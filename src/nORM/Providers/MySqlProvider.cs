@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Core;
+using nORM.Internal;
 using nORM.Mapping;
 
 #nullable enable
@@ -84,7 +85,7 @@ namespace nORM.Providers
             {
                 cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TEMPORARY TABLE {tempTableName} ({colDefs})";
-                await cmd.ExecuteNonQueryAsync(ct);
+                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
             }
 
             var tempMapping = new TableMapping(m.Type, this, ctx, null) { EscTable = tempTableName };
@@ -96,7 +97,7 @@ namespace nORM.Providers
             {
                 cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
                 cmd.CommandText = $"UPDATE {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause} SET {setClause}";
-                var updatedCount = await cmd.ExecuteNonQueryAsync(ct);
+                var updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, updatedCount, sw.Elapsed);
                 return updatedCount;
             }

@@ -93,7 +93,7 @@ namespace nORM.Query
             object result;
             if (plan.IsScalar)
             {
-                var scalarResult = await cmd.ExecuteScalarAsync(ct);
+                var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct);
                 _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                 if (scalarResult == null || scalarResult is DBNull) return default(TResult)!;
                 var resultType = typeof(TResult);
@@ -136,7 +136,7 @@ namespace nORM.Query
                              plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
             TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
-            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
             while (await reader.ReadAsync(ct))
             {
                 var entity = plan.Materializer(reader);
@@ -182,7 +182,7 @@ namespace nORM.Query
 
             var childMaterializer = new QueryTranslator(_ctx).CreateMaterializer(childMap, childMap.Type);
             var children = new List<object>();
-            await using (var reader = await cmd.ExecuteReaderAsync(ct))
+            await using (var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct))
             {
                 while (await reader.ReadAsync(ct))
                 {
@@ -232,7 +232,7 @@ namespace nORM.Query
 
             var childMaterializer = new QueryTranslator(_ctx).CreateMaterializer(childMap, childMap.Type);
             var children = new List<object>();
-            await using (var reader = await cmd.ExecuteReaderAsync(ct))
+            await using (var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct))
             {
                 while (await reader.ReadAsync(ct))
                 {
