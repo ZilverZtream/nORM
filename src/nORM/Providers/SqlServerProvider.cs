@@ -104,7 +104,7 @@ namespace nORM.Providers
             {
                 cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TABLE {tempTableName} ({colDefs})";
-                await cmd.ExecuteNonQueryAsync(ct);
+                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
             }
 
             await BulkInsertInternalAsync(ctx, m, entities, tempTableName, ct);
@@ -115,7 +115,7 @@ namespace nORM.Providers
             {
                 cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
                 cmd.CommandText = $"UPDATE T1 SET {setClause} FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause}";
-                var updatedCount = await cmd.ExecuteNonQueryAsync(ct);
+                var updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, updatedCount, sw.Elapsed);
                 return updatedCount;
             }
@@ -172,7 +172,7 @@ namespace nORM.Providers
             {
                 cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TABLE {tempTableName} ({keyColDefs})";
-                await cmd.ExecuteNonQueryAsync(ct);
+                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
             }
 
             using (var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
@@ -204,7 +204,7 @@ namespace nORM.Providers
             {
                 cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
                 cmd.CommandText = $"DELETE T1 FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause}";
-                var deletedCount = await cmd.ExecuteNonQueryAsync(ct);
+                var deletedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, deletedCount, sw.Elapsed);
                 return deletedCount;
             }

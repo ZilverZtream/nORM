@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Internal;
+using nORM.Core;
+using nORM.Configuration;
+using nORM.Providers;
 
 #nullable enable
 
@@ -15,12 +19,17 @@ namespace nORM.Migration
     {
         private readonly DbConnection _connection;
         private readonly Assembly _migrationsAssembly;
+        private readonly DbContext? _context;
         private const string HistoryTableName = "__NormMigrationsHistory";
 
-        public SqlServerMigrationRunner(DbConnection connection, Assembly migrationsAssembly)
+        public SqlServerMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null)
         {
             _connection = connection;
             _migrationsAssembly = migrationsAssembly;
+            if (options != null && options.CommandInterceptors.Count > 0)
+            {
+                _context = new DbContext(connection, new SqlServerProvider(), options);
+            }
         }
 
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
@@ -73,7 +82,7 @@ namespace nORM.Migration
             cmd.AddParam("@Version", migration.Version);
             cmd.AddParam("@Name", migration.Name);
             cmd.AddParam("@AppliedOn", DateTime.UtcNow);
-            await cmd.ExecuteNonQueryAsync(ct);
+            await ExecuteNonQueryAsync(cmd, ct);
         }
 
         private async Task<HashSet<long>> GetAppliedMigrationVersionsAsync(CancellationToken ct)
@@ -83,7 +92,7 @@ namespace nORM.Migration
             cmd.CommandText = $"SELECT [Version] FROM [{HistoryTableName}]";
             try
             {
-                await using var reader = await cmd.ExecuteReaderAsync(ct);
+                await using var reader = await ExecuteReaderAsync(cmd, ct);
                 while (await reader.ReadAsync(ct))
                 {
                     versions.Add(reader.GetInt64(0));
@@ -100,7 +109,13 @@ namespace nORM.Migration
         {
             await using var cmd = _connection.CreateCommand();
             cmd.CommandText = $"IF OBJECT_ID(N'{HistoryTableName}', N'U') IS NULL CREATE TABLE [{HistoryTableName}] (Version BIGINT PRIMARY KEY, Name NVARCHAR(255) NOT NULL, AppliedOn DATETIME2 NOT NULL);";
-            await cmd.ExecuteNonQueryAsync(ct);
+            await ExecuteNonQueryAsync(cmd, ct);
         }
+
+        private Task<int> ExecuteNonQueryAsync(DbCommand cmd, CancellationToken ct)
+            => _context != null ? cmd.ExecuteNonQueryWithInterceptionAsync(_context, ct) : cmd.ExecuteNonQueryAsync(ct);
+
+        private Task<DbDataReader> ExecuteReaderAsync(DbCommand cmd, CancellationToken ct)
+            => _context != null ? cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct) : cmd.ExecuteReaderAsync(ct);
     }
 }
