@@ -80,12 +80,11 @@ namespace nORM.Core
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
                 var anyExpression = Expression.Call(
-                    typeof(Queryable), 
-                    nameof(Queryable.Any), 
-                    new[] { typeof(T) }, 
+                    typeof(Queryable),
+                    nameof(Queryable.Any),
+                    new[] { typeof(T) },
                     source.Expression);
-                var result = await normProvider.ExecuteAsync<int>(anyExpression, ct);
-                return result > 0;
+                return await normProvider.ExecuteAsync<bool>(anyExpression, ct);
             }
             
             throw new InvalidOperationException(
