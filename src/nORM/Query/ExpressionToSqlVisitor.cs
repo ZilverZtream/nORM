@@ -8,6 +8,7 @@ using System.Text;
 using nORM.Core;
 using nORM.Mapping;
 using nORM.Providers;
+using nORM.Internal;
 
 #nullable enable
 
@@ -104,7 +105,7 @@ namespace nORM.Query
                         if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
                         {
                             var containsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _params[containsParam] = $"%{EscapeLikePattern(cs)}%";
+                            _params[containsParam] = $"%{cs.EscapeLike()}%";
                             _sql.Append(containsParam).Append(" ESCAPE '\\'");
                         }
                         else
@@ -117,7 +118,7 @@ namespace nORM.Query
                         if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
                         {
                             var startsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _params[startsParam] = $"{EscapeLikePattern(ss)}%";
+                            _params[startsParam] = $"{ss.EscapeLike()}%";
                             _sql.Append(startsParam).Append(" ESCAPE '\\'");
                         }
                         else
@@ -130,7 +131,7 @@ namespace nORM.Query
                         if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
                         {
                             var endsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _params[endsParam] = $"%{EscapeLikePattern(es)}";
+                            _params[endsParam] = $"%{es.EscapeLike()}";
                             _sql.Append(endsParam).Append(" ESCAPE '\\'");
                         }
                         else
@@ -182,10 +183,5 @@ namespace nORM.Query
             return true;
         }
 
-        private static string EscapeLikePattern(string value) =>
-            value
-                .Replace("\\", "\\\\")
-                .Replace("%", "\\%")
-                .Replace("_", "\\_");
     }
 }
