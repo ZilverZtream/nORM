@@ -57,11 +57,40 @@ namespace nORM.Providers
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
             if (!cols.Any()) return 0;
 
+            var npgConnType = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
+            if (npgConnType != null && npgConnType.IsInstanceOfType(ctx.Connection))
+            {
+                var copySql = $"COPY {m.EscTable} ({string.Join(", ", cols.Select(c => c.EscCol))}) FROM STDIN (FORMAT BINARY)";
+                var beginMethod = ctx.Connection.GetType().GetMethod("BeginBinaryImport", new[] { typeof(string) });
+                var importerObj = beginMethod?.Invoke(ctx.Connection, new object[] { copySql });
+                if (importerObj == null) throw new InvalidOperationException("BeginBinaryImport not available");
+                try
+                {
+                    dynamic importer = importerObj;
+                    foreach (var entity in entityList)
+                    {
+                        importer.StartRow();
+                        foreach (var col in cols)
+                        {
+                            var val = col.Getter(entity);
+                            if (val == null) importer.WriteNull();
+                            else importer.Write(val);
+                        }
+                    }
+                    await importer.CompleteAsync(ct);
+                }
+                finally
+                {
+                    if (importerObj is IAsyncDisposable iad) await iad.DisposeAsync();
+                    else if (importerObj is IDisposable id) id.Dispose();
+                }
+                ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, entityList.Count, sw.Elapsed);
+                return entityList.Count;
+            }
+
             var recordsAffected = 0;
-            
-            // PostgreSQL supports large batch sizes efficiently
             var batchSize = CalculateOptimalBatchSize(cols.Length);
-            
+
             await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
             try
             {
@@ -70,7 +99,7 @@ namespace nORM.Providers
                     var batch = entityList.Skip(i).Take(batchSize).ToList();
                     recordsAffected += await ExecutePostgresBatchInsert(ctx.Connection, transaction, m, cols, batch, ct);
                 }
-                
+
                 await transaction.CommitAsync(ct);
             }
             catch
@@ -202,6 +231,36 @@ namespace nORM.Providers
         {
             var entityList = entities.ToList();
             var cols = mapping.Columns.Where(c => !c.IsDbGenerated).ToArray();
+            var npgConnType = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
+            if (npgConnType != null && npgConnType.IsInstanceOfType(ctx.Connection))
+            {
+                var copySql = $"COPY {mapping.EscTable} ({string.Join(", ", cols.Select(c => c.EscCol))}) FROM STDIN (FORMAT BINARY)";
+                var beginMethod = ctx.Connection.GetType().GetMethod("BeginBinaryImport", new[] { typeof(string) });
+                var importerObj = beginMethod?.Invoke(ctx.Connection, new object[] { copySql });
+                if (importerObj == null) throw new InvalidOperationException("BeginBinaryImport not available");
+                try
+                {
+                    dynamic importer = importerObj;
+                    foreach (var entity in entityList)
+                    {
+                        importer.StartRow();
+                        foreach (var col in cols)
+                        {
+                            var val = col.Getter(entity);
+                            if (val == null) importer.WriteNull();
+                            else importer.Write(val);
+                        }
+                    }
+                    await importer.CompleteAsync(ct);
+                }
+                finally
+                {
+                    if (importerObj is IAsyncDisposable iad) await iad.DisposeAsync();
+                    else if (importerObj is IDisposable id) id.Dispose();
+                }
+                return entityList.Count;
+            }
+
             var batchSize = CalculateOptimalBatchSize(cols.Length);
             var totalInserted = 0;
 
@@ -209,11 +268,11 @@ namespace nORM.Providers
             {
                 var batch = entityList.Skip(i).Take(batchSize).ToList();
                 var sql = BuildPostgresBatchInsertSql(mapping, cols, batch.Count).Replace(" ON CONFLICT DO NOTHING", "");
-                
+
                 await using var cmd = ctx.Connection.CreateCommand();
                 cmd.Transaction = transaction;
                 cmd.CommandText = sql;
-                
+
                 var paramIndex = 0;
                 foreach (var entity in batch)
                 {
@@ -222,7 +281,7 @@ namespace nORM.Providers
                         cmd.AddParam($"{ParamPrefix}p{paramIndex++}", col.Getter(entity) ?? DBNull.Value);
                     }
                 }
-                
+
                 totalInserted += await cmd.ExecuteNonQueryAsync(ct);
             }
 
