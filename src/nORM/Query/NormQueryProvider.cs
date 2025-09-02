@@ -259,8 +259,82 @@ namespace nORM.Query
 
         private QueryPlan GetPlan(Expression expression)
         {
-            var key = new QueryPlanCacheKey(expression, _ctx.Options.TenantProvider?.GetCurrentTenantId());
-            return _planCache.GetOrAdd(key, _ => new QueryTranslator(_ctx).Translate(expression));
+            var filtered = ApplyGlobalFilters(expression);
+            var key = new QueryPlanCacheKey(filtered, _ctx.Options.TenantProvider?.GetCurrentTenantId());
+            return _planCache.GetOrAdd(key, _ => new QueryTranslator(_ctx).Translate(filtered));
+        }
+
+        private Expression ApplyGlobalFilters(Expression expression)
+        {
+            var entityType = GetElementType(expression);
+
+            if (_ctx.Options.GlobalFilters.Count > 0)
+            {
+                foreach (var kvp in _ctx.Options.GlobalFilters)
+                {
+                    if (!kvp.Key.IsAssignableFrom(entityType)) continue;
+                    foreach (var filter in kvp.Value)
+                    {
+                        LambdaExpression lambda;
+                        if (filter.Parameters.Count == 2)
+                        {
+                            var replacer = new ParameterReplacer(filter.Parameters[0], Expression.Constant(_ctx));
+                            var body = replacer.Visit(filter.Body)!;
+                            lambda = Expression.Lambda(body, filter.Parameters[1]);
+                        }
+                        else
+                        {
+                            lambda = filter;
+                        }
+
+                        expression = Expression.Call(
+                            typeof(Queryable),
+                            nameof(Queryable.Where),
+                            new[] { entityType },
+                            expression,
+                            Expression.Quote(lambda));
+                    }
+                }
+            }
+
+            if (_ctx.Options.TenantProvider != null)
+            {
+                var map = _ctx.GetMapping(entityType);
+                var tenantCol = map.Columns.FirstOrDefault(c => c.PropName == _ctx.Options.TenantColumnName);
+                if (tenantCol != null)
+                {
+                    var param = Expression.Parameter(entityType, "t");
+                    var prop = Expression.Property(param, tenantCol.Prop.Name);
+                    var tenantId = _ctx.Options.TenantProvider.GetCurrentTenantId();
+                    var constant = Expression.Constant(tenantId, tenantCol.Prop.PropertyType);
+                    var body = Expression.Equal(prop, constant);
+                    var lambda = Expression.Lambda(body, param);
+                    expression = Expression.Call(
+                        typeof(Queryable),
+                        nameof(Queryable.Where),
+                        new[] { entityType },
+                        expression,
+                        Expression.Quote(lambda));
+                }
+            }
+
+            return expression;
+        }
+
+        private static Type GetElementType(Expression queryExpression)
+        {
+            var type = queryExpression.Type;
+            if (type.IsGenericType)
+            {
+                var args = type.GetGenericArguments();
+                if (args.Length > 0) return args[0];
+            }
+
+            var iface = type.GetInterfaces()
+                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
+            if (iface != null) return iface.GetGenericArguments()[0];
+
+            throw new ArgumentException($"Cannot determine element type from expression of type {type}");
         }
     }
 }
