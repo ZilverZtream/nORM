@@ -129,12 +129,11 @@ namespace nORM.Navigation
                 }
                 else
                 {
-                    // For reference properties, we'll load on first access through a proxy
-                    // Initially set to null, will be loaded when accessed
-                    if (navProp.Property.GetValue(entity) == null)
-                    {
-                        context.MarkAsUnloaded(navProp.Property.Name);
-                    }
+                    // Create lazy reference
+                    var referenceType = typeof(LazyNavigationReference<>).MakeGenericType(navProp.TargetType);
+                    var reference = Activator.CreateInstance(referenceType, entity, navProp.Property, context);
+                    navProp.Property.SetValue(entity, reference);
+                    context.MarkAsUnloaded(navProp.Property.Name);
                 }
             }
         }
@@ -152,18 +151,29 @@ namespace nORM.Navigation
                 {
                     if (prop.GetCustomAttribute<NotMappedAttribute>() != null)
                         continue;
-                        
+
                     // Check if it's a navigation property
                     if (IsNavigationProperty(prop))
                     {
-                        var isCollection = typeof(IEnumerable).IsAssignableFrom(prop.PropertyType) && 
+                        var isCollection = typeof(IEnumerable).IsAssignableFrom(prop.PropertyType) &&
                                          prop.PropertyType != typeof(string) &&
                                          prop.PropertyType.IsGenericType;
-                        
-                        var targetType = isCollection 
-                            ? prop.PropertyType.GetGenericArguments()[0]
-                            : prop.PropertyType;
-                            
+
+                        Type targetType;
+                        if (isCollection)
+                        {
+                            targetType = prop.PropertyType.GetGenericArguments()[0];
+                        }
+                        else if (prop.PropertyType.IsGenericType &&
+                                 prop.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
+                        {
+                            targetType = prop.PropertyType.GetGenericArguments()[0];
+                        }
+                        else
+                        {
+                            targetType = prop.PropertyType;
+                        }
+
                         properties.Add(new NavigationPropertyInfo(prop, targetType, isCollection));
                     }
                 }
@@ -242,15 +252,36 @@ namespace nORM.Navigation
             {
                 // Reference navigation property (one-to-one)
                 var result = await ExecuteSingleQueryAsync(context.DbContext, dependentMapping, relation.ForeignKey, principalKeyValue, relation.DependentType, ct);
-                property.SetValue(entity, result);
+
+                if (property.PropertyType.IsGenericType &&
+                    property.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
+                {
+                    var reference = property.GetValue(entity);
+                    reference?.GetType().GetProperty("Value")?.SetValue(reference, result);
+                }
+                else
+                {
+                    property.SetValue(entity, result);
+                }
             }
         }
 
         private static async Task LoadInferredRelationshipAsync(object entity, PropertyInfo property, NavigationContext context, CancellationToken ct)
         {
-            var targetType = property.PropertyType.IsGenericType && typeof(IEnumerable).IsAssignableFrom(property.PropertyType)
-                ? property.PropertyType.GetGenericArguments()[0]
-                : property.PropertyType;
+            Type targetType;
+            if (property.PropertyType.IsGenericType && typeof(IEnumerable).IsAssignableFrom(property.PropertyType))
+            {
+                targetType = property.PropertyType.GetGenericArguments()[0];
+            }
+            else if (property.PropertyType.IsGenericType &&
+                     property.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
+            {
+                targetType = property.PropertyType.GetGenericArguments()[0];
+            }
+            else
+            {
+                targetType = property.PropertyType;
+            }
                 
             var targetMapping = context.DbContext.GetMapping(targetType);
             var sourceMapping = context.DbContext.GetMapping(context.EntityType);
@@ -274,21 +305,31 @@ namespace nORM.Navigation
                 {
                     // Collection
                     var results = await ExecuteCollectionQueryAsync(context.DbContext, targetMapping, foreignKeyColumn, sourcePrimaryKeyValue, targetType, ct);
-                    
+
                     var collectionType = typeof(List<>).MakeGenericType(targetType);
                     var collection = (IList)Activator.CreateInstance(collectionType)!;
                     foreach (var item in results)
                     {
                         collection.Add(item);
                     }
-                    
+
                     property.SetValue(entity, collection);
                 }
                 else
                 {
                     // Reference
                     var result = await ExecuteSingleQueryAsync(context.DbContext, targetMapping, foreignKeyColumn, sourcePrimaryKeyValue, targetType, ct);
-                    property.SetValue(entity, result);
+
+                    if (property.PropertyType.IsGenericType &&
+                        property.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
+                    {
+                        var reference = property.GetValue(entity);
+                        reference?.GetType().GetProperty("Value")?.SetValue(reference, result);
+                    }
+                    else
+                    {
+                        property.SetValue(entity, result);
+                    }
                 }
             }
         }
@@ -509,18 +550,17 @@ namespace nORM.Navigation
                 {
                     NavigationPropertyExtensions.LoadNavigationPropertyAsync(_parent, _property, _context, CancellationToken.None)
                         .GetAwaiter().GetResult();
-                    _value = (T?)_property.GetValue(_parent);
-                    _isLoaded = true;
                 }
                 return _value;
             }
             set
             {
                 _value = value;
-                _property.SetValue(_parent, value);
                 _isLoaded = true;
                 _context.MarkAsLoaded(_property.Name);
             }
         }
+
+        public static implicit operator T?(LazyNavigationReference<T> reference) => reference.Value;
     }
 }
