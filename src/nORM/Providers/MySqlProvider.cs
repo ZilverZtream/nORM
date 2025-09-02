@@ -21,7 +21,7 @@ namespace nORM.Providers
             if (limit.HasValue) sb.Append($" LIMIT {offset ?? 0}, {limit}");
         }
         
-        public override string GetIdentityRetrievalString() => "; SELECT LAST_INSERT_ID();";
+        public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT LAST_INSERT_ID();";
         
         public override System.Data.Common.DbParameter CreateParameter(string name, object? value)
         {
