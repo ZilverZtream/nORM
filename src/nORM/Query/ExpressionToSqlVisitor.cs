@@ -18,6 +18,7 @@ namespace nORM.Query
         private readonly DbContext _ctx;
         private readonly TableMapping _mapping;
         private readonly DatabaseProvider _provider;
+        private readonly Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _parameterMappings;
         private readonly ParameterExpression _parameter;
         private readonly string _tableAlias;
         private readonly StringBuilder _sql = new();
@@ -25,13 +26,18 @@ namespace nORM.Query
         private int _paramIndex = 0;
 
         public ExpressionToSqlVisitor(DbContext ctx, TableMapping mapping, DatabaseProvider provider,
-                                      ParameterExpression parameter, string tableAlias)
+                                      ParameterExpression parameter, string tableAlias,
+                                      Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated = null)
         {
             _ctx = ctx;
             _mapping = mapping;
             _provider = provider;
             _parameter = parameter;
             _tableAlias = tableAlias;
+            _parameterMappings = correlated != null
+                ? new(correlated)
+                : new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+            _parameterMappings[parameter] = (mapping, tableAlias);
         }
 
         public string Translate(Expression expression)
@@ -63,12 +69,12 @@ namespace nORM.Query
 
         protected override Expression VisitMember(MemberExpression node)
         {
-            if (node.Expression == _parameter)
+            if (node.Expression is ParameterExpression pe && _parameterMappings.TryGetValue(pe, out var info))
             {
-                var column = _mapping.Columns.FirstOrDefault(c => c.Prop.Name == node.Member.Name);
+                var column = info.Mapping.Columns.FirstOrDefault(c => c.Prop.Name == node.Member.Name);
                 if (column != null)
                 {
-                    _sql.Append($"{_tableAlias}.{column.EscCol}");
+                    _sql.Append($"{info.Alias}.{column.EscCol}");
                     return node;
                 }
             }
@@ -141,12 +147,56 @@ namespace nORM.Query
                     default:
                         throw new NotSupportedException($"String method '{node.Method.Name}' not supported.");
                 }
+                return node;
             }
-            else
+            if (node.Method.DeclaringType == typeof(Queryable))
             {
-                return base.VisitMethodCall(node);
+                switch (node.Method.Name)
+                {
+                    case nameof(Queryable.Any):
+                        BuildExists(node.Arguments[0], node.Arguments.Count > 1 ? StripQuotes(node.Arguments[1]) as LambdaExpression : null, negate:false);
+                        return node;
+                    case nameof(Queryable.All):
+                        var pred = StripQuotes(node.Arguments[1]) as LambdaExpression;
+                        if (pred == null) throw new ArgumentException("All requires a predicate");
+                        var param = pred.Parameters[0];
+                        var notBody = Expression.Not(pred.Body);
+                        var lambda = Expression.Lambda(notBody, param);
+                        BuildExists(node.Arguments[0], lambda, negate:true);
+                        return node;
+                    case nameof(Queryable.Contains):
+                        var source = node.Arguments[0];
+                        var elementType = GetElementType(source);
+                        var p = Expression.Parameter(elementType, "x");
+                        var eq = Expression.Equal(p, Expression.Convert(node.Arguments[1], elementType));
+                        var l = Expression.Lambda(eq, p);
+                        BuildExists(source, l, negate:false);
+                        return node;
+                    default:
+                        throw new NotSupportedException($"Queryable method '{node.Method.Name}' not supported.");
+                }
             }
-            return node;
+            return base.VisitMethodCall(node);
+        }
+
+        private void BuildExists(Expression source, LambdaExpression? predicate, bool negate)
+        {
+            var elementType = GetElementType(source);
+            var mapping = _ctx.GetMapping(elementType);
+            var alias = "T" + _parameterMappings.Count;
+            var builder = new StringBuilder();
+            builder.Append($"SELECT 1 FROM {mapping.EscTable} {alias} ");
+            if (predicate != null)
+            {
+                var visitor = new ExpressionToSqlVisitor(_ctx, mapping, _provider, predicate.Parameters[0], alias, _parameterMappings);
+                var predSql = visitor.Translate(predicate.Body);
+                foreach (var kvp in visitor.GetParameters())
+                    _params[kvp.Key] = kvp.Value;
+                builder.Append($"WHERE ({predSql})");
+            }
+            _sql.Append(negate ? "NOT EXISTS(" : "EXISTS(");
+            _sql.Append(builder);
+            _sql.Append(")");
         }
 
         public Dictionary<string, object> GetParameters() => _params;
@@ -180,6 +230,25 @@ namespace nORM.Query
 
             value = current;
             return true;
+        }
+
+        private static Expression StripQuotes(Expression e)
+            => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
+
+        private static Type GetElementType(Expression queryExpression)
+        {
+            var type = queryExpression.Type;
+            if (type.IsGenericType)
+            {
+                var args = type.GetGenericArguments();
+                if (args.Length > 0) return args[0];
+            }
+
+            var iface = type.GetInterfaces()
+                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
+            if (iface != null) return iface.GetGenericArguments()[0];
+
+            throw new ArgumentException($"Cannot determine element type from expression of type {type}");
         }
 
     }
