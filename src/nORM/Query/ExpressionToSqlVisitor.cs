@@ -8,7 +8,6 @@ using System.Text;
 using nORM.Core;
 using nORM.Mapping;
 using nORM.Providers;
-using nORM.Internal;
 
 #nullable enable
 
@@ -105,8 +104,8 @@ namespace nORM.Query
                         if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
                         {
                             var containsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _params[containsParam] = $"%{cs.EscapeLike()}%";
-                            _sql.Append(containsParam).Append(" ESCAPE '\\'");
+                            _params[containsParam] = $"%{_provider.EscapeLikePattern(cs)}%";
+                            _sql.Append(containsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
                         }
                         else
                         {
@@ -118,8 +117,8 @@ namespace nORM.Query
                         if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
                         {
                             var startsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _params[startsParam] = $"{ss.EscapeLike()}%";
-                            _sql.Append(startsParam).Append(" ESCAPE '\\'");
+                            _params[startsParam] = $"{_provider.EscapeLikePattern(ss)}%";
+                            _sql.Append(startsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
                         }
                         else
                         {
@@ -131,8 +130,8 @@ namespace nORM.Query
                         if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
                         {
                             var endsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _params[endsParam] = $"%{es.EscapeLike()}";
-                            _sql.Append(endsParam).Append(" ESCAPE '\\'");
+                            _params[endsParam] = $"%{_provider.EscapeLikePattern(es)}";
+                            _sql.Append(endsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
                         }
                         else
                         {
