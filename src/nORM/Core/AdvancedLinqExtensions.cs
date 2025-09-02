@@ -286,61 +286,50 @@ namespace nORM.Core
         /// </summary>
         private static Expression CreateAggregateExpression(Expression sourceExpression, LambdaExpression selector, string function)
         {
-            // Use standard LINQ Queryable methods that the query translator can understand
-            var candidates = typeof(Queryable).GetMethods()
-                .Where(m => m.Name == function &&
+            var sourceType = sourceExpression.Type.GetGenericArguments()[0];
+
+            MethodInfo genericMethod = function switch
+            {
+                "Sum" => GetAggregateMethod(SumMethods, selector.ReturnType).MakeGenericMethod(sourceType),
+                "Average" => GetAggregateMethod(AverageMethods, selector.ReturnType).MakeGenericMethod(sourceType),
+                "Min" => MinMethod.MakeGenericMethod(sourceType, selector.ReturnType),
+                "Max" => MaxMethod.MakeGenericMethod(sourceType, selector.ReturnType),
+                _ => throw new InvalidOperationException($"Unsupported aggregate function '{function}'.")
+            };
+
+            return Expression.Call(null, genericMethod, sourceExpression, selector);
+        }
+
+        private static MethodInfo GetAggregateMethod(IReadOnlyDictionary<Type, MethodInfo> cache, Type selectorType)
+        {
+            if (!cache.TryGetValue(selectorType, out var method))
+            {
+                throw new InvalidOperationException($"No suitable Queryable overload found for selector type {selectorType}.");
+            }
+            return method;
+        }
+
+        private static readonly IReadOnlyDictionary<Type, MethodInfo> SumMethods = BuildSelectorMethods(nameof(Queryable.Sum));
+        private static readonly IReadOnlyDictionary<Type, MethodInfo> AverageMethods = BuildSelectorMethods(nameof(Queryable.Average));
+        private static readonly MethodInfo MinMethod = BuildMinMaxMethod(nameof(Queryable.Min));
+        private static readonly MethodInfo MaxMethod = BuildMinMaxMethod(nameof(Queryable.Max));
+
+        private static IReadOnlyDictionary<Type, MethodInfo> BuildSelectorMethods(string name)
+            => typeof(Queryable).GetMethods()
+                .Where(m => m.Name == name &&
                             m.GetParameters().Length == 2 &&
                             m.GetParameters()[1].ParameterType.IsGenericType &&
                             m.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(Expression<>))
-                .ToList();
+                .ToDictionary(
+                    m => m.GetParameters()[1].ParameterType.GetGenericArguments()[0].GetGenericArguments()[1],
+                    m => m);
 
-            // Get the source element type
-            var sourceType = sourceExpression.Type.GetGenericArguments()[0];
-
-            // Attempt to find a method that matches the selector type
-            MethodInfo? genericMethod = null;
-            foreach (var candidate in candidates)
-            {
-                try
-                {
-                    MethodInfo constructed;
-                    var genericArgs = candidate.GetGenericArguments();
-                    if (genericArgs.Length == 1)
-                    {
-                        constructed = candidate.MakeGenericMethod(sourceType);
-                    }
-                    else if (genericArgs.Length == 2)
-                    {
-                        constructed = candidate.MakeGenericMethod(sourceType, selector.ReturnType);
-                    }
-                    else
-                    {
-                        continue;
-                    }
-
-                    if (constructed.GetParameters()[1].ParameterType == selector.Type)
-                    {
-                        genericMethod = constructed;
-                        break;
-                    }
-                }
-                catch (ArgumentException)
-                {
-                    // Skip methods that cannot be constructed with the provided types
-                }
-            }
-
-            if (genericMethod is null)
-            {
-                throw new InvalidOperationException($"No suitable Queryable.{function} overload found for selector type {selector.ReturnType}.");
-            }
-
-            return Expression.Call(
-                null,
-                genericMethod,
-                sourceExpression,
-                selector);
-        }
+        private static MethodInfo BuildMinMaxMethod(string name)
+            => typeof(Queryable).GetMethods()
+                .Single(m => m.Name == name &&
+                             m.GetParameters().Length == 2 &&
+                             m.GetParameters()[1].ParameterType.IsGenericType &&
+                             m.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(Expression<>));
 
         #endregion
     }
