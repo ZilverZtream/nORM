@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Data;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -14,6 +16,7 @@ namespace nORM.Providers
 {
     public sealed class MySqlProvider : DatabaseProvider
     {
+        private static readonly ConcurrentDictionary<Type, DataTable> _tableSchemas = new();
         public override string Escape(string id) => $"`{id}`";
         
         public override void ApplyPaging(StringBuilder sb, int? limit, int? offset)
@@ -41,8 +44,32 @@ namespace nORM.Providers
             }
         }
         
-        public override Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> e, CancellationToken ct) where T : class
-            => base.BulkInsertAsync(ctx, m, e, ct);
+        public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
+        {
+            var sw = Stopwatch.StartNew();
+            var entityList = entities.ToList();
+            if (!entityList.Any()) return 0;
+
+            var bulkCopyType = Type.GetType("MySqlConnector.MySqlBulkCopy, MySqlConnector");
+            if (bulkCopyType != null && ctx.Connection.GetType().FullName == "MySqlConnector.MySqlConnection")
+            {
+                dynamic bulkCopy = Activator.CreateInstance(bulkCopyType, ctx.Connection)!;
+                bulkCopy.DestinationTableName = m.EscTable.Trim('`');
+
+                var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
+                using var table = GetDataTable(m, insertableCols);
+                foreach (var entity in entityList)
+                    table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
+
+                await bulkCopy.WriteToServerAsync(table, ct);
+                ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, table.Rows.Count, sw.Elapsed);
+                return table.Rows.Count;
+            }
+
+            var affected = await base.BulkInsertAsync(ctx, m, entityList, ct);
+            ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, affected, sw.Elapsed);
+            return affected;
+        }
 
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
@@ -61,7 +88,7 @@ namespace nORM.Providers
             }
 
             var tempMapping = new TableMapping(m.Type, this, ctx, null) { EscTable = tempTableName };
-            await base.BulkInsertAsync(ctx, tempMapping, entities, ct);
+            await BulkInsertAsync(ctx, tempMapping, entities, ct);
 
             var setClause = string.Join(", ", nonKeyCols.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
             var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
@@ -90,6 +117,21 @@ namespace nORM.Providers
             if (t == typeof(Guid)) return "CHAR(36)";
             if (t == typeof(byte[])) return "BLOB";
             return "TEXT";
+        }
+
+        private static DataTable GetDataTable(TableMapping m, List<Column> cols)
+        {
+            var schema = _tableSchemas.GetOrAdd(m.Type, _ =>
+            {
+                var dt = new DataTable();
+                foreach (var c in cols)
+                {
+                    var propType = c.Prop.PropertyType;
+                    dt.Columns.Add(c.PropName, Nullable.GetUnderlyingType(propType) ?? propType);
+                }
+                return dt;
+            });
+            return schema.Clone();
         }
     }
 }
