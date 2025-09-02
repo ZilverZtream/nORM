@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using System.Data.Common;
 using System.Reflection;
 
 #nullable enable
@@ -22,6 +23,7 @@ namespace nORM.Internal
         public static readonly MethodInfo GetGuid = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetGuid))!;
         public static readonly MethodInfo GetString = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetString))!;
         public static readonly MethodInfo GetBytes = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetValue))!;
+        public static readonly MethodInfo GetFieldValue = typeof(DbDataReader).GetMethod(nameof(DbDataReader.GetFieldValue))!;
 
         internal static MethodInfo GetReaderMethod(Type type)
         {

@@ -145,10 +145,10 @@ namespace nORM.Query
 
             if (targetType.IsPrimitive || targetType == typeof(decimal) || targetType == typeof(string))
             {
+                var fieldValue = Methods.GetFieldValue.MakeGenericMethod(targetType);
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldc_I4_0);
-                il.Emit(OpCodes.Callvirt, Methods.GetReaderMethod(targetType));
-                if (Methods.GetReaderMethod(targetType).Name == "GetValue") il.Emit(OpCodes.Unbox_Any, targetType);
+                il.Emit(OpCodes.Callvirt, fieldValue);
             }
             else if (projection?.Body is NewExpression newExpr)
             {
@@ -215,7 +215,7 @@ namespace nORM.Query
                     il.Emit(OpCodes.Ldc_I4, i);
                     var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
                     il.Emit(OpCodes.Callvirt, readerMethod);
-                    if (readerMethod.Name == "GetValue") il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
+                    if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
                     il.Emit(OpCodes.Callvirt, col.SetterMethod);
                     il.MarkLabel(endOfBlock);
                 }
@@ -251,7 +251,7 @@ namespace nORM.Query
                 il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
                 var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
                 il.Emit(OpCodes.Callvirt, readerMethod);
-                if (readerMethod.Name == "GetValue") il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
+                if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
                 il.Emit(OpCodes.Callvirt, col.SetterMethod);
                 il.MarkLabel(endOfBlock);
             }
@@ -272,7 +272,7 @@ namespace nORM.Query
             il.Emit(OpCodes.Ldc_I4, columnIndex);
             var readerMethod = Methods.GetReaderMethod(column.Prop.PropertyType);
             il.Emit(OpCodes.Callvirt, readerMethod);
-            if (readerMethod.Name == "GetValue") il.Emit(OpCodes.Unbox_Any, column.Prop.PropertyType);
+            if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, column.Prop.PropertyType);
             il.Emit(OpCodes.Stloc, localVar);
             il.MarkLabel(endOfBlock);
         }
