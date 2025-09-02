@@ -20,22 +20,25 @@ namespace nORM.Mapping
         public readonly Action<object, object?> Setter;
         public readonly MethodInfo SetterMethod;
 
-        public Column(PropertyInfo pi, DatabaseProvider p, IEntityTypeConfiguration? fluentConfig)
+        public Column(PropertyInfo pi, DatabaseProvider p, IEntityTypeConfiguration? fluentConfig, string? prefix = null,
+            Func<object, object?>? getterOverride = null, Action<object, object?>? setterOverride = null,
+            MethodInfo? setterMethodOverride = null)
         {
             Prop = pi;
-            PropName = pi.Name;
+            PropName = (prefix != null ? prefix + "_" : "") + pi.Name;
 
             var fluentColName = fluentConfig?.ColumnNames.TryGetValue(pi, out var name) == true ? name : null;
-            EscCol = p.Escape(fluentColName ?? pi.GetCustomAttribute<ColumnAttribute>()?.Name ?? pi.Name);
+            var colName = fluentColName ?? pi.GetCustomAttribute<ColumnAttribute>()?.Name ?? PropName;
+            EscCol = p.Escape(colName);
 
             IsKey = fluentConfig?.KeyProperty == pi || pi.GetCustomAttribute<KeyAttribute>() != null;
             IsTimestamp = pi.GetCustomAttribute<TimestampAttribute>() != null;
             IsDbGenerated = pi.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity;
             ForeignKeyPrincipalTypeName = pi.GetCustomAttribute<ForeignKeyAttribute>()?.Name;
 
-            Getter = CreateGetterDelegate(pi);
-            Setter = CreateSetterDelegate(pi);
-            SetterMethod = pi.GetSetMethod()!;
+            Getter = getterOverride ?? CreateGetterDelegate(pi);
+            Setter = setterOverride ?? CreateSetterDelegate(pi);
+            SetterMethod = setterMethodOverride ?? pi.GetSetMethod()!;
         }
 
         public static Func<object, object?> CreateGetterDelegate(PropertyInfo property)

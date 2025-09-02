@@ -8,6 +8,7 @@ using System.Reflection;
 using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
+using System.Linq.Expressions;
 
 #nullable enable
 
@@ -28,17 +29,86 @@ namespace nORM.Mapping
             Type = t;
             Provider = p;
 
-            var tableName = fluentConfig?.TableName ?? t.GetCustomAttribute<TableAttribute>()?.Name ?? t.Name;
-            EscTable = p.Escape(tableName);
+            var splitAttr = t.GetCustomAttribute<TableSplitAttribute>();
+            var splitType = fluentConfig?.TableSplitWith ?? splitAttr?.PrincipalType;
+            if (splitType != null)
+            {
+                var principal = ctx.GetMapping(splitType);
+                EscTable = principal.EscTable;
+            }
+            else
+            {
+                var tableName = fluentConfig?.TableName ?? t.GetCustomAttribute<TableAttribute>()?.Name ?? t.Name;
+                EscTable = p.Escape(tableName);
+            }
 
-            Columns = t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(x => x.CanRead && x.CanWrite && x.GetCustomAttribute<NotMappedAttribute>() == null)
-                .Select(x => new Column(x, p, fluentConfig)).ToArray();
+            var cols = new List<Column>();
+            foreach (var prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(x => x.CanRead && x.CanWrite && x.GetCustomAttribute<NotMappedAttribute>() == null))
+            {
+                OwnedNavigation? ownedNav = null;
+                fluentConfig?.OwnedNavigations.TryGetValue(prop, out ownedNav);
+                if (ownedNav != null || prop.PropertyType.GetCustomAttribute<OwnedAttribute>() != null)
+                {
+                    var ownedType = ownedNav?.OwnedType ?? prop.PropertyType;
+                    var ownedConfig = ownedNav?.Configuration;
+                    foreach (var sp in ownedType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                        .Where(x => x.CanRead && x.CanWrite && x.GetCustomAttribute<NotMappedAttribute>() == null))
+                    {
+                        var getter = CreateOwnedGetter(prop, sp);
+                        var setter = CreateOwnedSetter(prop, sp);
+                        cols.Add(new Column(sp, p, ownedConfig, prop.Name, getter, setter));
+                    }
+                }
+                else
+                {
+                    cols.Add(new Column(prop, p, fluentConfig));
+                }
+            }
+
+            Columns = cols.ToArray();
 
             KeyColumns = Columns.Where(c => c.IsKey).ToArray();
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
 
             DiscoverRelations(ctx);
+        }
+
+        private static Func<object, object?> CreateOwnedGetter(PropertyInfo owner, PropertyInfo owned)
+        {
+            var entityParam = Expression.Parameter(typeof(object), "e");
+            var castEntity = Expression.Convert(entityParam, owner.DeclaringType!);
+            var ownerAccess = Expression.Property(castEntity, owner);
+            var nullCheck = Expression.Equal(ownerAccess, Expression.Constant(null, owner.PropertyType));
+            var ownedAccess = Expression.Property(ownerAccess, owned);
+            Expression body = Expression.Condition(
+                nullCheck,
+                Expression.Constant(null, typeof(object)),
+                Expression.Convert(ownedAccess, typeof(object)));
+            return Expression.Lambda<Func<object, object?>>(body, entityParam).Compile();
+        }
+
+        private static Action<object, object?> CreateOwnedSetter(PropertyInfo owner, PropertyInfo owned)
+        {
+            var entityParam = Expression.Parameter(typeof(object), "e");
+            var valueParam = Expression.Parameter(typeof(object), "v");
+            var castEntity = Expression.Convert(entityParam, owner.DeclaringType!);
+            var ownerAccess = Expression.Property(castEntity, owner);
+            var ownerVar = Expression.Variable(owner.PropertyType, "ownedObj");
+
+            var assignBlock = Expression.Block(new[] { ownerVar },
+                Expression.Assign(ownerVar, ownerAccess),
+                Expression.IfThen(
+                    Expression.Equal(ownerVar, Expression.Constant(null, owner.PropertyType)),
+                    Expression.Block(
+                        Expression.Assign(ownerVar, Expression.New(owner.PropertyType)),
+                        Expression.Assign(ownerAccess, ownerVar)
+                    )
+                ),
+                Expression.Assign(Expression.Property(ownerVar, owned), Expression.Convert(valueParam, owned.PropertyType))
+            );
+
+            return Expression.Lambda<Action<object, object?>>(assignBlock, entityParam, valueParam).Compile();
         }
 
         private void DiscoverRelations(DbContext ctx)

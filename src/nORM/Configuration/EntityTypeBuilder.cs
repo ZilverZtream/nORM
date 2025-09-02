@@ -14,10 +14,14 @@ namespace nORM.Configuration
             public string? TableName { get; private set; }
             public PropertyInfo? KeyProperty { get; private set; }
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
+            public Type? TableSplitWith { get; private set; }
+            public Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; } = new();
 
             public void SetTableName(string name) => TableName = name;
             public void SetKey(PropertyInfo prop) => KeyProperty = prop;
             public void SetColumnName(PropertyInfo prop, string name) => ColumnNames[prop] = name;
+            public void SetTableSplit(Type principal) => TableSplitWith = principal;
+            public void AddOwned(PropertyInfo prop, IEntityTypeConfiguration? config) => OwnedNavigations[prop] = new OwnedNavigation(prop.PropertyType, config);
         }
 
         private readonly MappingConfiguration _config = new();
@@ -26,6 +30,12 @@ namespace nORM.Configuration
         public EntityTypeBuilder<TEntity> ToTable(string name)
         {
             _config.SetTableName(name);
+            return this;
+        }
+
+        public EntityTypeBuilder<TEntity> SharesTableWith<TPrincipal>()
+        {
+            _config.SetTableSplit(typeof(TPrincipal));
             return this;
         }
 
@@ -40,6 +50,15 @@ namespace nORM.Configuration
         {
             var prop = GetProperty(propertyExpression);
             return new PropertyBuilder(this, prop);
+        }
+
+        public EntityTypeBuilder<TEntity> OwnsOne<TOwned>(Expression<Func<TEntity, TOwned>> navigation, Action<EntityTypeBuilder<TOwned>>? buildAction = null) where TOwned : class
+        {
+            var prop = GetProperty(navigation);
+            var builder = new EntityTypeBuilder<TOwned>();
+            buildAction?.Invoke(builder);
+            _config.AddOwned(prop, builder.Configuration);
+            return this;
         }
 
         private PropertyInfo GetProperty(LambdaExpression expression)
