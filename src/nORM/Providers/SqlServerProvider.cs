@@ -28,7 +28,7 @@ namespace nORM.Providers
             }
         }
         
-        public override string GetIdentityRetrievalString() => "; SELECT SCOPE_IDENTITY();";
+        public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT SCOPE_IDENTITY();";
         
         public override System.Data.Common.DbParameter CreateParameter(string name, object? value)
         {
