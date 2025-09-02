@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Data;
 using System.Diagnostics;
 using System.Linq;
@@ -17,7 +16,7 @@ namespace nORM.Providers
 {
     public sealed class MySqlProvider : DatabaseProvider
     {
-        private static readonly ConcurrentDictionary<Type, DataTable> _tableSchemas = new();
+        private static readonly ConcurrentLruCache<Type, DataTable> _tableSchemas = new(maxSize: 100);
         public override string Escape(string id) => $"`{id}`";
         
         public override void ApplyPaging(StringBuilder sb, int? limit, int? offset)

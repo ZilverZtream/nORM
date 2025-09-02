@@ -24,8 +24,7 @@ namespace nORM.Navigation
     public static class NavigationPropertyExtensions
     {
         private static readonly ConditionalWeakTable<object, NavigationContext> _navigationContexts = new();
-        private static readonly Dictionary<Type, List<NavigationPropertyInfo>> _navigationPropertyCache = new();
-        private static readonly object _cacheLock = new object();
+        private static readonly ConcurrentLruCache<Type, List<NavigationPropertyInfo>> _navigationPropertyCache = new(maxSize: 1000);
 
         /// <summary>
         /// Enables lazy loading for an entity instance
@@ -142,14 +141,11 @@ namespace nORM.Navigation
 
         private static List<NavigationPropertyInfo> GetNavigationProperties(Type entityType)
         {
-            lock (_cacheLock)
+            return _navigationPropertyCache.GetOrAdd(entityType, static t =>
             {
-                if (_navigationPropertyCache.TryGetValue(entityType, out var cached))
-                    return cached;
-
                 var properties = new List<NavigationPropertyInfo>();
-                
-                foreach (var prop in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+
+                foreach (var prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
                 {
                     if (prop.GetCustomAttribute<NotMappedAttribute>() != null)
                         continue;
@@ -179,10 +175,9 @@ namespace nORM.Navigation
                         properties.Add(new NavigationPropertyInfo(prop, targetType, isCollection));
                     }
                 }
-                
-                _navigationPropertyCache[entityType] = properties;
+
                 return properties;
-            }
+            });
         }
 
         private static bool IsNavigationProperty(PropertyInfo property)
