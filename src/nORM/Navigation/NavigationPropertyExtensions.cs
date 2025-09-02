@@ -353,6 +353,7 @@ namespace nORM.Navigation
                 var entity = materializer(reader);
                 // Enable lazy loading for the loaded entity
                 _navigationContexts.GetValue(entity, _ => new NavigationContext(context, entityType));
+                context.ChangeTracker.Track(entity, EntityState.Unchanged, mapping);
                 results.Add(entity);
             }
             
@@ -381,6 +382,7 @@ namespace nORM.Navigation
                 var entity = materializer(reader);
                 // Enable lazy loading for the loaded entity
                 _navigationContexts.GetValue(entity, _ => new NavigationContext(context, entityType));
+                context.ChangeTracker.Track(entity, EntityState.Unchanged, mapping);
                 return entity;
             }
             
