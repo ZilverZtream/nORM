@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -40,7 +39,7 @@ namespace nORM.Query
         private bool _singleResult = false;
         
         // Cache materializers to reduce memory allocations
-        private static readonly ConcurrentDictionary<(Type MappingType, Type TargetType, string? ProjectionKey), Func<DbDataReader, object>> _materializerCache = new();
+        private static readonly ConcurrentLruCache<(Type MappingType, Type TargetType, string? ProjectionKey), Func<DbDataReader, object>> _materializerCache = new(maxSize: 1000);
 
         // Initialize _groupJoinInfo in constructor to suppress warning
         // This field is used in complex join scenarios
