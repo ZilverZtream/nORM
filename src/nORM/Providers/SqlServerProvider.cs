@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Data;
 using System.Diagnostics;
 using System.Linq;
@@ -17,6 +18,8 @@ namespace nORM.Providers
 {
     public sealed class SqlServerProvider : DatabaseProvider
     {
+        private static readonly ConcurrentDictionary<Type, DataTable> _tableSchemas = new();
+        private static readonly ConcurrentDictionary<Type, DataTable> _keyTableSchemas = new();
         public override string Escape(string id) => $"[{id}]";
         
         public override void ApplyPaging(StringBuilder sb, int? limit, int? offset)
@@ -40,18 +43,18 @@ namespace nORM.Providers
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             var sw = Stopwatch.StartNew();
-            using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection);
-            bulkCopy.DestinationTableName = m.EscTable;
-            bulkCopy.BatchSize = ctx.Options.BulkBatchSize;
-            using var table = new DataTable();
+            using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
+            {
+                DestinationTableName = m.EscTable,
+                BatchSize = ctx.Options.BulkBatchSize,
+                EnableStreaming = true
+            };
 
             var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
             foreach (var col in insertableCols)
-            {
-                var propType = col.Prop.PropertyType;
-                table.Columns.Add(col.PropName, Nullable.GetUnderlyingType(propType) ?? propType);
                 bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
-            }
+
+            using var table = GetDataTable(m, insertableCols);
 
             var count = 0;
             foreach (var entity in entities)
@@ -97,18 +100,18 @@ namespace nORM.Providers
 
         private async Task<int> BulkInsertInternalAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, string destinationTableName, CancellationToken ct) where T : class
         {
-            using var bulkCopy = new SqlBulkCopy(ctx.Connection as SqlConnection);
-            bulkCopy.DestinationTableName = destinationTableName;
-            bulkCopy.BatchSize = ctx.Options.BulkBatchSize;
-            using var table = new DataTable();
+            using var bulkCopy = new SqlBulkCopy(ctx.Connection as SqlConnection)
+            {
+                DestinationTableName = destinationTableName,
+                BatchSize = ctx.Options.BulkBatchSize,
+                EnableStreaming = true
+            };
 
             var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
             foreach (var col in insertableCols)
-            {
-                var propType = col.Prop.PropertyType;
-                table.Columns.Add(col.PropName, Nullable.GetUnderlyingType(propType) ?? propType);
                 bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
-            }
+
+            using var table = GetDataTable(m, insertableCols);
 
             var count = 0;
             foreach (var entity in entities)
@@ -136,13 +139,16 @@ namespace nORM.Providers
                 await cmd.ExecuteNonQueryAsync(ct);
             }
 
-            using (var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection))
+            using (var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
             {
-                bulkCopy.DestinationTableName = tempTableName;
-                bulkCopy.BatchSize = ctx.Options.BulkBatchSize;
-                using var table = new DataTable();
-                foreach (var col in m.KeyColumns) table.Columns.Add(col.PropName, Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType);
-                foreach (var entity in entities) table.Rows.Add(m.KeyColumns.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
+                DestinationTableName = tempTableName,
+                BatchSize = ctx.Options.BulkBatchSize,
+                EnableStreaming = true
+            })
+            {
+                using var table = GetKeyTable(m);
+                foreach (var entity in entities)
+                    table.Rows.Add(m.KeyColumns.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
                 await bulkCopy.WriteToServerAsync(table, ct);
             }
 
@@ -169,6 +175,36 @@ namespace nORM.Providers
             if (t == typeof(Guid)) return "UNIQUEIDENTIFIER";
             if (t == typeof(byte[])) return "VARBINARY(MAX)";
             return "NVARCHAR(MAX)";
+        }
+
+        private static DataTable GetDataTable(TableMapping m, List<Column> cols)
+        {
+            var schema = _tableSchemas.GetOrAdd(m.Type, _ =>
+            {
+                var dt = new DataTable();
+                foreach (var c in cols)
+                {
+                    var propType = c.Prop.PropertyType;
+                    dt.Columns.Add(c.PropName, Nullable.GetUnderlyingType(propType) ?? propType);
+                }
+                return dt;
+            });
+            return schema.Clone();
+        }
+
+        private static DataTable GetKeyTable(TableMapping m)
+        {
+            var schema = _keyTableSchemas.GetOrAdd(m.Type, _ =>
+            {
+                var dt = new DataTable();
+                foreach (var c in m.KeyColumns)
+                {
+                    var propType = c.Prop.PropertyType;
+                    dt.Columns.Add(c.PropName, Nullable.GetUnderlyingType(propType) ?? propType);
+                }
+                return dt;
+            });
+            return schema.Clone();
         }
         #endregion
     }
