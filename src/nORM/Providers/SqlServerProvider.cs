@@ -32,11 +32,21 @@ namespace nORM.Providers
         }
         
         public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT SCOPE_IDENTITY();";
-        
+
         public override System.Data.Common.DbParameter CreateParameter(string name, object? value)
         {
             var param = new SqlParameter(name, value ?? DBNull.Value);
             return param;
+        }
+
+        public override string EscapeLikePattern(string value)
+        {
+            var escaped = base.EscapeLikePattern(value);
+            var esc = LikeEscapeChar.ToString();
+            return escaped
+                .Replace("[", esc + "[")
+                .Replace("]", esc + "]")
+                .Replace("^", esc + "^");
         }
 
         #region SQL Server Bulk Operations

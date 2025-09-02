@@ -16,12 +16,5 @@ namespace nORM.Internal
             cmd.Parameters.Add(p);
         }
 
-        public static string EscapeLike(this string value)
-        {
-            return value
-                .Replace("\\", "\\\\")
-                .Replace("%", "\\%")
-                .Replace("_", "\\_");
-        }
     }
 }
