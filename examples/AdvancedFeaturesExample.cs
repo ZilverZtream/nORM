@@ -310,15 +310,27 @@ namespace nORM.Examples
         private static async Task DemonstrateWindowFunctionsAsync(DbContext context)
         {
             Console.WriteLine("Window Functions: Users with row numbers ordered by salary:");
-            
+
             var usersWithRowNumbers = await context.Query<User>()
                 .OrderByDescending(u => u.Salary)
                 .WithRowNumber((user, rowNum) => new { User = user, RowNumber = rowNum })
                 .ToListAsync();
-            
+
             foreach (var item in usersWithRowNumbers)
             {
                 Console.WriteLine($"   #{item.RowNumber}: {item.User.Name} - ${item.User.Salary:N2}");
+            }
+
+            Console.WriteLine("Window Functions: Users ranked by salary:");
+
+            var usersWithRanks = await context.Query<User>()
+                .OrderByDescending(u => u.Salary)
+                .WithRank((user, rank) => new { User = user, Rank = rank })
+                .ToListAsync();
+
+            foreach (var item in usersWithRanks)
+            {
+                Console.WriteLine($"   Rank {item.Rank}: {item.User.Name} - ${item.User.Salary:N2}");
             }
         }
     }
