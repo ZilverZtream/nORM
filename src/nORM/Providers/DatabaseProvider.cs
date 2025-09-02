@@ -49,26 +49,26 @@ namespace nORM.Providers
                 batch.Add(entity);
                 if (batch.Count >= batchSize)
                 {
-                    recordsAffected += await ExecuteInsertBatch(ctx.Connection, m, batch, ct);
+                    recordsAffected += await ExecuteInsertBatch(ctx, m, batch, ct);
                     batch.Clear();
                 }
             }
             if (batch.Count > 0)
             {
-                recordsAffected += await ExecuteInsertBatch(ctx.Connection, m, batch, ct);
+                recordsAffected += await ExecuteInsertBatch(ctx, m, batch, ct);
             }
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, recordsAffected, sw.Elapsed);
             return recordsAffected;
         }
 
-        protected async Task<int> ExecuteInsertBatch<T>(DbConnection cn, TableMapping m, List<T> batch, CancellationToken ct) where T : class
+        protected async Task<int> ExecuteInsertBatch<T>(DbContext ctx, TableMapping m, List<T> batch, CancellationToken ct) where T : class
         {
             var sb = new StringBuilder();
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
             var colNames = string.Join(", ", cols.Select(c => c.EscCol));
             sb.Append($"INSERT INTO {m.EscTable} ({colNames}) VALUES ");
 
-            using var cmd = cn.CreateCommand();
+            await using var cmd = ctx.Connection.CreateCommand();
             var pIndex = 0;
             for (int i = 0; i < batch.Count; i++)
             {
@@ -82,7 +82,7 @@ namespace nORM.Providers
                 sb.Append(")");
             }
             cmd.CommandText = sb.ToString();
-            return await cmd.ExecuteNonQueryAsync(ct);
+            return await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
         }
 
         public virtual Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> e, CancellationToken ct) where T : class
@@ -113,7 +113,7 @@ namespace nORM.Providers
                     cmd.CommandText = BuildUpdate(m);
                     foreach (var col in m.Columns.Where(c => !c.IsTimestamp)) cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
                     if (m.TimestampColumn != null) cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
-                    totalUpdated += await cmd.ExecuteNonQueryAsync(ct);
+                    totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 }
                 await transaction.CommitAsync(ct);
             }
@@ -182,7 +182,7 @@ namespace nORM.Providers
                     }
 
                     cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {whereClause}";
-                    var deleted = await cmd.ExecuteNonQueryAsync(ct);
+                    var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                     totalDeleted += deleted;
                 }
 

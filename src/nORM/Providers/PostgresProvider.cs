@@ -97,7 +97,7 @@ namespace nORM.Providers
                 for (int i = 0; i < entityList.Count; i += batchSize)
                 {
                     var batch = entityList.Skip(i).Take(batchSize).ToList();
-                    recordsAffected += await ExecutePostgresBatchInsert(ctx.Connection, transaction, m, cols, batch, ct);
+                    recordsAffected += await ExecutePostgresBatchInsert(ctx, transaction, m, cols, batch, ct);
                 }
 
                 await transaction.CommitAsync(ct);
@@ -122,13 +122,13 @@ namespace nORM.Providers
             return Math.Min(maxRowsPerBatch, 1000);
         }
 
-        private async Task<int> ExecutePostgresBatchInsert<T>(System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction,
+        private async Task<int> ExecutePostgresBatchInsert<T>(DbContext ctx, System.Data.Common.DbTransaction transaction,
             TableMapping mapping, Column[] cols, List<T> batch, CancellationToken ct) where T : class
         {
             // Use PostgreSQL's multi-row VALUES syntax with RETURNING for identity columns
             var sql = BuildPostgresBatchInsertSql(mapping, cols, batch.Count);
             
-            await using var cmd = connection.CreateCommand();
+            await using var cmd = ctx.Connection.CreateCommand();
             cmd.Transaction = transaction;
             cmd.CommandText = sql;
             cmd.CommandTimeout = 30;
@@ -144,7 +144,7 @@ namespace nORM.Providers
                 }
             }
             
-            return await cmd.ExecuteNonQueryAsync(ct);
+            return await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
         }
 
         private string BuildPostgresBatchInsertSql(TableMapping mapping, Column[] cols, int batchSize)
@@ -195,7 +195,7 @@ namespace nORM.Providers
                     cmd.Transaction = transaction;
                     cmd.CommandTimeout = 30;
                     cmd.CommandText = $"CREATE TEMP TABLE {tempTableName} ({colDefs}) ON COMMIT DROP";
-                    await cmd.ExecuteNonQueryAsync(ct);
+                    await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 }
 
                 // Insert data into temp table
@@ -211,7 +211,7 @@ namespace nORM.Providers
                     cmd.Transaction = transaction;
                     cmd.CommandTimeout = 30;
                     cmd.CommandText = $"UPDATE {m.EscTable} SET {setClause} FROM {tempTableName} temp WHERE {joinClause}";
-                    totalUpdated = await cmd.ExecuteNonQueryAsync(ct);
+                    totalUpdated = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 }
 
                 await transaction.CommitAsync(ct);
@@ -282,7 +282,7 @@ namespace nORM.Providers
                     }
                 }
 
-                totalInserted += await cmd.ExecuteNonQueryAsync(ct);
+                totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
             }
 
             return totalInserted;
@@ -323,7 +323,7 @@ namespace nORM.Providers
                         }
                         
                         cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} = ANY(ARRAY[{string.Join(",", paramNames)}])";
-                        totalDeleted += await cmd.ExecuteNonQueryAsync(ct);
+                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                     }
                 }
                 else
@@ -345,7 +345,7 @@ namespace nORM.Providers
                         {
                             cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                         }
-                        totalDeleted += await cmd.ExecuteNonQueryAsync(ct);
+                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                     }
                 }
 

@@ -75,7 +75,7 @@ namespace nORM.Providers
                     {
                         cmd.Parameters[ParamPrefix + col.PropName].Value = col.Getter(entity) ?? DBNull.Value;
                     }
-                    recordsAffected += await cmd.ExecuteNonQueryAsync(ct);
+                    recordsAffected += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 }
                 
                 await transaction.CommitAsync(ct);
@@ -128,7 +128,7 @@ namespace nORM.Providers
                         cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                     }
                     
-                    totalUpdated += await cmd.ExecuteNonQueryAsync(ct);
+                    totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 }
                 
                 await transaction.CommitAsync(ct);
@@ -181,7 +181,7 @@ namespace nORM.Providers
                         }
                         
                         cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} IN ({string.Join(",", paramNames)})";
-                        totalDeleted += await cmd.ExecuteNonQueryAsync(ct);
+                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                     }
                 }
                 else
@@ -206,7 +206,7 @@ namespace nORM.Providers
                             cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                         }
                         
-                        totalDeleted += await cmd.ExecuteNonQueryAsync(ct);
+                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                     }
                 }
                 
