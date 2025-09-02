@@ -13,6 +13,7 @@ using nORM.Mapping;
 using nORM.Providers;
 using nORM.Internal;
 using nORM.Navigation;
+using System.Reflection;
 
 #nullable enable
 
@@ -27,6 +28,7 @@ namespace nORM.Core
         private readonly ModelBuilder _modelBuilder;
 
         public DbContextOptions Options { get; }
+        public ChangeTracker ChangeTracker { get; } = new();
 
         public DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options = null)
         {
@@ -73,6 +75,76 @@ namespace nORM.Core
 
         internal TableMapping GetMapping(Type t) => _m.GetOrAdd(t, static (k, args) =>
             new TableMapping(k, args.p, args.ctx, args.modelBuilder.GetConfiguration(k)), (p: _p, ctx: this, modelBuilder: _modelBuilder));
+
+        #region Change Tracking
+        public EntityEntry Add<T>(T entity) where T : class
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            NavigationPropertyExtensions.EnableLazyLoading(entity, this);
+            return ChangeTracker.Track(entity, EntityState.Added, GetMapping(typeof(T)));
+        }
+
+        public EntityEntry Attach<T>(T entity) where T : class
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            NavigationPropertyExtensions.EnableLazyLoading(entity, this);
+            return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(typeof(T)));
+        }
+
+        public EntityEntry Update<T>(T entity) where T : class
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            return ChangeTracker.Track(entity, EntityState.Modified, GetMapping(typeof(T)));
+        }
+
+        public EntityEntry Remove<T>(T entity) where T : class
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            return ChangeTracker.Track(entity, EntityState.Deleted, GetMapping(typeof(T)));
+        }
+
+        public EntityEntry Entry(object entity)
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            var method = typeof(NavigationPropertyExtensions).GetMethod(nameof(NavigationPropertyExtensions.EnableLazyLoading))!;
+            method.MakeGenericMethod(entity.GetType()).Invoke(null, new object[] { entity, this });
+            return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(entity.GetType()));
+        }
+
+        public int SaveChanges() => SaveChangesAsync().GetAwaiter().GetResult();
+
+        public async Task<int> SaveChangesAsync(CancellationToken ct = default)
+        {
+            ChangeTracker.DetectChanges();
+            var entries = ChangeTracker.Entries.ToList();
+            var total = 0;
+            foreach (var entry in entries)
+            {
+                switch (entry.State)
+                {
+                    case EntityState.Added:
+                        total += await InvokeWriteAsync(nameof(InsertAsync), entry, ct);
+                        entry.AcceptChanges();
+                        break;
+                    case EntityState.Modified:
+                        total += await InvokeWriteAsync(nameof(UpdateAsync), entry, ct);
+                        entry.AcceptChanges();
+                        break;
+                    case EntityState.Deleted:
+                        total += await InvokeWriteAsync(nameof(DeleteAsync), entry, ct);
+                        ChangeTracker.Remove(entry.Entity);
+                        break;
+                }
+            }
+            return total;
+        }
+
+        private Task<int> InvokeWriteAsync(string methodName, EntityEntry entry, CancellationToken ct)
+        {
+            var method = typeof(DbContext).GetMethod(methodName)!.MakeGenericMethod(entry.Entity.GetType());
+            return (Task<int>)method.Invoke(this, new object?[] { entry.Entity, ct })!;
+        }
+        #endregion
 
         #region Standard CRUD
         public Task<int> InsertAsync<T>(T entity, CancellationToken ct = default) where T : class
