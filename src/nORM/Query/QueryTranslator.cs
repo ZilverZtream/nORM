@@ -629,14 +629,14 @@ namespace nORM.Query
             switch (node.Method.Name)
             {
                 case "Any":
-                    _sql.Append("SELECT CASE WHEN EXISTS(");
+                    _sql.Append("SELECT 1 WHERE EXISTS(");
                     _sql.Append(subPlan.Sql);
-                    _sql.Append(") THEN 1 ELSE 0 END");
+                    _sql.Append(")");
                     break;
                 case "All":
-                    _sql.Append("SELECT CASE WHEN NOT EXISTS(");
+                    _sql.Append("SELECT 1 WHERE NOT EXISTS(");
                     _sql.Append(subPlan.Sql);
-                    _sql.Append(") THEN 1 ELSE 0 END");
+                    _sql.Append(")");
                     break;
                 case "Contains":
                     return Visit(node.Arguments[0]);
