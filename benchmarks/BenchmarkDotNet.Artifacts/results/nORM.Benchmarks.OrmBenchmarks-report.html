@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>nORM.Benchmarks.OrmBenchmarks-20250726-092345</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.13.12, Windows 11 (10.0.26100.4652)
+Intel Core i7-10750H CPU 2.60GHz, 1 CPU, 12 logical and 6 physical cores
+.NET SDK 9.0.103
+  [Host]     : .NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2
+  DefaultJob : .NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method        </th><th>Mean   </th><th>Error  </th><th>StdDev </th><th>Rank</th><th>Gen0</th><th>Gen1</th><th>Allocated</th>
+</tr>
+</thead><tbody><tr><td>Count_nORM</td><td>26.72 &mu;s</td><td>0.511 &mu;s</td><td>0.588 &mu;s</td><td>1</td><td>1.4648</td><td>-</td><td>9.13 KB</td>
+</tr><tr><td>Query_Simple_nORM</td><td>64.04 &mu;s</td><td>1.183 &mu;s</td><td>1.107 &mu;s</td><td>2</td><td>1.5869</td><td>-</td><td>10.34 KB</td>
+</tr><tr><td>Query_Simple_RawAdo</td><td>73.92 &mu;s</td><td>1.006 &mu;s</td><td>0.840 &mu;s</td><td>3</td><td>0.7324</td><td>-</td><td>4.86 KB</td>
+</tr><tr><td>Query_Simple_Dapper</td><td>80.28 &mu;s</td><td>0.778 &mu;s</td><td>0.728 &mu;s</td><td>4</td><td>0.8545</td><td>-</td><td>5.78 KB</td>
+</tr><tr><td>Count_Dapper</td><td>91.56 &mu;s</td><td>0.669 &mu;s</td><td>0.593 &mu;s</td><td>5</td><td>0.1221</td><td>-</td><td>1.39 KB</td>
+</tr><tr><td>Query_Complex_nORM</td><td>96.00 &mu;s</td><td>1.895 &mu;s</td><td>1.772 &mu;s</td><td>6</td><td>2.6855</td><td>-</td><td>17.64 KB</td>
+</tr><tr><td>Query_Join_Dapper</td><td>112.04 &mu;s</td><td>1.630 &mu;s</td><td>1.525 &mu;s</td><td>7</td><td>2.0752</td><td>-</td><td>13.13 KB</td>
+</tr><tr><td>Query_Join_nORM</td><td>134.62 &mu;s</td><td>1.611 &mu;s</td><td>1.428 &mu;s</td><td>8</td><td>3.9063</td><td>-</td><td>25.04 KB</td>
+</tr><tr><td>Count_EfCore</td><td>160.82 &mu;s</td><td>2.960 &mu;s</td><td>2.769 &mu;s</td><td>9</td><td>8.7891</td><td>0.9766</td><td>56.46 KB</td>
+</tr><tr><td>Query_Simple_EfCore</td><td>171.63 &mu;s</td><td>3.332 &mu;s</td><td>4.213 &mu;s</td><td>10</td><td>11.2305</td><td>1.4648</td><td>69.65 KB</td>
+</tr><tr><td>Query_Complex_Dapper</td><td>186.02 &mu;s</td><td>3.276 &mu;s</td><td>3.065 &mu;s</td><td>11</td><td>1.7090</td><td>-</td><td>11.04 KB</td>
+</tr><tr><td>Query_Join_EfCore</td><td>295.76 &mu;s</td><td>5.335 &mu;s</td><td>4.990 &mu;s</td><td>12</td><td>17.5781</td><td>1.9531</td><td>108.72 KB</td>
+</tr><tr><td>Query_Complex_EfCore</td><td>315.64 &mu;s</td><td>5.753 &mu;s</td><td>5.382 &mu;s</td><td>13</td><td>13.6719</td><td>1.9531</td><td>85.71 KB</td>
+</tr><tr><td>Insert_Single_nORM</td><td>687.18 &mu;s</td><td>10.870 &mu;s</td><td>9.636 &mu;s</td><td>14</td><td>3.9063</td><td>2.9297</td><td>27.3 KB</td>
+</tr><tr><td>BulkInsert_nORM</td><td>938.53 &mu;s</td><td>15.610 &mu;s</td><td>14.602 &mu;s</td><td>15</td><td>23.4375</td><td>21.4844</td><td>151.31 KB</td>
+</tr><tr><td>Insert_Single_EfCore</td><td>1,734.96 &mu;s</td><td>34.809 &mu;s</td><td>102.636 &mu;s</td><td>16</td><td>7.8125</td><td>-</td><td>65.63 KB</td>
+</tr><tr><td>BulkInsert_EfCore</td><td>5,121.10 &mu;s</td><td>86.887 &mu;s</td><td>135.273 &mu;s</td><td>17</td><td>187.5000</td><td>62.5000</td><td>1181.25 KB</td>
+</tr><tr><td>Insert_Single_RawAdo</td><td>5,568.16 &mu;s</td><td>109.427 &mu;s</td><td>149.784 &mu;s</td><td>18</td><td>-</td><td>-</td><td>2.09 KB</td>
+</tr><tr><td>Insert_Single_Dapper</td><td>5,633.55 &mu;s</td><td>111.867 &mu;s</td><td>114.879 &mu;s</td><td>18</td><td>-</td><td>-</td><td>3.93 KB</td>
+</tr><tr><td>BulkInsert_Dapper</td><td>552,597.11 &mu;s</td><td>10,662.265 &mu;s</td><td>14,233.818 &mu;s</td><td>19</td><td>-</td><td>-</td><td>310.23 KB</td>
+</tr></tbody></table>
+</body>
+</html>

@@ -1,0 +1,607 @@
+// Validating benchmarks:
+// ***** BenchmarkRunner: Start   *****
+// ***** Found 6 benchmark(s) in total *****
+// ***** Building 1 exe(s) in Parallel: Start   *****
+// start dotnet  restore /p:UseSharedCompilation=false /p:BuildInParallel=false /m:1 /p:Deterministic=true /p:Optimize=true in C:\aicode\nORM\benchmarks\bin\Release\net8.0\e928f797-6ef8-4df4-a0aa-35a67e0a5b96
+// command took 1.52 sec and exited with 0
+// start dotnet  build -c Release --no-restore /p:UseSharedCompilation=false /p:BuildInParallel=false /m:1 /p:Deterministic=true /p:Optimize=true in C:\aicode\nORM\benchmarks\bin\Release\net8.0\e928f797-6ef8-4df4-a0aa-35a67e0a5b96
+// command took 4.19 sec and exited with 0
+// ***** Done, took 00:00:05 (5.81 sec)   *****
+// Found 6 benchmarks:
+//   FastNormBenchmarks.Insert_Single: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+//   FastNormBenchmarks.Query_Simple: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+//   FastNormBenchmarks.Query_Complex: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+//   FastNormBenchmarks.Count_Operation: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+//   FastNormBenchmarks.Query_Join: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+//   FastNormBenchmarks.BulkInsert_Small: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Hög prestanda)
+// **************************
+// Benchmark: FastNormBenchmarks.Insert_Single: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet e928f797-6ef8-4df4-a0aa-35a67e0a5b96.dll --anonymousPipes 1568 1288 --benchmarkName nORM.Benchmarks.FastNormBenchmarks.Insert_Single --job "IterationCount=3, WarmupCount=1" --benchmarkId 0 in C:\aicode\nORM\benchmarks\bin\Release\net8.0\e928f797-6ef8-4df4-a0aa-35a67e0a5b96\bin\Release\net8.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.13.12
+// Runtime=.NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT VectorSize=256
+// Job: Job-LKXYMN(IterationCount=3, WarmupCount=1)
+
+?? Setting up fast nORM benchmark...
+? Fast nORM benchmark setup complete!
+OverheadJitting  1: 1 op, 188400.00 ns, 188.4000 us/op
+WorkloadJitting  1: 1 op, 1440200.00 ns, 1.4402 ms/op
+
+OverheadJitting  2: 16 op, 227500.00 ns, 14.2188 us/op
+WorkloadJitting  2: 16 op, 2464700.00 ns, 154.0437 us/op
+
+WorkloadPilot    1: 16 op, 2118500.00 ns, 132.4062 us/op
+WorkloadPilot    2: 32 op, 3820700.00 ns, 119.3969 us/op
+WorkloadPilot    3: 64 op, 7380900.00 ns, 115.3266 us/op
+WorkloadPilot    4: 128 op, 24447600.00 ns, 190.9969 us/op
+WorkloadPilot    5: 256 op, 22671400.00 ns, 88.5602 us/op
+WorkloadPilot    6: 512 op, 50474600.00 ns, 98.5832 us/op
+WorkloadPilot    7: 1024 op, 100494800.00 ns, 98.1395 us/op
+WorkloadPilot    8: 2048 op, 193605300.00 ns, 94.5338 us/op
+WorkloadPilot    9: 4096 op, 420979900.00 ns, 102.7783 us/op
+WorkloadPilot   10: 8192 op, 606486900.00 ns, 74.0340 us/op
+
+OverheadWarmup   1: 8192 op, 60500.00 ns, 7.3853 ns/op
+OverheadWarmup   2: 8192 op, 18800.00 ns, 2.2949 ns/op
+OverheadWarmup   3: 8192 op, 17500.00 ns, 2.1362 ns/op
+OverheadWarmup   4: 8192 op, 17500.00 ns, 2.1362 ns/op
+OverheadWarmup   5: 8192 op, 17900.00 ns, 2.1851 ns/op
+OverheadWarmup   6: 8192 op, 38900.00 ns, 4.7485 ns/op
+OverheadWarmup   7: 8192 op, 17600.00 ns, 2.1484 ns/op
+OverheadWarmup   8: 8192 op, 17500.00 ns, 2.1362 ns/op
+OverheadWarmup   9: 8192 op, 18000.00 ns, 2.1973 ns/op
+
+OverheadActual   1: 8192 op, 24200.00 ns, 2.9541 ns/op
+OverheadActual   2: 8192 op, 17900.00 ns, 2.1851 ns/op
+OverheadActual   3: 8192 op, 21300.00 ns, 2.6001 ns/op
+OverheadActual   4: 8192 op, 19700.00 ns, 2.4048 ns/op
+OverheadActual   5: 8192 op, 17600.00 ns, 2.1484 ns/op
+OverheadActual   6: 8192 op, 24400.00 ns, 2.9785 ns/op
+OverheadActual   7: 8192 op, 17900.00 ns, 2.1851 ns/op
+OverheadActual   8: 8192 op, 18400.00 ns, 2.2461 ns/op
+OverheadActual   9: 8192 op, 24900.00 ns, 3.0396 ns/op
+OverheadActual  10: 8192 op, 18800.00 ns, 2.2949 ns/op
+OverheadActual  11: 8192 op, 18700.00 ns, 2.2827 ns/op
+OverheadActual  12: 8192 op, 19300.00 ns, 2.3560 ns/op
+OverheadActual  13: 8192 op, 22300.00 ns, 2.7222 ns/op
+OverheadActual  14: 8192 op, 20800.00 ns, 2.5391 ns/op
+OverheadActual  15: 8192 op, 19600.00 ns, 2.3926 ns/op
+OverheadActual  16: 8192 op, 23400.00 ns, 2.8564 ns/op
+OverheadActual  17: 8192 op, 18000.00 ns, 2.1973 ns/op
+OverheadActual  18: 8192 op, 66200.00 ns, 8.0811 ns/op
+OverheadActual  19: 8192 op, 20100.00 ns, 2.4536 ns/op
+OverheadActual  20: 8192 op, 24400.00 ns, 2.9785 ns/op
+
+WorkloadWarmup   1: 8192 op, 522707100.00 ns, 63.8070 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 8192 op, 518927800.00 ns, 63.3457 us/op
+WorkloadActual   2: 8192 op, 520759600.00 ns, 63.5693 us/op
+WorkloadActual   3: 8192 op, 525642800.00 ns, 64.1654 us/op
+
+// AfterActualRun
+WorkloadResult   1: 8192 op, 518907900.00 ns, 63.3432 us/op
+WorkloadResult   2: 8192 op, 520739700.00 ns, 63.5669 us/op
+WorkloadResult   3: 8192 op, 525622900.00 ns, 64.1630 us/op
+// GC:  5 0 0 35585376 8192
+// Threading:  0 0 8192
+
+// AfterAll
+// Benchmark Process 37636 has exited with code 0.
+
+Mean = 63.691 μs, StdErr = 0.245 μs (0.38%), N = 3, StdDev = 0.424 μs
+Min = 63.343 μs, Q1 = 63.455 μs, Median = 63.567 μs, Q3 = 63.865 μs, Max = 64.163 μs
+IQR = 0.410 μs, LowerFence = 62.840 μs, UpperFence = 64.480 μs
+ConfidenceInterval = [55.961 μs; 71.421 μs] (CI 99.9%), Margin = 7.730 μs (12.14% of Mean)
+Skewness = 0.27, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 5 (83,3 %) benchmark(s) to run. Estimated finish 2025-07-26 10:04 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Hög prestanda)
+// **************************
+// Benchmark: FastNormBenchmarks.Query_Simple: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet e928f797-6ef8-4df4-a0aa-35a67e0a5b96.dll --anonymousPipes 1600 1324 --benchmarkName nORM.Benchmarks.FastNormBenchmarks.Query_Simple --job "IterationCount=3, WarmupCount=1" --benchmarkId 1 in C:\aicode\nORM\benchmarks\bin\Release\net8.0\e928f797-6ef8-4df4-a0aa-35a67e0a5b96\bin\Release\net8.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.13.12
+// Runtime=.NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT VectorSize=256
+// Job: Job-KJGZWF(IterationCount=3, WarmupCount=1)
+
+?? Setting up fast nORM benchmark...
+? Fast nORM benchmark setup complete!
+OverheadJitting  1: 1 op, 361700.00 ns, 361.7000 us/op
+WorkloadJitting  1: 1 op, 50625500.00 ns, 50.6255 ms/op
+
+WorkloadPilot    1: 2 op, 1298900.00 ns, 649.4500 us/op
+WorkloadPilot    2: 3 op, 695800.00 ns, 231.9333 us/op
+WorkloadPilot    3: 4 op, 669100.00 ns, 167.2750 us/op
+WorkloadPilot    4: 5 op, 686800.00 ns, 137.3600 us/op
+WorkloadPilot    5: 6 op, 802700.00 ns, 133.7833 us/op
+WorkloadPilot    6: 7 op, 1323400.00 ns, 189.0571 us/op
+WorkloadPilot    7: 8 op, 1045700.00 ns, 130.7125 us/op
+WorkloadPilot    8: 9 op, 1142000.00 ns, 126.8889 us/op
+WorkloadPilot    9: 10 op, 1452600.00 ns, 145.2600 us/op
+WorkloadPilot   10: 11 op, 1312000.00 ns, 119.2727 us/op
+WorkloadPilot   11: 12 op, 1478100.00 ns, 123.1750 us/op
+WorkloadPilot   12: 13 op, 1559800.00 ns, 119.9846 us/op
+WorkloadPilot   13: 14 op, 1645400.00 ns, 117.5286 us/op
+WorkloadPilot   14: 15 op, 1772700.00 ns, 118.1800 us/op
+WorkloadPilot   15: 16 op, 2589900.00 ns, 161.8688 us/op
+WorkloadPilot   16: 32 op, 4115600.00 ns, 128.6125 us/op
+WorkloadPilot   17: 64 op, 7215800.00 ns, 112.7469 us/op
+WorkloadPilot   18: 128 op, 14567600.00 ns, 113.8094 us/op
+WorkloadPilot   19: 256 op, 27917600.00 ns, 109.0531 us/op
+WorkloadPilot   20: 512 op, 55346600.00 ns, 108.0988 us/op
+WorkloadPilot   21: 1024 op, 121275900.00 ns, 118.4335 us/op
+WorkloadPilot   22: 2048 op, 234184400.00 ns, 114.3479 us/op
+WorkloadPilot   23: 4096 op, 480637200.00 ns, 117.3431 us/op
+WorkloadPilot   24: 8192 op, 965926700.00 ns, 117.9110 us/op
+
+WorkloadWarmup   1: 8192 op, 808127100.00 ns, 98.6483 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 8192 op, 505960900.00 ns, 61.7628 us/op
+WorkloadActual   2: 8192 op, 437492100.00 ns, 53.4048 us/op
+WorkloadActual   3: 8192 op, 439790500.00 ns, 53.6854 us/op
+
+// AfterActualRun
+WorkloadResult   1: 8192 op, 505960900.00 ns, 61.7628 us/op
+WorkloadResult   2: 8192 op, 437492100.00 ns, 53.4048 us/op
+WorkloadResult   3: 8192 op, 439790500.00 ns, 53.6854 us/op
+// GC:  10 0 0 68952528 8192
+// Threading:  0 0 8192
+
+// AfterAll
+// Benchmark Process 75712 has exited with code 0.
+
+Mean = 56.284 μs, StdErr = 2.740 μs (4.87%), N = 3, StdDev = 4.747 μs
+Min = 53.405 μs, Q1 = 53.545 μs, Median = 53.685 μs, Q3 = 57.724 μs, Max = 61.763 μs
+IQR = 4.179 μs, LowerFence = 47.277 μs, UpperFence = 63.993 μs
+ConfidenceInterval = [-30.311 μs; 142.880 μs] (CI 99.9%), Margin = 86.595 μs (153.85% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 4 (66,7 %) benchmark(s) to run. Estimated finish 2025-07-26 10:04 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Hög prestanda)
+// **************************
+// Benchmark: FastNormBenchmarks.Query_Complex: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet e928f797-6ef8-4df4-a0aa-35a67e0a5b96.dll --anonymousPipes 1640 1636 --benchmarkName nORM.Benchmarks.FastNormBenchmarks.Query_Complex --job "IterationCount=3, WarmupCount=1" --benchmarkId 2 in C:\aicode\nORM\benchmarks\bin\Release\net8.0\e928f797-6ef8-4df4-a0aa-35a67e0a5b96\bin\Release\net8.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.13.12
+// Runtime=.NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT VectorSize=256
+// Job: Job-AJCGJF(IterationCount=3, WarmupCount=1)
+
+?? Setting up fast nORM benchmark...
+? Fast nORM benchmark setup complete!
+OverheadJitting  1: 1 op, 225700.00 ns, 225.7000 us/op
+WorkloadJitting  1: 1 op, 33345700.00 ns, 33.3457 ms/op
+
+WorkloadPilot    1: 2 op, 1069500.00 ns, 534.7500 us/op
+WorkloadPilot    2: 3 op, 590700.00 ns, 196.9000 us/op
+WorkloadPilot    3: 4 op, 656000.00 ns, 164.0000 us/op
+WorkloadPilot    4: 5 op, 961700.00 ns, 192.3400 us/op
+WorkloadPilot    5: 6 op, 892900.00 ns, 148.8167 us/op
+WorkloadPilot    6: 7 op, 991200.00 ns, 141.6000 us/op
+WorkloadPilot    7: 8 op, 1127200.00 ns, 140.9000 us/op
+WorkloadPilot    8: 9 op, 1307500.00 ns, 145.2778 us/op
+WorkloadPilot    9: 10 op, 1346300.00 ns, 134.6300 us/op
+WorkloadPilot   10: 11 op, 1456400.00 ns, 132.4000 us/op
+WorkloadPilot   11: 12 op, 1749100.00 ns, 145.7583 us/op
+WorkloadPilot   12: 13 op, 1902700.00 ns, 146.3615 us/op
+WorkloadPilot   13: 14 op, 2142800.00 ns, 153.0571 us/op
+WorkloadPilot   14: 15 op, 1998300.00 ns, 133.2200 us/op
+WorkloadPilot   15: 16 op, 2038500.00 ns, 127.4062 us/op
+WorkloadPilot   16: 32 op, 4278600.00 ns, 133.7063 us/op
+WorkloadPilot   17: 64 op, 9175200.00 ns, 143.3625 us/op
+WorkloadPilot   18: 128 op, 17307300.00 ns, 135.2133 us/op
+WorkloadPilot   19: 256 op, 32900800.00 ns, 128.5188 us/op
+WorkloadPilot   20: 512 op, 67037300.00 ns, 130.9322 us/op
+WorkloadPilot   21: 1024 op, 145112600.00 ns, 141.7115 us/op
+WorkloadPilot   22: 2048 op, 281449400.00 ns, 137.4265 us/op
+WorkloadPilot   23: 4096 op, 585622000.00 ns, 142.9741 us/op
+
+WorkloadWarmup   1: 4096 op, 548326500.00 ns, 133.8688 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 4096 op, 552455000.00 ns, 134.8767 us/op
+WorkloadActual   2: 4096 op, 502071600.00 ns, 122.5761 us/op
+WorkloadActual   3: 4096 op, 359856300.00 ns, 87.8555 us/op
+
+// AfterActualRun
+WorkloadResult   1: 4096 op, 552455000.00 ns, 134.8767 us/op
+WorkloadResult   2: 4096 op, 502071600.00 ns, 122.5761 us/op
+WorkloadResult   3: 4096 op, 359856300.00 ns, 87.8555 us/op
+// GC:  7 0 0 49782000 4096
+// Threading:  0 0 4096
+
+// AfterAll
+// Benchmark Process 75680 has exited with code 0.
+
+Mean = 115.103 μs, StdErr = 14.079 μs (12.23%), N = 3, StdDev = 24.385 μs
+Min = 87.856 μs, Q1 = 105.216 μs, Median = 122.576 μs, Q3 = 128.726 μs, Max = 134.877 μs
+IQR = 23.511 μs, LowerFence = 69.950 μs, UpperFence = 163.992 μs
+ConfidenceInterval = [-329.773 μs; 559.979 μs] (CI 99.9%), Margin = 444.876 μs (386.50% of Mean)
+Skewness = -0.28, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 3 (50,0 %) benchmark(s) to run. Estimated finish 2025-07-26 10:04 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Hög prestanda)
+// **************************
+// Benchmark: FastNormBenchmarks.Count_Operation: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet e928f797-6ef8-4df4-a0aa-35a67e0a5b96.dll --anonymousPipes 1648 1656 --benchmarkName nORM.Benchmarks.FastNormBenchmarks.Count_Operation --job "IterationCount=3, WarmupCount=1" --benchmarkId 3 in C:\aicode\nORM\benchmarks\bin\Release\net8.0\e928f797-6ef8-4df4-a0aa-35a67e0a5b96\bin\Release\net8.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.13.12
+// Runtime=.NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT VectorSize=256
+// Job: Job-QDKFMV(IterationCount=3, WarmupCount=1)
+
+?? Setting up fast nORM benchmark...
+? Fast nORM benchmark setup complete!
+OverheadJitting  1: 1 op, 249800.00 ns, 249.8000 us/op
+WorkloadJitting  1: 1 op, 22265200.00 ns, 22.2652 ms/op
+
+OverheadJitting  2: 16 op, 378100.00 ns, 23.6313 us/op
+WorkloadJitting  2: 16 op, 2410200.00 ns, 150.6375 us/op
+
+WorkloadPilot    1: 16 op, 1163900.00 ns, 72.7438 us/op
+WorkloadPilot    2: 32 op, 1795200.00 ns, 56.1000 us/op
+WorkloadPilot    3: 64 op, 4221800.00 ns, 65.9656 us/op
+WorkloadPilot    4: 128 op, 6678000.00 ns, 52.1719 us/op
+WorkloadPilot    5: 256 op, 13627300.00 ns, 53.2316 us/op
+WorkloadPilot    6: 512 op, 27383600.00 ns, 53.4836 us/op
+WorkloadPilot    7: 1024 op, 51787200.00 ns, 50.5734 us/op
+WorkloadPilot    8: 2048 op, 144727800.00 ns, 70.6679 us/op
+WorkloadPilot    9: 4096 op, 209529000.00 ns, 51.1545 us/op
+WorkloadPilot   10: 8192 op, 427428500.00 ns, 52.1763 us/op
+WorkloadPilot   11: 16384 op, 852042700.00 ns, 52.0046 us/op
+
+OverheadWarmup   1: 16384 op, 80000.00 ns, 4.8828 ns/op
+OverheadWarmup   2: 16384 op, 64200.00 ns, 3.9185 ns/op
+OverheadWarmup   3: 16384 op, 56500.00 ns, 3.4485 ns/op
+OverheadWarmup   4: 16384 op, 57600.00 ns, 3.5156 ns/op
+OverheadWarmup   5: 16384 op, 37500.00 ns, 2.2888 ns/op
+OverheadWarmup   6: 16384 op, 33700.00 ns, 2.0569 ns/op
+OverheadWarmup   7: 16384 op, 33600.00 ns, 2.0508 ns/op
+OverheadWarmup   8: 16384 op, 33600.00 ns, 2.0508 ns/op
+OverheadWarmup   9: 16384 op, 34200.00 ns, 2.0874 ns/op
+
+OverheadActual   1: 16384 op, 33700.00 ns, 2.0569 ns/op
+OverheadActual   2: 16384 op, 33700.00 ns, 2.0569 ns/op
+OverheadActual   3: 16384 op, 33100.00 ns, 2.0203 ns/op
+OverheadActual   4: 16384 op, 32800.00 ns, 2.0020 ns/op
+OverheadActual   5: 16384 op, 32100.00 ns, 1.9592 ns/op
+OverheadActual   6: 16384 op, 38200.00 ns, 2.3315 ns/op
+OverheadActual   7: 16384 op, 38300.00 ns, 2.3376 ns/op
+OverheadActual   8: 16384 op, 38600.00 ns, 2.3560 ns/op
+OverheadActual   9: 16384 op, 65800.00 ns, 4.0161 ns/op
+OverheadActual  10: 16384 op, 38400.00 ns, 2.3438 ns/op
+OverheadActual  11: 16384 op, 38200.00 ns, 2.3315 ns/op
+OverheadActual  12: 16384 op, 32000.00 ns, 1.9531 ns/op
+OverheadActual  13: 16384 op, 32200.00 ns, 1.9653 ns/op
+OverheadActual  14: 16384 op, 44000.00 ns, 2.6855 ns/op
+OverheadActual  15: 16384 op, 43500.00 ns, 2.6550 ns/op
+OverheadActual  16: 16384 op, 42900.00 ns, 2.6184 ns/op
+OverheadActual  17: 16384 op, 32800.00 ns, 2.0020 ns/op
+OverheadActual  18: 16384 op, 34200.00 ns, 2.0874 ns/op
+OverheadActual  19: 16384 op, 31400.00 ns, 1.9165 ns/op
+OverheadActual  20: 16384 op, 31800.00 ns, 1.9409 ns/op
+
+WorkloadWarmup   1: 16384 op, 650985600.00 ns, 39.7330 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 16384 op, 384009600.00 ns, 23.4381 us/op
+WorkloadActual   2: 16384 op, 314909700.00 ns, 19.2206 us/op
+WorkloadActual   3: 16384 op, 293200300.00 ns, 17.8955 us/op
+
+// AfterActualRun
+WorkloadResult   1: 16384 op, 383975650.00 ns, 23.4360 us/op
+WorkloadResult   2: 16384 op, 314875750.00 ns, 19.2185 us/op
+WorkloadResult   3: 16384 op, 293166350.00 ns, 17.8935 us/op
+// GC:  18 0 0 117972832 16384
+// Threading:  0 0 16384
+
+// AfterAll
+// Benchmark Process 72528 has exited with code 0.
+
+Mean = 20.183 μs, StdErr = 1.671 μs (8.28%), N = 3, StdDev = 2.894 μs
+Min = 17.893 μs, Q1 = 18.556 μs, Median = 19.218 μs, Q3 = 21.327 μs, Max = 23.436 μs
+IQR = 2.771 μs, LowerFence = 14.399 μs, UpperFence = 25.484 μs
+ConfidenceInterval = [-32.621 μs; 72.986 μs] (CI 99.9%), Margin = 52.804 μs (261.63% of Mean)
+Skewness = 0.3, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 2 (33,3 %) benchmark(s) to run. Estimated finish 2025-07-26 10:04 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Hög prestanda)
+// **************************
+// Benchmark: FastNormBenchmarks.Query_Join: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet e928f797-6ef8-4df4-a0aa-35a67e0a5b96.dll --anonymousPipes 1584 1324 --benchmarkName nORM.Benchmarks.FastNormBenchmarks.Query_Join --job "IterationCount=3, WarmupCount=1" --benchmarkId 4 in C:\aicode\nORM\benchmarks\bin\Release\net8.0\e928f797-6ef8-4df4-a0aa-35a67e0a5b96\bin\Release\net8.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.13.12
+// Runtime=.NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT VectorSize=256
+// Job: Job-BATNUB(IterationCount=3, WarmupCount=1)
+
+?? Setting up fast nORM benchmark...
+? Fast nORM benchmark setup complete!
+OverheadJitting  1: 1 op, 210900.00 ns, 210.9000 us/op
+WorkloadJitting  1: 1 op, 30337200.00 ns, 30.3372 ms/op
+
+OverheadJitting  2: 16 op, 499800.00 ns, 31.2375 us/op
+WorkloadJitting  2: 16 op, 3703100.00 ns, 231.4437 us/op
+
+WorkloadPilot    1: 16 op, 2579000.00 ns, 161.1875 us/op
+WorkloadPilot    2: 32 op, 4979400.00 ns, 155.6062 us/op
+WorkloadPilot    3: 64 op, 10194900.00 ns, 159.2953 us/op
+WorkloadPilot    4: 128 op, 19517200.00 ns, 152.4781 us/op
+WorkloadPilot    5: 256 op, 38124400.00 ns, 148.9234 us/op
+WorkloadPilot    6: 512 op, 76238300.00 ns, 148.9029 us/op
+WorkloadPilot    7: 1024 op, 165667800.00 ns, 161.7850 us/op
+WorkloadPilot    8: 2048 op, 345296700.00 ns, 168.6019 us/op
+WorkloadPilot    9: 4096 op, 680467000.00 ns, 166.1296 us/op
+
+OverheadWarmup   1: 4096 op, 15300.00 ns, 3.7354 ns/op
+OverheadWarmup   2: 4096 op, 14100.00 ns, 3.4424 ns/op
+OverheadWarmup   3: 4096 op, 17400.00 ns, 4.2480 ns/op
+OverheadWarmup   4: 4096 op, 13800.00 ns, 3.3691 ns/op
+OverheadWarmup   5: 4096 op, 13800.00 ns, 3.3691 ns/op
+OverheadWarmup   6: 4096 op, 13800.00 ns, 3.3691 ns/op
+
+OverheadActual   1: 4096 op, 13800.00 ns, 3.3691 ns/op
+OverheadActual   2: 4096 op, 24600.00 ns, 6.0059 ns/op
+OverheadActual   3: 4096 op, 14900.00 ns, 3.6377 ns/op
+OverheadActual   4: 4096 op, 14900.00 ns, 3.6377 ns/op
+OverheadActual   5: 4096 op, 14700.00 ns, 3.5889 ns/op
+OverheadActual   6: 4096 op, 14800.00 ns, 3.6133 ns/op
+OverheadActual   7: 4096 op, 14800.00 ns, 3.6133 ns/op
+OverheadActual   8: 4096 op, 14700.00 ns, 3.5889 ns/op
+OverheadActual   9: 4096 op, 14100.00 ns, 3.4424 ns/op
+OverheadActual  10: 4096 op, 13700.00 ns, 3.3447 ns/op
+OverheadActual  11: 4096 op, 14400.00 ns, 3.5156 ns/op
+OverheadActual  12: 4096 op, 13800.00 ns, 3.3691 ns/op
+OverheadActual  13: 4096 op, 13800.00 ns, 3.3691 ns/op
+OverheadActual  14: 4096 op, 33900.00 ns, 8.2764 ns/op
+OverheadActual  15: 4096 op, 14900.00 ns, 3.6377 ns/op
+
+WorkloadWarmup   1: 4096 op, 700889800.00 ns, 171.1157 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 4096 op, 647173600.00 ns, 158.0014 us/op
+WorkloadActual   2: 4096 op, 480948700.00 ns, 117.4191 us/op
+WorkloadActual   3: 4096 op, 335825700.00 ns, 81.9887 us/op
+
+// AfterActualRun
+WorkloadResult   1: 4096 op, 647158900.00 ns, 157.9978 us/op
+WorkloadResult   2: 4096 op, 480934000.00 ns, 117.4155 us/op
+WorkloadResult   3: 4096 op, 335811000.00 ns, 81.9851 us/op
+// GC:  11 0 0 69093800 4096
+// Threading:  0 0 4096
+
+// AfterAll
+// Benchmark Process 82796 has exited with code 0.
+
+Mean = 119.133 μs, StdErr = 21.960 μs (18.43%), N = 3, StdDev = 38.035 μs
+Min = 81.985 μs, Q1 = 99.700 μs, Median = 117.416 μs, Q3 = 137.707 μs, Max = 157.998 μs
+IQR = 38.006 μs, LowerFence = 42.691 μs, UpperFence = 194.716 μs
+ConfidenceInterval = [-574.775 μs; 813.040 μs] (CI 99.9%), Margin = 693.908 μs (582.47% of Mean)
+Skewness = 0.05, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 1 (16,7 %) benchmark(s) to run. Estimated finish 2025-07-26 10:04 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Hög prestanda)
+// **************************
+// Benchmark: FastNormBenchmarks.BulkInsert_Small: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet e928f797-6ef8-4df4-a0aa-35a67e0a5b96.dll --anonymousPipes 1464 1380 --benchmarkName nORM.Benchmarks.FastNormBenchmarks.BulkInsert_Small --job "IterationCount=3, WarmupCount=1" --benchmarkId 5 in C:\aicode\nORM\benchmarks\bin\Release\net8.0\e928f797-6ef8-4df4-a0aa-35a67e0a5b96\bin\Release\net8.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.13.12
+// Runtime=.NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2,AES,BMI1,BMI2,FMA,LZCNT,PCLMUL,POPCNT VectorSize=256
+// Job: Job-SKPUFR(IterationCount=3, WarmupCount=1)
+
+?? Setting up fast nORM benchmark...
+? Fast nORM benchmark setup complete!
+OverheadJitting  1: 1 op, 209600.00 ns, 209.6000 us/op
+WorkloadJitting  1: 1 op, 7629800.00 ns, 7.6298 ms/op
+
+OverheadJitting  2: 16 op, 182600.00 ns, 11.4125 us/op
+WorkloadJitting  2: 16 op, 8307600.00 ns, 519.2250 us/op
+
+WorkloadPilot    1: 16 op, 7674600.00 ns, 479.6625 us/op
+WorkloadPilot    2: 32 op, 17730900.00 ns, 554.0906 us/op
+WorkloadPilot    3: 64 op, 37913100.00 ns, 592.3922 us/op
+WorkloadPilot    4: 128 op, 54246800.00 ns, 423.8031 us/op
+WorkloadPilot    5: 256 op, 138680500.00 ns, 541.7207 us/op
+WorkloadPilot    6: 512 op, 272168200.00 ns, 531.5785 us/op
+WorkloadPilot    7: 1024 op, 578587800.00 ns, 565.0271 us/op
+
+OverheadWarmup   1: 1024 op, 4100.00 ns, 4.0039 ns/op
+OverheadWarmup   2: 1024 op, 2500.00 ns, 2.4414 ns/op
+OverheadWarmup   3: 1024 op, 2400.00 ns, 2.3438 ns/op
+OverheadWarmup   4: 1024 op, 2700.00 ns, 2.6367 ns/op
+OverheadWarmup   5: 1024 op, 2500.00 ns, 2.4414 ns/op
+OverheadWarmup   6: 1024 op, 2500.00 ns, 2.4414 ns/op
+OverheadWarmup   7: 1024 op, 2500.00 ns, 2.4414 ns/op
+
+OverheadActual   1: 1024 op, 2500.00 ns, 2.4414 ns/op
+OverheadActual   2: 1024 op, 2400.00 ns, 2.3438 ns/op
+OverheadActual   3: 1024 op, 2400.00 ns, 2.3438 ns/op
+OverheadActual   4: 1024 op, 2800.00 ns, 2.7344 ns/op
+OverheadActual   5: 1024 op, 2300.00 ns, 2.2461 ns/op
+OverheadActual   6: 1024 op, 2300.00 ns, 2.2461 ns/op
+OverheadActual   7: 1024 op, 2300.00 ns, 2.2461 ns/op
+OverheadActual   8: 1024 op, 2400.00 ns, 2.3438 ns/op
+OverheadActual   9: 1024 op, 2300.00 ns, 2.2461 ns/op
+OverheadActual  10: 1024 op, 2400.00 ns, 2.3438 ns/op
+OverheadActual  11: 1024 op, 2300.00 ns, 2.2461 ns/op
+OverheadActual  12: 1024 op, 2300.00 ns, 2.2461 ns/op
+OverheadActual  13: 1024 op, 2400.00 ns, 2.3438 ns/op
+OverheadActual  14: 1024 op, 2300.00 ns, 2.2461 ns/op
+OverheadActual  15: 1024 op, 2500.00 ns, 2.4414 ns/op
+
+WorkloadWarmup   1: 1024 op, 317413100.00 ns, 309.9737 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 1024 op, 278750700.00 ns, 272.2175 us/op
+WorkloadActual   2: 1024 op, 274785400.00 ns, 268.3451 us/op
+WorkloadActual   3: 1024 op, 289144700.00 ns, 282.3679 us/op
+
+// AfterActualRun
+WorkloadResult   1: 1024 op, 278748300.00 ns, 272.2151 us/op
+WorkloadResult   2: 1024 op, 274783000.00 ns, 268.3428 us/op
+WorkloadResult   3: 1024 op, 289142300.00 ns, 282.3655 us/op
+// GC:  10 0 0 68285336 1024
+// Threading:  0 0 1024
+
+// AfterAll
+// Benchmark Process 73492 has exited with code 0.
+
+Mean = 274.308 μs, StdErr = 4.181 μs (1.52%), N = 3, StdDev = 7.242 μs
+Min = 268.343 μs, Q1 = 270.279 μs, Median = 272.215 μs, Q3 = 277.290 μs, Max = 282.366 μs
+IQR = 7.011 μs, LowerFence = 259.762 μs, UpperFence = 287.807 μs
+ConfidenceInterval = [142.190 μs; 406.425 μs] (CI 99.9%), Margin = 132.118 μs (48.16% of Mean)
+Skewness = 0.26, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 0 (0,0 %) benchmark(s) to run. Estimated finish 2025-07-26 10:04 (0h 0m from now) **
+Successfully reverted power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Hög prestanda)
+// ***** BenchmarkRunner: Finish  *****
+
+// * Export *
+  BenchmarkDotNet.Artifacts\results\nORM.Benchmarks.FastNormBenchmarks-report.csv
+  BenchmarkDotNet.Artifacts\results\nORM.Benchmarks.FastNormBenchmarks-report-github.md
+  BenchmarkDotNet.Artifacts\results\nORM.Benchmarks.FastNormBenchmarks-report.html
+
+// * Detailed results *
+FastNormBenchmarks.Count_Operation: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+Runtime = .NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2; GC = Concurrent Workstation
+Mean = 20.183 μs, StdErr = 1.671 μs (8.28%), N = 3, StdDev = 2.894 μs
+Min = 17.893 μs, Q1 = 18.556 μs, Median = 19.218 μs, Q3 = 21.327 μs, Max = 23.436 μs
+IQR = 2.771 μs, LowerFence = 14.399 μs, UpperFence = 25.484 μs
+ConfidenceInterval = [-32.621 μs; 72.986 μs] (CI 99.9%), Margin = 52.804 μs (261.63% of Mean)
+Skewness = 0.3, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[15.922 μs ; 21.190 μs) | @@
+[21.190 μs ; 26.070 μs) | @
+---------------------------------------------------
+
+FastNormBenchmarks.Query_Simple: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+Runtime = .NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2; GC = Concurrent Workstation
+Mean = 56.284 μs, StdErr = 2.740 μs (4.87%), N = 3, StdDev = 4.747 μs
+Min = 53.405 μs, Q1 = 53.545 μs, Median = 53.685 μs, Q3 = 57.724 μs, Max = 61.763 μs
+IQR = 4.179 μs, LowerFence = 47.277 μs, UpperFence = 63.993 μs
+ConfidenceInterval = [-30.311 μs; 142.880 μs] (CI 99.9%), Margin = 86.595 μs (153.85% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[53.264 μs ; 61.903 μs) | @@@
+---------------------------------------------------
+
+FastNormBenchmarks.Insert_Single: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+Runtime = .NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2; GC = Concurrent Workstation
+Mean = 63.691 μs, StdErr = 0.245 μs (0.38%), N = 3, StdDev = 0.424 μs
+Min = 63.343 μs, Q1 = 63.455 μs, Median = 63.567 μs, Q3 = 63.865 μs, Max = 64.163 μs
+IQR = 0.410 μs, LowerFence = 62.840 μs, UpperFence = 64.480 μs
+ConfidenceInterval = [55.961 μs; 71.421 μs] (CI 99.9%), Margin = 7.730 μs (12.14% of Mean)
+Skewness = 0.27, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[62.958 μs ; 64.549 μs) | @@@
+---------------------------------------------------
+
+FastNormBenchmarks.Query_Complex: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+Runtime = .NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2; GC = Concurrent Workstation
+Mean = 115.103 μs, StdErr = 14.079 μs (12.23%), N = 3, StdDev = 24.385 μs
+Min = 87.856 μs, Q1 = 105.216 μs, Median = 122.576 μs, Q3 = 128.726 μs, Max = 134.877 μs
+IQR = 23.511 μs, LowerFence = 69.950 μs, UpperFence = 163.992 μs
+ConfidenceInterval = [-329.773 μs; 559.979 μs] (CI 99.9%), Margin = 444.876 μs (386.50% of Mean)
+Skewness = -0.28, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[ 65.664 μs ; 106.535 μs) | @
+[106.535 μs ; 157.068 μs) | @@
+---------------------------------------------------
+
+FastNormBenchmarks.Query_Join: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+Runtime = .NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2; GC = Concurrent Workstation
+Mean = 119.133 μs, StdErr = 21.960 μs (18.43%), N = 3, StdDev = 38.035 μs
+Min = 81.985 μs, Q1 = 99.700 μs, Median = 117.416 μs, Q3 = 137.707 μs, Max = 157.998 μs
+IQR = 38.006 μs, LowerFence = 42.691 μs, UpperFence = 194.716 μs
+ConfidenceInterval = [-574.775 μs; 813.040 μs] (CI 99.9%), Margin = 693.908 μs (582.47% of Mean)
+Skewness = 0.05, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[ 65.087 μs ; 134.314 μs) | @@
+[134.314 μs ; 192.611 μs) | @
+---------------------------------------------------
+
+FastNormBenchmarks.BulkInsert_Small: Job-BRAPQQ(IterationCount=3, WarmupCount=1)
+Runtime = .NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2; GC = Concurrent Workstation
+Mean = 274.308 μs, StdErr = 4.181 μs (1.52%), N = 3, StdDev = 7.242 μs
+Min = 268.343 μs, Q1 = 270.279 μs, Median = 272.215 μs, Q3 = 277.290 μs, Max = 282.366 μs
+IQR = 7.011 μs, LowerFence = 259.762 μs, UpperFence = 287.807 μs
+ConfidenceInterval = [142.190 μs; 406.425 μs] (CI 99.9%), Margin = 132.118 μs (48.16% of Mean)
+Skewness = 0.26, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[263.689 μs ; 276.869 μs) | @@
+[276.869 μs ; 288.956 μs) | @
+---------------------------------------------------
+
+// * Summary *
+
+BenchmarkDotNet v0.13.12, Windows 11 (10.0.26100.4652)
+Intel Core i7-10750H CPU 2.60GHz, 1 CPU, 12 logical and 6 physical cores
+.NET SDK 9.0.103
+  [Host]     : .NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2
+  Job-BRAPQQ : .NET 8.0.13 (8.0.1325.6609), X64 RyuJIT AVX2
+
+IterationCount=3  WarmupCount=1  
+
+| Method           | Mean      | Error      | StdDev    | Gen0   | Allocated |
+|----------------- |----------:|-----------:|----------:|-------:|----------:|
+| Count_Operation  |  20.18 μs |  52.804 μs |  2.894 μs | 1.0986 |   7.03 KB |
+| Query_Simple     |  56.28 μs |  86.595 μs |  4.747 μs | 1.2207 |   8.22 KB |
+| Insert_Single    |  63.69 μs |   7.730 μs |  0.424 μs | 0.6104 |   4.24 KB |
+| Query_Complex    | 115.10 μs | 444.876 μs | 24.385 μs | 1.7090 |  11.87 KB |
+| Query_Join       | 119.13 μs | 693.908 μs | 38.035 μs | 2.6855 |  16.47 KB |
+| BulkInsert_Small | 274.31 μs | 132.118 μs |  7.242 μs | 9.7656 |  65.12 KB |
+
+// * Legends *
+  Mean      : Arithmetic mean of all measurements
+  Error     : Half of 99.9% confidence interval
+  StdDev    : Standard deviation of all measurements
+  Gen0      : GC Generation 0 collects per 1000 operations
+  Allocated : Allocated memory per single operation (managed only, inclusive, 1KB = 1024B)
+  1 μs      : 1 Microsecond (0.000001 sec)
+
+// * Diagnostic Output - MemoryDiagnoser *
+
+
+// ***** BenchmarkRunner: End *****
+Run time: 00:00:26 (26.64 sec), executed benchmarks: 6
+
+Global total time: 00:00:32 (32.79 sec), executed benchmarks: 6
+// * Artifacts cleanup *
+Artifacts cleanup is finished
