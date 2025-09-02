@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -392,7 +393,7 @@ namespace nORM.Navigation
     /// </summary>
     public sealed class NavigationContext
     {
-        private readonly HashSet<string> _loadedProperties = new();
+        private readonly ConcurrentDictionary<string, byte> _loadedProperties = new();
         
         public DbContext DbContext { get; }
         public Type EntityType { get; }
@@ -403,9 +404,9 @@ namespace nORM.Navigation
             EntityType = entityType;
         }
         
-        public bool IsLoaded(string propertyName) => _loadedProperties.Contains(propertyName);
-        public void MarkAsLoaded(string propertyName) => _loadedProperties.Add(propertyName);
-        public void MarkAsUnloaded(string propertyName) => _loadedProperties.Remove(propertyName);
+        public bool IsLoaded(string propertyName) => _loadedProperties.ContainsKey(propertyName);
+        public void MarkAsLoaded(string propertyName) => _loadedProperties[propertyName] = 0;
+        public void MarkAsUnloaded(string propertyName) => _loadedProperties.TryRemove(propertyName, out _);
     }
 
     /// <summary>
@@ -423,6 +424,7 @@ namespace nORM.Navigation
         private readonly NavigationContext _context;
         private List<T>? _data;
         private bool _isLoaded;
+        private readonly SemaphoreSlim _loadLock = new(1, 1);
 
         public LazyNavigationCollection(object parent, PropertyInfo property, NavigationContext context)
         {
@@ -434,11 +436,22 @@ namespace nORM.Navigation
 
         private async Task EnsureLoadedAsync()
         {
-            if (_isLoaded) return;
-            
-            await NavigationPropertyExtensions.LoadNavigationPropertyAsync(_parent, _property, _context, CancellationToken.None);
-            _data = (List<T>?)_property.GetValue(_parent) ?? new List<T>();
-            _isLoaded = true;
+            if (Volatile.Read(ref _isLoaded)) return;
+
+            await _loadLock.WaitAsync();
+            try
+            {
+                if (!_isLoaded)
+                {
+                    await NavigationPropertyExtensions.LoadNavigationPropertyAsync(_parent, _property, _context, CancellationToken.None);
+                    _data = (List<T>?)_property.GetValue(_parent) ?? new List<T>();
+                    Volatile.Write(ref _isLoaded, true);
+                }
+            }
+            finally
+            {
+                _loadLock.Release();
+            }
         }
 
         public IEnumerator<T> GetEnumerator()
@@ -452,31 +465,71 @@ namespace nORM.Navigation
         public void Add(T item)
         {
             EnsureLoadedAsync().GetAwaiter().GetResult();
-            _data!.Add(item);
+            _loadLock.Wait();
+            try
+            {
+                _data!.Add(item);
+            }
+            finally
+            {
+                _loadLock.Release();
+            }
         }
 
         public void Clear()
         {
             EnsureLoadedAsync().GetAwaiter().GetResult();
-            _data!.Clear();
+            _loadLock.Wait();
+            try
+            {
+                _data!.Clear();
+            }
+            finally
+            {
+                _loadLock.Release();
+            }
         }
 
         public bool Contains(T item)
         {
             EnsureLoadedAsync().GetAwaiter().GetResult();
-            return _data!.Contains(item);
+            _loadLock.Wait();
+            try
+            {
+                return _data!.Contains(item);
+            }
+            finally
+            {
+                _loadLock.Release();
+            }
         }
 
         public void CopyTo(T[] array, int arrayIndex)
         {
             EnsureLoadedAsync().GetAwaiter().GetResult();
-            _data!.CopyTo(array, arrayIndex);
+            _loadLock.Wait();
+            try
+            {
+                _data!.CopyTo(array, arrayIndex);
+            }
+            finally
+            {
+                _loadLock.Release();
+            }
         }
 
         public bool Remove(T item)
         {
             EnsureLoadedAsync().GetAwaiter().GetResult();
-            return _data!.Remove(item);
+            _loadLock.Wait();
+            try
+            {
+                return _data!.Remove(item);
+            }
+            finally
+            {
+                _loadLock.Release();
+            }
         }
 
         public int Count
@@ -484,7 +537,15 @@ namespace nORM.Navigation
             get
             {
                 EnsureLoadedAsync().GetAwaiter().GetResult();
-                return _data!.Count;
+                _loadLock.Wait();
+                try
+                {
+                    return _data!.Count;
+                }
+                finally
+                {
+                    _loadLock.Release();
+                }
             }
         }
 
@@ -493,19 +554,43 @@ namespace nORM.Navigation
         public int IndexOf(T item)
         {
             EnsureLoadedAsync().GetAwaiter().GetResult();
-            return _data!.IndexOf(item);
+            _loadLock.Wait();
+            try
+            {
+                return _data!.IndexOf(item);
+            }
+            finally
+            {
+                _loadLock.Release();
+            }
         }
 
         public void Insert(int index, T item)
         {
             EnsureLoadedAsync().GetAwaiter().GetResult();
-            _data!.Insert(index, item);
+            _loadLock.Wait();
+            try
+            {
+                _data!.Insert(index, item);
+            }
+            finally
+            {
+                _loadLock.Release();
+            }
         }
 
         public void RemoveAt(int index)
         {
             EnsureLoadedAsync().GetAwaiter().GetResult();
-            _data!.RemoveAt(index);
+            _loadLock.Wait();
+            try
+            {
+                _data!.RemoveAt(index);
+            }
+            finally
+            {
+                _loadLock.Release();
+            }
         }
 
         public T this[int index]
@@ -513,12 +598,28 @@ namespace nORM.Navigation
             get
             {
                 EnsureLoadedAsync().GetAwaiter().GetResult();
-                return _data![index];
+                _loadLock.Wait();
+                try
+                {
+                    return _data![index];
+                }
+                finally
+                {
+                    _loadLock.Release();
+                }
             }
             set
             {
                 EnsureLoadedAsync().GetAwaiter().GetResult();
-                _data![index] = value;
+                _loadLock.Wait();
+                try
+                {
+                    _data![index] = value;
+                }
+                finally
+                {
+                    _loadLock.Release();
+                }
             }
         }
     }
@@ -533,6 +634,7 @@ namespace nORM.Navigation
         private readonly NavigationContext _context;
         private T? _value;
         private bool _isLoaded;
+        private readonly object _loadLock = new();
 
         public LazyNavigationReference(object parent, PropertyInfo property, NavigationContext context)
         {
@@ -546,18 +648,27 @@ namespace nORM.Navigation
         {
             get
             {
-                if (!_isLoaded)
+                if (Volatile.Read(ref _isLoaded))
+                    return _value;
+
+                lock (_loadLock)
                 {
-                    NavigationPropertyExtensions.LoadNavigationPropertyAsync(_parent, _property, _context, CancellationToken.None)
-                        .GetAwaiter().GetResult();
+                    if (!_isLoaded)
+                    {
+                        NavigationPropertyExtensions.LoadNavigationPropertyAsync(_parent, _property, _context, CancellationToken.None)
+                            .GetAwaiter().GetResult();
+                    }
+                    return _value;
                 }
-                return _value;
             }
             set
             {
-                _value = value;
-                _isLoaded = true;
-                _context.MarkAsLoaded(_property.Name);
+                lock (_loadLock)
+                {
+                    _value = value;
+                    Volatile.Write(ref _isLoaded, true);
+                    _context.MarkAsLoaded(_property.Name);
+                }
             }
         }
 
