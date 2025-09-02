@@ -319,12 +319,12 @@ namespace nORM.Query
                     return Visit(node.Arguments[0]);
 
                 case "Take":
-                    if (TryGetConstantValue(node.Arguments[1], out int take))
+                    if (TryGetIntValue(node.Arguments[1], out int take))
                         _take = take;
                     return Visit(node.Arguments[0]);
 
                 case "Skip":
-                    if (TryGetConstantValue(node.Arguments[1], out int skip))
+                    if (TryGetIntValue(node.Arguments[1], out int skip))
                         _skip = skip;
                     return Visit(node.Arguments[0]);
 
@@ -644,7 +644,38 @@ namespace nORM.Query
             return node;
         }
 
-        private static bool TryGetConstantValue(Expression expr, out int value)
+        private static bool TryGetConstantValue(Expression e, out object? value)
+        {
+            var stack = new Stack<MemberExpression>();
+            while (e is MemberExpression me)
+            {
+                stack.Push(me);
+                e = me.Expression!;
+            }
+
+            if (e is not ConstantExpression ce)
+            {
+                value = null;
+                return false;
+            }
+
+            object? current = ce.Value;
+            while (stack.Count > 0)
+            {
+                var m = stack.Pop();
+                current = m.Member switch
+                {
+                    FieldInfo fi => fi.GetValue(current),
+                    PropertyInfo pi => pi.GetValue(current),
+                    _ => current
+                };
+            }
+
+            value = current;
+            return true;
+        }
+
+        private static bool TryGetIntValue(Expression expr, out int value)
         {
             value = 0;
             if (expr is ConstantExpression c && c.Value is int i)
@@ -700,11 +731,16 @@ namespace nORM.Query
                 _sql.Append(_mapping.Columns.First(c => c.Prop.Name == node.Member.Name).EscCol);
                 return node;
             }
-            var value = Expression.Lambda(node).Compile().DynamicInvoke();
-            var paramName = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
-            _params[paramName] = value ?? DBNull.Value;
-            _sql.Append(paramName);
-            return node;
+
+            if (TryGetConstantValue(node, out var value))
+            {
+                var paramName = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
+                _params[paramName] = value ?? DBNull.Value;
+                _sql.Append(paramName);
+                return node;
+            }
+
+            throw new NotSupportedException($"Member '{node.Member.Name}' is not supported in this context.");
         }
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
@@ -1097,27 +1133,24 @@ namespace nORM.Query
 
         private static Func<object, object> CreateObjectKeySelector(LambdaExpression keySelector)
         {
-            var compiledSelector = keySelector.Compile();
             var parameterType = keySelector.Parameters[0].Type;
             var returnType = keySelector.ReturnType;
 
-            // Create a more efficient wrapper that avoids unnecessary boxing when possible
-            return obj => 
+            var objParam = Expression.Parameter(typeof(object), "obj");
+            var castParam = Expression.Convert(objParam, parameterType);
+            var body = new ParameterReplacer(keySelector.Parameters[0], castParam).Visit(keySelector.Body)!;
+            var convertBody = Expression.Convert(body, typeof(object));
+            var invoker = Expression.Lambda<Func<object, object>>(convertBody, objParam).Compile();
+
+            return obj =>
             {
                 try
                 {
-                    // Cast the input to the expected parameter type
-                    var typedInput = Convert.ChangeType(obj, parameterType);
-                    var result = compiledSelector.DynamicInvoke(typedInput);
-                    
-                    // Handle null results
+                    var result = invoker(obj);
                     if (result == null)
                         return DBNull.Value;
-                        
-                    // For value types, ensure proper boxing
                     if (returnType.IsValueType && result.GetType() != typeof(object))
                         return result;
-                        
                     return result;
                 }
                 catch (Exception ex)
@@ -1126,6 +1159,21 @@ namespace nORM.Query
                         $"Error executing key selector for type {parameterType.Name}: {ex.Message}", ex);
                 }
             };
+        }
+
+        private sealed class ParameterReplacer : ExpressionVisitor
+        {
+            private readonly ParameterExpression _from;
+            private readonly Expression _to;
+
+            public ParameterReplacer(ParameterExpression from, Expression to)
+            {
+                _from = from;
+                _to = to;
+            }
+
+            protected override Expression VisitParameter(ParameterExpression node) =>
+                node == _from ? _to : base.VisitParameter(node);
         }
     }
 }
