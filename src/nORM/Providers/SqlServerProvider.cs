@@ -66,16 +66,29 @@ namespace nORM.Providers
 
             using var table = GetDataTable(m, insertableCols);
 
-            var count = 0;
+            var batchCount = 0;
+            var total = 0;
             foreach (var entity in entities)
             {
                 table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
-                count++;
+                batchCount++;
+                if (batchCount >= ctx.Options.BulkBatchSize)
+                {
+                    await bulkCopy.WriteToServerAsync(table, ct);
+                    total += batchCount;
+                    table.Clear();
+                    batchCount = 0;
+                }
             }
 
-            await bulkCopy.WriteToServerAsync(table, ct);
-            ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, count, sw.Elapsed);
-            return count;
+            if (batchCount > 0)
+            {
+                await bulkCopy.WriteToServerAsync(table, ct);
+                total += batchCount;
+            }
+
+            ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, total, sw.Elapsed);
+            return total;
         }
 
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
@@ -123,15 +136,28 @@ namespace nORM.Providers
 
             using var table = GetDataTable(m, insertableCols);
 
-            var count = 0;
+            var batchCount = 0;
+            var total = 0;
             foreach (var entity in entities)
             {
                 table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
-                count++;
+                batchCount++;
+                if (batchCount >= ctx.Options.BulkBatchSize)
+                {
+                    await bulkCopy.WriteToServerAsync(table, ct);
+                    total += batchCount;
+                    table.Clear();
+                    batchCount = 0;
+                }
             }
 
-            await bulkCopy.WriteToServerAsync(table, ct);
-            return count;
+            if (batchCount > 0)
+            {
+                await bulkCopy.WriteToServerAsync(table, ct);
+                total += batchCount;
+            }
+
+            return total;
         }
 
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
@@ -157,9 +183,20 @@ namespace nORM.Providers
             })
             {
                 using var table = GetKeyTable(m);
+                var batchCount = 0;
                 foreach (var entity in entities)
+                {
                     table.Rows.Add(m.KeyColumns.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
-                await bulkCopy.WriteToServerAsync(table, ct);
+                    batchCount++;
+                    if (batchCount >= ctx.Options.BulkBatchSize)
+                    {
+                        await bulkCopy.WriteToServerAsync(table, ct);
+                        table.Clear();
+                        batchCount = 0;
+                    }
+                }
+                if (batchCount > 0)
+                    await bulkCopy.WriteToServerAsync(table, ct);
             }
 
             var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
