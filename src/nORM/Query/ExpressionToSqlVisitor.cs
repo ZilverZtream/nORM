@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using nORM.Core;
 using nORM.Mapping;
@@ -72,11 +73,15 @@ namespace nORM.Query
                 }
             }
 
-            var value = Expression.Lambda(node).Compile().DynamicInvoke();
-            var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-            _params[paramName] = value ?? DBNull.Value;
-            _sql.Append(paramName);
-            return node;
+            if (TryGetConstantValue(node, out var value))
+            {
+                var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                _params[paramName] = value ?? DBNull.Value;
+                _sql.Append(paramName);
+                return node;
+            }
+
+            throw new NotSupportedException($"Member '{node.Member.Name}' is not supported in this context.");
         }
 
         protected override Expression VisitConstant(ConstantExpression node)
@@ -96,24 +101,42 @@ namespace nORM.Query
                 {
                     case "Contains":
                         _sql.Append(" LIKE ");
-                        var containsValue = Expression.Lambda(node.Arguments[0]).Compile().DynamicInvoke();
-                        var containsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                        _params[containsParam] = $"%{containsValue}%";
-                        _sql.Append(containsParam);
+                        if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
+                        {
+                            var containsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                            _params[containsParam] = $"%{EscapeLikePattern(cs)}%";
+                            _sql.Append(containsParam).Append(" ESCAPE '\\'");
+                        }
+                        else
+                        {
+                            throw new NotSupportedException("Only constant values are supported in Contains().");
+                        }
                         break;
                     case "StartsWith":
                         _sql.Append(" LIKE ");
-                        var startsValue = Expression.Lambda(node.Arguments[0]).Compile().DynamicInvoke();
-                        var startsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                        _params[startsParam] = $"{startsValue}%";
-                        _sql.Append(startsParam);
+                        if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
+                        {
+                            var startsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                            _params[startsParam] = $"{EscapeLikePattern(ss)}%";
+                            _sql.Append(startsParam).Append(" ESCAPE '\\'");
+                        }
+                        else
+                        {
+                            throw new NotSupportedException("Only constant values are supported in StartsWith().");
+                        }
                         break;
                     case "EndsWith":
                         _sql.Append(" LIKE ");
-                        var endsValue = Expression.Lambda(node.Arguments[0]).Compile().DynamicInvoke();
-                        var endsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                        _params[endsParam] = $"%{endsValue}";
-                        _sql.Append(endsParam);
+                        if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
+                        {
+                            var endsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                            _params[endsParam] = $"%{EscapeLikePattern(es)}";
+                            _sql.Append(endsParam).Append(" ESCAPE '\\'");
+                        }
+                        else
+                        {
+                            throw new NotSupportedException("Only constant values are supported in EndsWith().");
+                        }
                         break;
                     default:
                         throw new NotSupportedException($"String method '{node.Method.Name}' not supported.");
@@ -127,5 +150,42 @@ namespace nORM.Query
         }
 
         public Dictionary<string, object> GetParameters() => _params;
+
+        private static bool TryGetConstantValue(Expression e, out object? value)
+        {
+            var stack = new Stack<MemberExpression>();
+            while (e is MemberExpression me)
+            {
+                stack.Push(me);
+                e = me.Expression!;
+            }
+
+            if (e is not ConstantExpression ce)
+            {
+                value = null;
+                return false;
+            }
+
+            object? current = ce.Value;
+            while (stack.Count > 0)
+            {
+                var m = stack.Pop();
+                current = m.Member switch
+                {
+                    FieldInfo fi => fi.GetValue(current),
+                    PropertyInfo pi => pi.GetValue(current),
+                    _ => current
+                };
+            }
+
+            value = current;
+            return true;
+        }
+
+        private static string EscapeLikePattern(string value) =>
+            value
+                .Replace("\\", "\\\\")
+                .Replace("%", "\\%")
+                .Replace("_", "\\_");
     }
 }
