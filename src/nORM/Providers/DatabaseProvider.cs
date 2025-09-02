@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Diagnostics;
@@ -17,7 +16,7 @@ namespace nORM.Providers
 {
     public abstract class DatabaseProvider
     {
-        private static readonly ConcurrentDictionary<(Type Type, string Operation), string> _sqlCache = new();
+        private static readonly ConcurrentLruCache<(Type Type, string Operation), string> _sqlCache = new(maxSize: 1000);
         
         public string ParamPrefix { get; protected init; } = "@";
         public abstract string Escape(string id);
