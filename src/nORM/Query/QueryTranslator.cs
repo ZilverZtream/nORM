@@ -618,28 +618,30 @@ namespace nORM.Query
 
         private Expression HandleSetOperation(MethodCallExpression node)
         {
+            _isAggregate = true;
+            _singleResult = true;
+
+            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex);
+            var subPlan = subTranslator.Translate(node.Arguments[0]);
+            _paramIndex = subTranslator._paramIndex;
+            _mapping = subTranslator._mapping;
+
             switch (node.Method.Name)
             {
                 case "Any":
-                    _sql.Insert(0, "SELECT CASE WHEN EXISTS(");
+                    _sql.Append("SELECT CASE WHEN EXISTS(");
+                    _sql.Append(subPlan.Sql);
                     _sql.Append(") THEN 1 ELSE 0 END");
-                    if (node.Arguments.Count > 1)
-                    {
-                        var predicate = (LambdaExpression)StripQuotes(node.Arguments[1]);
-                    }
                     break;
                 case "All":
-                    _sql.Insert(0, "SELECT CASE WHEN NOT EXISTS(");
-                    if (node.Arguments.Count > 1)
-                    {
-                        var predicate = (LambdaExpression)StripQuotes(node.Arguments[1]);
-                    }
+                    _sql.Append("SELECT CASE WHEN NOT EXISTS(");
+                    _sql.Append(subPlan.Sql);
                     _sql.Append(") THEN 1 ELSE 0 END");
                     break;
                 case "Contains":
-                    break;
+                    return Visit(node.Arguments[0]);
             }
-            return Visit(node.Arguments[0]);
+            return node;
         }
 
         private static bool TryGetConstantValue(Expression expr, out int value)
