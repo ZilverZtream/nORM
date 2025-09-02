@@ -13,6 +13,7 @@ using nORM.Core;
 using nORM.Execution;
 using nORM.Internal;
 using nORM.Navigation;
+using nORM.Mapping;
 
 #nullable enable
 
@@ -130,19 +131,22 @@ namespace nORM.Query
             var listType = typeof(List<>).MakeGenericType(plan.ElementType);
             var list = (IList)Activator.CreateInstance(listType)!;
 
+            var trackable = plan.ElementType.IsClass &&
+                             !plan.ElementType.Name.StartsWith("<>") &&
+                             plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
+            TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
+
             await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
             while (await reader.ReadAsync(ct))
             {
                 var entity = plan.Materializer(reader);
-                
-                // Automatically enable lazy loading for entity types (not for projections/anonymous types)
-                if (plan.ElementType.IsClass && 
-                    !plan.ElementType.Name.StartsWith("<>") && // Not anonymous type
-                    plan.ElementType.GetConstructor(Type.EmptyTypes) != null) // Has parameterless constructor
+
+                if (trackable)
                 {
                     NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
+                    _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, entityMap!);
                 }
-                
+
                 list.Add(entity);
             }
 
@@ -180,7 +184,13 @@ namespace nORM.Query
             var children = new List<object>();
             await using (var reader = await cmd.ExecuteReaderAsync(ct))
             {
-                while (await reader.ReadAsync(ct)) children.Add(childMaterializer(reader));
+                while (await reader.ReadAsync(ct))
+                {
+                    var child = childMaterializer(reader);
+                    NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
+                    _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
+                    children.Add(child);
+                }
             }
 
             var childGroups = children.GroupBy(info.InnerKeySelector).ToDictionary(g => g.Key!, g => g.ToList());
@@ -224,7 +234,13 @@ namespace nORM.Query
             var children = new List<object>();
             await using (var reader = await cmd.ExecuteReaderAsync(ct))
             {
-                while (await reader.ReadAsync(ct)) children.Add(childMaterializer(reader));
+                while (await reader.ReadAsync(ct))
+                {
+                    var child = childMaterializer(reader);
+                    NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
+                    _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
+                    children.Add(child);
+                }
             }
 
             var childGroups = children.GroupBy(include.Relation.ForeignKey.Getter).ToDictionary(g => g.Key!, g => g.ToList());
