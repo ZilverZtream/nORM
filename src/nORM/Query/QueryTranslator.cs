@@ -621,26 +621,62 @@ namespace nORM.Query
             _isAggregate = true;
             _singleResult = true;
 
+            var source = node.Arguments[0];
+            var elementType = source.Type.GetGenericArguments().First();
+
+            if (node.Method.Name == nameof(Queryable.Any) && node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression anyPred)
+            {
+                source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(anyPred));
+            }
+            else if (node.Method.Name == nameof(Queryable.All) && node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression allPred)
+            {
+                var param = allPred.Parameters[0];
+                var notBody = Expression.Not(allPred.Body);
+                var notPred = Expression.Lambda(notBody, param);
+                source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(notPred));
+            }
+            else if (node.Method.Name == nameof(Queryable.Contains) && node.Arguments.Count == 2)
+            {
+                var param = Expression.Parameter(elementType, "x");
+                var value = Expression.Convert(node.Arguments[1], elementType);
+                var eq = Expression.Equal(param, value);
+                var lambda = Expression.Lambda(eq, param);
+                source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
+            }
+
             var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex);
-            var subPlan = subTranslator.Translate(node.Arguments[0]);
+            var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator._paramIndex;
             _mapping = subTranslator._mapping;
 
+            var subSqlBuilder = new StringBuilder();
+            var fromIndex = subPlan.Sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
+            if (fromIndex >= 0)
+            {
+                subSqlBuilder.Append("SELECT 1 ");
+                subSqlBuilder.Append(subPlan.Sql[fromIndex..]);
+            }
+            else
+            {
+                subSqlBuilder.Append(subPlan.Sql);
+            }
+            _ctx.Provider.ApplyPaging(subSqlBuilder, 1, null);
+
             switch (node.Method.Name)
             {
-                case "Any":
+                case nameof(Queryable.Any):
+                case nameof(Queryable.Contains):
                     _sql.Append("SELECT 1 WHERE EXISTS(");
-                    _sql.Append(subPlan.Sql);
+                    _sql.Append(subSqlBuilder);
                     _sql.Append(")");
                     break;
-                case "All":
+                case nameof(Queryable.All):
                     _sql.Append("SELECT 1 WHERE NOT EXISTS(");
-                    _sql.Append(subPlan.Sql);
+                    _sql.Append(subSqlBuilder);
                     _sql.Append(")");
                     break;
-                case "Contains":
-                    return Visit(node.Arguments[0]);
             }
+
             return node;
         }
 
