@@ -44,9 +44,12 @@ namespace nORM.Core
                 _cn.Open();
 
             // Apply SQLite optimizations once on connection open
-            using var pragmaCmd = _cn.CreateCommand();
-            pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
-            pragmaCmd.ExecuteNonQuery();
+            if (_p is SqliteProvider)
+            {
+                using var pragmaCmd = _cn.CreateCommand();
+                pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
+                pragmaCmd.ExecuteNonQuery();
+            }
         }
 
         public DbConnection Connection => _cn;
