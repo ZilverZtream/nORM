@@ -25,6 +25,17 @@ namespace nORM.Providers
         public abstract string GetIdentityRetrievalString(TableMapping m);
         public abstract DbParameter CreateParameter(string name, object? value);
 
+        public virtual char LikeEscapeChar => '\\';
+
+        public virtual string EscapeLikePattern(string value)
+        {
+            var esc = LikeEscapeChar.ToString();
+            return value
+                .Replace(esc, esc + esc)
+                .Replace("%", esc + "%")
+                .Replace("_", esc + "_");
+        }
+
         #region Bulk Operations (Abstract & Fallback)
         public virtual async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
