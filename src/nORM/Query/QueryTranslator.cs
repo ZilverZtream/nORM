@@ -143,6 +143,7 @@ namespace nORM.Query
                 // Handle projections (including join result projections)
                 var constructorArgs = new LocalBuilder[newExpr.Arguments.Count];
                 var columnIndex = 0;
+                var extraColumnIndex = mapping.Columns.Length;
 
                 for (var i = 0; i < newExpr.Arguments.Count; i++)
                 {
@@ -177,6 +178,22 @@ namespace nORM.Query
                             constructorArgs[i] = il.DeclareLocal(param.Type);
                             il.Emit(OpCodes.Ldnull);
                             il.Emit(OpCodes.Stloc, constructorArgs[i]);
+                        }
+                        else if (IsScalarType(param.Type))
+                        {
+                            var endOfBlock = il.DefineLabel();
+                            il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Ldc_I4, extraColumnIndex);
+                            il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
+                            il.Emit(OpCodes.Brtrue_S, endOfBlock);
+                            il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Ldc_I4, extraColumnIndex);
+                            var readerMethod = Methods.GetReaderMethod(param.Type);
+                            il.Emit(OpCodes.Callvirt, readerMethod);
+                            if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, param.Type);
+                            il.Emit(OpCodes.Stloc, constructorArgs[i]);
+                            il.MarkLabel(endOfBlock);
+                            extraColumnIndex++;
                         }
                         else
                         {
@@ -409,6 +426,10 @@ namespace nORM.Query
 
                 case "WithRowNumber":
                     return HandleRowNumberOperation(node);
+                case "WithRank":
+                    return HandleRankOperation(node);
+                case "WithDenseRank":
+                    return HandleDenseRankOperation(node);
 
                 case "Include":
                     if (node.Arguments.Count > 1)
@@ -829,6 +850,10 @@ namespace nORM.Query
             throw new ArgumentException($"Cannot determine element type from expression of type {type}");
         }
 
+        private static bool IsScalarType(Type type) =>
+            type.IsPrimitive || type.IsEnum || type == typeof(string) ||
+            type == typeof(decimal) || type == typeof(DateTime) || type == typeof(Guid);
+
         private static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping)
         {
             var neededColumns = new HashSet<string>();
@@ -1216,6 +1241,68 @@ namespace nORM.Query
                 _sql.Insert(selectIndex, $" ROW_NUMBER() OVER ({orderByClause}) AS RowNumber,");
             }
             
+            return node;
+        }
+
+        private Expression HandleRankOperation(MethodCallExpression node)
+        {
+            // WithRank adds RANK() OVER() to the select clause
+            var sourceQuery = node.Arguments[0];
+            var resultSelector = node.Arguments[1] as LambdaExpression;
+
+            if (resultSelector == null)
+                throw new ArgumentException("WithRank requires a result selector");
+
+            Visit(sourceQuery);
+
+            _projection = resultSelector;
+
+            var orderByClause = _orderBy.Count > 0
+                ? $"ORDER BY {string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}"))}"
+                : "ORDER BY (SELECT NULL)";
+
+            if (_sql.Length == 0)
+            {
+                var select = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
+                _sql.Append($"SELECT {select}, RANK() OVER ({orderByClause}) AS Rank FROM {_mapping.EscTable}");
+            }
+            else
+            {
+                var selectIndex = _sql.ToString().IndexOf("SELECT") + 6;
+                _sql.Insert(selectIndex, $" RANK() OVER ({orderByClause}) AS Rank,");
+            }
+
+            return node;
+        }
+
+        private Expression HandleDenseRankOperation(MethodCallExpression node)
+        {
+            // WithDenseRank adds DENSE_RANK() OVER() to the select clause
+            var sourceQuery = node.Arguments[0];
+            var resultSelector = node.Arguments[1] as LambdaExpression;
+
+            if (resultSelector == null)
+                throw new ArgumentException("WithDenseRank requires a result selector");
+
+            Visit(sourceQuery);
+
+            _projection = resultSelector;
+
+            var orderByClause = _orderBy.Count > 0
+                ? $"ORDER BY {string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}"))}"
+                : "ORDER BY (SELECT NULL)";
+
+            if (_sql.Length == 0)
+            {
+                var select = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
+                _sql.Append($"SELECT {select}, DENSE_RANK() OVER ({orderByClause}) AS DenseRank FROM {_mapping.EscTable}");
+            }
+            else
+            {
+                var selectIndex = _sql.ToString().IndexOf("SELECT") + 6;
+                _sql.Insert(selectIndex, $" DENSE_RANK() OVER ({orderByClause}) AS DenseRank,");
+            }
+
             return node;
         }
 
