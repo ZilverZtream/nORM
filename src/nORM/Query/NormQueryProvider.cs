@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -22,7 +21,7 @@ namespace nORM.Query
     internal sealed class NormQueryProvider : IQueryProvider
     {
         internal readonly DbContext _ctx;
-        private static readonly ConcurrentDictionary<QueryPlanCacheKey, QueryPlan> _planCache = new();
+        private static readonly ConcurrentLruCache<QueryPlanCacheKey, QueryPlan> _planCache = new(maxSize: 1000);
 
         public NormQueryProvider(DbContext ctx) => _ctx = ctx;
 
