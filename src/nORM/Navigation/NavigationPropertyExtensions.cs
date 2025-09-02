@@ -32,8 +32,7 @@ namespace nORM.Navigation
         {
             if (entity == null) return null!;
             
-            var navContext = new NavigationContext(context, typeof(T));
-            _navigationContexts.AddOrUpdate(entity, navContext);
+            var navContext = _navigationContexts.GetValue(entity, _ => new NavigationContext(context, typeof(T)));
             
             // Initialize navigation properties with lazy loading proxies
             InitializeNavigationProperties(entity, navContext);
@@ -311,7 +310,7 @@ namespace nORM.Navigation
             {
                 var entity = materializer(reader);
                 // Enable lazy loading for the loaded entity
-                _navigationContexts.AddOrUpdate(entity, new NavigationContext(context, entityType));
+                _navigationContexts.GetValue(entity, _ => new NavigationContext(context, entityType));
                 results.Add(entity);
             }
             
@@ -339,7 +338,7 @@ namespace nORM.Navigation
             {
                 var entity = materializer(reader);
                 // Enable lazy loading for the loaded entity
-                _navigationContexts.AddOrUpdate(entity, new NavigationContext(context, entityType));
+                _navigationContexts.GetValue(entity, _ => new NavigationContext(context, entityType));
                 return entity;
             }
             
