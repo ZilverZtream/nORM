@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Data;
 using nORM.Core;
 using nORM.Mapping;
 using nORM.Internal;
@@ -347,7 +348,7 @@ namespace nORM.Navigation
             var materializer = new Query.QueryTranslator(context).CreateMaterializer(mapping, entityType);
             var results = new List<object>();
             
-            using var reader = await cmd.ExecuteReaderAsync(ct);
+            using var reader = await cmd.ExecuteReaderWithInterceptionAsync(context, CommandBehavior.Default, ct);
             while (await reader.ReadAsync(ct))
             {
                 var entity = materializer(reader);
@@ -376,7 +377,7 @@ namespace nORM.Navigation
 
             var materializer = new Query.QueryTranslator(context).CreateMaterializer(mapping, entityType);
             
-            using var reader = await cmd.ExecuteReaderAsync(ct);
+            using var reader = await cmd.ExecuteReaderWithInterceptionAsync(context, CommandBehavior.Default, ct);
             if (await reader.ReadAsync(ct))
             {
                 var entity = materializer(reader);

@@ -66,7 +66,7 @@ namespace nORM.Core
                     await using var cmd = ctx.Connection.CreateCommand();
                     cmd.CommandText = "SELECT 1";
                     cmd.CommandTimeout = (int)TimeSpan.FromSeconds(5).TotalSeconds;
-                    var result = await cmd.ExecuteScalarAsync(token);
+                    var result = await cmd.ExecuteScalarWithInterceptionAsync(ctx, token);
                     return result is 1 or 1L;
                 }, ct);
             }
@@ -200,13 +200,13 @@ namespace nORM.Core
 
                     if (operation == WriteOperation.Insert && map.KeyColumns.Any(k => k.IsDbGenerated))
                     {
-                        var newId = await cmd.ExecuteScalarAsync(token);
+                        var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, token);
                         if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
                         await transaction.CommitAsync(token);
                         return 1;
                     }
 
-                    var recordsAffected = await cmd.ExecuteNonQueryAsync(token);
+                    var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, token);
                     if (operation != WriteOperation.Insert && map.TimestampColumn != null && recordsAffected == 0)
                     {
                         throw new DBConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
@@ -245,13 +245,13 @@ namespace nORM.Core
 
                 if (map.KeyColumns.Any(k => k.IsDbGenerated))
                 {
-                    var newId = await cmd.ExecuteScalarAsync(ct);
+                    var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct);
                     if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
                     await transaction.CommitAsync(ct);
                     return 1;
                 }
 
-                var recordsAffected = await cmd.ExecuteNonQueryAsync(ct);
+                var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct);
                 await transaction.CommitAsync(ct);
                 return recordsAffected;
             }
@@ -324,7 +324,7 @@ namespace nORM.Core
 
                 var materializer = new Query.QueryTranslator(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
-                await using var reader = await cmd.ExecuteReaderAsync(token);
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
                 while (await reader.ReadAsync(token)) list.Add((T)materializer(reader));
 
                 ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
@@ -353,7 +353,7 @@ namespace nORM.Core
 
                 var materializer = new Query.QueryTranslator(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
-                await using var reader = await cmd.ExecuteReaderAsync(token);
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
                 while (await reader.ReadAsync(token)) list.Add((T)materializer(reader));
 
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);

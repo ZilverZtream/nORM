@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using nORM.Enterprise;
 
 #nullable enable
@@ -15,5 +16,6 @@ namespace nORM.Configuration
         public string TenantColumnName { get; set; } = "TenantId";
         public Action<ModelBuilder>? OnModelCreating { get; set; }
         public bool UseBatchedBulkOps { get; set; } = false;
+        public IList<IDbCommandInterceptor> CommandInterceptors { get; } = new List<IDbCommandInterceptor>();
     }
 }
