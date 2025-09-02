@@ -22,7 +22,7 @@ namespace nORM.Providers
         public string ParamPrefix { get; protected init; } = "@";
         public abstract string Escape(string id);
         public abstract void ApplyPaging(StringBuilder sb, int? limit, int? offset);
-        public abstract string GetIdentityRetrievalString();
+        public abstract string GetIdentityRetrievalString(TableMapping m);
         public abstract DbParameter CreateParameter(string name, object? value);
 
         #region Bulk Operations (Abstract & Fallback)
@@ -195,7 +195,7 @@ namespace nORM.Providers
                 var cols = m.Columns.Where(c => !c.IsDbGenerated);
                 var colNames = string.Join(", ", cols.Select(c => c.EscCol));
                 var valParams = string.Join(", ", cols.Select(c => ParamPrefix + c.PropName));
-                return $"INSERT INTO {m.EscTable} ({colNames}) VALUES ({valParams}){GetIdentityRetrievalString()}";
+                return $"INSERT INTO {m.EscTable} ({colNames}) VALUES ({valParams}){GetIdentityRetrievalString(m)}";
             });
         }
 

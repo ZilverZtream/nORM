@@ -26,7 +26,7 @@ namespace nORM.Providers
             if (offset.HasValue) sb.Append($" OFFSET {offset}");
         }
         
-        public override string GetIdentityRetrievalString() => "; SELECT last_insert_rowid();";
+        public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT last_insert_rowid();";
         
         public override DbParameter CreateParameter(string name, object? value)
         {

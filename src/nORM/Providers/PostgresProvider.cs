@@ -24,7 +24,11 @@ namespace nORM.Providers
             if (offset.HasValue) sb.Append($" OFFSET {offset}");
         }
         
-        public override string GetIdentityRetrievalString() => " RETURNING id";
+        public override string GetIdentityRetrievalString(TableMapping m)
+        {
+            var keyCol = m.KeyColumns.FirstOrDefault(c => c.IsDbGenerated);
+            return keyCol != null ? $" RETURNING {keyCol.EscCol}" : string.Empty;
+        }
         
         public override System.Data.Common.DbParameter CreateParameter(string name, object? value)
         {
