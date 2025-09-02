@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
+using System.Linq.Expressions;
 using nORM.Mapping;
 
 #nullable enable
@@ -33,13 +34,20 @@ namespace nORM.Query
 
     internal sealed class QueryPlanCacheKey : IEquatable<QueryPlanCacheKey>
     {
-        private readonly string _key;
-        
-        public QueryPlanCacheKey(System.Linq.Expressions.Expression expression, object? tenantId) 
-            => _key = $"{tenantId}_{expression}";
-            
-        public override int GetHashCode() => _key.GetHashCode();
+        private readonly object? _tenantId;
+        private readonly int _fingerprint;
+        private readonly int _hashCode;
+
+        public QueryPlanCacheKey(Expression expression, object? tenantId)
+        {
+            _tenantId = tenantId;
+            _fingerprint = ExpressionFingerprint.Compute(expression);
+            _hashCode = HashCode.Combine(_tenantId?.GetHashCode() ?? 0, _fingerprint);
+        }
+
+        public override int GetHashCode() => _hashCode;
         public override bool Equals(object? obj) => Equals(obj as QueryPlanCacheKey);
-        public bool Equals(QueryPlanCacheKey? other) => other != null && _key == other._key;
+        public bool Equals(QueryPlanCacheKey? other)
+            => other != null && _fingerprint == other._fingerprint && Equals(_tenantId, other._tenantId);
     }
 }
