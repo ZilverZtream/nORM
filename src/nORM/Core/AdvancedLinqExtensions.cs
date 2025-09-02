@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -286,29 +287,54 @@ namespace nORM.Core
         private static Expression CreateAggregateExpression(Expression sourceExpression, LambdaExpression selector, string function)
         {
             // Use standard LINQ Queryable methods that the query translator can understand
-            var methodInfo = function switch
-            {
-                "Sum" => typeof(Queryable).GetMethods()
-                    .First(m => m.Name == "Sum" && m.GetParameters().Length == 2 && 
-                               m.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(Expression<>)),
-                "Average" => typeof(Queryable).GetMethods()
-                    .First(m => m.Name == "Average" && m.GetParameters().Length == 2 && 
-                               m.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(Expression<>)),
-                "Min" => typeof(Queryable).GetMethods()
-                    .First(m => m.Name == "Min" && m.GetParameters().Length == 2 && 
-                               m.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(Expression<>)),
-                "Max" => typeof(Queryable).GetMethods()
-                    .First(m => m.Name == "Max" && m.GetParameters().Length == 2 && 
-                               m.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(Expression<>)),
-                _ => throw new ArgumentException($"Unknown aggregate function: {function}")
-            };
+            var candidates = typeof(Queryable).GetMethods()
+                .Where(m => m.Name == function &&
+                            m.GetParameters().Length == 2 &&
+                            m.GetParameters()[1].ParameterType.IsGenericType &&
+                            m.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(Expression<>))
+                .ToList();
 
             // Get the source element type
             var sourceType = sourceExpression.Type.GetGenericArguments()[0];
-            
-            // Make the generic method specific to our types
-            var genericMethod = methodInfo.MakeGenericMethod(sourceType, selector.ReturnType);
-            
+
+            // Attempt to find a method that matches the selector type
+            MethodInfo? genericMethod = null;
+            foreach (var candidate in candidates)
+            {
+                try
+                {
+                    MethodInfo constructed;
+                    var genericArgs = candidate.GetGenericArguments();
+                    if (genericArgs.Length == 1)
+                    {
+                        constructed = candidate.MakeGenericMethod(sourceType);
+                    }
+                    else if (genericArgs.Length == 2)
+                    {
+                        constructed = candidate.MakeGenericMethod(sourceType, selector.ReturnType);
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
+                    if (constructed.GetParameters()[1].ParameterType == selector.Type)
+                    {
+                        genericMethod = constructed;
+                        break;
+                    }
+                }
+                catch (ArgumentException)
+                {
+                    // Skip methods that cannot be constructed with the provided types
+                }
+            }
+
+            if (genericMethod is null)
+            {
+                throw new InvalidOperationException($"No suitable Queryable.{function} overload found for selector type {selector.ReturnType}.");
+            }
+
             return Expression.Call(
                 null,
                 genericMethod,
