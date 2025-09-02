@@ -203,33 +203,48 @@ namespace nORM.Query
 
         private static bool TryGetConstantValue(Expression e, out object? value)
         {
-            var stack = new Stack<MemberExpression>();
-            while (e is MemberExpression me)
+            switch (e)
             {
-                stack.Push(me);
-                e = me.Expression!;
+                case ConstantExpression ce:
+                    value = ce.Value;
+                    return true;
+                case MemberExpression me:
+                    if (me.Expression != null && TryGetConstantValue(me.Expression, out var obj))
+                    {
+                        value = me.Member switch
+                        {
+                            FieldInfo fi => fi.GetValue(obj),
+                            PropertyInfo pi => pi.GetValue(obj),
+                            _ => null
+                        };
+                        return true;
+                    }
+                    break;
+                case MethodCallExpression mce:
+                    object? instance = null;
+                    if (mce.Object != null && !TryGetConstantValue(mce.Object, out instance))
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    var args = new object?[mce.Arguments.Count];
+                    for (int i = 0; i < mce.Arguments.Count; i++)
+                    {
+                        if (!TryGetConstantValue(mce.Arguments[i], out var argVal))
+                        {
+                            value = null;
+                            return false;
+                        }
+                        args[i] = argVal;
+                    }
+
+                    value = mce.Method.Invoke(instance, args);
+                    return true;
             }
 
-            if (e is not ConstantExpression ce)
-            {
-                value = null;
-                return false;
-            }
-
-            object? current = ce.Value;
-            while (stack.Count > 0)
-            {
-                var m = stack.Pop();
-                current = m.Member switch
-                {
-                    FieldInfo fi => fi.GetValue(current),
-                    PropertyInfo pi => pi.GetValue(current),
-                    _ => current
-                };
-            }
-
-            value = current;
-            return true;
+            value = null;
+            return false;
         }
 
         private static Expression StripQuotes(Expression e)
