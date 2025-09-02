@@ -132,6 +132,24 @@ var options = new DbContextOptions { RetryPolicy = retryPolicy };
 var context = new DbContext(connection, provider, options);
 ```
 
+### Connection Pooling
+
+```csharp
+// Create a pool that manages SQL Server connections
+var pool = new ConnectionPool(
+    () => new SqlConnection("Server=.;Database=MyApp;Trusted_Connection=true"),
+    new ConnectionPoolOptions
+    {
+        MaxPoolSize = 50,
+        MinPoolSize = 5,
+        ConnectionIdleLifetime = TimeSpan.FromMinutes(5)
+    });
+
+await using var pooledConnection = await pool.RentAsync();
+var context = new DbContext(pooledConnection, provider);
+// Disposing the connection or context returns it to the pool
+```
+
 ### Advanced Logging
 
 ```csharp
