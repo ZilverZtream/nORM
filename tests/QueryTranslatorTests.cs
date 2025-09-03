@@ -93,5 +93,14 @@ namespace nORM.Tests
             Assert.Equal("SELECT \"Id\", \"Name\", \"Price\", \"CategoryId\", \"IsAvailable\" FROM \"Product\" T0 ORDER BY T0.\"Id\" ASC LIMIT 10 OFFSET 20", sql);
         }
 
+        [Fact]
+        public void SelectMany_creates_cross_join()
+        {
+            var (sql, parameters, elementType) = Translate<Product, Product>(q => q.SelectMany(p => q));
+            Assert.Equal("SELECT T1.\"Id\", T1.\"Name\", T1.\"Price\", T1.\"CategoryId\", T1.\"IsAvailable\" FROM \"Product\" T0 CROSS JOIN \"Product\" T1", sql);
+            Assert.Empty(parameters);
+            Assert.Equal(typeof(Product), elementType);
+        }
+
     }
 }
