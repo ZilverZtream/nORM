@@ -87,6 +87,7 @@ namespace nORM.SourceGenerators
             var simpleName = type.Name;
             var props = type.GetMembers().OfType<IPropertySymbol>()
                 .Where(p => !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
+                .OrderBy(p => p.Name)
                 .ToList();
 
             var sb = new StringBuilder();
@@ -99,22 +100,13 @@ namespace nORM.SourceGenerators
             sb.AppendLine("    [global::System.Runtime.CompilerServices.ModuleInitializer]");
             sb.AppendLine("    public static void Register()");
             sb.AppendLine("    {");
-            sb.AppendLine($"        CompiledMaterializerStore.Add(typeof({typeName}), reader =>");
+            sb.AppendLine($"        CompiledMaterializerStore.Add<{typeName}>(reader =>");
             sb.AppendLine("        {");
             sb.AppendLine($"            var entity = new {typeName}();");
             for (int i = 0; i < props.Count; i++)
             {
                 var prop = props[i];
-                var propType = prop.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                var read = $"reader.GetFieldValue<{propType}>({i})";
-                if (prop.Type.IsReferenceType || prop.NullableAnnotation == NullableAnnotation.Annotated)
-                {
-                    sb.AppendLine($"            if (!reader.IsDBNull({i})) entity.{prop.Name} = {read};");
-                }
-                else
-                {
-                    sb.AppendLine($"            entity.{prop.Name} = {read};");
-                }
+                sb.AppendLine(BuildAssignmentExpression(prop, i));
             }
             sb.AppendLine("            return entity;");
             sb.AppendLine("        });");
@@ -122,6 +114,53 @@ namespace nORM.SourceGenerators
             sb.AppendLine("}");
 
             context.AddSource($"{simpleName}_Materializer.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
+        }
+
+        private static string BuildAssignmentExpression(IPropertySymbol prop, int index)
+        {
+            var read = GetReaderExpression(prop.Type, index);
+            var needsNullCheck = prop.Type.IsReferenceType || prop.NullableAnnotation == NullableAnnotation.Annotated;
+            return needsNullCheck
+                ? $"            if (!reader.IsDBNull({index})) entity.{prop.Name} = {read};"
+                : $"            entity.{prop.Name} = {read};";
+        }
+
+        private static string GetReaderExpression(ITypeSymbol type, int index)
+        {
+            if (type is INamedTypeSymbol named && named.IsGenericType && named.ConstructedFrom.SpecialType == SpecialType.System_Nullable_T)
+            {
+                type = named.TypeArguments[0];
+            }
+
+            if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
+            {
+                var underlying = enumType.EnumUnderlyingType!;
+                var underlyingExpr = GetReaderExpression(underlying, index);
+                var enumName = enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                return $"({enumName}){underlyingExpr}";
+            }
+
+            var typeName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            switch (type.SpecialType)
+            {
+                case SpecialType.System_Boolean: return $"reader.GetBoolean({index})";
+                case SpecialType.System_Byte: return $"reader.GetByte({index})";
+                case SpecialType.System_Int16: return $"reader.GetInt16({index})";
+                case SpecialType.System_Int32: return $"reader.GetInt32({index})";
+                case SpecialType.System_Int64: return $"reader.GetInt64({index})";
+                case SpecialType.System_Single: return $"reader.GetFloat({index})";
+                case SpecialType.System_Double: return $"reader.GetDouble({index})";
+                case SpecialType.System_Decimal: return $"reader.GetDecimal({index})";
+                case SpecialType.System_DateTime: return $"reader.GetDateTime({index})";
+                case SpecialType.System_String: return $"reader.GetString({index})";
+            }
+
+            if (typeName == "global::System.Guid")
+                return $"reader.GetGuid({index})";
+            if (typeName == "global::System.Byte[]")
+                return $"reader.GetFieldValue<byte[]>({index})";
+
+            return $"reader.GetFieldValue<{typeName}>({index})";
         }
 
         private void GenerateQuery(IMethodSymbol method, INamedTypeSymbol entity, GeneratorExecutionContext context)
