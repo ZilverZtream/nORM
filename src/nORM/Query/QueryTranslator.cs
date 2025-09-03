@@ -62,13 +62,14 @@ namespace nORM.Query
             _tables = new HashSet<string>();
         }
 
-        private QueryTranslator(
+        internal QueryTranslator(
             DbContext ctx,
             TableMapping mapping,
             Dictionary<string, object> parameters,
             ref int pIndex,
             Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlated,
-            HashSet<string> tables)
+            HashSet<string> tables,
+            int joinStart = 0)
         {
             _ctx = ctx;
             _provider = ctx.Provider;
@@ -80,6 +81,7 @@ namespace nORM.Query
             _correlatedParams = correlated;
             _tables = tables;
             _tables.Add(mapping.TableName);
+            _joinCounter = joinStart;
         }
 
         private static Type GetElementType(Expression queryExpression)
@@ -182,7 +184,7 @@ namespace nORM.Query
 
         private string TranslateSubExpression(Expression e)
         {
-            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables);
+            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _joinCounter);
             var subPlan = subTranslator.Translate(e);
             _paramIndex = subTranslator._paramIndex;
             return subPlan.Sql;
@@ -1060,7 +1062,7 @@ namespace nORM.Query
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
             }
 
-            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables);
+            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _joinCounter);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator._paramIndex;
             _mapping = subTranslator._mapping;
