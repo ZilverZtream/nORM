@@ -24,8 +24,17 @@ namespace nORM.Query
     {
         internal readonly DbContext _ctx;
         private static readonly ConcurrentLruCache<QueryPlanCacheKey, QueryPlan> _planCache = new(maxSize: 1000);
+        private readonly QueryExecutor _executor;
+        private readonly IncludeProcessor _includeProcessor;
+        private readonly BulkCudBuilder _cudBuilder;
 
-        public NormQueryProvider(DbContext ctx) => _ctx = ctx;
+        public NormQueryProvider(DbContext ctx)
+        {
+            _ctx = ctx;
+            _includeProcessor = new IncludeProcessor(ctx);
+            _executor = new QueryExecutor(ctx, _includeProcessor);
+            _cudBuilder = new BulkCudBuilder(ctx);
+        }
 
         public IQueryable CreateQuery(Expression expression)
         {
@@ -125,7 +134,7 @@ namespace nORM.Query
             }
             else
             {
-                var list = await MaterializeAsync(plan, cmd, ct);
+                var list = await _executor.MaterializeAsync(plan, cmd, ct);
                 _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, list.Count);
                 if (plan.SingleResult)
                 {
@@ -189,7 +198,7 @@ namespace nORM.Query
             }
             else
             {
-                var list = await MaterializeAsync(plan, cmd, ct);
+                var list = await _executor.MaterializeAsync(plan, cmd, ct);
                 _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, list.Count);
                 if (plan.SingleResult)
                 {
@@ -243,8 +252,8 @@ namespace nORM.Query
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
 
-            ValidateCudPlan(plan.Sql);
-            var whereClause = ExtractWhereClause(plan.Sql, mapping.EscTable);
+            _cudBuilder.ValidateCudPlan(plan.Sql);
+            var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
 
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
@@ -268,9 +277,9 @@ namespace nORM.Query
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
 
-            ValidateCudPlan(plan.Sql);
-            var whereClause = ExtractWhereClause(plan.Sql, mapping.EscTable);
-            var (setClause, setParams) = BuildSetClause(mapping, set);
+            _cudBuilder.ValidateCudPlan(plan.Sql);
+            var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
+            var (setClause, setParams) = _cudBuilder.BuildSetClause(mapping, set);
 
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
@@ -290,66 +299,6 @@ namespace nORM.Query
             return affected;
         }
 
-        private static void ValidateCudPlan(string sql)
-        {
-            if (sql.IndexOf(" GROUP BY ", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                sql.IndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                sql.IndexOf(" HAVING ", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                sql.IndexOf(" JOIN ", StringComparison.OrdinalIgnoreCase) >= 0)
-                throw new NotSupportedException("ExecuteUpdate/Delete does not support grouped, ordered, joined or aggregated queries.");
-        }
-
-        private string ExtractWhereClause(string sql, string escTable)
-        {
-            var upper = sql.ToUpperInvariant();
-            var fromIndex = upper.IndexOf("FROM " + escTable.ToUpperInvariant(), StringComparison.Ordinal);
-            string? alias = null;
-            if (fromIndex >= 0)
-            {
-                var after = sql.Substring(fromIndex + ("FROM " + escTable).Length);
-                var tokens = after.TrimStart().Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                if (tokens.Length > 0)
-                    alias = tokens[0];
-            }
-            var whereIndex = upper.IndexOf(" WHERE", StringComparison.Ordinal);
-            if (whereIndex < 0) return string.Empty;
-            var where = sql.Substring(whereIndex);
-            if (!string.IsNullOrEmpty(alias))
-                where = where.Replace(alias + ".", "");
-            return where;
-        }
-
-        private (string Sql, Dictionary<string, object> Params) BuildSetClause<T>(TableMapping mapping, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set)
-        {
-            var assigns = new List<(string Column, object? Value)>();
-            var call = set.Body as MethodCallExpression;
-            while (call != null)
-            {
-                var lambda = (LambdaExpression)StripQuotes(call.Arguments[0]);
-                var member = (MemberExpression)lambda.Body;
-                var column = mapping.Columns.First(c => c.Prop.Name == member.Member.Name).EscCol;
-                var value = Expression.Lambda(call.Arguments[1]).Compile().DynamicInvoke();
-                assigns.Add((column, value));
-                call = call.Object as MethodCallExpression;
-            }
-            assigns.Reverse();
-            var sb = new StringBuilder();
-            var parameters = new Dictionary<string, object>();
-            for (int i = 0; i < assigns.Count; i++)
-            {
-                if (i > 0) sb.Append(", ");
-                var pName = _ctx.Provider.ParamPrefix + "u" + i;
-                sb.Append($"{assigns[i].Column} = {pName}");
-                parameters[pName] = assigns[i].Value ?? DBNull.Value;
-            }
-            return (sb.ToString(), parameters);
-        }
-
-        private static Expression StripQuotes(Expression e)
-        {
-            while (e.NodeType == ExpressionType.Quote) e = ((UnaryExpression)e).Operand;
-            return e;
-        }
 
         public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
         {
@@ -404,150 +353,6 @@ namespace nORM.Query
                 cache.Set(cacheKey, cacheList ?? new List<T>(), _ctx.Options.CacheExpiration, plan.Tables);
         }
 
-        private async Task<IList> MaterializeAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
-        {
-            if (plan.GroupJoinInfo != null)
-                return await MaterializeGroupJoinAsync(plan, cmd, ct);
-
-            var listType = typeof(List<>).MakeGenericType(plan.ElementType);
-            var list = (IList)Activator.CreateInstance(listType)!;
-
-            var trackable = !plan.NoTracking &&
-                             plan.ElementType.IsClass &&
-                             !plan.ElementType.Name.StartsWith("<>") &&
-                             plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
-            TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
-
-            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
-            while (await reader.ReadAsync(ct))
-            {
-                var entity = await plan.Materializer(reader, ct);
-
-                if (trackable)
-                {
-                    NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
-                    var actualMap = _ctx.GetMapping(entity.GetType());
-                    _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, actualMap);
-                }
-
-                list.Add(entity);
-            }
-
-            foreach (var include in plan.Includes)
-            {
-                await EagerLoadAsync(include, list, ct, plan.NoTracking);
-            }
-
-            return list;
-        }
-
-        private async Task<IList> MaterializeGroupJoinAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
-        {
-            var info = plan.GroupJoinInfo!;
-
-            var listType = typeof(List<>).MakeGenericType(info.ResultType);
-            var resultList = (IList)Activator.CreateInstance(listType)!;
-
-            var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
-            var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith("<>") && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
-
-            var outerMap = _ctx.GetMapping(info.OuterType);
-            var innerMap = _ctx.GetMapping(info.InnerType);
-
-            var innerKeyIndex = outerMap.Columns.Length + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
-
-            var groups = new Dictionary<object, (object outer, List<object> children)>();
-
-            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
-            while (await reader.ReadAsync(ct))
-            {
-                var tuple = (ValueTuple<object, object>)await plan.Materializer(reader, ct);
-                var outer = tuple.Item1;
-                var key = info.OuterKeySelector(outer) ?? DBNull.Value;
-
-                if (!groups.TryGetValue(key, out var entry))
-                {
-                    if (trackOuter)
-                    {
-                        NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
-                        var actualMap = _ctx.GetMapping(outer.GetType());
-                        _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
-                    }
-                    entry = (outer, new List<object>());
-                    groups[key] = entry;
-                }
-
-                if (!reader.IsDBNull(innerKeyIndex))
-                {
-                    var inner = tuple.Item2;
-                    if (trackInner)
-                    {
-                        NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
-                        var actualInnerMap = _ctx.GetMapping(inner.GetType());
-                        _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualInnerMap);
-                    }
-                    entry.children.Add(inner);
-                }
-            }
-            foreach (var g in groups.Values)
-            {
-                var result = info.ResultSelector(g.outer, g.children);
-                resultList.Add(result);
-            }
-
-            return resultList;
-        }
-
-        private async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct, bool noTracking)
-        {
-            IList current = parents;
-            foreach (var relation in include.Path)
-            {
-                current = await EagerLoadLevelAsync(relation, current, ct, noTracking);
-                if (current.Count == 0) break;
-            }
-        }
-
-        private async Task<IList> EagerLoadLevelAsync(TableMapping.Relation relation, IList parents, CancellationToken ct, bool noTracking)
-        {
-            var resultChildren = new List<object>();
-            if (parents.Count == 0) return resultChildren;
-
-            var childMap = _ctx.GetMapping(relation.DependentType);
-            var keys = parents.Cast<object>().Select(relation.PrincipalKey.Getter).Where(k => k != null).Distinct().ToList();
-            if (keys.Count == 0) return resultChildren;
-
-            var paramNames = new List<string>();
-            await using var cmd = _ctx.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
-            for (int i = 0; i < keys.Count; i++)
-            {
-                var paramName = $"{_ctx.Provider.ParamPrefix}fk{i}";
-                paramNames.Add(paramName);
-                cmd.AddParam(paramName, keys[i]);
-            }
-            cmd.CommandText = $"SELECT * FROM {childMap.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({string.Join(",", paramNames)})";
-
-            var childMaterializer = new QueryTranslator(_ctx).CreateMaterializer(childMap, childMap.Type);
-            await using (var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct))
-            {
-                while (await reader.ReadAsync(ct))
-                {
-                    var child = await childMaterializer(reader, ct);
-                    if (!noTracking)
-                    {
-                        NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
-                        _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
-                    }
-                    resultChildren.Add(child);
-                }
-            }
-
-            var childGroups = resultChildren.GroupBy(relation.ForeignKey.Getter).ToDictionary(g => g.Key!, g => g.ToList());
-            foreach (var p in parents.Cast<object>())
-            {
-                var pk = relation.PrincipalKey.Getter(p);
-                if (pk != null && childGroups.TryGetValue(pk, out var c))
                 {
                     var listType = typeof(List<>).MakeGenericType(relation.DependentType);
                     var childList = (IList)Activator.CreateInstance(listType)!;
