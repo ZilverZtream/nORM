@@ -24,6 +24,7 @@ namespace nORM.Internal
         public static readonly MethodInfo GetString = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetString))!;
         public static readonly MethodInfo GetBytes = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetValue))!;
         public static readonly MethodInfo GetFieldValue = typeof(DbDataReader).GetMethod(nameof(DbDataReader.GetFieldValue))!;
+        public static readonly MethodInfo SetShadowValue = typeof(ShadowPropertyStore).GetMethod(nameof(ShadowPropertyStore.Set))!;
 
         internal static MethodInfo GetReaderMethod(Type type)
         {
