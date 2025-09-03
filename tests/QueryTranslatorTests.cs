@@ -102,5 +102,33 @@ namespace nORM.Tests
             Assert.Equal(typeof(Product), elementType);
         }
 
+        [Fact]
+        public void Distinct_adds_keyword()
+        {
+            var (sql, _, _) = Translate<Product, Product>(q => q.Distinct());
+            Assert.Equal("SELECT DISTINCT \"Id\", \"Name\", \"Price\", \"CategoryId\", \"IsAvailable\" FROM \"Product\"", sql);
+        }
+
+        [Fact]
+        public void Union_combines_queries()
+        {
+            var (sql, _, _) = Translate<Product, Product>(q => q.Union(q));
+            Assert.Equal("(SELECT \"Id\", \"Name\", \"Price\", \"CategoryId\", \"IsAvailable\" FROM \"Product\") UNION (SELECT \"Id\", \"Name\", \"Price\", \"CategoryId\", \"IsAvailable\" FROM \"Product\")", sql);
+        }
+
+        [Fact]
+        public void Intersect_combines_queries()
+        {
+            var (sql, _, _) = Translate<Product, Product>(q => q.Intersect(q));
+            Assert.Equal("(SELECT \"Id\", \"Name\", \"Price\", \"CategoryId\", \"IsAvailable\" FROM \"Product\") INTERSECT (SELECT \"Id\", \"Name\", \"Price\", \"CategoryId\", \"IsAvailable\" FROM \"Product\")", sql);
+        }
+
+        [Fact]
+        public void Except_combines_queries()
+        {
+            var (sql, _, _) = Translate<Product, Product>(q => q.Except(q));
+            Assert.Equal("(SELECT \"Id\", \"Name\", \"Price\", \"CategoryId\", \"IsAvailable\" FROM \"Product\") EXCEPT (SELECT \"Id\", \"Name\", \"Price\", \"CategoryId\", \"IsAvailable\" FROM \"Product\")", sql);
+        }
+
     }
 }
