@@ -138,8 +138,7 @@ namespace nORM.Query
 
             return _materializerCache.GetOrAdd(cacheKey, _ =>
             {
-                if (projection == null && targetType == mapping.Type &&
-                    CompiledMaterializerStore.TryGet(targetType, out var precompiled))
+                if (CompiledMaterializerStore.TryGet(targetType, out var precompiled))
                 {
                     return precompiled;
                 }
