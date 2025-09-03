@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Data.Sqlite;
+using nORM.Mapping;
 using nORM.SourceGeneration;
 using Xunit;
 
@@ -17,6 +18,20 @@ namespace nORM.Tests
         public string Name { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public Status Status { get; set; }
+    }
+
+    [Owned]
+    internal class MatAddress
+    {
+        public string Street { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+    }
+
+    [GenerateMaterializer]
+    internal class MaterializedOwned
+    {
+        public int Id { get; set; }
+        public MatAddress Address { get; set; } = new();
     }
 
     public class MaterializerGeneratorTests
@@ -43,6 +58,25 @@ namespace nORM.Tests
             Assert.Equal("foo", entity.Name);
             Assert.Equal(12.34m, entity.Price);
             Assert.Equal(Status.Active, entity.Status);
+        }
+
+        [Fact]
+        public void Generated_materializer_reads_owned_data_correctly()
+        {
+            Assert.True(CompiledMaterializerStore.TryGet(typeof(MaterializedOwned), out _));
+
+            using var cn = new SqliteConnection("Data Source=:memory:");
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "SELECT 'Metro' AS Address_City, 'Main' AS Address_Street, 1 AS Id";
+            using var reader = cmd.ExecuteReader();
+            Assert.True(reader.Read());
+            var mat = CompiledMaterializerStore.Get<MaterializedOwned>();
+            var entity = mat(reader);
+            Assert.NotNull(entity.Address);
+            Assert.Equal("Main", entity.Address.Street);
+            Assert.Equal("Metro", entity.Address.City);
+            Assert.Equal(1, entity.Id);
         }
     }
 }
