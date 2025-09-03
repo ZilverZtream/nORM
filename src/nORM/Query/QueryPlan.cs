@@ -13,10 +13,11 @@ namespace nORM.Query
         IReadOnlyDictionary<string, object> Parameters, 
         Func<DbDataReader, object> Materializer, 
         Type ElementType, 
-        bool IsScalar, 
-        bool SingleResult, 
-        string MethodName, 
-        List<IncludePlan> Includes, 
+        bool IsScalar,
+        bool SingleResult,
+        bool NoTracking,
+        string MethodName,
+        List<IncludePlan> Includes,
         GroupJoinInfo? GroupJoinInfo
     );
     
