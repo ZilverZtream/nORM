@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Globalization;
 
 #nullable enable
 
@@ -32,6 +33,8 @@ namespace nORM.Internal
         public override MethodInfo? GetSetMethod(bool nonPublic) => null;
         public override object? GetValue(object? obj, object?[]? index) => throw new NotSupportedException();
         public override void SetValue(object? obj, object? value, object?[]? index) => throw new NotSupportedException();
+        public override object? GetValue(object? obj, BindingFlags invokeAttr, Binder? binder, object?[]? index, CultureInfo? culture) => throw new NotSupportedException();
+        public override void SetValue(object? obj, object? value, BindingFlags invokeAttr, Binder? binder, object?[]? index, CultureInfo? culture) => throw new NotSupportedException();
         public override object[] GetCustomAttributes(bool inherit) => Array.Empty<object>();
         public override object[] GetCustomAttributes(Type attributeType, bool inherit) => Array.Empty<object>();
         public override bool IsDefined(Type attributeType, bool inherit) => false;
