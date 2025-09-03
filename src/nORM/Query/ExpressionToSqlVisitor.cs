@@ -195,6 +195,59 @@ namespace nORM.Query
 
                 throw new NotSupportedException($"String method '{node.Method.Name}' not supported.");
             }
+            if (node.Method.DeclaringType == typeof(Enumerable) || node.Method.DeclaringType == typeof(Queryable))
+            {
+                switch (node.Method.Name)
+                {
+                    case "Count":
+                    case "LongCount":
+                        if (node.Arguments.Count >= 1 && node.Arguments[0] is ParameterExpression cp && _parameterMappings.ContainsKey(cp))
+                        {
+                            if (node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression countSelector)
+                            {
+                                var info = _parameterMappings[cp];
+                                var visitor = new ExpressionToSqlVisitor(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings);
+                                var predSql = visitor.Translate(countSelector.Body);
+                                foreach (var kvp in visitor.GetParameters())
+                                    _params[kvp.Key] = kvp.Value;
+                                _sql.Append($"COUNT(CASE WHEN {predSql} THEN 1 ELSE NULL END)");
+                            }
+                            else
+                            {
+                                _sql.Append("COUNT(*)");
+                            }
+                            return node;
+                        }
+                        break;
+                    case "Sum":
+                    case "Average":
+                    case "Min":
+                    case "Max":
+                        if (node.Arguments.Count >= 2 && node.Arguments[0] is ParameterExpression gp && _parameterMappings.ContainsKey(gp))
+                        {
+                            var selector = StripQuotes(node.Arguments[1]) as LambdaExpression;
+                            if (selector != null)
+                            {
+                                var info = _parameterMappings[gp];
+                                var visitor = new ExpressionToSqlVisitor(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings);
+                                var colSql = visitor.Translate(selector.Body);
+                                foreach (var kvp in visitor.GetParameters())
+                                    _params[kvp.Key] = kvp.Value;
+                                var fn = node.Method.Name switch
+                                {
+                                    "Sum" => "SUM",
+                                    "Average" => "AVG",
+                                    "Min" => "MIN",
+                                    "Max" => "MAX",
+                                    _ => ""
+                                };
+                                _sql.Append($"{fn}({colSql})");
+                                return node;
+                            }
+                        }
+                        break;
+                }
+            }
             if (node.Method.Name == nameof(List<int>.Contains))
             {
                 Expression? collectionExpr = null;

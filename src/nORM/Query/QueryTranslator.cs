@@ -34,6 +34,7 @@ namespace nORM.Query
         private bool _isDistinct = false;
         private string _methodName = "";
         private readonly StringBuilder _where = new();
+        private readonly StringBuilder _having = new();
         private readonly Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams;
 #pragma warning disable CS0649 // Field is never assigned to, and will always have its default value - used in complex join scenarios
         private GroupJoinInfo? _groupJoinInfo;
@@ -157,6 +158,7 @@ namespace nORM.Query
             if (_where.Length > 0) _sql.Append($" WHERE {_where}");
 
             if (_groupBy.Count > 0) _sql.Append(" GROUP BY " + string.Join(", ", _groupBy));
+            if (_having.Length > 0) _sql.Append(" HAVING " + _having);
             if (_orderBy.Count > 0) _sql.Append(" ORDER BY " + string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}")));
             _ctx.Provider.ApplyPaging(_sql, _take, _skip);
 
@@ -555,8 +557,10 @@ namespace nORM.Query
                             _correlatedParams[param] = (_mapping, alias);
                         var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams);
                         var sql = visitor.Translate(body);
-                        if (_where.Length > 0) _where.Append(" AND ");
-                        _where.Append($"({sql})");
+                        var isGrouping = node.Arguments[0] is MethodCallExpression mc && mc.Method.Name == "GroupBy";
+                        var target = isGrouping ? _having : _where;
+                        if (target.Length > 0) target.Append(" AND ");
+                        target.Append($"({sql})");
 
                         foreach (var kvp in visitor.GetParameters())
                             _params[kvp.Key] = kvp.Value;
