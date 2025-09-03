@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <Compile Remove="nORM.SourceGenerators/**" />
+    <Compile Remove="dotnet-norm/**" />
   </ItemGroup>
 
     <ItemGroup>
