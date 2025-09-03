@@ -38,6 +38,7 @@ namespace nORM.Query
         private int _joinCounter = 0;
         private DatabaseProvider _provider;
         private bool _singleResult = false;
+        private bool _noTracking = false;
         
         // Cache materializers to reduce memory allocations
         private static readonly ConcurrentLruCache<(Type MappingType, Type TargetType, string? ProjectionKey), Func<DbDataReader, object>> _materializerCache = new(maxSize: 1000);
@@ -105,7 +106,7 @@ namespace nORM.Query
             var singleResult = _singleResult || _methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
                 or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
 
-            return new QueryPlan(_sql.ToString(), _params, materializer, projectType, isScalar, singleResult, _methodName, _includes, _groupJoinInfo);
+            return new QueryPlan(_sql.ToString(), _params, materializer, projectType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo);
         }
 
         private string TranslateSubExpression(Expression e)
@@ -447,6 +448,10 @@ namespace nORM.Query
                             }
                         }
                     }
+                    return Visit(node.Arguments[0]);
+
+                case "AsNoTracking":
+                    _noTracking = true;
                     return Visit(node.Arguments[0]);
 
                 default:

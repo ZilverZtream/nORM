@@ -57,6 +57,12 @@ var users = await context.Query<User>()
     .OrderBy(u => u.CreatedAt)
     .ToListAsync();
 
+// For read-only queries, disable tracking to boost performance
+var readOnlyUsers = await context.Query<User>()
+    .AsNoTracking()
+    .Where(u => u.Name.StartsWith("John"))
+    .ToListAsync();
+
 // Complex queries with projections
 var userSummary = await context.Query<User>()
     .Where(u => u.CreatedAt > DateTime.Now.AddDays(-30))
