@@ -10,7 +10,7 @@ namespace nORM.Tests
 {
     public class QueryTranslatorTests
     {
-        private static (string Sql, Dictionary<string, object> Params, Type ElementType) Translate<T, TResult>(Func<INormQueryable<T>, IQueryable<TResult>> build) where T : class, new()
+        private static (string Sql, Dictionary<string, object> Params, Type ElementType) Translate<T, TResult>(Func<IQueryable<T>, IQueryable<TResult>> build) where T : class, new()
         {
             using var cn = new SqliteConnection("Data Source=:memory:");
             using var ctx = new DbContext(cn, new SqliteProvider());

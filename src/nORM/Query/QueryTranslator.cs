@@ -137,8 +137,44 @@ namespace nORM.Query
             });
         }
         
-        private Func<DbDataReader, object> CreateMaterializerInternal(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
+        private Func<DbDataReader, object> CreateMaterializerInternal(TableMapping mapping, Type targetType, LambdaExpression? projection = null, bool ignoreTph = false)
         {
+            if (!ignoreTph && mapping.DiscriminatorColumn != null && mapping.TphMappings.Count > 0 && projection == null)
+            {
+                var discIndex = Array.IndexOf(mapping.Columns, mapping.DiscriminatorColumn);
+                var baseMat = CreateMaterializerInternal(mapping, targetType, null, true);
+                var derivedMats = mapping.TphMappings.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp =>
+                    {
+                        var dmap = kvp.Value;
+                        var indices = dmap.Columns.Select(c => Array.FindIndex(mapping.Columns, bc => bc.Prop.Name == c.Prop.Name)).ToArray();
+                        return (Func<DbDataReader, object>)(reader =>
+                        {
+                            var entity = Activator.CreateInstance(dmap.Type)!;
+                            for (int i = 0; i < dmap.Columns.Length; i++)
+                            {
+                                var col = dmap.Columns[i];
+                                var idx = indices[i];
+                                if (reader.IsDBNull(idx)) continue;
+                                var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
+                                var value = readerMethod.Invoke(reader, new object[] { idx });
+                                if (readerMethod == Methods.GetValue)
+                                    value = Convert.ChangeType(value!, col.Prop.PropertyType);
+                                col.Setter(entity, value);
+                            }
+                            return entity;
+                        });
+                    });
+                return reader =>
+                {
+                    var disc = reader.GetValue(discIndex);
+                    if (disc != null && derivedMats.TryGetValue(disc, out var mat))
+                        return mat(reader);
+                    return baseMat(reader);
+                };
+            }
+
             var dm = new DynamicMethod("mat_" + Guid.NewGuid().ToString("N"), typeof(object), new[] { typeof(DbDataReader) }, targetType.Module, true);
             var il = dm.GetILGenerator();
 
@@ -226,29 +262,84 @@ namespace nORM.Query
             }
             else
             {
-                // Standard single-table materialization
-                var loc = il.DeclareLocal(targetType);
-                il.Emit(OpCodes.Newobj, targetType.GetConstructor(Type.EmptyTypes)!);
-                il.Emit(OpCodes.Stloc, loc);
-
-                for (int i = 0; i < mapping.Columns.Length; i++)
+                if (targetType.GetConstructor(Type.EmptyTypes) == null)
                 {
-                    var col = mapping.Columns[i];
-                    var endOfBlock = il.DefineLabel();
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, i);
-                    il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
-                    il.Emit(OpCodes.Brtrue_S, endOfBlock);
+                    var ctor = targetType.GetConstructors().OrderByDescending(c => c.GetParameters().Length).First();
+                    var parameters = ctor.GetParameters();
+                    var locals = new LocalBuilder[parameters.Length];
+                    var used = new HashSet<string>(parameters.Select(p => p.Name!), StringComparer.OrdinalIgnoreCase);
+
+                    for (int i = 0; i < parameters.Length; i++)
+                    {
+                        var param = parameters[i];
+                        var col = mapping.Columns.First(c => string.Equals(c.Prop.Name, param.Name, StringComparison.OrdinalIgnoreCase));
+                        var colIndex = Array.IndexOf(mapping.Columns, col);
+                        locals[i] = il.DeclareLocal(param.ParameterType);
+                        var endOfBlock = il.DefineLabel();
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldc_I4, colIndex);
+                        il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
+                        il.Emit(OpCodes.Brtrue_S, endOfBlock);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldc_I4, colIndex);
+                        var readerMethod = Methods.GetReaderMethod(param.ParameterType);
+                        il.Emit(OpCodes.Callvirt, readerMethod);
+                        if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, param.ParameterType);
+                        il.Emit(OpCodes.Stloc, locals[i]);
+                        il.MarkLabel(endOfBlock);
+                    }
+
+                    var loc = il.DeclareLocal(targetType);
+                    foreach (var l in locals) il.Emit(OpCodes.Ldloc, l);
+                    il.Emit(OpCodes.Newobj, ctor);
+                    il.Emit(OpCodes.Stloc, loc);
+
+                    for (int i = 0; i < mapping.Columns.Length; i++)
+                    {
+                        var col = mapping.Columns[i];
+                        if (used.Contains(col.Prop.Name)) continue;
+                        var endOfBlock = il.DefineLabel();
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldc_I4, i);
+                        il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
+                        il.Emit(OpCodes.Brtrue_S, endOfBlock);
+                        il.Emit(OpCodes.Ldloc, loc);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldc_I4, i);
+                        var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
+                        il.Emit(OpCodes.Callvirt, readerMethod);
+                        if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
+                        il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                        il.MarkLabel(endOfBlock);
+                    }
                     il.Emit(OpCodes.Ldloc, loc);
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, i);
-                    var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
-                    il.Emit(OpCodes.Callvirt, readerMethod);
-                    if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
-                    il.Emit(OpCodes.Callvirt, col.SetterMethod);
-                    il.MarkLabel(endOfBlock);
                 }
-                il.Emit(OpCodes.Ldloc, loc);
+                else
+                {
+                    // Standard single-table materialization with parameterless constructor
+                    var loc = il.DeclareLocal(targetType);
+                    il.Emit(OpCodes.Newobj, targetType.GetConstructor(Type.EmptyTypes)!);
+                    il.Emit(OpCodes.Stloc, loc);
+
+                    for (int i = 0; i < mapping.Columns.Length; i++)
+                    {
+                        var col = mapping.Columns[i];
+                        var endOfBlock = il.DefineLabel();
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldc_I4, i);
+                        il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
+                        il.Emit(OpCodes.Brtrue_S, endOfBlock);
+                        il.Emit(OpCodes.Ldloc, loc);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldc_I4, i);
+                        var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
+                        il.Emit(OpCodes.Callvirt, readerMethod);
+                        if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
+                        il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                        il.MarkLabel(endOfBlock);
+                    }
+                    il.Emit(OpCodes.Ldloc, loc);
+                }
             }
 
             if (targetType.IsValueType) il.Emit(OpCodes.Box, targetType);
