@@ -10,8 +10,30 @@ namespace nORM.Configuration
 {
     public class DbContextOptions
     {
-        public TimeSpan CommandTimeout { get; set; } = TimeSpan.FromSeconds(30);
-        public int BulkBatchSize { get; set; } = 1000;
+        private TimeSpan _commandTimeout = TimeSpan.FromSeconds(30);
+        private int _bulkBatchSize = 1000;
+
+        public TimeSpan CommandTimeout
+        {
+            get => _commandTimeout;
+            set
+            {
+                if (value <= TimeSpan.Zero || value > TimeSpan.FromHours(1))
+                    throw new ArgumentOutOfRangeException(nameof(value), "CommandTimeout must be between 1 second and 1 hour");
+                _commandTimeout = value;
+            }
+        }
+
+        public int BulkBatchSize
+        {
+            get => _bulkBatchSize;
+            set
+            {
+                if (value <= 0 || value > 10000)
+                    throw new ArgumentOutOfRangeException(nameof(value), "BulkBatchSize must be between 1 and 10000");
+                _bulkBatchSize = value;
+            }
+        }
         public IDbContextLogger? Logger { get; set; }
         public RetryPolicy? RetryPolicy { get; set; }
         public ITenantProvider? TenantProvider { get; set; }
@@ -41,6 +63,17 @@ namespace nORM.Configuration
             var ctxParam = Expression.Parameter(typeof(DbContext), "ctx");
             var lambda = Expression.Lambda<Func<DbContext, TEntity, bool>>(filter.Body, ctxParam, filter.Parameters[0]);
             return AddGlobalFilter(lambda);
+        }
+
+        public void Validate()
+        {
+            if (RetryPolicy != null)
+            {
+                if (RetryPolicy.MaxRetries < 0 || RetryPolicy.MaxRetries > 10)
+                    throw new InvalidOperationException("MaxRetries must be between 0 and 10");
+                if (RetryPolicy.BaseDelay <= TimeSpan.Zero)
+                    throw new InvalidOperationException("BaseDelay must be positive");
+            }
         }
     }
 }
