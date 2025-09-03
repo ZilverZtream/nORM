@@ -159,10 +159,14 @@ namespace nORM.Configuration
                     _dependentNavigation = dependentNavigation;
                 }
 
-                public EntityTypeBuilder<TEntity> HasForeignKey(Expression<Func<TDependent, object>> foreignKeyExpression)
+                public EntityTypeBuilder<TEntity> HasForeignKey(
+                    Expression<Func<TDependent, object>> foreignKeyExpression,
+                    Expression<Func<TEntity, object>>? principalKeyExpression = null)
                 {
                     var fkProp = _parent.GetProperty(foreignKeyExpression);
-                    var principalKey = _parent._config.KeyProperty;
+                    var principalKey = principalKeyExpression != null
+                        ? _parent.GetProperty(principalKeyExpression)
+                        : _parent._config.KeyProperty;
                     _parent._config.AddRelationship(new RelationshipConfiguration(_principalNavigation, typeof(TDependent), _dependentNavigation, principalKey, fkProp));
                     return _parent;
                 }
