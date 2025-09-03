@@ -23,6 +23,7 @@ namespace nORM.Query
         private readonly StringBuilder _sql;
         private readonly Dictionary<string, object> _params = new();
         private TableMapping _mapping = null!;
+        private Type? _rootType;
         private int _paramIndex = 0;
         private int? _take, _skip;
         private readonly List<(string col, bool asc)> _orderBy = new();
@@ -53,6 +54,7 @@ namespace nORM.Query
             _provider = ctx.Provider;
             _sql = new StringBuilder();
             _mapping = null!;
+            _rootType = null;
             _correlatedParams = new();
         }
 
@@ -66,17 +68,58 @@ namespace nORM.Query
             _ctx = ctx;
             _provider = ctx.Provider;
             _mapping = mapping;
+            _rootType = mapping.Type;
             _params = parameters;
             _paramIndex = pIndex;
             _sql = new StringBuilder();
             _correlatedParams = correlated;
         }
 
+        private static Type GetElementType(Expression queryExpression)
+        {
+            var type = queryExpression.Type;
+            if (type.IsGenericType)
+            {
+                var args = type.GetGenericArguments();
+                if (args.Length > 0) return args[0];
+            }
+
+            var iface = type.GetInterfaces()
+                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
+            if (iface != null) return iface.GetGenericArguments()[0];
+
+            throw new ArgumentException($"Cannot determine element type from expression of type {type}");
+        }
+
         public QueryPlan Translate(Expression e)
         {
+            // Determine root query type and handle TPH discriminator filters
+            _rootType = GetElementType(e);
+            _mapping = _ctx.GetMapping(_rootType);
+
+            // Walk up inheritance hierarchy to find base mapping with discriminator
+            var baseType = _rootType.BaseType;
+            while (baseType != null && baseType != typeof(object))
+            {
+                var baseMap = _ctx.GetMapping(baseType);
+                if (baseMap.DiscriminatorColumn != null)
+                {
+                    _mapping = baseMap;
+                    var discAttr = _rootType.GetCustomAttribute<DiscriminatorValueAttribute>();
+                    if (discAttr != null)
+                    {
+                        var paramName = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
+                        _params[paramName] = discAttr.Value;
+                        _where.Append($"({_mapping.DiscriminatorColumn!.EscCol} = {paramName})");
+                    }
+                    break;
+                }
+                baseType = baseType.BaseType;
+            }
+
             Visit(e);
 
-            var projectType = _projection?.Body.Type ?? _mapping.Type;
+            var projectType = _projection?.Body.Type ?? _rootType ?? _mapping.Type;
             if (_isAggregate && _groupBy.Count == 0 && (e as MethodCallExpression)?.Method.Name is "Count" or "LongCount")
             {
                 projectType = typeof(int);
@@ -891,7 +934,11 @@ namespace nORM.Query
         {
             if (node.Value is IQueryable q && q.ElementType != null)
             {
-                _mapping = _ctx.GetMapping(q.ElementType);
+                if (_rootType == null || q.ElementType != _rootType)
+                {
+                    _rootType = q.ElementType;
+                    _mapping = _ctx.GetMapping(q.ElementType);
+                }
                 return node;
             }
 
@@ -945,26 +992,6 @@ namespace nORM.Query
         }
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
-
-        private static Type GetElementType(Expression queryExpression)
-        {
-            var type = queryExpression.Type;
-            if (type.IsGenericType)
-            {
-                var genericArgs = type.GetGenericArguments();
-                if (genericArgs.Length > 0)
-                    return genericArgs[0];
-            }
-            
-            // Try to get element type from IQueryable<T>
-            var queryableInterface = type.GetInterfaces()
-                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
-            
-            if (queryableInterface != null)
-                return queryableInterface.GetGenericArguments()[0];
-                
-            throw new ArgumentException($"Cannot determine element type from expression of type {type}");
-        }
 
         private static bool IsScalarType(Type type) =>
             type.IsPrimitive || type.IsEnum || type == typeof(string) ||
