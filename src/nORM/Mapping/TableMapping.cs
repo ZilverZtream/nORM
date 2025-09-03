@@ -119,7 +119,18 @@ namespace nORM.Mapping
                 {
                     var dependentType = prop.PropertyType.GetGenericArguments()[0];
                     var dependentMap = ctx.GetMapping(dependentType);
-                    var foreignKeyProp = dependentMap.Columns.FirstOrDefault(c => c.ForeignKeyPrincipalTypeName == Type.Name);
+
+                    Column? foreignKeyProp = dependentMap.Columns
+                        .FirstOrDefault(c => string.Equals(c.ForeignKeyPrincipalTypeName, Type.Name, StringComparison.OrdinalIgnoreCase));
+
+                    if (foreignKeyProp == null && KeyColumns.Length == 1)
+                    {
+                        var fkName = $"{Type.Name}Id";
+                        var fkComposite = $"{Type.Name}_{KeyColumns[0].PropName}";
+                        foreignKeyProp = dependentMap.Columns.FirstOrDefault(c =>
+                            string.Equals(c.PropName, fkName, StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(c.PropName, fkComposite, StringComparison.OrdinalIgnoreCase));
+                    }
 
                     if (foreignKeyProp != null && KeyColumns.Length == 1)
                     {
