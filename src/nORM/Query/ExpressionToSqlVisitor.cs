@@ -298,7 +298,7 @@ namespace nORM.Query
                 switch (node.Method.Name)
                 {
                     case nameof(Queryable.Any):
-                        BuildExists(node.Arguments[0], node.Arguments.Count > 1 ? StripQuotes(node.Arguments[1]) as LambdaExpression : null, negate:false);
+                        BuildExists(node.Arguments[0], node.Arguments.Count > 1 ? StripQuotes(node.Arguments[1]) as LambdaExpression : null, negate: false);
                         return node;
                     case nameof(Queryable.All):
                         var pred = StripQuotes(node.Arguments[1]) as LambdaExpression;
@@ -306,15 +306,10 @@ namespace nORM.Query
                         var param = pred.Parameters[0];
                         var notBody = Expression.Not(pred.Body);
                         var lambda = Expression.Lambda(notBody, param);
-                        BuildExists(node.Arguments[0], lambda, negate:true);
+                        BuildExists(node.Arguments[0], lambda, negate: true);
                         return node;
                     case nameof(Queryable.Contains):
-                        var source = node.Arguments[0];
-                        var elementType = GetElementType(source);
-                        var p = Expression.Parameter(elementType, "x");
-                        var eq = Expression.Equal(p, Expression.Convert(node.Arguments[1], elementType));
-                        var l = Expression.Lambda(eq, p);
-                        BuildExists(source, l, negate:false);
+                        BuildIn(node.Arguments[0], node.Arguments[1]);
                         return node;
                     default:
                         throw new NotSupportedException($"Queryable method '{node.Method.Name}' not supported.");
@@ -346,23 +341,48 @@ namespace nORM.Query
 
         private void BuildExists(Expression source, LambdaExpression? predicate, bool negate)
         {
-            var elementType = GetElementType(source);
-            var mapping = _ctx.GetMapping(elementType);
-            var alias = "T" + _parameterMappings.Count;
-            var builder = new StringBuilder();
-            builder.Append($"SELECT 1 FROM {mapping.EscTable} {alias} ");
             if (predicate != null)
             {
-                var visitor = new ExpressionToSqlVisitor(_ctx, mapping, _provider, predicate.Parameters[0], alias, _parameterMappings);
-                var predSql = visitor.Translate(predicate.Body);
-                foreach (var kvp in visitor.GetParameters())
-                    _params[kvp.Key] = kvp.Value;
-                builder.Append($"WHERE ({predSql})");
+                var et = GetElementType(source);
+                source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { et }, source, Expression.Quote(predicate));
             }
+
+            var rootType = GetRootElementType(source);
+            var mapping = _ctx.GetMapping(rootType);
+
+            var subTranslator = new QueryTranslator(_ctx, mapping, _params, ref _paramIndex, _parameterMappings, new HashSet<string>(), _parameterMappings.Count);
+            var subPlan = subTranslator.Translate(source);
+
             _sql.Append(negate ? "NOT EXISTS(" : "EXISTS(");
-            _sql.Append(builder);
+            _sql.Append(subPlan.Sql);
             _sql.Append(")");
         }
+
+        private void BuildIn(Expression source, Expression value)
+        {
+            var rootType = GetRootElementType(source);
+            var mapping = _ctx.GetMapping(rootType);
+
+            var subTranslator = new QueryTranslator(_ctx, mapping, _params, ref _paramIndex, _parameterMappings, new HashSet<string>(), _parameterMappings.Count);
+            var subPlan = subTranslator.Translate(source);
+
+            Visit(value);
+            _sql.Append(" IN (");
+            _sql.Append(subPlan.Sql);
+            _sql.Append(")");
+        }
+
+        private static Type GetRootElementType(Expression source)
+        {
+            while (source is MethodCallExpression mce)
+            {
+                if (mce.Method.Name == "Query" && mce.Arguments.Count == 0)
+                    return GetElementType(mce);
+                source = mce.Arguments[0];
+            }
+            return GetElementType(source);
+        }
+
 
         public Dictionary<string, object> GetParameters() => _params;
 
