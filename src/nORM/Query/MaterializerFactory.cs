@@ -96,6 +96,10 @@ namespace nORM.Query
 
             var parameterlessCtor = targetType.GetConstructor(Type.EmptyTypes);
 
+            if (parameterlessCtor != null && columns.All(c => c.Prop.DeclaringType == targetType && c.Prop.GetSetMethod() != null))
+            {
+                return CreateOptimizedMaterializer(columns, targetType);
+            }
             if (parameterlessCtor != null)
             {
                 return reader =>
@@ -162,6 +166,49 @@ namespace nORM.Query
                     .ToArray();
             }
             return mapping.Columns;
+        }
+
+        private static Func<DbDataReader, object> CreateOptimizedMaterializer(Column[] columns, Type targetType)
+        {
+            var readerParam = Expression.Parameter(typeof(DbDataReader), "reader");
+            var entityVar = Expression.Variable(targetType, "entity");
+            var expressions = new List<Expression>
+            {
+                Expression.Assign(entityVar, Expression.New(targetType))
+            };
+
+            for (int i = 0; i < columns.Length; i++)
+            {
+                var column = columns[i];
+                var isNullCheck = Expression.Call(readerParam, Methods.IsDbNull, Expression.Constant(i));
+                var getValue = GetOptimizedReaderCall(readerParam, column.Prop.PropertyType, i);
+                var setProperty = Expression.Call(entityVar, column.Prop.GetSetMethod()!, getValue);
+                var conditionalSet = Expression.IfThen(Expression.Not(isNullCheck), setProperty);
+                expressions.Add(conditionalSet);
+            }
+
+            expressions.Add(Expression.Convert(entityVar, typeof(object)));
+            var block = Expression.Block(new[] { entityVar }, expressions);
+            return Expression.Lambda<Func<DbDataReader, object>>(block, readerParam).Compile();
+        }
+
+        private static Expression GetOptimizedReaderCall(ParameterExpression reader, Type propertyType, int index)
+        {
+            var underlyingType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
+
+            Expression call = underlyingType.Name switch
+            {
+                nameof(Int32) => Expression.Call(reader, Methods.GetInt32, Expression.Constant(index)),
+                nameof(String) => Expression.Call(reader, Methods.GetString, Expression.Constant(index)),
+                nameof(DateTime) => Expression.Call(reader, Methods.GetDateTime, Expression.Constant(index)),
+                nameof(Boolean) => Expression.Call(reader, Methods.GetBoolean, Expression.Constant(index)),
+                _ => Expression.Call(reader, Methods.GetValue, Expression.Constant(index))
+            };
+
+            if (call.Type != propertyType)
+                call = Expression.Convert(call, propertyType);
+
+            return call;
         }
 
     }
