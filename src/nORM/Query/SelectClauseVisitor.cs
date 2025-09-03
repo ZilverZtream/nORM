@@ -77,6 +77,20 @@ namespace nORM.Query
             return node;
         }
 
+        protected override Expression VisitMemberInit(MemberInitExpression node)
+        {
+            for (int i = 0; i < node.Bindings.Count; i++)
+            {
+                if (i > 0) _sb.Append(", ");
+                if (node.Bindings[i] is MemberAssignment assignment)
+                {
+                    Visit(assignment.Expression);
+                    _sb.Append($" AS {_provider.Escape(assignment.Member.Name)}");
+                }
+            }
+            return node;
+        }
+
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
     }
 }
