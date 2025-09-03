@@ -140,17 +140,43 @@ namespace nORM.Core
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
                 var firstOrDefaultExpression = Expression.Call(
-                    typeof(Queryable), 
-                    nameof(Queryable.FirstOrDefault), 
-                    new[] { typeof(T) }, 
+                    typeof(Queryable),
+                    nameof(Queryable.FirstOrDefault),
+                    new[] { typeof(T) },
                     source.Expression);
                 return normProvider.ExecuteAsync<T?>(firstOrDefaultExpression, ct);
             }
-            
+
             throw new InvalidOperationException(
                 "FirstOrDefaultAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync().");
+        }
+
+        public static Task<int> ExecuteDeleteAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
+            where T : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                return normProvider.ExecuteDeleteAsync(source.Expression, ct);
+            }
+
+            throw new InvalidOperationException(
+                "ExecuteDeleteAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>().");
+        }
+
+        public static Task<int> ExecuteUpdateAsync<T>(this IQueryable<T> source, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct = default)
+            where T : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                return normProvider.ExecuteUpdateAsync(source.Expression, set, ct);
+            }
+
+            throw new InvalidOperationException(
+                "ExecuteUpdateAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>().");
         }
         
         // Join operations for nORM - these don't conflict since they return IQueryable
