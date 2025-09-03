@@ -67,17 +67,22 @@ namespace nORM.Query
                 }
             }
 
-            var childGroups = resultChildren.GroupBy(relation.ForeignKey.Getter).ToDictionary(g => g.Key!, g => g.ToList());
+            var childGroups = resultChildren
+                .GroupBy(relation.ForeignKey.Getter)
+                .ToDictionary(g => g.Key!, g => g.ToList());
+
             foreach (var p in parents.Cast<object>())
             {
                 var pk = relation.PrincipalKey.Getter(p);
+                var listType = typeof(List<>).MakeGenericType(relation.DependentType);
+                var childList = (IList)System.Activator.CreateInstance(listType)!;
+
                 if (pk != null && childGroups.TryGetValue(pk, out var c))
                 {
-                    var listType = typeof(List<>).MakeGenericType(relation.DependentType);
-                    var childList = (IList)System.Activator.CreateInstance(listType)!;
                     foreach (var item in c) childList.Add(item);
-                    relation.NavProp.SetValue(p, childList);
                 }
+
+                relation.NavProp.SetValue(p, childList);
             }
 
             return resultChildren;
