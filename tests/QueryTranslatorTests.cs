@@ -44,7 +44,7 @@ namespace nORM.Tests
         public void Select_into_anonymous_type()
         {
             var (sql, parameters, elementType) = Translate<Product, object>(q => q.Select(p => new { p.Id, p.Name }));
-            Assert.Equal("SELECT \"Id\", \"Name\", \"Price\", \"CategoryId\", \"IsAvailable\" FROM \"Product\"", sql);
+            Assert.Equal("SELECT \"Id\" AS \"Id\", \"Name\" AS \"Name\" FROM \"Product\"", sql);
             Assert.Empty(parameters);
             Assert.StartsWith("<>", elementType.Name);
         }
@@ -53,7 +53,7 @@ namespace nORM.Tests
         public void Select_into_named_dto_class()
         {
             var (sql, parameters, elementType) = Translate<Product, ProductDto>(q => q.Select(p => new ProductDto { Id = p.Id, Name = p.Name }));
-            Assert.Equal("SELECT \"Id\", \"Name\", \"Price\", \"CategoryId\", \"IsAvailable\" FROM \"Product\"", sql);
+            Assert.Equal("SELECT \"Id\" AS \"Id\", \"Name\" AS \"Name\" FROM \"Product\"", sql);
             Assert.Empty(parameters);
             Assert.Equal(typeof(ProductDto), elementType);
         }

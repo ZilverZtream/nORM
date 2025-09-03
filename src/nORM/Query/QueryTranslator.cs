@@ -93,7 +93,17 @@ namespace nORM.Query
                 }
                 else
                 {
-                    var select = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
+                    string select;
+                    if (_projection != null)
+                    {
+                        var selectVisitor = new SelectClauseVisitor(_mapping, _groupBy, _provider);
+                        select = selectVisitor.Translate(_projection.Body);
+                    }
+                    else
+                    {
+                        select = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
+                    }
+
                     var alias = _correlatedParams.Count > 0 ? _correlatedParams.Values.First().Alias : null;
                     _sql.Insert(0, $"SELECT {select} FROM {_mapping.EscTable}" + (alias != null ? $" {alias}" : string.Empty));
                 }
