@@ -14,6 +14,8 @@ using nORM.Providers;
 using nORM.Internal;
 using nORM.Navigation;
 using System.Reflection;
+using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 
 #nullable enable
 
@@ -359,6 +361,72 @@ namespace nORM.Core
 
         public Task<int> BulkDeleteAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync((ctx, token) => _p.BulkDeleteAsync(ctx, GetMapping(typeof(T)), entities, token), ct);
+        #endregion
+
+        #region Transaction Savepoints
+        public Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            if (transaction == null)
+                throw new InvalidOperationException("No active transaction.");
+
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
+
+            switch (transaction)
+            {
+                case SqlTransaction sqlTransaction:
+                    sqlTransaction.Save(name);
+                    break;
+                case SqliteTransaction sqliteTransaction:
+                    sqliteTransaction.Save(name);
+                    break;
+                default:
+                    var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) });
+                    if (saveMethod != null)
+                    {
+                        saveMethod.Invoke(transaction, new object[] { name });
+                    }
+                    else
+                    {
+                        throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+                    }
+                    break;
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            if (transaction == null)
+                throw new InvalidOperationException("No active transaction.");
+
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
+
+            switch (transaction)
+            {
+                case SqlTransaction sqlTransaction:
+                    sqlTransaction.Rollback(name);
+                    break;
+                case SqliteTransaction sqliteTransaction:
+                    sqliteTransaction.Rollback(name);
+                    break;
+                default:
+                    var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) });
+                    if (rollbackMethod != null)
+                    {
+                        rollbackMethod.Invoke(transaction, new object[] { name });
+                    }
+                    else
+                    {
+                        throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+                    }
+                    break;
+            }
+
+            return Task.CompletedTask;
+        }
         #endregion
 
         #region Raw SQL & Stored Procedures
