@@ -17,6 +17,8 @@ namespace nORM.Providers
     public sealed class MySqlProvider : DatabaseProvider
     {
         private static readonly ConcurrentLruCache<Type, DataTable> _tableSchemas = new(maxSize: 100);
+        public override int MaxSqlLength => 4_194_304;
+        public override int MaxParameters => 65_535;
         public override string Escape(string id) => $"`{id}`";
         
         public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam)

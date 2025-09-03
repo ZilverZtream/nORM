@@ -19,6 +19,8 @@ namespace nORM.Providers
         private static readonly ConcurrentLruCache<(Type Type, string Operation), string> _sqlCache = new(maxSize: 1000);
         
         public string ParamPrefix { get; protected init; } = "@";
+        public virtual int MaxSqlLength => int.MaxValue;
+        public virtual int MaxParameters => int.MaxValue;
         public abstract string Escape(string id);
         public abstract void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam);
         public abstract string GetIdentityRetrievalString(TableMapping m);
