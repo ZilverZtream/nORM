@@ -364,7 +364,7 @@ namespace nORM.Query
             var elementType = GetElementType(filtered);
             var key = new QueryPlanCacheKey(filtered, _ctx.Options.TenantProvider?.GetCurrentTenantId(), elementType);
             var local = filtered;
-            return _planCache.GetOrAdd(key, _ => new QueryTranslator(_ctx).Translate(local));
+            return _planCache.GetOrAdd(key, _ => QueryTranslator.Rent(_ctx).Translate(local));
         }
 
         private string BuildCacheKey<TResult>(Expression expression, IReadOnlyDictionary<string, object> parameters)
