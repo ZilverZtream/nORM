@@ -8,6 +8,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text;
 using System.Runtime.CompilerServices;
 using nORM.Core;
 using nORM.Execution;
@@ -81,6 +82,20 @@ namespace nORM.Query
                : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteInternalAsync<TResult>(expression, token), ct);
         }
 
+        public Task<int> ExecuteDeleteAsync(Expression expression, CancellationToken ct)
+        {
+            return _ctx.Options.RetryPolicy != null
+                ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteDeleteInternalAsync(expression, token), ct)
+                : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteDeleteInternalAsync(expression, token), ct);
+        }
+
+        public Task<int> ExecuteUpdateAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
+        {
+            return _ctx.Options.RetryPolicy != null
+                ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteUpdateInternalAsync(expression, set, token), ct)
+                : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteUpdateInternalAsync(expression, set, token), ct);
+        }
+
         private async Task<TResult> ExecuteInternalAsync<TResult>(Expression expression, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
@@ -137,6 +152,124 @@ namespace nORM.Query
                 cache.Set(cacheKey, (TResult)result!, _ctx.Options.CacheExpiration, plan.Tables);
 
             return (TResult)result!;
+        }
+
+        private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
+        {
+            var sw = Stopwatch.StartNew();
+            var plan = GetPlan(expression, out var filtered);
+            if (plan.Tables.Count != 1)
+                throw new NotSupportedException("ExecuteDeleteAsync only supports single table queries.");
+
+            var rootType = GetElementType(filtered);
+            var mapping = _ctx.GetMapping(rootType);
+
+            ValidateCudPlan(plan.Sql);
+            var whereClause = ExtractWhereClause(plan.Sql, mapping.EscTable);
+
+            await using var cmd = _ctx.Connection.CreateCommand();
+            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+            var finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
+            cmd.CommandText = finalSql;
+            foreach (var p in plan.Parameters)
+                cmd.AddParam(p.Key, p.Value);
+
+            var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct);
+            _ctx.Options.Logger?.LogQuery(finalSql, plan.Parameters, sw.Elapsed, affected);
+            return affected;
+        }
+
+        private async Task<int> ExecuteUpdateInternalAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
+        {
+            var sw = Stopwatch.StartNew();
+            var plan = GetPlan(expression, out var filtered);
+            if (plan.Tables.Count != 1)
+                throw new NotSupportedException("ExecuteUpdateAsync only supports single table queries.");
+
+            var rootType = GetElementType(filtered);
+            var mapping = _ctx.GetMapping(rootType);
+
+            ValidateCudPlan(plan.Sql);
+            var whereClause = ExtractWhereClause(plan.Sql, mapping.EscTable);
+            var (setClause, setParams) = BuildSetClause(mapping, set);
+
+            await using var cmd = _ctx.Connection.CreateCommand();
+            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+            var finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
+            cmd.CommandText = finalSql;
+            foreach (var p in plan.Parameters)
+                cmd.AddParam(p.Key, p.Value);
+            foreach (var p in setParams)
+                cmd.AddParam(p.Key, p.Value);
+
+            var allParams = plan.Parameters.ToDictionary(k => k.Key, v => v.Value);
+            foreach (var p in setParams)
+                allParams[p.Key] = p.Value;
+
+            var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct);
+            _ctx.Options.Logger?.LogQuery(finalSql, allParams, sw.Elapsed, affected);
+            return affected;
+        }
+
+        private static void ValidateCudPlan(string sql)
+        {
+            if (sql.IndexOf(" GROUP BY ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                sql.IndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                sql.IndexOf(" HAVING ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                sql.IndexOf(" JOIN ", StringComparison.OrdinalIgnoreCase) >= 0)
+                throw new NotSupportedException("ExecuteUpdate/Delete does not support grouped, ordered, joined or aggregated queries.");
+        }
+
+        private string ExtractWhereClause(string sql, string escTable)
+        {
+            var upper = sql.ToUpperInvariant();
+            var fromIndex = upper.IndexOf("FROM " + escTable.ToUpperInvariant(), StringComparison.Ordinal);
+            string? alias = null;
+            if (fromIndex >= 0)
+            {
+                var after = sql.Substring(fromIndex + ("FROM " + escTable).Length);
+                var tokens = after.TrimStart().Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (tokens.Length > 0)
+                    alias = tokens[0];
+            }
+            var whereIndex = upper.IndexOf(" WHERE", StringComparison.Ordinal);
+            if (whereIndex < 0) return string.Empty;
+            var where = sql.Substring(whereIndex);
+            if (!string.IsNullOrEmpty(alias))
+                where = where.Replace(alias + ".", "");
+            return where;
+        }
+
+        private (string Sql, Dictionary<string, object> Params) BuildSetClause<T>(TableMapping mapping, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set)
+        {
+            var assigns = new List<(string Column, object? Value)>();
+            var call = set.Body as MethodCallExpression;
+            while (call != null)
+            {
+                var lambda = (LambdaExpression)StripQuotes(call.Arguments[0]);
+                var member = (MemberExpression)lambda.Body;
+                var column = mapping.Columns.First(c => c.Prop.Name == member.Member.Name).EscCol;
+                var value = Expression.Lambda(call.Arguments[1]).Compile().DynamicInvoke();
+                assigns.Add((column, value));
+                call = call.Object as MethodCallExpression;
+            }
+            assigns.Reverse();
+            var sb = new StringBuilder();
+            var parameters = new Dictionary<string, object>();
+            for (int i = 0; i < assigns.Count; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                var pName = _ctx.Provider.ParamPrefix + "u" + i;
+                sb.Append($"{assigns[i].Column} = {pName}");
+                parameters[pName] = assigns[i].Value ?? DBNull.Value;
+            }
+            return (sb.ToString(), parameters);
+        }
+
+        private static Expression StripQuotes(Expression e)
+        {
+            while (e.NodeType == ExpressionType.Quote) e = ((UnaryExpression)e).Operand;
+            return e;
         }
 
         public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
