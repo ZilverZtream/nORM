@@ -8,6 +8,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 using nORM.Core;
 using nORM.Execution;
 using nORM.Internal;
@@ -123,6 +124,42 @@ namespace nORM.Query
                 }
             }
             return (TResult)result!;
+        }
+
+        public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            var sw = Stopwatch.StartNew();
+            var plan = GetPlan(expression);
+            await using var cmd = _ctx.Connection.CreateCommand();
+            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+            cmd.CommandText = plan.Sql;
+            foreach (var p in plan.Parameters) cmd.AddParam(p.Key, p.Value);
+
+            if (plan.Includes.Count > 0 || plan.GroupJoinInfo != null)
+                throw new NotSupportedException("AsAsyncEnumerable does not support Include or GroupJoin operations.");
+
+            var trackable = !plan.NoTracking &&
+                             plan.ElementType.IsClass &&
+                             !plan.ElementType.Name.StartsWith("<>") &&
+                             plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
+            TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
+
+            var count = 0;
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var entity = plan.Materializer(reader);
+                if (trackable)
+                {
+                    NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
+                    var actualMap = _ctx.GetMapping(entity.GetType());
+                    _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, actualMap);
+                }
+                count++;
+                yield return (T)entity;
+            }
+
+            _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, count);
         }
 
         private async Task<IList> MaterializeAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
