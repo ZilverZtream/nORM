@@ -84,7 +84,16 @@ namespace nORM.Query
         private async Task<TResult> ExecuteInternalAsync<TResult>(Expression expression, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
-            var plan = GetPlan(expression);
+            var plan = GetPlan(expression, out var filtered);
+            string? cacheKey = null;
+            var cache = _ctx.Options.CacheProvider;
+            if (cache != null)
+            {
+                cacheKey = BuildCacheKey<TResult>(filtered, plan.Parameters);
+                if (cache.TryGet(cacheKey, out TResult? cached))
+                    return cached!;
+            }
+
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
@@ -123,13 +132,30 @@ namespace nORM.Query
                     result = list;
                 }
             }
+
+            if (cache != null && cacheKey != null)
+                cache.Set(cacheKey, (TResult)result!, _ctx.Options.CacheExpiration);
+
             return (TResult)result!;
         }
 
         public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
         {
+            var plan = GetPlan(expression, out var filtered);
+            var cache = _ctx.Options.CacheProvider;
+            string? cacheKey = null;
+            if (cache != null)
+            {
+                cacheKey = BuildCacheKey<T>(filtered, plan.Parameters);
+                if (cache.TryGet(cacheKey, out List<T>? cachedList) && cachedList != null)
+                {
+                    foreach (var item in cachedList)
+                        yield return item;
+                    yield break;
+                }
+            }
+
             var sw = Stopwatch.StartNew();
-            var plan = GetPlan(expression);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
@@ -145,21 +171,25 @@ namespace nORM.Query
             TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
             var count = 0;
+            var cacheList = cache != null ? new List<T>() : null;
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
             while (await reader.ReadAsync(ct))
             {
-                var entity = plan.Materializer(reader);
+                var entity = (T)plan.Materializer(reader);
                 if (trackable)
                 {
-                    NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
-                    var actualMap = _ctx.GetMapping(entity.GetType());
-                    _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, actualMap);
+                    NavigationPropertyExtensions.EnableLazyLoading((object)entity!, _ctx);
+                    var actualMap = _ctx.GetMapping(entity!.GetType());
+                    _ctx.ChangeTracker.Track(entity!, EntityState.Unchanged, actualMap);
                 }
                 count++;
-                yield return (T)entity;
+                cacheList?.Add(entity);
+                yield return entity;
             }
 
             _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, count);
+            if (cache != null && cacheKey != null)
+                cache.Set(cacheKey, cacheList ?? new List<T>(), _ctx.Options.CacheExpiration);
         }
 
         private async Task<IList> MaterializeAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
@@ -313,12 +343,28 @@ namespace nORM.Query
             return resultChildren;
         }
 
-        private QueryPlan GetPlan(Expression expression)
+        private QueryPlan GetPlan(Expression expression, out Expression filtered)
         {
-            var filtered = ApplyGlobalFilters(expression);
+            filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(filtered);
             var key = new QueryPlanCacheKey(filtered, _ctx.Options.TenantProvider?.GetCurrentTenantId(), elementType);
-            return _planCache.GetOrAdd(key, _ => new QueryTranslator(_ctx).Translate(filtered));
+            var local = filtered;
+            return _planCache.GetOrAdd(key, _ => new QueryTranslator(_ctx).Translate(local));
+        }
+
+        private string BuildCacheKey<TResult>(Expression expression, IReadOnlyDictionary<string, object> parameters)
+        {
+            var hash = new HashCode();
+            hash.Add(ExpressionFingerprint.Compute(expression));
+            hash.Add(typeof(TResult));
+            foreach (var kvp in parameters.OrderBy(k => k.Key))
+            {
+                hash.Add(kvp.Key);
+                hash.Add(kvp.Value?.GetHashCode() ?? 0);
+            }
+            var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
+            if (tenant != null) hash.Add(tenant);
+            return hash.ToHashCode().ToString();
         }
 
         private Expression ApplyGlobalFilters(Expression expression)
