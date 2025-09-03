@@ -347,6 +347,57 @@ namespace nORM.Core
         #endregion
 
         #region Raw SQL & Stored Procedures
+        public Task<List<T>> QueryUnchangedAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
+            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                var sw = Stopwatch.StartNew();
+                await using var cmd = ctx.Connection.CreateCommand();
+                cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandText = sql;
+                var paramDict = new Dictionary<string, object>();
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    var pName = $"{_p.ParamPrefix}p{i}";
+                    cmd.AddParam(pName, parameters[i]);
+                    paramDict[pName] = parameters[i];
+                }
+
+                var props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(p => p.CanWrite)
+                    .ToDictionary(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase);
+
+                var list = new List<T>();
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
+                var fieldCount = reader.FieldCount;
+                var columns = new string[fieldCount];
+                for (int i = 0; i < fieldCount; i++) columns[i] = reader.GetName(i);
+
+                while (await reader.ReadAsync(token))
+                {
+                    var item = new T();
+                    for (int i = 0; i < fieldCount; i++)
+                    {
+                        if (!props.TryGetValue(columns[i], out var prop)) continue;
+                        var value = reader.GetValue(i);
+                        if (value == DBNull.Value) continue;
+                        var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                        try
+                        {
+                            var converted = targetType.IsEnum ? Enum.ToObject(targetType, value) : Convert.ChangeType(value, targetType);
+                            prop.SetValue(item, converted);
+                        }
+                        catch
+                        {
+                            prop.SetValue(item, value);
+                        }
+                    }
+                    list.Add(item);
+                }
+
+                ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
+                return list;
+            }, ct);
+
         public Task<List<T>> FromSqlRawAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
