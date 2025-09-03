@@ -144,7 +144,8 @@ namespace nORM.Query
                 if (trackable)
                 {
                     NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
-                    _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, entityMap!);
+                    var actualMap = _ctx.GetMapping(entity.GetType());
+                    _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, actualMap);
                 }
 
                 list.Add(entity);
@@ -266,7 +267,8 @@ namespace nORM.Query
         private QueryPlan GetPlan(Expression expression)
         {
             var filtered = ApplyGlobalFilters(expression);
-            var key = new QueryPlanCacheKey(filtered, _ctx.Options.TenantProvider?.GetCurrentTenantId());
+            var elementType = GetElementType(filtered);
+            var key = new QueryPlanCacheKey(filtered, _ctx.Options.TenantProvider?.GetCurrentTenantId(), elementType);
             return _planCache.GetOrAdd(key, _ => new QueryTranslator(_ctx).Translate(filtered));
         }
 
