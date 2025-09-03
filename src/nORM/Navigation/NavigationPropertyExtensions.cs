@@ -42,6 +42,17 @@ namespace nORM.Navigation
         }
 
         /// <summary>
+        /// Removes navigation context tracking for an entity and cleans up lazy proxies.
+        /// </summary>
+        public static void CleanupNavigationContext<T>(T entity) where T : class
+        {
+            if (entity != null && _navigationContexts.TryGetValue(entity, out _))
+            {
+                _navigationContexts.Remove(entity);
+            }
+        }
+
+        /// <summary>
         /// Loads a navigation property explicitly
         /// </summary>
         public static async Task LoadAsync<T, TProperty>(this T entity, 
