@@ -29,8 +29,11 @@ namespace nORM.Core
         private readonly IExecutionStrategy _executionStrategy;
         private readonly ModelBuilder _modelBuilder;
 
+        private DbTransaction? _currentTransaction;
+
         public DbContextOptions Options { get; }
         public ChangeTracker ChangeTracker { get; } = new();
+        public DatabaseFacade Database { get; }
 
         public DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options = null)
         {
@@ -39,6 +42,8 @@ namespace nORM.Core
             Options = options ?? new DbContextOptions();
             _modelBuilder = new ModelBuilder();
             Options.OnModelCreating?.Invoke(_modelBuilder);
+
+            Database = new DatabaseFacade(this);
 
             _executionStrategy = Options.RetryPolicy != null
                 ? new RetryingExecutionStrategy(this, Options.RetryPolicy)
@@ -58,6 +63,18 @@ namespace nORM.Core
 
         public DbConnection Connection => _cn;
         public DatabaseProvider Provider => _p;
+
+        internal DbTransaction? CurrentTransaction
+        {
+            get => _currentTransaction;
+            set => _currentTransaction = value;
+        }
+
+        internal void ClearTransaction(DbTransaction transaction)
+        {
+            if (ReferenceEquals(_currentTransaction, transaction))
+                _currentTransaction = null;
+        }
 
         public async Task<bool> IsHealthyAsync(CancellationToken ct = default)
         {
@@ -134,7 +151,10 @@ namespace nORM.Core
             }
 
             var total = 0;
-            await using var transaction = await Connection.BeginTransactionAsync(ct);
+            var transaction = Database.CurrentTransaction;
+            var ownsTransaction = transaction is null;
+            if (ownsTransaction)
+                transaction = await Connection.BeginTransactionAsync(ct);
             try
             {
                 foreach (var entry in changedEntries)
@@ -142,20 +162,21 @@ namespace nORM.Core
                     switch (entry.State)
                     {
                         case EntityState.Added:
-                            total += await InvokeWriteAsync(nameof(InsertAsync), entry, transaction, ct);
+                            total += await InvokeWriteAsync(nameof(InsertAsync), entry, transaction!, ct);
                             entry.AcceptChanges();
                             break;
                         case EntityState.Modified:
-                            total += await InvokeWriteAsync(nameof(UpdateAsync), entry, transaction, ct);
+                            total += await InvokeWriteAsync(nameof(UpdateAsync), entry, transaction!, ct);
                             entry.AcceptChanges();
                             break;
                         case EntityState.Deleted:
-                            total += await InvokeWriteAsync(nameof(DeleteAsync), entry, transaction, ct);
+                            total += await InvokeWriteAsync(nameof(DeleteAsync), entry, transaction!, ct);
                             ChangeTracker.Remove(entry.Entity);
                             break;
                     }
                 }
-                await transaction.CommitAsync(ct);
+                if (ownsTransaction)
+                    await transaction!.CommitAsync(ct);
 
                 var cache = Options.CacheProvider;
                 if (cache != null)
@@ -172,8 +193,15 @@ namespace nORM.Core
             }
             catch
             {
-                await transaction.RollbackAsync(ct);
+                if (ownsTransaction)
+                    await transaction!.RollbackAsync(ct);
                 throw;
+            }
+
+            finally
+            {
+                if (ownsTransaction)
+                    await transaction!.DisposeAsync();
             }
 
             if (saveInterceptors.Count > 0)
@@ -229,14 +257,16 @@ namespace nORM.Core
             var map = GetMapping(typeof(T));
             if (operation == WriteOperation.Insert) SetTenantId(entity, map);
 
-            if (operation == WriteOperation.Insert && Options.RetryPolicy == null)
+            var tx = transaction ?? Database.CurrentTransaction;
+
+            if (operation == WriteOperation.Insert && Options.RetryPolicy == null && tx == null)
             {
-                return await ExecuteFastInsert(entity, map, ct, transaction);
+                return await ExecuteFastInsert(entity, map, ct, null);
             }
 
-            if (transaction != null)
+            if (tx != null)
             {
-                return await WriteWithTransactionAsync(entity, map, operation, transaction, ct, ownsTransaction: false);
+                return await WriteWithTransactionAsync(entity, map, operation, tx, ct, ownsTransaction: false);
             }
 
             return await _executionStrategy.ExecuteAsync((ctx, token) =>
