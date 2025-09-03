@@ -18,7 +18,8 @@ namespace nORM.Query
         bool NoTracking,
         string MethodName,
         List<IncludePlan> Includes,
-        GroupJoinInfo? GroupJoinInfo
+        GroupJoinInfo? GroupJoinInfo,
+        IReadOnlyCollection<string> Tables
     );
 
     internal sealed record IncludePlan(List<TableMapping.Relation> Path);
