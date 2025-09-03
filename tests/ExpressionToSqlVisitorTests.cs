@@ -27,7 +27,9 @@ namespace nORM.Tests
         private class Product
         {
             public int Id { get; set; }
-            public string Name { get; set; } = string.Empty;
+            public string? Name { get; set; }
+            public decimal Price { get; set; }
+            public bool IsAvailable { get; set; }
         }
 
         [Fact]
@@ -63,7 +65,7 @@ namespace nORM.Tests
         [Fact]
         public void Where_with_string_contains()
         {
-            var (sql, parameters) = Translate<Product>(p => p.Name.Contains("Foo"));
+            var (sql, parameters) = Translate<Product>(p => p.Name!.Contains("Foo"));
             Assert.Equal("T0.\"Name\" LIKE @p0 ESCAPE '\\'", sql);
             Assert.Single(parameters);
             Assert.Equal("%Foo%", parameters["@p0"]);
@@ -72,11 +74,64 @@ namespace nORM.Tests
         [Fact]
         public void Where_with_startswith_and_endswith()
         {
-            var (sql, parameters) = Translate<Product>(p => p.Name.StartsWith("Foo") && p.Name.EndsWith("Bar"));
+            var (sql, parameters) = Translate<Product>(p => p.Name!.StartsWith("Foo") && p.Name!.EndsWith("Bar"));
             Assert.Equal("(T0.\"Name\" LIKE @p0 ESCAPE '\\' AND T0.\"Name\" LIKE @p1 ESCAPE '\\')", sql);
             Assert.Equal(2, parameters.Count);
             Assert.Equal("Foo%", parameters["@p0"]);
             Assert.Equal("%Bar", parameters["@p1"]);
         }
+
+        [Fact]
+        public void Where_with_greater_and_less_than()
+        {
+            var (sql, parameters) = Translate<Product>(p => p.Price > 50 && p.Price <= 100);
+            Assert.Equal("((T0.\"Price\" > @p0) AND (T0.\"Price\" <= @p1))", sql);
+            Assert.Equal(2, parameters.Count);
+            Assert.Equal(50m, parameters["@p0"]);
+            Assert.Equal(100m, parameters["@p1"]);
+        }
+
+        [Fact]
+        public void Where_with_not_equal()
+        {
+            var (sql, parameters) = Translate<Product>(p => p.Name != "Test");
+            Assert.Equal("(T0.\"Name\" <> @p0)", sql);
+            Assert.Single(parameters);
+            Assert.Equal("Test", parameters["@p0"]);
+        }
+
+        [Fact]
+        public void Where_with_null_check()
+        {
+            var (sql, parameters) = Translate<Product>(p => p.Name == null);
+            Assert.Equal("(T0.\"Name\" = @p0)", sql);
+            Assert.Single(parameters);
+            Assert.IsType<DBNull>(parameters["@p0"]);
+        }
+
+        [Fact]
+        public void Where_on_boolean_property_true()
+        {
+            var (sql, parameters) = Translate<Product>(p => p.IsAvailable);
+            Assert.Equal("T0.\"IsAvailable\"", sql);
+            Assert.Empty(parameters);
+        }
+
+        [Fact]
+        public void Where_on_boolean_property_false()
+        {
+            var (sql, parameters) = Translate<Product>(p => !p.IsAvailable);
+            Assert.Equal("(NOT(T0.\"IsAvailable\"))", sql);
+            Assert.Empty(parameters);
+        }
+
+        [Fact]
+        public void Where_with_method_call_resolving_to_constant()
+        {
+            var testName = "TEST";
+            var ex = Assert.Throws<System.Reflection.TargetInvocationException>(() => Translate<Product>(p => p.Name == testName.ToLower()));
+            Assert.IsType<NotSupportedException>(ex.InnerException);
+        }
     }
 }
+
