@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -24,6 +25,7 @@ namespace nORM.Query
     {
         internal readonly DbContext _ctx;
         private static readonly ConcurrentLruCache<QueryPlanCacheKey, QueryPlan> _planCache = new(maxSize: 1000);
+        private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
@@ -109,59 +111,51 @@ namespace nORM.Query
         {
             var sw = Stopwatch.StartNew();
             var plan = GetPlan(expression, out var filtered);
-            string? cacheKey = null;
-            var cache = _ctx.Options.CacheProvider;
-            if (cache != null)
+            var cacheKey = BuildCacheKey<TResult>(filtered, plan.Parameters);
+            return await ExecuteWithCacheAsync(cacheKey, plan.Tables, async () =>
             {
-                cacheKey = BuildCacheKey<TResult>(filtered, plan.Parameters);
-                if (cache.TryGet(cacheKey, out TResult? cached))
-                    return cached!;
-            }
+                await _ctx.EnsureConnectionAsync(ct);
+                await using var cmd = _ctx.Connection.CreateCommand();
+                cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandText = plan.Sql;
+                foreach (var p in plan.Parameters) cmd.AddParam(p.Key, p.Value);
 
-            await _ctx.EnsureConnectionAsync(ct);
-            await using var cmd = _ctx.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
-            cmd.CommandText = plan.Sql;
-            foreach (var p in plan.Parameters) cmd.AddParam(p.Key, p.Value);
-
-            object result;
-            if (plan.IsScalar)
-            {
-                var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct);
-                _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
-                if (scalarResult == null || scalarResult is DBNull) return default(TResult)!;
-                var resultType = typeof(TResult);
-                result = Convert.ChangeType(scalarResult, Nullable.GetUnderlyingType(resultType) ?? resultType)!;
-            }
-            else
-            {
-                var list = await _executor.MaterializeAsync(plan, cmd, ct);
-                _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, list.Count);
-                if (plan.SingleResult)
+                object result;
+                if (plan.IsScalar)
                 {
-                    result = plan.MethodName switch
-                    {
-                        "First" => ((IEnumerable)list).Cast<object>().First(),
-                        "FirstOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
-                        "Single" => ((IEnumerable)list).Cast<object>().Single(),
-                        "SingleOrDefault" => ((IEnumerable)list).Cast<object>().SingleOrDefault(),
-                        "ElementAt" => ((IEnumerable)list).Cast<object>().First(),
-                        "ElementAtOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
-                        "Last" => ((IEnumerable)list).Cast<object>().First(),
-                        "LastOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
-                        _ => list
-                    } ?? (object)list;
+                    var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
+                    if (scalarResult == null || scalarResult is DBNull) return default(TResult)!;
+                    var resultType = typeof(TResult);
+                    result = Convert.ChangeType(scalarResult, Nullable.GetUnderlyingType(resultType) ?? resultType)!;
                 }
                 else
                 {
-                    result = list;
+                    var list = await _executor.MaterializeAsync(plan, cmd, ct);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, list.Count);
+                    if (plan.SingleResult)
+                    {
+                        result = plan.MethodName switch
+                        {
+                            "First" => ((IEnumerable)list).Cast<object>().First(),
+                            "FirstOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
+                            "Single" => ((IEnumerable)list).Cast<object>().Single(),
+                            "SingleOrDefault" => ((IEnumerable)list).Cast<object>().SingleOrDefault(),
+                            "ElementAt" => ((IEnumerable)list).Cast<object>().First(),
+                            "ElementAtOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
+                            "Last" => ((IEnumerable)list).Cast<object>().First(),
+                            "LastOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
+                            _ => list
+                        } ?? (object)list;
+                    }
+                    else
+                    {
+                        result = list;
+                    }
                 }
-            }
 
-            if (cache != null && cacheKey != null)
-                cache.Set(cacheKey, (TResult)result!, _ctx.Options.CacheExpiration, plan.Tables);
-
-            return (TResult)result!;
+                return (TResult)result!;
+            }, ct);
         }
 
         internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
@@ -174,59 +168,79 @@ namespace nORM.Query
         private async Task<TResult> ExecuteCompiledInternalAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
-            string? cacheKey = null;
-            var cache = _ctx.Options.CacheProvider;
-            if (cache != null)
+            var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, parameters);
+            return await ExecuteWithCacheAsync(cacheKey, plan.Tables, async () =>
             {
-                cacheKey = BuildCacheKeyFromPlan<TResult>(plan, parameters);
-                if (cache.TryGet(cacheKey, out TResult? cached))
-                    return cached!;
-            }
+                await _ctx.EnsureConnectionAsync(ct);
+                await using var cmd = _ctx.Connection.CreateCommand();
+                cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandText = plan.Sql;
+                foreach (var p in parameters) cmd.AddParam(p.Key, p.Value);
 
-            await _ctx.EnsureConnectionAsync(ct);
-            await using var cmd = _ctx.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
-            cmd.CommandText = plan.Sql;
-            foreach (var p in parameters) cmd.AddParam(p.Key, p.Value);
-
-            object result;
-            if (plan.IsScalar)
-            {
-                var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct);
-                _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
-                if (scalarResult == null || scalarResult is DBNull) return default!;
-                var resultType = typeof(TResult);
-                result = Convert.ChangeType(scalarResult, Nullable.GetUnderlyingType(resultType) ?? resultType)!;
-            }
-            else
-            {
-                var list = await _executor.MaterializeAsync(plan, cmd, ct);
-                _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, list.Count);
-                if (plan.SingleResult)
+                object result;
+                if (plan.IsScalar)
                 {
-                    result = plan.MethodName switch
-                    {
-                        "First" => ((IEnumerable)list).Cast<object>().First(),
-                        "FirstOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
-                        "Single" => ((IEnumerable)list).Cast<object>().Single(),
-                        "SingleOrDefault" => ((IEnumerable)list).Cast<object>().SingleOrDefault(),
-                        "ElementAt" => ((IEnumerable)list).Cast<object>().First(),
-                        "ElementAtOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
-                        "Last" => ((IEnumerable)list).Cast<object>().First(),
-                        "LastOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
-                        _ => list
-                    } ?? (object)list;
+                    var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
+                    if (scalarResult == null || scalarResult is DBNull) return default!;
+                    var resultType = typeof(TResult);
+                    result = Convert.ChangeType(scalarResult, Nullable.GetUnderlyingType(resultType) ?? resultType)!;
                 }
                 else
                 {
-                    result = list;
+                    var list = await _executor.MaterializeAsync(plan, cmd, ct);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, list.Count);
+                    if (plan.SingleResult)
+                    {
+                        result = plan.MethodName switch
+                        {
+                            "First" => ((IEnumerable)list).Cast<object>().First(),
+                            "FirstOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
+                            "Single" => ((IEnumerable)list).Cast<object>().Single(),
+                            "SingleOrDefault" => ((IEnumerable)list).Cast<object>().SingleOrDefault(),
+                            "ElementAt" => ((IEnumerable)list).Cast<object>().First(),
+                            "ElementAtOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
+                            "Last" => ((IEnumerable)list).Cast<object>().First(),
+                            "LastOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
+                            _ => list
+                        } ?? (object)list;
+                    }
+                    else
+                    {
+                        result = list;
+                    }
                 }
+
+                return (TResult)result!;
+            }, ct);
+        }
+
+        private async Task<TResult> ExecuteWithCacheAsync<TResult>(string cacheKey, IReadOnlyCollection<string> tables, Func<Task<TResult>> factory, CancellationToken ct)
+        {
+            var cache = _ctx.Options.CacheProvider;
+            if (cache == null)
+                return await factory();
+
+            if (cache.TryGet(cacheKey, out TResult? cached))
+                return cached!;
+
+            var semaphore = _cacheLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
+            await semaphore.WaitAsync(ct);
+            try
+            {
+                if (cache.TryGet(cacheKey, out cached))
+                    return cached!;
+
+                var result = await factory();
+                cache.Set(cacheKey, result!, _ctx.Options.CacheExpiration, tables);
+                return result;
             }
-
-            if (cache != null && cacheKey != null)
-                cache.Set(cacheKey, (TResult)result!, _ctx.Options.CacheExpiration, plan.Tables);
-
-            return (TResult)result!;
+            finally
+            {
+                semaphore.Release();
+                if (semaphore.CurrentCount == 1)
+                    _cacheLocks.TryRemove(cacheKey, out _);
+            }
         }
 
         private string BuildCacheKeyFromPlan<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
