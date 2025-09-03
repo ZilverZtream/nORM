@@ -29,6 +29,7 @@ namespace nORM.Core
     {
         INormIncludableQueryable<T, TProperty> Include<TProperty>(Expression<Func<T, TProperty>> navigationPropertyPath);
         INormQueryable<T> AsNoTracking();
+        INormQueryable<T> AsSplitQuery();
         IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default);
         Task<List<T>> ToListAsync(CancellationToken ct = default);
         Task<T[]> ToArrayAsync(CancellationToken ct = default);
@@ -88,6 +89,17 @@ namespace nORM.Core
             var expression = Expression.Call(
                 typeof(INormQueryable<>).MakeGenericType(typeof(T)),
                 nameof(AsNoTracking),
+                Type.EmptyTypes,
+                Expression
+            );
+            return new NormQueryableImpl<T>(Provider, expression);
+        }
+
+        public INormQueryable<T> AsSplitQuery()
+        {
+            var expression = Expression.Call(
+                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
+                nameof(AsSplitQuery),
                 Type.EmptyTypes,
                 Expression
             );
@@ -166,6 +178,17 @@ namespace nORM.Core
             var expression = Expression.Call(
                 typeof(INormQueryable<>).MakeGenericType(typeof(T)),
                 nameof(INormQueryable<T>.AsNoTracking),
+                Type.EmptyTypes,
+                Expression
+            );
+            return new NormQueryableImpl<T>(Provider, expression);
+        }
+
+        public INormQueryable<T> AsSplitQuery()
+        {
+            var expression = Expression.Call(
+                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
+                nameof(INormQueryable<T>.AsSplitQuery),
                 Type.EmptyTypes,
                 Expression
             );
