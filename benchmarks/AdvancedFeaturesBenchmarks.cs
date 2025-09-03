@@ -33,6 +33,7 @@ namespace nORM.Benchmarks
     {
         private DbContext? _nOrmContext;
         private TestDbContext? _efContext;
+        private SqliteConnection? _nOrmConnection;
         private SqliteConnection? _dapperConnection;
         private const int DataSize = 1000;
         private const int UsersCount = 100;
@@ -42,29 +43,31 @@ namespace nORM.Benchmarks
         public async Task Setup()
         {
             // Setup nORM
-            var nOrmConnection = new SqliteConnection("Data Source=:memory:");
-            await nOrmConnection.OpenAsync();
-            await CreateSchema(nOrmConnection);
+            _nOrmConnection = new SqliteConnection("Data Source=:memory:");
+            await _nOrmConnection.OpenAsync();
+            await CreateSchema(_nOrmConnection);
             var provider = new SqliteProvider();
-            _nOrmContext = new DbContext(nOrmConnection, provider);
+            _nOrmContext = new DbContext(_nOrmConnection, provider);
             await SeedData(_nOrmContext);
-            
+
             // Setup EF Core
             _efContext = new TestDbContext();
+            await _efContext.Database.OpenConnectionAsync();
             await _efContext.Database.EnsureCreatedAsync();
             await SeedDataEF(_efContext);
-            
+
             // Setup Dapper
             _dapperConnection = new SqliteConnection("Data Source=:memory:");
             await _dapperConnection.OpenAsync();
             await CreateSchema(_dapperConnection);
             await SeedDataDapper(_dapperConnection);
         }
-        
+
         [GlobalCleanup]
         public void Cleanup()
         {
             _nOrmContext?.Dispose();
+            _nOrmConnection?.Dispose();
             _efContext?.Dispose();
             _dapperConnection?.Dispose();
         }
