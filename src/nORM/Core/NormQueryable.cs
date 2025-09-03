@@ -38,6 +38,8 @@ namespace nORM.Core
         Task<T?> FirstOrDefaultAsync(CancellationToken ct = default);
         Task<T> SingleAsync(CancellationToken ct = default);
         Task<T?> SingleOrDefaultAsync(CancellationToken ct = default);
+        Task<int> ExecuteDeleteAsync(CancellationToken ct = default);
+        Task<int> ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct = default);
     }
 
     public interface INormIncludableQueryable<TEntity, out TProperty> : INormQueryable<TEntity>
@@ -103,6 +105,9 @@ namespace nORM.Core
         public Task<T?> FirstOrDefaultAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<T?>(Expression.Call(typeof(Queryable), nameof(Queryable.FirstOrDefault), new[] { typeof(T) }, Expression), ct);
         public Task<T> SingleAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<T>(Expression.Call(typeof(Queryable), nameof(Queryable.Single), new[] { typeof(T) }, Expression), ct);
         public Task<T?> SingleOrDefaultAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<T?>(Expression.Call(typeof(Queryable), nameof(Queryable.SingleOrDefault), new[] { typeof(T) }, Expression), ct);
+        public Task<int> ExecuteDeleteAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteDeleteAsync(Expression, ct);
+        public Task<int> ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).ExecuteUpdateAsync(Expression, set, ct);
     }
 
     /// <summary>
@@ -185,6 +190,9 @@ namespace nORM.Core
             => ((NormQueryProvider)Provider).ExecuteAsync<T>(Expression.Call(typeof(Queryable), nameof(Queryable.Single), new[] { typeof(T) }, Expression), ct);
         public Task<T?> SingleOrDefaultAsync(CancellationToken ct = default)
             => ((NormQueryProvider)Provider).ExecuteAsync<T?>(Expression.Call(typeof(Queryable), nameof(Queryable.SingleOrDefault), new[] { typeof(T) }, Expression), ct);
+        public Task<int> ExecuteDeleteAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteDeleteAsync(Expression, ct);
+        public Task<int> ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).ExecuteUpdateAsync(Expression, set, ct);
     }
 
     public static class NormIncludableQueryableExtensions
