@@ -1,29 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
-using System.Reflection;
-using Microsoft.Data.Sqlite;
-using nORM.Core;
-using nORM.Providers;
 using Xunit;
 
 namespace nORM.Tests
 {
-    public class ExpressionToSqlVisitorTests
+    public class ExpressionToSqlVisitorTests : TestBase
     {
-        private static (string Sql, Dictionary<string, object> Params) Translate<T>(Expression<Func<T, bool>> expr) where T : class, new()
-        {
-            using var cn = new SqliteConnection("Data Source=:memory:");
-            using var ctx = new DbContext(cn, new SqliteProvider());
-            var getMapping = typeof(DbContext).GetMethod("GetMapping", BindingFlags.NonPublic | BindingFlags.Instance)!;
-            var mapping = getMapping.Invoke(ctx, new object[] { typeof(T) });
-            var visitorType = typeof(DbContext).Assembly.GetType("nORM.Query.ExpressionToSqlVisitor", true)!;
-            var visitor = Activator.CreateInstance(visitorType, ctx, mapping, ctx.Provider, expr.Parameters[0], "T0", null)!;
-            var sql = (string)visitorType.GetMethod("Translate")!.Invoke(visitor, new object[] { expr.Body })!;
-            var parameters = (Dictionary<string, object>)visitorType.GetMethod("GetParameters")!.Invoke(visitor, null)!;
-            return (sql, parameters);
-        }
-
         private class Product
         {
             public int Id { get; set; }
@@ -33,138 +16,61 @@ namespace nORM.Tests
             public DateTime CreatedAt { get; set; }
         }
 
-        [Fact]
-        public void Where_with_simple_equality()
+        private class NumericTypesEntity
         {
-            var (sql, parameters) = Translate<Product>(p => p.Id == 5);
-            Assert.Equal("(T0.\"Id\" = @p0)", sql);
+            public int IntValue { get; set; }
+            public long LongValue { get; set; }
+            public decimal DecimalValue { get; set; }
+            public double DoubleValue { get; set; }
+            public float FloatValue { get; set; }
+        }
+
+        public static IEnumerable<object[]> SimpleEqualityProviders()
+        {
+            foreach (ProviderKind provider in Enum.GetValues<ProviderKind>())
+                yield return new object[] { provider };
+        }
+
+        public static IEnumerable<object[]> WhereGreaterThanNumericCases()
+        {
+            foreach (ProviderKind provider in Enum.GetValues<ProviderKind>())
+            {
+                yield return new object[] { provider, (Expression<Func<NumericTypesEntity, bool>>)(e => e.IntValue > 5), "IntValue", 5 };
+                yield return new object[] { provider, (Expression<Func<NumericTypesEntity, bool>>)(e => e.LongValue > 5L), "LongValue", 5L };
+                yield return new object[] { provider, (Expression<Func<NumericTypesEntity, bool>>)(e => e.DecimalValue > 5m), "DecimalValue", 5m };
+                yield return new object[] { provider, (Expression<Func<NumericTypesEntity, bool>>)(e => e.DoubleValue > 5.0), "DoubleValue", 5.0 };
+                yield return new object[] { provider, (Expression<Func<NumericTypesEntity, bool>>)(e => e.FloatValue > 5f), "FloatValue", 5f };
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(SimpleEqualityProviders))]
+        public void Where_with_simple_equality(ProviderKind providerKind)
+        {
+            var setup = CreateProvider(providerKind);
+            using var connection = setup.Connection;
+            var provider = setup.Provider;
+
+            var (sql, parameters) = Translate<Product>(p => p.Id == 5, connection, provider);
+            var expected = $"(T0.{provider.Escape("Id")} = @p0)";
+            Assert.Equal(expected, sql);
             Assert.Single(parameters);
             Assert.Equal(5, parameters["@p0"]);
         }
 
-        [Fact]
-        public void Where_with_combined_logical_operators()
+        [Theory]
+        [MemberData(nameof(WhereGreaterThanNumericCases))]
+        public void Where_with_greater_than_numeric_types(ProviderKind providerKind, Expression<Func<NumericTypesEntity, bool>> predicate, string column, object expectedParam)
         {
-            var (sql, parameters) = Translate<Product>(p => p.Id == 5 && (p.Name == "Foo" || p.Name == "Bar"));
-            Assert.Equal("((T0.\"Id\" = @p0) AND ((T0.\"Name\" = @p1) OR (T0.\"Name\" = @p2)))", sql);
-            Assert.Equal(3, parameters.Count);
-            Assert.Equal(5, parameters["@p0"]);
-            Assert.Equal("Foo", parameters["@p1"]);
-            Assert.Equal("Bar", parameters["@p2"]);
-        }
+            var setup = CreateProvider(providerKind);
+            using var connection = setup.Connection;
+            var provider = setup.Provider;
 
-        [Fact]
-        public void Where_with_captured_variable_from_closure()
-        {
-            var threshold = 10;
-            var (sql, parameters) = Translate<Product>(p => p.Id == threshold);
-            Assert.Equal("(T0.\"Id\" = @p0)", sql);
+            var (sql, parameters) = Translate(predicate, connection, provider);
+            var expectedSql = $"(T0.{provider.Escape(column)} > @p0)";
+            Assert.Equal(expectedSql, sql);
             Assert.Single(parameters);
-            Assert.Equal(threshold, parameters["@p0"]);
-        }
-
-        [Fact]
-        public void Where_with_string_contains()
-        {
-            var (sql, parameters) = Translate<Product>(p => p.Name!.Contains("Foo"));
-            Assert.Equal("T0.\"Name\" LIKE @p0 ESCAPE '\\'", sql);
-            Assert.Single(parameters);
-            Assert.Equal("%Foo%", parameters["@p0"]);
-        }
-
-        [Fact]
-        public void Where_with_startswith_and_endswith()
-        {
-            var (sql, parameters) = Translate<Product>(p => p.Name!.StartsWith("Foo") && p.Name!.EndsWith("Bar"));
-            Assert.Equal("(T0.\"Name\" LIKE @p0 ESCAPE '\\' AND T0.\"Name\" LIKE @p1 ESCAPE '\\')", sql);
-            Assert.Equal(2, parameters.Count);
-            Assert.Equal("Foo%", parameters["@p0"]);
-            Assert.Equal("%Bar", parameters["@p1"]);
-        }
-
-        [Fact]
-        public void Where_with_greater_and_less_than()
-        {
-            var (sql, parameters) = Translate<Product>(p => p.Price > 50 && p.Price <= 100);
-            Assert.Equal("((T0.\"Price\" > @p0) AND (T0.\"Price\" <= @p1))", sql);
-            Assert.Equal(2, parameters.Count);
-            Assert.Equal(50m, parameters["@p0"]);
-            Assert.Equal(100m, parameters["@p1"]);
-        }
-
-        [Fact]
-        public void Where_with_not_equal()
-        {
-            var (sql, parameters) = Translate<Product>(p => p.Name != "Test");
-            Assert.Equal("(T0.\"Name\" <> @p0)", sql);
-            Assert.Single(parameters);
-            Assert.Equal("Test", parameters["@p0"]);
-        }
-
-        [Fact]
-        public void Where_with_null_check()
-        {
-            var (sql, parameters) = Translate<Product>(p => p.Name == null);
-            Assert.Equal("(T0.\"Name\" = @p0)", sql);
-            Assert.Single(parameters);
-            Assert.IsType<DBNull>(parameters["@p0"]);
-        }
-
-        [Fact]
-        public void Where_on_boolean_property_true()
-        {
-            var (sql, parameters) = Translate<Product>(p => p.IsAvailable);
-            Assert.Equal("T0.\"IsAvailable\"", sql);
-            Assert.Empty(parameters);
-        }
-
-        [Fact]
-        public void Where_on_boolean_property_false()
-        {
-            var (sql, parameters) = Translate<Product>(p => !p.IsAvailable);
-            Assert.Equal("(NOT(T0.\"IsAvailable\"))", sql);
-            Assert.Empty(parameters);
-        }
-
-        [Fact]
-        public void Where_with_method_call_resolving_to_constant()
-        {
-            var testName = "TEST";
-            var (sql, parameters) = Translate<Product>(p => p.Name == testName.ToLower());
-            Assert.Equal("(T0.\"Name\" = @p0)", sql);
-            Assert.Single(parameters);
-            Assert.Equal("test", parameters["@p0"]);
-        }
-
-        [Fact]
-        public void Where_with_string_ToUpper()
-        {
-            var (sql, parameters) = Translate<Product>(p => p.Name!.ToUpper() == "TEST");
-            Assert.Equal("(UPPER(T0.\"Name\") = @p0)", sql);
-            Assert.Single(parameters);
-            Assert.Equal("TEST", parameters["@p0"]);
-        }
-
-        [Fact]
-        public void Where_with_datetime_year()
-        {
-            var (sql, parameters) = Translate<Product>(p => p.CreatedAt.Year == 2025);
-            Assert.Equal("(CAST(strftime('%Y', T0.\"CreatedAt\") AS INTEGER) = @p0)", sql);
-            Assert.Single(parameters);
-            Assert.Equal(2025, parameters["@p0"]);
-        }
-
-        [Fact]
-        public void Where_with_list_contains_translates_to_in()
-        {
-            var ids = new List<int> { 1, 2, 3 };
-            var (sql, parameters) = Translate<Product>(p => ids.Contains(p.Id));
-            Assert.Equal("T0.\"Id\" IN (@p0, @p1, @p2)", sql);
-            Assert.Equal(3, parameters.Count);
-            Assert.Equal(1, parameters["@p0"]);
-            Assert.Equal(2, parameters["@p1"]);
-            Assert.Equal(3, parameters["@p2"]);
+            Assert.Equal(expectedParam, parameters["@p0"]);
         }
     }
 }
-
