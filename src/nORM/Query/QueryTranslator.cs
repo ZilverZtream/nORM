@@ -692,11 +692,32 @@ namespace nORM.Query
                             var propName = member.Member.Name;
                             if (_mapping.Relations.TryGetValue(propName, out var relation))
                             {
-                                _includes.Add(new IncludePlan(relation));
+                                _includes.Add(new IncludePlan(new List<TableMapping.Relation> { relation }));
                             }
                         }
                     }
                     return Visit(node.Arguments[0]);
+
+                case "ThenInclude":
+                    var parentExpression = Visit(node.Arguments[0]);
+                    if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression thenLambda)
+                    {
+                        var member = thenLambda.Body is UnaryExpression unary2 ?
+                                     (MemberExpression)unary2.Operand :
+                                     (MemberExpression)thenLambda.Body;
+                        var propName = member.Member.Name;
+                        if (_includes.Count > 0)
+                        {
+                            var lastInclude = _includes[^1];
+                            var lastRelation = lastInclude.Path.Last();
+                            var parentMap = _ctx.GetMapping(lastRelation.DependentType);
+                            if (parentMap.Relations.TryGetValue(propName, out var relation))
+                            {
+                                lastInclude.Path.Add(relation);
+                            }
+                        }
+                    }
+                    return parentExpression;
 
                 case "AsNoTracking":
                     _noTracking = true;
