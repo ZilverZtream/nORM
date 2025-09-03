@@ -23,6 +23,7 @@ namespace nORM.Providers
         public abstract void ApplyPaging(StringBuilder sb, int? limit, int? offset);
         public abstract string GetIdentityRetrievalString(TableMapping m);
         public abstract DbParameter CreateParameter(string name, object? value);
+        public abstract string? TranslateFunction(string name, Type declaringType, params string[] args);
 
         public virtual char LikeEscapeChar => '\\';
 
