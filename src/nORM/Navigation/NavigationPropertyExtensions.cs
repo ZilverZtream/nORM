@@ -336,6 +336,7 @@ namespace nORM.Navigation
 
         private static async Task<List<object>> ExecuteCollectionQueryAsync(DbContext context, TableMapping mapping, Column foreignKey, object keyValue, Type entityType, CancellationToken ct)
         {
+            await context.EnsureConnectionAsync(ct);
             using var cmd = context.Connection.CreateCommand();
             cmd.CommandTimeout = (int)context.Options.CommandTimeout.TotalSeconds;
             
@@ -361,6 +362,7 @@ namespace nORM.Navigation
 
         private static async Task<object?> ExecuteSingleQueryAsync(DbContext context, TableMapping mapping, Column foreignKey, object keyValue, Type entityType, CancellationToken ct)
         {
+            await context.EnsureConnectionAsync(ct);
             using var cmd = context.Connection.CreateCommand();
             cmd.CommandTimeout = (int)context.Options.CommandTimeout.TotalSeconds;
             

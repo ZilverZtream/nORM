@@ -28,7 +28,7 @@ namespace nORM.Core
         private readonly ConcurrentDictionary<Type, TableMapping> _m = new();
         private readonly IExecutionStrategy _executionStrategy;
         private readonly ModelBuilder _modelBuilder;
-
+        private bool _sqliteInitialized;
         private DbTransaction? _currentTransaction;
 
         public DbContextOptions Options { get; }
@@ -48,17 +48,6 @@ namespace nORM.Core
             _executionStrategy = Options.RetryPolicy != null
                 ? new RetryingExecutionStrategy(this, Options.RetryPolicy)
                 : new DefaultExecutionStrategy(this);
-
-            if (_cn.State != ConnectionState.Open)
-                _cn.Open();
-
-            // Apply SQLite optimizations once on connection open
-            if (_p is SqliteProvider)
-            {
-                using var pragmaCmd = _cn.CreateCommand();
-                pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
-                pragmaCmd.ExecuteNonQuery();
-            }
         }
 
         public DbContext(string connectionString, DatabaseProvider p, DbContextOptions? options = null)
@@ -91,7 +80,30 @@ namespace nORM.Core
             throw new NotSupportedException($"Unsupported provider type: {provider.GetType().Name}");
         }
 
-        public DbConnection Connection => _cn;
+        internal async Task<DbConnection> EnsureConnectionAsync(CancellationToken ct = default)
+        {
+            if (_cn.State != ConnectionState.Open)
+                await _cn.OpenAsync(ct);
+
+            if (!_sqliteInitialized && _p is SqliteProvider)
+            {
+                await using var pragmaCmd = _cn.CreateCommand();
+                pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
+                await pragmaCmd.ExecuteNonQueryAsync(ct);
+                _sqliteInitialized = true;
+            }
+
+            return _cn;
+        }
+
+        public DbConnection Connection
+        {
+            get
+            {
+                EnsureConnectionAsync().GetAwaiter().GetResult();
+                return _cn;
+            }
+        }
         public DatabaseProvider Provider => _p;
 
         internal DbTransaction? CurrentTransaction
@@ -112,6 +124,7 @@ namespace nORM.Core
             {
                 return await _executionStrategy.ExecuteAsync(async (ctx, token) =>
                 {
+                    await ctx.EnsureConnectionAsync(token);
                     await using var cmd = ctx.Connection.CreateCommand();
                     cmd.CommandText = "SELECT 1";
                     cmd.CommandTimeout = (int)TimeSpan.FromSeconds(5).TotalSeconds;
@@ -305,6 +318,7 @@ namespace nORM.Core
 
         private async Task<int> WriteWithTransactionAsync<T>(T entity, TableMapping map, WriteOperation operation, DbTransaction? transaction, CancellationToken ct, bool ownsTransaction) where T : class
         {
+            await EnsureConnectionAsync(ct);
             var currentTransaction = transaction ?? await Connection.BeginTransactionAsync(ct);
             try
             {
@@ -355,6 +369,7 @@ namespace nORM.Core
                 return await WriteWithTransactionAsync(entity, map, WriteOperation.Insert, transaction, ct, ownsTransaction: false);
             }
 
+            await EnsureConnectionAsync(ct);
             await using var ownTransaction = await _cn.BeginTransactionAsync(ct);
             try
             {
@@ -423,18 +438,27 @@ namespace nORM.Core
 
         #region Bulk Operations
         public Task<int> BulkInsertAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
-            => _executionStrategy.ExecuteAsync((ctx, token) =>
+            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
+                await ctx.EnsureConnectionAsync(token);
                 var map = GetMapping(typeof(T));
                 foreach (var entity in entities) SetTenantId(entity, map);
-                return _p.BulkInsertAsync(ctx, map, entities, token);
+                return await _p.BulkInsertAsync(ctx, map, entities, token);
             }, ct);
 
         public Task<int> BulkUpdateAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
-            => _executionStrategy.ExecuteAsync((ctx, token) => _p.BulkUpdateAsync(ctx, GetMapping(typeof(T)), entities, token), ct);
+            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                await ctx.EnsureConnectionAsync(token);
+                return await _p.BulkUpdateAsync(ctx, GetMapping(typeof(T)), entities, token);
+            }, ct);
 
         public Task<int> BulkDeleteAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
-            => _executionStrategy.ExecuteAsync((ctx, token) => _p.BulkDeleteAsync(ctx, GetMapping(typeof(T)), entities, token), ct);
+            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                await ctx.EnsureConnectionAsync(token);
+                return await _p.BulkDeleteAsync(ctx, GetMapping(typeof(T)), entities, token);
+            }, ct);
         #endregion
 
         #region Transaction Savepoints
@@ -507,6 +531,7 @@ namespace nORM.Core
         public Task<List<T>> QueryUnchangedAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
+                await ctx.EnsureConnectionAsync(token);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
@@ -558,6 +583,7 @@ namespace nORM.Core
         public Task<List<T>> FromSqlRawAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
+                await ctx.EnsureConnectionAsync(token);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
@@ -582,6 +608,7 @@ namespace nORM.Core
         public Task<List<T>> ExecuteStoredProcedureAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
+                await ctx.EnsureConnectionAsync(token);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
