@@ -21,39 +21,49 @@ namespace nORM.Internal
 
         public TValue GetOrAdd(TKey key, Func<TKey, TValue> factory)
         {
-            if (_cache.TryGetValue(key, out var node))
+            // First, try a lock-free read for the common case.
+            if (_cache.TryGetValue(key, out var existingNode))
             {
-                // _cache is concurrent, but _lruList is not; all interactions with
-                // the list must occur inside this lock to keep it consistent.
                 lock (_lock)
                 {
-                    _lruList.Remove(node);
-                    _lruList.AddFirst(node);
-                }
-                return node.Value.Value;
-            }
-
-            var value = factory(key);
-            var newNode = new LinkedListNode<CacheItem>(new CacheItem(key, value));
-
-            // All subsequent operations that touch _lruList are also wrapped in the
-            // same lock to guarantee consistency with the concurrent dictionary.
-            lock (_lock)
-            {
-                if (_cache.TryAdd(key, newNode))
-                {
-                    _lruList.AddFirst(newNode);
-
-                    if (_lruList.Count > _maxSize)
+                    // The node might have been removed by another thread between TryGetValue and the lock.
+                    // A simple check is to see if it still has a list.
+                    if (existingNode.List != null)
                     {
-                        var lastNode = _lruList.Last!;
-                        _lruList.RemoveLast();
-                        _cache.TryRemove(lastNode.Value.Key, out _);
+                        _lruList.Remove(existingNode);
+                        _lruList.AddFirst(existingNode);
+                        return existingNode.Value.Value;
                     }
                 }
             }
 
-            return value;
+            // Key doesn't exist or was just evicted, we need to add it.
+            lock (_lock)
+            {
+                // Double-check if another thread added it while we were waiting for the lock.
+                if (_cache.TryGetValue(key, out existingNode))
+                {
+                    _lruList.Remove(existingNode);
+                    _lruList.AddFirst(existingNode);
+                    return existingNode.Value.Value;
+                }
+
+                // We are the first, create and add the new item.
+                var value = factory(key);
+                var newNode = new LinkedListNode<CacheItem>(new CacheItem(key, value));
+
+                _cache[key] = newNode; // Use indexer now that we are in a lock.
+                _lruList.AddFirst(newNode);
+
+                if (_lruList.Count > _maxSize)
+                {
+                    var lastNode = _lruList.Last!;
+                    _lruList.RemoveLast();
+                    _cache.TryRemove(lastNode.Value.Key, out _);
+                }
+
+                return value;
+            }
         }
 
         private record CacheItem(TKey Key, TValue Value);
