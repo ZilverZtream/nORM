@@ -33,10 +33,13 @@ using nORM.Core;
 using nORM.Providers;
 using Microsoft.Data.SqlClient;
 
-// Create connection and context
-var connection = new SqlConnection("Server=.;Database=MyApp;Trusted_Connection=true");
+// Create context and let it manage the connection
 var provider = new SqlServerProvider();
-var context = new DbContext(connection, provider);
+var context = new DbContext("Server=.;Database=MyApp;Trusted_Connection=true", provider);
+
+// Or create and pass an existing connection
+// using var connection = new SqlConnection("Server=.;Database=MyApp;Trusted_Connection=true");
+// var context = new DbContext(connection, provider);
 
 // Define your entities
 public class User
