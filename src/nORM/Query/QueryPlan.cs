@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 using nORM.Mapping;
 
 #nullable enable
@@ -11,7 +13,7 @@ namespace nORM.Query
     internal sealed record QueryPlan(
         string Sql, 
         IReadOnlyDictionary<string, object> Parameters, 
-        Func<DbDataReader, object> Materializer, 
+        Func<DbDataReader, CancellationToken, Task<object>> Materializer,
         Type ElementType, 
         bool IsScalar,
         bool SingleResult,

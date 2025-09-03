@@ -387,7 +387,7 @@ namespace nORM.Query
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
             while (await reader.ReadAsync(ct))
             {
-                var entity = (T)plan.Materializer(reader);
+                var entity = (T)await plan.Materializer(reader, ct);
                 if (trackable)
                 {
                     NavigationPropertyExtensions.EnableLazyLoading((object)entity!, _ctx);
@@ -421,7 +421,7 @@ namespace nORM.Query
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
             while (await reader.ReadAsync(ct))
             {
-                var entity = plan.Materializer(reader);
+                var entity = await plan.Materializer(reader, ct);
 
                 if (trackable)
                 {
@@ -461,7 +461,7 @@ namespace nORM.Query
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
             while (await reader.ReadAsync(ct))
             {
-                var tuple = (ValueTuple<object, object>)plan.Materializer(reader);
+                var tuple = (ValueTuple<object, object>)await plan.Materializer(reader, ct);
                 var outer = tuple.Item1;
                 var key = info.OuterKeySelector(outer) ?? DBNull.Value;
 
@@ -533,7 +533,7 @@ namespace nORM.Query
             {
                 while (await reader.ReadAsync(ct))
                 {
-                    var child = childMaterializer(reader);
+                    var child = await childMaterializer(reader, ct);
                     if (!noTracking)
                     {
                         NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
