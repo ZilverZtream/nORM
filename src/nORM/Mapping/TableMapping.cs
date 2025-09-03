@@ -23,6 +23,8 @@ namespace nORM.Mapping
         public readonly Column? TimestampColumn;
         public readonly Dictionary<string, Relation> Relations = new();
         public readonly DatabaseProvider Provider;
+        public readonly Column? DiscriminatorColumn = null;
+        public readonly Dictionary<object, TableMapping> TphMappings = new();
 
         public TableMapping(Type t, DatabaseProvider p, DbContext ctx, IEntityTypeConfiguration? fluentConfig)
         {
@@ -63,6 +65,26 @@ namespace nORM.Mapping
                 else
                 {
                     cols.Add(new Column(prop, p, fluentConfig));
+                }
+            }
+
+            var discriminatorAttr = t.GetCustomAttribute<DiscriminatorColumnAttribute>();
+            if (discriminatorAttr != null)
+            {
+                DiscriminatorColumn = cols.FirstOrDefault(c => string.Equals(c.Prop.Name, discriminatorAttr.PropertyName, StringComparison.OrdinalIgnoreCase));
+                var derivedTypes = AppDomain.CurrentDomain.GetAssemblies()
+                    .SelectMany(a => a.GetTypes())
+                    .Where(tp => tp.BaseType == t && tp.GetCustomAttribute<DiscriminatorValueAttribute>() != null);
+                foreach (var dt in derivedTypes)
+                {
+                    var value = dt.GetCustomAttribute<DiscriminatorValueAttribute>()!.Value;
+                    var map = ctx.GetMapping(dt);
+                    TphMappings[value] = map;
+                    foreach (var dc in map.Columns)
+                    {
+                        if (!cols.Any(c => string.Equals(c.Prop.Name, dc.Prop.Name, StringComparison.Ordinal)))
+                            cols.Add(dc);
+                    }
                 }
             }
 

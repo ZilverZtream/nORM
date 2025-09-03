@@ -16,8 +16,10 @@ namespace nORM.Core
     /// </summary>
     public static class NormQueryable
     {
-        public static INormQueryable<T> Query<T>(this DbContext ctx) where T : class, new()
-            => new NormQueryableImpl<T>(ctx);
+        public static IQueryable<T> Query<T>(this DbContext ctx) where T : class
+            => typeof(T).GetConstructor(Type.EmptyTypes) != null
+                ? (IQueryable<T>)Activator.CreateInstance(typeof(NormQueryableImpl<>).MakeGenericType(typeof(T)), ctx)!
+                : new NormQueryableImplUnconstrained<T>(ctx);
     }
 
     /// <summary>
@@ -106,6 +108,12 @@ namespace nORM.Core
         public Expression Expression { get; }
         public Type ElementType => typeof(T);
         public IQueryProvider Provider { get; }
+
+        public NormQueryableImplUnconstrained(DbContext ctx)
+        {
+            Provider = new NormQueryProvider(ctx);
+            Expression = Expression.Constant(this);
+        }
 
         public NormQueryableImplUnconstrained(IQueryProvider provider, Expression expression)
         {
