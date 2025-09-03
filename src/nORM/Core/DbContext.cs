@@ -243,9 +243,10 @@ namespace nORM.Core
                 }
 
                 var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct);
-                if (operation != WriteOperation.Insert && map.TimestampColumn != null && recordsAffected == 0)
+                if ((operation is WriteOperation.Update or WriteOperation.Delete) &&
+                    map.TimestampColumn != null && recordsAffected == 0)
                 {
-                    throw new DBConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+                    throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
                 }
                 if (ownsTransaction) await currentTransaction.CommitAsync(ct);
                 return recordsAffected;
