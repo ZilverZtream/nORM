@@ -20,7 +20,7 @@ namespace nORM.Core
         {
             if (_context.CurrentTransaction != null)
                 throw new InvalidOperationException("A transaction is already active.");
-
+            await _context.EnsureConnectionAsync(ct);
             var transaction = await _context.Connection.BeginTransactionAsync(ct);
             _context.CurrentTransaction = transaction;
             return new DbContextTransaction(transaction, _context);
