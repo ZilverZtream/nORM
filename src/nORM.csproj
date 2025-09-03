@@ -24,6 +24,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="nORM.SourceGenerators/nORM.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="nORM.SourceGenerators/**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
