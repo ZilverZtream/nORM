@@ -1,7 +1,11 @@
 using System;
 using System.CommandLine;
 using System.Data.Common;
+using System.IO;
+using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
@@ -65,6 +69,68 @@ update.SetHandler(async (conn, prov, asmPath) =>
 database.AddCommand(update);
 root.AddCommand(database);
 
+var migrations = new Command("migrations", "Migration management commands");
+var add = new Command("add", "Add a new migration");
+var migNameArg = new Argument<string>("name", description: "Migration name");
+var addProvOpt = new Option<string>("--provider", description: "Database provider (sqlserver)") { IsRequired = true };
+var addAsmOpt = new Option<string>("--assembly", description: "Path to assembly containing DbContext and entities") { IsRequired = true };
+var addOutOpt = new Option<string>("--output", () => "Migrations", "Output directory for migrations");
+add.AddArgument(migNameArg);
+add.AddOption(addProvOpt);
+add.AddOption(addAsmOpt);
+add.AddOption(addOutOpt);
+
+add.SetHandler((string name, string prov, string asmPath, string output) =>
+{
+    var assembly = Assembly.LoadFrom(asmPath);
+
+    var snapshotPath = Path.Combine(output, "schema.snapshot.json");
+    SchemaSnapshot oldSnap = File.Exists(snapshotPath)
+        ? JsonSerializer.Deserialize<SchemaSnapshot>(File.ReadAllText(snapshotPath)) ?? new SchemaSnapshot()
+        : new SchemaSnapshot();
+
+    var newSnap = SchemaSnapshotBuilder.Build(assembly);
+    var diff = SchemaDiffer.Diff(oldSnap, newSnap);
+    if (!diff.HasChanges)
+    {
+        Console.WriteLine("No changes detected.");
+        return;
+    }
+
+    IMigrationSqlGenerator generator = prov.ToLowerInvariant() switch
+    {
+        "sqlserver" => new SqlServerMigrationSqlGenerator(),
+        _ => throw new ArgumentException($"Provider '{prov}' not supported.")
+    };
+
+    var sql = generator.GenerateSql(diff);
+
+    Directory.CreateDirectory(output);
+
+    var version = long.Parse(DateTime.UtcNow.ToString("yyyyMMddHHmmss"));
+    var className = $"{version}_{name}";
+    var filePath = Path.Combine(output, className + ".cs");
+
+    var sb = new StringBuilder();
+    sb.AppendLine("using System.Data.Common;");
+    sb.AppendLine("using nORM.Migration;");
+    sb.AppendLine();
+    sb.AppendLine($"public class {className} : Migration");
+    sb.AppendLine("{");
+    sb.AppendLine($"    public {className}() : base({version}, \"{name}\") {{ }}");
+    AppendMethod("Up", sql.Up, sb);
+    AppendMethod("Down", sql.Down, sb);
+    sb.AppendLine("}");
+    File.WriteAllText(filePath, sb.ToString());
+
+    var snapJson = JsonSerializer.Serialize(newSnap, new JsonSerializerOptions { WriteIndented = true });
+    File.WriteAllText(snapshotPath, snapJson);
+    Console.WriteLine($"Migration '{className}' generated at {filePath}.");
+}, migNameArg, addProvOpt, addAsmOpt, addOutOpt);
+
+migrations.AddCommand(add);
+root.AddCommand(migrations);
+
 return await root.InvokeAsync(args);
 
 static DbConnection CreateConnection(string provider, string connectionString)
@@ -82,3 +148,24 @@ static DatabaseProvider CreateProvider(string provider)
         "sqlite" => new SqliteProvider(),
         _ => throw new ArgumentException($"Unsupported provider '{provider}'.")
     };
+
+static void AppendMethod(string methodName, IReadOnlyList<string> statements, StringBuilder sb)
+{
+    sb.AppendLine($"    public override void {methodName}(DbConnection connection, DbTransaction transaction)");
+    sb.AppendLine("    {");
+    sb.AppendLine("        foreach (var sql in new[] {");
+    for (int i = 0; i < statements.Count; i++)
+    {
+        var stmt = statements[i].Replace("\"", "\\\"");
+        var comma = i < statements.Count - 1 ? "," : string.Empty;
+        sb.AppendLine($"            \"{stmt}\"{comma}");
+    }
+    sb.AppendLine("        })");
+    sb.AppendLine("        {");
+    sb.AppendLine("            using var cmd = connection.CreateCommand();");
+    sb.AppendLine("            cmd.Transaction = transaction;");
+    sb.AppendLine("            cmd.CommandText = sql;");
+    sb.AppendLine("            cmd.ExecuteNonQuery();");
+    sb.AppendLine("        }");
+    sb.AppendLine("    }");
+}
