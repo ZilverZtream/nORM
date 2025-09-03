@@ -11,6 +11,7 @@ using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
 using nORM.Providers;
+using nORM.SourceGeneration;
 
 #nullable enable
 
@@ -123,8 +124,16 @@ namespace nORM.Query
             // Create cache key
             var projectionKey = projection?.ToString();
             var cacheKey = (mapping.Type, targetType, projectionKey);
-            
-            return _materializerCache.GetOrAdd(cacheKey, _ => CreateMaterializerInternal(mapping, targetType, projection));
+
+            return _materializerCache.GetOrAdd(cacheKey, _ =>
+            {
+                if (projection == null && targetType == mapping.Type &&
+                    CompiledMaterializerStore.TryGet(targetType, out var precompiled))
+                {
+                    return precompiled;
+                }
+                return CreateMaterializerInternal(mapping, targetType, projection);
+            });
         }
         
         private Func<DbDataReader, object> CreateMaterializerInternal(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
