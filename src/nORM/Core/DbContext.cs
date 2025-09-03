@@ -61,6 +61,36 @@ namespace nORM.Core
             }
         }
 
+        public DbContext(string connectionString, DatabaseProvider p, DbContextOptions? options = null)
+            : this(CreateConnection(connectionString, p), p, options)
+        {
+        }
+
+        private static DbConnection CreateConnection(string connectionString, DatabaseProvider provider)
+        {
+            if (provider is SqlServerProvider)
+                return new SqlConnection(connectionString);
+            if (provider is SqliteProvider)
+                return new SqliteConnection(connectionString);
+            if (provider is PostgresProvider)
+            {
+                var type = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
+                if (type == null)
+                    throw new InvalidOperationException("Npgsql package is required for PostgreSQL support. Please install the Npgsql NuGet package.");
+                return (DbConnection)Activator.CreateInstance(type, connectionString)!;
+            }
+            if (provider is MySqlProvider)
+            {
+                var type = Type.GetType("MySqlConnector.MySqlConnection, MySqlConnector") ??
+                           Type.GetType("MySql.Data.MySqlClient.MySqlConnection, MySql.Data");
+                if (type == null)
+                    throw new InvalidOperationException("MySQL package is required for MySQL support. Please install MySqlConnector or MySql.Data.");
+                return (DbConnection)Activator.CreateInstance(type, connectionString)!;
+            }
+
+            throw new NotSupportedException($"Unsupported provider type: {provider.GetType().Name}");
+        }
+
         public DbConnection Connection => _cn;
         public DatabaseProvider Provider => _p;
 
