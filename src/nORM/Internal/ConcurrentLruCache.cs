@@ -10,6 +10,7 @@ namespace nORM.Internal
     {
         private readonly ConcurrentDictionary<TKey, LinkedListNode<CacheItem>> _cache = new();
         private readonly LinkedList<CacheItem> _lruList = new();
+        // Protects access to _lruList, which is not thread-safe.
         private readonly object _lock = new();
         private readonly int _maxSize;
 
@@ -22,6 +23,8 @@ namespace nORM.Internal
         {
             if (_cache.TryGetValue(key, out var node))
             {
+                // _cache is concurrent, but _lruList is not; all interactions with
+                // the list must occur inside this lock to keep it consistent.
                 lock (_lock)
                 {
                     _lruList.Remove(node);
@@ -33,6 +36,8 @@ namespace nORM.Internal
             var value = factory(key);
             var newNode = new LinkedListNode<CacheItem>(new CacheItem(key, value));
 
+            // All subsequent operations that touch _lruList are also wrapped in the
+            // same lock to guarantee consistency with the concurrent dictionary.
             lock (_lock)
             {
                 if (_cache.TryAdd(key, newNode))
