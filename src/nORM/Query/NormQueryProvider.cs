@@ -217,11 +217,22 @@ namespace nORM.Query
 
         private async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct, bool noTracking)
         {
-            if (parents.Count == 0) return;
+            IList current = parents;
+            foreach (var relation in include.Path)
+            {
+                current = await EagerLoadLevelAsync(relation, current, ct, noTracking);
+                if (current.Count == 0) break;
+            }
+        }
 
-            var childMap = _ctx.GetMapping(include.Relation.DependentType);
-            var keys = parents.Cast<object>().Select(include.Relation.PrincipalKey.Getter).Where(k => k != null).Distinct().ToList();
-            if (keys.Count == 0) return;
+        private async Task<IList> EagerLoadLevelAsync(TableMapping.Relation relation, IList parents, CancellationToken ct, bool noTracking)
+        {
+            var resultChildren = new List<object>();
+            if (parents.Count == 0) return resultChildren;
+
+            var childMap = _ctx.GetMapping(relation.DependentType);
+            var keys = parents.Cast<object>().Select(relation.PrincipalKey.Getter).Where(k => k != null).Distinct().ToList();
+            if (keys.Count == 0) return resultChildren;
 
             var paramNames = new List<string>();
             await using var cmd = _ctx.Connection.CreateCommand();
@@ -232,10 +243,9 @@ namespace nORM.Query
                 paramNames.Add(paramName);
                 cmd.AddParam(paramName, keys[i]);
             }
-            cmd.CommandText = $"SELECT * FROM {childMap.EscTable} WHERE {include.Relation.ForeignKey.EscCol} IN ({string.Join(",", paramNames)})";
+            cmd.CommandText = $"SELECT * FROM {childMap.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({string.Join(",", paramNames)})";
 
             var childMaterializer = new QueryTranslator(_ctx).CreateMaterializer(childMap, childMap.Type);
-            var children = new List<object>();
             await using (var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct))
             {
                 while (await reader.ReadAsync(ct))
@@ -246,22 +256,24 @@ namespace nORM.Query
                         NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
                         _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
                     }
-                    children.Add(child);
+                    resultChildren.Add(child);
                 }
             }
 
-            var childGroups = children.GroupBy(include.Relation.ForeignKey.Getter).ToDictionary(g => g.Key!, g => g.ToList());
+            var childGroups = resultChildren.GroupBy(relation.ForeignKey.Getter).ToDictionary(g => g.Key!, g => g.ToList());
             foreach (var p in parents.Cast<object>())
             {
-                var pk = include.Relation.PrincipalKey.Getter(p);
+                var pk = relation.PrincipalKey.Getter(p);
                 if (pk != null && childGroups.TryGetValue(pk, out var c))
                 {
-                    var listType = typeof(List<>).MakeGenericType(include.Relation.DependentType);
+                    var listType = typeof(List<>).MakeGenericType(relation.DependentType);
                     var childList = (IList)Activator.CreateInstance(listType)!;
                     foreach (var item in c) childList.Add(item);
-                    include.Relation.NavProp.SetValue(p, childList);
+                    relation.NavProp.SetValue(p, childList);
                 }
             }
+
+            return resultChildren;
         }
 
         private QueryPlan GetPlan(Expression expression)

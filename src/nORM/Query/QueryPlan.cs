@@ -20,8 +20,8 @@ namespace nORM.Query
         List<IncludePlan> Includes,
         GroupJoinInfo? GroupJoinInfo
     );
-    
-    internal sealed record IncludePlan(TableMapping.Relation Relation);
+
+    internal sealed record IncludePlan(List<TableMapping.Relation> Path);
     
     internal sealed record GroupJoinInfo(
         Type OuterType, 
