@@ -117,55 +117,82 @@ namespace nORM.Core
         {
             ChangeTracker.DetectChanges();
             var entries = ChangeTracker.Entries.ToList();
-            var total = 0;
-            foreach (var entry in entries)
+            if (!entries.Any(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
             {
-                switch (entry.State)
-                {
-                    case EntityState.Added:
-                        total += await InvokeWriteAsync(nameof(InsertAsync), entry, ct);
-                        entry.AcceptChanges();
-                        break;
-                    case EntityState.Modified:
-                        total += await InvokeWriteAsync(nameof(UpdateAsync), entry, ct);
-                        entry.AcceptChanges();
-                        break;
-                    case EntityState.Deleted:
-                        total += await InvokeWriteAsync(nameof(DeleteAsync), entry, ct);
-                        ChangeTracker.Remove(entry.Entity);
-                        break;
-                }
+                return 0;
             }
+
+            var total = 0;
+            await using var transaction = await Connection.BeginTransactionAsync(ct);
+            try
+            {
+                foreach (var entry in entries)
+                {
+                    switch (entry.State)
+                    {
+                        case EntityState.Added:
+                            total += await InvokeWriteAsync(nameof(InsertAsync), entry, transaction, ct);
+                            entry.AcceptChanges();
+                            break;
+                        case EntityState.Modified:
+                            total += await InvokeWriteAsync(nameof(UpdateAsync), entry, transaction, ct);
+                            entry.AcceptChanges();
+                            break;
+                        case EntityState.Deleted:
+                            total += await InvokeWriteAsync(nameof(DeleteAsync), entry, transaction, ct);
+                            ChangeTracker.Remove(entry.Entity);
+                            break;
+                    }
+                }
+                await transaction.CommitAsync(ct);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+
             return total;
         }
 
-        private Task<int> InvokeWriteAsync(string methodName, EntityEntry entry, CancellationToken ct)
+        private Task<int> InvokeWriteAsync(string methodName, EntityEntry entry, DbTransaction transaction, CancellationToken ct)
         {
-            var method = typeof(DbContext).GetMethod(methodName)!.MakeGenericMethod(entry.Entity.GetType());
-            return (Task<int>)method.Invoke(this, new object?[] { entry.Entity, ct })!;
+            var method = typeof(DbContext).GetMethods()
+                .First(m => m.Name == methodName && m.GetParameters().Length == 3)
+                .MakeGenericMethod(entry.Entity.GetType());
+            return (Task<int>)method.Invoke(this, new object?[] { entry.Entity, transaction, ct })!;
         }
         #endregion
 
         #region Standard CRUD
         public Task<int> InsertAsync<T>(T entity, CancellationToken ct = default) where T : class
+            => InsertAsync(entity, null, ct);
+
+        public Task<int> InsertAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
         {
-            var result = WriteOptimizedAsync(entity, WriteOperation.Insert, ct);
-            
+            var result = WriteOptimizedAsync(entity, WriteOperation.Insert, ct, transaction);
+
             // Enable lazy loading for the inserted entity
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
-            
+
             return result;
         }
 
         public Task<int> UpdateAsync<T>(T entity, CancellationToken ct = default) where T : class
-            => WriteOptimizedAsync(entity, WriteOperation.Update, ct);
+            => UpdateAsync(entity, null, ct);
+
+        public Task<int> UpdateAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
+            => WriteOptimizedAsync(entity, WriteOperation.Update, ct, transaction);
 
         public Task<int> DeleteAsync<T>(T entity, CancellationToken ct = default) where T : class
-            => WriteOptimizedAsync(entity, WriteOperation.Delete, ct);
+            => DeleteAsync(entity, null, ct);
+
+        public Task<int> DeleteAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
+            => WriteOptimizedAsync(entity, WriteOperation.Delete, ct, transaction);
 
         private enum WriteOperation { Insert, Update, Delete }
 
-        private async Task<int> WriteOptimizedAsync<T>(T entity, WriteOperation operation, CancellationToken ct) where T : class
+        private async Task<int> WriteOptimizedAsync<T>(T entity, WriteOperation operation, CancellationToken ct, DbTransaction? transaction = null) where T : class
         {
             if (entity is null) throw new ArgumentNullException(nameof(entity));
 
@@ -174,61 +201,74 @@ namespace nORM.Core
 
             if (operation == WriteOperation.Insert && Options.RetryPolicy == null)
             {
-                return await ExecuteFastInsert(entity, map, ct);
+                return await ExecuteFastInsert(entity, map, ct, transaction);
             }
 
-            return await _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            if (transaction != null)
             {
-                await using var transaction = await ctx.Connection.BeginTransactionAsync(token);
-                try
-                {
-                    await using var cmd = ctx.Connection.CreateCommand();
-                    cmd.Transaction = transaction;
-                    cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
-                    
-                    cmd.CommandText = operation switch
-                    {
-                        WriteOperation.Insert => _p.BuildInsert(map),
-                        WriteOperation.Update => _p.BuildUpdate(map),
-                        WriteOperation.Delete => _p.BuildDelete(map),
-                        _ => throw new ArgumentOutOfRangeException(nameof(operation))
-                    };
+                return await WriteWithTransactionAsync(entity, map, operation, transaction, ct, ownsTransaction: false);
+            }
 
-                    AddParametersOptimized(cmd, map, entity, operation);
-
-                    await cmd.PrepareAsync(token);
-
-                    if (operation == WriteOperation.Insert && map.KeyColumns.Any(k => k.IsDbGenerated))
-                    {
-                        var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, token);
-                        if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
-                        await transaction.CommitAsync(token);
-                        return 1;
-                    }
-
-                    var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, token);
-                    if (operation != WriteOperation.Insert && map.TimestampColumn != null && recordsAffected == 0)
-                    {
-                        throw new DBConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
-                    }
-                    await transaction.CommitAsync(token);
-                    return recordsAffected;
-                }
-                catch
-                {
-                    await transaction.RollbackAsync(token);
-                    throw;
-                }
-            }, ct);
+            return await _executionStrategy.ExecuteAsync((ctx, token) =>
+                WriteWithTransactionAsync(entity, map, operation, null, token, ownsTransaction: true), ct);
         }
 
-        private async Task<int> ExecuteFastInsert<T>(T entity, TableMapping map, CancellationToken ct) where T : class
+        private async Task<int> WriteWithTransactionAsync<T>(T entity, TableMapping map, WriteOperation operation, DbTransaction? transaction, CancellationToken ct, bool ownsTransaction) where T : class
         {
-            await using var transaction = await _cn.BeginTransactionAsync(ct);
+            var currentTransaction = transaction ?? await Connection.BeginTransactionAsync(ct);
+            try
+            {
+                await using var cmd = Connection.CreateCommand();
+                cmd.Transaction = currentTransaction;
+                cmd.CommandTimeout = (int)Options.CommandTimeout.TotalSeconds;
+
+                cmd.CommandText = operation switch
+                {
+                    WriteOperation.Insert => _p.BuildInsert(map),
+                    WriteOperation.Update => _p.BuildUpdate(map),
+                    WriteOperation.Delete => _p.BuildDelete(map),
+                    _ => throw new ArgumentOutOfRangeException(nameof(operation))
+                };
+
+                AddParametersOptimized(cmd, map, entity, operation);
+
+                await cmd.PrepareAsync(ct);
+
+                if (operation == WriteOperation.Insert && map.KeyColumns.Any(k => k.IsDbGenerated))
+                {
+                    var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct);
+                    if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
+                    if (ownsTransaction) await currentTransaction.CommitAsync(ct);
+                    return 1;
+                }
+
+                var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct);
+                if (operation != WriteOperation.Insert && map.TimestampColumn != null && recordsAffected == 0)
+                {
+                    throw new DBConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+                }
+                if (ownsTransaction) await currentTransaction.CommitAsync(ct);
+                return recordsAffected;
+            }
+            catch
+            {
+                if (ownsTransaction) await currentTransaction.RollbackAsync(ct);
+                throw;
+            }
+        }
+
+        private async Task<int> ExecuteFastInsert<T>(T entity, TableMapping map, CancellationToken ct, DbTransaction? transaction) where T : class
+        {
+            if (transaction != null)
+            {
+                return await WriteWithTransactionAsync(entity, map, WriteOperation.Insert, transaction, ct, ownsTransaction: false);
+            }
+
+            await using var ownTransaction = await _cn.BeginTransactionAsync(ct);
             try
             {
                 await using var cmd = _cn.CreateCommand();
-                cmd.Transaction = transaction;
+                cmd.Transaction = ownTransaction;
                 cmd.CommandTimeout = 30;
                 cmd.CommandText = _p.BuildInsert(map);
 
@@ -247,17 +287,17 @@ namespace nORM.Core
                 {
                     var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct);
                     if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
-                    await transaction.CommitAsync(ct);
+                    await ownTransaction.CommitAsync(ct);
                     return 1;
                 }
 
                 var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct);
-                await transaction.CommitAsync(ct);
+                await ownTransaction.CommitAsync(ct);
                 return recordsAffected;
             }
             catch
             {
-                await transaction.RollbackAsync(ct);
+                await ownTransaction.RollbackAsync(ct);
                 throw;
             }
         }
