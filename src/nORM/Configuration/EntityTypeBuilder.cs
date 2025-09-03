@@ -16,12 +16,18 @@ namespace nORM.Configuration
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
             public Type? TableSplitWith { get; private set; }
             public Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; } = new();
+            public Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; } = new();
 
             public void SetTableName(string name) => TableName = name;
             public void SetKey(PropertyInfo prop) => KeyProperty = prop;
             public void SetColumnName(PropertyInfo prop, string name) => ColumnNames[prop] = name;
             public void SetTableSplit(Type principal) => TableSplitWith = principal;
             public void AddOwned(PropertyInfo prop, IEntityTypeConfiguration? config) => OwnedNavigations[prop] = new OwnedNavigation(prop.PropertyType, config);
+            public void AddShadowProperty(string name, Type clrType) => ShadowProperties[name] = new ShadowPropertyConfiguration(clrType);
+            public void SetShadowColumnName(string name, string column)
+            {
+                if (ShadowProperties.TryGetValue(name, out var sp)) ShadowProperties[name] = sp with { ColumnName = column };
+            }
         }
 
         private readonly MappingConfiguration _config = new();
@@ -50,6 +56,12 @@ namespace nORM.Configuration
         {
             var prop = GetProperty(propertyExpression);
             return new PropertyBuilder(this, prop);
+        }
+
+        public ShadowPropertyBuilder Property<TProperty>(string name)
+        {
+            _config.AddShadowProperty(name, typeof(TProperty));
+            return new ShadowPropertyBuilder(this, name);
         }
 
         public EntityTypeBuilder<TEntity> OwnsOne<TOwned>(Expression<Func<TEntity, TOwned>> navigation, Action<EntityTypeBuilder<TOwned>>? buildAction = null) where TOwned : class
@@ -84,6 +96,24 @@ namespace nORM.Configuration
             public EntityTypeBuilder<TEntity> HasColumnName(string name)
             {
                 _parent._config.SetColumnName(_property, name);
+                return _parent;
+            }
+        }
+
+        public class ShadowPropertyBuilder
+        {
+            private readonly EntityTypeBuilder<TEntity> _parent;
+            private readonly string _name;
+
+            internal ShadowPropertyBuilder(EntityTypeBuilder<TEntity> parent, string name)
+            {
+                _parent = parent;
+                _name = name;
+            }
+
+            public EntityTypeBuilder<TEntity> HasColumnName(string columnName)
+            {
+                _parent._config.SetShadowColumnName(_name, columnName);
                 return _parent;
             }
         }

@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using nORM.Configuration;
 using nORM.Providers;
+using nORM.Internal;
 
 #nullable enable
 
@@ -14,7 +15,7 @@ namespace nORM.Mapping
     {
         public readonly PropertyInfo Prop;
         public readonly string PropName, EscCol;
-        public readonly bool IsKey, IsDbGenerated, IsTimestamp;
+        public readonly bool IsKey, IsDbGenerated, IsTimestamp, IsShadow;
         public readonly string? ForeignKeyPrincipalTypeName;
         public readonly Func<object, object?> Getter;
         public readonly Action<object, object?> Setter;
@@ -55,6 +56,36 @@ namespace nORM.Mapping
             Getter = getterOverride ?? CreateGetterDelegate(pi);
             Setter = setterOverride ?? CreateSetterDelegate(pi);
             SetterMethod = setterMethodOverride ?? pi.GetSetMethod()!;
+            IsShadow = false;
+        }
+
+        public Column(string name, Type clrType, Type declaringType, DatabaseProvider p, string? columnName = null)
+        {
+            Prop = new ShadowPropertyInfo(name, clrType, declaringType);
+            PropName = name;
+            var colName = columnName ?? name;
+            EscCol = p.Escape(colName);
+            IsKey = false;
+            IsTimestamp = false;
+            IsDbGenerated = false;
+            ForeignKeyPrincipalTypeName = null;
+            var propName = name;
+            if (propName.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && propName.Length > 2)
+            {
+                var principalName = propName[..^2];
+                if (!string.Equals(principalName, "Id", StringComparison.OrdinalIgnoreCase))
+                    ForeignKeyPrincipalTypeName = principalName;
+            }
+            else
+            {
+                var underscore = propName.IndexOf('_');
+                if (underscore > 0)
+                    ForeignKeyPrincipalTypeName = propName.Substring(0, underscore);
+            }
+            Getter = e => ShadowPropertyStore.Get(e, name);
+            Setter = (e, v) => ShadowPropertyStore.Set(e, name, v);
+            SetterMethod = Methods.SetShadowValue;
+            IsShadow = true;
         }
 
         public static Func<object, object?> CreateGetterDelegate(PropertyInfo property)

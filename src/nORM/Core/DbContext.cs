@@ -463,6 +463,12 @@ namespace nORM.Core
             }
         }
 
+        public void SetShadowProperty(object entity, string name, object? value)
+            => Internal.ShadowPropertyStore.Set(entity, name, value);
+
+        public object? GetShadowProperty(object entity, string name)
+            => Internal.ShadowPropertyStore.Get(entity, name);
+
         public void Dispose() => _cn?.Dispose();
     }
 }
