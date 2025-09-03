@@ -1,5 +1,6 @@
 using System;
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using System.Data;
 using System.Data.Common;
 using System.IO;
@@ -7,6 +8,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
@@ -17,68 +19,75 @@ using nORM.Scaffolding;
 
 var root = new RootCommand("Command line tools for the nORM ORM framework");
 
+// scaffold command
 var scaffold = new Command("scaffold", "Scaffold entity classes and a DbContext from an existing database.\nExample:\n  norm scaffold --connection \"Server=.;Database=AppDb;Trusted_Connection=True;\" --provider sqlserver --output Models");
-var connOpt = new Option<string>("--connection", description: "Database connection string. e.g. 'Server=.;Database=AppDb;Trusted_Connection=True;'") { IsRequired = true };
-var providerOpt = new Option<string>("--provider", description: "Database provider (sqlserver, sqlite, postgres, mysql)") { IsRequired = true };
-var outputOpt = new Option<string>("--output", () => ".", "Output directory for generated code");
-var nsOpt = new Option<string>("--namespace", () => "Scaffolded", "Namespace for generated classes");
-var ctxOpt = new Option<string>("--context", () => "AppDbContext", "DbContext class name");
-scaffold.AddOption(connOpt);
-scaffold.AddOption(providerOpt);
-scaffold.AddOption(outputOpt);
-scaffold.AddOption(nsOpt);
-scaffold.AddOption(ctxOpt);
-
-scaffold.SetHandler(async (conn, prov, output, ns, ctx) =>
+var connOpt = new Option<string>("--connection") { Description = "Database connection string. e.g. 'Server=.;Database=AppDb;Trusted_Connection=True;'", Required = true };
+var providerOpt = new Option<string>("--provider") { Description = "Database provider (sqlserver, sqlite, postgres, mysql)", Required = true };
+var outputOpt = new Option<string>("--output") { Description = "Output directory for generated code", DefaultValueFactory = _ => "." };
+var nsOpt = new Option<string>("--namespace") { Description = "Namespace for generated classes", DefaultValueFactory = _ => "Scaffolded" };
+var ctxOpt = new Option<string>("--context") { Description = "DbContext class name", DefaultValueFactory = _ => "AppDbContext" };
+scaffold.Add(connOpt);
+scaffold.Add(providerOpt);
+scaffold.Add(outputOpt);
+scaffold.Add(nsOpt);
+scaffold.Add(ctxOpt);
+scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
 {
+    var conn = result.GetValue(connOpt)!;
+    var prov = result.GetValue(providerOpt)!;
+    var output = result.GetValue(outputOpt)!;
+    var ns = result.GetValue(nsOpt)!;
+    var ctx = result.GetValue(ctxOpt)!;
     try
     {
         using var connection = CreateConnection(prov, conn);
         await connection.OpenAsync();
         var provider = CreateProvider(prov);
-        await DatabaseScaffolder.ScaffoldAsync(connection, provider, output!, ns!, ctx!);
+        await DatabaseScaffolder.ScaffoldAsync(connection, provider, output, ns, ctx);
         Console.WriteLine($"Scaffolding completed. Files written to {output}.");
     }
     catch (Exception ex)
     {
         Console.Error.WriteLine($"Error: {ex.Message}");
     }
-}, connOpt, providerOpt, outputOpt, nsOpt, ctxOpt);
+});
+root.Add(scaffold);
 
-root.AddCommand(scaffold);
-
+// database update/drop commands
 var database = new Command("database", "Database related commands");
+
 var update = new Command("update", "Apply pending migrations to the database.\nExample:\n  norm database update --connection \"...\" --provider sqlserver --assembly Migrations.dll");
-var migConnOpt = new Option<string>("--connection", "Database connection string") { IsRequired = true };
-var migProvOpt = new Option<string>("--provider", "Database provider. Currently only 'sqlserver' is supported for applying migrations.") { IsRequired = true };
-var assemblyOpt = new Option<string>("--assembly", "Path to migrations assembly (e.g. ./bin/Debug/net8.0/App.Migrations.dll)") { IsRequired = true };
-update.AddOption(migConnOpt);
-update.AddOption(migProvOpt);
-update.AddOption(assemblyOpt);
-update.SetHandler(async (conn, prov, asmPath) =>
+var migConnOpt = new Option<string>("--connection") { Description = "Database connection string", Required = true };
+var migProvOpt = new Option<string>("--provider") { Description = "Database provider. Currently only 'sqlserver' is supported for applying migrations.", Required = true };
+var assemblyOpt = new Option<string>("--assembly") { Description = "Path to migrations assembly (e.g. ./bin/Debug/net8.0/App.Migrations.dll)", Required = true };
+update.Add(migConnOpt);
+update.Add(migProvOpt);
+update.Add(assemblyOpt);
+update.SetAction(async (ParseResult result, CancellationToken _) =>
 {
+    var conn = result.GetValue(migConnOpt)!;
+    var prov = result.GetValue(migProvOpt)!;
+    var asmPath = result.GetValue(assemblyOpt)!;
     try
     {
-        if (!File.Exists(asmPath!))
+        if (!File.Exists(asmPath))
         {
             Console.Error.WriteLine($"Assembly '{asmPath}' not found.");
             return;
         }
         using var connection = CreateConnection(prov, conn);
         await connection.OpenAsync();
-        var assembly = Assembly.LoadFrom(asmPath!);
+        var assembly = Assembly.LoadFrom(asmPath);
         IMigrationRunner runner = prov.ToLowerInvariant() switch
         {
             "sqlserver" => new SqlServerMigrationRunner(connection, assembly),
             _ => throw new ArgumentException($"Provider '{prov}' does not support migrations.")
         };
-
         if (!await runner.HasPendingMigrationsAsync())
         {
             Console.WriteLine("No pending migrations found.");
             return;
         }
-
         await runner.ApplyMigrationsAsync();
         Console.WriteLine("Migrations applied successfully.");
     }
@@ -86,15 +95,17 @@ update.SetHandler(async (conn, prov, asmPath) =>
     {
         Console.Error.WriteLine($"Error: {ex.Message}");
     }
-}, migConnOpt, migProvOpt, assemblyOpt);
+});
 
 var drop = new Command("drop", "Drop the target database or all tables. Useful for resetting test databases.\nExample:\n  norm database drop --connection \"...\" --provider postgres");
-var dropConnOpt = new Option<string>("--connection", "Database connection string") { IsRequired = true };
-var dropProvOpt = new Option<string>("--provider", "Database provider (sqlserver, sqlite, postgres, mysql)") { IsRequired = true };
-drop.AddOption(dropConnOpt);
-drop.AddOption(dropProvOpt);
-drop.SetHandler(async (conn, prov) =>
+var dropConnOpt = new Option<string>("--connection") { Description = "Database connection string", Required = true };
+var dropProvOpt = new Option<string>("--provider") { Description = "Database provider (sqlserver, sqlite, postgres, mysql)", Required = true };
+drop.Add(dropConnOpt);
+drop.Add(dropProvOpt);
+drop.SetAction(async (ParseResult result, CancellationToken _) =>
 {
+    var conn = result.GetValue(dropConnOpt)!;
+    var prov = result.GetValue(dropProvOpt)!;
     try
     {
         if (prov.Equals("sqlite", StringComparison.OrdinalIgnoreCase))
@@ -127,14 +138,7 @@ drop.SetHandler(async (conn, prov) =>
                 : $"{provider.Escape(tableSchema!)}.{provider.Escape(tableName!)}";
             using var cmd = connection.CreateCommand();
             cmd.CommandText = $"DROP TABLE {full}";
-            try
-            {
-                await cmd.ExecuteNonQueryAsync();
-            }
-            catch (DbException)
-            {
-                // ignore failures due to dependencies
-            }
+            try { await cmd.ExecuteNonQueryAsync(); } catch (DbException) { }
         }
         Console.WriteLine("Database dropped successfully.");
     }
@@ -142,25 +146,29 @@ drop.SetHandler(async (conn, prov) =>
     {
         Console.Error.WriteLine($"Error: {ex.Message}");
     }
-}, dropConnOpt, dropProvOpt);
+});
 
-database.AddCommand(update);
-database.AddCommand(drop);
-root.AddCommand(database);
+database.Add(update);
+database.Add(drop);
+root.Add(database);
 
+// migrations add
 var migrations = new Command("migrations", "Migration management commands");
 var add = new Command("add", "Add a new migration based on model changes.\nExample:\n  norm migrations add InitialCreate --provider sqlserver --assembly App.dll");
-var migNameArg = new Argument<string>("name", description: "Migration name");
-var addProvOpt = new Option<string>("--provider", description: "Database provider (sqlserver, sqlite, postgres, mysql)") { IsRequired = true };
-var addAsmOpt = new Option<string>("--assembly", description: "Path to assembly containing DbContext and entities") { IsRequired = true };
-var addOutOpt = new Option<string>("--output", () => "Migrations", "Output directory for migrations");
-add.AddArgument(migNameArg);
-add.AddOption(addProvOpt);
-add.AddOption(addAsmOpt);
-add.AddOption(addOutOpt);
-
-add.SetHandler((string name, string prov, string asmPath, string output) =>
+var migNameArg = new Argument<string>("name") { Description = "Migration name" };
+var addProvOpt = new Option<string>("--provider") { Description = "Database provider (sqlserver, sqlite, postgres, mysql)", Required = true };
+var addAsmOpt = new Option<string>("--assembly") { Description = "Path to assembly containing DbContext and entities", Required = true };
+var addOutOpt = new Option<string>("--output") { Description = "Output directory for migrations", DefaultValueFactory = _ => "Migrations" };
+add.Add(migNameArg);
+add.Add(addProvOpt);
+add.Add(addAsmOpt);
+add.Add(addOutOpt);
+add.SetAction((ParseResult result) =>
 {
+    var name = result.GetValue(migNameArg)!;
+    var prov = result.GetValue(addProvOpt)!;
+    var asmPath = result.GetValue(addAsmOpt)!;
+    var output = result.GetValue(addOutOpt)!;
     try
     {
         if (!File.Exists(asmPath))
@@ -193,7 +201,6 @@ add.SetHandler((string name, string prov, string asmPath, string output) =>
         };
 
         var sql = generator.GenerateSql(diff);
-
         Directory.CreateDirectory(output);
 
         var version = long.Parse(DateTime.UtcNow.ToString("yyyyMMddHHmmss"));
@@ -220,12 +227,12 @@ add.SetHandler((string name, string prov, string asmPath, string output) =>
     {
         Console.Error.WriteLine($"Error: {ex.Message}");
     }
-}, migNameArg, addProvOpt, addAsmOpt, addOutOpt);
+});
 
-migrations.AddCommand(add);
-root.AddCommand(migrations);
+migrations.Add(add);
+root.Add(migrations);
 
-return await root.InvokeAsync(args);
+return await root.Parse(args).InvokeAsync(new InvocationConfiguration());
 
 static DbConnection CreateConnection(string provider, string connectionString)
 {
@@ -235,7 +242,7 @@ static DbConnection CreateConnection(string provider, string connectionString)
         {
             "sqlserver" => new SqlConnection(connectionString),
             "sqlite" => new SqliteConnection(connectionString),
-            "postgres" or "postgresql" => CreateConnectionFromType("Npgsql.NpgsqlConnection, Npgsql", "PostgreSQL", connectionString),
+            "postgres" or "postgresql" => CreateConnectionFromType(new[] { "Npgsql.NpgsqlConnection, Npgsql" }, "PostgreSQL", connectionString),
             "mysql" => CreateConnectionFromType(new[] { "MySql.Data.MySqlClient.MySqlConnection, MySql.Data", "MySqlConnector.MySqlConnection, MySqlConnector" }, "MySQL", connectionString),
             _ => throw new ArgumentException($"Unsupported provider '{provider}'.")
         };
@@ -245,9 +252,6 @@ static DbConnection CreateConnection(string provider, string connectionString)
         throw new InvalidOperationException($"Failed to create connection: {ex.Message}", ex);
     }
 }
-
-static DbConnection CreateConnectionFromType(string typeName, string friendly, string connString)
-    => CreateConnectionFromType(new[] { typeName }, friendly, connString);
 
 static DbConnection CreateConnectionFromType(string[] typeNames, string friendly, string connString)
 {
@@ -262,8 +266,8 @@ static DbConnection CreateConnectionFromType(string[] typeNames, string friendly
     throw new InvalidOperationException($"{friendly} provider assembly not found. Ensure the appropriate package is referenced.");
 }
 
-static DatabaseProvider CreateProvider(string provider)
-    => provider.ToLowerInvariant() switch
+static DatabaseProvider CreateProvider(string provider) =>
+    provider.ToLowerInvariant() switch
     {
         "sqlserver" => new SqlServerProvider(),
         "sqlite" => new SqliteProvider(),
@@ -292,3 +296,4 @@ static void AppendMethod(string methodName, IReadOnlyList<string> statements, St
     sb.AppendLine("        }");
     sb.AppendLine("    }");
 }
+
