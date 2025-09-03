@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
+using nORM.Core;
 
 #nullable enable
 
@@ -12,7 +13,7 @@ namespace nORM.Configuration
         internal class MappingConfiguration : IEntityTypeConfiguration
         {
             public string? TableName { get; private set; }
-            public PropertyInfo? KeyProperty { get; private set; }
+            public List<PropertyInfo> KeyProperties { get; } = new();
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
             public Type? TableSplitWith { get; private set; }
             public Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; } = new();
@@ -20,7 +21,11 @@ namespace nORM.Configuration
             public List<RelationshipConfiguration> Relationships { get; } = new();
 
             public void SetTableName(string name) => TableName = name;
-            public void SetKey(PropertyInfo prop) => KeyProperty = prop;
+            public void AddKey(PropertyInfo prop)
+            {
+                if (!KeyProperties.Contains(prop))
+                    KeyProperties.Add(prop);
+            }
             public void SetColumnName(PropertyInfo prop, string name) => ColumnNames[prop] = name;
             public void SetTableSplit(Type principal) => TableSplitWith = principal;
             public void AddOwned(PropertyInfo prop, IEntityTypeConfiguration? config) => OwnedNavigations[prop] = new OwnedNavigation(prop.PropertyType, config);
@@ -50,8 +55,19 @@ namespace nORM.Configuration
 
         public EntityTypeBuilder<TEntity> HasKey(Expression<Func<TEntity, object>> keyExpression)
         {
-            var prop = GetProperty(keyExpression);
-            _config.SetKey(prop);
+            if (keyExpression.Body is NewExpression ne)
+            {
+                foreach (var arg in ne.Arguments)
+                {
+                    var prop = GetProperty(arg);
+                    _config.AddKey(prop);
+                }
+            }
+            else
+            {
+                var prop = GetProperty(keyExpression.Body);
+                _config.AddKey(prop);
+            }
             return this;
         }
 
@@ -82,14 +98,16 @@ namespace nORM.Configuration
             return new CollectionNavigationBuilder<TProperty>(this, prop);
         }
 
-        private PropertyInfo GetProperty(LambdaExpression expression)
+        private PropertyInfo GetProperty(Expression expression)
         {
-            if (expression.Body is MemberExpression me)
+            if (expression is MemberExpression me)
                 return (PropertyInfo)me.Member;
-            if (expression.Body is UnaryExpression ue && ue.Operand is MemberExpression ume)
+            if (expression is UnaryExpression ue && ue.Operand is MemberExpression ume)
                 return (PropertyInfo)ume.Member;
             throw new ArgumentException("Expression is not a valid property selector.", nameof(expression));
         }
+
+        private PropertyInfo GetProperty(LambdaExpression expression) => GetProperty(expression.Body);
 
         public class PropertyBuilder
         {
@@ -164,9 +182,19 @@ namespace nORM.Configuration
                     Expression<Func<TEntity, object>>? principalKeyExpression = null)
                 {
                     var fkProp = _parent.GetProperty(foreignKeyExpression);
-                    var principalKey = principalKeyExpression != null
-                        ? _parent.GetProperty(principalKeyExpression)
-                        : _parent._config.KeyProperty;
+                    PropertyInfo? principalKey = null;
+                    if (principalKeyExpression != null)
+                    {
+                        principalKey = _parent.GetProperty(principalKeyExpression);
+                    }
+                    else if (_parent._config.KeyProperties.Count == 1)
+                    {
+                        principalKey = _parent._config.KeyProperties[0];
+                    }
+                    else
+                    {
+                        throw new NormConfigurationException($"Principal key must be specified for relationship '{_principalNavigation.Name}' on entity {typeof(TEntity).Name}.");
+                    }
                     _parent._config.AddRelationship(new RelationshipConfiguration(_principalNavigation, typeof(TDependent), _dependentNavigation, principalKey, fkProp));
                     return _parent;
                 }

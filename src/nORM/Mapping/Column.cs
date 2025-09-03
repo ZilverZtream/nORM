@@ -32,7 +32,7 @@ namespace nORM.Mapping
             var colName = fluentColName ?? pi.GetCustomAttribute<ColumnAttribute>()?.Name ?? PropName;
             EscCol = p.Escape(colName);
 
-            IsKey = fluentConfig?.KeyProperty == pi || pi.GetCustomAttribute<KeyAttribute>() != null;
+            IsKey = (fluentConfig?.KeyProperties.Contains(pi) ?? false) || pi.GetCustomAttribute<KeyAttribute>() != null;
             IsTimestamp = pi.GetCustomAttribute<TimestampAttribute>() != null;
             IsDbGenerated = pi.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity;
             ForeignKeyPrincipalTypeName = pi.GetCustomAttribute<ForeignKeyAttribute>()?.Name;
