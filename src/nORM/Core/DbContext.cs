@@ -118,11 +118,19 @@ namespace nORM.Core
         public async Task<int> SaveChangesAsync(CancellationToken ct = default)
         {
             ChangeTracker.DetectChanges();
-            var entries = ChangeTracker.Entries.ToList();
-            var changedEntries = entries.Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted).ToList();
+            var changedEntries = ChangeTracker.Entries
+                .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                .ToList();
             if (changedEntries.Count == 0)
             {
                 return 0;
+            }
+
+            var saveInterceptors = Options.SaveChangesInterceptors;
+            if (saveInterceptors.Count > 0)
+            {
+                foreach (var interceptor in saveInterceptors)
+                    await interceptor.SavingChangesAsync(this, changedEntries, ct);
             }
 
             var total = 0;
@@ -166,6 +174,12 @@ namespace nORM.Core
             {
                 await transaction.RollbackAsync(ct);
                 throw;
+            }
+
+            if (saveInterceptors.Count > 0)
+            {
+                foreach (var interceptor in saveInterceptors)
+                    await interceptor.SavedChangesAsync(this, changedEntries, total, ct);
             }
 
             return total;
