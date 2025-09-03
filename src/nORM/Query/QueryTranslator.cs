@@ -43,6 +43,7 @@ namespace nORM.Query
         private DatabaseProvider _provider;
         private bool _singleResult = false;
         private bool _noTracking = false;
+        private readonly HashSet<string> _tables;
         
         // Cache materializers to reduce memory allocations
         private static readonly ConcurrentLruCache<(Type MappingType, Type TargetType, string? ProjectionKey), Func<DbDataReader, object>> _materializerCache = new(maxSize: 1000);
@@ -58,6 +59,7 @@ namespace nORM.Query
             _mapping = null!;
             _rootType = null;
             _correlatedParams = new();
+            _tables = new HashSet<string>();
         }
 
         private QueryTranslator(
@@ -65,7 +67,8 @@ namespace nORM.Query
             TableMapping mapping,
             Dictionary<string, object> parameters,
             ref int pIndex,
-            Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlated)
+            Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlated,
+            HashSet<string> tables)
         {
             _ctx = ctx;
             _provider = ctx.Provider;
@@ -75,6 +78,8 @@ namespace nORM.Query
             _paramIndex = pIndex;
             _sql = new StringBuilder();
             _correlatedParams = correlated;
+            _tables = tables;
+            _tables.Add(mapping.TableName);
         }
 
         private static Type GetElementType(Expression queryExpression)
@@ -97,13 +102,13 @@ namespace nORM.Query
         {
             // Determine root query type and handle TPH discriminator filters
             _rootType = GetElementType(e);
-            _mapping = _ctx.GetMapping(_rootType);
+            _mapping = TrackMapping(_rootType);
 
             // Walk up inheritance hierarchy to find base mapping with discriminator
             var baseType = _rootType.BaseType;
             while (baseType != null && baseType != typeof(object))
             {
-                var baseMap = _ctx.GetMapping(baseType);
+                var baseMap = TrackMapping(baseType);
                 if (baseMap.DiscriminatorColumn != null)
                 {
                     _mapping = baseMap;
@@ -165,12 +170,19 @@ namespace nORM.Query
             var singleResult = _singleResult || _methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
                 or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
 
-            return new QueryPlan(_sql.ToString(), _params, materializer, projectType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo);
+            return new QueryPlan(_sql.ToString(), _params, materializer, projectType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray());
+        }
+
+        private TableMapping TrackMapping(Type type)
+        {
+            var map = _ctx.GetMapping(type);
+            _tables.Add(map.TableName);
+            return map;
         }
 
         private string TranslateSubExpression(Expression e)
         {
-            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams);
+            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables);
             var subPlan = subTranslator.Translate(e);
             _paramIndex = subTranslator._paramIndex;
             return subPlan.Sql;
@@ -259,7 +271,7 @@ namespace nORM.Query
                     {
                         // This is a property access from a join - find the correct column offset
                         var isLeftTable = memberParam.Type == mapping.Type;
-                        var memberMapping = isLeftTable ? mapping : _ctx.GetMapping(memberParam.Type);
+                        var memberMapping = isLeftTable ? mapping : TrackMapping(memberParam.Type);
                         
                         var column = memberMapping.Columns.FirstOrDefault(c => c.Prop.Name == memberExpr.Member.Name);
                         if (column != null)
@@ -302,7 +314,7 @@ namespace nORM.Query
                         else
                         {
                             // This is a parameter from a join - need to materialize the entire object
-                            var paramMapping = param.Type == mapping.Type ? mapping : _ctx.GetMapping(param.Type);
+                            var paramMapping = param.Type == mapping.Type ? mapping : TrackMapping(param.Type);
                             var startIndex = param.Type == mapping.Type ? 0 : mapping.Columns.Length;
                             EmitObjectMaterialization(il, paramMapping, constructorArgs[i], startIndex);
                         }
@@ -713,6 +725,7 @@ namespace nORM.Query
                             if (_mapping.Relations.TryGetValue(propName, out var relation))
                             {
                                 _includes.Add(new IncludePlan(new List<TableMapping.Relation> { relation }));
+                                TrackMapping(relation.DependentType);
                             }
                         }
                     }
@@ -730,10 +743,11 @@ namespace nORM.Query
                         {
                             var lastInclude = _includes[^1];
                             var lastRelation = lastInclude.Path.Last();
-                            var parentMap = _ctx.GetMapping(lastRelation.DependentType);
+                            var parentMap = TrackMapping(lastRelation.DependentType);
                             if (parentMap.Relations.TryGetValue(propName, out var relation))
                             {
                                 lastInclude.Path.Add(relation);
+                                TrackMapping(relation.DependentType);
                             }
                         }
                     }
@@ -774,7 +788,7 @@ namespace nORM.Query
 
             // Get the inner table mapping
             var innerElementType = GetElementType(innerQuery);
-            var innerMapping = _ctx.GetMapping(innerElementType);
+            var innerMapping = TrackMapping(innerElementType);
 
             // Generate table aliases
             var outerAlias = "T0";
@@ -905,7 +919,7 @@ namespace nORM.Query
             if (collectionSelector.Body is MemberExpression memberExpr &&
                 outerMapping.Relations.TryGetValue(memberExpr.Member.Name, out var relation))
             {
-                var innerMapping = _ctx.GetMapping(relation.DependentType);
+                var innerMapping = TrackMapping(relation.DependentType);
                 var innerAlias = "T" + (++_joinCounter);
 
                 if (resultSelector != null && resultSelector.Parameters.Count > 1 &&
@@ -963,7 +977,7 @@ namespace nORM.Query
 
             // Otherwise treat as CROSS JOIN
             var innerType = GetElementType(collectionSelector.Body);
-            var crossMapping = _ctx.GetMapping(innerType);
+            var crossMapping = TrackMapping(innerType);
             var crossAlias = "T" + (++_joinCounter);
 
             if (resultSelector != null && resultSelector.Parameters.Count > 1 &&
@@ -1046,7 +1060,7 @@ namespace nORM.Query
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
             }
 
-            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams);
+            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator._paramIndex;
             _mapping = subTranslator._mapping;
@@ -1146,7 +1160,7 @@ namespace nORM.Query
                 if (_rootType == null || q.ElementType != _rootType)
                 {
                     _rootType = q.ElementType;
-                    _mapping = _ctx.GetMapping(q.ElementType);
+            _mapping = TrackMapping(q.ElementType);
                 }
                 return node;
             }
