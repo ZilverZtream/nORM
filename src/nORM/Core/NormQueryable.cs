@@ -29,6 +29,7 @@ namespace nORM.Core
     {
         INormIncludableQueryable<T, TProperty> Include<TProperty>(Expression<Func<T, TProperty>> navigationPropertyPath);
         INormQueryable<T> AsNoTracking();
+        IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default);
         Task<List<T>> ToListAsync(CancellationToken ct = default);
         Task<T[]> ToArrayAsync(CancellationToken ct = default);
         Task<int> CountAsync(CancellationToken ct = default);
@@ -90,6 +91,9 @@ namespace nORM.Core
             );
             return new NormQueryableImpl<T>(Provider, expression);
         }
+
+        public IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).AsAsyncEnumerable<T>(Expression, ct);
 
         public Task<List<T>> ToListAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<List<T>>(Expression, ct);
         public async Task<T[]> ToArrayAsync(CancellationToken ct = default) => (await ToListAsync(ct)).ToArray();
@@ -162,6 +166,9 @@ namespace nORM.Core
             );
             return new NormQueryableImpl<T>(Provider, expression);
         }
+
+        public IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).AsAsyncEnumerable<T>(Expression, ct);
 
         public Task<List<T>> ToListAsync(CancellationToken ct = default)
             => ((NormQueryProvider)Provider).ExecuteAsync<List<T>>(Expression, ct);

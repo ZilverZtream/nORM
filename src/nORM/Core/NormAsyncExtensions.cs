@@ -14,6 +14,22 @@ namespace nORM.Core
     public static class NormAsyncExtensions
     {
         /// <summary>
+        /// Streams nORM query results asynchronously - only works with nORM queries
+        /// </summary>
+        public static IAsyncEnumerable<T> AsAsyncEnumerable<T>(this IQueryable<T> source, CancellationToken ct = default)
+            where T : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                return normProvider.AsAsyncEnumerable<T>(source.Expression, ct);
+            }
+
+            throw new InvalidOperationException(
+                "AsAsyncEnumerable extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>().");
+        }
+
+        /// <summary>
         /// Converts nORM query to List asynchronously - only works with nORM queries
         /// </summary>
         public static Task<List<T>> ToListAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
