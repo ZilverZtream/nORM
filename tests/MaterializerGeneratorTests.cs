@@ -3,6 +3,8 @@ using Microsoft.Data.Sqlite;
 using nORM.Mapping;
 using nORM.SourceGeneration;
 using Xunit;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace nORM.Tests
 {
@@ -37,7 +39,7 @@ namespace nORM.Tests
     public class MaterializerGeneratorTests
     {
         [Fact]
-        public void Generated_materializer_reads_data_correctly()
+        public async Task Generated_materializer_reads_data_correctly()
         {
             Assert.True(CompiledMaterializerStore.TryGet(typeof(Materialized), out _));
 
@@ -50,7 +52,7 @@ namespace nORM.Tests
             using var reader = cmd.ExecuteReader();
             Assert.True(reader.Read());
             var mat = CompiledMaterializerStore.Get<Materialized>();
-            var entity = mat(reader);
+            var entity = await mat(reader, CancellationToken.None);
             Assert.Null(entity.Created);
             Assert.Equal(g, entity.Guid);
             Assert.Equal(1, entity.Id);
@@ -61,7 +63,7 @@ namespace nORM.Tests
         }
 
         [Fact]
-        public void Generated_materializer_reads_owned_data_correctly()
+        public async Task Generated_materializer_reads_owned_data_correctly()
         {
             Assert.True(CompiledMaterializerStore.TryGet(typeof(MaterializedOwned), out _));
 
@@ -72,7 +74,7 @@ namespace nORM.Tests
             using var reader = cmd.ExecuteReader();
             Assert.True(reader.Read());
             var mat = CompiledMaterializerStore.Get<MaterializedOwned>();
-            var entity = mat(reader);
+            var entity = await mat(reader, CancellationToken.None);
             Assert.NotNull(entity.Address);
             Assert.Equal("Main", entity.Address.Street);
             Assert.Equal("Metro", entity.Address.City);

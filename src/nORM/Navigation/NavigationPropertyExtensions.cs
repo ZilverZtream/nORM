@@ -345,11 +345,11 @@ namespace nORM.Navigation
 
             var materializer = new Query.QueryTranslator(context).CreateMaterializer(mapping, entityType);
             var results = new List<object>();
-            
+
             using var reader = await cmd.ExecuteReaderWithInterceptionAsync(context, CommandBehavior.Default, ct);
             while (await reader.ReadAsync(ct))
             {
-                var entity = materializer(reader);
+                var entity = await materializer(reader, ct);
                 // Enable lazy loading for the loaded entity
                 _navigationContexts.GetValue(entity, _ => new NavigationContext(context, entityType));
                 context.ChangeTracker.Track(entity, EntityState.Unchanged, mapping);
@@ -374,11 +374,11 @@ namespace nORM.Navigation
             cmd.CommandText = sql.ToString();
 
             var materializer = new Query.QueryTranslator(context).CreateMaterializer(mapping, entityType);
-            
+
             using var reader = await cmd.ExecuteReaderWithInterceptionAsync(context, CommandBehavior.Default, ct);
             if (await reader.ReadAsync(ct))
             {
-                var entity = materializer(reader);
+                var entity = await materializer(reader, ct);
                 // Enable lazy loading for the loaded entity
                 _navigationContexts.GetValue(entity, _ => new NavigationContext(context, entityType));
                 context.ChangeTracker.Track(entity, EntityState.Unchanged, mapping);
