@@ -77,51 +77,97 @@ namespace nORM.Query
             var outerMap = _ctx.GetMapping(info.OuterType);
             var innerMap = _ctx.GetMapping(info.InnerType);
 
-            var innerKeyIndex = outerMap.Columns.Length + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
-
-            var groups = new Dictionary<object, (object outer, List<object> children)>();
+            var outerColumnCount = outerMap.Columns.Length;
+            var innerKeyIndex = outerColumnCount + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
 
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
+
+            object? currentOuter = null;
+            object? currentKey = null;
+            List<object> currentChildren = new();
+
             while (await reader.ReadAsync(ct))
             {
-                var tuple = (ValueTuple<object, object>)await plan.Materializer(reader, ct);
-                var outer = tuple.Item1;
+                var outer = await plan.Materializer(reader, ct);
                 var key = info.OuterKeySelector(outer) ?? DBNull.Value;
 
-                if (!groups.TryGetValue(key, out var entry))
+                if (currentOuter == null || !Equals(currentKey, key))
                 {
+                    if (currentOuter != null)
+                    {
+                        var list = CreateList(info.InnerType, currentChildren);
+                        var result = info.ResultSelector(currentOuter, list.Cast<object>());
+                        resultList.Add(result);
+                        currentChildren = new List<object>();
+                    }
+
                     if (trackOuter)
                     {
                         NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
                         var actualMap = _ctx.GetMapping(outer.GetType());
                         _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
                     }
-                    entry = (outer, new List<object>());
-                    groups[key] = entry;
+
+                    currentOuter = outer;
+                    currentKey = key;
                 }
 
                 if (!reader.IsDBNull(innerKeyIndex))
                 {
-                    var inner = tuple.Item2;
+                    var inner = MaterializeEntity(reader, innerMap, outerColumnCount);
                     if (trackInner)
                     {
                         NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
                         var actualMap = _ctx.GetMapping(inner.GetType());
                         _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualMap);
                     }
-                    entry.children.Add(inner);
+                    currentChildren.Add(inner);
                 }
             }
 
-            foreach (var entry in groups.Values)
+            if (currentOuter != null)
             {
-                var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(info.InnerType))!;
-                foreach (var child in entry.children) list.Add(child);
-                var result = info.ResultSelector(entry.outer, list.Cast<object>());
+                var list = CreateList(info.InnerType, currentChildren);
+                var result = info.ResultSelector(currentOuter, list.Cast<object>());
                 resultList.Add(result);
             }
 
             return resultList;
+
+            static object MaterializeEntity(DbDataReader reader, TableMapping map, int offset)
+            {
+                if (map.DiscriminatorColumn != null && map.TphMappings.Count > 0)
+                {
+                    var discIndex = offset + Array.IndexOf(map.Columns, map.DiscriminatorColumn);
+                    if (!reader.IsDBNull(discIndex))
+                    {
+                        var disc = reader.GetValue(discIndex);
+                        if (disc != null && map.TphMappings.TryGetValue(disc, out var derived))
+                            return MaterializeEntity(reader, derived, offset);
+                    }
+                }
+
+                var entity = Activator.CreateInstance(map.Type)!;
+                for (int i = 0; i < map.Columns.Length; i++)
+                {
+                    var idx = offset + i;
+                    if (reader.IsDBNull(idx)) continue;
+                    var col = map.Columns[i];
+                    var read = Methods.GetReaderMethod(col.Prop.PropertyType);
+                    var value = read.Invoke(reader, new object[] { idx });
+                    if (read == Methods.GetValue)
+                        value = Convert.ChangeType(value!, col.Prop.PropertyType);
+                    col.Setter(entity, value);
+                }
+                return entity;
+            }
+
+            static IList CreateList(Type innerType, List<object> items)
+            {
+                var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(innerType))!;
+                foreach (var item in items) list.Add(item);
+                return list;
+            }
         }
     }
 }
