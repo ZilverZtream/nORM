@@ -56,9 +56,12 @@ namespace nORM.Query
                 list.Add(entity);
             }
 
-            foreach (var include in plan.Includes)
+            if (plan.SplitQuery)
             {
-                await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking);
+                foreach (var include in plan.Includes)
+                {
+                    await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking);
+                }
             }
 
             return list;

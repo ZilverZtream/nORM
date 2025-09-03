@@ -42,6 +42,7 @@ namespace nORM.Query
         private DatabaseProvider _provider;
         private bool _singleResult = false;
         private bool _noTracking = false;
+        private bool _splitQuery = false;
         private readonly HashSet<string> _tables;
 
         private StringBuilder _sql => _clauses.Sql;
@@ -188,7 +189,7 @@ namespace nORM.Query
 
             var elementType = _groupJoinInfo?.ResultType ?? materializerType;
 
-            var plan = new QueryPlan(_sql.ToString(), _params, _compiledParams, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray());
+            var plan = new QueryPlan(_sql.ToString(), _params, _compiledParams, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray(), _splitQuery);
             QueryPlanValidator.Validate(plan, _provider);
             return plan;
         }
@@ -525,6 +526,10 @@ namespace nORM.Query
 
                 case "AsNoTracking":
                     _noTracking = true;
+                    return Visit(node.Arguments[0]);
+
+                case "AsSplitQuery":
+                    _splitQuery = true;
                     return Visit(node.Arguments[0]);
 
                 default:
