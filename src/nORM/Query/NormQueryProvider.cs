@@ -406,6 +406,9 @@ namespace nORM.Query
 
         private async Task<IList> MaterializeAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
+            if (plan.GroupJoinInfo != null)
+                return await MaterializeGroupJoinAsync(plan, cmd, ct);
+
             var listType = typeof(List<>).MakeGenericType(plan.ElementType);
             var list = (IList)Activator.CreateInstance(listType)!;
 
@@ -435,63 +438,64 @@ namespace nORM.Query
                 await EagerLoadAsync(include, list, ct, plan.NoTracking);
             }
 
-            if (plan.GroupJoinInfo != null && list.Count > 0)
-            {
-                await EagerLoadGroupJoinAsync(plan.GroupJoinInfo, list, ct, plan.NoTracking);
-            }
-
             return list;
         }
 
-        private async Task EagerLoadGroupJoinAsync(GroupJoinInfo info, IList parents, CancellationToken ct, bool noTracking)
+        private async Task<IList> MaterializeGroupJoinAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
-            var childMap = _ctx.GetMapping(info.InnerType);
-            var keys = parents.Cast<object>().Select(info.OuterKeySelector).Where(k => k != null).Distinct().ToList();
-            if (keys.Count == 0) return;
+            var info = plan.GroupJoinInfo!;
 
-            var paramNames = new List<string>();
-            await using var cmd = _ctx.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
-            for (int i = 0; i < keys.Count; i++)
-            {
-                var paramName = $"{_ctx.Provider.ParamPrefix}fk{i}";
-                paramNames.Add(paramName);
-                cmd.AddParam(paramName, keys[i]);
-            }
-            cmd.CommandText = $"SELECT * FROM {childMap.EscTable} WHERE {info.InnerKeyColumn.EscCol} IN ({string.Join(",", paramNames)})";
+            var listType = typeof(List<>).MakeGenericType(info.ResultType);
+            var resultList = (IList)Activator.CreateInstance(listType)!;
 
-            var childMaterializer = new QueryTranslator(_ctx).CreateMaterializer(childMap, childMap.Type);
-            var children = new List<object>();
-            await using (var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct))
+            var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
+            var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith("<>") && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
+
+            var outerMap = _ctx.GetMapping(info.OuterType);
+            var innerMap = _ctx.GetMapping(info.InnerType);
+
+            var innerKeyIndex = outerMap.Columns.Length + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
+
+            var groups = new Dictionary<object, (object outer, List<object> children)>();
+
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
+            while (await reader.ReadAsync(ct))
             {
-                while (await reader.ReadAsync(ct))
+                var tuple = (ValueTuple<object, object>)plan.Materializer(reader);
+                var outer = tuple.Item1;
+                var key = info.OuterKeySelector(outer) ?? DBNull.Value;
+
+                if (!groups.TryGetValue(key, out var entry))
                 {
-                    var child = childMaterializer(reader);
-                    if (!noTracking)
+                    if (trackOuter)
                     {
-                        NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
-                        _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
+                        NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
+                        var actualMap = _ctx.GetMapping(outer.GetType());
+                        _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
                     }
-                    children.Add(child);
+                    entry = (outer, new List<object>());
+                    groups[key] = entry;
                 }
-            }
 
-            var childGroups = children.GroupBy(info.InnerKeySelector).ToDictionary(g => g.Key!, g => g.ToList());
-
-            var linesProperty = info.ResultType.GetProperty(info.CollectionName)!;
-
-            foreach (var p in parents.Cast<object>())
-            {
-                var pk = info.OuterKeySelector(p);
-                var listType = typeof(List<>).MakeGenericType(info.InnerType);
-                var childList = (IList)Activator.CreateInstance(listType)!;
-
-                if (pk != null && childGroups.TryGetValue(pk, out var c))
+                if (!reader.IsDBNull(innerKeyIndex))
                 {
-                    foreach (var item in c) childList.Add(item);
+                    var inner = tuple.Item2;
+                    if (trackInner)
+                    {
+                        NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
+                        var actualInnerMap = _ctx.GetMapping(inner.GetType());
+                        _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualInnerMap);
+                    }
+                    entry.children.Add(inner);
                 }
-                linesProperty.SetValue(p, childList);
             }
+            foreach (var g in groups.Values)
+            {
+                var result = info.ResultSelector(g.outer, g.children);
+                resultList.Add(result);
+            }
+
+            return resultList;
         }
 
         private async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct, bool noTracking)
