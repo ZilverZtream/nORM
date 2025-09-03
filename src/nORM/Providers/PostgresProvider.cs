@@ -47,6 +47,49 @@ namespace nORM.Providers
             }
         }
 
+        public override string? TranslateFunction(string name, Type declaringType, params string[] args)
+        {
+            if (declaringType == typeof(string))
+            {
+                return name switch
+                {
+                    nameof(string.ToUpper) => $"UPPER({args[0]})",
+                    nameof(string.ToLower) => $"LOWER({args[0]})",
+                    nameof(string.Length) when args.Length == 1 => $"LENGTH({args[0]})",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(DateTime))
+            {
+                return name switch
+                {
+                    nameof(DateTime.Year) => $"EXTRACT(YEAR FROM {args[0]})",
+                    nameof(DateTime.Month) => $"EXTRACT(MONTH FROM {args[0]})",
+                    nameof(DateTime.Day) => $"EXTRACT(DAY FROM {args[0]})",
+                    nameof(DateTime.Hour) => $"EXTRACT(HOUR FROM {args[0]})",
+                    nameof(DateTime.Minute) => $"EXTRACT(MINUTE FROM {args[0]})",
+                    nameof(DateTime.Second) => $"EXTRACT(SECOND FROM {args[0]})",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(Math))
+            {
+                return name switch
+                {
+                    nameof(Math.Abs) => $"ABS({args[0]})",
+                    nameof(Math.Ceiling) => $"CEILING({args[0]})",
+                    nameof(Math.Floor) => $"FLOOR({args[0]})",
+                    nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
+                    nameof(Math.Round) => $"ROUND({args[0]})",
+                    _ => null
+                };
+            }
+
+            return null;
+        }
+
         // PostgreSQL-optimized bulk operations
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {

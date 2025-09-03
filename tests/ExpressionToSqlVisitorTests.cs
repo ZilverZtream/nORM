@@ -30,6 +30,7 @@ namespace nORM.Tests
             public string? Name { get; set; }
             public decimal Price { get; set; }
             public bool IsAvailable { get; set; }
+            public DateTime CreatedAt { get; set; }
         }
 
         [Fact]
@@ -129,8 +130,28 @@ namespace nORM.Tests
         public void Where_with_method_call_resolving_to_constant()
         {
             var testName = "TEST";
-            var ex = Assert.Throws<System.Reflection.TargetInvocationException>(() => Translate<Product>(p => p.Name == testName.ToLower()));
-            Assert.IsType<NotSupportedException>(ex.InnerException);
+            var (sql, parameters) = Translate<Product>(p => p.Name == testName.ToLower());
+            Assert.Equal("(T0.\"Name\" = @p0)", sql);
+            Assert.Single(parameters);
+            Assert.Equal("test", parameters["@p0"]);
+        }
+
+        [Fact]
+        public void Where_with_string_ToUpper()
+        {
+            var (sql, parameters) = Translate<Product>(p => p.Name!.ToUpper() == "TEST");
+            Assert.Equal("(UPPER(T0.\"Name\") = @p0)", sql);
+            Assert.Single(parameters);
+            Assert.Equal("TEST", parameters["@p0"]);
+        }
+
+        [Fact]
+        public void Where_with_datetime_year()
+        {
+            var (sql, parameters) = Translate<Product>(p => p.CreatedAt.Year == 2025);
+            Assert.Equal("(CAST(strftime('%Y', T0.\"CreatedAt\") AS INTEGER) = @p0)", sql);
+            Assert.Single(parameters);
+            Assert.Equal(2025, parameters["@p0"]);
         }
 
         [Fact]
