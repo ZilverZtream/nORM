@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Data.Common;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
@@ -94,9 +95,25 @@ namespace nORM.Providers
 
             return null;
         }
+
+        protected override void ValidateConnection(DbConnection connection)
+        {
+            base.ValidateConnection(connection);
+            var name = connection.GetType().FullName;
+            if (name != "MySqlConnector.MySqlConnection" && name != "MySql.Data.MySqlClient.MySqlConnection")
+                throw new InvalidOperationException("A MySqlConnection is required for MySqlProvider. Please install MySqlConnector or MySql.Data.");
+        }
+
+        public override Task<bool> IsAvailableAsync()
+        {
+            return Task.FromResult(
+                Type.GetType("MySqlConnector.MySqlConnection, MySqlConnector") != null ||
+                Type.GetType("MySql.Data.MySqlClient.MySqlConnection, MySql.Data") != null);
+        }
         
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
@@ -124,6 +141,7 @@ namespace nORM.Providers
 
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct);
 
             var sw = Stopwatch.StartNew();
@@ -154,7 +172,10 @@ namespace nORM.Providers
         }
         
         public override Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> e, CancellationToken ct) where T : class
-            => base.BatchedDeleteAsync(ctx, m, e, ct);
+        {
+            ValidateConnection(ctx.Connection);
+            return base.BatchedDeleteAsync(ctx, m, e, ct);
+        }
 
         private static string GetSqlType(Type t)
         {
