@@ -31,6 +31,7 @@ namespace nORM.Query
         private LambdaExpression? _projection;
         private readonly List<string> _groupBy = new();
         private bool _isAggregate = false;
+        private bool _isDistinct = false;
         private string _methodName = "";
         private readonly StringBuilder _where = new();
         private readonly Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams;
@@ -148,7 +149,8 @@ namespace nORM.Query
                     }
 
                     var alias = _correlatedParams.Count > 0 ? _correlatedParams.Values.First().Alias : null;
-                    _sql.Insert(0, $"SELECT {select} FROM {_mapping.EscTable}" + (alias != null ? $" {alias}" : string.Empty));
+                    var distinct = _isDistinct ? "DISTINCT " : string.Empty;
+                    _sql.Insert(0, $"SELECT {distinct}{select} FROM {_mapping.EscTable}" + (alias != null ? $" {alias}" : string.Empty));
                 }
             }
 
@@ -167,9 +169,9 @@ namespace nORM.Query
         private string TranslateSubExpression(Expression e)
         {
             var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams);
-            subTranslator.Visit(e);
+            var subPlan = subTranslator.Translate(e);
             _paramIndex = subTranslator._paramIndex;
-            return subTranslator._sql.ToString();
+            return subPlan.Sql;
         }
 
 
@@ -584,6 +586,26 @@ namespace nORM.Query
 
                 case "SelectMany":
                     return HandleSelectMany(node);
+
+                case "Distinct":
+                    _isDistinct = true;
+                    return Visit(node.Arguments[0]);
+
+                case "Union":
+                case "Intersect":
+                case "Except":
+                    var leftSql = TranslateSubExpression(node.Arguments[0]);
+                    var rightSql = TranslateSubExpression(node.Arguments[1]);
+                    var setOp = _methodName switch
+                    {
+                        "Union" => "UNION",
+                        "Intersect" => "INTERSECT",
+                        "Except" => "EXCEPT",
+                        _ => throw new NotSupportedException()
+                    };
+                    _sql.Clear();
+                    _sql.Append($"({leftSql}) {setOp} ({rightSql})");
+                    return node;
 
                 case "Any":
                 case "Contains":
