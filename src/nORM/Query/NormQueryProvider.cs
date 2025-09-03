@@ -130,7 +130,8 @@ namespace nORM.Query
             var listType = typeof(List<>).MakeGenericType(plan.ElementType);
             var list = (IList)Activator.CreateInstance(listType)!;
 
-            var trackable = plan.ElementType.IsClass &&
+            var trackable = !plan.NoTracking &&
+                             plan.ElementType.IsClass &&
                              !plan.ElementType.Name.StartsWith("<>") &&
                              plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
             TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
@@ -151,18 +152,18 @@ namespace nORM.Query
 
             foreach (var include in plan.Includes)
             {
-                await EagerLoadAsync(include, list, ct);
+                await EagerLoadAsync(include, list, ct, plan.NoTracking);
             }
 
             if (plan.GroupJoinInfo != null && list.Count > 0)
             {
-                await EagerLoadGroupJoinAsync(plan.GroupJoinInfo, list, ct);
+                await EagerLoadGroupJoinAsync(plan.GroupJoinInfo, list, ct, plan.NoTracking);
             }
 
             return list;
         }
 
-        private async Task EagerLoadGroupJoinAsync(GroupJoinInfo info, IList parents, CancellationToken ct)
+        private async Task EagerLoadGroupJoinAsync(GroupJoinInfo info, IList parents, CancellationToken ct, bool noTracking)
         {
             var childMap = _ctx.GetMapping(info.InnerType);
             var keys = parents.Cast<object>().Select(info.OuterKeySelector).Where(k => k != null).Distinct().ToList();
@@ -186,8 +187,11 @@ namespace nORM.Query
                 while (await reader.ReadAsync(ct))
                 {
                     var child = childMaterializer(reader);
-                    NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
-                    _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
+                    if (!noTracking)
+                    {
+                        NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
+                        _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
+                    }
                     children.Add(child);
                 }
             }
@@ -210,7 +214,7 @@ namespace nORM.Query
             }
         }
 
-        private async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct)
+        private async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct, bool noTracking)
         {
             if (parents.Count == 0) return;
 
@@ -236,8 +240,11 @@ namespace nORM.Query
                 while (await reader.ReadAsync(ct))
                 {
                     var child = childMaterializer(reader);
-                    NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
-                    _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
+                    if (!noTracking)
+                    {
+                        NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
+                        _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
+                    }
                     children.Add(child);
                 }
             }

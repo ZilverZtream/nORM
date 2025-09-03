@@ -26,6 +26,7 @@ namespace nORM.Core
     public interface INormQueryable<T> : IOrderedQueryable<T>
     {
         INormQueryable<T> Include(Expression<Func<T, object>> navigationPropertyPath);
+        INormQueryable<T> AsNoTracking();
         Task<List<T>> ToListAsync(CancellationToken ct = default);
         Task<T[]> ToArrayAsync(CancellationToken ct = default);
         Task<int> CountAsync(CancellationToken ct = default);
@@ -71,6 +72,17 @@ namespace nORM.Core
                 Type.EmptyTypes,
                 Expression,
                 path
+            );
+            return new NormQueryableImpl<T>(Provider, expression);
+        }
+
+        public INormQueryable<T> AsNoTracking()
+        {
+            var expression = Expression.Call(
+                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
+                nameof(AsNoTracking),
+                Type.EmptyTypes,
+                Expression
             );
             return new NormQueryableImpl<T>(Provider, expression);
         }
