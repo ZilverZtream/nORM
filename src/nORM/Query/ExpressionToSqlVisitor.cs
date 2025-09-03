@@ -25,10 +25,14 @@ namespace nORM.Query
         private readonly StringBuilder _sql = new();
         private readonly Dictionary<string, object> _params = new();
         private int _paramIndex = 0;
+        private readonly List<string> _compiledParams;
+        private readonly Dictionary<ParameterExpression, string> _paramMap;
 
         public ExpressionToSqlVisitor(DbContext ctx, TableMapping mapping, DatabaseProvider provider,
                                       ParameterExpression parameter, string tableAlias,
-                                      Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated = null)
+                                      Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated = null,
+                                      List<string>? compiledParams = null,
+                                      Dictionary<ParameterExpression, string>? paramMap = null)
         {
             _ctx = ctx;
             _mapping = mapping;
@@ -39,6 +43,8 @@ namespace nORM.Query
                 ? new(correlated)
                 : new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
             _parameterMappings[parameter] = (mapping, tableAlias);
+            _compiledParams = compiledParams ?? new List<string>();
+            _paramMap = paramMap ?? new Dictionary<ParameterExpression, string>();
         }
 
         public string Translate(Expression expression)
@@ -106,6 +112,25 @@ namespace nORM.Query
         {
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
             _params[paramName] = node.Value ?? DBNull.Value;
+            _sql.Append(paramName);
+            return node;
+        }
+
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            if (_parameterMappings.ContainsKey(node))
+                return base.VisitParameter(node);
+
+            if (_paramMap.TryGetValue(node, out var existing))
+            {
+                _sql.Append(existing);
+                return node;
+            }
+
+            var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+            _params[paramName] = DBNull.Value;
+            _compiledParams.Add(paramName);
+            _paramMap[node] = paramName;
             _sql.Append(paramName);
             return node;
         }
@@ -206,7 +231,7 @@ namespace nORM.Query
                             if (node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression countSelector)
                             {
                                 var info = _parameterMappings[cp];
-                                var visitor = new ExpressionToSqlVisitor(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings);
+                                var visitor = new ExpressionToSqlVisitor(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
                                 var predSql = visitor.Translate(countSelector.Body);
                                 foreach (var kvp in visitor.GetParameters())
                                     _params[kvp.Key] = kvp.Value;
@@ -229,7 +254,7 @@ namespace nORM.Query
                             if (selector != null)
                             {
                                 var info = _parameterMappings[gp];
-                                var visitor = new ExpressionToSqlVisitor(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings);
+                                var visitor = new ExpressionToSqlVisitor(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
                                 var colSql = visitor.Translate(selector.Body);
                                 foreach (var kvp in visitor.GetParameters())
                                     _params[kvp.Key] = kvp.Value;
@@ -350,7 +375,7 @@ namespace nORM.Query
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
 
-            var subTranslator = new QueryTranslator(_ctx, mapping, _params, ref _paramIndex, _parameterMappings, new HashSet<string>(), _parameterMappings.Count);
+            var subTranslator = new QueryTranslator(_ctx, mapping, _params, ref _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count);
             var subPlan = subTranslator.Translate(source);
 
             _sql.Append(negate ? "NOT EXISTS(" : "EXISTS(");
@@ -363,7 +388,7 @@ namespace nORM.Query
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
 
-            var subTranslator = new QueryTranslator(_ctx, mapping, _params, ref _paramIndex, _parameterMappings, new HashSet<string>(), _parameterMappings.Count);
+            var subTranslator = new QueryTranslator(_ctx, mapping, _params, ref _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count);
             var subPlan = subTranslator.Translate(source);
 
             Visit(value);
