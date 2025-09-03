@@ -211,25 +211,32 @@ namespace nORM.Providers
 
         public string BuildUpdate(TableMapping m)
         {
-            return _sqlCache.GetOrAdd((m.Type, "UPDATE"), _ => {
-                var set = string.Join(", ", m.Columns.Where(c => !c.IsKey && !c.IsTimestamp).Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}"));
-                var where = string.Join(" AND ", m.KeyColumns.Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}"));
+            return _sqlCache.GetOrAdd((m.Type, "UPDATE"), _ =>
+            {
+                var set = string.Join(", ", m.Columns
+                    .Where(c => !c.IsKey && !c.IsTimestamp)
+                    .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}"));
+
+                var whereCols = m.KeyColumns
+                    .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}");
                 if (m.TimestampColumn != null)
-                {
-                    where += $" AND {m.TimestampColumn.EscCol}={ParamPrefix}{m.TimestampColumn.PropName}";
-                }
+                    whereCols = whereCols.Append($"{m.TimestampColumn.EscCol}={ParamPrefix}{m.TimestampColumn.PropName}");
+                var where = string.Join(" AND ", whereCols);
+
                 return $"UPDATE {m.EscTable} SET {set} WHERE {where}";
             });
         }
 
         public string BuildDelete(TableMapping m)
         {
-            return _sqlCache.GetOrAdd((m.Type, "DELETE"), _ => {
-                var where = string.Join(" AND ", m.KeyColumns.Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}"));
+            return _sqlCache.GetOrAdd((m.Type, "DELETE"), _ =>
+            {
+                var whereCols = m.KeyColumns
+                    .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}");
                 if (m.TimestampColumn != null)
-                {
-                    where += $" AND {m.TimestampColumn.EscCol}={ParamPrefix}{m.TimestampColumn.PropName}";
-                }
+                    whereCols = whereCols.Append($"{m.TimestampColumn.EscCol}={ParamPrefix}{m.TimestampColumn.PropName}");
+                var where = string.Join(" AND ", whereCols);
+
                 return $"DELETE FROM {m.EscTable} WHERE {where}";
             });
         }
