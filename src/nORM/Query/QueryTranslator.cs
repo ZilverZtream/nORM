@@ -94,7 +94,8 @@ namespace nORM.Query
                 else
                 {
                     var select = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
-                    _sql.Insert(0, $"SELECT {select} FROM {_mapping.EscTable}");
+                    var alias = _correlatedParams.Count > 0 ? _correlatedParams.Values.First().Alias : null;
+                    _sql.Insert(0, $"SELECT {select} FROM {_mapping.EscTable}" + (alias != null ? $" {alias}" : string.Empty));
                 }
             }
 
@@ -312,7 +313,7 @@ namespace nORM.Query
             switch (_methodName)
             {
                 case "Where":
-                    if (node.Arguments[1] is LambdaExpression lambda)
+                    if (StripQuotes(node.Arguments[1]) is LambdaExpression lambda)
                     {
                         var body = lambda.Body;
                         var param = lambda.Parameters[0];
@@ -330,14 +331,15 @@ namespace nORM.Query
                     return Visit(node.Arguments[0]);
 
                 case "Select":
-                    _projection = node.Arguments[1] as LambdaExpression;
+                    _projection = StripQuotes(node.Arguments[1]) as LambdaExpression;
                     return Visit(node.Arguments[0]);
 
                 case "OrderBy":
                 case "OrderByDescending":
                 case "ThenBy":
                 case "ThenByDescending":
-                    if (node.Arguments[1] is LambdaExpression keySelector)
+                    var source = Visit(node.Arguments[0]);
+                    if (StripQuotes(node.Arguments[1]) is LambdaExpression keySelector)
                     {
                         var param = keySelector.Parameters[0];
                         var alias = "T" + _joinCounter;
@@ -348,7 +350,7 @@ namespace nORM.Query
 
                         _orderBy.Add((sql, !_methodName.Contains("Descending")));
                     }
-                    return Visit(node.Arguments[0]);
+                    return source;
 
                 case "Take":
                     if (TryGetIntValue(node.Arguments[1], out int take))
