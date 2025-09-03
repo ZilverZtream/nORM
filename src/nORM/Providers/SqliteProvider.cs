@@ -18,6 +18,8 @@ namespace nORM.Providers
 {
     public sealed class SqliteProvider : DatabaseProvider
     {
+        public override int MaxSqlLength => 1_000_000;
+        public override int MaxParameters => 999;
         public override string Escape(string id) => $"\"{id}\"";
         
         public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam)

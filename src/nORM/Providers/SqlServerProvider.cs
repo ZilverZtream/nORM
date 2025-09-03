@@ -19,6 +19,8 @@ namespace nORM.Providers
     {
         private static readonly ConcurrentLruCache<Type, DataTable> _tableSchemas = new(maxSize: 100);
         private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: 100);
+        public override int MaxSqlLength => 8_000;
+        public override int MaxParameters => 2_100;
         public override string Escape(string id) => $"[{id}]";
         
         public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam)
