@@ -100,52 +100,46 @@ namespace nORM.Providers
             return Task.FromResult(Type.GetType("Microsoft.Data.Sqlite.SqliteConnection, Microsoft.Data.Sqlite") != null);
         }
 
-        // High-performance SQLite bulk insert using optimized single-row prepared statements
+        // Optimized bulk insert for SQLite using batched multi-row commands
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
-            var entityList = entities as List<T> ?? entities.ToList();
+            var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
-            
+
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
-            if (!cols.Any()) return 0;
-            
-            var recordsAffected = 0;
-            
+            if (cols.Length == 0) return 0;
+
+            // Respect SQLite's parameter limit and cap batches to 500 rows
+            var batchSize = Math.Min(500, MaxParameters / cols.Length);
+            var totalInserted = 0;
+
             await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
             try
             {
-                await using var cmd = ctx.Connection.CreateCommand();
-                cmd.Transaction = transaction;
-                cmd.CommandTimeout = 30;
-                
-                // Build single-row INSERT SQL
-                var colNames = string.Join(", ", cols.Select(c => c.EscCol));
-                var paramNames = string.Join(", ", cols.Select(c => ParamPrefix + c.PropName));
-                cmd.CommandText = $"INSERT INTO {m.EscTable} ({colNames}) VALUES ({paramNames})";
-                
-                // Add parameters once
-                foreach (var col in cols)
+                for (int i = 0; i < entityList.Count; i += batchSize)
                 {
-                    var param = cmd.CreateParameter();
-                    param.ParameterName = ParamPrefix + col.PropName;
-                    cmd.Parameters.Add(param);
-                }
-                
-                // Prepare the command once
-                await cmd.PrepareAsync(ct);
-                
-                // Insert all data
-                foreach (var entity in entityList)
-                {
-                    foreach (var col in cols)
+                    var batch = entityList.Skip(i).Take(batchSize).ToList();
+
+                    await using var cmd = ctx.Connection.CreateCommand();
+                    cmd.Transaction = transaction;
+                    cmd.CommandTimeout = 30;
+                    cmd.CommandText = BuildBatchInsertSql(m, cols, batch.Count);
+
+                    var paramIndex = 0;
+                    foreach (var entity in batch)
                     {
-                        cmd.Parameters[ParamPrefix + col.PropName].Value = col.Getter(entity) ?? DBNull.Value;
+                        foreach (var col in cols)
+                        {
+                            var value = col.Getter(entity) ?? DBNull.Value;
+                            cmd.AddParam($"{ParamPrefix}p{paramIndex++}", value);
+                        }
                     }
-                    recordsAffected += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+
+                    totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 }
-                
+
                 await transaction.CommitAsync(ct);
             }
             catch
@@ -153,9 +147,33 @@ namespace nORM.Providers
                 await transaction.RollbackAsync(ct);
                 throw;
             }
-            
-            ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, recordsAffected, sw.Elapsed);
-            return recordsAffected;
+
+            ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
+            return totalInserted;
+        }
+
+        private string BuildBatchInsertSql(TableMapping m, Column[] cols, int batchSize)
+        {
+            var colNames = string.Join(", ", cols.Select(c => c.EscCol));
+            var sb = new StringBuilder();
+            sb.Append($"INSERT INTO {m.EscTable} ({colNames}) VALUES ");
+
+            var paramIndex = 0;
+            for (int i = 0; i < batchSize; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                sb.Append("(");
+
+                for (int j = 0; j < cols.Length; j++)
+                {
+                    if (j > 0) sb.Append(", ");
+                    sb.Append($"{ParamPrefix}p{paramIndex++}");
+                }
+
+                sb.Append(")");
+            }
+
+            return sb.ToString();
         }
         
         // Optimized bulk update for SQLite
