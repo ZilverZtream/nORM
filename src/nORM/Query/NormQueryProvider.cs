@@ -154,6 +154,85 @@ namespace nORM.Query
             return (TResult)result!;
         }
 
+        internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
+        {
+            return _ctx.Options.RetryPolicy != null
+                ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteCompiledInternalAsync<TResult>(plan, parameters, token), ct)
+                : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteCompiledInternalAsync<TResult>(plan, parameters, token), ct);
+        }
+
+        private async Task<TResult> ExecuteCompiledInternalAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
+        {
+            var sw = Stopwatch.StartNew();
+            string? cacheKey = null;
+            var cache = _ctx.Options.CacheProvider;
+            if (cache != null)
+            {
+                cacheKey = BuildCacheKeyFromPlan<TResult>(plan, parameters);
+                if (cache.TryGet(cacheKey, out TResult? cached))
+                    return cached!;
+            }
+
+            await using var cmd = _ctx.Connection.CreateCommand();
+            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+            cmd.CommandText = plan.Sql;
+            foreach (var p in parameters) cmd.AddParam(p.Key, p.Value);
+
+            object result;
+            if (plan.IsScalar)
+            {
+                var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct);
+                _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
+                if (scalarResult == null || scalarResult is DBNull) return default!;
+                var resultType = typeof(TResult);
+                result = Convert.ChangeType(scalarResult, Nullable.GetUnderlyingType(resultType) ?? resultType)!;
+            }
+            else
+            {
+                var list = await MaterializeAsync(plan, cmd, ct);
+                _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, list.Count);
+                if (plan.SingleResult)
+                {
+                    result = plan.MethodName switch
+                    {
+                        "First" => ((IEnumerable)list).Cast<object>().First(),
+                        "FirstOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
+                        "Single" => ((IEnumerable)list).Cast<object>().Single(),
+                        "SingleOrDefault" => ((IEnumerable)list).Cast<object>().SingleOrDefault(),
+                        "ElementAt" => ((IEnumerable)list).Cast<object>().First(),
+                        "ElementAtOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
+                        "Last" => ((IEnumerable)list).Cast<object>().First(),
+                        "LastOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
+                        _ => list
+                    } ?? (object)list;
+                }
+                else
+                {
+                    result = list;
+                }
+            }
+
+            if (cache != null && cacheKey != null)
+                cache.Set(cacheKey, (TResult)result!, _ctx.Options.CacheExpiration, plan.Tables);
+
+            return (TResult)result!;
+        }
+
+        private string BuildCacheKeyFromPlan<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
+        {
+            var hash = new HashCode();
+            hash.Add(plan.Sql);
+            hash.Add(typeof(TResult));
+            foreach (var kvp in parameters.OrderBy(k => k.Key))
+            {
+                hash.Add(kvp.Key);
+                hash.Add(kvp.Value?.GetHashCode() ?? 0);
+            }
+            var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
+            if (tenant != null) hash.Add(tenant);
+            return hash.ToHashCode().ToString();
+        }
+
         private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
@@ -476,7 +555,7 @@ namespace nORM.Query
             return resultChildren;
         }
 
-        private QueryPlan GetPlan(Expression expression, out Expression filtered)
+        internal QueryPlan GetPlan(Expression expression, out Expression filtered)
         {
             filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(filtered);
