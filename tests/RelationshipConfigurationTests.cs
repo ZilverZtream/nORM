@@ -51,5 +51,32 @@ public class RelationshipConfigurationTests
         Assert.Equal("Key", rel.PrincipalKey.PropName);
         Assert.Equal("ParentKey", rel.ForeignKey.PropName);
     }
+
+    [Fact]
+    public void Fluent_relationship_configuration_with_explicit_principal_key_is_used()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<Blog>()
+                    .HasKey(b => b.Key)
+                    .HasMany(b => b.Posts)
+                    .WithOne(p => p.Parent)
+                    .HasForeignKey(p => p.ParentKey, b => b.Key);
+            }
+        };
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+        var getMapping = typeof(DbContext).GetMethod("GetMapping", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var blogMap = (TableMapping)getMapping.Invoke(ctx, new object[] { typeof(Blog) })!;
+
+        Assert.True(blogMap.Relations.ContainsKey(nameof(Blog.Posts)));
+        var rel = blogMap.Relations[nameof(Blog.Posts)];
+        Assert.Equal(typeof(Post), rel.DependentType);
+        Assert.Equal("Key", rel.PrincipalKey.PropName);
+        Assert.Equal("ParentKey", rel.ForeignKey.PropName);
+    }
 }
 
