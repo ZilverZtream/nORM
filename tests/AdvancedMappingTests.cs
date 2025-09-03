@@ -66,5 +66,23 @@ namespace nORM.Tests
             Assert.IsType<Dog>(animals[1]);
             Assert.True(((Dog)animals[1]).GoodBoy);
         }
+
+        [Fact]
+        public void Querying_derived_type_filters_by_discriminator()
+        {
+            using var cn = new SqliteConnection("Data Source=:memory:");
+            cn.Open();
+            using (var cmd = cn.CreateCommand())
+            {
+                cmd.CommandText = @"CREATE TABLE Animal(Id INTEGER, Type TEXT, Lives INTEGER, GoodBoy INTEGER);
+                                    INSERT INTO Animal VALUES(1,'Cat',9,NULL);
+                                    INSERT INTO Animal VALUES(2,'Dog',NULL,1);";
+                cmd.ExecuteNonQuery();
+            }
+            using var ctx = new DbContext(cn, new SqliteProvider());
+            var dogs = ctx.Query<Dog>().OrderBy(d => d.Id).ToList();
+            Assert.Single(dogs);
+            Assert.True(dogs[0].GoodBoy);
+        }
     }
 }
