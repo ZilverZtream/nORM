@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using System.Data.Common;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
@@ -97,9 +98,22 @@ namespace nORM.Providers
             return null;
         }
 
+        protected override void ValidateConnection(DbConnection connection)
+        {
+            base.ValidateConnection(connection);
+            if (connection is not SqlConnection)
+                throw new InvalidOperationException("A SqlConnection is required for SqlServerProvider.");
+        }
+
+        public override Task<bool> IsAvailableAsync()
+        {
+            return Task.FromResult(Type.GetType("Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient") != null);
+        }
+
         #region SQL Server Bulk Operations
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
             {
@@ -141,6 +155,7 @@ namespace nORM.Providers
 
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct);
 
             var sw = Stopwatch.StartNew();
@@ -210,6 +225,7 @@ namespace nORM.Providers
 
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             if (ctx.Options.UseBatchedBulkOps) return await base.BatchedDeleteAsync(ctx, m, entities, ct);
 
             var sw = Stopwatch.StartNew();

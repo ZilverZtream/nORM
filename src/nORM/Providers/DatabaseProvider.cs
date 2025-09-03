@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
@@ -38,9 +39,21 @@ namespace nORM.Providers
                 .Replace("_", esc + "_");
         }
 
+        protected virtual void ValidateConnection(DbConnection connection)
+        {
+            if (connection.State != ConnectionState.Open)
+                throw new InvalidOperationException($"Connection must be open for {GetType().Name}");
+        }
+
+        public virtual Task<bool> IsAvailableAsync()
+        {
+            return Task.FromResult(true);
+        }
+
         #region Bulk Operations (Abstract & Fallback)
         public virtual async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             int recordsAffected = 0;
             var batchSize = ctx.Options.BulkBatchSize;
@@ -65,6 +78,7 @@ namespace nORM.Providers
 
         protected async Task<int> ExecuteInsertBatch<T>(DbContext ctx, TableMapping m, List<T> batch, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sb = new StringBuilder();
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
             var colNames = string.Join(", ", cols.Select(c => c.EscCol));
@@ -89,13 +103,15 @@ namespace nORM.Providers
 
         public virtual Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> e, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             if (ctx.Options.UseBatchedBulkOps)
                 return BatchedUpdateAsync(ctx, m, e, ct);
             throw new NotImplementedException("This provider does not have a native bulk update implementation.");
         }
-        
+
         public virtual Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> e, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             if (ctx.Options.UseBatchedBulkOps)
                 return BatchedDeleteAsync(ctx, m, e, ct);
             throw new NotImplementedException("This provider does not have a native bulk delete implementation.");
@@ -103,6 +119,7 @@ namespace nORM.Providers
 
         protected async Task<int> BatchedUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var totalUpdated = 0;
             await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
@@ -130,6 +147,7 @@ namespace nORM.Providers
 
         protected async Task<int> BatchedDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
