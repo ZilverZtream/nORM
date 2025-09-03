@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using Xunit;
+using nORM.Query;
 
 namespace nORM.Tests
 {
@@ -41,6 +42,12 @@ namespace nORM.Tests
                 yield return new object[] { provider, (Expression<Func<NumericTypesEntity, bool>>)(e => e.DoubleValue > 5.0), "DoubleValue", 5.0 };
                 yield return new object[] { provider, (Expression<Func<NumericTypesEntity, bool>>)(e => e.FloatValue > 5f), "FloatValue", 5f };
             }
+        }
+
+        private static class CustomFunctions
+        {
+            [SqlFunction("SOUNDEX({0})")]
+            public static string Soundex(string s) => throw new NotSupportedException();
         }
 
         [Theory]
@@ -83,6 +90,21 @@ namespace nORM.Tests
 
             var (sql, parameters) = Translate<Product>(p => p.Name!.ToUpper() == "ABC", connection, provider);
             var expected = $"(UPPER(T0.{provider.Escape("Name")}) = @p0)";
+            Assert.Equal(expected, sql);
+            Assert.Single(parameters);
+            Assert.Equal("ABC", parameters["@p0"]);
+        }
+
+        [Theory]
+        [MemberData(nameof(SimpleEqualityProviders))]
+        public void Where_with_custom_sql_function(ProviderKind providerKind)
+        {
+            var setup = CreateProvider(providerKind);
+            using var connection = setup.Connection;
+            var provider = setup.Provider;
+
+            var (sql, parameters) = Translate<Product>(p => CustomFunctions.Soundex(p.Name!) == "ABC", connection, provider);
+            var expected = $"(SOUNDEX(T0.{provider.Escape("Name")}) = @p0)";
             Assert.Equal(expected, sql);
             Assert.Single(parameters);
             Assert.Equal("ABC", parameters["@p0"]);
