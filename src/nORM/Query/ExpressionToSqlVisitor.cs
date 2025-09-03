@@ -162,48 +162,48 @@ namespace nORM.Query
             {
                 switch (node.Method.Name)
                 {
-                    case "Contains":
-                        Visit(node.Object);
-                        _sql.Append(" LIKE ");
-                        if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
-                        {
-                            var containsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _params[containsParam] = $"%{_provider.EscapeLikePattern(cs)}%";
-                            _sql.Append(containsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
-                        }
-                        else
-                        {
-                            throw new NotSupportedException("Only constant values are supported in Contains().");
-                        }
-                        return node;
-                    case "StartsWith":
-                        Visit(node.Object);
-                        _sql.Append(" LIKE ");
-                        if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
-                        {
-                            var startsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _params[startsParam] = $"{_provider.EscapeLikePattern(ss)}%";
-                            _sql.Append(startsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
-                        }
-                        else
-                        {
-                            throw new NotSupportedException("Only constant values are supported in StartsWith().");
-                        }
-                        return node;
-                    case "EndsWith":
-                        Visit(node.Object);
-                        _sql.Append(" LIKE ");
-                        if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
-                        {
-                            var endsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _params[endsParam] = $"%{_provider.EscapeLikePattern(es)}";
-                            _sql.Append(endsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
-                        }
-                        else
-                        {
-                            throw new NotSupportedException("Only constant values are supported in EndsWith().");
-                        }
-                        return node;
+                      case "Contains":
+                          Visit(node.Object);
+                          _sql.Append(" LIKE ");
+                          if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
+                          {
+                              var containsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                              _params[containsParam] = CreateSafeLikePattern(cs, LikeOperation.Contains);
+                              _sql.Append(containsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
+                          }
+                          else
+                          {
+                              throw new NotSupportedException("Only constant values are supported in Contains().");
+                          }
+                          return node;
+                      case "StartsWith":
+                          Visit(node.Object);
+                          _sql.Append(" LIKE ");
+                          if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
+                          {
+                              var startsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                              _params[startsParam] = CreateSafeLikePattern(ss, LikeOperation.StartsWith);
+                              _sql.Append(startsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
+                          }
+                          else
+                          {
+                              throw new NotSupportedException("Only constant values are supported in StartsWith().");
+                          }
+                          return node;
+                      case "EndsWith":
+                          Visit(node.Object);
+                          _sql.Append(" LIKE ");
+                          if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
+                          {
+                              var endsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                              _params[endsParam] = CreateSafeLikePattern(es, LikeOperation.EndsWith);
+                              _sql.Append(endsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
+                          }
+                          else
+                          {
+                              throw new NotSupportedException("Only constant values are supported in EndsWith().");
+                          }
+                          return node;
                 }
 
                 var strArgs = new List<string>();
@@ -395,6 +395,33 @@ namespace nORM.Query
             _sql.Append(" IN (");
             _sql.Append(subPlan.Sql);
             _sql.Append(")");
+        }
+
+        private enum LikeOperation
+        {
+            Contains,
+            StartsWith,
+            EndsWith
+        }
+
+        private string CreateSafeLikePattern(string value, LikeOperation operation)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+
+            // Validate and double-escape
+            var escaped = value
+                .Replace("\\", "\\\\")  // Escape backslashes first
+                .Replace("%", "\\%")
+                .Replace("_", "\\_")
+                .Replace("[", "\\[");
+
+            return operation switch
+            {
+                LikeOperation.Contains => $"%{escaped}%",
+                LikeOperation.StartsWith => $"{escaped}%",
+                LikeOperation.EndsWith => $"%{escaped}",
+                _ => escaped
+            };
         }
 
         private static Type GetRootElementType(Expression source)
