@@ -17,6 +17,8 @@ using Dapper;
 
 // Namespace aliases to avoid ambiguity between EF Core and nORM extension methods
 using EfExtensions = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
+using NormAsync = nORM.Core.NormAsyncExtensions;
+using NormAdvanced = nORM.Core.AdvancedLinqExtensions;
 using DbContext = nORM.Core.DbContext;
 
 namespace nORM.Benchmarks
@@ -78,8 +80,7 @@ namespace nORM.Benchmarks
         [BenchmarkCategory("Aggregates")]
         public async Task<decimal> Sum_nORM()
         {
-            return await _nOrmContext!.Query<BenchmarkUser>()
-                .SumAsync(u => u.Salary);
+            return await NormAdvanced.SumAsync(_nOrmContext!.Query<BenchmarkUser>(), u => u.Salary);
         }
         
         [Benchmark]
@@ -101,15 +102,15 @@ namespace nORM.Benchmarks
         [BenchmarkCategory("GroupByAggregate")]
         public async Task<List<object>> GroupByWithAggregates_nORM()
         {
-            var result = await _nOrmContext!.Query<BenchmarkUser>()
+            var query = _nOrmContext!.Query<BenchmarkUser>()
                 .GroupBy(u => u.Department)
-                .Select(g => new { 
-                    Department = g.Key, 
+                .Select(g => new {
+                    Department = g.Key,
                     Count = g.Count(),
                     AvgSalary = g.Average(u => u.Salary),
                     TotalSalary = g.Sum(u => u.Salary)
-                })
-                .ToListAsync();
+                });
+            var result = await NormAsync.ToListAsync(query);
             return result.Cast<object>().ToList();
         }
         
@@ -117,14 +118,15 @@ namespace nORM.Benchmarks
         [BenchmarkCategory("GroupByAggregate")]
         public async Task<List<object>> GroupByWithAggregates_EfCore()
         {
-            return await EfExtensions.ToListAsync(_efContext!.Users
+            var result = await EfExtensions.ToListAsync(_efContext!.Users
                 .GroupBy(u => u.Department)
-                .Select(g => new { 
-                    Department = g.Key, 
+                .Select(g => new {
+                    Department = g.Key,
                     Count = g.Count(),
                     AvgSalary = g.Average(u => u.Salary),
                     TotalSalary = g.Sum(u => u.Salary)
                 }));
+            return result.Cast<object>().ToList();
         }
         
         [Benchmark]
@@ -148,19 +150,19 @@ namespace nORM.Benchmarks
         [BenchmarkCategory("Navigation")]
         public async Task<List<BenchmarkUser>> EagerLoading_nORM()
         {
-            return await _nOrmContext!.Query<BenchmarkUser>()
+            var query = _nOrmContext!.Query<BenchmarkUser>()
                 .Include(u => u.Orders)
-                .Take(10)
-                .ToListAsync();
+                .Take(10);
+            return await NormAsync.ToListAsync(query);
         }
         
         [Benchmark]
         [BenchmarkCategory("Navigation")]
         public async Task<List<BenchmarkUser>> EagerLoading_EfCore()
         {
-            return await EfExtensions.ToListAsync(_efContext!.Users
-                .Include(u => u.Orders)
-                .Take(10));
+            return await EfExtensions.ToListAsync(
+                EfExtensions.Include(_efContext!.Users, u => u.Orders)
+                    .Take(10));
         }
         
         [Benchmark]
@@ -230,7 +232,7 @@ namespace nORM.Benchmarks
         [BenchmarkCategory("ComplexQuery")]
         public async Task<List<object>> ComplexAggregateQuery_nORM()
         {
-            var result = await _nOrmContext!.Query<BenchmarkUser>()
+            var query = _nOrmContext!.Query<BenchmarkUser>()
                 .Where(u => u.Salary > 50000)
                 .GroupBy(u => new { u.Department, u.IsActive })
                 .Select(g => new {
@@ -240,8 +242,8 @@ namespace nORM.Benchmarks
                     AvgSalary = g.Average(u => u.Salary),
                     MinSalary = g.Min(u => u.Salary),
                     MaxSalary = g.Max(u => u.Salary)
-                })
-                .ToListAsync();
+                });
+            var result = await NormAsync.ToListAsync(query);
             return result.Cast<object>().ToList();
         }
         
@@ -249,7 +251,7 @@ namespace nORM.Benchmarks
         [BenchmarkCategory("ComplexQuery")]
         public async Task<List<object>> ComplexAggregateQuery_EfCore()
         {
-            return await EfExtensions.ToListAsync(_efContext!.Users
+            var result = await EfExtensions.ToListAsync(_efContext!.Users
                 .Where(u => u.Salary > 50000)
                 .GroupBy(u => new { u.Department, u.IsActive })
                 .Select(g => new {
@@ -260,6 +262,7 @@ namespace nORM.Benchmarks
                     MinSalary = g.Min(u => u.Salary),
                     MaxSalary = g.Max(u => u.Salary)
                 }));
+            return result.Cast<object>().ToList();
         }
         
         [Benchmark]
