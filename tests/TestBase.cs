@@ -27,10 +27,17 @@ public abstract class TestBase
     {
         return kind switch
         {
-            ProviderKind.Sqlite => (new SqliteConnection("Data Source=:memory:"), new SqliteProvider()),
-            ProviderKind.SqlServer => (new SqliteConnection("Data Source=:memory:"), new SqlServerProvider()),
+            ProviderKind.Sqlite => (CreateOpenConnection(), new SqliteProvider()),
+            ProviderKind.SqlServer => (CreateOpenConnection(), new SqlServerProvider()),
             _ => throw new NotSupportedException()
         };
+    }
+
+    private static DbConnection CreateOpenConnection()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        return cn;
     }
 
     protected (string Sql, Dictionary<string, object> Params, Type ElementType) TranslateQuery<T, TResult>(

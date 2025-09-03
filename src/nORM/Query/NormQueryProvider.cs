@@ -118,6 +118,7 @@ namespace nORM.Query
                     return cached!;
             }
 
+            await _ctx.EnsureConnectionAsync(ct);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
@@ -182,6 +183,7 @@ namespace nORM.Query
                     return cached!;
             }
 
+            await _ctx.EnsureConnectionAsync(ct);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
@@ -255,6 +257,7 @@ namespace nORM.Query
             _cudBuilder.ValidateCudPlan(plan.Sql);
             var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
 
+            await _ctx.EnsureConnectionAsync(ct);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
             var finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
@@ -281,6 +284,7 @@ namespace nORM.Query
             var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
             var (setClause, setParams) = _cudBuilder.BuildSetClause(mapping, set);
 
+            await _ctx.EnsureConnectionAsync(ct);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
             var finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
@@ -317,6 +321,7 @@ namespace nORM.Query
             }
 
             var sw = Stopwatch.StartNew();
+            await _ctx.EnsureConnectionAsync(ct);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
