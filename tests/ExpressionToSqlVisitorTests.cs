@@ -132,6 +132,18 @@ namespace nORM.Tests
             var ex = Assert.Throws<System.Reflection.TargetInvocationException>(() => Translate<Product>(p => p.Name == testName.ToLower()));
             Assert.IsType<NotSupportedException>(ex.InnerException);
         }
+
+        [Fact]
+        public void Where_with_list_contains_translates_to_in()
+        {
+            var ids = new List<int> { 1, 2, 3 };
+            var (sql, parameters) = Translate<Product>(p => ids.Contains(p.Id));
+            Assert.Equal("T0.\"Id\" IN (@p0, @p1, @p2)", sql);
+            Assert.Equal(3, parameters.Count);
+            Assert.Equal(1, parameters["@p0"]);
+            Assert.Equal(2, parameters["@p1"]);
+            Assert.Equal(3, parameters["@p2"]);
+        }
     }
 }
 
