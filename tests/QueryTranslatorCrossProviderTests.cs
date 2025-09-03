@@ -207,4 +207,25 @@ public class QueryTranslatorCrossProviderTests : TestBase
         Assert.Equal(expected, sql);
     }
 
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public void GroupBy_followed_by_having(ProviderKind providerKind)
+    {
+        var setup = CreateProvider(providerKind);
+        using var connection = setup.Connection;
+        var provider = setup.Provider;
+        var (sql, parameters, elementType) = TranslateQuery<Product, int>(
+            q => q.GroupBy(p => p.CategoryId)
+                  .Where(g => g.Count() > 10)
+                  .Select(g => g.Key),
+            connection, provider);
+        var table = provider.Escape("Product");
+        var col = provider.Escape("CategoryId");
+        var paramName = provider.ParamPrefix + "p0";
+        var expected = $"SELECT T0.{col} FROM {table} T0 GROUP BY T0.{col} HAVING ((COUNT(*) > {paramName}))";
+        Assert.Equal(expected, sql);
+        Assert.Equal(10, parameters[paramName]);
+        Assert.Equal(typeof(int), elementType);
+    }
+
 }
