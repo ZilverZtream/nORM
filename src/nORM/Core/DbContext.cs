@@ -21,7 +21,7 @@ using Microsoft.Data.Sqlite;
 
 namespace nORM.Core
 {
-    public sealed class DbContext : IDisposable
+    public class DbContext : IDisposable
     {
         private readonly DbConnection _cn;
         private readonly DatabaseProvider _p;
