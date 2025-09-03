@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
@@ -63,8 +64,8 @@ namespace nORM.Mapping
                         .Where(x => x.CanRead && x.CanWrite && x.GetCustomAttribute<NotMappedAttribute>() == null))
                     {
                         var getter = CreateOwnedGetter(prop, sp);
-                        var setter = CreateOwnedSetter(prop, sp);
-                        cols.Add(new Column(sp, p, ownedConfig, prop.Name, getter, setter));
+                        var setter = CreateOwnedSetter(prop, sp, out var setterMethod);
+                        cols.Add(new Column(sp, p, ownedConfig, prop.Name, getter, setter, setterMethod));
                     }
                 }
                 else
@@ -123,27 +124,44 @@ namespace nORM.Mapping
             return Expression.Lambda<Func<object, object?>>(body, entityParam).Compile();
         }
 
-        private static Action<object, object?> CreateOwnedSetter(PropertyInfo owner, PropertyInfo owned)
+        private static Action<object, object?> CreateOwnedSetter(PropertyInfo owner, PropertyInfo owned, out MethodInfo methodInfo)
         {
-            var entityParam = Expression.Parameter(typeof(object), "e");
-            var valueParam = Expression.Parameter(typeof(object), "v");
-            var castEntity = Expression.Convert(entityParam, owner.DeclaringType!);
-            var ownerAccess = Expression.Property(castEntity, owner);
-            var ownerVar = Expression.Variable(owner.PropertyType, "ownedObj");
+            var dm = new DynamicMethod($"set_{owner.Name}_{owned.Name}", typeof(void), new[] { typeof(object), typeof(object) }, owner.DeclaringType!.Module, true);
+            var il = dm.GetILGenerator();
 
-            var assignBlock = Expression.Block(new[] { ownerVar },
-                Expression.Assign(ownerVar, ownerAccess),
-                Expression.IfThen(
-                    Expression.Equal(ownerVar, Expression.Constant(null, owner.PropertyType)),
-                    Expression.Block(
-                        Expression.Assign(ownerVar, Expression.New(owner.PropertyType)),
-                        Expression.Assign(ownerAccess, ownerVar)
-                    )
-                ),
-                Expression.Assign(Expression.Property(ownerVar, owned), Expression.Convert(valueParam, owned.PropertyType))
-            );
+            // Cast entity to owner type
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Castclass, owner.DeclaringType!);
+            il.Emit(OpCodes.Dup);
+            il.Emit(OpCodes.Callvirt, owner.GetGetMethod()!);
+            var ownedVar = il.DeclareLocal(owner.PropertyType);
+            il.Emit(OpCodes.Stloc, ownedVar);
+            il.Emit(OpCodes.Pop); // remove duplicated entity
 
-            return Expression.Lambda<Action<object, object?>>(assignBlock, entityParam, valueParam).Compile();
+            // Initialize owned object if null
+            il.Emit(OpCodes.Ldloc, ownedVar);
+            var hasValue = il.DefineLabel();
+            il.Emit(OpCodes.Brtrue_S, hasValue);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Castclass, owner.DeclaringType!);
+            il.Emit(OpCodes.Newobj, owner.PropertyType.GetConstructor(Type.EmptyTypes)!);
+            il.Emit(OpCodes.Dup);
+            il.Emit(OpCodes.Stloc, ownedVar);
+            il.Emit(OpCodes.Callvirt, owner.GetSetMethod()!);
+            il.MarkLabel(hasValue);
+
+            // Assign value
+            il.Emit(OpCodes.Ldloc, ownedVar);
+            il.Emit(OpCodes.Ldarg_1);
+            if (owned.PropertyType.IsValueType)
+                il.Emit(OpCodes.Unbox_Any, owned.PropertyType);
+            else
+                il.Emit(OpCodes.Castclass, owned.PropertyType);
+            il.Emit(OpCodes.Callvirt, owned.GetSetMethod()!);
+            il.Emit(OpCodes.Ret);
+
+            methodInfo = dm;
+            return (Action<object, object?>)dm.CreateDelegate(typeof(Action<object, object?>));
         }
 
         private void DiscoverRelations(DbContext ctx)

@@ -32,8 +32,7 @@ namespace nORM.Core
         {
             foreach (var entry in _entries.Values)
             {
-                if (entry.State == EntityState.Unchanged)
-                    entry.DetectChanges();
+                entry.DetectChanges();
             }
         }
     }

@@ -188,14 +188,17 @@ namespace nORM.Navigation
             // 3. Not a primitive type or string
             // 4. Not explicitly marked as NotMapped
             
-            if (property.PropertyType.IsPrimitive || 
+            if (property.PropertyType.IsPrimitive ||
                 property.PropertyType == typeof(string) ||
                 property.PropertyType == typeof(DateTime) ||
                 property.PropertyType == typeof(decimal) ||
                 property.PropertyType == typeof(Guid))
                 return false;
-                
+
             if (property.PropertyType.IsValueType) // Enums, structs, etc.
+                return false;
+
+            if (property.PropertyType.GetCustomAttribute<OwnedAttribute>() != null)
                 return false;
                 
             // Check if it's a collection

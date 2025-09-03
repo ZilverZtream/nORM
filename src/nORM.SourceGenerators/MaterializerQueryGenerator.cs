@@ -103,10 +103,24 @@ namespace nORM.SourceGenerators
             sb.AppendLine($"        CompiledMaterializerStore.Add<{typeName}>(reader =>");
             sb.AppendLine("        {");
             sb.AppendLine($"            var entity = new {typeName}();");
-            for (int i = 0; i < props.Count; i++)
+            var colIndex = 0;
+            foreach (var prop in props)
             {
-                var prop = props[i];
-                sb.AppendLine(BuildAssignmentExpression(prop, i));
+                if (IsOwnedType(prop.Type))
+                {
+                    var ownedType = (INamedTypeSymbol)prop.Type;
+                    var ownedProps = ownedType.GetMembers().OfType<IPropertySymbol>()
+                        .Where(p => !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
+                        .OrderBy(p => p.Name);
+                    foreach (var op in ownedProps)
+                    {
+                        sb.AppendLine(BuildOwnedAssignmentExpression(prop, op, ownedType, colIndex++));
+                    }
+                }
+                else
+                {
+                    sb.AppendLine(BuildAssignmentExpression(prop, colIndex++));
+                }
             }
             sb.AppendLine("            return entity;");
             sb.AppendLine("        });");
@@ -123,6 +137,20 @@ namespace nORM.SourceGenerators
             return needsNullCheck
                 ? $"            if (!reader.IsDBNull({index})) entity.{prop.Name} = {read};"
                 : $"            entity.{prop.Name} = {read};";
+        }
+
+        private static bool IsOwnedType(ITypeSymbol type)
+            => type.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == "nORM.Mapping.OwnedAttribute");
+
+        private static string BuildOwnedAssignmentExpression(IPropertySymbol owner, IPropertySymbol ownedProp, INamedTypeSymbol ownedType, int index)
+        {
+            var read = GetReaderExpression(ownedProp.Type, index);
+            var needsNullCheck = ownedProp.Type.IsReferenceType || ownedProp.NullableAnnotation == NullableAnnotation.Annotated;
+            var ownedTypeName = ownedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var ensureOwner = $"if (entity.{owner.Name} == null) entity.{owner.Name} = new {ownedTypeName}(); ";
+            return needsNullCheck
+                ? $"            if (!reader.IsDBNull({index})) {{ {ensureOwner}entity.{owner.Name}.{ownedProp.Name} = {read}; }}"
+                : $"            {ensureOwner}entity.{owner.Name}.{ownedProp.Name} = {read};";
         }
 
         private static string GetReaderExpression(ITypeSymbol type, int index)
