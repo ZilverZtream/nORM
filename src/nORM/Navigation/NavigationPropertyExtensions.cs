@@ -424,7 +424,7 @@ namespace nORM.Navigation
         private readonly PropertyInfo _property;
         private readonly NavigationContext _context;
         private List<T>? _data;
-        private bool _isLoaded;
+        private volatile bool _isLoaded;
         private readonly SemaphoreSlim _loadLock = new(1, 1);
 
         public LazyNavigationCollection(object parent, PropertyInfo property, NavigationContext context)
@@ -437,7 +437,7 @@ namespace nORM.Navigation
 
         private async Task EnsureLoadedAsync()
         {
-            if (Volatile.Read(ref _isLoaded)) return;
+            if (_isLoaded) return;
 
             await _loadLock.WaitAsync();
             try
@@ -446,7 +446,7 @@ namespace nORM.Navigation
                 {
                     await NavigationPropertyExtensions.LoadNavigationPropertyAsync(_parent, _property, _context, CancellationToken.None);
                     _data = (List<T>?)_property.GetValue(_parent) ?? new List<T>();
-                    Volatile.Write(ref _isLoaded, true);
+                    _isLoaded = true;
                 }
             }
             finally
@@ -634,7 +634,7 @@ namespace nORM.Navigation
         private readonly PropertyInfo _property;
         private readonly NavigationContext _context;
         private T? _value;
-        private bool _isLoaded;
+        private volatile bool _isLoaded;
         private readonly object _loadLock = new();
 
         public LazyNavigationReference(object parent, PropertyInfo property, NavigationContext context)
@@ -649,7 +649,7 @@ namespace nORM.Navigation
         {
             get
             {
-                if (Volatile.Read(ref _isLoaded))
+                if (_isLoaded)
                     return _value;
 
                 lock (_loadLock)
@@ -667,7 +667,7 @@ namespace nORM.Navigation
                 lock (_loadLock)
                 {
                     _value = value;
-                    Volatile.Write(ref _isLoaded, true);
+                    _isLoaded = true;
                     _context.MarkAsLoaded(_property.Name);
                 }
             }
