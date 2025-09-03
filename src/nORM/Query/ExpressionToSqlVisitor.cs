@@ -88,6 +88,17 @@ namespace nORM.Query
                 return node;
             }
 
+            if (node.Expression != null)
+            {
+                var exprSql = GetSql(node.Expression);
+                var fn = _provider.TranslateFunction(node.Member.Name, node.Member.DeclaringType!, exprSql);
+                if (fn != null)
+                {
+                    _sql.Append(fn);
+                    return node;
+                }
+            }
+
             throw new NotSupportedException($"Member '{node.Member.Name}' is not supported in this context.");
         }
 
@@ -114,12 +125,20 @@ namespace nORM.Query
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
+            if (TryGetConstantValue(node, out var constVal))
+            {
+                var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                _params[paramName] = constVal ?? DBNull.Value;
+                _sql.Append(paramName);
+                return node;
+            }
+
             if (node.Method.DeclaringType == typeof(string))
             {
-                Visit(node.Object);
                 switch (node.Method.Name)
                 {
                     case "Contains":
+                        Visit(node.Object);
                         _sql.Append(" LIKE ");
                         if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
                         {
@@ -131,8 +150,9 @@ namespace nORM.Query
                         {
                             throw new NotSupportedException("Only constant values are supported in Contains().");
                         }
-                        break;
+                        return node;
                     case "StartsWith":
+                        Visit(node.Object);
                         _sql.Append(" LIKE ");
                         if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
                         {
@@ -144,8 +164,9 @@ namespace nORM.Query
                         {
                             throw new NotSupportedException("Only constant values are supported in StartsWith().");
                         }
-                        break;
+                        return node;
                     case "EndsWith":
+                        Visit(node.Object);
                         _sql.Append(" LIKE ");
                         if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
                         {
@@ -157,11 +178,22 @@ namespace nORM.Query
                         {
                             throw new NotSupportedException("Only constant values are supported in EndsWith().");
                         }
-                        break;
-                    default:
-                        throw new NotSupportedException($"String method '{node.Method.Name}' not supported.");
+                        return node;
                 }
-                return node;
+
+                var strArgs = new List<string>();
+                if (node.Object != null)
+                    strArgs.Add(GetSql(node.Object));
+                foreach (var a in node.Arguments)
+                    strArgs.Add(GetSql(a));
+                var fn = _provider.TranslateFunction(node.Method.Name, node.Method.DeclaringType!, strArgs.ToArray());
+                if (fn != null)
+                {
+                    _sql.Append(fn);
+                    return node;
+                }
+
+                throw new NotSupportedException($"String method '{node.Method.Name}' not supported.");
             }
             if (node.Method.Name == nameof(List<int>.Contains))
             {
@@ -235,7 +267,20 @@ namespace nORM.Query
                         throw new NotSupportedException($"Queryable method '{node.Method.Name}' not supported.");
                 }
             }
-            return base.VisitMethodCall(node);
+
+            var args = new List<string>();
+            if (node.Object != null)
+                args.Add(GetSql(node.Object));
+            foreach (var a in node.Arguments)
+                args.Add(GetSql(a));
+            var fnSql = _provider.TranslateFunction(node.Method.Name, node.Method.DeclaringType!, args.ToArray());
+            if (fnSql != null)
+            {
+                _sql.Append(fnSql);
+                return node;
+            }
+
+            throw new NotSupportedException($"Method '{node.Method.Name}' not supported.");
         }
 
         private void BuildExists(Expression source, LambdaExpression? predicate, bool negate)
@@ -259,6 +304,15 @@ namespace nORM.Query
         }
 
         public Dictionary<string, object> GetParameters() => _params;
+
+        private string GetSql(Expression expression)
+        {
+            var start = _sql.Length;
+            Visit(expression);
+            var segment = _sql.ToString(start, _sql.Length - start);
+            _sql.Remove(start, _sql.Length - start);
+            return segment;
+        }
 
         private static bool TryGetConstantValue(Expression e, out object? value)
         {

@@ -43,6 +43,49 @@ namespace nORM.Providers
                 throw new InvalidOperationException("MySQL package is required for MySQL support. Please install either MySqlConnector or MySql.Data NuGet package.");
             }
         }
+
+        public override string? TranslateFunction(string name, Type declaringType, params string[] args)
+        {
+            if (declaringType == typeof(string))
+            {
+                return name switch
+                {
+                    nameof(string.ToUpper) => $"UPPER({args[0]})",
+                    nameof(string.ToLower) => $"LOWER({args[0]})",
+                    nameof(string.Length) when args.Length == 1 => $"CHAR_LENGTH({args[0]})",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(DateTime))
+            {
+                return name switch
+                {
+                    nameof(DateTime.Year) => $"YEAR({args[0]})",
+                    nameof(DateTime.Month) => $"MONTH({args[0]})",
+                    nameof(DateTime.Day) => $"DAY({args[0]})",
+                    nameof(DateTime.Hour) => $"HOUR({args[0]})",
+                    nameof(DateTime.Minute) => $"MINUTE({args[0]})",
+                    nameof(DateTime.Second) => $"SECOND({args[0]})",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(Math))
+            {
+                return name switch
+                {
+                    nameof(Math.Abs) => $"ABS({args[0]})",
+                    nameof(Math.Ceiling) => $"CEILING({args[0]})",
+                    nameof(Math.Floor) => $"FLOOR({args[0]})",
+                    nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
+                    nameof(Math.Round) => $"ROUND({args[0]})",
+                    _ => null
+                };
+            }
+
+            return null;
+        }
         
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
