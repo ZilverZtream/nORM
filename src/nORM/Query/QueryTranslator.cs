@@ -111,7 +111,7 @@ namespace nORM.Query
                 .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
             if (iface != null) return iface.GetGenericArguments()[0];
 
-            throw new ArgumentException($"Cannot determine element type from expression of type {type}");
+            throw new NormQueryTranslationException($"Cannot determine element type from expression of type {type}");
         }
 
         public QueryPlan Translate(Expression e)
@@ -331,7 +331,7 @@ namespace nORM.Query
                         "Union" => "UNION",
                         "Intersect" => "INTERSECT",
                         "Except" => "EXCEPT",
-                        _ => throw new NotSupportedException()
+                        _ => throw new NormUnsupportedFeatureException("Set operation not supported")
                     };
                     _sql.Clear();
                     _sql.Append($"({leftSql}) {setOp} ({rightSql})");
@@ -371,7 +371,7 @@ namespace nORM.Query
                             _skip = (_skip ?? 0) + index;
                     }
                     else
-                        throw new NotSupportedException("ElementAt requires constant integer index or parameter.");
+                        throw new NormUnsupportedFeatureException("ElementAt requires constant integer index or parameter.");
 
                     _take = 1;
                     _singleResult = _methodName == "ElementAt";
@@ -542,7 +542,7 @@ namespace nORM.Query
             // node.Arguments[4] = result selector
 
             if (node.Arguments.Count < 5)
-                throw new ArgumentException("Join operation requires 5 arguments");
+                throw new NormQueryTranslationException("Join operation requires 5 arguments");
 
             var outerQuery = node.Arguments[0];
             var innerQuery = node.Arguments[1];
@@ -551,7 +551,7 @@ namespace nORM.Query
             var resultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
 
             if (outerKeySelector == null || innerKeySelector == null || resultSelector == null)
-                throw new ArgumentException("Join selectors must be lambda expressions");
+                throw new NormQueryTranslationException("Join selectors must be lambda expressions");
 
             // Visit the outer query first to establish the base table
             Visit(outerQuery);
@@ -686,11 +686,11 @@ namespace nORM.Query
             // 2. SelectMany(collectionSelector, resultSelector) - joins and projects
 
             if (node.Arguments.Count < 2)
-                throw new ArgumentException("SelectMany requires at least 2 arguments");
+                throw new NormQueryTranslationException("SelectMany requires at least 2 arguments");
 
             var sourceQuery = node.Arguments[0];
             var collectionSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
-                                   ?? throw new ArgumentException("Collection selector must be a lambda expression");
+                                   ?? throw new NormQueryTranslationException("Collection selector must be a lambda expression");
 
             // Visit the source query first to establish base mapping
             Visit(sourceQuery);
@@ -999,7 +999,7 @@ namespace nORM.Query
                 ExpressionType.LessThanOrEqual => " <= ",
                 ExpressionType.AndAlso => " AND ",
                 ExpressionType.OrElse => " OR ",
-                _ => throw new NotSupportedException($"Op '{node.NodeType}' not supported.")
+                _ => throw new NormUnsupportedFeatureException($"Op '{node.NodeType}' not supported.")
             });
             Visit(node.Right);
             _sql.Append(")");
@@ -1022,7 +1022,7 @@ namespace nORM.Query
                 return node;
             }
 
-            throw new NotSupportedException($"Member '{node.Member.Name}' is not supported in this context.");
+            throw new NormUnsupportedFeatureException($"Member '{node.Member.Name}' is not supported in this context.");
         }
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
@@ -1084,7 +1084,7 @@ namespace nORM.Query
             var functionConstant = node.Arguments[2] as ConstantExpression;
             
             if (selectorLambda == null || functionConstant?.Value is not string functionName)
-                throw new ArgumentException("Invalid aggregate expression structure");
+                throw new NormQueryTranslationException("Invalid aggregate expression structure");
 
             Visit(sourceQuery);
             
@@ -1116,7 +1116,7 @@ namespace nORM.Query
             var keySelectorLambda = StripQuotes(node.Arguments[1]) as LambdaExpression;
             
             if (keySelectorLambda == null)
-                throw new ArgumentException("GroupBy key selector must be a lambda expression");
+                throw new NormQueryTranslationException("GroupBy key selector must be a lambda expression");
 
             Visit(sourceQuery);
             
@@ -1315,7 +1315,7 @@ namespace nORM.Query
             var predicate = node.Arguments[1] as LambdaExpression;
             
             if (predicate == null)
-                throw new ArgumentException("All operation requires a predicate");
+                throw new NormQueryTranslationException("All operation requires a predicate");
 
             Visit(sourceQuery);
             
@@ -1348,7 +1348,7 @@ namespace nORM.Query
             var resultSelector = node.Arguments[1] as LambdaExpression;
             
             if (resultSelector == null)
-                throw new ArgumentException("WithRowNumber requires a result selector");
+                throw new NormQueryTranslationException("WithRowNumber requires a result selector");
 
             Visit(sourceQuery);
             
@@ -1383,7 +1383,7 @@ namespace nORM.Query
             var resultSelector = node.Arguments[1] as LambdaExpression;
 
             if (resultSelector == null)
-                throw new ArgumentException("WithRank requires a result selector");
+                throw new NormQueryTranslationException("WithRank requires a result selector");
 
             Visit(sourceQuery);
 
@@ -1414,7 +1414,7 @@ namespace nORM.Query
             var resultSelector = node.Arguments[1] as LambdaExpression;
 
             if (resultSelector == null)
-                throw new ArgumentException("WithDenseRank requires a result selector");
+                throw new NormQueryTranslationException("WithDenseRank requires a result selector");
 
             Visit(sourceQuery);
 
