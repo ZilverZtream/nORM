@@ -333,6 +333,14 @@ namespace nORM.Query
                 return node;
             }
 
+            var custom = node.Method.GetCustomAttribute<SqlFunctionAttribute>();
+            if (custom != null)
+            {
+                var formatted = string.Format(custom.Format, args.ToArray());
+                _sql.Append(formatted);
+                return node;
+            }
+
             throw new NotSupportedException($"Method '{node.Method.Name}' not supported.");
         }
 
