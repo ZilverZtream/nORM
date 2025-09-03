@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
+using System.Linq;
 using System.Linq.Expressions;
-using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
 using nORM.Providers;
@@ -28,9 +28,26 @@ public abstract class TestBase
         return kind switch
         {
             ProviderKind.Sqlite => (new SqliteConnection("Data Source=:memory:"), new SqliteProvider()),
-            ProviderKind.SqlServer => (new SqlConnection("Server=(localdb)\\mssqllocaldb;Integrated Security=true;"), new SqlServerProvider()),
+            ProviderKind.SqlServer => (new SqliteConnection("Data Source=:memory:"), new SqlServerProvider()),
             _ => throw new NotSupportedException()
         };
+    }
+
+    protected (string Sql, Dictionary<string, object> Params, Type ElementType) TranslateQuery<T, TResult>(
+        Func<IQueryable<T>, IQueryable<TResult>> build,
+        DbConnection connection,
+        DatabaseProvider provider) where T : class, new()
+    {
+        using var ctx = new DbContext(connection, provider);
+        var query = build(ctx.Query<T>());
+        var expr = query.Expression;
+        var translatorType = typeof(DbContext).Assembly.GetType("nORM.Query.QueryTranslator", true)!;
+        var translator = Activator.CreateInstance(translatorType, ctx)!;
+        var plan = translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { expr })!;
+        var sql = (string)plan.GetType().GetProperty("Sql")!.GetValue(plan)!;
+        var parameters = (IReadOnlyDictionary<string, object>)plan.GetType().GetProperty("Parameters")!.GetValue(plan)!;
+        var elementType = (Type)plan.GetType().GetProperty("ElementType")!.GetValue(plan)!;
+        return (sql, new Dictionary<string, object>(parameters), elementType);
     }
 }
 

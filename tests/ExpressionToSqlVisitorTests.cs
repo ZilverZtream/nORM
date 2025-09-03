@@ -72,5 +72,20 @@ namespace nORM.Tests
             Assert.Single(parameters);
             Assert.Equal(expectedParam, parameters["@p0"]);
         }
+
+        [Theory]
+        [MemberData(nameof(SimpleEqualityProviders))]
+        public void Where_with_string_method_translation(ProviderKind providerKind)
+        {
+            var setup = CreateProvider(providerKind);
+            using var connection = setup.Connection;
+            var provider = setup.Provider;
+
+            var (sql, parameters) = Translate<Product>(p => p.Name!.ToUpper() == "ABC", connection, provider);
+            var expected = $"(UPPER(T0.{provider.Escape("Name")}) = @p0)";
+            Assert.Equal(expected, sql);
+            Assert.Single(parameters);
+            Assert.Equal("ABC", parameters["@p0"]);
+        }
     }
 }
