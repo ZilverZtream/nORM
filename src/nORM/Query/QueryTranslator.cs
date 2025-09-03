@@ -368,12 +368,16 @@ namespace nORM.Query
                         il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
                         il.Emit(OpCodes.Brtrue_S, endOfBlock);
                         il.Emit(OpCodes.Ldloc, loc);
+                        if (col.IsShadow) il.Emit(OpCodes.Ldstr, col.PropName);
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldc_I4, i);
                         var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
                         il.Emit(OpCodes.Callvirt, readerMethod);
                         if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
-                        il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                        if (col.IsShadow)
+                            il.Emit(OpCodes.Call, Methods.SetShadowValue);
+                        else
+                            il.Emit(OpCodes.Callvirt, col.SetterMethod);
                         il.MarkLabel(endOfBlock);
                     }
                     il.Emit(OpCodes.Ldloc, loc);
@@ -394,12 +398,16 @@ namespace nORM.Query
                         il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
                         il.Emit(OpCodes.Brtrue_S, endOfBlock);
                         il.Emit(OpCodes.Ldloc, loc);
+                        if (col.IsShadow) il.Emit(OpCodes.Ldstr, col.PropName);
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldc_I4, i);
                         var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
                         il.Emit(OpCodes.Callvirt, readerMethod);
                         if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
-                        il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                        if (col.IsShadow)
+                            il.Emit(OpCodes.Call, Methods.SetShadowValue);
+                        else
+                            il.Emit(OpCodes.Callvirt, col.SetterMethod);
                         il.MarkLabel(endOfBlock);
                     }
                     il.Emit(OpCodes.Ldloc, loc);
@@ -463,12 +471,16 @@ namespace nORM.Query
                     il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
                     il.Emit(OpCodes.Brtrue_S, endOfBlock);
                     il.Emit(OpCodes.Ldloc, localVar);
+                    if (col.IsShadow) il.Emit(OpCodes.Ldstr, col.PropName);
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
                     var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
                     il.Emit(OpCodes.Callvirt, readerMethod);
                     if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
-                    il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                    if (col.IsShadow)
+                        il.Emit(OpCodes.Call, Methods.SetShadowValue);
+                    else
+                        il.Emit(OpCodes.Callvirt, col.SetterMethod);
                     il.MarkLabel(endOfBlock);
                 }
             }
@@ -492,12 +504,16 @@ namespace nORM.Query
 
                     // Set property value
                     il.Emit(OpCodes.Ldloc, localVar);
+                    if (col.IsShadow) il.Emit(OpCodes.Ldstr, col.PropName);
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
                     var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
                     il.Emit(OpCodes.Callvirt, readerMethod);
                     if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
-                    il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                    if (col.IsShadow)
+                        il.Emit(OpCodes.Call, Methods.SetShadowValue);
+                    else
+                        il.Emit(OpCodes.Callvirt, col.SetterMethod);
                     il.MarkLabel(endOfBlock);
                 }
             }

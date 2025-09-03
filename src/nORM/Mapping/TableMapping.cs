@@ -68,6 +68,14 @@ namespace nORM.Mapping
                 }
             }
 
+            if (fluentConfig?.ShadowProperties.Count > 0)
+            {
+                foreach (var sp in fluentConfig.ShadowProperties)
+                {
+                    cols.Add(new Column(sp.Key, sp.Value.ClrType, t, p, sp.Value.ColumnName));
+                }
+            }
+
             var discriminatorAttr = t.GetCustomAttribute<DiscriminatorColumnAttribute>();
             if (discriminatorAttr != null)
             {
