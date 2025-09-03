@@ -177,18 +177,19 @@ namespace nORM.Query
 
         public Func<DbDataReader, object> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
         {
-            // Create cache key
+            // Create cache key for runtime materializers
             var projectionKey = projection?.ToString();
             var cacheKey = (mapping.Type, targetType, projectionKey);
 
-            return _materializerCache.GetOrAdd(cacheKey, _ =>
+            // Prefer a precompiled materializer when available
+            if (projection == null && CompiledMaterializerStore.TryGet(targetType, out var precompiled))
             {
-                if (CompiledMaterializerStore.TryGet(targetType, out var precompiled))
-                {
-                    return precompiled;
-                }
-                return CreateMaterializerInternal(mapping, targetType, projection);
-            });
+                _materializerCache.GetOrAdd(cacheKey, _ => precompiled);
+                return precompiled;
+            }
+
+            return _materializerCache.GetOrAdd(cacheKey, _ =>
+                CreateMaterializerInternal(mapping, targetType, projection));
         }
         
         private Func<DbDataReader, object> CreateMaterializerInternal(TableMapping mapping, Type targetType, LambdaExpression? projection = null, bool ignoreTph = false)

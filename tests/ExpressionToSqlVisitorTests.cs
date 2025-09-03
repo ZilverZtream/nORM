@@ -16,7 +16,7 @@ namespace nORM.Tests
             public DateTime CreatedAt { get; set; }
         }
 
-        private class NumericTypesEntity
+        public class NumericTypesEntity
         {
             public int IntValue { get; set; }
             public long LongValue { get; set; }
