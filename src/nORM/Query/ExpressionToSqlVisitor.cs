@@ -98,6 +98,19 @@ namespace nORM.Query
             return node;
         }
 
+        protected override Expression VisitUnary(UnaryExpression node)
+        {
+            if (node.NodeType == ExpressionType.Not)
+            {
+                _sql.Append("(NOT(");
+                Visit(node.Operand);
+                _sql.Append("))");
+                return node;
+            }
+
+            return base.VisitUnary(node);
+        }
+
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             if (node.Method.DeclaringType == typeof(string))
