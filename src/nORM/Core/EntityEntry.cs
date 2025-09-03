@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+using System;
+using System.Collections;
 using System.ComponentModel;
 using System.Linq;
 using nORM.Mapping;
@@ -11,7 +12,10 @@ namespace nORM.Core
     public sealed class EntityEntry
     {
         private readonly TableMapping _mapping;
-        private readonly Dictionary<string, object?> _originalValues = new();
+        private readonly Column[] _nonKeyColumns;
+        private readonly int[] _originalHashes;
+        private readonly BitArray _changedProperties;
+        private readonly Func<object, int>[] _getHashCodes;
         private bool _hasNotifiedChange;
 
         public object Entity { get; }
@@ -23,6 +27,15 @@ namespace nORM.Core
             Entity = entity;
             State = state;
             _mapping = mapping;
+            _nonKeyColumns = mapping.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
+            _getHashCodes = new Func<object, int>[_nonKeyColumns.Length];
+            for (int i = 0; i < _nonKeyColumns.Length; i++)
+            {
+                var getter = _nonKeyColumns[i].Getter;
+                _getHashCodes[i] = e => getter(e)?.GetHashCode() ?? 0;
+            }
+            _originalHashes = new int[_nonKeyColumns.Length];
+            _changedProperties = new BitArray(_nonKeyColumns.Length);
             CaptureOriginalValues();
 
             if (entity is INotifyPropertyChanged notify)
@@ -38,10 +51,10 @@ namespace nORM.Core
 
         private void CaptureOriginalValues()
         {
-            _originalValues.Clear();
-            foreach (var col in _mapping.Columns)
+            for (int i = 0; i < _nonKeyColumns.Length; i++)
             {
-                _originalValues[col.PropName] = col.Getter(Entity);
+                _originalHashes[i] = _getHashCodes[i](Entity);
+                _changedProperties[i] = false;
             }
         }
 
@@ -50,18 +63,18 @@ namespace nORM.Core
             if (State is EntityState.Added or EntityState.Deleted) return;
             if (_hasNotifiedChange) return;
 
-            foreach (var col in _mapping.Columns.Where(c => !c.IsKey && !c.IsTimestamp))
+            var hasChanges = false;
+            for (int i = 0; i < _nonKeyColumns.Length; i++)
             {
-                var current = col.Getter(Entity);
-                var original = _originalValues.TryGetValue(col.PropName, out var o) ? o : null;
-                if (!Equals(current, original))
-                {
-                    State = EntityState.Modified;
-                    return;
-                }
+                var currentHash = _getHashCodes[i](Entity);
+                var changed = currentHash != _originalHashes[i];
+                _changedProperties[i] = changed;
+                hasChanges |= changed;
             }
 
-            if (State == EntityState.Modified)
+            if (hasChanges)
+                State = EntityState.Modified;
+            else if (State == EntityState.Modified)
                 State = EntityState.Unchanged;
         }
 
