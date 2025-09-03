@@ -32,6 +32,49 @@ namespace nORM.Providers
         {
             return new SqliteParameter(name, value ?? DBNull.Value);
         }
+
+        public override string? TranslateFunction(string name, Type declaringType, params string[] args)
+        {
+            if (declaringType == typeof(string))
+            {
+                return name switch
+                {
+                    nameof(string.ToUpper) => $"UPPER({args[0]})",
+                    nameof(string.ToLower) => $"LOWER({args[0]})",
+                    nameof(string.Length) when args.Length == 1 => $"LENGTH({args[0]})",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(DateTime))
+            {
+                return name switch
+                {
+                    nameof(DateTime.Year) => $"CAST(strftime('%Y', {args[0]}) AS INTEGER)",
+                    nameof(DateTime.Month) => $"CAST(strftime('%m', {args[0]}) AS INTEGER)",
+                    nameof(DateTime.Day) => $"CAST(strftime('%d', {args[0]}) AS INTEGER)",
+                    nameof(DateTime.Hour) => $"CAST(strftime('%H', {args[0]}) AS INTEGER)",
+                    nameof(DateTime.Minute) => $"CAST(strftime('%M', {args[0]}) AS INTEGER)",
+                    nameof(DateTime.Second) => $"CAST(strftime('%S', {args[0]}) AS INTEGER)",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(Math))
+            {
+                return name switch
+                {
+                    nameof(Math.Abs) => $"ABS({args[0]})",
+                    nameof(Math.Ceiling) => $"CEIL({args[0]})",
+                    nameof(Math.Floor) => $"FLOOR({args[0]})",
+                    nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
+                    nameof(Math.Round) => $"ROUND({args[0]})",
+                    _ => null
+                };
+            }
+
+            return null;
+        }
         
         // High-performance SQLite bulk insert using optimized single-row prepared statements
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
