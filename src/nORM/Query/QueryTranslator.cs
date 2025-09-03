@@ -188,7 +188,9 @@ namespace nORM.Query
 
             var elementType = _groupJoinInfo?.ResultType ?? materializerType;
 
-            return new QueryPlan(_sql.ToString(), _params, _compiledParams, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray());
+            var plan = new QueryPlan(_sql.ToString(), _params, _compiledParams, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray());
+            QueryPlanValidator.Validate(plan, _provider);
+            return plan;
         }
 
         private TableMapping TrackMapping(Type type)

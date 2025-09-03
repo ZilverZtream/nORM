@@ -16,6 +16,8 @@ namespace nORM.Providers
 {
     public sealed class PostgresProvider : DatabaseProvider
     {
+        public override int MaxSqlLength => int.MaxValue;
+        public override int MaxParameters => 32_767;
         public override string Escape(string id) => $"\"{id}\"";
         
         public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam)
