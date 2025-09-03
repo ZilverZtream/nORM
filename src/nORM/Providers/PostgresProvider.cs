@@ -21,15 +21,18 @@ namespace nORM.Providers
         public override int MaxParameters => 32_767;
         public override string Escape(string id) => $"\"{id}\"";
         
-        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam)
+        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
         {
-            if (limitParam != null)
-                sb.Append(" LIMIT ").Append(limitParam);
+            EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
+            EnsureValidParameterName(offsetParameterName, nameof(offsetParameterName));
+
+            if (limitParameterName != null)
+                sb.Append(" LIMIT ").Append(limitParameterName);
             else if (limit.HasValue)
                 sb.Append($" LIMIT {limit}");
 
-            if (offsetParam != null)
-                sb.Append(" OFFSET ").Append(offsetParam);
+            if (offsetParameterName != null)
+                sb.Append(" OFFSET ").Append(offsetParameterName);
             else if (offset.HasValue)
                 sb.Append($" OFFSET {offset}");
         }

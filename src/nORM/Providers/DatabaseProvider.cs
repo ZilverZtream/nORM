@@ -23,7 +23,7 @@ namespace nORM.Providers
         public virtual int MaxSqlLength => int.MaxValue;
         public virtual int MaxParameters => int.MaxValue;
         public abstract string Escape(string id);
-        public abstract void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam);
+        public abstract void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName);
         public abstract string GetIdentityRetrievalString(TableMapping m);
         public abstract DbParameter CreateParameter(string name, object? value);
         public abstract string? TranslateFunction(string name, Type declaringType, params string[] args);
@@ -43,6 +43,12 @@ namespace nORM.Providers
         {
             if (connection.State != ConnectionState.Open)
                 throw new InvalidOperationException($"Connection must be open for {GetType().Name}");
+        }
+
+        protected void EnsureValidParameterName(string? parameterName, string argumentName)
+        {
+            if (parameterName != null && !parameterName.StartsWith(ParamPrefix, StringComparison.Ordinal))
+                throw new ArgumentException($"Parameter name must start with '{ParamPrefix}'", argumentName);
         }
 
         public virtual Task<bool> IsAvailableAsync()
