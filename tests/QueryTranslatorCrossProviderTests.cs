@@ -142,6 +142,17 @@ public class QueryTranslatorCrossProviderTests : TestBase
 
     [Theory]
     [MemberData(nameof(Providers))]
+    public void ApplyPaging_throws_on_invalid_parameter_name(ProviderKind providerKind)
+    {
+        var setup = CreateProvider(providerKind);
+        using var connection = setup.Connection;
+        var provider = setup.Provider;
+        var sb = new StringBuilder(BaseSelect(provider));
+        Assert.Throws<ArgumentException>(() => provider.ApplyPaging(sb, 5, null, "p0", null));
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
     public void SelectMany_creates_cross_join(ProviderKind providerKind)
     {
         var setup = CreateProvider(providerKind);

@@ -24,15 +24,18 @@ namespace nORM.Providers
         public override int MaxParameters => 2_100;
         public override string Escape(string id) => $"[{id}]";
         
-        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam)
+        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
         {
-            if (offset.HasValue || offsetParam != null || limit.HasValue || limitParam != null)
+            EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
+            EnsureValidParameterName(offsetParameterName, nameof(offsetParameterName));
+
+            if (offset.HasValue || offsetParameterName != null || limit.HasValue || limitParameterName != null)
             {
                 if (!sb.ToString().Contains("ORDER BY")) sb.Append(" ORDER BY (SELECT NULL)");
                 sb.Append(" OFFSET ");
-                sb.Append(offsetParam ?? (offset ?? 0).ToString());
+                sb.Append(offsetParameterName ?? (offset ?? 0).ToString());
                 sb.Append(" ROWS FETCH NEXT ");
-                sb.Append(limitParam ?? (limit ?? int.MaxValue).ToString());
+                sb.Append(limitParameterName ?? (limit ?? int.MaxValue).ToString());
                 sb.Append(" ROWS ONLY");
             }
         }
