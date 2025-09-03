@@ -156,8 +156,17 @@ namespace nORM.Providers
                 throw new Exception($"Cannot delete from '{m.EscTable}': no key columns defined.");
 
             var totalDeleted = 0;
-            var batchSize = ctx.Options.BulkBatchSize;
             var keyColumns = m.KeyColumns.ToList();
+
+            // Determine maximum entities per batch based on provider parameter limit
+            var batchSize = ctx.Options.BulkBatchSize;
+            if (MaxParameters != int.MaxValue)
+            {
+                var paramsPerEntity = Math.Max(1, keyColumns.Count);
+                var maxBatchByParams = MaxParameters / paramsPerEntity;
+                if (maxBatchByParams <= 0) maxBatchByParams = 1;
+                batchSize = Math.Min(batchSize, maxBatchByParams);
+            }
 
             await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
             try
