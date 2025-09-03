@@ -5,6 +5,8 @@ using nORM.Core;
 using nORM.Providers;
 using nORM.SourceGeneration;
 using Xunit;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace nORM.Tests
 {
@@ -20,7 +22,7 @@ namespace nORM.Tests
             var getMapping = typeof(DbContext).GetMethod("GetMapping", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
             var mapping = getMapping.Invoke(ctx, new object[] { typeof(Materialized) });
             var create = translatorType.GetMethod("CreateMaterializer")!;
-            var materializer = (Func<DbDataReader, object>)create.Invoke(translator, new object?[] { mapping!, typeof(Materialized), null })!;
+            var materializer = (Func<DbDataReader, CancellationToken, Task<object>>)create.Invoke(translator, new object?[] { mapping!, typeof(Materialized), null })!;
             Assert.True(CompiledMaterializerStore.TryGet(typeof(Materialized), out var precompiled));
             Assert.Same(precompiled, materializer);
         }

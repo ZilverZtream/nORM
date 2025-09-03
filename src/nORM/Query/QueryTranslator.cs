@@ -7,6 +7,8 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
@@ -46,7 +48,7 @@ namespace nORM.Query
         private readonly HashSet<string> _tables;
         
         // Cache materializers to reduce memory allocations
-        private static readonly ConcurrentLruCache<(Type MappingType, Type TargetType, string? ProjectionKey), Func<DbDataReader, object>> _materializerCache = new(maxSize: 1000);
+        private static readonly ConcurrentLruCache<(Type MappingType, Type TargetType, string? ProjectionKey), Func<DbDataReader, CancellationToken, Task<object>>> _materializerCache = new(maxSize: 1000);
 
         // Initialize _groupJoinInfo in constructor to suppress warning
         // This field is used in complex join scenarios
@@ -193,7 +195,7 @@ namespace nORM.Query
         }
 
 
-        public Func<DbDataReader, object> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
+        public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
         {
             // Create cache key for runtime materializers
             var projectionKey = projection?.ToString();
@@ -207,7 +209,10 @@ namespace nORM.Query
             }
 
             return _materializerCache.GetOrAdd(cacheKey, _ =>
-                CreateMaterializerInternal(mapping, targetType, projection));
+            {
+                var sync = CreateMaterializerInternal(mapping, targetType, projection);
+                return (reader, ct) => Task.FromResult(sync(reader));
+            });
         }
         
         private Func<DbDataReader, object> CreateMaterializerInternal(TableMapping mapping, Type targetType, LambdaExpression? projection = null, bool ignoreTph = false)
@@ -831,32 +836,32 @@ namespace nORM.Query
                 var innerType = innerKeySelector.Parameters[0].Type;
                 var resultType = resultSelector.Body.Type;
 
-                var innerAlias = "T" + (++_joinCounter);
+                var innerAliasG = "T" + (++_joinCounter);
 
                 if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                     _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
-                var outerKeyVisitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams);
-                var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
+                var outerKeyVisitorG = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams);
+                var outerKeySqlG = outerKeyVisitorG.Translate(outerKeySelector.Body);
 
                 if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
-                    _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
-                var innerKeyVisitor = new ExpressionToSqlVisitor(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams);
-                var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
+                    _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAliasG);
+                var innerKeyVisitorG = new ExpressionToSqlVisitor(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAliasG, _correlatedParams);
+                var innerKeySqlG = innerKeyVisitorG.Translate(innerKeySelector.Body);
 
-                foreach (var kvp in outerKeyVisitor.GetParameters())
+                foreach (var kvp in outerKeyVisitorG.GetParameters())
                     _params[kvp.Key] = kvp.Value;
-                foreach (var kvp in innerKeyVisitor.GetParameters())
+                foreach (var kvp in innerKeyVisitorG.GetParameters())
                     _params[kvp.Key] = kvp.Value;
 
-                var joinSql = new StringBuilder(256);
+                var joinSqlG = new StringBuilder(256);
                 var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                var innerColumns = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                joinSql.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
-                joinSql.Append($"FROM {_mapping.EscTable} {outerAlias} ");
-                joinSql.Append($"LEFT JOIN {innerMapping.EscTable} {innerAlias} ON {outerKeySql} = {innerKeySql}");
+                var innerColumns = innerMapping.Columns.Select(c => $"{innerAliasG}.{c.EscCol}");
+                joinSqlG.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
+                joinSqlG.Append($"FROM {_mapping.EscTable} {outerAlias} ");
+                joinSqlG.Append($"LEFT JOIN {innerMapping.EscTable} {innerAliasG} ON {outerKeySqlG} = {innerKeySqlG}");
 
                 _sql.Clear();
-                _sql.Append(joinSql.ToString());
+                _sql.Append(joinSqlG.ToString());
 
                 var tupleCtor = typeof(ValueTuple<object, object>).GetConstructor(new[] { typeof(object), typeof(object) })!;
                 var tupleExpr = Expression.New(tupleCtor,

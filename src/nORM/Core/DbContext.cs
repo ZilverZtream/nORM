@@ -513,7 +513,7 @@ namespace nORM.Core
                 var materializer = new Query.QueryTranslator(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
-                while (await reader.ReadAsync(token)) list.Add((T)materializer(reader));
+                while (await reader.ReadAsync(token)) list.Add((T)await materializer(reader, token));
 
                 ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
                 return list;
@@ -542,7 +542,7 @@ namespace nORM.Core
                 var materializer = new Query.QueryTranslator(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
-                while (await reader.ReadAsync(token)) list.Add((T)materializer(reader));
+                while (await reader.ReadAsync(token)) list.Add((T)await materializer(reader, token));
 
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
                 return list;
