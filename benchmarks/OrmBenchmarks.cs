@@ -408,7 +408,7 @@ namespace nORM.Benchmarks
         {
             var result = await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Join(
-                    _nOrmContext.Query<BenchmarkOrder>(),
+                    _nOrmContext!.Query<BenchmarkOrder>(),
                     u => u.Id,
                     o => o.UserId,
                     (u, o) => new { u.Name, o.Amount, o.ProductName }

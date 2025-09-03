@@ -24,7 +24,7 @@ namespace nORM.Core
                 return normProvider.AsAsyncEnumerable<T>(source.Expression, ct);
             }
 
-            throw new InvalidOperationException(
+            throw new NormUsageException(
                 "AsAsyncEnumerable extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>().");
         }
@@ -41,7 +41,7 @@ namespace nORM.Core
                 return normProvider.ExecuteAsync<List<T>>(source.Expression, ct);
             }
             
-            throw new InvalidOperationException(
+            throw new NormUsageException(
                 "ToListAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync().");
@@ -63,7 +63,7 @@ namespace nORM.Core
                 return normProvider.ExecuteAsync<int>(countExpression, ct);
             }
             
-            throw new InvalidOperationException(
+            throw new NormUsageException(
                 "CountAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync().");
@@ -81,7 +81,7 @@ namespace nORM.Core
                 return list.ToArray();
             }
             
-            throw new InvalidOperationException(
+            throw new NormUsageException(
                 "ToArrayAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToArrayAsync().");
@@ -103,7 +103,7 @@ namespace nORM.Core
                 return await normProvider.ExecuteAsync<bool>(anyExpression, ct);
             }
             
-            throw new InvalidOperationException(
+            throw new NormUsageException(
                 "AnyAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync().");
@@ -125,7 +125,7 @@ namespace nORM.Core
                 return normProvider.ExecuteAsync<T>(firstExpression, ct);
             }
             
-            throw new InvalidOperationException(
+            throw new NormUsageException(
                 "FirstAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstAsync().");
@@ -147,7 +147,7 @@ namespace nORM.Core
                 return normProvider.ExecuteAsync<T?>(firstOrDefaultExpression, ct);
             }
 
-            throw new InvalidOperationException(
+            throw new NormUsageException(
                 "FirstOrDefaultAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync().");
@@ -161,7 +161,7 @@ namespace nORM.Core
                 return normProvider.ExecuteDeleteAsync(source.Expression, ct);
             }
 
-            throw new InvalidOperationException(
+            throw new NormUsageException(
                 "ExecuteDeleteAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>().");
         }
@@ -174,7 +174,7 @@ namespace nORM.Core
                 return normProvider.ExecuteUpdateAsync(source.Expression, set, ct);
             }
 
-            throw new InvalidOperationException(
+            throw new NormUsageException(
                 "ExecuteUpdateAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>().");
         }
