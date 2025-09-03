@@ -596,7 +596,7 @@ namespace nORM.Core
                     paramDict[pName] = parameters[i];
                 }
 
-                var materializer = new Query.QueryTranslator(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
+                var materializer = Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
                 while (await reader.ReadAsync(token)) list.Add((T)await materializer(reader, token));
@@ -626,7 +626,7 @@ namespace nORM.Core
                     }
                 }
 
-                var materializer = new Query.QueryTranslator(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
+                var materializer = Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
                 while (await reader.ReadAsync(token)) list.Add((T)await materializer(reader, token));

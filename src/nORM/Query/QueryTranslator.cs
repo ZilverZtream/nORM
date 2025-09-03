@@ -21,29 +21,29 @@ namespace nORM.Query
 {
     internal sealed partial class QueryTranslator : ExpressionVisitor
     {
-        private readonly DbContext _ctx;
-        private readonly SqlClauseBuilder _clauses = new();
-        private readonly Dictionary<string, object> _params = new();
+        private DbContext _ctx = null!;
+        private SqlClauseBuilder _clauses = new();
+        private Dictionary<string, object> _params = new();
         private readonly MaterializerFactory _materializerFactory = new();
         private TableMapping _mapping = null!;
         private Type? _rootType;
-        private int _paramIndex = 0;
-        private readonly List<string> _compiledParams;
-        private readonly Dictionary<ParameterExpression, string> _paramMap;
-        private readonly List<IncludePlan> _includes = new();
+        private int _paramIndex;
+        private List<string> _compiledParams = new();
+        private Dictionary<ParameterExpression, string> _paramMap = new();
+        private List<IncludePlan> _includes = new();
         private LambdaExpression? _projection;
-        private bool _isAggregate = false;
+        private bool _isAggregate;
         private string _methodName = "";
-        private readonly Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams;
+        private Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams = new();
 #pragma warning disable CS0649 // Field is never assigned to, and will always have its default value - used in complex join scenarios
         private GroupJoinInfo? _groupJoinInfo;
 #pragma warning restore CS0649
-        private int _joinCounter = 0;
-        private DatabaseProvider _provider;
-        private bool _singleResult = false;
-        private bool _noTracking = false;
-        private bool _splitQuery = false;
-        private readonly HashSet<string> _tables;
+        private int _joinCounter;
+        private DatabaseProvider _provider = null!;
+        private bool _singleResult;
+        private bool _noTracking;
+        private bool _splitQuery;
+        private HashSet<string> _tables = new();
 
         private StringBuilder _sql => _clauses.Sql;
         private StringBuilder _where => _clauses.Where;
@@ -59,16 +59,16 @@ namespace nORM.Query
         // Initialize _groupJoinInfo in constructor to suppress warning
         // This field is used in complex join scenarios
 
+        private static readonly ThreadLocal<QueryTranslator> _threadLocalTranslator =
+            new(() => new QueryTranslator(), trackAllValues: false);
+
+        private QueryTranslator()
+        {
+        }
+
         public QueryTranslator(DbContext ctx)
         {
-            _ctx = ctx;
-            _provider = ctx.Provider;
-            _mapping = null!;
-            _rootType = null;
-            _correlatedParams = new();
-            _compiledParams = new();
-            _paramMap = new();
-            _tables = new HashSet<string>();
+            Reset(ctx);
         }
 
         internal QueryTranslator(
@@ -94,6 +94,37 @@ namespace nORM.Query
             _paramMap = paramMap;
             _tables.Add(mapping.TableName);
             _joinCounter = joinStart;
+        }
+
+        internal static QueryTranslator Rent(DbContext ctx)
+        {
+            var t = _threadLocalTranslator.Value!;
+            t.Reset(ctx);
+            return t;
+        }
+
+        private void Reset(DbContext ctx)
+        {
+            _ctx = ctx;
+            _provider = ctx.Provider;
+            _mapping = null!;
+            _rootType = null;
+            _paramIndex = 0;
+            _compiledParams = new List<string>();
+            _paramMap = new Dictionary<ParameterExpression, string>();
+            _includes = new List<IncludePlan>();
+            _projection = null;
+            _isAggregate = false;
+            _methodName = string.Empty;
+            _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+            _groupJoinInfo = null;
+            _joinCounter = 0;
+            _singleResult = false;
+            _noTracking = false;
+            _splitQuery = false;
+            _tables = new HashSet<string>();
+            _params = new Dictionary<string, object>();
+            _clauses = new SqlClauseBuilder();
         }
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)

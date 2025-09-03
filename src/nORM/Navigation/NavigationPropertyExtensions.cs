@@ -344,7 +344,7 @@ namespace nORM.Navigation
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {foreignKey.EscCol} = {paramName}";
             cmd.AddParam(paramName, keyValue);
 
-            var materializer = new Query.QueryTranslator(context).CreateMaterializer(mapping, entityType);
+            var materializer = Query.QueryTranslator.Rent(context).CreateMaterializer(mapping, entityType);
             var results = new List<object>();
 
             using var reader = await cmd.ExecuteReaderWithInterceptionAsync(context, CommandBehavior.Default, ct);
@@ -375,7 +375,7 @@ namespace nORM.Navigation
             context.Provider.ApplyPaging(sql, 1, null, null, null);
             cmd.CommandText = sql.ToString();
 
-            var materializer = new Query.QueryTranslator(context).CreateMaterializer(mapping, entityType);
+            var materializer = Query.QueryTranslator.Rent(context).CreateMaterializer(mapping, entityType);
 
             using var reader = await cmd.ExecuteReaderWithInterceptionAsync(context, CommandBehavior.Default, ct);
             if (await reader.ReadAsync(ct))
