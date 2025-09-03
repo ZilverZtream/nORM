@@ -15,6 +15,7 @@ nORM (The Norm) is a modern, high-performance Object-Relational Mapping (ORM) li
 - **📊 Bulk Operations**: High-performance bulk insert, update, and delete operations
 - **🔧 Provider Agnostic**: Support for SQL Server, PostgreSQL, SQLite, and MySQL
 - **🎯 Simple API**: Clean, intuitive API that feels familiar to EF users
+- **🔨 Database Scaffolding**: Reverse-engineer existing databases into entity classes and a DbContext
 
 ## 📦 Installation
 
@@ -97,6 +98,22 @@ await context.BulkUpdateAsync(modifiedUsers);
 // Bulk delete
 await context.BulkDeleteAsync(usersToDelete);
 ```
+
+### Scaffolding from Existing Database
+
+```csharp
+using nORM.Scaffolding;
+
+await DatabaseScaffolder.ScaffoldAsync(
+    connection,
+    provider,
+    outputDirectory: "Models",
+    namespaceName: "MyApp.Models",
+    contextName: "MyAppContext");
+```
+
+This generates entity classes and a DbContext from the existing database schema,
+providing a quick starting point for new projects.
 
 ## 🏢 Enterprise Features
 
