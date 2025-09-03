@@ -34,12 +34,29 @@ namespace nORM.Migration
                 down.Add($"DROP TABLE IF EXISTS \"{table.Name}\"");
             }
 
-            foreach (var (table, column) in diff.AddedColumns)
+            foreach (var group in diff.AddedColumns.GroupBy(x => x.Table))
             {
-                var colDef = $"\"{column.Name}\" {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
-                up.Add($"ALTER TABLE \"{table.Name}\" ADD COLUMN {colDef}");
-                // SQLite does not support dropping columns prior to version 3.35
-                down.Add($"-- SQLite does not support dropping column '{column.Name}'");
+                var table = group.Key;
+                var addedColumnNames = group.Select(g => g.Column.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var (_, column) in group)
+                {
+                    var colDef = $"\"{column.Name}\" {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
+                    up.Add($"ALTER TABLE \"{table.Name}\" ADD COLUMN {colDef}");
+                }
+
+                var remainingColumns = table.Columns
+                    .Where(c => !addedColumnNames.Contains(c.Name))
+                    .ToArray();
+
+                var remainingDefs = remainingColumns
+                    .Select(c => $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
+                var remainingNames = remainingColumns.Select(c => $"\"{c.Name}\"").ToArray();
+
+                down.Add($"CREATE TABLE \"__temp__{table.Name}\" ({string.Join(", ", remainingDefs)})");
+                down.Add($"INSERT INTO \"__temp__{table.Name}\" ({string.Join(", ", remainingNames)}) SELECT {string.Join(", ", remainingNames)} FROM \"{table.Name}\"");
+                down.Add($"DROP TABLE \"{table.Name}\"");
+                down.Add($"ALTER TABLE \"__temp__{table.Name}\" RENAME TO \"{table.Name}\"");
             }
 
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
