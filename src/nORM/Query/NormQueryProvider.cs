@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Caching.Memory;
 using nORM.Core;
 using nORM.Execution;
 using nORM.Internal;
@@ -24,7 +25,12 @@ namespace nORM.Query
     internal sealed class NormQueryProvider : IQueryProvider
     {
         internal readonly DbContext _ctx;
-        private static readonly ConcurrentLruCache<QueryPlanCacheKey, QueryPlan> _planCache = new(maxSize: 1000);
+        private static readonly MemoryCache _planCache = new(new MemoryCacheOptions
+        {
+            SizeLimit = 1000,
+            CompactionPercentage = 0.25
+        });
+        private static readonly SemaphoreSlim _cacheSemaphore = new(1, 1);
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
@@ -376,9 +382,37 @@ namespace nORM.Query
         {
             filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(filtered);
-            var key = new QueryPlanCacheKey(filtered, _ctx.Options.TenantProvider?.GetCurrentTenantId(), elementType);
-            var local = filtered;
-            return _planCache.GetOrAdd(key, _ => QueryTranslator.Rent(_ctx).Translate(local));
+            var fingerprint = ExpressionFingerprint.Compute(filtered);
+            var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
+            var cacheKey = HashCode.Combine(fingerprint, tenantHash, elementType.GetHashCode());
+
+            if (_planCache.TryGetValue(cacheKey, out QueryPlan? cached))
+            {
+                return cached!;
+            }
+
+            _cacheSemaphore.Wait();
+            try
+            {
+                if (_planCache.TryGetValue(cacheKey, out cached))
+                    return cached!;
+
+                var plan = new QueryTranslator(_ctx).Translate(filtered);
+
+                var options = new MemoryCacheEntryOptions
+                {
+                    Size = 1,
+                    SlidingExpiration = TimeSpan.FromMinutes(30),
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(2)
+                };
+
+                _planCache.Set(cacheKey, plan, options);
+                return plan;
+            }
+            finally
+            {
+                _cacheSemaphore.Release();
+            }
         }
 
         private string BuildCacheKey<TResult>(Expression expression, IReadOnlyDictionary<string, object> parameters)
