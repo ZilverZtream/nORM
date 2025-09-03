@@ -26,11 +26,13 @@ namespace nORM.Mapping
         public readonly DatabaseProvider Provider;
         public readonly Column? DiscriminatorColumn = null;
         public readonly Dictionary<object, TableMapping> TphMappings = new();
+        private readonly IEntityTypeConfiguration? _fluentConfig;
 
         public TableMapping(Type t, DatabaseProvider p, DbContext ctx, IEntityTypeConfiguration? fluentConfig)
         {
             Type = t;
             Provider = p;
+            _fluentConfig = fluentConfig;
 
             var splitAttr = t.GetCustomAttribute<TableSplitAttribute>();
             var splitType = fluentConfig?.TableSplitWith ?? splitAttr?.PrincipalType;
@@ -146,8 +148,27 @@ namespace nORM.Mapping
 
         private void DiscoverRelations(DbContext ctx)
         {
+            if (_fluentConfig?.Relationships.Count > 0)
+            {
+                foreach (var rel in _fluentConfig.Relationships)
+                {
+                    var dependentMap = ctx.GetMapping(rel.DependentType);
+                    Column principalKey;
+                    if (rel.PrincipalKey != null)
+                        principalKey = Columns.First(c => c.Prop == rel.PrincipalKey);
+                    else if (KeyColumns.Length == 1)
+                        principalKey = KeyColumns[0];
+                    else
+                        continue;
+                    var foreignKey = dependentMap.Columns.First(c => c.Prop == rel.ForeignKey);
+                    Relations[rel.PrincipalNavigation.Name] = new Relation(rel.PrincipalNavigation, rel.DependentType, principalKey, foreignKey);
+                }
+            }
+
             foreach (var prop in Type.GetProperties().Where(pr => pr.GetCustomAttribute<NotMappedAttribute>() == null))
             {
+                if (Relations.ContainsKey(prop.Name))
+                    continue;
                 if (typeof(IEnumerable).IsAssignableFrom(prop.PropertyType) && prop.PropertyType.IsGenericType)
                 {
                     var dependentType = prop.PropertyType.GetGenericArguments()[0];
