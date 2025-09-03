@@ -814,67 +814,141 @@ namespace nORM.Query
             // SelectMany can be used in different ways:
             // 1. SelectMany(collectionSelector) - flattens collections
             // 2. SelectMany(collectionSelector, resultSelector) - joins and projects
-            
+
             if (node.Arguments.Count < 2)
                 throw new ArgumentException("SelectMany requires at least 2 arguments");
 
             var sourceQuery = node.Arguments[0];
-            var collectionSelector = StripQuotes(node.Arguments[1]) as LambdaExpression;
-            
-            if (collectionSelector == null)
-                throw new ArgumentException("Collection selector must be a lambda expression");
+            var collectionSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
+                                   ?? throw new ArgumentException("Collection selector must be a lambda expression");
 
-            // Visit the source query
+            // Visit the source query first to establish base mapping
             Visit(sourceQuery);
 
-            // Check if this is a navigation property access (common case)
-            if (collectionSelector.Body is MemberExpression memberExpr)
+            var outerMapping = _mapping;
+            var outerAlias = "T0";
+
+            // Track the outer parameter for correlated references
+            if (!_correlatedParams.ContainsKey(collectionSelector.Parameters[0]))
+                _correlatedParams[collectionSelector.Parameters[0]] = (outerMapping, outerAlias);
+
+            // Determine if a result selector is provided
+            var resultSelector = node.Arguments.Count > 2
+                ? StripQuotes(node.Arguments[2]) as LambdaExpression
+                : null;
+
+            // Navigation property: treat as INNER JOIN
+            if (collectionSelector.Body is MemberExpression memberExpr &&
+                outerMapping.Relations.TryGetValue(memberExpr.Member.Name, out var relation))
             {
-                var propertyName = memberExpr.Member.Name;
-                
-                // Check if this is a navigation property
-                if (_mapping.Relations.TryGetValue(propertyName, out var relation))
+                var innerMapping = _ctx.GetMapping(relation.DependentType);
+                var innerAlias = "T" + (++_joinCounter);
+
+                if (resultSelector != null && resultSelector.Parameters.Count > 1 &&
+                    !_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
                 {
-                    // This is a navigation property - convert to JOIN
-                    var sourceAlias = "T0";
-                    var targetAlias = "T" + (++_joinCounter);
-                    var targetMapping = _ctx.GetMapping(relation.DependentType);
+                    _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
+                }
 
-                    // Build the JOIN query
-                    var sourceColumns = _mapping.Columns.Select(c => $"{sourceAlias}.{c.EscCol}");
-                    var targetColumns = targetMapping.Columns.Select(c => $"{targetAlias}.{c.EscCol}");
-                    
-                    var joinSql = new StringBuilder();
-                    joinSql.Append($"SELECT {string.Join(", ", targetColumns)} ");
-                    joinSql.Append($"FROM {_mapping.EscTable} {sourceAlias} ");
-                    joinSql.Append($"INNER JOIN {targetMapping.EscTable} {targetAlias} ");
-                    joinSql.Append($"ON {sourceAlias}.{relation.PrincipalKey.EscCol} = {targetAlias}.{relation.ForeignKey.EscCol}");
+                var joinSql = new StringBuilder(256);
 
-                    // Replace the current SQL
-                    _sql.Clear();
-                    _sql.Append(joinSql.ToString());
-                    
-                    // Update the current mapping to the target type
-                    _mapping = targetMapping;
-
-                    // Handle result selector if present
-                    if (node.Arguments.Count > 2)
+                if (_projection?.Body is NewExpression newExpr)
+                {
+                    var neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping);
+                    if (neededColumns.Count == 0)
                     {
-                        var resultSelector = StripQuotes(node.Arguments[2]) as LambdaExpression;
-                        if (resultSelector != null)
-                        {
-                            _projection = resultSelector;
-                        }
+                        var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+                        var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
+                        joinSql.Append($"SELECT {string.Join(", ", outerCols.Concat(innerCols))} ");
                     }
+                    else
+                    {
+                        joinSql.Append($"SELECT {string.Join(", ", neededColumns)} ");
+                    }
+                }
+                else if (resultSelector == null)
+                {
+                    var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
+                    joinSql.Append($"SELECT {string.Join(", ", innerCols)} ");
                 }
                 else
                 {
-                    throw new NotSupportedException($"Property '{propertyName}' is not a recognized navigation property");
+                    var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+                    var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
+                    joinSql.Append($"SELECT {string.Join(", ", outerCols.Concat(innerCols))} ");
                 }
+
+                joinSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
+                joinSql.Append($"INNER JOIN {innerMapping.EscTable} {innerAlias} ");
+                joinSql.Append($"ON {outerAlias}.{relation.PrincipalKey.EscCol} = {innerAlias}.{relation.ForeignKey.EscCol}");
+
+                _sql.Clear();
+                _sql.Append(joinSql.ToString());
+
+                if (resultSelector != null)
+                {
+                    _projection = resultSelector;
+                }
+                else
+                {
+                    _mapping = innerMapping;
+                }
+
+                return node;
+            }
+
+            // Otherwise treat as CROSS JOIN
+            var innerType = GetElementType(collectionSelector.Body);
+            var crossMapping = _ctx.GetMapping(innerType);
+            var crossAlias = "T" + (++_joinCounter);
+
+            if (resultSelector != null && resultSelector.Parameters.Count > 1 &&
+                !_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
+            {
+                _correlatedParams[resultSelector.Parameters[1]] = (crossMapping, crossAlias);
+            }
+
+            var crossSql = new StringBuilder(256);
+
+            if (_projection?.Body is NewExpression crossNew)
+            {
+                var neededColumns = ExtractNeededColumns(crossNew, outerMapping, crossMapping);
+                if (neededColumns.Count == 0)
+                {
+                    var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+                    var innerCols = crossMapping.Columns.Select(c => $"{crossAlias}.{c.EscCol}");
+                    crossSql.Append($"SELECT {string.Join(", ", outerCols.Concat(innerCols))} ");
+                }
+                else
+                {
+                    crossSql.Append($"SELECT {string.Join(", ", neededColumns)} ");
+                }
+            }
+            else if (resultSelector == null)
+            {
+                var innerCols = crossMapping.Columns.Select(c => $"{crossAlias}.{c.EscCol}");
+                crossSql.Append($"SELECT {string.Join(", ", innerCols)} ");
             }
             else
             {
-                throw new NotSupportedException("Complex SelectMany expressions are not yet supported");
+                var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+                var innerCols = crossMapping.Columns.Select(c => $"{crossAlias}.{c.EscCol}");
+                crossSql.Append($"SELECT {string.Join(", ", outerCols.Concat(innerCols))} ");
+            }
+
+            crossSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
+            crossSql.Append($"CROSS JOIN {crossMapping.EscTable} {crossAlias}");
+
+            _sql.Clear();
+            _sql.Append(crossSql.ToString());
+
+            if (resultSelector != null)
+            {
+                _projection = resultSelector;
+            }
+            else
+            {
+                _mapping = crossMapping;
             }
 
             return node;
