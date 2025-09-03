@@ -71,6 +71,11 @@ namespace nORM.Benchmarks
         private readonly string _nOrmConnectionString = "Data Source=norm_benchmark.db";
         private readonly string _dapperConnectionString = "Data Source=dapper_benchmark.db";
 
+        private EfCoreContext? _efContext;
+        private SqliteConnection? _nOrmConnection;
+        private nORM.Core.DbContext? _nOrmContext;
+        private SqliteConnection? _dapperConnection;
+
         [GlobalSetup]
         public async Task Setup()
         {
@@ -118,12 +123,14 @@ namespace nORM.Benchmarks
             if (System.IO.File.Exists("ef_benchmark.db"))
                 System.IO.File.Delete("ef_benchmark.db");
 
-            using var context = new EfCoreContext(_efConnectionString);
-            await context.Database.EnsureCreatedAsync();
+            _efContext = new EfCoreContext(_efConnectionString);
+            await _efContext.Database.OpenConnectionAsync();
+            await _efContext.Database.EnsureCreatedAsync();
 
-            context.Users.AddRange(_testUsers);
-            context.Orders.AddRange(_testOrders);
-            await context.SaveChangesAsync();
+            _efContext.Users.AddRange(_testUsers);
+            _efContext.Orders.AddRange(_testOrders);
+            await _efContext.SaveChangesAsync();
+            _efContext.ChangeTracker.Clear();
         }
 
         private async Task SetupnORM()
@@ -170,6 +177,10 @@ namespace nORM.Benchmarks
             // Insert test data using nORM
             await context.BulkInsertAsync(_testUsers);
             await context.BulkInsertAsync(_testOrders);
+
+            _nOrmConnection = new SqliteConnection(_nOrmConnectionString);
+            await _nOrmConnection.OpenAsync();
+            _nOrmContext = new nORM.Core.DbContext(_nOrmConnection, new SqliteProvider(), options);
         }
 
         private async Task SetupDapper()
@@ -214,6 +225,9 @@ namespace nORM.Benchmarks
 
             await connection.ExecuteAsync(insertUserSql, _testUsers);
             await connection.ExecuteAsync(insertOrderSql, _testOrders);
+
+            _dapperConnection = new SqliteConnection(_dapperConnectionString);
+            await _dapperConnection.OpenAsync();
         }
 
         // ========== SINGLE INSERT BENCHMARKS ==========
@@ -221,7 +235,6 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task Insert_Single_EfCore()
         {
-            using var context = new EfCoreContext(_efConnectionString);
             var user = new BenchmarkUser
             {
                 Name = "Test User EF",
@@ -232,17 +245,14 @@ namespace nORM.Benchmarks
                 City = "TestCity"
             };
 
-            context.Users.Add(user);
-            await context.SaveChangesAsync();
+            _efContext!.Users.Add(user);
+            await _efContext.SaveChangesAsync();
+            _efContext.ChangeTracker.Clear();
         }
 
         [Benchmark]
         public async Task Insert_Single_nORM()
         {
-            using var connection = new SqliteConnection(_nOrmConnectionString);
-            await connection.OpenAsync();
-            using var context = new nORM.Core.DbContext(connection, new SqliteProvider());
-
             var user = new BenchmarkUser
             {
                 Name = "Test User nORM",
@@ -253,15 +263,12 @@ namespace nORM.Benchmarks
                 City = "TestCity"
             };
 
-            await context.InsertAsync(user);
+            await _nOrmContext!.InsertAsync(user);
         }
 
         [Benchmark]
         public async Task Insert_Single_Dapper()
         {
-            using var connection = new SqliteConnection(_dapperConnectionString);
-            await connection.OpenAsync();
-
             var user = new BenchmarkUser
             {
                 Name = "Test User Dapper",
@@ -271,25 +278,20 @@ namespace nORM.Benchmarks
                 Age = 25,
                 City = "TestCity"
             };
-
             var sql = @"
-                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City) 
+                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City)
                 VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City)";
 
-            await connection.ExecuteAsync(sql, user);
+            await _dapperConnection!.ExecuteAsync(sql, user);
         }
 
         [Benchmark]
         public async Task Insert_Single_RawAdo()
         {
-            using var connection = new SqliteConnection(_dapperConnectionString);
-            await connection.OpenAsync();
-
             var sql = @"
-                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City) 
+                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City)
                 VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City)";
-
-            using var command = connection.CreateCommand();
+            using var command = _dapperConnection!.CreateCommand();
             command.CommandText = sql;
             command.Parameters.AddWithValue("@Name", "Test User ADO");
             command.Parameters.AddWithValue("@Email", "test@ado.com");
@@ -306,8 +308,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Simple_EfCore()
         {
-            using var context = new EfCoreContext(_efConnectionString);
-            return await EfQueryableExtensions.ToListAsync(context.Users
+            return await EfQueryableExtensions.ToListAsync(_efContext!.Users
                 .Where(u => u.IsActive)
                 .Take(10));
         }
@@ -315,11 +316,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Simple_nORM()
         {
-            using var connection = new SqliteConnection(_nOrmConnectionString);
-            await connection.OpenAsync();
-            using var context = new nORM.Core.DbContext(connection, new SqliteProvider());
-
-            return await NormAsyncExtensions.ToListAsync(context.Query<BenchmarkUser>()
+            return await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Where(u => u.IsActive)
                 .Take(10));
         }
@@ -327,22 +324,16 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Simple_Dapper()
         {
-            using var connection = new SqliteConnection(_dapperConnectionString);
-            await connection.OpenAsync();
-
             var sql = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
-            var result = await connection.QueryAsync<BenchmarkUser>(sql);
+            var result = await _dapperConnection!.QueryAsync<BenchmarkUser>(sql);
             return result.ToList();
         }
 
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Simple_RawAdo()
         {
-            using var connection = new SqliteConnection(_dapperConnectionString);
-            await connection.OpenAsync();
-
             var sql = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
-            using var command = connection.CreateCommand();
+            using var command = _dapperConnection!.CreateCommand();
             command.CommandText = sql;
 
             using var reader = await command.ExecuteReaderAsync();
@@ -370,8 +361,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Complex_EfCore()
         {
-            using var context = new EfCoreContext(_efConnectionString);
-            return await EfQueryableExtensions.ToListAsync(context.Users
+            return await EfQueryableExtensions.ToListAsync(_efContext!.Users
                 .Where(u => u.IsActive && u.Age > 25 && u.City == "New York")
                 .OrderBy(u => u.Name)
                 .Skip(5)
@@ -381,11 +371,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Complex_nORM()
         {
-            using var connection = new SqliteConnection(_nOrmConnectionString);
-            await connection.OpenAsync();
-            using var context = new nORM.Core.DbContext(connection, new SqliteProvider());
-
-            return await NormAsyncExtensions.ToListAsync(context.Query<BenchmarkUser>()
+            return await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Where(u => u.IsActive && u.Age > 25 && u.City == "New York")
                 .OrderBy(u => u.Name)
                 .Skip(5)
@@ -395,16 +381,13 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Complex_Dapper()
         {
-            using var connection = new SqliteConnection(_dapperConnectionString);
-            await connection.OpenAsync();
-
             var sql = @"
-                SELECT * FROM BenchmarkUser 
+                SELECT * FROM BenchmarkUser
                 WHERE IsActive = 1 AND Age > @Age AND City = @City
-                ORDER BY Name 
+                ORDER BY Name
                 LIMIT 20 OFFSET 5";
 
-            var result = await connection.QueryAsync<BenchmarkUser>(sql, new { Age = 25, City = "New York" });
+            var result = await _dapperConnection!.QueryAsync<BenchmarkUser>(sql, new { Age = 25, City = "New York" });
             return result.ToList();
         }
 
@@ -413,9 +396,8 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<object>> Query_Join_EfCore()
         {
-            using var context = new EfCoreContext(_efConnectionString);
-            var result = await EfQueryableExtensions.ToListAsync(context.Users
-                .Join(context.Orders, u => u.Id, o => o.UserId, (u, o) => new { u.Name, o.Amount, o.ProductName })
+            var result = await EfQueryableExtensions.ToListAsync(_efContext!.Users
+                .Join(_efContext.Orders, u => u.Id, o => o.UserId, (u, o) => new { u.Name, o.Amount, o.ProductName })
                 .Where(x => x.Amount > 100)
                 .Take(50));
             return result.Cast<object>().ToList();
@@ -424,13 +406,9 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<object>> Query_Join_nORM()
         {
-            using var connection = new SqliteConnection(_nOrmConnectionString);
-            await connection.OpenAsync();
-            using var context = new nORM.Core.DbContext(connection, new SqliteProvider());
-
-            var result = await NormAsyncExtensions.ToListAsync(context.Query<BenchmarkUser>()
+            var result = await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Join(
-                    context.Query<BenchmarkOrder>(),
+                    _nOrmContext.Query<BenchmarkOrder>(),
                     u => u.Id,
                     o => o.UserId,
                     (u, o) => new { u.Name, o.Amount, o.ProductName }
@@ -443,17 +421,14 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<object>> Query_Join_Dapper()
         {
-            using var connection = new SqliteConnection(_dapperConnectionString);
-            await connection.OpenAsync();
-
             var sql = @"
                 SELECT u.Name, o.Amount, o.ProductName
-                FROM BenchmarkUser u 
+                FROM BenchmarkUser u
                 INNER JOIN BenchmarkOrder o ON u.Id = o.UserId
                 WHERE o.Amount > @Amount
                 LIMIT 50";
 
-            var result = await connection.QueryAsync(sql, new { Amount = 100 });
+            var result = await _dapperConnection!.QueryAsync(sql, new { Amount = 100 });
             return result.Cast<object>().ToList();
         }
 
@@ -462,29 +437,21 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<int> Count_EfCore()
         {
-            using var context = new EfCoreContext(_efConnectionString);
-            return await EfQueryableExtensions.CountAsync(context.Users, u => u.IsActive);
+            return await EfQueryableExtensions.CountAsync(_efContext!.Users, u => u.IsActive);
         }
 
         [Benchmark]
         public async Task<int> Count_nORM()
         {
-            using var connection = new SqliteConnection(_nOrmConnectionString);
-            await connection.OpenAsync();
-            using var context = new nORM.Core.DbContext(connection, new SqliteProvider());
-
-            return await NormAsyncExtensions.CountAsync(context.Query<BenchmarkUser>()
+            return await NormAsyncExtensions.CountAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Where(u => u.IsActive));
         }
 
         [Benchmark]
         public async Task<int> Count_Dapper()
         {
-            using var connection = new SqliteConnection(_dapperConnectionString);
-            await connection.OpenAsync();
-
             var sql = "SELECT COUNT(*) FROM BenchmarkUser WHERE IsActive = 1";
-            return await connection.QuerySingleAsync<int>(sql);
+            return await _dapperConnection!.QuerySingleAsync<int>(sql);
         }
 
         // ========== BULK OPERATIONS BENCHMARKS ==========
@@ -492,7 +459,6 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task BulkInsert_EfCore()
         {
-            using var context = new EfCoreContext(_efConnectionString);
             var users = Enumerable.Range(1, 100).Select(i => new BenchmarkUser
             {
                 Name = $"Bulk User EF {i}",
@@ -503,17 +469,14 @@ namespace nORM.Benchmarks
                 City = "BulkCity"
             }).ToList();
 
-            context.Users.AddRange(users);
-            await context.SaveChangesAsync();
+            _efContext!.Users.AddRange(users);
+            await _efContext.SaveChangesAsync();
+            _efContext.ChangeTracker.Clear();
         }
 
         [Benchmark]
         public async Task BulkInsert_nORM()
         {
-            using var connection = new SqliteConnection(_nOrmConnectionString);
-            await connection.OpenAsync();
-            using var context = new nORM.Core.DbContext(connection, new SqliteProvider());
-
             var users = Enumerable.Range(1, 100).Select(i => new BenchmarkUser
             {
                 Name = $"Bulk User nORM {i}",
@@ -524,15 +487,12 @@ namespace nORM.Benchmarks
                 City = "BulkCity"
             }).ToList();
 
-            await context.BulkInsertAsync(users);
+            await _nOrmContext!.BulkInsertAsync(users);
         }
 
         [Benchmark]
         public async Task BulkInsert_Dapper()
         {
-            using var connection = new SqliteConnection(_dapperConnectionString);
-            await connection.OpenAsync();
-
             var users = Enumerable.Range(1, 100).Select(i => new BenchmarkUser
             {
                 Name = $"Bulk User Dapper {i}",
@@ -544,15 +504,20 @@ namespace nORM.Benchmarks
             }).ToList();
 
             var sql = @"
-                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City) 
+                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City)
                 VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City)";
 
-            await connection.ExecuteAsync(sql, users);
+            await _dapperConnection!.ExecuteAsync(sql, users);
         }
 
         [GlobalCleanup]
         public void Cleanup()
         {
+            _efContext?.Dispose();
+            _nOrmContext?.Dispose();
+            _nOrmConnection?.Dispose();
+            _dapperConnection?.Dispose();
+
             // Clean up database files
             try
             {
