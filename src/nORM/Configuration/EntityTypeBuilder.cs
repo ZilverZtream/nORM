@@ -17,6 +17,7 @@ namespace nORM.Configuration
             public Type? TableSplitWith { get; private set; }
             public Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; } = new();
             public Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; } = new();
+            public List<RelationshipConfiguration> Relationships { get; } = new();
 
             public void SetTableName(string name) => TableName = name;
             public void SetKey(PropertyInfo prop) => KeyProperty = prop;
@@ -28,6 +29,8 @@ namespace nORM.Configuration
             {
                 if (ShadowProperties.TryGetValue(name, out var sp)) ShadowProperties[name] = sp with { ColumnName = column };
             }
+
+            public void AddRelationship(RelationshipConfiguration relationship) => Relationships.Add(relationship);
         }
 
         private readonly MappingConfiguration _config = new();
@@ -73,6 +76,12 @@ namespace nORM.Configuration
             return this;
         }
 
+        public CollectionNavigationBuilder<TProperty> HasMany<TProperty>(Expression<Func<TEntity, IEnumerable<TProperty>>> navigation) where TProperty : class
+        {
+            var prop = GetProperty(navigation);
+            return new CollectionNavigationBuilder<TProperty>(this, prop);
+        }
+
         private PropertyInfo GetProperty(LambdaExpression expression)
         {
             if (expression.Body is MemberExpression me)
@@ -115,6 +124,48 @@ namespace nORM.Configuration
             {
                 _parent._config.SetShadowColumnName(_name, columnName);
                 return _parent;
+            }
+        }
+
+        public class CollectionNavigationBuilder<TDependent> where TDependent : class
+        {
+            private readonly EntityTypeBuilder<TEntity> _parent;
+            internal readonly PropertyInfo PrincipalNavigation;
+
+            internal CollectionNavigationBuilder(EntityTypeBuilder<TEntity> parent, PropertyInfo principalNavigation)
+            {
+                _parent = parent;
+                PrincipalNavigation = principalNavigation;
+            }
+
+            public ReferenceCollectionBuilder WithOne(Expression<Func<TDependent, TEntity?>>? navigation = null)
+            {
+                PropertyInfo? dependentNav = null;
+                if (navigation != null)
+                    dependentNav = _parent.GetProperty(navigation);
+                return new ReferenceCollectionBuilder(_parent, PrincipalNavigation, dependentNav);
+            }
+
+            public class ReferenceCollectionBuilder
+            {
+                private readonly EntityTypeBuilder<TEntity> _parent;
+                private readonly PropertyInfo _principalNavigation;
+                private readonly PropertyInfo? _dependentNavigation;
+
+                internal ReferenceCollectionBuilder(EntityTypeBuilder<TEntity> parent, PropertyInfo principalNavigation, PropertyInfo? dependentNavigation)
+                {
+                    _parent = parent;
+                    _principalNavigation = principalNavigation;
+                    _dependentNavigation = dependentNavigation;
+                }
+
+                public EntityTypeBuilder<TEntity> HasForeignKey(Expression<Func<TDependent, object>> foreignKeyExpression)
+                {
+                    var fkProp = _parent.GetProperty(foreignKeyExpression);
+                    var principalKey = _parent._config.KeyProperty;
+                    _parent._config.AddRelationship(new RelationshipConfiguration(_principalNavigation, typeof(TDependent), _dependentNavigation, principalKey, fkProp));
+                    return _parent;
+                }
             }
         }
     }
