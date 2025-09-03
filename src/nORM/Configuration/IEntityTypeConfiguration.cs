@@ -9,7 +9,7 @@ namespace nORM.Configuration
     public interface IEntityTypeConfiguration
     {
         string? TableName { get; }
-        PropertyInfo? KeyProperty { get; }
+        List<PropertyInfo> KeyProperties { get; }
         Dictionary<PropertyInfo, string> ColumnNames { get; }
         Type? TableSplitWith { get; }
         Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; }
