@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Data.Common;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
@@ -99,9 +100,22 @@ namespace nORM.Providers
             return null;
         }
 
+        protected override void ValidateConnection(DbConnection connection)
+        {
+            base.ValidateConnection(connection);
+            if (connection.GetType().FullName != "Npgsql.NpgsqlConnection")
+                throw new InvalidOperationException("A NpgsqlConnection is required for PostgresProvider.");
+        }
+
+        public override Task<bool> IsAvailableAsync()
+        {
+            return Task.FromResult(Type.GetType("Npgsql.NpgsqlConnection, Npgsql") != null);
+        }
+
         // PostgreSQL-optimized bulk operations
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
@@ -228,6 +242,7 @@ namespace nORM.Providers
 
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
@@ -342,6 +357,7 @@ namespace nORM.Providers
 
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
