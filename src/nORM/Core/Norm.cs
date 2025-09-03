@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
-using nORM.Internal;
 using nORM.Query;
 
 #nullable enable
@@ -14,12 +13,11 @@ namespace nORM.Core
     {
         public static Func<TContext, TParam, Task<List<T>>> CompileQuery<TContext, TParam, T>(Expression<Func<TContext, TParam, IQueryable<T>>> queryExpression)
             where TContext : DbContext
+            where T : class
         {
             if (queryExpression == null) throw new ArgumentNullException(nameof(queryExpression));
 
-            var ctxParameter = queryExpression.Parameters[0];
-            var valueParameter = queryExpression.Parameters[1];
-
+            var compiled = queryExpression.Compile();
             QueryPlan? cachedPlan = null;
             string? paramName = null;
 
@@ -27,10 +25,9 @@ namespace nORM.Core
             {
                 if (cachedPlan == null)
                 {
-                    var body = new ParameterReplacer(ctxParameter, Expression.Constant(ctx)).Visit(queryExpression.Body)!;
-                    body = new ParameterReplacer(valueParameter, Expression.Constant(value, typeof(TParam))).Visit(body)!;
+                    var query = compiled(ctx, value);
                     var provider = new NormQueryProvider(ctx);
-                    cachedPlan = provider.GetPlan(body, out _);
+                    cachedPlan = provider.GetPlan(query.Expression, out _);
                     paramName = cachedPlan.Parameters.Keys.FirstOrDefault();
                 }
 
