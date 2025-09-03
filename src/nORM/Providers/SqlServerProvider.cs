@@ -21,12 +21,16 @@ namespace nORM.Providers
         private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: 100);
         public override string Escape(string id) => $"[{id}]";
         
-        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset)
+        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam)
         {
-            if (offset.HasValue || limit.HasValue)
+            if (offset.HasValue || offsetParam != null || limit.HasValue || limitParam != null)
             {
                 if (!sb.ToString().Contains("ORDER BY")) sb.Append(" ORDER BY (SELECT NULL)");
-                sb.Append($" OFFSET {offset ?? 0} ROWS FETCH NEXT {limit ?? int.MaxValue} ROWS ONLY");
+                sb.Append(" OFFSET ");
+                sb.Append(offsetParam ?? (offset ?? 0).ToString());
+                sb.Append(" ROWS FETCH NEXT ");
+                sb.Append(limitParam ?? (limit ?? int.MaxValue).ToString());
+                sb.Append(" ROWS ONLY");
             }
         }
         

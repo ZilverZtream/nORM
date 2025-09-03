@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Core;
+using nORM.Internal;
 using nORM.Mapping;
 using nORM.Navigation;
 
@@ -116,7 +117,7 @@ namespace nORM.Query
             {
                 var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(info.InnerType))!;
                 foreach (var child in entry.children) list.Add(child);
-                var result = info.ResultSelector(entry.outer, list);
+                var result = info.ResultSelector(entry.outer, list.Cast<object>());
                 resultList.Add(result);
             }
 

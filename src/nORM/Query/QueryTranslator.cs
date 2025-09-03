@@ -28,6 +28,8 @@ namespace nORM.Query
         private TableMapping _mapping = null!;
         private Type? _rootType;
         private int _paramIndex = 0;
+        private readonly List<string> _compiledParams;
+        private readonly Dictionary<ParameterExpression, string> _paramMap;
         private readonly List<IncludePlan> _includes = new();
         private LambdaExpression? _projection;
         private bool _isAggregate = false;
@@ -49,6 +51,8 @@ namespace nORM.Query
         private List<string> _groupBy => _clauses.GroupBy;
         private int? _take { get => _clauses.Take; set => _clauses.Take = value; }
         private int? _skip { get => _clauses.Skip; set => _clauses.Skip = value; }
+        private string? _takeParam { get => _clauses.TakeParam; set => _clauses.TakeParam = value; }
+        private string? _skipParam { get => _clauses.SkipParam; set => _clauses.SkipParam = value; }
         private bool _isDistinct { get => _clauses.IsDistinct; set => _clauses.IsDistinct = value; }
 
         // Initialize _groupJoinInfo in constructor to suppress warning
@@ -61,6 +65,8 @@ namespace nORM.Query
             _mapping = null!;
             _rootType = null;
             _correlatedParams = new();
+            _compiledParams = new();
+            _paramMap = new();
             _tables = new HashSet<string>();
         }
 
@@ -71,6 +77,8 @@ namespace nORM.Query
             ref int pIndex,
             Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlated,
             HashSet<string> tables,
+            List<string> compiledParams,
+            Dictionary<ParameterExpression, string> paramMap,
             int joinStart = 0)
         {
             _ctx = ctx;
@@ -81,9 +89,14 @@ namespace nORM.Query
             _paramIndex = pIndex;
             _correlatedParams = correlated;
             _tables = tables;
+            _compiledParams = compiledParams;
+            _paramMap = paramMap;
             _tables.Add(mapping.TableName);
             _joinCounter = joinStart;
         }
+
+        public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
+            => _materializerFactory.CreateMaterializer(mapping, targetType, projection);
 
         private static Type GetElementType(Expression queryExpression)
         {
@@ -168,14 +181,14 @@ namespace nORM.Query
             if (_groupBy.Count > 0) _sql.Append(" GROUP BY " + string.Join(", ", _groupBy));
             if (_having.Length > 0) _sql.Append(" HAVING " + _having);
             if (_orderBy.Count > 0) _sql.Append(" ORDER BY " + string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}")));
-            _ctx.Provider.ApplyPaging(_sql, _take, _skip);
+            _ctx.Provider.ApplyPaging(_sql, _take, _skip, _takeParam, _skipParam);
 
             var singleResult = _singleResult || _methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
                 or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
 
             var elementType = _groupJoinInfo?.ResultType ?? materializerType;
 
-            return new QueryPlan(_sql.ToString(), _params, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray());
+            return new QueryPlan(_sql.ToString(), _params, _compiledParams, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray());
         }
 
         private TableMapping TrackMapping(Type type)
@@ -187,7 +200,7 @@ namespace nORM.Query
 
         private string TranslateSubExpression(Expression e)
         {
-            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _joinCounter);
+            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
             var subPlan = subTranslator.Translate(e);
             _paramIndex = subTranslator._paramIndex;
             return subPlan.Sql;
@@ -210,7 +223,7 @@ namespace nORM.Query
                         var alias = "T" + _joinCounter;
                         if (!_correlatedParams.ContainsKey(param))
                             _correlatedParams[param] = (_mapping, alias);
-                        var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams);
+                    var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
                         var sql = visitor.Translate(body);
                         var isGrouping = node.Arguments[0] is MethodCallExpression mc && mc.Method.Name == "GroupBy";
                         var target = isGrouping ? _having : _where;
@@ -237,7 +250,7 @@ namespace nORM.Query
                         var alias = "T" + _joinCounter;
                         if (!_correlatedParams.ContainsKey(param))
                             _correlatedParams[param] = (_mapping, alias);
-                        var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams);
+                    var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
                         var sql = visitor.Translate(keySelector.Body);
 
                         _orderBy.Add((sql, !_methodName.Contains("Descending")));
@@ -245,12 +258,34 @@ namespace nORM.Query
                     return source;
 
                 case "Take":
-                    if (TryGetIntValue(node.Arguments[1], out int take))
+                    if (node.Arguments[1] is ParameterExpression tp)
+                    {
+                        if (!_paramMap.TryGetValue(tp, out var tName))
+                        {
+                            tName = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
+                            _params[tName] = DBNull.Value;
+                            _compiledParams.Add(tName);
+                            _paramMap[tp] = tName;
+                        }
+                        _takeParam = tName;
+                    }
+                    else if (TryGetIntValue(node.Arguments[1], out int take))
                         _take = take;
                     return Visit(node.Arguments[0]);
 
                 case "Skip":
-                    if (TryGetIntValue(node.Arguments[1], out int skip))
+                    if (node.Arguments[1] is ParameterExpression sp)
+                    {
+                        if (!_paramMap.TryGetValue(sp, out var sName))
+                        {
+                            sName = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
+                            _params[sName] = DBNull.Value;
+                            _compiledParams.Add(sName);
+                            _paramMap[sp] = sName;
+                        }
+                        _skipParam = sName;
+                    }
+                    else if (TryGetIntValue(node.Arguments[1], out int skip))
                         _skip = skip;
                     return Visit(node.Arguments[0]);
 
@@ -297,7 +332,7 @@ namespace nORM.Query
                         var alias = "T" + _joinCounter;
                         if (!_correlatedParams.ContainsKey(param))
                             _correlatedParams[param] = (_mapping, alias);
-                        var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams);
+                    var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
                         var sql = visitor.Translate(predicate.Body);
                         if (_where.Length > 0) _where.Append(" AND ");
                         _where.Append($"({sql})");
@@ -320,7 +355,7 @@ namespace nORM.Query
                         var alias = "T" + _joinCounter;
                         if (!_correlatedParams.ContainsKey(param))
                             _correlatedParams[param] = (_mapping, alias);
-                        var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams);
+                    var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
                         var sql = visitor.Translate(countPredicate.Body);
                         if (_where.Length > 0) _where.Append(" AND ");
                         _where.Append($"({sql})");
@@ -446,12 +481,12 @@ namespace nORM.Query
 
                 if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                     _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
-                var outerKeyVisitorG = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams);
+                var outerKeyVisitorG = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
                 var outerKeySqlG = outerKeyVisitorG.Translate(outerKeySelector.Body);
 
                 if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
                     _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAliasG);
-                var innerKeyVisitorG = new ExpressionToSqlVisitor(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAliasG, _correlatedParams);
+                var innerKeyVisitorG = new ExpressionToSqlVisitor(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAliasG, _correlatedParams, _compiledParams, _paramMap);
                 var innerKeySqlG = innerKeyVisitorG.Translate(innerKeySelector.Body);
 
                 foreach (var kvp in outerKeyVisitorG.GetParameters())
@@ -500,12 +535,12 @@ namespace nORM.Query
 
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
-            var outerKeyVisitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams);
+            var outerKeyVisitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
             var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
 
             if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
                 _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
-            var innerKeyVisitor = new ExpressionToSqlVisitor(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams);
+            var innerKeyVisitor = new ExpressionToSqlVisitor(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap);
             var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
 
             foreach (var kvp in outerKeyVisitor.GetParameters())
@@ -727,7 +762,7 @@ namespace nORM.Query
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
             }
 
-            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _joinCounter);
+            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator._paramIndex;
             _mapping = subTranslator._mapping;
@@ -743,7 +778,7 @@ namespace nORM.Query
             {
                 subSqlBuilder.Append(subPlan.Sql);
             }
-            _ctx.Provider.ApplyPaging(subSqlBuilder, 1, null);
+            _ctx.Provider.ApplyPaging(subSqlBuilder, 1, null, null, null);
 
             switch (node.Method.Name)
             {
@@ -841,6 +876,25 @@ namespace nORM.Query
             return node;
         }
 
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            if (_correlatedParams.ContainsKey(node))
+                return base.VisitParameter(node);
+
+            if (_paramMap.TryGetValue(node, out var existing))
+            {
+                _sql.Append(existing);
+                return node;
+            }
+
+            var paramName = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
+            _params[paramName] = DBNull.Value;
+            _compiledParams.Add(paramName);
+            _paramMap[node] = paramName;
+            _sql.Append(paramName);
+            return node;
+        }
+
         protected override Expression VisitBinary(BinaryExpression node)
         {
             _sql.Append("(");
@@ -882,8 +936,6 @@ namespace nORM.Query
         }
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
-
-            type == typeof(decimal) || type == typeof(DateTime) || type == typeof(Guid);
 
         private static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping)
         {
@@ -950,7 +1002,7 @@ namespace nORM.Query
             var alias = "T" + _joinCounter;
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams);
+            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
             var columnSql = visitor.Translate(selectorLambda.Body);
             
             foreach (var kvp in visitor.GetParameters())
@@ -982,7 +1034,7 @@ namespace nORM.Query
             var alias = "T" + _joinCounter;
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams);
+            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
             var groupBySql = visitor.Translate(keySelectorLambda.Body);
             
             foreach (var kvp in visitor.GetParameters())
@@ -1042,7 +1094,7 @@ namespace nORM.Query
                         // Try to translate as regular expression
                         if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
                             _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
-                        var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams);
+                        var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
                         var sql = visitor.Translate(arg);
                         selectItems.Add($"{sql} AS {memberName}");
                         
@@ -1074,7 +1126,7 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams);
+                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 _params[kvp.Key] = kvp.Value;
@@ -1090,7 +1142,7 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams);
+                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 _params[kvp.Key] = kvp.Value;
@@ -1106,7 +1158,7 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams);
+                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 _params[kvp.Key] = kvp.Value;
@@ -1122,7 +1174,7 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams);
+                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 _params[kvp.Key] = kvp.Value;
@@ -1148,7 +1200,7 @@ namespace nORM.Query
                 var alias = "T" + _joinCounter;
                 if (!_correlatedParams.ContainsKey(param))
                     _correlatedParams[param] = (_mapping, alias);
-                var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams);
+                var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
                 var columnSql = visitor.Translate(selector.Body);
                 
                 foreach (var kvp in visitor.GetParameters())
@@ -1182,7 +1234,7 @@ namespace nORM.Query
             var alias = "T" + _joinCounter;
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams);
+            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
             var predicateSql = visitor.Translate(predicate.Body);
             
             foreach (var kvp in visitor.GetParameters())

@@ -20,7 +20,7 @@ namespace nORM.Providers
         
         public string ParamPrefix { get; protected init; } = "@";
         public abstract string Escape(string id);
-        public abstract void ApplyPaging(StringBuilder sb, int? limit, int? offset);
+        public abstract void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam);
         public abstract string GetIdentityRetrievalString(TableMapping m);
         public abstract DbParameter CreateParameter(string name, object? value);
         public abstract string? TranslateFunction(string name, Type declaringType, params string[] args);

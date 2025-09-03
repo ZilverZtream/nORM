@@ -353,17 +353,6 @@ namespace nORM.Query
                 cache.Set(cacheKey, cacheList ?? new List<T>(), _ctx.Options.CacheExpiration, plan.Tables);
         }
 
-                {
-                    var listType = typeof(List<>).MakeGenericType(relation.DependentType);
-                    var childList = (IList)Activator.CreateInstance(listType)!;
-                    foreach (var item in c) childList.Add(item);
-                    relation.NavProp.SetValue(p, childList);
-                }
-            }
-
-            return resultChildren;
-        }
-
         internal QueryPlan GetPlan(Expression expression, out Expression filtered)
         {
             filtered = ApplyGlobalFilters(expression);
