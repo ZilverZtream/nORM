@@ -423,205 +423,92 @@ namespace nORM.Navigation
         private readonly object _parent;
         private readonly PropertyInfo _property;
         private readonly NavigationContext _context;
-        private List<T>? _data;
-        private volatile bool _isLoaded;
-        private readonly SemaphoreSlim _loadLock = new(1, 1);
 
         public LazyNavigationCollection(object parent, PropertyInfo property, NavigationContext context)
         {
             _parent = parent;
             _property = property;
             _context = context;
-            _isLoaded = false;
         }
 
-        private async Task EnsureLoadedAsync()
+        private ICollection<T> GetLoadedCollection()
         {
-            if (_isLoaded) return;
+            if (!_context.IsLoaded(_property.Name))
+                throw new InvalidOperationException("The collection has not been loaded. Use LoadAsync() or an async enumeration (await foreach) to access the data.");
 
-            await _loadLock.WaitAsync();
-            try
-            {
-                if (!_isLoaded)
-                {
-                    await NavigationPropertyExtensions.LoadNavigationPropertyAsync(_parent, _property, _context, CancellationToken.None);
-                    _data = (List<T>?)_property.GetValue(_parent) ?? new List<T>();
-                    _isLoaded = true;
-                }
-            }
-            finally
-            {
-                _loadLock.Release();
-            }
+            return (ICollection<T>)(_property.GetValue(_parent) ?? throw new InvalidOperationException("The collection has not been loaded. Use LoadAsync() or an async enumeration (await foreach) to access the data."));
         }
 
-        public IEnumerator<T> GetEnumerator()
-        {
-            EnsureLoadedAsync().GetAwaiter().GetResult();
-            return _data!.GetEnumerator();
-        }
+        private IList<T> GetLoadedList() => (IList<T>)GetLoadedCollection();
+
+        /// <summary>
+        /// Returns an enumerator for the loaded collection.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded. Use <c>LoadAsync()</c> or an async enumeration (<c>await foreach</c>) to access the data.</exception>
+        public IEnumerator<T> GetEnumerator() => GetLoadedCollection().GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-        public void Add(T item)
-        {
-            EnsureLoadedAsync().GetAwaiter().GetResult();
-            _loadLock.Wait();
-            try
-            {
-                _data!.Add(item);
-            }
-            finally
-            {
-                _loadLock.Release();
-            }
-        }
+        /// <summary>
+        /// Adds an item to the loaded collection.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
+        public void Add(T item) => GetLoadedCollection().Add(item);
 
-        public void Clear()
-        {
-            EnsureLoadedAsync().GetAwaiter().GetResult();
-            _loadLock.Wait();
-            try
-            {
-                _data!.Clear();
-            }
-            finally
-            {
-                _loadLock.Release();
-            }
-        }
+        /// <summary>
+        /// Clears the loaded collection.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
+        public void Clear() => GetLoadedCollection().Clear();
 
-        public bool Contains(T item)
-        {
-            EnsureLoadedAsync().GetAwaiter().GetResult();
-            _loadLock.Wait();
-            try
-            {
-                return _data!.Contains(item);
-            }
-            finally
-            {
-                _loadLock.Release();
-            }
-        }
+        /// <summary>
+        /// Determines whether the loaded collection contains the specified item.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
+        public bool Contains(T item) => GetLoadedCollection().Contains(item);
 
-        public void CopyTo(T[] array, int arrayIndex)
-        {
-            EnsureLoadedAsync().GetAwaiter().GetResult();
-            _loadLock.Wait();
-            try
-            {
-                _data!.CopyTo(array, arrayIndex);
-            }
-            finally
-            {
-                _loadLock.Release();
-            }
-        }
+        /// <summary>
+        /// Copies the elements of the loaded collection to an array.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
+        public void CopyTo(T[] array, int arrayIndex) => GetLoadedCollection().CopyTo(array, arrayIndex);
 
-        public bool Remove(T item)
-        {
-            EnsureLoadedAsync().GetAwaiter().GetResult();
-            _loadLock.Wait();
-            try
-            {
-                return _data!.Remove(item);
-            }
-            finally
-            {
-                _loadLock.Release();
-            }
-        }
+        /// <summary>
+        /// Removes the first occurrence of a specific object from the loaded collection.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
+        public bool Remove(T item) => GetLoadedCollection().Remove(item);
 
-        public int Count
-        {
-            get
-            {
-                EnsureLoadedAsync().GetAwaiter().GetResult();
-                _loadLock.Wait();
-                try
-                {
-                    return _data!.Count;
-                }
-                finally
-                {
-                    _loadLock.Release();
-                }
-            }
-        }
+        /// <summary>
+        /// Gets the number of elements in the loaded collection.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
+        public int Count => GetLoadedCollection().Count;
 
-        public bool IsReadOnly => false;
+        public bool IsReadOnly => GetLoadedCollection().IsReadOnly;
 
-        public int IndexOf(T item)
-        {
-            EnsureLoadedAsync().GetAwaiter().GetResult();
-            _loadLock.Wait();
-            try
-            {
-                return _data!.IndexOf(item);
-            }
-            finally
-            {
-                _loadLock.Release();
-            }
-        }
+        /// <summary>
+        /// Searches for the specified object and returns the zero-based index of the first occurrence within the loaded list.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
+        public int IndexOf(T item) => GetLoadedList().IndexOf(item);
 
-        public void Insert(int index, T item)
-        {
-            EnsureLoadedAsync().GetAwaiter().GetResult();
-            _loadLock.Wait();
-            try
-            {
-                _data!.Insert(index, item);
-            }
-            finally
-            {
-                _loadLock.Release();
-            }
-        }
+        /// <summary>
+        /// Inserts an item to the loaded list at the specified index.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
+        public void Insert(int index, T item) => GetLoadedList().Insert(index, item);
 
-        public void RemoveAt(int index)
-        {
-            EnsureLoadedAsync().GetAwaiter().GetResult();
-            _loadLock.Wait();
-            try
-            {
-                _data!.RemoveAt(index);
-            }
-            finally
-            {
-                _loadLock.Release();
-            }
-        }
+        /// <summary>
+        /// Removes the loaded list item at the specified index.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
+        public void RemoveAt(int index) => GetLoadedList().RemoveAt(index);
 
         public T this[int index]
         {
-            get
-            {
-                EnsureLoadedAsync().GetAwaiter().GetResult();
-                _loadLock.Wait();
-                try
-                {
-                    return _data![index];
-                }
-                finally
-                {
-                    _loadLock.Release();
-                }
-            }
-            set
-            {
-                EnsureLoadedAsync().GetAwaiter().GetResult();
-                _loadLock.Wait();
-                try
-                {
-                    _data![index] = value;
-                }
-                finally
-                {
-                    _loadLock.Release();
-                }
-            }
+            get => GetLoadedList()[index];
+            set => GetLoadedList()[index] = value;
         }
     }
 
@@ -645,22 +532,18 @@ namespace nORM.Navigation
             _isLoaded = false;
         }
 
+        /// <summary>
+        /// Gets or sets the referenced entity.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the reference has not been loaded. Use <c>LoadAsync()</c> before accessing the value.</exception>
         public T? Value
         {
             get
             {
-                if (_isLoaded)
-                    return _value;
+                if (!_isLoaded)
+                    throw new InvalidOperationException("The reference has not been loaded. Use LoadAsync() to access the value.");
 
-                lock (_loadLock)
-                {
-                    if (!_isLoaded)
-                    {
-                        NavigationPropertyExtensions.LoadNavigationPropertyAsync(_parent, _property, _context, CancellationToken.None)
-                            .GetAwaiter().GetResult();
-                    }
-                    return _value;
-                }
+                return _value;
             }
             set
             {
