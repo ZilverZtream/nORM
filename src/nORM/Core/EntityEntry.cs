@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using nORM.Mapping;
+using nORM.Navigation;
 
 #nullable enable
 
@@ -69,6 +70,12 @@ namespace nORM.Core
             CaptureOriginalValues();
             State = EntityState.Unchanged;
             _hasNotifiedChange = false;
+        }
+
+        internal void DetachEntity()
+        {
+            State = EntityState.Detached;
+            NavigationPropertyExtensions.CleanupNavigationContext(Entity);
         }
     }
 }

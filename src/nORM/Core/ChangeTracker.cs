@@ -24,7 +24,14 @@ namespace nORM.Core
             return entry;
         }
 
-        internal void Remove(object entity) => _entries.Remove(entity);
+        internal void Remove(object entity)
+        {
+            if (_entries.TryGetValue(entity, out var entry))
+            {
+                entry.DetachEntity();
+                _entries.Remove(entity);
+            }
+        }
 
         public IEnumerable<EntityEntry> Entries => _entries.Values;
 
