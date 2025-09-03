@@ -84,7 +84,6 @@ WHERE T1.[Amount] > @p0
 #### 3. **Helper Methods**
 - `GetElementType()`: Extracts element types from query expressions
 - `ExtractPropertyName()`: Gets property names from expressions
-- `ExtractCollectionPropertyName()`: Identifies collection properties in group joins
 - Enhanced `ExpressionToSqlVisitor` for multi-table contexts
 
 #### 4. **SQL Generation Enhancements**
@@ -114,8 +113,8 @@ var results = await context.Query<User>()
 ```
 
 #### **Group Join Processing**
-- Automatically sets up `GroupJoinInfo` for post-processing
-- Handles collection materialization for grouped results
+- Translates LINQ `GroupJoin` into SQL `LEFT JOIN`
+- Uses `GroupJoinInfo` to assemble result groups after materialization
 - Supports eager loading of related entities
 
 #### **Navigation Property Support**

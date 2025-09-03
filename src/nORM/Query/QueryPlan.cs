@@ -25,13 +25,12 @@ namespace nORM.Query
     internal sealed record IncludePlan(List<TableMapping.Relation> Path);
     
     internal sealed record GroupJoinInfo(
-        Type OuterType, 
-        Type InnerType, 
-        Type ResultType, 
-        Func<object, object> OuterKeySelector, 
-        Func<object, object> InnerKeySelector, 
-        Column InnerKeyColumn, 
-        string CollectionName
+        Type OuterType,
+        Type InnerType,
+        Type ResultType,
+        Func<object, object?> OuterKeySelector,
+        Column InnerKeyColumn,
+        Func<object, IEnumerable<object>, object> ResultSelector
     );
 
     internal sealed class QueryPlanCacheKey : IEquatable<QueryPlanCacheKey>

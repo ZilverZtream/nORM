@@ -128,13 +128,13 @@ namespace nORM.Query
 
             Visit(e);
 
-            var projectType = _projection?.Body.Type ?? _rootType ?? _mapping.Type;
+            var materializerType = _projection?.Body.Type ?? _rootType ?? _mapping.Type;
             if (_isAggregate && _groupBy.Count == 0 && (e as MethodCallExpression)?.Method.Name is "Count" or "LongCount")
             {
-                projectType = typeof(int);
+                materializerType = typeof(int);
             }
 
-            var materializer = CreateMaterializer(_mapping, projectType, _projection);
+            var materializer = CreateMaterializer(_mapping, materializerType, _projection);
             var isScalar = _isAggregate && _groupBy.Count == 0;
 
             if (_sql.Length == 0)
@@ -172,7 +172,9 @@ namespace nORM.Query
             var singleResult = _singleResult || _methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
                 or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
 
-            return new QueryPlan(_sql.ToString(), _params, materializer, projectType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray());
+            var elementType = _groupJoinInfo?.ResultType ?? materializerType;
+
+            return new QueryPlan(_sql.ToString(), _params, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray());
         }
 
         private TableMapping TrackMapping(Type type)
@@ -825,33 +827,57 @@ namespace nORM.Query
 
             if (isGroupJoin)
             {
-                _projection = resultSelector;
-
                 var outerType = outerKeySelector.Parameters[0].Type;
                 var innerType = innerKeySelector.Parameters[0].Type;
                 var resultType = resultSelector.Body.Type;
 
-                var collectionName = ExtractCollectionPropertyName(resultSelector);
-                if (collectionName != null)
+                var innerAlias = "T" + (++_joinCounter);
+
+                if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
+                    _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
+                var outerKeyVisitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams);
+                var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
+
+                if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
+                    _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
+                var innerKeyVisitor = new ExpressionToSqlVisitor(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams);
+                var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
+
+                foreach (var kvp in outerKeyVisitor.GetParameters())
+                    _params[kvp.Key] = kvp.Value;
+                foreach (var kvp in innerKeyVisitor.GetParameters())
+                    _params[kvp.Key] = kvp.Value;
+
+                var joinSql = new StringBuilder(256);
+                var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+                var innerColumns = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
+                joinSql.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
+                joinSql.Append($"FROM {_mapping.EscTable} {outerAlias} ");
+                joinSql.Append($"LEFT JOIN {innerMapping.EscTable} {innerAlias} ON {outerKeySql} = {innerKeySql}");
+
+                _sql.Clear();
+                _sql.Append(joinSql.ToString());
+
+                var tupleCtor = typeof(ValueTuple<object, object>).GetConstructor(new[] { typeof(object), typeof(object) })!;
+                var tupleExpr = Expression.New(tupleCtor,
+                    Expression.Convert(outerKeySelector.Parameters[0], typeof(object)),
+                    Expression.Convert(innerKeySelector.Parameters[0], typeof(object)));
+                _projection = Expression.Lambda(tupleExpr, outerKeySelector.Parameters[0], innerKeySelector.Parameters[0]);
+
+                var innerKeyColumn = innerMapping.Columns.FirstOrDefault(c =>
+                    ExtractPropertyName(innerKeySelector.Body) == c.PropName);
+                if (innerKeyColumn != null)
                 {
-                    var innerKeyColumn = innerMapping.Columns.FirstOrDefault(c =>
-                        ExtractPropertyName(innerKeySelector.Body) == c.PropName);
-
-                    if (innerKeyColumn != null)
-                    {
-                        var outerKeyFunc = CreateObjectKeySelector(outerKeySelector);
-                        var innerKeyFunc = CreateObjectKeySelector(innerKeySelector);
-
-                        _groupJoinInfo = new GroupJoinInfo(
-                            outerType,
-                            innerType,
-                            resultType,
-                            outerKeyFunc,
-                            innerKeyFunc,
-                            innerKeyColumn,
-                            collectionName
-                        );
-                    }
+                    var outerKeyFunc = CreateObjectKeySelector(outerKeySelector);
+                    var resultSelectorFunc = CompileGroupJoinResultSelector(resultSelector);
+                    _groupJoinInfo = new GroupJoinInfo(
+                        outerType,
+                        innerType,
+                        resultType,
+                        outerKeyFunc,
+                        innerKeyColumn,
+                        resultSelectorFunc
+                    );
                 }
 
                 return node;
@@ -1296,50 +1322,6 @@ namespace nORM.Query
             };
         }
 
-        private static string? ExtractCollectionPropertyName(LambdaExpression resultSelector)
-        {
-            // Look for patterns like: new { user, orders = orders } or new SomeType { Orders = orders }
-            if (resultSelector.Body is NewExpression newExpr)
-            {
-                // Anonymous type or constructor with parameters
-                for (int i = 0; i < newExpr.Arguments.Count; i++)
-                {
-                    var arg = newExpr.Arguments[i];
-                    if (arg is ParameterExpression param && param.Type.IsGenericType)
-                    {
-                        var genericTypeDef = param.Type.GetGenericTypeDefinition();
-                        if (genericTypeDef == typeof(IEnumerable<>) || genericTypeDef == typeof(ICollection<>) || genericTypeDef == typeof(List<>))
-                        {
-                            // This is likely the collection parameter
-                            if (newExpr.Members != null && i < newExpr.Members.Count)
-                            {
-                                return newExpr.Members[i].Name;
-                            }
-                        }
-                    }
-                }
-            }
-            else if (resultSelector.Body is MemberInitExpression memberInit)
-            {
-                // Object initializer syntax
-                foreach (var binding in memberInit.Bindings)
-                {
-                    if (binding is MemberAssignment assignment && 
-                        assignment.Expression is ParameterExpression param &&
-                        param.Type.IsGenericType)
-                    {
-                        var genericTypeDef = param.Type.GetGenericTypeDefinition();
-                        if (genericTypeDef == typeof(IEnumerable<>) || genericTypeDef == typeof(ICollection<>) || genericTypeDef == typeof(List<>))
-                        {
-                            return binding.Member.Name;
-                        }
-                    }
-                }
-            }
-            
-            return null;
-        }
-
         private Expression HandleAggregateExpression(MethodCallExpression node)
         {
             // node.Arguments[0] = source query
@@ -1733,6 +1715,25 @@ namespace nORM.Query
                         $"Error executing key selector for type {parameterType.Name}: {ex.Message}", ex);
                 }
             };
+        }
+
+        private static Func<object, IEnumerable<object>, object> CompileGroupJoinResultSelector(LambdaExpression resultSelector)
+        {
+            var outerParam = Expression.Parameter(typeof(object), "outer");
+            var innerParam = Expression.Parameter(typeof(IEnumerable<object>), "inners");
+
+            var castOuter = Expression.Convert(outerParam, resultSelector.Parameters[0].Type);
+            var innerElementType = resultSelector.Parameters[1].Type.GetGenericArguments()[0];
+            var castMethod = typeof(Enumerable).GetMethod("Cast")!.MakeGenericMethod(innerElementType);
+            var castInner = Expression.Call(castMethod, innerParam);
+
+            Expression body = resultSelector.Body;
+            body = new ParameterReplacer(resultSelector.Parameters[0], castOuter).Visit(body)!;
+            body = new ParameterReplacer(resultSelector.Parameters[1], castInner).Visit(body)!;
+            body = Expression.Convert(body, typeof(object));
+
+            var lambda = Expression.Lambda<Func<object, IEnumerable<object>, object>>(body, outerParam, innerParam);
+            return lambda.Compile();
         }
 
         private sealed class ParameterReplacer : ExpressionVisitor
