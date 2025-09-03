@@ -14,6 +14,7 @@ nORM (The Norm) is a modern, high-performance Object-Relational Mapping (ORM) li
 - **🏢 Enterprise Ready**: Multi-tenancy, connection resilience, advanced logging, and migration framework
 - **📊 Bulk Operations**: High-performance bulk insert, update, and delete operations
 - **🔧 Provider Agnostic**: Support for SQL Server, PostgreSQL, SQLite, and MySQL
+- **🔗 Smart Conventions**: Automatic relationship discovery using standard naming patterns
 - **🎯 Simple API**: Clean, intuitive API that feels familiar to EF users
 - **🔨 Database Scaffolding**: Reverse-engineer existing databases into entity classes and a DbContext
 

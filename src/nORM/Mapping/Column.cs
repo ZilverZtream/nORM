@@ -35,6 +35,22 @@ namespace nORM.Mapping
             IsTimestamp = pi.GetCustomAttribute<TimestampAttribute>() != null;
             IsDbGenerated = pi.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity;
             ForeignKeyPrincipalTypeName = pi.GetCustomAttribute<ForeignKeyAttribute>()?.Name;
+            if (ForeignKeyPrincipalTypeName == null && !IsKey)
+            {
+                var propName = pi.Name;
+                if (propName.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && propName.Length > 2)
+                {
+                    var principalName = propName[..^2];
+                    if (!string.Equals(principalName, "Id", StringComparison.OrdinalIgnoreCase))
+                        ForeignKeyPrincipalTypeName = principalName;
+                }
+                else
+                {
+                    var underscore = propName.IndexOf('_');
+                    if (underscore > 0)
+                        ForeignKeyPrincipalTypeName = propName.Substring(0, underscore);
+                }
+            }
 
             Getter = getterOverride ?? CreateGetterDelegate(pi);
             Setter = setterOverride ?? CreateSetterDelegate(pi);
