@@ -107,7 +107,7 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var provider = setup.Provider;
         var (sql, _, _) = TranslateQuery<Product, Product>(q => q.Take(5), connection, provider);
         var sb = new StringBuilder(BaseSelect(provider));
-        provider.ApplyPaging(sb, 5, null);
+        provider.ApplyPaging(sb, 5, null, null, null);
         var expected = sb.ToString();
         Assert.Equal(expected, sql);
     }
@@ -121,7 +121,7 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var provider = setup.Provider;
         var (sql, _, _) = TranslateQuery<Product, Product>(q => q.Skip(10), connection, provider);
         var sb = new StringBuilder(BaseSelect(provider));
-        provider.ApplyPaging(sb, null, 10);
+        provider.ApplyPaging(sb, null, 10, null, null);
         var expected = sb.ToString();
         Assert.Equal(expected, sql);
     }
@@ -135,7 +135,7 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var provider = setup.Provider;
         var (sql, _, _) = TranslateQuery<Product, Product>(q => q.OrderBy(p => p.Id).Skip(20).Take(10), connection, provider);
         var sb = new StringBuilder($"{BaseSelect(provider, true)} ORDER BY T0.{provider.Escape("Id")} ASC");
-        provider.ApplyPaging(sb, 10, 20);
+        provider.ApplyPaging(sb, 10, 20, null, null);
         var expected = sb.ToString();
         Assert.Equal(expected, sql);
     }

@@ -15,6 +15,8 @@ namespace nORM.Query
         public List<string> GroupBy { get; } = new();
         public int? Take { get; set; }
         public int? Skip { get; set; }
+        public string? TakeParam { get; set; }
+        public string? SkipParam { get; set; }
         public bool IsDistinct { get; set; }
     }
 }

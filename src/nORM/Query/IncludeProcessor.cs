@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Core;
+using nORM.Internal;
 using nORM.Mapping;
 using nORM.Navigation;
 

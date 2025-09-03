@@ -4,7 +4,6 @@ using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Reflection.Emit;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Internal;
@@ -76,60 +75,81 @@ namespace nORM.Query
                 };
             }
 
-            var dm = new DynamicMethod("mat_" + Guid.NewGuid().ToString("N"), typeof(object), new[] { typeof(DbDataReader) }, targetType.Module, true);
-            var il = dm.GetILGenerator();
-
+            // Handle simple scalar types directly
             if (targetType.IsPrimitive || targetType == typeof(decimal) || targetType == typeof(string))
             {
-                var read = Methods.GetReaderMethod(targetType);
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldc_I4_0);
-                il.EmitCall(OpCodes.Callvirt, read, null);
-                if (read.ReturnType == typeof(object))
-                    il.Emit(OpCodes.Unbox_Any, targetType);
-                else if (read.ReturnType != targetType)
-                    il.Emit(OpCodes.Box, read.ReturnType);
-                if (targetType.IsValueType)
-                    il.Emit(OpCodes.Box, targetType);
-                il.Emit(OpCodes.Ret);
-                return (Func<DbDataReader, object>)dm.CreateDelegate(typeof(Func<DbDataReader, object>));
+                return reader =>
+                {
+                    if (reader.IsDBNull(0))
+                        return targetType.IsValueType ? Activator.CreateInstance(targetType)! : null!;
+                    var read = Methods.GetReaderMethod(targetType);
+                    var value = read.Invoke(reader, new object[] { 0 });
+                    if (read == Methods.GetValue)
+                        value = Convert.ChangeType(value!, targetType);
+                    return value!;
+                };
             }
-
-            var ctor = targetType.GetConstructor(Type.EmptyTypes) ?? throw new InvalidOperationException($"Type {targetType} must have a parameterless constructor");
-            il.Emit(OpCodes.Newobj, ctor);
-            var entity = il.DeclareLocal(targetType);
-            il.Emit(OpCodes.Stloc, entity);
 
             var columns = projection == null
                 ? mapping.Columns
                 : ExtractColumnsFromProjection(mapping, projection);
 
-            for (int i = 0; i < columns.Length; i++)
+            var parameterlessCtor = targetType.GetConstructor(Type.EmptyTypes);
+
+            if (parameterlessCtor != null)
             {
-                var col = columns[i];
-                var propType = col.Prop.PropertyType;
-                var read = Methods.GetReaderMethod(propType);
-                il.Emit(OpCodes.Ldloc, entity);
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldc_I4, i);
-                il.EmitCall(OpCodes.Callvirt, read, null);
-                if (read.ReturnType == typeof(object))
+                return reader =>
                 {
-                    il.Emit(OpCodes.Unbox_Any, propType);
-                }
-                else if (read.ReturnType != propType)
-                {
-                    il.Emit(OpCodes.Box, read.ReturnType);
-                    il.Emit(OpCodes.Unbox_Any, propType);
-                }
-                il.Emit(OpCodes.Callvirt, col.Prop.SetMethod!);
+                    var entity = parameterlessCtor.Invoke(null);
+                    for (int i = 0; i < columns.Length; i++)
+                    {
+                        if (reader.IsDBNull(i)) continue;
+                        var col = columns[i];
+                        var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
+                        var value = readerMethod.Invoke(reader, new object[] { i });
+                        if (readerMethod == Methods.GetValue)
+                            value = Convert.ChangeType(value!, col.Prop.PropertyType);
+                        col.Setter(entity, value);
+                    }
+                    return entity!;
+                };
             }
 
-            il.Emit(OpCodes.Ldloc, entity);
-            if (targetType.IsValueType)
-                il.Emit(OpCodes.Box, targetType);
-            il.Emit(OpCodes.Ret);
-            return (Func<DbDataReader, object>)dm.CreateDelegate(typeof(Func<DbDataReader, object>));
+            // Constructor with parameters (record types, anonymous types, etc.)
+            var ctor = targetType.GetConstructors()
+                .OrderByDescending(c => c.GetParameters().Length)
+                .FirstOrDefault(c =>
+                {
+                    var ps = c.GetParameters();
+                    if (ps.Length != columns.Length) return false;
+                    for (int i = 0; i < ps.Length; i++)
+                    {
+                        if (!string.Equals(ps[i].Name, columns[i].Prop.Name, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                    }
+                    return true;
+                }) ?? throw new InvalidOperationException($"Type {targetType} has no suitable constructor");
+
+            return reader =>
+            {
+                var args = new object?[columns.Length];
+                var parameters = ctor.GetParameters();
+                for (int i = 0; i < columns.Length; i++)
+                {
+                    if (reader.IsDBNull(i))
+                    {
+                        args[i] = parameters[i].ParameterType.IsValueType ? Activator.CreateInstance(parameters[i].ParameterType) : null;
+                        continue;
+                    }
+                    var paramType = parameters[i].ParameterType;
+                    var readerMethod = Methods.GetReaderMethod(paramType);
+                    var value = readerMethod.Invoke(reader, new object[] { i });
+                    if (readerMethod == Methods.GetValue)
+                        value = Convert.ChangeType(value!, paramType);
+                    args[i] = value;
+                }
+                return ctor.Invoke(args)!;
+            };
         }
 
         private static Column[] ExtractColumnsFromProjection(TableMapping mapping, LambdaExpression projection)
@@ -144,7 +164,5 @@ namespace nORM.Query
             return mapping.Columns;
         }
 
-        private static bool IsScalarType(Type type) =>
-            type.IsPrimitive || type == typeof(string) || type == typeof(decimal);
     }
 }

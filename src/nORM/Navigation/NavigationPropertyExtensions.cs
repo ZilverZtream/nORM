@@ -370,7 +370,7 @@ namespace nORM.Navigation
             
             // Apply LIMIT 1 for single result
             var sql = new System.Text.StringBuilder(cmd.CommandText);
-            context.Provider.ApplyPaging(sql, 1, null);
+            context.Provider.ApplyPaging(sql, 1, null, null, null);
             cmd.CommandText = sql.ToString();
 
             var materializer = new Query.QueryTranslator(context).CreateMaterializer(mapping, entityType);

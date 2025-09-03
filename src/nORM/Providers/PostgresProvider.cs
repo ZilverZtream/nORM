@@ -18,10 +18,17 @@ namespace nORM.Providers
     {
         public override string Escape(string id) => $"\"{id}\"";
         
-        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset)
+        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam)
         {
-            if (limit.HasValue) sb.Append($" LIMIT {limit}");
-            if (offset.HasValue) sb.Append($" OFFSET {offset}");
+            if (limitParam != null)
+                sb.Append(" LIMIT ").Append(limitParam);
+            else if (limit.HasValue)
+                sb.Append($" LIMIT {limit}");
+
+            if (offsetParam != null)
+                sb.Append(" OFFSET ").Append(offsetParam);
+            else if (offset.HasValue)
+                sb.Append($" OFFSET {offset}");
         }
         
         public override string GetIdentityRetrievalString(TableMapping m)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
+using nORM.Internal;
 using nORM.Query;
 
 #nullable enable
@@ -17,27 +18,42 @@ namespace nORM.Core
         {
             if (queryExpression == null) throw new ArgumentNullException(nameof(queryExpression));
 
-            var compiled = queryExpression.Compile();
             QueryPlan? cachedPlan = null;
-            string? paramName = null;
+            IReadOnlyList<string>? paramNames = null;
 
             return async (ctx, value) =>
             {
                 if (cachedPlan == null)
                 {
-                    var query = compiled(ctx, value);
+                    var ctxParam = queryExpression.Parameters[0];
+                    var body = new ParameterReplacer(ctxParam, Expression.Constant(ctx)).Visit(queryExpression.Body)!;
+                    body = new QueryCallEvaluator().Visit(body)!;
                     var provider = new NormQueryProvider(ctx);
-                    cachedPlan = provider.GetPlan(query.Expression, out _);
-                    paramName = cachedPlan.Parameters.Keys.FirstOrDefault();
+                    cachedPlan = provider.GetPlan(body, out _);
+                    paramNames = cachedPlan.CompiledParameters;
                 }
 
                 var parameters = cachedPlan.Parameters.ToDictionary(k => k.Key, v => v.Value);
-                if (paramName != null)
-                    parameters[paramName] = value!;
+                if (paramNames != null)
+                    foreach (var name in paramNames)
+                        parameters[name] = value!;
 
                 var execProvider = new NormQueryProvider(ctx);
                 return await execProvider.ExecuteCompiledAsync<List<T>>(cachedPlan, parameters, default);
             };
+        }
+
+        private sealed class QueryCallEvaluator : ExpressionVisitor
+        {
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                if (node.Method.DeclaringType == typeof(NormQueryable) && node.Method.Name == "Query")
+                {
+                    var result = Expression.Lambda(node).Compile().DynamicInvoke();
+                    return Expression.Constant(result, node.Type);
+                }
+                return base.VisitMethodCall(node);
+            }
         }
     }
 }
