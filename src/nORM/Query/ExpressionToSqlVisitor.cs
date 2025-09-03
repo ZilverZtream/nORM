@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
@@ -162,6 +163,51 @@ namespace nORM.Query
                 }
                 return node;
             }
+            if (node.Method.Name == nameof(List<int>.Contains))
+            {
+                Expression? collectionExpr = null;
+                Expression? valueExpr = null;
+
+                if (node.Method.DeclaringType == typeof(Enumerable))
+                {
+                    if (node.Arguments.Count == 2)
+                    {
+                        collectionExpr = node.Arguments[0];
+                        valueExpr = node.Arguments[1];
+                    }
+                }
+                else if (node.Object != null && node.Arguments.Count == 1)
+                {
+                    collectionExpr = node.Object;
+                    valueExpr = node.Arguments[0];
+                }
+
+                if (collectionExpr != null && valueExpr != null && TryGetConstantValue(collectionExpr, out var colVal) && colVal is IEnumerable en && colVal is not string)
+                {
+                    var items = new List<object?>();
+                    foreach (var item in en)
+                        items.Add(item);
+
+                    if (items.Count == 0)
+                    {
+                        _sql.Append("(1=0)");
+                        return node;
+                    }
+
+                    Visit(valueExpr);
+                    _sql.Append(" IN (");
+                    for (int i = 0; i < items.Count; i++)
+                    {
+                        if (i > 0) _sql.Append(", ");
+                        var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                        _params[paramName] = items[i] ?? DBNull.Value;
+                        _sql.Append(paramName);
+                    }
+                    _sql.Append(")");
+                    return node;
+                }
+            }
+
             if (node.Method.DeclaringType == typeof(Queryable))
             {
                 switch (node.Method.Name)
