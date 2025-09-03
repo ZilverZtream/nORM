@@ -314,9 +314,18 @@ namespace nORM.Query
             }
             else
             {
-                if (targetType.GetConstructor(Type.EmptyTypes) == null)
+                var hasDefaultCtor = targetType.GetConstructor(Type.EmptyTypes) != null;
+                var isRecord = IsRecordType(targetType);
+
+                if (!hasDefaultCtor)
                 {
-                    var ctor = targetType.GetConstructors().OrderByDescending(c => c.GetParameters().Length).First();
+                    var constructors = targetType.GetConstructors();
+                    if (isRecord)
+                        constructors = constructors
+                            .Where(c => !c.GetParameters().Any(p => p.ParameterType == targetType))
+                            .ToArray();
+
+                    var ctor = constructors.OrderByDescending(c => c.GetParameters().Length).First();
                     var parameters = ctor.GetParameters();
                     var locals = new LocalBuilder[parameters.Length];
                     var used = new HashSet<string>(parameters.Select(p => p.Name!), StringComparer.OrdinalIgnoreCase);
@@ -401,31 +410,93 @@ namespace nORM.Query
 
         private void EmitObjectMaterialization(ILGenerator il, TableMapping mapping, LocalBuilder localVar, int startColumnIndex)
         {
-            // Create new instance of the object
-            il.Emit(OpCodes.Newobj, mapping.Type.GetConstructor(Type.EmptyTypes)!);
-            il.Emit(OpCodes.Stloc, localVar);
+            var hasDefaultCtor = mapping.Type.GetConstructor(Type.EmptyTypes) != null;
+            var isRecord = IsRecordType(mapping.Type);
 
-            // Set all properties
-            for (int i = 0; i < mapping.Columns.Length; i++)
+            if (!hasDefaultCtor)
             {
-                var col = mapping.Columns[i];
-                var endOfBlock = il.DefineLabel();
-                
-                // Check for null
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
-                il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
-                il.Emit(OpCodes.Brtrue_S, endOfBlock);
-                
-                // Set property value
-                il.Emit(OpCodes.Ldloc, localVar);
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
-                var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
-                il.Emit(OpCodes.Callvirt, readerMethod);
-                if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
-                il.Emit(OpCodes.Callvirt, col.SetterMethod);
-                il.MarkLabel(endOfBlock);
+                var constructors = mapping.Type.GetConstructors();
+                if (isRecord)
+                    constructors = constructors
+                        .Where(c => !c.GetParameters().Any(p => p.ParameterType == mapping.Type))
+                        .ToArray();
+
+                var ctor = constructors.OrderByDescending(c => c.GetParameters().Length).First();
+                var parameters = ctor.GetParameters();
+                var locals = new LocalBuilder[parameters.Length];
+                var used = new HashSet<string>(parameters.Select(p => p.Name!), StringComparer.OrdinalIgnoreCase);
+
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    var param = parameters[i];
+                    var col = mapping.Columns.First(c => string.Equals(c.Prop.Name, param.Name, StringComparison.OrdinalIgnoreCase));
+                    var colIndex = startColumnIndex + Array.IndexOf(mapping.Columns, col);
+                    locals[i] = il.DeclareLocal(param.ParameterType);
+                    var endOfBlock = il.DefineLabel();
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, colIndex);
+                    il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
+                    il.Emit(OpCodes.Brtrue_S, endOfBlock);
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, colIndex);
+                    var readerMethod = Methods.GetReaderMethod(param.ParameterType);
+                    il.Emit(OpCodes.Callvirt, readerMethod);
+                    if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, param.ParameterType);
+                    il.Emit(OpCodes.Stloc, locals[i]);
+                    il.MarkLabel(endOfBlock);
+                }
+
+                foreach (var l in locals) il.Emit(OpCodes.Ldloc, l);
+                il.Emit(OpCodes.Newobj, ctor);
+                il.Emit(OpCodes.Stloc, localVar);
+
+                for (int i = 0; i < mapping.Columns.Length; i++)
+                {
+                    var col = mapping.Columns[i];
+                    if (used.Contains(col.Prop.Name)) continue;
+                    var endOfBlock = il.DefineLabel();
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
+                    il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
+                    il.Emit(OpCodes.Brtrue_S, endOfBlock);
+                    il.Emit(OpCodes.Ldloc, localVar);
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
+                    var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
+                    il.Emit(OpCodes.Callvirt, readerMethod);
+                    if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
+                    il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                    il.MarkLabel(endOfBlock);
+                }
+            }
+            else
+            {
+                // Create new instance of the object
+                il.Emit(OpCodes.Newobj, mapping.Type.GetConstructor(Type.EmptyTypes)!);
+                il.Emit(OpCodes.Stloc, localVar);
+
+                // Set all properties
+                for (int i = 0; i < mapping.Columns.Length; i++)
+                {
+                    var col = mapping.Columns[i];
+                    var endOfBlock = il.DefineLabel();
+
+                    // Check for null
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
+                    il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
+                    il.Emit(OpCodes.Brtrue_S, endOfBlock);
+
+                    // Set property value
+                    il.Emit(OpCodes.Ldloc, localVar);
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
+                    var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
+                    il.Emit(OpCodes.Callvirt, readerMethod);
+                    if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
+                    il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                    il.MarkLabel(endOfBlock);
+                }
             }
         }
 
@@ -1029,6 +1100,9 @@ namespace nORM.Query
 
             return neededColumns.ToList();
         }
+
+        private static bool IsRecordType(Type type) =>
+            type.GetMethod("<Clone>$", BindingFlags.Instance | BindingFlags.NonPublic) != null;
 
         private static string? ExtractPropertyName(Expression expression)
         {
