@@ -21,6 +21,7 @@ namespace nORM.Mapping
         public readonly Column[] Columns;
         public readonly Column[] KeyColumns;
         public readonly Column? TimestampColumn;
+        public string TableName { get; }
         public readonly Dictionary<string, Relation> Relations = new();
         public readonly DatabaseProvider Provider;
         public readonly Column? DiscriminatorColumn = null;
@@ -37,11 +38,13 @@ namespace nORM.Mapping
             {
                 var principal = ctx.GetMapping(splitType);
                 EscTable = principal.EscTable;
+                TableName = principal.TableName;
             }
             else
             {
                 var tableName = fluentConfig?.TableName ?? t.GetCustomAttribute<TableAttribute>()?.Name ?? t.Name;
                 EscTable = p.Escape(tableName);
+                TableName = tableName;
             }
 
             var cols = new List<Column>();

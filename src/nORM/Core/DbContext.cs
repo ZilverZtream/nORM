@@ -117,7 +117,8 @@ namespace nORM.Core
         {
             ChangeTracker.DetectChanges();
             var entries = ChangeTracker.Entries.ToList();
-            if (!entries.Any(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
+            var changedEntries = entries.Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted).ToList();
+            if (changedEntries.Count == 0)
             {
                 return 0;
             }
@@ -126,7 +127,7 @@ namespace nORM.Core
             await using var transaction = await Connection.BeginTransactionAsync(ct);
             try
             {
-                foreach (var entry in entries)
+                foreach (var entry in changedEntries)
                 {
                     switch (entry.State)
                     {
@@ -145,6 +146,19 @@ namespace nORM.Core
                     }
                 }
                 await transaction.CommitAsync(ct);
+
+                var cache = Options.CacheProvider;
+                if (cache != null)
+                {
+                    var tags = new HashSet<string>();
+                    foreach (var entry in changedEntries)
+                    {
+                        var map = GetMapping(entry.Entity.GetType());
+                        tags.Add(map.TableName);
+                    }
+                    foreach (var tag in tags)
+                        cache.InvalidateTag(tag);
+                }
             }
             catch
             {

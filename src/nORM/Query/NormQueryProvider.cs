@@ -134,7 +134,7 @@ namespace nORM.Query
             }
 
             if (cache != null && cacheKey != null)
-                cache.Set(cacheKey, (TResult)result!, _ctx.Options.CacheExpiration);
+                cache.Set(cacheKey, (TResult)result!, _ctx.Options.CacheExpiration, plan.Tables);
 
             return (TResult)result!;
         }
@@ -189,7 +189,7 @@ namespace nORM.Query
 
             _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, count);
             if (cache != null && cacheKey != null)
-                cache.Set(cacheKey, cacheList ?? new List<T>(), _ctx.Options.CacheExpiration);
+                cache.Set(cacheKey, cacheList ?? new List<T>(), _ctx.Options.CacheExpiration, plan.Tables);
         }
 
         private async Task<IList> MaterializeAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
