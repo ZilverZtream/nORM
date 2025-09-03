@@ -592,15 +592,13 @@ namespace nORM.Query
                 joinSqlG.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
                 joinSqlG.Append($"FROM {_mapping.EscTable} {outerAlias} ");
                 joinSqlG.Append($"LEFT JOIN {innerMapping.EscTable} {innerAliasG} ON {outerKeySqlG} = {innerKeySqlG}");
+                joinSqlG.Append($" ORDER BY {outerKeySqlG}");
 
                 _sql.Clear();
                 _sql.Append(joinSqlG.ToString());
 
-                var tupleCtor = typeof(ValueTuple<object, object>).GetConstructor(new[] { typeof(object), typeof(object) })!;
-                var tupleExpr = Expression.New(tupleCtor,
-                    Expression.Convert(outerKeySelector.Parameters[0], typeof(object)),
-                    Expression.Convert(innerKeySelector.Parameters[0], typeof(object)));
-                _projection = Expression.Lambda(tupleExpr, outerKeySelector.Parameters[0], innerKeySelector.Parameters[0]);
+                // Reset projection so outer entities are materialized directly
+                _projection = null;
 
                 var innerKeyColumn = innerMapping.Columns.FirstOrDefault(c =>
                     ExtractPropertyName(innerKeySelector.Body) == c.PropName);
