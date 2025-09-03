@@ -108,6 +108,159 @@ namespace nORM.Core
                 "Make sure you started with context.Query<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SumAsync().");
         }
+
+        /// <summary>
+        /// Computes the sum of a sequence of nullable decimal values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<decimal?> SumAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, decimal?>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Sum");
+                return normProvider.ExecuteAsync<decimal?>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "SumAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SumAsync().");
+        }
+
+        /// <summary>
+        /// Computes the sum of a sequence of double values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<double> SumAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, double>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Sum");
+                return normProvider.ExecuteAsync<double>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "SumAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SumAsync().");
+        }
+
+        /// <summary>
+        /// Computes the sum of a sequence of nullable double values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<double?> SumAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, double?>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Sum");
+                return normProvider.ExecuteAsync<double?>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "SumAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SumAsync().");
+        }
+
+        /// <summary>
+        /// Computes the sum of a sequence of float values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<float> SumAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, float>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Sum");
+                return normProvider.ExecuteAsync<float>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "SumAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SumAsync().");
+        }
+
+        /// <summary>
+        /// Computes the sum of a sequence of nullable float values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<float?> SumAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, float?>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Sum");
+                return normProvider.ExecuteAsync<float?>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "SumAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SumAsync().");
+        }
+
+        /// <summary>
+        /// Computes the sum of a sequence of int values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<int> SumAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, int>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Sum");
+                return normProvider.ExecuteAsync<int>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "SumAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SumAsync().");
+        }
+
+        /// <summary>
+        /// Computes the sum of a sequence of nullable int values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<int?> SumAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, int?>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Sum");
+                return normProvider.ExecuteAsync<int?>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "SumAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SumAsync().");
+        }
+
+        /// <summary>
+        /// Computes the sum of a sequence of long values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<long> SumAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, long>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Sum");
+                return normProvider.ExecuteAsync<long>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "SumAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SumAsync().");
+        }
+
+        /// <summary>
+        /// Computes the sum of a sequence of nullable long values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<long?> SumAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, long?>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Sum");
+                return normProvider.ExecuteAsync<long?>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "SumAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SumAsync().");
+        }
         
         /// <summary>
         /// Computes the average of a sequence of decimal values (for LINQ chained nORM queries only)
@@ -119,6 +272,163 @@ namespace nORM.Core
             {
                 var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Average");
                 return normProvider.ExecuteAsync<decimal>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "AverageAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AverageAsync().");
+        }
+
+        /// <summary>
+        /// Computes the average of a sequence of nullable decimal values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<decimal?> AverageAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, decimal?>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Average");
+                return normProvider.ExecuteAsync<decimal?>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "AverageAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AverageAsync().");
+        }
+
+        /// <summary>
+        /// Computes the average of a sequence of double values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<double> AverageAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, double>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Average");
+                return normProvider.ExecuteAsync<double>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "AverageAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AverageAsync().");
+        }
+
+        /// <summary>
+        /// Computes the average of a sequence of nullable double values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<double?> AverageAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, double?>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Average");
+                return normProvider.ExecuteAsync<double?>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "AverageAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AverageAsync().");
+        }
+
+        /// <summary>
+        /// Computes the average of a sequence of float values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<float> AverageAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, float>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Average");
+                return normProvider.ExecuteAsync<float>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "AverageAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AverageAsync().");
+        }
+
+        /// <summary>
+        /// Computes the average of a sequence of nullable float values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<float?> AverageAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, float?>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var aggregateExpression = CreateAggregateExpression(source.Expression, selector, "Average");
+                return normProvider.ExecuteAsync<float?>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "AverageAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AverageAsync().");
+        }
+
+        /// <summary>
+        /// Computes the average of a sequence of int values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<double> AverageAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, int>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var converted = Expression.Lambda<Func<TSource, double>>(Expression.Convert(selector.Body, typeof(double)), selector.Parameters);
+                var aggregateExpression = CreateAggregateExpression(source.Expression, converted, "Average");
+                return normProvider.ExecuteAsync<double>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "AverageAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AverageAsync().");
+        }
+
+        /// <summary>
+        /// Computes the average of a sequence of nullable int values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<double?> AverageAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, int?>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var converted = Expression.Lambda<Func<TSource, double?>>(Expression.Convert(selector.Body, typeof(double?)), selector.Parameters);
+                var aggregateExpression = CreateAggregateExpression(source.Expression, converted, "Average");
+                return normProvider.ExecuteAsync<double?>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "AverageAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AverageAsync().");
+        }
+
+        /// <summary>
+        /// Computes the average of a sequence of long values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<double> AverageAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, long>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var converted = Expression.Lambda<Func<TSource, double>>(Expression.Convert(selector.Body, typeof(double)), selector.Parameters);
+                var aggregateExpression = CreateAggregateExpression(source.Expression, converted, "Average");
+                return normProvider.ExecuteAsync<double>(aggregateExpression, ct);
+            }
+            throw new InvalidOperationException(
+                "AverageAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AverageAsync().");
+        }
+
+        /// <summary>
+        /// Computes the average of a sequence of nullable long values (for LINQ chained nORM queries only)
+        /// </summary>
+        public static Task<double?> AverageAsync<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, long?>> selector, CancellationToken ct = default)
+            where TSource : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var converted = Expression.Lambda<Func<TSource, double?>>(Expression.Convert(selector.Body, typeof(double?)), selector.Parameters);
+                var aggregateExpression = CreateAggregateExpression(source.Expression, converted, "Average");
+                return normProvider.ExecuteAsync<double?>(aggregateExpression, ct);
             }
             throw new InvalidOperationException(
                 "AverageAsync extension can only be used with nORM queries. " +

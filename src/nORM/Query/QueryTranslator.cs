@@ -302,6 +302,23 @@ namespace nORM.Query
                     _isDistinct = true;
                     return Visit(node.Arguments[0]);
 
+                case "Reverse":
+                    var revSource = Visit(node.Arguments[0]);
+                    if (_orderBy.Count > 0)
+                    {
+                        for (int i = 0; i < _orderBy.Count; i++)
+                        {
+                            var (col, asc) = _orderBy[i];
+                            _orderBy[i] = (col, !asc);
+                        }
+                    }
+                    else
+                    {
+                        foreach (var key in _mapping.KeyColumns)
+                            _orderBy.Add((key.EscCol, false));
+                    }
+                    return revSource;
+
                 case "Union":
                 case "Intersect":
                 case "Except":
@@ -321,6 +338,45 @@ namespace nORM.Query
                 case "Any":
                 case "Contains":
                     return HandleSetOperation(node);
+
+                case "ElementAt":
+                case "ElementAtOrDefault":
+                    var elementSource = Visit(node.Arguments[0]);
+                    if (node.Arguments[1] is ParameterExpression eaParam)
+                    {
+                        if (!_paramMap.TryGetValue(eaParam, out var eName))
+                        {
+                            eName = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
+                            _params[eName] = DBNull.Value;
+                            _compiledParams.Add(eName);
+                            _paramMap[eaParam] = eName;
+                        }
+                        if (_skipParam != null)
+                            _skipParam = $"({_skipParam} + {eName})";
+                        else if (_skip != null)
+                        {
+                            _skipParam = $"({_skip} + {eName})";
+                            _skip = null;
+                        }
+                        else
+                            _skipParam = eName;
+                    }
+                    else if (TryGetIntValue(node.Arguments[1], out int index))
+                    {
+                        if (_skipParam != null)
+                            _skipParam = $"({_skipParam} + {index})";
+                        else
+                            _skip = (_skip ?? 0) + index;
+                    }
+                    else
+                        throw new NotSupportedException("ElementAt requires constant integer index or parameter.");
+
+                    _take = 1;
+                    _singleResult = _methodName == "ElementAt";
+                    if (_orderBy.Count == 0)
+                        foreach (var key in _mapping.KeyColumns)
+                            _orderBy.Add((key.EscCol, true));
+                    return elementSource;
 
                 case "First":
                 case "FirstOrDefault":
@@ -343,6 +399,40 @@ namespace nORM.Query
                     _take = 1;
                     _singleResult = _methodName == "First" || _methodName == "Single";
                     return Visit(node.Arguments[0]);
+
+                case "Last":
+                case "LastOrDefault":
+                    if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression lastPredicate)
+                    {
+                        var param = lastPredicate.Parameters[0];
+                        var alias = "T" + _joinCounter;
+                        if (!_correlatedParams.ContainsKey(param))
+                            _correlatedParams[param] = (_mapping, alias);
+                        var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
+                        var sql = visitor.Translate(lastPredicate.Body);
+                        if (_where.Length > 0) _where.Append(" AND ");
+                        _where.Append($"({sql})");
+
+                        foreach (var kvp in visitor.GetParameters())
+                            _params[kvp.Key] = kvp.Value;
+                    }
+                    var lastSrc = Visit(node.Arguments[0]);
+                    if (_orderBy.Count > 0)
+                    {
+                        for (int i = 0; i < _orderBy.Count; i++)
+                        {
+                            var (col, asc) = _orderBy[i];
+                            _orderBy[i] = (col, !asc);
+                        }
+                    }
+                    else
+                    {
+                        foreach (var key in _mapping.KeyColumns)
+                            _orderBy.Add((key.EscCol, false));
+                    }
+                    _take = 1;
+                    _singleResult = _methodName == "Last";
+                    return lastSrc;
 
                 case "Count":
                 case "LongCount":
