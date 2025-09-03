@@ -257,7 +257,7 @@ namespace nORM.Navigation
                     property.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
                 {
                     var reference = property.GetValue(entity);
-                    reference?.GetType().GetProperty("Value")?.SetValue(reference, result);
+                    reference?.GetType().GetMethod("SetValue")?.Invoke(reference, new object?[] { result });
                 }
                 else
                 {
@@ -324,7 +324,7 @@ namespace nORM.Navigation
                         property.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
                     {
                         var reference = property.GetValue(entity);
-                        reference?.GetType().GetProperty("Value")?.SetValue(reference, result);
+                        reference?.GetType().GetMethod("SetValue")?.Invoke(reference, new object?[] { result });
                     }
                     else
                     {
@@ -418,7 +418,7 @@ namespace nORM.Navigation
     /// <summary>
     /// Lazy loading collection that loads data on first enumeration
     /// </summary>
-    public sealed class LazyNavigationCollection<T> : ICollection<T>, IList<T> where T : class
+    public sealed class LazyNavigationCollection<T> : ICollection<T>, IList<T>, IAsyncEnumerable<T> where T : class
     {
         private readonly object _parent;
         private readonly PropertyInfo _property;
@@ -448,6 +448,16 @@ namespace nORM.Navigation
         public IEnumerator<T> GetEnumerator() => GetLoadedCollection().GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        public async IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken ct = default)
+        {
+            if (!_context.IsLoaded(_property.Name))
+                await NavigationPropertyExtensions.LoadNavigationPropertyAsync(_parent, _property, _context, ct).ConfigureAwait(false);
+
+            var collection = (IEnumerable<T>)(_property.GetValue(_parent) ?? Array.Empty<T>());
+            foreach (var item in collection)
+                yield return item;
+        }
 
         /// <summary>
         /// Adds an item to the loaded collection.
@@ -532,30 +542,24 @@ namespace nORM.Navigation
             _isLoaded = false;
         }
 
-        /// <summary>
-        /// Gets or sets the referenced entity.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if the reference has not been loaded. Use <c>LoadAsync()</c> before accessing the value.</exception>
-        public T? Value
+        public async Task<T?> GetValueAsync(CancellationToken ct = default)
         {
-            get
-            {
-                if (!_isLoaded)
-                    throw new InvalidOperationException("The reference has not been loaded. Use LoadAsync() to access the value.");
+            if (!_isLoaded)
+                await NavigationPropertyExtensions.LoadNavigationPropertyAsync(_parent, _property, _context, ct).ConfigureAwait(false);
 
-                return _value;
-            }
-            set
+            return _value;
+        }
+
+        public void SetValue(T? value)
+        {
+            lock (_loadLock)
             {
-                lock (_loadLock)
-                {
-                    _value = value;
-                    _isLoaded = true;
-                    _context.MarkAsLoaded(_property.Name);
-                }
+                _value = value;
+                _isLoaded = true;
+                _context.MarkAsLoaded(_property.Name);
             }
         }
 
-        public static implicit operator T?(LazyNavigationReference<T> reference) => reference.Value;
+        public static implicit operator Task<T?>(LazyNavigationReference<T> reference) => reference.GetValueAsync();
     }
 }
