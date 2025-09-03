@@ -393,7 +393,14 @@ namespace nORM.Query
                         if (col.IsShadow)
                             il.Emit(OpCodes.Call, Methods.SetShadowValue);
                         else
-                            il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                        {
+                            var setter = col.SetterMethod;
+                            var setterParams = setter.GetParameters();
+                            var valueParam = setterParams[setterParams.Length - 1].ParameterType;
+                            if (valueParam == typeof(object) && col.Prop.PropertyType.IsValueType)
+                                il.Emit(OpCodes.Box, col.Prop.PropertyType);
+                            il.Emit(setter.IsStatic ? OpCodes.Call : OpCodes.Callvirt, setter);
+                        }
                         il.MarkLabel(endOfBlock);
                     }
                     il.Emit(OpCodes.Ldloc, loc);
@@ -423,7 +430,14 @@ namespace nORM.Query
                         if (col.IsShadow)
                             il.Emit(OpCodes.Call, Methods.SetShadowValue);
                         else
-                            il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                        {
+                            var setter = col.SetterMethod;
+                            var setterParams = setter.GetParameters();
+                            var valueParam = setterParams[setterParams.Length - 1].ParameterType;
+                            if (valueParam == typeof(object) && col.Prop.PropertyType.IsValueType)
+                                il.Emit(OpCodes.Box, col.Prop.PropertyType);
+                            il.Emit(setter.IsStatic ? OpCodes.Call : OpCodes.Callvirt, setter);
+                        }
                         il.MarkLabel(endOfBlock);
                     }
                     il.Emit(OpCodes.Ldloc, loc);
@@ -496,7 +510,14 @@ namespace nORM.Query
                     if (col.IsShadow)
                         il.Emit(OpCodes.Call, Methods.SetShadowValue);
                     else
-                        il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                    {
+                        var setter = col.SetterMethod;
+                        var setterParams = setter.GetParameters();
+                        var valueParam = setterParams[setterParams.Length - 1].ParameterType;
+                        if (valueParam == typeof(object) && col.Prop.PropertyType.IsValueType)
+                            il.Emit(OpCodes.Box, col.Prop.PropertyType);
+                        il.Emit(setter.IsStatic ? OpCodes.Call : OpCodes.Callvirt, setter);
+                    }
                     il.MarkLabel(endOfBlock);
                 }
             }
@@ -529,7 +550,14 @@ namespace nORM.Query
                     if (col.IsShadow)
                         il.Emit(OpCodes.Call, Methods.SetShadowValue);
                     else
-                        il.Emit(OpCodes.Callvirt, col.SetterMethod);
+                    {
+                        var setter = col.SetterMethod;
+                        var setterParams = setter.GetParameters();
+                        var valueParam = setterParams[setterParams.Length - 1].ParameterType;
+                        if (valueParam == typeof(object) && col.Prop.PropertyType.IsValueType)
+                            il.Emit(OpCodes.Box, col.Prop.PropertyType);
+                        il.Emit(setter.IsStatic ? OpCodes.Call : OpCodes.Callvirt, setter);
+                    }
                     il.MarkLabel(endOfBlock);
                 }
             }
