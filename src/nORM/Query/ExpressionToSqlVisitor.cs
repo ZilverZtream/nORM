@@ -16,17 +16,21 @@ namespace nORM.Query
 {
     internal sealed class ExpressionToSqlVisitor : ExpressionVisitor
     {
-        private readonly DbContext _ctx;
-        private readonly TableMapping _mapping;
-        private readonly DatabaseProvider _provider;
-        private readonly Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _parameterMappings;
-        private readonly ParameterExpression _parameter;
-        private readonly string _tableAlias;
+        private DbContext _ctx = null!;
+        private TableMapping _mapping = null!;
+        private DatabaseProvider _provider = null!;
+        private readonly Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _parameterMappings = new();
+        private ParameterExpression _parameter = null!;
+        private string _tableAlias = string.Empty;
         private readonly StringBuilder _sql = new();
         private readonly Dictionary<string, object> _params = new();
         private int _paramIndex = 0;
-        private readonly List<string> _compiledParams;
-        private readonly Dictionary<ParameterExpression, string> _paramMap;
+        private readonly List<string> _ownedCompiledParams = new();
+        private readonly Dictionary<ParameterExpression, string> _ownedParamMap = new();
+        private List<string> _compiledParams = null!;
+        private Dictionary<ParameterExpression, string> _paramMap = null!;
+
+        internal ExpressionToSqlVisitor() { }
 
         public ExpressionToSqlVisitor(DbContext ctx, TableMapping mapping, DatabaseProvider provider,
                                       ParameterExpression parameter, string tableAlias,
@@ -34,17 +38,55 @@ namespace nORM.Query
                                       List<string>? compiledParams = null,
                                       Dictionary<ParameterExpression, string>? paramMap = null)
         {
+            Initialize(ctx, mapping, provider, parameter, tableAlias, correlated, compiledParams, paramMap);
+        }
+
+        public void Initialize(DbContext ctx, TableMapping mapping, DatabaseProvider provider,
+                               ParameterExpression parameter, string tableAlias,
+                               Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated = null,
+                               List<string>? compiledParams = null,
+                               Dictionary<ParameterExpression, string>? paramMap = null)
+        {
             _ctx = ctx;
             _mapping = mapping;
             _provider = provider;
             _parameter = parameter;
             _tableAlias = tableAlias;
-            _parameterMappings = correlated != null
-                ? new(correlated)
-                : new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+
+            _parameterMappings.Clear();
+            if (correlated != null)
+            {
+                foreach (var kvp in correlated)
+                    _parameterMappings[kvp.Key] = kvp.Value;
+            }
             _parameterMappings[parameter] = (mapping, tableAlias);
-            _compiledParams = compiledParams ?? new List<string>();
-            _paramMap = paramMap ?? new Dictionary<ParameterExpression, string>();
+
+            _compiledParams = compiledParams ?? _ownedCompiledParams;
+            if (compiledParams == null)
+                _ownedCompiledParams.Clear();
+
+            _paramMap = paramMap ?? _ownedParamMap;
+            if (paramMap == null)
+                _ownedParamMap.Clear();
+
+            _paramIndex = 0;
+        }
+
+        public void Reset()
+        {
+            _sql.Clear();
+            _params.Clear();
+            _paramIndex = 0;
+            _parameterMappings.Clear();
+            _ownedCompiledParams.Clear();
+            _ownedParamMap.Clear();
+            _compiledParams = null!;
+            _paramMap = null!;
+            _ctx = null!;
+            _mapping = null!;
+            _provider = null!;
+            _parameter = null!;
+            _tableAlias = string.Empty;
         }
 
         public string Translate(Expression expression)
@@ -231,11 +273,12 @@ namespace nORM.Query
                             if (node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression countSelector)
                             {
                                 var info = _parameterMappings[cp];
-                                var visitor = new ExpressionToSqlVisitor(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
+                                var visitor = ExpressionVisitorPool.Get(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
                                 var predSql = visitor.Translate(countSelector.Body);
                                 foreach (var kvp in visitor.GetParameters())
                                     _params[kvp.Key] = kvp.Value;
                                 _sql.Append($"COUNT(CASE WHEN {predSql} THEN 1 ELSE NULL END)");
+                                ExpressionVisitorPool.Return(visitor);
                             }
                             else
                             {
@@ -254,7 +297,7 @@ namespace nORM.Query
                             if (selector != null)
                             {
                                 var info = _parameterMappings[gp];
-                                var visitor = new ExpressionToSqlVisitor(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
+                                var visitor = ExpressionVisitorPool.Get(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
                                 var colSql = visitor.Translate(selector.Body);
                                 foreach (var kvp in visitor.GetParameters())
                                     _params[kvp.Key] = kvp.Value;
@@ -264,9 +307,10 @@ namespace nORM.Query
                                     "Average" => "AVG",
                                     "Min" => "MIN",
                                     "Max" => "MAX",
-                                    _ => ""
+                                    _ => "",
                                 };
                                 _sql.Append($"{fn}({colSql})");
+                                ExpressionVisitorPool.Return(visitor);
                                 return node;
                             }
                         }
