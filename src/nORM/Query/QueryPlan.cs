@@ -11,10 +11,11 @@ using nORM.Mapping;
 namespace nORM.Query
 {
     internal sealed record QueryPlan(
-        string Sql, 
-        IReadOnlyDictionary<string, object> Parameters, 
+        string Sql,
+        IReadOnlyDictionary<string, object> Parameters,
+        IReadOnlyList<string> CompiledParameters,
         Func<DbDataReader, CancellationToken, Task<object>> Materializer,
-        Type ElementType, 
+        Type ElementType,
         bool IsScalar,
         bool SingleResult,
         bool NoTracking,

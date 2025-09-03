@@ -19,9 +19,15 @@ namespace nORM.Providers
         private static readonly ConcurrentLruCache<Type, DataTable> _tableSchemas = new(maxSize: 100);
         public override string Escape(string id) => $"`{id}`";
         
-        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset)
+        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParam, string? offsetParam)
         {
-            if (limit.HasValue) sb.Append($" LIMIT {offset ?? 0}, {limit}");
+            if (limitParam != null || limit.HasValue)
+            {
+                sb.Append(" LIMIT ");
+                sb.Append(offsetParam ?? (offset ?? 0).ToString());
+                sb.Append(", ");
+                sb.Append(limitParam ?? limit!.Value.ToString());
+            }
         }
         
         public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT LAST_INSERT_ID();";
