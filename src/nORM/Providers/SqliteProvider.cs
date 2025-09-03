@@ -84,10 +84,23 @@ namespace nORM.Providers
 
             return null;
         }
-        
+
+        protected override void ValidateConnection(DbConnection connection)
+        {
+            base.ValidateConnection(connection);
+            if (connection is not SqliteConnection)
+                throw new InvalidOperationException("A SqliteConnection is required for SqliteProvider.");
+        }
+
+        public override Task<bool> IsAvailableAsync()
+        {
+            return Task.FromResult(Type.GetType("Microsoft.Data.Sqlite.SqliteConnection, Microsoft.Data.Sqlite") != null);
+        }
+
         // High-performance SQLite bulk insert using optimized single-row prepared statements
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities as List<T> ?? entities.ToList();
             if (!entityList.Any()) return 0;
@@ -145,6 +158,7 @@ namespace nORM.Providers
         // Optimized bulk update for SQLite
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
@@ -198,6 +212,7 @@ namespace nORM.Providers
         // Optimized bulk delete for SQLite using IN clauses where possible
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
+            ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
