@@ -254,9 +254,9 @@ namespace nORM.Providers
                     .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}"));
 
                 var whereCols = m.KeyColumns
-                    .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}");
+                    .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}").ToList();
                 if (m.TimestampColumn != null)
-                    whereCols = whereCols.Append($"{m.TimestampColumn.EscCol}={ParamPrefix}{m.TimestampColumn.PropName}");
+                    whereCols.Add($"{m.TimestampColumn.EscCol}={ParamPrefix}{m.TimestampColumn.PropName}");
                 var where = string.Join(" AND ", whereCols);
 
                 return $"UPDATE {m.EscTable} SET {set} WHERE {where}";
@@ -268,9 +268,9 @@ namespace nORM.Providers
             return _sqlCache.GetOrAdd((m.Type, "DELETE"), _ =>
             {
                 var whereCols = m.KeyColumns
-                    .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}");
+                    .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}").ToList();
                 if (m.TimestampColumn != null)
-                    whereCols = whereCols.Append($"{m.TimestampColumn.EscCol}={ParamPrefix}{m.TimestampColumn.PropName}");
+                    whereCols.Add($"{m.TimestampColumn.EscCol}={ParamPrefix}{m.TimestampColumn.PropName}");
                 var where = string.Join(" AND ", whereCols);
 
                 return $"DELETE FROM {m.EscTable} WHERE {where}";
