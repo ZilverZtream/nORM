@@ -294,18 +294,20 @@ namespace nORM.Query
 
                 if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                     _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
-                var outerKeyVisitorG = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
+                var outerKeyVisitorG = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
                 var outerKeySqlG = outerKeyVisitorG.Translate(outerKeySelector.Body);
 
                 if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
                     _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAliasG);
-                var innerKeyVisitorG = new ExpressionToSqlVisitor(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAliasG, _correlatedParams, _compiledParams, _paramMap);
+                var innerKeyVisitorG = ExpressionVisitorPool.Get(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAliasG, _correlatedParams, _compiledParams, _paramMap);
                 var innerKeySqlG = innerKeyVisitorG.Translate(innerKeySelector.Body);
 
                 foreach (var kvp in outerKeyVisitorG.GetParameters())
                     _params[kvp.Key] = kvp.Value;
+                ExpressionVisitorPool.Return(outerKeyVisitorG);
                 foreach (var kvp in innerKeyVisitorG.GetParameters())
                     _params[kvp.Key] = kvp.Value;
+                ExpressionVisitorPool.Return(innerKeyVisitorG);
 
                 var joinSqlG = new StringBuilder(256);
                 var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
@@ -346,18 +348,20 @@ namespace nORM.Query
 
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
-            var outerKeyVisitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
+            var outerKeyVisitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
             var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
 
             if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
                 _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
-            var innerKeyVisitor = new ExpressionToSqlVisitor(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap);
+            var innerKeyVisitor = ExpressionVisitorPool.Get(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap);
             var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
 
             foreach (var kvp in outerKeyVisitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
+            ExpressionVisitorPool.Return(outerKeyVisitor);
             foreach (var kvp in innerKeyVisitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
+            ExpressionVisitorPool.Return(innerKeyVisitor);
 
             var joinSql = new StringBuilder(256);
 
@@ -813,11 +817,12 @@ namespace nORM.Query
             var alias = "T" + _joinCounter;
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
+            var visitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
             var columnSql = visitor.Translate(selectorLambda.Body);
-            
+
             foreach (var kvp in visitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
+            ExpressionVisitorPool.Return(visitor);
 
             _isAggregate = true;
             _sql.Clear();
@@ -845,11 +850,12 @@ namespace nORM.Query
             var alias = "T" + _joinCounter;
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
+            var visitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
             var groupBySql = visitor.Translate(keySelectorLambda.Body);
-            
+
             foreach (var kvp in visitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
+            ExpressionVisitorPool.Return(visitor);
 
             _groupBy.Add(groupBySql);
             
@@ -905,12 +911,13 @@ namespace nORM.Query
                         // Try to translate as regular expression
                         if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
                             _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
-                        var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
+                        var visitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
                         var sql = visitor.Translate(arg);
                         selectItems.Add($"{sql} AS {memberName}");
-                        
+
                         foreach (var kvp in visitor.GetParameters())
                             _params[kvp.Key] = kvp.Value;
+                        ExpressionVisitorPool.Return(visitor);
                     }
                 }
             }
@@ -937,10 +944,11 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
+                            var visitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 _params[kvp.Key] = kvp.Value;
+                            ExpressionVisitorPool.Return(visitor);
                             return $"SUM({columnSql})";
                         }
                     }
@@ -953,10 +961,11 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
+                            var visitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 _params[kvp.Key] = kvp.Value;
+                            ExpressionVisitorPool.Return(visitor);
                             return $"AVG({columnSql})";
                         }
                     }
@@ -969,10 +978,11 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
+                            var visitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 _params[kvp.Key] = kvp.Value;
+                            ExpressionVisitorPool.Return(visitor);
                             return $"MIN({columnSql})";
                         }
                     }
@@ -985,10 +995,11 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
+                            var visitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 _params[kvp.Key] = kvp.Value;
+                            ExpressionVisitorPool.Return(visitor);
                             return $"MAX({columnSql})";
                         }
                     }
@@ -1011,11 +1022,12 @@ namespace nORM.Query
                 var alias = "T" + _joinCounter;
                 if (!_correlatedParams.ContainsKey(param))
                     _correlatedParams[param] = (_mapping, alias);
-                var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
+                var visitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
                 var columnSql = visitor.Translate(selector.Body);
-                
+
                 foreach (var kvp in visitor.GetParameters())
                     _params[kvp.Key] = kvp.Value;
+                ExpressionVisitorPool.Return(visitor);
 
                 _isAggregate = true;
                 _sql.Clear();
@@ -1045,11 +1057,12 @@ namespace nORM.Query
             var alias = "T" + _joinCounter;
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var visitor = new ExpressionToSqlVisitor(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
+            var visitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
             var predicateSql = visitor.Translate(predicate.Body);
-            
+
             foreach (var kvp in visitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
+            ExpressionVisitorPool.Return(visitor);
 
             // Wrap in NOT EXISTS
             _sql.Insert(0, "SELECT CASE WHEN NOT EXISTS(");
