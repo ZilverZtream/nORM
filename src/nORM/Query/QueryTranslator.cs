@@ -22,21 +22,16 @@ namespace nORM.Query
     internal sealed class QueryTranslator : ExpressionVisitor
     {
         private readonly DbContext _ctx;
-        private readonly StringBuilder _sql;
+        private readonly SqlClauseBuilder _clauses = new();
         private readonly Dictionary<string, object> _params = new();
+        private readonly MaterializerFactory _materializerFactory = new();
         private TableMapping _mapping = null!;
         private Type? _rootType;
         private int _paramIndex = 0;
-        private int? _take, _skip;
-        private readonly List<(string col, bool asc)> _orderBy = new();
         private readonly List<IncludePlan> _includes = new();
         private LambdaExpression? _projection;
-        private readonly List<string> _groupBy = new();
         private bool _isAggregate = false;
-        private bool _isDistinct = false;
         private string _methodName = "";
-        private readonly StringBuilder _where = new();
-        private readonly StringBuilder _having = new();
         private readonly Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams;
 #pragma warning disable CS0649 // Field is never assigned to, and will always have its default value - used in complex join scenarios
         private GroupJoinInfo? _groupJoinInfo;
@@ -46,9 +41,15 @@ namespace nORM.Query
         private bool _singleResult = false;
         private bool _noTracking = false;
         private readonly HashSet<string> _tables;
-        
-        // Cache materializers to reduce memory allocations
-        private static readonly ConcurrentLruCache<(Type MappingType, Type TargetType, string? ProjectionKey), Func<DbDataReader, CancellationToken, Task<object>>> _materializerCache = new(maxSize: 1000);
+
+        private StringBuilder _sql => _clauses.Sql;
+        private StringBuilder _where => _clauses.Where;
+        private StringBuilder _having => _clauses.Having;
+        private List<(string col, bool asc)> _orderBy => _clauses.OrderBy;
+        private List<string> _groupBy => _clauses.GroupBy;
+        private int? _take { get => _clauses.Take; set => _clauses.Take = value; }
+        private int? _skip { get => _clauses.Skip; set => _clauses.Skip = value; }
+        private bool _isDistinct { get => _clauses.IsDistinct; set => _clauses.IsDistinct = value; }
 
         // Initialize _groupJoinInfo in constructor to suppress warning
         // This field is used in complex join scenarios
@@ -57,7 +58,6 @@ namespace nORM.Query
         {
             _ctx = ctx;
             _provider = ctx.Provider;
-            _sql = new StringBuilder();
             _mapping = null!;
             _rootType = null;
             _correlatedParams = new();
@@ -79,7 +79,6 @@ namespace nORM.Query
             _rootType = mapping.Type;
             _params = parameters;
             _paramIndex = pIndex;
-            _sql = new StringBuilder();
             _correlatedParams = correlated;
             _tables = tables;
             _tables.Add(mapping.TableName);
@@ -136,7 +135,7 @@ namespace nORM.Query
                 materializerType = typeof(int);
             }
 
-            var materializer = CreateMaterializer(_mapping, materializerType, _projection);
+            var materializer = _materializerFactory.CreateMaterializer(_mapping, materializerType, _projection);
             var isScalar = _isAggregate && _groupBy.Count == 0;
 
             if (_sql.Length == 0)
@@ -195,400 +194,7 @@ namespace nORM.Query
         }
 
 
-        public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
-        {
-            // Create cache key for runtime materializers
-            var projectionKey = projection?.ToString();
-            var cacheKey = (mapping.Type, targetType, projectionKey);
 
-            // Prefer a precompiled materializer when available
-            if (projection == null && CompiledMaterializerStore.TryGet(targetType, out var precompiled))
-            {
-                _materializerCache.GetOrAdd(cacheKey, _ => precompiled);
-                return precompiled;
-            }
-
-            return _materializerCache.GetOrAdd(cacheKey, _ =>
-            {
-                var sync = CreateMaterializerInternal(mapping, targetType, projection);
-                return (reader, ct) => Task.FromResult(sync(reader));
-            });
-        }
-        
-        private Func<DbDataReader, object> CreateMaterializerInternal(TableMapping mapping, Type targetType, LambdaExpression? projection = null, bool ignoreTph = false)
-        {
-            if (!ignoreTph && mapping.DiscriminatorColumn != null && mapping.TphMappings.Count > 0 && projection == null)
-            {
-                var discIndex = Array.IndexOf(mapping.Columns, mapping.DiscriminatorColumn);
-                var baseMat = CreateMaterializerInternal(mapping, targetType, null, true);
-                var derivedMats = mapping.TphMappings.ToDictionary(
-                    kvp => kvp.Key,
-                    kvp =>
-                    {
-                        var dmap = kvp.Value;
-                        var indices = dmap.Columns.Select(c => Array.FindIndex(mapping.Columns, bc => bc.Prop.Name == c.Prop.Name)).ToArray();
-                        return (Func<DbDataReader, object>)(reader =>
-                        {
-                            var entity = Activator.CreateInstance(dmap.Type)!;
-                            for (int i = 0; i < dmap.Columns.Length; i++)
-                            {
-                                var col = dmap.Columns[i];
-                                var idx = indices[i];
-                                if (reader.IsDBNull(idx)) continue;
-                                var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
-                                var value = readerMethod.Invoke(reader, new object[] { idx });
-                                if (readerMethod == Methods.GetValue)
-                                    value = Convert.ChangeType(value!, col.Prop.PropertyType);
-                                col.Setter(entity, value);
-                            }
-                            return entity;
-                        });
-                    });
-                return reader =>
-                {
-                    var disc = reader.GetValue(discIndex);
-                    if (disc != null && derivedMats.TryGetValue(disc, out var mat))
-                        return mat(reader);
-                    return baseMat(reader);
-                };
-            }
-
-            var dm = new DynamicMethod("mat_" + Guid.NewGuid().ToString("N"), typeof(object), new[] { typeof(DbDataReader) }, targetType.Module, true);
-            var il = dm.GetILGenerator();
-
-            if (targetType.IsPrimitive || targetType == typeof(decimal) || targetType == typeof(string))
-            {
-                var fieldValue = Methods.GetFieldValue.MakeGenericMethod(targetType);
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldc_I4_0);
-                il.Emit(OpCodes.Callvirt, fieldValue);
-            }
-            else if (projection?.Body is NewExpression newExpr)
-            {
-                // Handle projections (including join result projections)
-                var constructorArgs = new LocalBuilder[newExpr.Arguments.Count];
-                var columnIndex = 0;
-                var extraColumnIndex = mapping.Columns.Length;
-
-                for (var i = 0; i < newExpr.Arguments.Count; i++)
-                {
-                    var arg = newExpr.Arguments[i];
-                    var propType = arg.Type;
-                    constructorArgs[i] = il.DeclareLocal(propType);
-
-                    if (arg is MemberExpression memberExpr && memberExpr.Expression is ParameterExpression memberParam)
-                    {
-                        // This is a property access from a join - find the correct column offset
-                        var isLeftTable = memberParam.Type == mapping.Type;
-                        var memberMapping = isLeftTable ? mapping : TrackMapping(memberParam.Type);
-                        
-                        var column = memberMapping.Columns.FirstOrDefault(c => c.Prop.Name == memberExpr.Member.Name);
-                        if (column != null)
-                        {
-                            var actualColumnIndex = isLeftTable 
-                                ? Array.IndexOf(memberMapping.Columns, column)
-                                : mapping.Columns.Length + Array.IndexOf(memberMapping.Columns, column);
-                            
-                            EmitColumnMaterialization(il, column, constructorArgs[i], actualColumnIndex);
-                        }
-                    }
-                    else if (arg is ParameterExpression param)
-                    {
-                        if (param.Type.IsGenericType &&
-                            (param.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>) ||
-                             param.Type.GetGenericTypeDefinition() == typeof(ICollection<>) ||
-                             param.Type.GetGenericTypeDefinition() == typeof(List<>)))
-                        {
-                            // Collection parameter from group join - initialize to null, will be populated later
-                            constructorArgs[i] = il.DeclareLocal(param.Type);
-                            il.Emit(OpCodes.Ldnull);
-                            il.Emit(OpCodes.Stloc, constructorArgs[i]);
-                        }
-                        else if (IsScalarType(param.Type))
-                        {
-                            var endOfBlock = il.DefineLabel();
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Ldc_I4, extraColumnIndex);
-                            il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
-                            il.Emit(OpCodes.Brtrue_S, endOfBlock);
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Ldc_I4, extraColumnIndex);
-                            var readerMethod = Methods.GetReaderMethod(param.Type);
-                            il.Emit(OpCodes.Callvirt, readerMethod);
-                            if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, param.Type);
-                            il.Emit(OpCodes.Stloc, constructorArgs[i]);
-                            il.MarkLabel(endOfBlock);
-                            extraColumnIndex++;
-                        }
-                        else
-                        {
-                            // This is a parameter from a join - need to materialize the entire object
-                            var paramMapping = param.Type == mapping.Type ? mapping : TrackMapping(param.Type);
-                            var startIndex = param.Type == mapping.Type ? 0 : mapping.Columns.Length;
-                            EmitObjectMaterialization(il, paramMapping, constructorArgs[i], startIndex);
-                        }
-                    }
-                    else
-                    {
-                        // Simple column access
-                        EmitColumnMaterialization(il, mapping.Columns[columnIndex], constructorArgs[i], columnIndex++);
-                    }
-                }
-
-                foreach (var arg in constructorArgs) il.Emit(OpCodes.Ldloc, arg);
-                il.Emit(OpCodes.Newobj, newExpr.Constructor!);
-            }
-            else
-            {
-                var hasDefaultCtor = targetType.GetConstructor(Type.EmptyTypes) != null;
-                var isRecord = IsRecordType(targetType);
-
-                if (!hasDefaultCtor)
-                {
-                    var constructors = targetType.GetConstructors();
-                    if (isRecord)
-                        constructors = constructors
-                            .Where(c => !c.GetParameters().Any(p => p.ParameterType == targetType))
-                            .ToArray();
-
-                    var ctor = constructors.OrderByDescending(c => c.GetParameters().Length).First();
-                    var parameters = ctor.GetParameters();
-                    var locals = new LocalBuilder[parameters.Length];
-                    var used = new HashSet<string>(parameters.Select(p => p.Name!), StringComparer.OrdinalIgnoreCase);
-
-                    for (int i = 0; i < parameters.Length; i++)
-                    {
-                        var param = parameters[i];
-                        var col = mapping.Columns.First(c => string.Equals(c.Prop.Name, param.Name, StringComparison.OrdinalIgnoreCase));
-                        var colIndex = Array.IndexOf(mapping.Columns, col);
-                        locals[i] = il.DeclareLocal(param.ParameterType);
-                        var endOfBlock = il.DefineLabel();
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldc_I4, colIndex);
-                        il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
-                        il.Emit(OpCodes.Brtrue_S, endOfBlock);
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldc_I4, colIndex);
-                        var readerMethod = Methods.GetReaderMethod(param.ParameterType);
-                        il.Emit(OpCodes.Callvirt, readerMethod);
-                        if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, param.ParameterType);
-                        il.Emit(OpCodes.Stloc, locals[i]);
-                        il.MarkLabel(endOfBlock);
-                    }
-
-                    var loc = il.DeclareLocal(targetType);
-                    foreach (var l in locals) il.Emit(OpCodes.Ldloc, l);
-                    il.Emit(OpCodes.Newobj, ctor);
-                    il.Emit(OpCodes.Stloc, loc);
-
-                    for (int i = 0; i < mapping.Columns.Length; i++)
-                    {
-                        var col = mapping.Columns[i];
-                        if (used.Contains(col.Prop.Name)) continue;
-                        var endOfBlock = il.DefineLabel();
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldc_I4, i);
-                        il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
-                        il.Emit(OpCodes.Brtrue_S, endOfBlock);
-                        il.Emit(OpCodes.Ldloc, loc);
-                        if (col.IsShadow) il.Emit(OpCodes.Ldstr, col.PropName);
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldc_I4, i);
-                        var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
-                        il.Emit(OpCodes.Callvirt, readerMethod);
-                        if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
-                        if (col.IsShadow)
-                            il.Emit(OpCodes.Call, Methods.SetShadowValue);
-                        else
-                        {
-                            var setter = col.SetterMethod;
-                            var setterParams = setter.GetParameters();
-                            var valueParam = setterParams[setterParams.Length - 1].ParameterType;
-                            if (valueParam == typeof(object) && col.Prop.PropertyType.IsValueType)
-                                il.Emit(OpCodes.Box, col.Prop.PropertyType);
-                            il.Emit(setter.IsStatic ? OpCodes.Call : OpCodes.Callvirt, setter);
-                        }
-                        il.MarkLabel(endOfBlock);
-                    }
-                    il.Emit(OpCodes.Ldloc, loc);
-                }
-                else
-                {
-                    // Standard single-table materialization with parameterless constructor
-                    var loc = il.DeclareLocal(targetType);
-                    il.Emit(OpCodes.Newobj, targetType.GetConstructor(Type.EmptyTypes)!);
-                    il.Emit(OpCodes.Stloc, loc);
-
-                    for (int i = 0; i < mapping.Columns.Length; i++)
-                    {
-                        var col = mapping.Columns[i];
-                        var endOfBlock = il.DefineLabel();
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldc_I4, i);
-                        il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
-                        il.Emit(OpCodes.Brtrue_S, endOfBlock);
-                        il.Emit(OpCodes.Ldloc, loc);
-                        if (col.IsShadow) il.Emit(OpCodes.Ldstr, col.PropName);
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldc_I4, i);
-                        var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
-                        il.Emit(OpCodes.Callvirt, readerMethod);
-                        if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
-                        if (col.IsShadow)
-                            il.Emit(OpCodes.Call, Methods.SetShadowValue);
-                        else
-                        {
-                            var setter = col.SetterMethod;
-                            var setterParams = setter.GetParameters();
-                            var valueParam = setterParams[setterParams.Length - 1].ParameterType;
-                            if (valueParam == typeof(object) && col.Prop.PropertyType.IsValueType)
-                                il.Emit(OpCodes.Box, col.Prop.PropertyType);
-                            il.Emit(setter.IsStatic ? OpCodes.Call : OpCodes.Callvirt, setter);
-                        }
-                        il.MarkLabel(endOfBlock);
-                    }
-                    il.Emit(OpCodes.Ldloc, loc);
-                }
-            }
-
-            if (targetType.IsValueType) il.Emit(OpCodes.Box, targetType);
-            il.Emit(OpCodes.Ret);
-            return (Func<DbDataReader, object>)dm.CreateDelegate(typeof(Func<DbDataReader, object>));
-        }
-
-        private void EmitObjectMaterialization(ILGenerator il, TableMapping mapping, LocalBuilder localVar, int startColumnIndex)
-        {
-            var hasDefaultCtor = mapping.Type.GetConstructor(Type.EmptyTypes) != null;
-            var isRecord = IsRecordType(mapping.Type);
-
-            if (!hasDefaultCtor)
-            {
-                var constructors = mapping.Type.GetConstructors();
-                if (isRecord)
-                    constructors = constructors
-                        .Where(c => !c.GetParameters().Any(p => p.ParameterType == mapping.Type))
-                        .ToArray();
-
-                var ctor = constructors.OrderByDescending(c => c.GetParameters().Length).First();
-                var parameters = ctor.GetParameters();
-                var locals = new LocalBuilder[parameters.Length];
-                var used = new HashSet<string>(parameters.Select(p => p.Name!), StringComparer.OrdinalIgnoreCase);
-
-                for (int i = 0; i < parameters.Length; i++)
-                {
-                    var param = parameters[i];
-                    var col = mapping.Columns.First(c => string.Equals(c.Prop.Name, param.Name, StringComparison.OrdinalIgnoreCase));
-                    var colIndex = startColumnIndex + Array.IndexOf(mapping.Columns, col);
-                    locals[i] = il.DeclareLocal(param.ParameterType);
-                    var endOfBlock = il.DefineLabel();
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, colIndex);
-                    il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
-                    il.Emit(OpCodes.Brtrue_S, endOfBlock);
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, colIndex);
-                    var readerMethod = Methods.GetReaderMethod(param.ParameterType);
-                    il.Emit(OpCodes.Callvirt, readerMethod);
-                    if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, param.ParameterType);
-                    il.Emit(OpCodes.Stloc, locals[i]);
-                    il.MarkLabel(endOfBlock);
-                }
-
-                foreach (var l in locals) il.Emit(OpCodes.Ldloc, l);
-                il.Emit(OpCodes.Newobj, ctor);
-                il.Emit(OpCodes.Stloc, localVar);
-
-                for (int i = 0; i < mapping.Columns.Length; i++)
-                {
-                    var col = mapping.Columns[i];
-                    if (used.Contains(col.Prop.Name)) continue;
-                    var endOfBlock = il.DefineLabel();
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
-                    il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
-                    il.Emit(OpCodes.Brtrue_S, endOfBlock);
-                    il.Emit(OpCodes.Ldloc, localVar);
-                    if (col.IsShadow) il.Emit(OpCodes.Ldstr, col.PropName);
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
-                    var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
-                    il.Emit(OpCodes.Callvirt, readerMethod);
-                    if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
-                    if (col.IsShadow)
-                        il.Emit(OpCodes.Call, Methods.SetShadowValue);
-                    else
-                    {
-                        var setter = col.SetterMethod;
-                        var setterParams = setter.GetParameters();
-                        var valueParam = setterParams[setterParams.Length - 1].ParameterType;
-                        if (valueParam == typeof(object) && col.Prop.PropertyType.IsValueType)
-                            il.Emit(OpCodes.Box, col.Prop.PropertyType);
-                        il.Emit(setter.IsStatic ? OpCodes.Call : OpCodes.Callvirt, setter);
-                    }
-                    il.MarkLabel(endOfBlock);
-                }
-            }
-            else
-            {
-                // Create new instance of the object
-                il.Emit(OpCodes.Newobj, mapping.Type.GetConstructor(Type.EmptyTypes)!);
-                il.Emit(OpCodes.Stloc, localVar);
-
-                // Set all properties
-                for (int i = 0; i < mapping.Columns.Length; i++)
-                {
-                    var col = mapping.Columns[i];
-                    var endOfBlock = il.DefineLabel();
-
-                    // Check for null
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
-                    il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
-                    il.Emit(OpCodes.Brtrue_S, endOfBlock);
-
-                    // Set property value
-                    il.Emit(OpCodes.Ldloc, localVar);
-                    if (col.IsShadow) il.Emit(OpCodes.Ldstr, col.PropName);
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, startColumnIndex + i);
-                    var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
-                    il.Emit(OpCodes.Callvirt, readerMethod);
-                    if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, col.Prop.PropertyType);
-                    if (col.IsShadow)
-                        il.Emit(OpCodes.Call, Methods.SetShadowValue);
-                    else
-                    {
-                        var setter = col.SetterMethod;
-                        var setterParams = setter.GetParameters();
-                        var valueParam = setterParams[setterParams.Length - 1].ParameterType;
-                        if (valueParam == typeof(object) && col.Prop.PropertyType.IsValueType)
-                            il.Emit(OpCodes.Box, col.Prop.PropertyType);
-                        il.Emit(setter.IsStatic ? OpCodes.Call : OpCodes.Callvirt, setter);
-                    }
-                    il.MarkLabel(endOfBlock);
-                }
-            }
-        }
-
-        private void EmitColumnMaterialization(ILGenerator il, Column column, LocalBuilder localVar, int columnIndex)
-        {
-            var endOfBlock = il.DefineLabel();
-            
-            // Check for null
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Ldc_I4, columnIndex);
-            il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
-            il.Emit(OpCodes.Brtrue_S, endOfBlock);
-            
-            // Get value
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Ldc_I4, columnIndex);
-            var readerMethod = Methods.GetReaderMethod(column.Prop.PropertyType);
-            il.Emit(OpCodes.Callvirt, readerMethod);
-            if (readerMethod == Methods.GetValue) il.Emit(OpCodes.Unbox_Any, column.Prop.PropertyType);
-            il.Emit(OpCodes.Stloc, localVar);
-            il.MarkLabel(endOfBlock);
-        }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
@@ -1277,8 +883,6 @@ namespace nORM.Query
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
 
-        private static bool IsScalarType(Type type) =>
-            type.IsPrimitive || type.IsEnum || type == typeof(string) ||
             type == typeof(decimal) || type == typeof(DateTime) || type == typeof(Guid);
 
         private static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping)
