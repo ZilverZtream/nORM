@@ -222,13 +222,13 @@ nORM supports multiple database providers out of the box:
 var provider = new SqlServerProvider();
 
 // PostgreSQL
-var provider = new PostgresProvider();
+var provider = new PostgresProvider(new NpgsqlParameterFactory());
 
 // SQLite
 var provider = new SqliteProvider();
 
 // MySQL
-var provider = new MySqlProvider();
+var provider = new MySqlProvider(new MySqlParameterFactory());
 ```
 
 ## 📊 Raw SQL & Stored Procedures
