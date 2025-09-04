@@ -44,6 +44,8 @@ namespace nORM.Query
         private bool _splitQuery;
         private HashSet<string> _tables = new();
         private TimeSpan _estimatedTimeout;
+        private bool _isCacheable;
+        private TimeSpan? _cacheExpiration;
 
         private OptimizedSqlBuilder _sql => _clauses.Sql;
         private OptimizedSqlBuilder _where => _clauses.Where;
@@ -127,6 +129,8 @@ namespace nORM.Query
             _clauses.Dispose();
             _clauses = new SqlClauseBuilder();
             _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
+            _isCacheable = false;
+            _cacheExpiration = null;
         }
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
@@ -258,7 +262,7 @@ namespace nORM.Query
 
             var elementType = _groupJoinInfo?.ResultType ?? materializerType;
 
-            var plan = new QueryPlan(_sql.ToString(), _params, _compiledParams, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray(), _splitQuery, _estimatedTimeout);
+            var plan = new QueryPlan(_sql.ToString(), _params, _compiledParams, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray(), _splitQuery, _estimatedTimeout, _isCacheable, _cacheExpiration);
             QueryPlanValidator.Validate(plan, _provider);
             return plan;
         }

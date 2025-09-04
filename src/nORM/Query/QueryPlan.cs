@@ -23,7 +23,9 @@ namespace nORM.Query
         GroupJoinInfo? GroupJoinInfo,
         IReadOnlyCollection<string> Tables,
         bool SplitQuery,
-        TimeSpan CommandTimeout
+        TimeSpan CommandTimeout,
+        bool IsCacheable,
+        TimeSpan? CacheExpiration
     );
 
     internal sealed record IncludePlan(List<TableMapping.Relation> Path);

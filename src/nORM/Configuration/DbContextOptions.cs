@@ -41,8 +41,15 @@ namespace nORM.Configuration
         public bool UsePreciseChangeTracking { get; set; } = false;
         public IList<IDbCommandInterceptor> CommandInterceptors { get; } = new List<IDbCommandInterceptor>();
         public IList<ISaveChangesInterceptor> SaveChangesInterceptors { get; } = new List<ISaveChangesInterceptor>();
-        public IDbCacheProvider? CacheProvider { get; set; }
+        // Caching is opt-in and disabled by default
+        public IDbCacheProvider? CacheProvider { get; set; } = null;
         public TimeSpan CacheExpiration { get; set; } = TimeSpan.FromMinutes(5);
+
+        public DbContextOptions UseInMemoryCache()
+        {
+            this.CacheProvider = new NormMemoryCacheProvider();
+            return this;
+        }
 
         public IDictionary<Type, List<LambdaExpression>> GlobalFilters { get; } = new Dictionary<Type, List<LambdaExpression>>();
 
