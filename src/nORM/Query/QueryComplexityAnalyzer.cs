@@ -76,9 +76,22 @@ namespace nORM.Query
                     node.Value is not string &&
                     node.Value is not IQueryable)
                 {
-                    var count = 0;
-                    foreach (var _ in enumerable)
-                        count++;
+                    int count;
+                    if (enumerable is System.Collections.ICollection collection)
+                    {
+                        count = collection.Count;
+                    }
+                    else
+                    {
+                        count = 0;
+                        foreach (var _ in enumerable)
+                        {
+                            count++;
+                            if (count > MaxParameterCount)
+                                break;
+                        }
+                    }
+
                     _complexity.ParameterCount += count;
                     if (_complexity.ParameterCount > MaxParameterCount)
                         throw new NormQueryTranslationException($"Query exceeds maximum parameter count of {MaxParameterCount}");
