@@ -56,7 +56,7 @@ namespace nORM.Query
                     while (await reader.ReadAsync(ct).ConfigureAwait(false))
                     {
                         var entity = await plan.Materializer(reader, ct).ConfigureAwait(false);
-                        ProcessEntity(entity, trackable, entityMap);
+                        entity = ProcessEntity(entity, trackable, entityMap);
                         list.Add(entity);
                     }
 
@@ -78,15 +78,17 @@ namespace nORM.Query
             }, "MaterializeAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText }).ConfigureAwait(false);
         }
 
-        private void ProcessEntity(object entity, bool trackable, TableMapping? entityMap)
+        private object ProcessEntity(object entity, bool trackable, TableMapping? entityMap)
         {
-            if (!trackable) return;
+            if (!trackable) return entity;
 
-            NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
             var actualMap = entityMap != null && entity.GetType() == entityMap.Type
                 ? entityMap
                 : _ctx.GetMapping(entity.GetType());
-            _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, actualMap);
+            var entry = _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, actualMap);
+            entity = entry.Entity;
+            NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
+            return entity;
         }
 
         private async Task<IList> MaterializeGroupJoinAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
@@ -133,9 +135,10 @@ namespace nORM.Query
 
                             if (trackOuter)
                             {
-                                NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
                                 var actualMap = _ctx.GetMapping(outer.GetType());
-                                _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
+                                var entry = _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
+                                outer = entry.Entity;
+                                NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
                             }
 
                             currentOuter = outer;
@@ -147,9 +150,10 @@ namespace nORM.Query
                             var inner = MaterializeEntity(reader, innerMap, outerColumnCount);
                             if (trackInner)
                             {
-                                NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
                                 var actualMap = _ctx.GetMapping(inner.GetType());
-                                _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualMap);
+                                var entry = _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualMap);
+                                inner = entry.Entity;
+                                NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
                             }
                             currentChildren.Add(inner);
                         }
