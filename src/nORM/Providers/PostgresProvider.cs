@@ -92,6 +92,12 @@ namespace nORM.Providers
             return null;
         }
 
+        public override string TranslateJsonPathAccess(string columnName, string jsonPath)
+        {
+            var pgPath = string.Join(",", jsonPath.Split('.').Skip(1).Select(p => $"'{p}'"));
+            return $"jsonb_extract_path_text({columnName}, {pgPath})";
+        }
+
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);
