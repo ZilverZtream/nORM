@@ -425,21 +425,25 @@ namespace nORM.Navigation
             _context = context;
         }
 
-        private ICollection<T> GetLoadedCollection()
+        private ICollection<T> GetOrLoadCollection()
         {
             if (!_context.IsLoaded(_property.Name))
-                throw new InvalidOperationException("The collection has not been loaded. Use LoadAsync() or an async enumeration (await foreach) to access the data.");
+            {
+                NavigationPropertyExtensions
+                    .LoadNavigationPropertyAsync(_parent, _property, _context, CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+            }
 
-            return (ICollection<T>)(_property.GetValue(_parent) ?? throw new InvalidOperationException("The collection has not been loaded. Use LoadAsync() or an async enumeration (await foreach) to access the data."));
+            return (ICollection<T>)(_property.GetValue(_parent) ?? throw new InvalidOperationException("The collection could not be loaded."));
         }
 
-        private IList<T> GetLoadedList() => (IList<T>)GetLoadedCollection();
+        private IList<T> GetOrLoadList() => (IList<T>)GetOrLoadCollection();
 
         /// <summary>
-        /// Returns an enumerator for the loaded collection.
+        /// Returns an enumerator for the collection, loading it if necessary.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded. Use <c>LoadAsync()</c> or an async enumeration (<c>await foreach</c>) to access the data.</exception>
-        public IEnumerator<T> GetEnumerator() => GetLoadedCollection().GetEnumerator();
+        public IEnumerator<T> GetEnumerator() => GetOrLoadCollection().GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
@@ -454,65 +458,56 @@ namespace nORM.Navigation
         }
 
         /// <summary>
-        /// Adds an item to the loaded collection.
+        /// Adds an item to the collection, loading it if necessary.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
-        public void Add(T item) => GetLoadedCollection().Add(item);
+        public void Add(T item) => GetOrLoadCollection().Add(item);
 
         /// <summary>
-        /// Clears the loaded collection.
+        /// Clears the collection, loading it if necessary.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
-        public void Clear() => GetLoadedCollection().Clear();
+        public void Clear() => GetOrLoadCollection().Clear();
 
         /// <summary>
-        /// Determines whether the loaded collection contains the specified item.
+        /// Determines whether the collection contains the specified item, loading it if necessary.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
-        public bool Contains(T item) => GetLoadedCollection().Contains(item);
+        public bool Contains(T item) => GetOrLoadCollection().Contains(item);
 
         /// <summary>
-        /// Copies the elements of the loaded collection to an array.
+        /// Copies the elements of the collection to an array, loading it if necessary.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
-        public void CopyTo(T[] array, int arrayIndex) => GetLoadedCollection().CopyTo(array, arrayIndex);
+        public void CopyTo(T[] array, int arrayIndex) => GetOrLoadCollection().CopyTo(array, arrayIndex);
 
         /// <summary>
-        /// Removes the first occurrence of a specific object from the loaded collection.
+        /// Removes the first occurrence of a specific object from the collection, loading it if necessary.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
-        public bool Remove(T item) => GetLoadedCollection().Remove(item);
+        public bool Remove(T item) => GetOrLoadCollection().Remove(item);
 
         /// <summary>
-        /// Gets the number of elements in the loaded collection.
+        /// Gets the number of elements in the collection, loading it if necessary.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
-        public int Count => GetLoadedCollection().Count;
+        public int Count => GetOrLoadCollection().Count;
 
-        public bool IsReadOnly => GetLoadedCollection().IsReadOnly;
-
-        /// <summary>
-        /// Searches for the specified object and returns the zero-based index of the first occurrence within the loaded list.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
-        public int IndexOf(T item) => GetLoadedList().IndexOf(item);
+        public bool IsReadOnly => GetOrLoadCollection().IsReadOnly;
 
         /// <summary>
-        /// Inserts an item to the loaded list at the specified index.
+        /// Searches for the specified object and returns the zero-based index of the first occurrence within the list, loading it if necessary.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
-        public void Insert(int index, T item) => GetLoadedList().Insert(index, item);
+        public int IndexOf(T item) => GetOrLoadList().IndexOf(item);
 
         /// <summary>
-        /// Removes the loaded list item at the specified index.
+        /// Inserts an item to the list at the specified index, loading it if necessary.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if the collection has not been loaded.</exception>
-        public void RemoveAt(int index) => GetLoadedList().RemoveAt(index);
+        public void Insert(int index, T item) => GetOrLoadList().Insert(index, item);
+
+        /// <summary>
+        /// Removes the list item at the specified index, loading the collection if necessary.
+        /// </summary>
+        public void RemoveAt(int index) => GetOrLoadList().RemoveAt(index);
 
         public T this[int index]
         {
-            get => GetLoadedList()[index];
-            set => GetLoadedList()[index] = value;
+            get => GetOrLoadList()[index];
+            set => GetOrLoadList()[index] = value;
         }
     }
 
