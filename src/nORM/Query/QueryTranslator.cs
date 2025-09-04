@@ -6,7 +6,6 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Core;
@@ -45,9 +44,9 @@ namespace nORM.Query
         private bool _splitQuery;
         private HashSet<string> _tables = new();
 
-        private StringBuilder _sql => _clauses.Sql;
-        private StringBuilder _where => _clauses.Where;
-        private StringBuilder _having => _clauses.Having;
+        private OptimizedSqlBuilder _sql => _clauses.Sql;
+        private OptimizedSqlBuilder _where => _clauses.Where;
+        private OptimizedSqlBuilder _having => _clauses.Having;
         private List<(string col, bool asc)> _orderBy => _clauses.OrderBy;
         private List<string> _groupBy => _clauses.GroupBy;
         private int? _take { get => _clauses.Take; set => _clauses.Take = value; }
@@ -124,6 +123,7 @@ namespace nORM.Query
             _splitQuery = false;
             _tables = new HashSet<string>();
             _params = new Dictionary<string, object>();
+            _clauses.Dispose();
             _clauses = new SqlClauseBuilder();
         }
 
@@ -187,7 +187,7 @@ namespace nORM.Query
             {
                 if (_isAggregate && _groupBy.Count == 0)
                 {
-                    _sql.Append($"SELECT COUNT(*) FROM {_mapping.EscTable}");
+                    _sql.AppendFragment("SELECT COUNT(*) FROM ").Append(_mapping.EscTable);
                 }
                 else
                 {
@@ -204,16 +204,25 @@ namespace nORM.Query
 
                     var alias = _correlatedParams.Count > 0 ? _correlatedParams.Values.First().Alias : null;
                     var distinct = _isDistinct ? "DISTINCT " : string.Empty;
-                    _sql.Insert(0, $"SELECT {distinct}{select} FROM {_mapping.EscTable}" + (alias != null ? $" {alias}" : string.Empty));
+                    using var prefix = new OptimizedSqlBuilder(select.Length + _mapping.EscTable.Length + 32);
+                    prefix.AppendFragment("SELECT ").Append(distinct).Append(select).AppendFragment(" FROM ").Append(_mapping.EscTable);
+                    if (alias != null) prefix.Append(' ').Append(alias);
+                    _sql.Insert(0, prefix.ToSqlString());
                 }
             }
 
-            if (_where.Length > 0) _sql.Append($" WHERE {_where}");
+            if (_where.Length > 0)
+            {
+                _sql.AppendFragment(" WHERE ").Append(_where.ToSqlString());
+            }
 
-            if (_groupBy.Count > 0) _sql.Append(" GROUP BY " + string.Join(", ", _groupBy));
-            if (_having.Length > 0) _sql.Append(" HAVING " + _having);
-            if (_orderBy.Count > 0) _sql.Append(" ORDER BY " + string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}")));
-            _ctx.Provider.ApplyPaging(_sql, _take, _skip, _takeParam, _skipParam);
+            if (_groupBy.Count > 0)
+                _sql.AppendFragment(" GROUP BY ").Append(string.Join(", ", _groupBy));
+            if (_having.Length > 0)
+                _sql.AppendFragment(" HAVING ").Append(_having.ToSqlString());
+            if (_orderBy.Count > 0)
+                _sql.AppendFragment(" ORDER BY ").Append(string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}")));
+            _ctx.Provider.ApplyPaging(_sql.InnerBuilder, _take, _skip, _takeParam, _skipParam);
 
             var singleResult = _singleResult || _methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
                 or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
@@ -309,7 +318,7 @@ namespace nORM.Query
                     _params[kvp.Key] = kvp.Value;
                 ExpressionVisitorPool.Return(innerKeyVisitorG);
 
-                var joinSqlG = new StringBuilder(256);
+                using var joinSqlG = new OptimizedSqlBuilder(256);
                 var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                 var innerColumns = innerMapping.Columns.Select(c => $"{innerAliasG}.{c.EscCol}");
                 joinSqlG.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
@@ -318,7 +327,7 @@ namespace nORM.Query
                 joinSqlG.Append($" ORDER BY {outerKeySqlG}");
 
                 _sql.Clear();
-                _sql.Append(joinSqlG.ToString());
+                _sql.Append(joinSqlG.ToSqlString());
 
                 // Reset projection so outer entities are materialized directly
                 _projection = null;
@@ -363,7 +372,7 @@ namespace nORM.Query
                 _params[kvp.Key] = kvp.Value;
             ExpressionVisitorPool.Return(innerKeyVisitor);
 
-            var joinSql = new StringBuilder(256);
+            using var joinSql = new OptimizedSqlBuilder(256);
 
             if (_projection?.Body is NewExpression newExpr)
             {
@@ -391,7 +400,7 @@ namespace nORM.Query
             joinSql.Append($"ON {outerKeySql} = {innerKeySql}");
 
             _sql.Clear();
-            _sql.Append(joinSql.ToString());
+            _sql.Append(joinSql.ToSqlString());
 
             if (resultSelector != null)
                 _projection = resultSelector;
@@ -445,7 +454,7 @@ namespace nORM.Query
                     _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
                 }
 
-                var joinSql = new StringBuilder(256);
+                using var joinSql = new OptimizedSqlBuilder(256);
 
                 if (_projection?.Body is NewExpression newExpr)
                 {
@@ -478,7 +487,7 @@ namespace nORM.Query
                 joinSql.Append($"ON {outerAlias}.{relation.PrincipalKey.EscCol} = {innerAlias}.{relation.ForeignKey.EscCol}");
 
                 _sql.Clear();
-                _sql.Append(joinSql.ToString());
+                _sql.Append(joinSql.ToSqlString());
 
                 if (resultSelector != null)
                 {
@@ -503,7 +512,7 @@ namespace nORM.Query
                 _correlatedParams[resultSelector.Parameters[1]] = (crossMapping, crossAlias);
             }
 
-            var crossSql = new StringBuilder(256);
+            using var crossSql = new OptimizedSqlBuilder(256);
 
             if (_projection?.Body is NewExpression crossNew)
             {
@@ -535,7 +544,7 @@ namespace nORM.Query
             crossSql.Append($"CROSS JOIN {crossMapping.EscTable} {crossAlias}");
 
             _sql.Clear();
-            _sql.Append(crossSql.ToString());
+            _sql.Append(crossSql.ToSqlString());
 
             if (resultSelector != null)
             {
@@ -582,7 +591,7 @@ namespace nORM.Query
             _paramIndex = subTranslator._paramIndex;
             _mapping = subTranslator._mapping;
 
-            var subSqlBuilder = new StringBuilder();
+            using var subSqlBuilder = new OptimizedSqlBuilder();
             var fromIndex = subPlan.Sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
             if (fromIndex >= 0)
             {
@@ -593,19 +602,19 @@ namespace nORM.Query
             {
                 subSqlBuilder.Append(subPlan.Sql);
             }
-            _ctx.Provider.ApplyPaging(subSqlBuilder, 1, null, null, null);
+            _ctx.Provider.ApplyPaging(subSqlBuilder.InnerBuilder, 1, null, null, null);
 
             switch (node.Method.Name)
             {
                 case nameof(Queryable.Any):
                 case nameof(Queryable.Contains):
                     _sql.Append("SELECT 1 WHERE EXISTS(");
-                    _sql.Append(subSqlBuilder);
+                    _sql.Append(subSqlBuilder.ToSqlString());
                     _sql.Append(")");
                     break;
                 case nameof(Queryable.All):
                     _sql.Append("SELECT 1 WHERE NOT EXISTS(");
-                    _sql.Append(subSqlBuilder);
+                    _sql.Append(subSqlBuilder.ToSqlString());
                     _sql.Append(")");
                     break;
             }
