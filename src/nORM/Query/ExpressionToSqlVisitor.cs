@@ -29,6 +29,7 @@ namespace nORM.Query
         private readonly Dictionary<ParameterExpression, string> _ownedParamMap = new();
         private List<string> _compiledParams = null!;
         private Dictionary<ParameterExpression, string> _paramMap = null!;
+        private bool _suppressNullCheck = false;
 
         internal ExpressionToSqlVisitor() { }
 
@@ -70,6 +71,7 @@ namespace nORM.Query
                 _ownedParamMap.Clear();
 
             _paramIndex = 0;
+            _suppressNullCheck = false;
         }
 
         public void Reset()
@@ -87,6 +89,7 @@ namespace nORM.Query
             _provider = null!;
             _parameter = null!;
             _tableAlias = string.Empty;
+            _suppressNullCheck = false;
         }
 
         public string Translate(Expression expression)
@@ -192,12 +195,17 @@ namespace nORM.Query
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
-            if (TryGetConstantValue(node, out var constVal))
+            if (!IsTranslatableMethod(node.Method))
+                throw new NormQueryTranslationException($"Method '{node.Method.Name}' cannot be translated to SQL");
+
+            if (!_suppressNullCheck && RequiresNullCheck(node))
             {
-                var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                _params[paramName] = constVal ?? DBNull.Value;
-                _sql.Append(paramName);
-                return node;
+                return TranslateWithNullCheck(node);
+            }
+
+            if (TryGetConstantValueSafe(node, out var constVal))
+            {
+                return CreateSafeParameter(constVal);
             }
 
             if (node.Method.DeclaringType == typeof(string))
@@ -439,6 +447,87 @@ namespace nORM.Query
             _sql.Append(" IN (");
             _sql.Append(subPlan.Sql);
             _sql.Append(")");
+        }
+
+        private bool IsTranslatableMethod(MethodInfo method)
+        {
+            if (method.GetCustomAttribute<SqlFunctionAttribute>() != null)
+                return true;
+
+            var safeDeclaringTypes = new HashSet<Type>
+            {
+                typeof(string), typeof(Math), typeof(DateTime), typeof(Convert), typeof(Enumerable), typeof(Queryable)
+            };
+
+            if (method.DeclaringType == null || !safeDeclaringTypes.Contains(method.DeclaringType))
+                return false;
+
+            var dangerousMethods = new HashSet<string>
+            {
+                "GetType", "ToString", "GetHashCode"
+            };
+
+            return !dangerousMethods.Contains(method.Name);
+        }
+
+        private Expression TranslateWithNullCheck(MethodCallExpression node)
+        {
+            if (node.Object == null) return base.VisitMethodCall(node);
+
+            _sql.Append("(CASE WHEN ");
+            Visit(node.Object);
+            _sql.Append(" IS NULL THEN NULL ELSE ");
+
+            _suppressNullCheck = true;
+            var result = VisitMethodCall(node);
+            _suppressNullCheck = false;
+
+            _sql.Append(" END)");
+            return result;
+        }
+
+        private bool RequiresNullCheck(MethodCallExpression node)
+        {
+            if (node.Object == null)
+                return false;
+
+            if (node.Method.DeclaringType == typeof(string))
+                return false;
+
+            return !node.Object.Type.IsValueType || Nullable.GetUnderlyingType(node.Object.Type) != null;
+        }
+
+        private bool TryGetConstantValueSafe(Expression expr, out object? value, int maxDepth = 5)
+        {
+            if (maxDepth <= 0)
+            {
+                value = null;
+                return false;
+            }
+
+            try
+            {
+                return TryGetConstantValue(expr, out value);
+            }
+            catch (Exception ex) when (ex is TargetInvocationException or ArgumentException)
+            {
+                value = null;
+                return false;
+            }
+        }
+
+        private Expression CreateSafeParameter(object? value)
+        {
+            if (value is string str && str.Length > 8000)
+                throw new NormQueryTranslationException("String parameter exceeds maximum length");
+
+            if (value is byte[] bytes && bytes.Length > 8000)
+                throw new NormQueryTranslationException("Binary parameter exceeds maximum length");
+
+            var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+            _params[paramName] = value ?? DBNull.Value;
+            _sql.Append(paramName);
+            return Expression.Constant(value);
         }
 
         private enum LikeOperation
