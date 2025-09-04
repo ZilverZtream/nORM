@@ -14,6 +14,7 @@ using nORM.Providers;
 using nORM.Internal;
 using nORM.Navigation;
 using System.Reflection;
+using nORM.Scaffolding;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 
@@ -28,6 +29,8 @@ namespace nORM.Core
         private readonly ConcurrentDictionary<Type, TableMapping> _m = new();
         private readonly IExecutionStrategy _executionStrategy;
         private readonly ModelBuilder _modelBuilder;
+        private readonly DynamicEntityTypeGenerator _typeGenerator = new();
+        private readonly ConcurrentDictionary<string, Type> _dynamicTypeCache = new();
         private bool _sqliteInitialized;
         private DbTransaction? _currentTransaction;
 
@@ -157,6 +160,19 @@ namespace nORM.Core
 
         internal TableMapping GetMapping(Type t) => _m.GetOrAdd(t, static (k, args) =>
             new TableMapping(k, args.p, args.ctx, args.modelBuilder.GetConfiguration(k)), (p: _p, ctx: this, modelBuilder: _modelBuilder));
+
+        public IQueryable Query(string tableName)
+        {
+            if (string.IsNullOrWhiteSpace(tableName))
+                throw new ArgumentException("Table name cannot be null or empty.", nameof(tableName));
+
+            var entityType = _dynamicTypeCache.GetOrAdd(tableName, t => _typeGenerator.GenerateEntityType(this.Connection, t));
+
+            var method = typeof(NormQueryable).GetMethods()
+                .Single(m => m.Name == nameof(NormQueryable.Query) && m.IsGenericMethodDefinition);
+            var generic = method.MakeGenericMethod(entityType);
+            return (IQueryable)generic.Invoke(null, new object[] { this })!;
+        }
 
         #region Change Tracking
         public EntityEntry Add<T>(T entity) where T : class
@@ -702,7 +718,7 @@ namespace nORM.Core
 
                 NormValidator.ValidateRawSql(sql, paramDict);
 
-                var materializer = Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
+                var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
                 while (await reader.ReadAsync(token)) list.Add((T)await materializer(reader, token));
@@ -734,7 +750,7 @@ namespace nORM.Core
 
                 NormValidator.ValidateRawSql(procedureName, paramDict);
 
-                var materializer = Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
+                var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
                 while (await reader.ReadAsync(token)) list.Add((T)await materializer(reader, token));
