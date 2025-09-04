@@ -144,6 +144,26 @@ END;";
             return Task.FromResult(Type.GetType("Microsoft.Data.Sqlite.SqliteConnection, Microsoft.Data.Sqlite") != null);
         }
 
+        public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            if (transaction is SqliteTransaction sqliteTransaction)
+            {
+                sqliteTransaction.Save(name);
+                return Task.CompletedTask;
+            }
+            throw new ArgumentException("Transaction must be a SqliteTransaction.", nameof(transaction));
+        }
+
+        public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            if (transaction is SqliteTransaction sqliteTransaction)
+            {
+                sqliteTransaction.Rollback(name);
+                return Task.CompletedTask;
+            }
+            throw new ArgumentException("Transaction must be a SqliteTransaction.", nameof(transaction));
+        }
+
         // Optimized bulk insert for SQLite using batched multi-row commands
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {

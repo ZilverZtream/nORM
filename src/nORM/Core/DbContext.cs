@@ -601,28 +601,7 @@ namespace nORM.Core
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
 
-            switch (transaction)
-            {
-                case SqlTransaction sqlTransaction:
-                    sqlTransaction.Save(name);
-                    break;
-                case SqliteTransaction sqliteTransaction:
-                    sqliteTransaction.Save(name);
-                    break;
-                default:
-                    var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) });
-                    if (saveMethod != null)
-                    {
-                        saveMethod.Invoke(transaction, new object[] { name });
-                    }
-                    else
-                    {
-                        throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
-                    }
-                    break;
-            }
-
-            return Task.CompletedTask;
+            return _p.CreateSavepointAsync(transaction, name, ct);
         }
 
         public Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
@@ -633,28 +612,7 @@ namespace nORM.Core
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
 
-            switch (transaction)
-            {
-                case SqlTransaction sqlTransaction:
-                    sqlTransaction.Rollback(name);
-                    break;
-                case SqliteTransaction sqliteTransaction:
-                    sqliteTransaction.Rollback(name);
-                    break;
-                default:
-                    var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) });
-                    if (rollbackMethod != null)
-                    {
-                        rollbackMethod.Invoke(transaction, new object[] { name });
-                    }
-                    else
-                    {
-                        throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
-                    }
-                    break;
-            }
-
-            return Task.CompletedTask;
+            return _p.RollbackToSavepointAsync(transaction, name, ct);
         }
         #endregion
 
