@@ -105,11 +105,15 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var setup = CreateProvider(providerKind);
         using var connection = setup.Connection;
         var provider = setup.Provider;
-        var (sql, _, _) = TranslateQuery<Product, Product>(q => q.Take(5), connection, provider);
+        var (sql, parameters, _) = TranslateQuery<Product, Product>(q => q.Take(5), connection, provider);
         var sb = new StringBuilder(BaseSelect(provider));
-        provider.ApplyPaging(sb, 5, null, null, null);
+        var paramName = provider.ParamPrefix + "p0";
+        provider.ApplyPaging(sb, 5, null, paramName, null);
         var expected = sb.ToString();
         Assert.Equal(expected, sql);
+        var param = Assert.Single(parameters);
+        Assert.Equal(paramName, param.Key);
+        Assert.Equal(5, param.Value);
     }
 
     [Theory]
@@ -119,11 +123,15 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var setup = CreateProvider(providerKind);
         using var connection = setup.Connection;
         var provider = setup.Provider;
-        var (sql, _, _) = TranslateQuery<Product, Product>(q => q.Skip(10), connection, provider);
+        var (sql, parameters, _) = TranslateQuery<Product, Product>(q => q.Skip(10), connection, provider);
         var sb = new StringBuilder(BaseSelect(provider));
-        provider.ApplyPaging(sb, null, 10, null, null);
+        var paramName = provider.ParamPrefix + "p0";
+        provider.ApplyPaging(sb, null, 10, null, paramName);
         var expected = sb.ToString();
         Assert.Equal(expected, sql);
+        var param = Assert.Single(parameters);
+        Assert.Equal(paramName, param.Key);
+        Assert.Equal(10, param.Value);
     }
 
     [Theory]
@@ -133,11 +141,16 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var setup = CreateProvider(providerKind);
         using var connection = setup.Connection;
         var provider = setup.Provider;
-        var (sql, _, _) = TranslateQuery<Product, Product>(q => q.OrderBy(p => p.Id).Skip(20).Take(10), connection, provider);
+        var (sql, parameters, _) = TranslateQuery<Product, Product>(q => q.OrderBy(p => p.Id).Skip(20).Take(10), connection, provider);
         var sb = new StringBuilder($"{BaseSelect(provider, true)} ORDER BY T0.{provider.Escape("Id")} ASC");
-        provider.ApplyPaging(sb, 10, 20, null, null);
+        var offsetParam = provider.ParamPrefix + "p0";
+        var limitParam = provider.ParamPrefix + "p1";
+        provider.ApplyPaging(sb, 10, 20, limitParam, offsetParam);
         var expected = sb.ToString();
         Assert.Equal(expected, sql);
+        Assert.Equal(2, parameters.Count);
+        Assert.Equal(20, parameters[offsetParam]);
+        Assert.Equal(10, parameters[limitParam]);
     }
 
     [Theory]

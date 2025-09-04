@@ -28,14 +28,16 @@ namespace nORM.Providers
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
             EnsureValidParameterName(offsetParameterName, nameof(offsetParameterName));
 
-            if (offset.HasValue || offsetParameterName != null || limit.HasValue || limitParameterName != null)
+            if (limitParameterName != null || offsetParameterName != null)
             {
                 if (!sb.ToString().Contains("ORDER BY")) sb.Append(" ORDER BY (SELECT NULL)");
                 sb.Append(" OFFSET ");
-                sb.Append(offsetParameterName ?? (offset ?? 0).ToString());
-                sb.Append(" ROWS FETCH NEXT ");
-                sb.Append(limitParameterName ?? (limit ?? int.MaxValue).ToString());
-                sb.Append(" ROWS ONLY");
+                sb.Append(offsetParameterName ?? "0");
+                sb.Append(" ROWS");
+                if (limitParameterName != null)
+                {
+                    sb.Append(" FETCH NEXT ").Append(limitParameterName).Append(" ROWS ONLY");
+                }
             }
         }
         
