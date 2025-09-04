@@ -46,6 +46,7 @@ namespace nORM.Query
         private TimeSpan _estimatedTimeout;
         private bool _isCacheable;
         private TimeSpan? _cacheExpiration;
+        private DateTime? _asOfTimestamp;
 
         private OptimizedSqlBuilder _sql => _clauses.Sql;
         private OptimizedSqlBuilder _where => _clauses.Where;
@@ -131,6 +132,7 @@ namespace nORM.Query
             _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
             _isCacheable = false;
             _cacheExpiration = null;
+            _asOfTimestamp = null;
         }
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
@@ -205,10 +207,22 @@ namespace nORM.Query
 
             if (_sql.Length == 0)
             {
+                var fromClause = _mapping.EscTable;
+                var alias = _correlatedParams.Count > 0 ? _correlatedParams.Values.First().Alias : null;
+                if (_asOfTimestamp.HasValue)
+                {
+                    alias ??= "T0";
+                    var timeParamName = _provider.ParamPrefix + "p" + _paramIndex++;
+                    _params[timeParamName] = _asOfTimestamp.Value;
+                    var historyTable = _provider.Escape(_mapping.TableName + "_History");
+                    var cols = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
+                    var temporalQuery = $@"\n(\n    SELECT {cols} FROM {_mapping.EscTable}\n    WHERE {timeParamName} >= __ValidFrom AND {timeParamName} < __ValidTo\n    UNION ALL\n    SELECT {cols} FROM {historyTable}\n    WHERE {timeParamName} >= __ValidFrom AND {timeParamName} < __ValidTo\n)";
+                    fromClause = temporalQuery;
+                }
+
                 if (_isAggregate && _groupBy.Count == 0)
                 {
-                    var alias = _correlatedParams.Count > 0 ? _correlatedParams.Values.First().Alias : null;
-                    _sql.AppendFragment("SELECT COUNT(*) FROM ").Append(_mapping.EscTable);
+                    _sql.AppendFragment("SELECT COUNT(*) FROM ").Append(fromClause);
                     if (alias != null) _sql.Append(' ').Append(alias);
                 }
                 else
@@ -235,10 +249,9 @@ namespace nORM.Query
                         select = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
                     }
 
-                    var alias = _correlatedParams.Count > 0 ? _correlatedParams.Values.First().Alias : null;
                     var distinct = _isDistinct ? "DISTINCT " : string.Empty;
                     using var prefix = new OptimizedSqlBuilder(select.Length + _mapping.EscTable.Length + 32);
-                    prefix.AppendFragment("SELECT ").Append(distinct).Append(select).AppendFragment(" FROM ").Append(_mapping.EscTable);
+                    prefix.AppendFragment("SELECT ").Append(distinct).Append(select).AppendFragment(" FROM ").Append(fromClause);
                     if (alias != null) prefix.Append(' ').Append(alias);
                     _sql.Insert(0, prefix.ToSqlString());
                 }
@@ -358,6 +371,19 @@ namespace nORM.Query
             var subPlan = subTranslator.Translate(e);
             _paramIndex = subTranslator._paramIndex;
             return subPlan.Sql;
+        }
+
+        private DateTime GetTimestampForTag(string tagName)
+        {
+            _ctx.EnsureConnectionAsync().GetAwaiter().GetResult();
+            using var cmd = _ctx.Connection.CreateCommand();
+            var pName = _provider.ParamPrefix + "p0";
+            cmd.CommandText = $"SELECT Timestamp FROM __NormTemporalTags WHERE TagName = {pName}";
+            cmd.AddParam(pName, tagName);
+            var result = cmd.ExecuteScalar();
+            if (result == null || result == DBNull.Value)
+                throw new NormQueryTranslationException($"Tag '{tagName}' not found.");
+            return Convert.ToDateTime(result);
         }
 
 

@@ -105,6 +105,12 @@ namespace nORM.Providers
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
             => $"JSON_VALUE({columnName}, '{jsonPath}')";
 
+        public override string GenerateCreateHistoryTableSql(TableMapping mapping)
+            => throw new NotImplementedException();
+
+        public override string GenerateTemporalTriggersSql(TableMapping mapping)
+            => throw new NotImplementedException();
+
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);
