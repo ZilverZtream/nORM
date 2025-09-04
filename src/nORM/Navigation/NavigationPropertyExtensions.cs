@@ -133,20 +133,29 @@ namespace nORM.Navigation
             
             foreach (var navProp in navigationProperties)
             {
-                if (navProp.IsCollection)
+                // Only initialize lazy loading proxies when the navigation property is null
+                if (navProp.Property.GetValue(entity) == null)
                 {
-                    // Create lazy collection
-                    var collectionType = typeof(LazyNavigationCollection<>).MakeGenericType(navProp.TargetType);
-                    var collection = Activator.CreateInstance(collectionType, entity, navProp.Property, context);
-                    navProp.Property.SetValue(entity, collection);
+                    if (navProp.IsCollection)
+                    {
+                        // Create lazy collection
+                        var collectionType = typeof(LazyNavigationCollection<>).MakeGenericType(navProp.TargetType);
+                        var collection = Activator.CreateInstance(collectionType, entity, navProp.Property, context);
+                        navProp.Property.SetValue(entity, collection);
+                    }
+                    else
+                    {
+                        // Create lazy reference
+                        var referenceType = typeof(LazyNavigationReference<>).MakeGenericType(navProp.TargetType);
+                        var reference = Activator.CreateInstance(referenceType, entity, navProp.Property, context);
+                        navProp.Property.SetValue(entity, reference);
+                        context.MarkAsUnloaded(navProp.Property.Name);
+                    }
                 }
                 else
                 {
-                    // Create lazy reference
-                    var referenceType = typeof(LazyNavigationReference<>).MakeGenericType(navProp.TargetType);
-                    var reference = Activator.CreateInstance(referenceType, entity, navProp.Property, context);
-                    navProp.Property.SetValue(entity, reference);
-                    context.MarkAsUnloaded(navProp.Property.Name);
+                    // Property already has a value; mark it as loaded so it won't be reloaded
+                    context.MarkAsLoaded(navProp.Property.Name);
                 }
             }
         }
