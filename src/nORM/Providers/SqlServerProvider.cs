@@ -18,7 +18,6 @@ namespace nORM.Providers
 {
     public sealed class SqlServerProvider : DatabaseProvider
     {
-        private static readonly ConcurrentLruCache<Type, DataTable> _tableSchemas = new(maxSize: 100);
         private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: 100);
         public override int MaxSqlLength => 8_000;
         public override int MaxParameters => 2_100;
@@ -118,42 +117,38 @@ namespace nORM.Providers
         {
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
-            using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
-            {
-                DestinationTableName = m.EscTable,
-                BatchSize = ctx.Options.BulkBatchSize,
-                EnableStreaming = true
-            };
 
             var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
-            foreach (var col in insertableCols)
-                bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
+            var totalInserted = 0;
 
-            using var table = GetDataTable(m, insertableCols);
-
-            var batchCount = 0;
-            var total = 0;
-            foreach (var entity in entities)
+            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
+            try
             {
-                table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
-                batchCount++;
-                if (batchCount >= ctx.Options.BulkBatchSize)
+                using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection, SqlBulkCopyOptions.Default, (SqlTransaction)transaction)
                 {
-                    await bulkCopy.WriteToServerAsync(table, ct);
-                    total += batchCount;
-                    table.Clear();
-                    batchCount = 0;
-                }
-            }
+                    DestinationTableName = m.EscTable,
+                    BatchSize = ctx.Options.BulkBatchSize,
+                    EnableStreaming = true,
+                    BulkCopyTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds
+                };
 
-            if (batchCount > 0)
+                foreach (var col in insertableCols)
+                    bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
+
+                using var reader = new EntityDataReader<T>(entities, insertableCols);
+                await bulkCopy.WriteToServerAsync(reader, ct);
+                totalInserted = reader.RecordsProcessed;
+
+                await transaction.CommitAsync(ct);
+            }
+            catch
             {
-                await bulkCopy.WriteToServerAsync(table, ct);
-                total += batchCount;
+                await transaction.RollbackAsync(ct);
+                throw;
             }
 
-            ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, total, sw.Elapsed);
-            return total;
+            ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
+            return totalInserted;
         }
 
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
@@ -189,41 +184,21 @@ namespace nORM.Providers
 
         private async Task<int> BulkInsertInternalAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, string destinationTableName, CancellationToken ct) where T : class
         {
-            using var bulkCopy = new SqlBulkCopy(ctx.Connection as SqlConnection)
+            var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
+            using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
             {
                 DestinationTableName = destinationTableName,
                 BatchSize = ctx.Options.BulkBatchSize,
-                EnableStreaming = true
+                EnableStreaming = true,
+                BulkCopyTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds
             };
 
-            var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
             foreach (var col in insertableCols)
                 bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
 
-            using var table = GetDataTable(m, insertableCols);
-
-            var batchCount = 0;
-            var total = 0;
-            foreach (var entity in entities)
-            {
-                table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
-                batchCount++;
-                if (batchCount >= ctx.Options.BulkBatchSize)
-                {
-                    await bulkCopy.WriteToServerAsync(table, ct);
-                    total += batchCount;
-                    table.Clear();
-                    batchCount = 0;
-                }
-            }
-
-            if (batchCount > 0)
-            {
-                await bulkCopy.WriteToServerAsync(table, ct);
-                total += batchCount;
-            }
-
-            return total;
+            using var reader = new EntityDataReader<T>(entities, insertableCols);
+            await bulkCopy.WriteToServerAsync(reader, ct);
+            return reader.RecordsProcessed;
         }
 
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
@@ -291,21 +266,6 @@ namespace nORM.Providers
             return "NVARCHAR(MAX)";
         }
 
-        private static DataTable GetDataTable(TableMapping m, List<Column> cols)
-        {
-            var schema = _tableSchemas.GetOrAdd(m.Type, _ =>
-            {
-                var dt = new DataTable();
-                foreach (var c in cols)
-                {
-                    var propType = c.Prop.PropertyType;
-                    dt.Columns.Add(c.PropName, Nullable.GetUnderlyingType(propType) ?? propType);
-                }
-                return dt;
-            });
-            return schema.Clone();
-        }
-
         private static DataTable GetKeyTable(TableMapping m)
         {
             var schema = _keyTableSchemas.GetOrAdd(m.Type, _ =>
@@ -319,6 +279,87 @@ namespace nORM.Providers
                 return dt;
             });
             return schema.Clone();
+        }
+
+        private sealed class EntityDataReader<T> : IDataReader where T : class
+        {
+            private readonly IEnumerator<T> _enumerator;
+            private readonly List<Column> _columns;
+            private bool _disposed;
+            private T? _current;
+
+            public int RecordsProcessed { get; private set; }
+
+            public EntityDataReader(IEnumerable<T> entities, List<Column> columns)
+            {
+                _enumerator = entities.GetEnumerator();
+                _columns = columns;
+            }
+
+            public bool Read()
+            {
+                if (_enumerator.MoveNext())
+                {
+                    _current = _enumerator.Current;
+                    RecordsProcessed++;
+                    return true;
+                }
+                return false;
+            }
+
+            public int FieldCount => _columns.Count;
+            public object this[int i] => GetValue(i);
+            public object this[string name] => GetValue(GetOrdinal(name));
+
+            public object GetValue(int i)
+            {
+                if (_current == null) throw new InvalidOperationException("No current record");
+                return _columns[i].Getter(_current) ?? DBNull.Value;
+            }
+
+            public string GetName(int i) => _columns[i].PropName;
+            public string GetDataTypeName(int i) => GetFieldType(i).Name;
+            public Type GetFieldType(int i) => _columns[i].Prop.PropertyType;
+            public int GetOrdinal(string name) => _columns.FindIndex(c => c.PropName == name);
+            public bool IsDBNull(int i) => GetValue(i) == DBNull.Value;
+
+            public int GetValues(object[] values)
+            {
+                var count = Math.Min(values.Length, FieldCount);
+                for (var i = 0; i < count; i++)
+                    values[i] = GetValue(i);
+                return count;
+            }
+
+            public bool NextResult() => false;
+            public int Depth => 0;
+            public bool IsClosed => _disposed;
+            public int RecordsAffected => -1;
+            public DataTable? GetSchemaTable() => null;
+            public void Close() => Dispose();
+
+            public bool GetBoolean(int i) => (bool)GetValue(i);
+            public byte GetByte(int i) => (byte)GetValue(i);
+            public long GetBytes(int i, long fieldOffset, byte[]? buffer, int bufferoffset, int length) => throw new NotSupportedException();
+            public char GetChar(int i) => (char)GetValue(i);
+            public long GetChars(int i, long fieldoffset, char[]? buffer, int bufferoffset, int length) => throw new NotSupportedException();
+            public IDataReader GetData(int i) => throw new NotSupportedException();
+            public DateTime GetDateTime(int i) => (DateTime)GetValue(i);
+            public decimal GetDecimal(int i) => (decimal)GetValue(i);
+            public double GetDouble(int i) => (double)GetValue(i);
+            public float GetFloat(int i) => (float)GetValue(i);
+            public Guid GetGuid(int i) => (Guid)GetValue(i);
+            public short GetInt16(int i) => (short)GetValue(i);
+            public int GetInt32(int i) => (int)GetValue(i);
+            public long GetInt64(int i) => (long)GetValue(i);
+            public string GetString(int i) => (string)GetValue(i);
+
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _enumerator.Dispose();
+            }
         }
         #endregion
     }
