@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using nORM.Providers;
+using nORM.Core;
 using Xunit;
 
 namespace nORM.Tests;
@@ -189,6 +190,23 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var provider = setup.Provider;
         var (sql, _, _) = TranslateQuery<Product, Product>(q => q.Distinct(), connection, provider);
         var expected = $"SELECT DISTINCT {Columns(provider)} FROM {provider.Escape("Product")}";
+        Assert.Equal(expected, sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public void WithRowNumber_projects_row_number(ProviderKind providerKind)
+    {
+        var setup = CreateProvider(providerKind);
+        using var connection = setup.Connection;
+        var provider = setup.Provider;
+        var (sql, _, _) = TranslateQuery<Product, object>(
+            q => q.OrderBy(p => p.Id).WithRowNumber((p, rn) => new { p.Id, RowNumber = rn }),
+            connection,
+            provider);
+
+        var orderBy = $"ORDER BY T0.{provider.Escape("Id")} ASC";
+        var expected = $"SELECT {provider.Escape("Id")} AS {provider.Escape("Id")}, ROW_NUMBER() OVER ({orderBy}) AS {provider.Escape("RowNumber")} FROM {provider.Escape("Product")} T0 {orderBy}";
         Assert.Equal(expected, sql);
     }
 

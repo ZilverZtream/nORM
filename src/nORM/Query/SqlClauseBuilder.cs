@@ -13,6 +13,7 @@ namespace nORM.Query
         public OptimizedSqlBuilder Having { get; } = new();
         public List<(string col, bool asc)> OrderBy { get; } = new();
         public List<string> GroupBy { get; } = new();
+        public List<WindowFunctionInfo> WindowFunctions { get; } = new();
         public int? Take { get; set; }
         public int? Skip { get; set; }
         public string? TakeParam { get; set; }
