@@ -209,8 +209,19 @@ namespace nORM.Query
                 }
                 else
                 {
+                    var windowFuncs = _clauses.WindowFunctions;
+                    if (windowFuncs.Count > 0 && _projection == null)
+                        _projection = windowFuncs[^1].ResultSelector;
+
                     string select;
-                    if (_projection != null)
+                    if (windowFuncs.Count > 0 && _projection != null)
+                    {
+                        var orderByForOverClause = _orderBy.Any()
+                            ? $"ORDER BY {string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}"))}"
+                            : "ORDER BY (SELECT NULL)";
+                        select = BuildSelectWithWindowFunctions(_projection, windowFuncs, orderByForOverClause);
+                    }
+                    else if (_projection != null)
                     {
                         var selectVisitor = new SelectClauseVisitor(_mapping, _groupBy, _provider);
                         select = selectVisitor.Translate(_projection.Body);
@@ -257,6 +268,84 @@ namespace nORM.Query
             var map = _ctx.GetMapping(type);
             _tables.Add(map.TableName);
             return map;
+        }
+
+        private string BuildSelectWithWindowFunctions(LambdaExpression projection, List<WindowFunctionInfo> windowFuncs, string overClause)
+        {
+            if (projection.Body is not NewExpression ne)
+                throw new NormQueryTranslationException("Window function projection must be an anonymous object initializer.");
+
+            var paramMap = windowFuncs.ToDictionary(w => w.ResultParameter, w => w);
+            var items = new List<string>();
+            for (int i = 0; i < ne.Arguments.Count; i++)
+            {
+                var arg = ne.Arguments[i];
+                var alias = ne.Members![i].Name;
+                if (arg is MemberExpression me)
+                {
+                    var col = _mapping.Columns.First(c => c.Prop.Name == me.Member.Name);
+                    items.Add($"{col.EscCol} AS {_provider.Escape(alias)}");
+                }
+                else if (arg is ParameterExpression p && paramMap.TryGetValue(p, out var wf))
+                {
+                    var wfSql = BuildWindowFunctionSql(wf, overClause);
+                    items.Add($"{wfSql} AS {_provider.Escape(alias)}");
+                }
+                else
+                {
+                    var param = projection.Parameters[0];
+                    if (!_correlatedParams.TryGetValue(param, out var info))
+                    {
+                        info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? "T" + _joinCounter);
+                        _correlatedParams[param] = info;
+                    }
+                    var visitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap);
+                    var sql = visitor.Translate(arg);
+                    foreach (var kvp in visitor.GetParameters())
+                        _params[kvp.Key] = kvp.Value;
+                    ExpressionVisitorPool.Return(visitor);
+                    items.Add($"{sql} AS {_provider.Escape(alias)}");
+                }
+            }
+            return string.Join(", ", items);
+        }
+
+        private string BuildWindowFunctionSql(WindowFunctionInfo wf, string overClause)
+        {
+            if (wf.ValueSelector != null)
+            {
+                var param = wf.ValueSelector.Parameters[0];
+                if (!_correlatedParams.TryGetValue(param, out var info))
+                {
+                    info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? "T" + _joinCounter);
+                    _correlatedParams[param] = info;
+                }
+                var visitor = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap);
+                var valueSql = visitor.Translate(wf.ValueSelector.Body);
+                foreach (var kvp in visitor.GetParameters())
+                    _params[kvp.Key] = kvp.Value;
+                ExpressionVisitorPool.Return(visitor);
+
+                string defaultSql = string.Empty;
+                if (wf.DefaultValueSelector != null)
+                {
+                    var dParam = wf.DefaultValueSelector.Parameters[0];
+                    if (!_correlatedParams.TryGetValue(dParam, out info))
+                    {
+                        info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? "T" + _joinCounter);
+                        _correlatedParams[dParam] = info;
+                    }
+                    var visitor2 = ExpressionVisitorPool.Get(_ctx, _mapping, _provider, dParam, info.Alias, _correlatedParams, _compiledParams, _paramMap);
+                    var defSql = visitor2.Translate(wf.DefaultValueSelector.Body);
+                    foreach (var kv in visitor2.GetParameters())
+                        _params[kv.Key] = kv.Value;
+                    ExpressionVisitorPool.Return(visitor2);
+                    defaultSql = $", {defSql}";
+                }
+
+                return $"{wf.FunctionName}({valueSql}, {wf.Offset}{defaultSql}) OVER ({overClause})";
+            }
+            return $"{wf.FunctionName}() OVER ({overClause})";
         }
 
         private string TranslateSubExpression(Expression e)
@@ -1145,102 +1234,6 @@ namespace nORM.Query
             return node;
         }
 
-        private Expression HandleRowNumberOperation(MethodCallExpression node)
-        {
-            // WithRowNumber adds ROW_NUMBER() OVER() to the select clause
-            var sourceQuery = node.Arguments[0];
-            var resultSelector = node.Arguments[1] as LambdaExpression;
-            
-            if (resultSelector == null)
-                throw new NormQueryTranslationException("WithRowNumber requires a result selector");
-
-            Visit(sourceQuery);
-            
-            // Modify the projection to include ROW_NUMBER()
-            _projection = resultSelector;
-            
-            // The result selector will be handled during materialization
-            // We need to add ROW_NUMBER() OVER (ORDER BY ...) to the SELECT clause
-            var orderByClause = _orderBy.Count > 0 
-                ? $"ORDER BY {string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}"))}"
-                : "ORDER BY (SELECT NULL)";
-            
-            if (_sql.Length == 0)
-            {
-                var select = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
-                _sql.Append($"SELECT {select}, ROW_NUMBER() OVER ({orderByClause}) AS RowNumber FROM {_mapping.EscTable}");
-            }
-            else
-            {
-                // Insert ROW_NUMBER() into existing SELECT
-                var selectIndex = _sql.ToString().IndexOf("SELECT") + 6;
-                _sql.Insert(selectIndex, $" ROW_NUMBER() OVER ({orderByClause}) AS RowNumber,");
-            }
-            
-            return node;
-        }
-
-        private Expression HandleRankOperation(MethodCallExpression node)
-        {
-            // WithRank adds RANK() OVER() to the select clause
-            var sourceQuery = node.Arguments[0];
-            var resultSelector = node.Arguments[1] as LambdaExpression;
-
-            if (resultSelector == null)
-                throw new NormQueryTranslationException("WithRank requires a result selector");
-
-            Visit(sourceQuery);
-
-            _projection = resultSelector;
-
-            var orderByClause = _orderBy.Count > 0
-                ? $"ORDER BY {string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}"))}"
-                : "ORDER BY (SELECT NULL)";
-
-            if (_sql.Length == 0)
-            {
-                var select = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
-                _sql.Append($"SELECT {select}, RANK() OVER ({orderByClause}) AS Rank FROM {_mapping.EscTable}");
-            }
-            else
-            {
-                var selectIndex = _sql.ToString().IndexOf("SELECT") + 6;
-                _sql.Insert(selectIndex, $" RANK() OVER ({orderByClause}) AS Rank,");
-            }
-
-            return node;
-        }
-
-        private Expression HandleDenseRankOperation(MethodCallExpression node)
-        {
-            // WithDenseRank adds DENSE_RANK() OVER() to the select clause
-            var sourceQuery = node.Arguments[0];
-            var resultSelector = node.Arguments[1] as LambdaExpression;
-
-            if (resultSelector == null)
-                throw new NormQueryTranslationException("WithDenseRank requires a result selector");
-
-            Visit(sourceQuery);
-
-            _projection = resultSelector;
-
-            var orderByClause = _orderBy.Count > 0
-                ? $"ORDER BY {string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}"))}"
-                : "ORDER BY (SELECT NULL)";
-
-            if (_sql.Length == 0)
-            {
-                var select = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
-                _sql.Append($"SELECT {select}, DENSE_RANK() OVER ({orderByClause}) AS DenseRank FROM {_mapping.EscTable}");
-            }
-            else
-            {
-                var selectIndex = _sql.ToString().IndexOf("SELECT") + 6;
-                _sql.Insert(selectIndex, $" DENSE_RANK() OVER ({orderByClause}) AS DenseRank,");
-            }
-
-            return node;
-        }
 
         private static Func<object, object> CreateObjectKeySelector(LambdaExpression keySelector)
         {
