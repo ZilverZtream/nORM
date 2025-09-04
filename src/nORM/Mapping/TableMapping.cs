@@ -50,29 +50,7 @@ namespace nORM.Mapping
                 TableName = tableName;
             }
 
-            var cols = new List<Column>();
-            foreach (var prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(x => x.CanRead && x.CanWrite && x.GetCustomAttribute<NotMappedAttribute>() == null))
-            {
-                OwnedNavigation? ownedNav = null;
-                fluentConfig?.OwnedNavigations.TryGetValue(prop, out ownedNav);
-                if (ownedNav != null || prop.PropertyType.GetCustomAttribute<OwnedAttribute>() != null)
-                {
-                    var ownedType = ownedNav?.OwnedType ?? prop.PropertyType;
-                    var ownedConfig = ownedNav?.Configuration;
-                    foreach (var sp in ownedType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                        .Where(x => x.CanRead && x.CanWrite && x.GetCustomAttribute<NotMappedAttribute>() == null))
-                    {
-                        var getter = CreateOwnedGetter(prop, sp);
-                        var setter = CreateOwnedSetter(prop, sp, out var setterMethod);
-                        cols.Add(new Column(sp, p, ownedConfig, prop.Name, getter, setter, setterMethod));
-                    }
-                }
-                else
-                {
-                    cols.Add(new Column(prop, p, fluentConfig));
-                }
-            }
+            var cols = ColumnMappingCache.GetCachedColumns(t, p, fluentConfig).ToList();
 
             if (fluentConfig?.ShadowProperties.Count > 0)
             {
@@ -108,60 +86,6 @@ namespace nORM.Mapping
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
 
             DiscoverRelations(ctx);
-        }
-
-        private static Func<object, object?> CreateOwnedGetter(PropertyInfo owner, PropertyInfo owned)
-        {
-            var entityParam = Expression.Parameter(typeof(object), "e");
-            var castEntity = Expression.Convert(entityParam, owner.DeclaringType!);
-            var ownerAccess = Expression.Property(castEntity, owner);
-            var nullCheck = Expression.Equal(ownerAccess, Expression.Constant(null, owner.PropertyType));
-            var ownedAccess = Expression.Property(ownerAccess, owned);
-            Expression body = Expression.Condition(
-                nullCheck,
-                Expression.Constant(null, typeof(object)),
-                Expression.Convert(ownedAccess, typeof(object)));
-            return Expression.Lambda<Func<object, object?>>(body, entityParam).Compile();
-        }
-
-        private static Action<object, object?> CreateOwnedSetter(PropertyInfo owner, PropertyInfo owned, out MethodInfo methodInfo)
-        {
-            var dm = new DynamicMethod($"set_{owner.Name}_{owned.Name}", typeof(void), new[] { typeof(object), typeof(object) }, owner.DeclaringType!.Module, true);
-            var il = dm.GetILGenerator();
-
-            // Cast entity to owner type
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Castclass, owner.DeclaringType!);
-            il.Emit(OpCodes.Dup);
-            il.Emit(OpCodes.Callvirt, owner.GetGetMethod()!);
-            var ownedVar = il.DeclareLocal(owner.PropertyType);
-            il.Emit(OpCodes.Stloc, ownedVar);
-            il.Emit(OpCodes.Pop); // remove duplicated entity
-
-            // Initialize owned object if null
-            il.Emit(OpCodes.Ldloc, ownedVar);
-            var hasValue = il.DefineLabel();
-            il.Emit(OpCodes.Brtrue_S, hasValue);
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Castclass, owner.DeclaringType!);
-            il.Emit(OpCodes.Newobj, owner.PropertyType.GetConstructor(Type.EmptyTypes)!);
-            il.Emit(OpCodes.Dup);
-            il.Emit(OpCodes.Stloc, ownedVar);
-            il.Emit(OpCodes.Callvirt, owner.GetSetMethod()!);
-            il.MarkLabel(hasValue);
-
-            // Assign value
-            il.Emit(OpCodes.Ldloc, ownedVar);
-            il.Emit(OpCodes.Ldarg_1);
-            if (owned.PropertyType.IsValueType)
-                il.Emit(OpCodes.Unbox_Any, owned.PropertyType);
-            else
-                il.Emit(OpCodes.Castclass, owned.PropertyType);
-            il.Emit(OpCodes.Callvirt, owned.GetSetMethod()!);
-            il.Emit(OpCodes.Ret);
-
-            methodInfo = dm;
-            return (Action<object, object?>)dm.CreateDelegate(typeof(Action<object, object?>));
         }
 
         private void DiscoverRelations(DbContext ctx)
