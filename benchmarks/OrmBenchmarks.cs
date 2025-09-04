@@ -272,6 +272,14 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task Insert_Single_nORM()
         {
+            var options = new nORM.Configuration.DbContextOptions
+            {
+                BulkBatchSize = 50,
+                TimeoutConfiguration = { BaseTimeout = TimeSpan.FromSeconds(30) }
+            };
+
+            await using var context = new nORM.Core.DbContext(_nOrmConnectionString, new SqliteProvider(), options);
+
             var user = new BenchmarkUser
             {
                 Name = "Test User nORM",
@@ -284,7 +292,7 @@ namespace nORM.Benchmarks
                 Salary = 50_000
             };
 
-            await _nOrmContext!.InsertAsync(user);
+            await context.InsertAsync(user);
         }
 
         [Benchmark]
@@ -541,7 +549,9 @@ namespace nORM.Benchmarks
                 INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
                 VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
 
-            await _dapperConnection!.ExecuteAsync(sql, users);
+            await using var transaction = await _dapperConnection!.BeginTransactionAsync();
+            await _dapperConnection!.ExecuteAsync(sql, users, transaction);
+            await transaction.CommitAsync();
         }
 
         [GlobalCleanup]
