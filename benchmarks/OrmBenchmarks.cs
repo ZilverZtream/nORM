@@ -67,9 +67,9 @@ namespace nORM.Benchmarks
         private List<BenchmarkUser> _testUsers = new();
         private List<BenchmarkOrder> _testOrders = new();
 
-        private readonly string _efConnectionString = "Data Source=ef_benchmark.db";
-        private readonly string _nOrmConnectionString = "Data Source=norm_benchmark.db";
-        private readonly string _dapperConnectionString = "Data Source=dapper_benchmark.db";
+        private readonly string _efConnectionString = "Data Source=benchmark.db";
+        private readonly string _nOrmConnectionString = "Data Source=benchmark.db";
+        private readonly string _dapperConnectionString = "Data Source=benchmark.db";
 
         private EfCoreContext? _efContext;
         private SqliteConnection? _nOrmConnection;
@@ -106,9 +106,7 @@ namespace nORM.Benchmarks
                 }).ToList();
 
             // Setup all databases
-            await SetupEfCore();
-            await SetupnORM();
-            await SetupDapper();
+            await SetupDatabase();
 
             Console.WriteLine("✅ Benchmark setup complete!");
         }
@@ -125,12 +123,13 @@ namespace nORM.Benchmarks
             return departments[random.Next(departments.Length)];
         }
 
-        private async Task SetupEfCore()
+        private async Task SetupDatabase()
         {
             // Delete existing database
-            if (System.IO.File.Exists("ef_benchmark.db"))
-                System.IO.File.Delete("ef_benchmark.db");
+            if (System.IO.File.Exists("benchmark.db"))
+                System.IO.File.Delete("benchmark.db");
 
+            // Use EF Core to create the database and initial data
             _efContext = new EfCoreContext(_efConnectionString);
             await _efContext.Database.OpenConnectionAsync();
             await _efContext.Database.EnsureCreatedAsync();
@@ -144,105 +143,19 @@ namespace nORM.Benchmarks
             await _efContext.SaveChangesAsync();
 
             _efContext.ChangeTracker.Clear();
-        }
 
-        private async Task SetupnORM()
-        {
-            // Delete existing database
-            if (System.IO.File.Exists("norm_benchmark.db"))
-                System.IO.File.Delete("norm_benchmark.db");
-
-            using var connection = new SqliteConnection(_nOrmConnectionString);
-            await connection.OpenAsync();
-
+            // Setup nORM connection
             var options = new nORM.Configuration.DbContextOptions
             {
                 BulkBatchSize = 50, // Optimized for SQLite parameter limits
                 TimeoutConfiguration = { BaseTimeout = TimeSpan.FromSeconds(30) }
             };
 
-            using var context = new nORM.Core.DbContext(connection, new SqliteProvider(), options);
-
-            // Create tables manually
-            var createUserTableSql = @"
-                CREATE TABLE BenchmarkUser (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Name TEXT NOT NULL,
-                    Email TEXT NOT NULL,
-                    CreatedAt TEXT NOT NULL,
-                    IsActive INTEGER NOT NULL,
-                    Age INTEGER NOT NULL,
-                    City TEXT NOT NULL,
-                    Department TEXT NOT NULL,
-                    Salary REAL NOT NULL
-                )";
-
-            var createOrderTableSql = @"
-                CREATE TABLE BenchmarkOrder (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    UserId INTEGER NOT NULL,
-                    Amount REAL NOT NULL,
-                    OrderDate TEXT NOT NULL,
-                    ProductName TEXT NOT NULL
-                )";
-
-            await connection.ExecuteAsync(createUserTableSql);
-            await connection.ExecuteAsync(createOrderTableSql);
-
-            // Insert test data using nORM
-            await context.BulkInsertAsync(_testUsers);
-            await context.BulkInsertAsync(_testOrders);
-
             _nOrmConnection = new SqliteConnection(_nOrmConnectionString);
             await _nOrmConnection.OpenAsync();
             _nOrmContext = new nORM.Core.DbContext(_nOrmConnection, new SqliteProvider(), options);
-        }
 
-        private async Task SetupDapper()
-        {
-            // Delete existing database
-            if (System.IO.File.Exists("dapper_benchmark.db"))
-                System.IO.File.Delete("dapper_benchmark.db");
-
-            using var connection = new SqliteConnection(_dapperConnectionString);
-            await connection.OpenAsync();
-
-            var createUserTableSql = @"
-                CREATE TABLE BenchmarkUser (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Name TEXT NOT NULL,
-                    Email TEXT NOT NULL,
-                    CreatedAt TEXT NOT NULL,
-                    IsActive INTEGER NOT NULL,
-                    Age INTEGER NOT NULL,
-                    City TEXT NOT NULL,
-                    Department TEXT NOT NULL,
-                    Salary REAL NOT NULL
-                )";
-
-            var createOrderTableSql = @"
-                CREATE TABLE BenchmarkOrder (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    UserId INTEGER NOT NULL,
-                    Amount REAL NOT NULL,
-                    OrderDate TEXT NOT NULL,
-                    ProductName TEXT NOT NULL
-                )";
-
-            await connection.ExecuteAsync(createUserTableSql);
-            await connection.ExecuteAsync(createOrderTableSql);
-
-            var insertUserSql = @"
-                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
-                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
-
-            var insertOrderSql = @"
-                INSERT INTO BenchmarkOrder (UserId, Amount, OrderDate, ProductName) 
-                VALUES (@UserId, @Amount, @OrderDate, @ProductName)";
-
-            await connection.ExecuteAsync(insertUserSql, _testUsers);
-            await connection.ExecuteAsync(insertOrderSql, _testOrders);
-
+            // Setup Dapper connection
             _dapperConnection = new SqliteConnection(_dapperConnectionString);
             await _dapperConnection.OpenAsync();
         }
@@ -383,7 +296,9 @@ namespace nORM.Benchmarks
                     CreatedAt = DateTime.Parse(reader.GetString("CreatedAt")),
                     IsActive = reader.GetInt32("IsActive") == 1,
                     Age = reader.GetInt32("Age"),
-                    City = reader.GetString("City")
+                    City = reader.GetString("City"),
+                    Department = reader.GetString("Department"),
+                    Salary = reader.GetDouble("Salary")
                 });
             }
 
@@ -562,17 +477,14 @@ namespace nORM.Benchmarks
             _nOrmConnection?.Dispose();
             _dapperConnection?.Dispose();
 
-            // Clean up database files
+            // Clean up database file
             try
             {
-                if (System.IO.File.Exists("ef_benchmark.db"))
-                    System.IO.File.Delete("ef_benchmark.db");
-                if (System.IO.File.Exists("norm_benchmark.db"))
-                    System.IO.File.Delete("norm_benchmark.db");
-                if (System.IO.File.Exists("dapper_benchmark.db"))
-                    System.IO.File.Delete("dapper_benchmark.db");
+                if (System.IO.File.Exists("benchmark.db"))
+                    System.IO.File.Delete("benchmark.db");
             }
             catch { /* Ignore cleanup errors */ }
         }
     }
 }
+
