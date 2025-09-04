@@ -17,6 +17,7 @@ using nORM.Execution;
 using nORM.Internal;
 using nORM.Navigation;
 using nORM.Mapping;
+using Microsoft.Extensions.Logging;
 
 #nullable enable
 

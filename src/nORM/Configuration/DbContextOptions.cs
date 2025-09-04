@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using nORM.Core;
 using nORM.Enterprise;
 using nORM.Execution;
+using Microsoft.Extensions.Logging;
 
 #nullable enable
 
@@ -33,7 +34,7 @@ namespace nORM.Configuration
                 _bulkBatchSize = value;
             }
         }
-        public IDbContextLogger? Logger { get; set; }
+        public ILogger? Logger { get; set; }
         public RetryPolicy? RetryPolicy { get; set; }
         public ITenantProvider? TenantProvider { get; set; }
         public string TenantColumnName { get; set; } = "TenantId";
