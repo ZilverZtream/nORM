@@ -23,8 +23,9 @@ namespace nORM.Navigation
     /// </summary>
     public static class NavigationPropertyExtensions
     {
-        private static readonly ConditionalWeakTable<object, NavigationContext> _navigationContexts = new();
+        internal static readonly ConditionalWeakTable<object, NavigationContext> _navigationContexts = new();
         private static readonly ConcurrentLruCache<Type, List<NavigationPropertyInfo>> _navigationPropertyCache = new(maxSize: 1000);
+        private static readonly ConditionalWeakTable<DbContext, BatchedNavigationLoader> _navigationLoaders = new();
 
         /// <summary>
         /// Enables lazy loading for an entity instance
@@ -248,15 +249,16 @@ namespace nORM.Navigation
             if (property.PropertyType.IsGenericType && typeof(IEnumerable).IsAssignableFrom(property.PropertyType))
             {
                 // Collection navigation property
-                var results = await ExecuteCollectionQueryAsync(context.DbContext, dependentMapping, relation.ForeignKey, principalKeyValue, relation.DependentType, ct);
-                
+                var loader = _navigationLoaders.GetValue(context.DbContext, ctx => new BatchedNavigationLoader(ctx));
+                var results = await loader.LoadNavigationAsync<List<object>>(entity, property.Name, ct);
+
                 var collectionType = typeof(List<>).MakeGenericType(relation.DependentType);
                 var collection = (IList)Activator.CreateInstance(collectionType)!;
                 foreach (var item in results)
                 {
                     collection.Add(item);
                 }
-                
+
                 property.SetValue(entity, collection);
             }
             else
@@ -312,10 +314,12 @@ namespace nORM.Navigation
                 
             if (foreignKeyColumn != null)
             {
+                sourceMapping.Relations[property.Name] = new TableMapping.Relation(property, targetType, sourcePrimaryKey, foreignKeyColumn);
+                var loader = _navigationLoaders.GetValue(context.DbContext, ctx => new BatchedNavigationLoader(ctx));
                 if (property.PropertyType.IsGenericType && typeof(IEnumerable).IsAssignableFrom(property.PropertyType))
                 {
                     // Collection
-                    var results = await ExecuteCollectionQueryAsync(context.DbContext, targetMapping, foreignKeyColumn, sourcePrimaryKeyValue, targetType, ct);
+                    var results = await loader.LoadNavigationAsync<List<object>>(entity, property.Name, ct);
 
                     var collectionType = typeof(List<>).MakeGenericType(targetType);
                     var collection = (IList)Activator.CreateInstance(collectionType)!;
@@ -329,13 +333,14 @@ namespace nORM.Navigation
                 else
                 {
                     // Reference
-                    var result = await ExecuteSingleQueryAsync(context.DbContext, targetMapping, foreignKeyColumn, sourcePrimaryKeyValue, targetType, ct);
+                    var list = await loader.LoadNavigationAsync<List<object>>(entity, property.Name, ct);
+                    var result = list.FirstOrDefault();
 
                     if (property.PropertyType.IsGenericType &&
                         property.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
                     {
                         var reference = property.GetValue(entity);
-                        reference?.GetType().GetMethod("SetValue")?.Invoke(reference, new object?[] { result });
+                        reference?.GetType()?.GetMethod("SetValue")?.Invoke(reference, new object?[] { result });
                     }
                     else
                     {
@@ -343,32 +348,6 @@ namespace nORM.Navigation
                     }
                 }
             }
-        }
-
-        private static async Task<List<object>> ExecuteCollectionQueryAsync(DbContext context, TableMapping mapping, Column foreignKey, object keyValue, Type entityType, CancellationToken ct)
-        {
-            await context.EnsureConnectionAsync(ct);
-            using var cmd = context.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)context.Options.CommandTimeout.TotalSeconds;
-            
-            var paramName = context.Provider.ParamPrefix + "fk";
-            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {foreignKey.EscCol} = {paramName}";
-            cmd.AddParam(paramName, keyValue);
-
-            var materializer = Query.QueryTranslator.Rent(context).CreateMaterializer(mapping, entityType);
-            var results = new List<object>();
-
-            using var reader = await cmd.ExecuteReaderWithInterceptionAsync(context, CommandBehavior.Default, ct);
-            while (await reader.ReadAsync(ct))
-            {
-                var entity = await materializer(reader, ct);
-                // Enable lazy loading for the loaded entity
-                _navigationContexts.GetValue(entity, _ => new NavigationContext(context, entityType));
-                context.ChangeTracker.Track(entity, EntityState.Unchanged, mapping);
-                results.Add(entity);
-            }
-            
-            return results;
         }
 
         private static async Task<object?> ExecuteSingleQueryAsync(DbContext context, TableMapping mapping, Column foreignKey, object keyValue, Type entityType, CancellationToken ct)
