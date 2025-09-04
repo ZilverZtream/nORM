@@ -368,10 +368,10 @@ namespace nORM.Query
         internal QueryPlan GetPlan(Expression expression, out Expression filtered)
         {
             filtered = ApplyGlobalFilters(expression);
-            var elementType = GetElementType(filtered);
+            var elementType = GetElementType(UnwrapQueryExpression(filtered));
             var fingerprint = ExpressionFingerprint.Compute(filtered);
             var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
-            var cacheKey = HashCode.Combine(fingerprint, tenantHash, elementType.GetHashCode());
+            var cacheKey = HashCode.Combine(fingerprint, tenantHash, elementType.GetHashCode(), filtered.Type.GetHashCode());
 
             if (_planCache.TryGetValue(cacheKey, out QueryPlan? cached))
             {
@@ -417,8 +417,27 @@ namespace nORM.Query
             return hash.ToHashCode().ToString();
         }
 
+        private static Expression UnwrapQueryExpression(Expression expression)
+        {
+            return expression is MethodCallExpression mc &&
+                   !typeof(IQueryable).IsAssignableFrom(expression.Type) &&
+                   mc.Arguments.Count > 0
+                ? mc.Arguments[0]
+                : expression;
+        }
+
         private Expression ApplyGlobalFilters(Expression expression)
         {
+            if (expression is MethodCallExpression mc &&
+                !typeof(IQueryable).IsAssignableFrom(expression.Type) &&
+                mc.Arguments.Count > 0)
+            {
+                var filteredSource = ApplyGlobalFilters(mc.Arguments[0]);
+                var args = mc.Arguments.ToArray();
+                args[0] = filteredSource;
+                return mc.Update(mc.Object, args);
+            }
+
             var entityType = GetElementType(expression);
 
             if (_ctx.Options.GlobalFilters.Count > 0)

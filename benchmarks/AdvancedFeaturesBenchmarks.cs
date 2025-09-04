@@ -78,23 +78,23 @@ namespace nORM.Benchmarks
         
         [Benchmark(Baseline = true)]
         [BenchmarkCategory("Aggregates")]
-        public async Task<decimal> Sum_nORM()
+        public async Task<double> Sum_nORM()
         {
             return await NormAdvanced.SumAsync(_nOrmContext!.Query<BenchmarkUser>(), u => u.Salary);
         }
         
         [Benchmark]
         [BenchmarkCategory("Aggregates")]
-        public async Task<decimal> Sum_EfCore()
+        public async Task<double> Sum_EfCore()
         {
             return await EfExtensions.SumAsync(_efContext!.Users, u => u.Salary);
         }
         
         [Benchmark]
         [BenchmarkCategory("Aggregates")]
-        public async Task<decimal> Sum_Dapper()
+        public async Task<double> Sum_Dapper()
         {
-            return await _dapperConnection!.QuerySingleAsync<decimal>(
+            return await _dapperConnection!.QuerySingleAsync<double>(
                 "SELECT SUM(Salary) FROM Users");
         }
         
@@ -292,7 +292,7 @@ namespace nORM.Benchmarks
                     Name TEXT NOT NULL,
                     Email TEXT NOT NULL,
                     Department TEXT NOT NULL,
-                    Salary DECIMAL(10,2) NOT NULL,
+                    Salary REAL NOT NULL,
                     IsActive BOOLEAN NOT NULL,
                     CreatedAt DATETIME NOT NULL,
                     Age INTEGER NOT NULL,
@@ -441,30 +441,34 @@ namespace nORM.Benchmarks
     public class BenchmarkUser
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string Department { get; set; } = string.Empty;
-        public decimal Salary { get; set; }
+        public double Salary { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public int Age { get; set; }
         public string City { get; set; } = string.Empty;
-        
+
         // Navigation property
+        [NotMapped]
         public virtual ICollection<BenchmarkOrder> Orders { get; set; } = new List<BenchmarkOrder>();
     }
     
     public class BenchmarkOrder
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
         public int UserId { get; set; }
         public decimal Amount { get; set; }
         public DateTime OrderDate { get; set; }
         public string ProductName { get; set; } = string.Empty;
-        
+
         // Navigation property
+        [NotMapped]
         [ForeignKey(nameof(UserId))]
         public virtual BenchmarkUser? User { get; set; }
     }
@@ -491,7 +495,7 @@ namespace nORM.Benchmarks
                 entity.Property(e => e.Name).IsRequired();
                 entity.Property(e => e.Email).IsRequired();
                 entity.Property(e => e.Department).IsRequired();
-                entity.Property(e => e.Salary).HasColumnType("DECIMAL(10,2)");
+                entity.Property(e => e.Salary).HasColumnType("REAL");
                 
                 entity.HasMany(e => e.Orders)
                     .WithOne(e => e.User)

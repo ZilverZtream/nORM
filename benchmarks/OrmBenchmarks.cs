@@ -91,7 +91,9 @@ namespace nORM.Benchmarks
                     CreatedAt = DateTime.Now.AddDays(-random.Next(365)),
                     IsActive = random.Next(10) > 2,
                     Age = random.Next(18, 80),
-                    City = GetRandomCity(random)
+                    City = GetRandomCity(random),
+                    Department = GetRandomDepartment(random),
+                    Salary = random.Next(40_000, 100_000)
                 }).ToList();
 
             _testOrders = Enumerable.Range(1, OrderCount)
@@ -115,6 +117,12 @@ namespace nORM.Benchmarks
         {
             var cities = new[] { "New York", "London", "Tokyo", "Paris", "Berlin", "Sydney", "Toronto", "Madrid" };
             return cities[random.Next(cities.Length)];
+        }
+
+        private static string GetRandomDepartment(Random random)
+        {
+            var departments = new[] { "Sales", "Engineering", "HR", "Marketing" };
+            return departments[random.Next(departments.Length)];
         }
 
         private async Task SetupEfCore()
@@ -164,7 +172,9 @@ namespace nORM.Benchmarks
                     CreatedAt TEXT NOT NULL,
                     IsActive INTEGER NOT NULL,
                     Age INTEGER NOT NULL,
-                    City TEXT NOT NULL
+                    City TEXT NOT NULL,
+                    Department TEXT NOT NULL,
+                    Salary REAL NOT NULL
                 )";
 
             var createOrderTableSql = @"
@@ -205,7 +215,9 @@ namespace nORM.Benchmarks
                     CreatedAt TEXT NOT NULL,
                     IsActive INTEGER NOT NULL,
                     Age INTEGER NOT NULL,
-                    City TEXT NOT NULL
+                    City TEXT NOT NULL,
+                    Department TEXT NOT NULL,
+                    Salary REAL NOT NULL
                 )";
 
             var createOrderTableSql = @"
@@ -221,8 +233,8 @@ namespace nORM.Benchmarks
             await connection.ExecuteAsync(createOrderTableSql);
 
             var insertUserSql = @"
-                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City) 
-                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City)";
+                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
+                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
 
             var insertOrderSql = @"
                 INSERT INTO BenchmarkOrder (UserId, Amount, OrderDate, ProductName) 
@@ -247,7 +259,9 @@ namespace nORM.Benchmarks
                 CreatedAt = DateTime.Now,
                 IsActive = true,
                 Age = 25,
-                City = "TestCity"
+                City = "TestCity",
+                Department = "TestDept",
+                Salary = 50_000
             };
 
             _efContext!.Users.Add(user);
@@ -265,7 +279,9 @@ namespace nORM.Benchmarks
                 CreatedAt = DateTime.Now,
                 IsActive = true,
                 Age = 25,
-                City = "TestCity"
+                City = "TestCity",
+                Department = "TestDept",
+                Salary = 50_000
             };
 
             await _nOrmContext!.InsertAsync(user);
@@ -281,11 +297,13 @@ namespace nORM.Benchmarks
                 CreatedAt = DateTime.Now,
                 IsActive = true,
                 Age = 25,
-                City = "TestCity"
+                City = "TestCity",
+                Department = "TestDept",
+                Salary = 50_000
             };
             var sql = @"
-                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City)
-                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City)";
+                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
+                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
 
             await _dapperConnection!.ExecuteAsync(sql, user);
         }
@@ -294,8 +312,8 @@ namespace nORM.Benchmarks
         public async Task Insert_Single_RawAdo()
         {
             var sql = @"
-                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City)
-                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City)";
+                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
+                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
             using var command = _dapperConnection!.CreateCommand();
             command.CommandText = sql;
             command.Parameters.AddWithValue("@Name", "Test User ADO");
@@ -304,6 +322,8 @@ namespace nORM.Benchmarks
             command.Parameters.AddWithValue("@IsActive", 1);
             command.Parameters.AddWithValue("@Age", 25);
             command.Parameters.AddWithValue("@City", "TestCity");
+            command.Parameters.AddWithValue("@Department", "TestDept");
+            command.Parameters.AddWithValue("@Salary", 50_000);
 
             await command.ExecuteNonQueryAsync();
         }
@@ -471,7 +491,9 @@ namespace nORM.Benchmarks
                 CreatedAt = DateTime.Now,
                 IsActive = true,
                 Age = 30,
-                City = "BulkCity"
+                City = "BulkCity",
+                Department = "BulkDept",
+                Salary = 60_000
             }).ToList();
 
             _efContext!.Users.AddRange(users);
@@ -489,7 +511,9 @@ namespace nORM.Benchmarks
                 CreatedAt = DateTime.Now,
                 IsActive = true,
                 Age = 30,
-                City = "BulkCity"
+                City = "BulkCity",
+                Department = "BulkDept",
+                Salary = 60_000
             }).ToList();
 
             await _nOrmContext!.BulkInsertAsync(users);
@@ -505,12 +529,14 @@ namespace nORM.Benchmarks
                 CreatedAt = DateTime.Now,
                 IsActive = true,
                 Age = 30,
-                City = "BulkCity"
+                City = "BulkCity",
+                Department = "BulkDept",
+                Salary = 60_000
             }).ToList();
 
             var sql = @"
-                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City)
-                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City)";
+                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
+                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
 
             await _dapperConnection!.ExecuteAsync(sql, users);
         }

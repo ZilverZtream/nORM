@@ -42,7 +42,9 @@ namespace nORM.Benchmarks
                         CreatedAt TEXT NOT NULL,
                         IsActive INTEGER NOT NULL,
                         Age INTEGER NOT NULL,
-                        City TEXT NOT NULL
+                        City TEXT NOT NULL,
+                        Department TEXT NOT NULL,
+                        Salary REAL NOT NULL
                     )");
                     
                 await connection.ExecuteAsync(@"
@@ -59,9 +61,9 @@ namespace nORM.Benchmarks
                 // Insert test data
                 var testUsers = new[]
                 {
-                    new BenchmarkUser { Name = "Alice", Email = "alice@test.com", CreatedAt = DateTime.Now, IsActive = true, Age = 30, City = "NYC" },
-                    new BenchmarkUser { Name = "Bob", Email = "bob@test.com", CreatedAt = DateTime.Now, IsActive = true, Age = 25, City = "LA" },
-                    new BenchmarkUser { Name = "Charlie", Email = "charlie@test.com", CreatedAt = DateTime.Now, IsActive = false, Age = 35, City = "NYC" }
+                    new BenchmarkUser { Name = "Alice", Email = "alice@test.com", CreatedAt = DateTime.Now, IsActive = true, Age = 30, City = "NYC", Department = "Sales", Salary = 50_000 },
+                    new BenchmarkUser { Name = "Bob", Email = "bob@test.com", CreatedAt = DateTime.Now, IsActive = true, Age = 25, City = "LA", Department = "HR", Salary = 45_000 },
+                    new BenchmarkUser { Name = "Charlie", Email = "charlie@test.com", CreatedAt = DateTime.Now, IsActive = false, Age = 35, City = "NYC", Department = "Engineering", Salary = 55_000 }
                 };
                 
                 foreach (var user in testUsers)
@@ -149,7 +151,9 @@ namespace nORM.Benchmarks
                             CreatedAt = DateTime.Now,
                             IsActive = true,
                             Age = 25 + (i % 20),
-                            City = "TestCity"
+                            City = "TestCity",
+                            Department = "BulkDept",
+                            Salary = 40_000 + i
                         };
                     }
                     
