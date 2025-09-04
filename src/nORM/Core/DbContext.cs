@@ -32,7 +32,7 @@ namespace nORM.Core
         private DbTransaction? _currentTransaction;
 
         public DbContextOptions Options { get; }
-        public ChangeTracker ChangeTracker { get; } = new();
+        public ChangeTracker ChangeTracker { get; }
         public DatabaseFacade Database { get; }
 
         public DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options = null)
@@ -40,6 +40,7 @@ namespace nORM.Core
             _cn = cn;
             _p = p;
             Options = options ?? new DbContextOptions();
+            ChangeTracker = new ChangeTracker(Options);
             _modelBuilder = new ModelBuilder();
             Options.OnModelCreating?.Invoke(_modelBuilder);
 

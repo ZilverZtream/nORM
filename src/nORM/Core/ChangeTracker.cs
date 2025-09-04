@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using nORM.Configuration;
 using nORM.Mapping;
 using RefComparer = System.Collections.Generic.ReferenceEqualityComparer;
 
@@ -9,12 +10,18 @@ namespace nORM.Core
     public sealed class ChangeTracker
     {
         private readonly Dictionary<object, EntityEntry> _entries = new(RefComparer.Instance);
+        private readonly DbContextOptions _options;
+
+        public ChangeTracker(DbContextOptions options)
+        {
+            _options = options;
+        }
 
         internal EntityEntry Track(object entity, EntityState state, TableMapping mapping)
         {
             if (!_entries.TryGetValue(entity, out var entry))
             {
-                entry = new EntityEntry(entity, state, mapping);
+                entry = new EntityEntry(entity, state, mapping, _options);
                 _entries[entity] = entry;
             }
             else

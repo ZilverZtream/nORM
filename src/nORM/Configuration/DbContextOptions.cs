@@ -38,6 +38,7 @@ namespace nORM.Configuration
         public string TenantColumnName { get; set; } = "TenantId";
         public Action<ModelBuilder>? OnModelCreating { get; set; }
         public bool UseBatchedBulkOps { get; set; } = false;
+        public bool UsePreciseChangeTracking { get; set; } = false;
         public IList<IDbCommandInterceptor> CommandInterceptors { get; } = new List<IDbCommandInterceptor>();
         public IList<ISaveChangesInterceptor> SaveChangesInterceptors { get; } = new List<ISaveChangesInterceptor>();
         public IDbCacheProvider? CacheProvider { get; set; }
