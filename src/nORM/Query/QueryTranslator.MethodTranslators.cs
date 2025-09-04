@@ -53,11 +53,34 @@ namespace nORM.Query
             { "WithRowNumber", new RowNumberTranslator() },
             { "WithRank", new RankTranslator() },
             { "WithDenseRank", new DenseRankTranslator() },
+            { "WithLag", new LagTranslator() },
+            { "WithLead", new LeadTranslator() },
             { "Include", new IncludeTranslator() },
             { "ThenInclude", new ThenIncludeTranslator() },
             { "AsNoTracking", new AsNoTrackingTranslator() },
             { "AsSplitQuery", new AsSplitQueryTranslator() }
         };
+
+        private static string GetWindowAlias(LambdaExpression selector, int paramIndex, string defaultAlias)
+        {
+            if (selector.Body is NewExpression ne)
+            {
+                for (int i = 0; i < ne.Arguments.Count; i++)
+                {
+                    if (ne.Arguments[i] == selector.Parameters[paramIndex])
+                        return ne.Members?[i].Name ?? defaultAlias;
+                }
+            }
+            else if (selector.Body is MemberInitExpression mi)
+            {
+                foreach (var b in mi.Bindings)
+                {
+                    if (b is MemberAssignment ma && ma.Expression == selector.Parameters[paramIndex])
+                        return b.Member.Name;
+                }
+            }
+            return defaultAlias;
+        }
 
         private sealed class WhereTranslator : IMethodCallTranslator
         {
@@ -432,7 +455,12 @@ namespace nORM.Query
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                return t.HandleRowNumberOperation(node);
+                var resultSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
+                    ?? throw new NormQueryTranslationException("WithRowNumber requires a result selector");
+                var alias = GetWindowAlias(resultSelector, 1, "RowNumber");
+                var wf = new WindowFunctionInfo("ROW_NUMBER", null, 0, null, alias, resultSelector.Parameters[1], resultSelector);
+                t._clauses.WindowFunctions.Add(wf);
+                return t.Visit(node.Arguments[0]);
             }
         }
 
@@ -440,7 +468,12 @@ namespace nORM.Query
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                return t.HandleRankOperation(node);
+                var resultSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
+                    ?? throw new NormQueryTranslationException("WithRank requires a result selector");
+                var alias = GetWindowAlias(resultSelector, 1, "Rank");
+                var wf = new WindowFunctionInfo("RANK", null, 0, null, alias, resultSelector.Parameters[1], resultSelector);
+                t._clauses.WindowFunctions.Add(wf);
+                return t.Visit(node.Arguments[0]);
             }
         }
 
@@ -448,7 +481,50 @@ namespace nORM.Query
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                return t.HandleDenseRankOperation(node);
+                var resultSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
+                    ?? throw new NormQueryTranslationException("WithDenseRank requires a result selector");
+                var alias = GetWindowAlias(resultSelector, 1, "DenseRank");
+                var wf = new WindowFunctionInfo("DENSE_RANK", null, 0, null, alias, resultSelector.Parameters[1], resultSelector);
+                t._clauses.WindowFunctions.Add(wf);
+                return t.Visit(node.Arguments[0]);
+            }
+        }
+
+        private sealed class LagTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                var valueSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
+                    ?? throw new NormQueryTranslationException("WithLag requires a value selector");
+                int offset = TryGetIntValue(node.Arguments[2], out var off) ? off : 1;
+                var resultSelector = StripQuotes(node.Arguments[3]) as LambdaExpression
+                    ?? throw new NormQueryTranslationException("WithLag requires a result selector");
+                LambdaExpression? defaultSelector = null;
+                if (node.Arguments.Count > 4)
+                    defaultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
+                var alias = GetWindowAlias(resultSelector, 1, "Lag");
+                var wf = new WindowFunctionInfo("LAG", valueSelector, offset, defaultSelector, alias, resultSelector.Parameters[1], resultSelector);
+                t._clauses.WindowFunctions.Add(wf);
+                return t.Visit(node.Arguments[0]);
+            }
+        }
+
+        private sealed class LeadTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                var valueSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
+                    ?? throw new NormQueryTranslationException("WithLead requires a value selector");
+                int offset = TryGetIntValue(node.Arguments[2], out var off) ? off : 1;
+                var resultSelector = StripQuotes(node.Arguments[3]) as LambdaExpression
+                    ?? throw new NormQueryTranslationException("WithLead requires a result selector");
+                LambdaExpression? defaultSelector = null;
+                if (node.Arguments.Count > 4)
+                    defaultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
+                var alias = GetWindowAlias(resultSelector, 1, "Lead");
+                var wf = new WindowFunctionInfo("LEAD", valueSelector, offset, defaultSelector, alias, resultSelector.Parameters[1], resultSelector);
+                t._clauses.WindowFunctions.Add(wf);
+                return t.Visit(node.Arguments[0]);
             }
         }
 
