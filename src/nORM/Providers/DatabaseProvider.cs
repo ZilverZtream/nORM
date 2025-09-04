@@ -30,6 +30,9 @@ namespace nORM.Providers
         public abstract string? TranslateFunction(string name, Type declaringType, params string[] args);
         public abstract string TranslateJsonPathAccess(string columnName, string jsonPath);
 
+        public abstract string GenerateCreateHistoryTableSql(TableMapping mapping);
+        public abstract string GenerateTemporalTriggersSql(TableMapping mapping);
+
         public virtual char LikeEscapeChar => '\\';
 
         public virtual string EscapeLikePattern(string value)

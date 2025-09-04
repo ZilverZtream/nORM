@@ -12,6 +12,7 @@ namespace nORM.Configuration
     public class DbContextOptions
     {
         private int _bulkBatchSize = 1000;
+        private bool _temporalVersioningEnabled = false;
 
         public AdaptiveTimeoutManager.TimeoutConfiguration TimeoutConfiguration { get; set; } = new();
 
@@ -50,6 +51,14 @@ namespace nORM.Configuration
             this.CacheProvider = new NormMemoryCacheProvider();
             return this;
         }
+
+        public DbContextOptions EnableTemporalVersioning()
+        {
+            _temporalVersioningEnabled = true;
+            return this;
+        }
+
+        internal bool IsTemporalVersioningEnabled => _temporalVersioningEnabled;
 
         public IDictionary<Type, List<LambdaExpression>> GlobalFilters { get; } = new Dictionary<Type, List<LambdaExpression>>();
 

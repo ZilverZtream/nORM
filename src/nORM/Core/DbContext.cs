@@ -13,6 +13,7 @@ using nORM.Mapping;
 using nORM.Providers;
 using nORM.Internal;
 using nORM.Navigation;
+using nORM.Versioning;
 using System.Reflection;
 using nORM.Scaffolding;
 using Microsoft.Data.SqlClient;
@@ -52,6 +53,11 @@ namespace nORM.Core
             _executionStrategy = Options.RetryPolicy != null
                 ? new RetryingExecutionStrategy(this, Options.RetryPolicy)
                 : new DefaultExecutionStrategy(this);
+
+            if (Options.IsTemporalVersioningEnabled)
+            {
+                TemporalManager.InitializeAsync(this).GetAwaiter().GetResult();
+            }
         }
 
         public DbContext(string connectionString, DatabaseProvider p, DbContextOptions? options = null)
@@ -160,6 +166,12 @@ namespace nORM.Core
 
         internal TableMapping GetMapping(Type t) => _m.GetOrAdd(t, static (k, args) =>
             new TableMapping(k, args.p, args.ctx, args.modelBuilder.GetConfiguration(k)), (p: _p, ctx: this, modelBuilder: _modelBuilder));
+
+        internal IEnumerable<TableMapping> GetAllMappings()
+        {
+            foreach (var type in _modelBuilder.GetConfiguredEntityTypes())
+                yield return GetMapping(type);
+        }
 
         public IQueryable Query(string tableName)
         {
@@ -775,6 +787,22 @@ namespace nORM.Core
 
         public object? GetShadowProperty(object entity, string name)
             => Internal.ShadowPropertyStore.Get(entity, name);
+
+        public async Task CreateTagAsync(string tagName)
+        {
+            await _executionStrategy.ExecuteAsync(async (ctx, ct) =>
+            {
+                await ctx.EnsureConnectionAsync(ct);
+                await using var cmd = ctx.Connection.CreateCommand();
+                var p0 = _p.ParamPrefix + "p0";
+                var p1 = _p.ParamPrefix + "p1";
+                cmd.CommandText = $"INSERT INTO __NormTemporalTags (TagName, Timestamp) VALUES ({p0}, {p1})";
+                cmd.AddParam(p0, tagName);
+                cmd.AddParam(p1, DateTime.UtcNow);
+                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                return 0;
+            }, default);
+        }
 
         public void Dispose()
         {

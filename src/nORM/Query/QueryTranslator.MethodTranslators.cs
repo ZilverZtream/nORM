@@ -59,7 +59,8 @@ namespace nORM.Query
             { "Include", new IncludeTranslator() },
             { "ThenInclude", new ThenIncludeTranslator() },
             { "AsNoTracking", new AsNoTrackingTranslator() },
-            { "AsSplitQuery", new AsSplitQueryTranslator() }
+            { "AsSplitQuery", new AsSplitQueryTranslator() },
+            { "AsOf", new AsOfTranslator() }
         };
 
         private static string GetWindowAlias(LambdaExpression selector, int paramIndex, string defaultAlias)
@@ -607,6 +608,30 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._splitQuery = true;
+                return t.Visit(node.Arguments[0]);
+            }
+        }
+
+        private sealed class AsOfTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                var timeTravelArg = node.Arguments[1];
+                if (QueryTranslator.TryGetConstantValue(timeTravelArg, out var value))
+                {
+                    if (value is DateTime dt)
+                    {
+                        t._asOfTimestamp = dt;
+                    }
+                    else if (value is string tagName)
+                    {
+                        t._asOfTimestamp = t.GetTimestampForTag(tagName);
+                    }
+                }
+                else
+                {
+                    throw new NormQueryTranslationException(".AsOf() requires a constant DateTime or string tag.");
+                }
                 return t.Visit(node.Arguments[0]);
             }
         }
