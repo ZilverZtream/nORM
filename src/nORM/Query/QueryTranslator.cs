@@ -164,7 +164,8 @@ namespace nORM.Query
             _estimatedTimeout = adjustedTimeout;
 
             // Determine root query type and handle TPH discriminator filters
-            _rootType = GetElementType(e);
+            var rootExpr = UnwrapQueryExpression(e);
+            _rootType = GetElementType(rootExpr);
             _mapping = TrackMapping(_rootType);
 
             // Walk up inheritance hierarchy to find base mapping with discriminator
@@ -202,7 +203,9 @@ namespace nORM.Query
             {
                 if (_isAggregate && _groupBy.Count == 0)
                 {
+                    var alias = _correlatedParams.Count > 0 ? _correlatedParams.Values.First().Alias : null;
                     _sql.AppendFragment("SELECT COUNT(*) FROM ").Append(_mapping.EscTable);
+                    if (alias != null) _sql.Append(' ').Append(alias);
                 }
                 else
                 {
@@ -387,41 +390,47 @@ namespace nORM.Query
                 _params[kvp.Key] = kvp.Value;
             ExpressionVisitorPool.Return(innerKeyVisitor);
 
-            using var joinSql = new OptimizedSqlBuilder(256);
+              if (resultSelector != null)
+              {
+                  _projection = resultSelector;
+                  if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                      _correlatedParams[resultSelector.Parameters[0]] = (_mapping, outerAlias);
+                  if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
+                      _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
+              }
 
-            if (_projection?.Body is NewExpression newExpr)
-            {
-                var neededColumns = ExtractNeededColumns(newExpr, _mapping, innerMapping);
-                if (neededColumns.Count == 0)
-                {
-                    var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                    var innerColumns = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                    joinSql.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
-                }
-                else
-                {
-                    joinSql.Append($"SELECT {string.Join(", ", neededColumns)} ");
-                }
-            }
-            else
-            {
-                var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                var innerColumns = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                joinSql.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
-            }
+              using var joinSql = new OptimizedSqlBuilder(256);
 
-            joinSql.Append($"FROM {_mapping.EscTable} {outerAlias} ");
-            joinSql.Append($"{joinType} {innerMapping.EscTable} {innerAlias} ");
-            joinSql.Append($"ON {outerKeySql} = {innerKeySql}");
+              if (_projection?.Body is NewExpression newExpr)
+              {
+                  var neededColumns = ExtractNeededColumns(newExpr, _mapping, innerMapping);
+                  if (neededColumns.Count == 0)
+                  {
+                      var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+                      var innerColumns = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
+                      joinSql.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
+                  }
+                  else
+                  {
+                      joinSql.Append($"SELECT {string.Join(", ", neededColumns)} ");
+                  }
+              }
+              else
+              {
+                  var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+                  var innerColumns = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
+                  joinSql.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
+              }
 
-            _sql.Clear();
-            _sql.Append(joinSql.ToSqlString());
+              joinSql.Append($"FROM {_mapping.EscTable} {outerAlias} ");
+              joinSql.Append($"{joinType} {innerMapping.EscTable} {innerAlias} ");
+              joinSql.Append($"ON {outerKeySql} = {innerKeySql}");
 
-            if (resultSelector != null)
-                _projection = resultSelector;
+              _sql.Clear();
+              _sql.Append(joinSql.ToSqlString());
 
-            return node;
-        }
+              return node;
+          }
 
         private Expression HandleGroupJoin(MethodCallExpression node)
         {
@@ -759,9 +768,18 @@ namespace nORM.Query
 
         protected override Expression VisitMember(MemberExpression node)
         {
-            if (node.Expression?.NodeType == ExpressionType.Parameter)
+            if (node.Expression is ParameterExpression pe)
             {
-                _sql.Append(_mapping.Columns.First(c => c.Prop.Name == node.Member.Name).EscCol);
+                if (_correlatedParams.TryGetValue(pe, out var info))
+                {
+                    var col = info.Mapping.Columns.First(c => c.Prop.Name == node.Member.Name);
+                    _sql.Append($"{info.Alias}.{col.EscCol}");
+                }
+                else
+                {
+                    var col = _mapping.Columns.First(c => c.Prop.Name == node.Member.Name);
+                    _sql.Append(col.EscCol);
+                }
                 return node;
             }
 
@@ -778,9 +796,29 @@ namespace nORM.Query
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
 
+        private LambdaExpression ExpandProjection(LambdaExpression lambda)
+        {
+            if (_projection != null &&
+                lambda.Parameters.Count == 1 &&
+                lambda.Parameters[0].Type == _projection.Body.Type)
+            {
+                var body = new nORM.Internal.ParameterReplacer(lambda.Parameters[0], _projection.Body).Visit(lambda.Body)!;
+                body = new ProjectionMemberReplacer().Visit(body);
+                return Expression.Lambda(body, _projection.Parameters);
+            }
+            return lambda;
+        }
+
+        private static Expression UnwrapQueryExpression(Expression expression) =>
+            expression is MethodCallExpression mc &&
+            !typeof(IQueryable).IsAssignableFrom(expression.Type) &&
+            mc.Arguments.Count > 0
+                ? mc.Arguments[0]
+                : expression;
+
         private static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping)
         {
-            var neededColumns = new HashSet<string>();
+            var neededColumns = new List<string>();
             var outerAlias = "T0";
             var innerAlias = "T1";
 
@@ -795,7 +833,9 @@ namespace nORM.Query
                     var column = mapping.Columns.FirstOrDefault(c => c.Prop.Name == memberExpr.Member.Name);
                     if (column != null)
                     {
-                        neededColumns.Add($"{alias}.{column.EscCol}");
+                        var colSql = $"{alias}.{column.EscCol}";
+                        if (!neededColumns.Contains(colSql))
+                            neededColumns.Add(colSql);
                     }
                 }
                 else if (arg is ParameterExpression param)
@@ -804,11 +844,15 @@ namespace nORM.Query
                     var mapping = isOuter ? outerMapping : innerMapping;
                     var alias = isOuter ? outerAlias : innerAlias;
                     foreach (var col in mapping.Columns)
-                        neededColumns.Add($"{alias}.{col.EscCol}");
+                    {
+                        var colSql = $"{alias}.{col.EscCol}";
+                        if (!neededColumns.Contains(colSql))
+                            neededColumns.Add(colSql);
+                    }
                 }
             }
 
-            return neededColumns.ToList();
+            return neededColumns;
         }
 
         private static bool IsRecordType(Type type) =>
@@ -1260,6 +1304,22 @@ namespace nORM.Query
 
             protected override Expression VisitParameter(ParameterExpression node) =>
                 node == _from ? _to : base.VisitParameter(node);
+        }
+
+        private sealed class ProjectionMemberReplacer : ExpressionVisitor
+        {
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (node.Expression is NewExpression newExpr && newExpr.Members != null)
+                {
+                    for (int i = 0; i < newExpr.Members.Count; i++)
+                    {
+                        if (newExpr.Members[i].Name == node.Member.Name)
+                            return Visit(newExpr.Arguments[i]);
+                    }
+                }
+                return base.VisitMember(node);
+            }
         }
     }
 }
