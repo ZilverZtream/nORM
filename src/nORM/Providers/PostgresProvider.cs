@@ -160,6 +160,30 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             return Task.FromResult(Type.GetType("Npgsql.NpgsqlConnection, Npgsql") != null);
         }
 
+        public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) }) ??
+                             transaction.GetType().GetMethod("CreateSavepoint", new[] { typeof(string) });
+            if (saveMethod != null)
+            {
+                saveMethod.Invoke(transaction, new object[] { name });
+                return Task.CompletedTask;
+            }
+            throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+        }
+
+        public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) }) ??
+                                 transaction.GetType().GetMethod("RollbackToSavepoint", new[] { typeof(string) });
+            if (rollbackMethod != null)
+            {
+                rollbackMethod.Invoke(transaction, new object[] { name });
+                return Task.CompletedTask;
+            }
+            throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+        }
+
         // PostgreSQL-optimized bulk operations
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {

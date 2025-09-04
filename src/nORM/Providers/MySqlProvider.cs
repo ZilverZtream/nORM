@@ -165,7 +165,32 @@ END;";
                 Type.GetType("MySqlConnector.MySqlConnection, MySqlConnector") != null ||
                 Type.GetType("MySql.Data.MySqlClient.MySqlConnection, MySql.Data") != null);
         }
-        
+
+        public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) }) ??
+                             transaction.GetType().GetMethod("CreateSavepoint", new[] { typeof(string) }) ??
+                             transaction.GetType().GetMethod("Savepoint", new[] { typeof(string) });
+            if (saveMethod != null)
+            {
+                saveMethod.Invoke(transaction, new object[] { name });
+                return Task.CompletedTask;
+            }
+            throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+        }
+
+        public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) }) ??
+                                 transaction.GetType().GetMethod("RollbackToSavepoint", new[] { typeof(string) });
+            if (rollbackMethod != null)
+            {
+                rollbackMethod.Invoke(transaction, new object[] { name });
+                return Task.CompletedTask;
+            }
+            throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+        }
+
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);

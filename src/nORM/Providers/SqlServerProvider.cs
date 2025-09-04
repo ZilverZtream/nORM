@@ -168,6 +168,26 @@ END;";
             return Task.FromResult(Type.GetType("Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient") != null);
         }
 
+        public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            if (transaction is SqlTransaction sqlTransaction)
+            {
+                sqlTransaction.Save(name);
+                return Task.CompletedTask;
+            }
+            throw new ArgumentException("Transaction must be a SqlTransaction.", nameof(transaction));
+        }
+
+        public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            if (transaction is SqlTransaction sqlTransaction)
+            {
+                sqlTransaction.Rollback(name);
+                return Task.CompletedTask;
+            }
+            throw new ArgumentException("Transaction must be a SqlTransaction.", nameof(transaction));
+        }
+
         #region SQL Server Bulk Operations
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
