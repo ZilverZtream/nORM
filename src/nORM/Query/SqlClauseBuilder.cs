@@ -1,16 +1,16 @@
+using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace nORM.Query
 {
     /// <summary>
-    /// Simple container for the various SQL clause builders used by <see cref="QueryTranslator"/>.
+    /// Container for the various SQL clause builders used by <see cref="QueryTranslator"/>.
     /// </summary>
-    internal sealed class SqlClauseBuilder
+    internal sealed class SqlClauseBuilder : IDisposable
     {
-        public StringBuilder Sql { get; } = new();
-        public StringBuilder Where { get; } = new();
-        public StringBuilder Having { get; } = new();
+        public OptimizedSqlBuilder Sql { get; } = new();
+        public OptimizedSqlBuilder Where { get; } = new();
+        public OptimizedSqlBuilder Having { get; } = new();
         public List<(string col, bool asc)> OrderBy { get; } = new();
         public List<string> GroupBy { get; } = new();
         public int? Take { get; set; }
@@ -18,5 +18,12 @@ namespace nORM.Query
         public string? TakeParam { get; set; }
         public string? SkipParam { get; set; }
         public bool IsDistinct { get; set; }
+
+        public void Dispose()
+        {
+            Sql.Dispose();
+            Where.Dispose();
+            Having.Dispose();
+        }
     }
 }

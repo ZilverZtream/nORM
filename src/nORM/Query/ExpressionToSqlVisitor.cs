@@ -5,7 +5,6 @@ using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Text;
 using nORM.Core;
 using nORM.Mapping;
 using nORM.Providers;
@@ -22,7 +21,7 @@ namespace nORM.Query
         private readonly Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _parameterMappings = new();
         private ParameterExpression _parameter = null!;
         private string _tableAlias = string.Empty;
-        private readonly StringBuilder _sql = new();
+        private OptimizedSqlBuilder _sql = null!;
         private readonly Dictionary<string, object> _params = new();
         private int _paramIndex = 0;
         private readonly List<string> _ownedCompiledParams = new();
@@ -76,7 +75,7 @@ namespace nORM.Query
 
         public void Reset()
         {
-            _sql.Clear();
+            _sql = null!;
             _params.Clear();
             _paramIndex = 0;
             _parameterMappings.Clear();
@@ -94,8 +93,10 @@ namespace nORM.Query
 
         public string Translate(Expression expression)
         {
+            using var builder = new OptimizedSqlBuilder();
+            _sql = builder;
             Visit(expression);
-            return _sql.ToString();
+            return builder.ToSqlString();
         }
 
         protected override Expression VisitBinary(BinaryExpression node)
@@ -134,8 +135,7 @@ namespace nORM.Query
             if (TryGetConstantValue(node, out var value))
             {
                 var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                _params[paramName] = value ?? DBNull.Value;
-                _sql.Append(paramName);
+                _sql.AppendParameterizedValue(paramName, value, _params);
                 return node;
             }
 
@@ -156,8 +156,7 @@ namespace nORM.Query
         protected override Expression VisitConstant(ConstantExpression node)
         {
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-            _params[paramName] = node.Value ?? DBNull.Value;
-            _sql.Append(paramName);
+            _sql.AppendParameterizedValue(paramName, node.Value, _params);
             return node;
         }
 
@@ -218,8 +217,8 @@ namespace nORM.Query
                           if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
                           {
                               var containsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                              _params[containsParam] = CreateSafeLikePattern(cs, LikeOperation.Contains);
-                              _sql.Append(containsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
+                              _sql.AppendParameterizedValue(containsParam, CreateSafeLikePattern(cs, LikeOperation.Contains), _params)
+                                  .Append($" ESCAPE '{_provider.LikeEscapeChar}'");
                           }
                           else
                           {
@@ -232,8 +231,8 @@ namespace nORM.Query
                           if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
                           {
                               var startsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                              _params[startsParam] = CreateSafeLikePattern(ss, LikeOperation.StartsWith);
-                              _sql.Append(startsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
+                              _sql.AppendParameterizedValue(startsParam, CreateSafeLikePattern(ss, LikeOperation.StartsWith), _params)
+                                  .Append($" ESCAPE '{_provider.LikeEscapeChar}'");
                           }
                           else
                           {
@@ -246,8 +245,8 @@ namespace nORM.Query
                           if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
                           {
                               var endsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                              _params[endsParam] = CreateSafeLikePattern(es, LikeOperation.EndsWith);
-                              _sql.Append(endsParam).Append($" ESCAPE '{_provider.LikeEscapeChar}'");
+                              _sql.AppendParameterizedValue(endsParam, CreateSafeLikePattern(es, LikeOperation.EndsWith), _params)
+                                  .Append($" ESCAPE '{_provider.LikeEscapeChar}'");
                           }
                           else
                           {
@@ -362,8 +361,7 @@ namespace nORM.Query
                     {
                         if (i > 0) _sql.Append(", ");
                         var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                        _params[paramName] = items[i] ?? DBNull.Value;
-                        _sql.Append(paramName);
+                        _sql.AppendParameterizedValue(paramName, items[i], _params);
                     }
                     _sql.Append(")");
                     return node;
@@ -525,8 +523,7 @@ namespace nORM.Query
                 throw new NormQueryTranslationException("Binary parameter exceeds maximum length");
 
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-            _params[paramName] = value ?? DBNull.Value;
-            _sql.Append(paramName);
+            _sql.AppendParameterizedValue(paramName, value, _params);
             return Expression.Constant(value);
         }
 
