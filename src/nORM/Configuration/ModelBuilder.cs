@@ -18,5 +18,8 @@ namespace nORM.Configuration
 
         internal IEntityTypeConfiguration? GetConfiguration(Type type)
             => _configurations.TryGetValue(type, out var config) ? config : null;
+
+        internal IEnumerable<Type> GetConfiguredEntityTypes()
+            => _configurations.Keys;
     }
 }

@@ -87,6 +87,51 @@ namespace nORM.Providers
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
             => $"json_extract({columnName}, '{jsonPath}')";
 
+        public override string GenerateCreateHistoryTableSql(TableMapping mapping)
+        {
+            var columns = string.Join(", ", mapping.Columns.Select(c => $"{Escape(c.PropName)} TEXT"));
+            return @$"CREATE TABLE IF NOT EXISTS {Escape(mapping.TableName + "_History")} (
+                __VersionId INTEGER PRIMARY KEY AUTOINCREMENT,
+                __ValidFrom TEXT NOT NULL,
+                __ValidTo TEXT NOT NULL,
+                __Operation TEXT NOT NULL,
+                {columns}
+            );";
+        }
+
+        public override string GenerateTemporalTriggersSql(TableMapping mapping)
+        {
+            var table = Escape(mapping.TableName);
+            var history = Escape(mapping.TableName + "_History");
+            var columnList = string.Join(", ", mapping.Columns.Select(c => Escape(c.PropName)));
+            var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.PropName)));
+            var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.PropName)));
+            var keyCondition = mapping.KeyColumns.Length > 0
+                ? string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.PropName)} = OLD.{Escape(c.PropName)}"))
+                : "1=1";
+
+            return @$"
+CREATE TRIGGER IF NOT EXISTS {Escape(mapping.TableName + "_ai")} AFTER INSERT ON {table}
+BEGIN
+    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columnList})
+    VALUES (datetime('now'), '9999-12-31', 'I', {newColumns});
+END;
+
+CREATE TRIGGER IF NOT EXISTS {Escape(mapping.TableName + "_au")} AFTER UPDATE ON {table}
+BEGIN
+    UPDATE {history} SET __ValidTo = datetime('now') WHERE __ValidTo = '9999-12-31' AND {keyCondition};
+    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columnList})
+    VALUES (datetime('now'), '9999-12-31', 'U', {newColumns});
+END;
+
+CREATE TRIGGER IF NOT EXISTS {Escape(mapping.TableName + "_ad")} AFTER DELETE ON {table}
+BEGIN
+    UPDATE {history} SET __ValidTo = datetime('now') WHERE __ValidTo = '9999-12-31' AND {keyCondition};
+    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columnList})
+    VALUES (datetime('now'), datetime('now'), 'D', {oldColumns});
+END;";
+        }
+
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);
