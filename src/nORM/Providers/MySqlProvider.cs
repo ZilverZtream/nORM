@@ -118,7 +118,38 @@ CREATE TABLE {historyTable} (
         }
 
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
-            => throw new NotImplementedException();
+        {
+            var table = Escape(mapping.TableName);
+            var history = Escape(mapping.TableName + "_History");
+            var columns = string.Join(", ", mapping.Columns.Select(c => Escape(c.PropName)));
+            var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.PropName)));
+            var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.PropName)));
+            var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.PropName)} = OLD.{Escape(c.PropName)}"));
+
+            return $@"
+CREATE TRIGGER {Escape(mapping.TableName + "_ai")} AFTER INSERT ON {table}
+FOR EACH ROW
+BEGIN
+    INSERT INTO {history} (`__ValidFrom`, `__ValidTo`, `__Operation`, {columns})
+    VALUES (UTC_TIMESTAMP(), '9999-12-31', 'I', {newColumns});
+END;
+-- DELIMITER
+CREATE TRIGGER {Escape(mapping.TableName + "_au")} AFTER UPDATE ON {table}
+FOR EACH ROW
+BEGIN
+    UPDATE {history} SET `__ValidTo` = UTC_TIMESTAMP() WHERE `__ValidTo` = '9999-12-31' AND {keyCondition};
+    INSERT INTO {history} (`__ValidFrom`, `__ValidTo`, `__Operation`, {columns})
+    VALUES (UTC_TIMESTAMP(), '9999-12-31', 'U', {newColumns});
+END;
+-- DELIMITER
+CREATE TRIGGER {Escape(mapping.TableName + "_ad")} AFTER DELETE ON {table}
+FOR EACH ROW
+BEGIN
+    UPDATE {history} SET `__ValidTo` = UTC_TIMESTAMP() WHERE `__ValidTo` = '9999-12-31' AND {keyCondition};
+    INSERT INTO {history} (`__ValidFrom`, `__ValidTo`, `__Operation`, {columns})
+    VALUES (UTC_TIMESTAMP(), UTC_TIMESTAMP(), 'D', {oldColumns});
+END;";
+        }
 
         protected override void ValidateConnection(DbConnection connection)
         {
