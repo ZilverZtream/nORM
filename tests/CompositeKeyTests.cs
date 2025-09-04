@@ -41,5 +41,29 @@ public class CompositeKeyTests
         Assert.Contains("KeyPart2", deleteSql);
         Assert.Contains(" AND ", deleteSql);
     }
+
+    [Fact]
+    public void ChangeTracker_uses_composite_key_for_identity_map()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<CompositeEntity>().HasKey(e => new { e.KeyPart1, e.KeyPart2 })
+        };
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var first = new CompositeEntity { KeyPart1 = 1, KeyPart2 = 2, Value = "A" };
+        var second = new CompositeEntity { KeyPart1 = 1, KeyPart2 = 2, Value = "B" };
+
+        ctx.Attach(first);
+        var entry = ctx.Attach(second);
+
+        Assert.Same(first, entry.Entity);
+        Assert.Single(ctx.ChangeTracker.Entries);
+    }
 }
 
