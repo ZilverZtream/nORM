@@ -175,16 +175,38 @@ namespace nORM.Core
 
         public int SaveChanges() => SaveChangesAsync().GetAwaiter().GetResult();
 
-        public async Task<int> SaveChangesAsync(CancellationToken ct = default)
+        public Task<int> SaveChangesAsync(CancellationToken ct = default)
+            => SaveChangesWithRetryAsync(ct);
+
+        private async Task<int> SaveChangesWithRetryAsync(CancellationToken ct)
+        {
+            const int maxRetries = 3;
+            var baseDelay = TimeSpan.FromMilliseconds(100);
+
+            for (int attempt = 0; attempt < maxRetries - 1; attempt++)
+            {
+                try
+                {
+                    return await SaveChangesInternalAsync(ct);
+                }
+                catch (Exception ex) when (IsRetryableException(ex))
+                {
+                    var delay = TimeSpan.FromMilliseconds(baseDelay.TotalMilliseconds * Math.Pow(2, attempt));
+                    await Task.Delay(delay, ct);
+                }
+            }
+
+            return await SaveChangesInternalAsync(ct);
+        }
+
+        private async Task<int> SaveChangesInternalAsync(CancellationToken ct)
         {
             ChangeTracker.DetectChanges();
             var changedEntries = ChangeTracker.Entries
                 .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
                 .ToList();
             if (changedEntries.Count == 0)
-            {
                 return 0;
-            }
 
             var saveInterceptors = Options.SaveChangesInterceptors;
             if (saveInterceptors.Count > 0)
@@ -193,33 +215,37 @@ namespace nORM.Core
                     await interceptor.SavingChangesAsync(this, changedEntries, ct);
             }
 
-            var total = 0;
-            var transaction = Database.CurrentTransaction;
-            var ownsTransaction = transaction is null;
+            var existingTransaction = Database.CurrentTransaction;
+            var ownsTransaction = existingTransaction == null;
+            DbTransaction transaction;
+            CancellationTokenSource? timeoutCts = null;
+            CancellationTokenSource? linkedCts = null;
+
             if (ownsTransaction)
-                transaction = await Connection.BeginTransactionAsync(ct);
+            {
+                await EnsureConnectionAsync(ct);
+                var isolationLevel = DetermineIsolationLevel(changedEntries);
+                transaction = await Connection.BeginTransactionAsync(isolationLevel, ct);
+
+                timeoutCts = new CancellationTokenSource(Options.CommandTimeout);
+                linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+                ct = linkedCts.Token;
+            }
+            else
+            {
+                transaction = existingTransaction!;
+            }
+
+            var totalAffected = 0;
             try
             {
                 foreach (var entry in changedEntries)
                 {
-                    switch (entry.State)
-                    {
-                        case EntityState.Added:
-                            total += await InvokeWriteAsync(nameof(InsertAsync), entry, transaction!, ct);
-                            entry.AcceptChanges();
-                            break;
-                        case EntityState.Modified:
-                            total += await InvokeWriteAsync(nameof(UpdateAsync), entry, transaction!, ct);
-                            entry.AcceptChanges();
-                            break;
-                        case EntityState.Deleted:
-                            total += await InvokeWriteAsync(nameof(DeleteAsync), entry, transaction!, ct);
-                            ChangeTracker.Remove(entry.Entity);
-                            break;
-                    }
+                    totalAffected += await ProcessEntityChangeAsync(entry, transaction, ct);
                 }
+
                 if (ownsTransaction)
-                    await transaction!.CommitAsync(ct);
+                    await transaction.CommitAsync(ct);
 
                 var cache = Options.CacheProvider;
                 if (cache != null)
@@ -237,23 +263,62 @@ namespace nORM.Core
             catch
             {
                 if (ownsTransaction)
-                    await transaction!.RollbackAsync(ct);
+                    await transaction.RollbackAsync(ct);
                 throw;
             }
-
             finally
             {
                 if (ownsTransaction)
-                    await transaction!.DisposeAsync();
+                    await transaction.DisposeAsync();
+                linkedCts?.Dispose();
+                timeoutCts?.Dispose();
             }
 
             if (saveInterceptors.Count > 0)
             {
                 foreach (var interceptor in saveInterceptors)
-                    await interceptor.SavedChangesAsync(this, changedEntries, total, ct);
+                    await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, ct);
             }
 
-            return total;
+            return totalAffected;
+        }
+
+        private async Task<int> ProcessEntityChangeAsync(EntityEntry entry, DbTransaction transaction, CancellationToken ct)
+        {
+            switch (entry.State)
+            {
+                case EntityState.Added:
+                    var inserted = await InvokeWriteAsync(nameof(InsertAsync), entry, transaction, ct);
+                    entry.AcceptChanges();
+                    return inserted;
+                case EntityState.Modified:
+                    var updated = await InvokeWriteAsync(nameof(UpdateAsync), entry, transaction, ct);
+                    entry.AcceptChanges();
+                    return updated;
+                case EntityState.Deleted:
+                    var deleted = await InvokeWriteAsync(nameof(DeleteAsync), entry, transaction, ct);
+                    ChangeTracker.Remove(entry.Entity);
+                    return deleted;
+                default:
+                    return 0;
+            }
+        }
+
+        private static IsolationLevel DetermineIsolationLevel(IEnumerable<EntityEntry> entries)
+        {
+            return entries.Any(e => e.State == EntityState.Deleted)
+                ? IsolationLevel.Serializable
+                : IsolationLevel.ReadCommitted;
+        }
+
+        private static bool IsRetryableException(Exception ex)
+        {
+            return ex switch
+            {
+                SqlException sqlEx => sqlEx.Number is 1205 or 1222,
+                TimeoutException => true,
+                _ => false
+            };
         }
 
         private Task<int> InvokeWriteAsync(string methodName, EntityEntry entry, DbTransaction transaction, CancellationToken ct)
