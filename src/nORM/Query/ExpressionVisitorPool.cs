@@ -27,16 +27,16 @@ internal static class ExpressionVisitorPool
         return visitor;
     }
 
-    public static void Return(ExpressionToSqlVisitor visitor) => _pool.Return(visitor);
+    public static void Return(ExpressionToSqlVisitor visitor)
+    {
+        visitor.Reset();
+        _pool.Return(visitor);
+    }
 }
 
 internal sealed class VisitorPooledObjectPolicy : PooledObjectPolicy<ExpressionToSqlVisitor>
 {
     public override ExpressionToSqlVisitor Create() => new ExpressionToSqlVisitor();
 
-    public override bool Return(ExpressionToSqlVisitor obj)
-    {
-        obj.Reset();
-        return true;
-    }
+    public override bool Return(ExpressionToSqlVisitor obj) => true;
 }
