@@ -59,7 +59,7 @@ var database = new Command("database", "Database related commands");
 
 var update = new Command("update", "Apply pending migrations to the database.\nExample:\n  norm database update --connection \"...\" --provider sqlserver --assembly Migrations.dll");
 var migConnOpt = new Option<string>("--connection") { Description = "Database connection string", Required = true };
-var migProvOpt = new Option<string>("--provider") { Description = "Database provider. Currently only 'sqlserver' is supported for applying migrations.", Required = true };
+var migProvOpt = new Option<string>("--provider") { Description = "Database provider (sqlserver, sqlite, postgres, mysql)", Required = true };
 var assemblyOpt = new Option<string>("--assembly") { Description = "Path to migrations assembly (e.g. ./bin/Debug/net8.0/App.Migrations.dll)", Required = true };
 update.Add(migConnOpt);
 update.Add(migProvOpt);
@@ -82,6 +82,9 @@ update.SetAction(async (ParseResult result, CancellationToken _) =>
         IMigrationRunner runner = prov.ToLowerInvariant() switch
         {
             "sqlserver" => new SqlServerMigrationRunner(connection, assembly),
+            "sqlite" => new SqliteMigrationRunner(connection, assembly),
+            "postgres" or "postgresql" => new PostgresMigrationRunner(connection, assembly),
+            "mysql" => new MySqlMigrationRunner(connection, assembly),
             _ => throw new ArgumentException($"Provider '{prov}' does not support migrations.")
         };
         if (!await runner.HasPendingMigrationsAsync())
