@@ -27,7 +27,7 @@ namespace nORM.Query
             IList current = parents;
             foreach (var relation in include.Path)
             {
-                current = await EagerLoadLevelAsync(relation, current, ct, noTracking);
+                current = await EagerLoadLevelAsync(relation, current, ct, noTracking).ConfigureAwait(false);
                 if (current.Count == 0) break;
             }
         }
@@ -42,7 +42,7 @@ namespace nORM.Query
             if (keys.Count == 0) return resultChildren;
 
             var paramNames = new List<string>();
-            await _ctx.EnsureConnectionAsync(ct);
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             for (int i = 0; i < keys.Count; i++)
@@ -54,11 +54,11 @@ namespace nORM.Query
             cmd.CommandText = $"SELECT * FROM {childMap.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({string.Join(",", paramNames)})";
 
             var childMaterializer = _materializerFactory.CreateMaterializer(childMap, childMap.Type);
-            await using (var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct))
+            await using (var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false))
             {
-                while (await reader.ReadAsync(ct))
+                while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
-                    var child = await childMaterializer(reader, ct);
+                    var child = await childMaterializer(reader, ct).ConfigureAwait(false);
                     if (!noTracking)
                     {
                         var entry = _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);

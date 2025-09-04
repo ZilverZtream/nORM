@@ -13,18 +13,18 @@ namespace nORM.Versioning
         public static async Task InitializeAsync(DbContext context)
         {
             var provider = context.Provider;
-            await CreateTagsTableIfNotExistsAsync(context);
+            await CreateTagsTableIfNotExistsAsync(context).ConfigureAwait(false);
 
             foreach (var mapping in context.GetAllMappings())
             {
-                if (await HistoryTableExistsAsync(context, mapping))
+                if (await HistoryTableExistsAsync(context, mapping).ConfigureAwait(false))
                     continue;
 
                 var createHistoryTableSql = provider.GenerateCreateHistoryTableSql(mapping);
-                await ExecuteDdlAsync(context, createHistoryTableSql);
+                await ExecuteDdlAsync(context, createHistoryTableSql).ConfigureAwait(false);
 
                 var createTriggersSql = provider.GenerateTemporalTriggersSql(mapping);
-                await ExecuteDdlAsync(context, createTriggersSql);
+                await ExecuteDdlAsync(context, createTriggersSql).ConfigureAwait(false);
             }
         }
 
@@ -32,7 +32,7 @@ namespace nORM.Versioning
         {
             var table = context.Provider.Escape("__NormTemporalTags");
             var sql = $"CREATE TABLE IF NOT EXISTS {table} (TagName TEXT PRIMARY KEY, Timestamp TEXT NOT NULL);";
-            await ExecuteDdlAsync(context, sql);
+            await ExecuteDdlAsync(context, sql).ConfigureAwait(false);
         }
 
         private static async Task<bool> HistoryTableExistsAsync(DbContext context, TableMapping mapping)
@@ -40,9 +40,9 @@ namespace nORM.Versioning
             var historyTable = context.Provider.Escape(mapping.TableName + "_History");
             try
             {
-                await using var cmd = (await context.EnsureConnectionAsync()).CreateCommand();
+                await using var cmd = (await context.EnsureConnectionAsync().ConfigureAwait(false)).CreateCommand();
                 cmd.CommandText = $"SELECT 1 FROM {historyTable} LIMIT 1";
-                await cmd.ExecuteScalarAsync();
+                await cmd.ExecuteScalarAsync().ConfigureAwait(false);
                 return true;
             }
             catch
@@ -57,9 +57,9 @@ namespace nORM.Versioning
 
             await handler.ExecuteWithExceptionHandling(async () =>
             {
-                await using var cmd = (await context.EnsureConnectionAsync()).CreateCommand();
+                await using var cmd = (await context.EnsureConnectionAsync().ConfigureAwait(false)).CreateCommand();
                 cmd.CommandText = sql;
-                await cmd.ExecuteNonQueryWithInterceptionAsync(context, default);
+                await cmd.ExecuteNonQueryWithInterceptionAsync(context, default).ConfigureAwait(false);
                 return 0;
             }, "ExecuteDdlAsync", new Dictionary<string, object> { ["Sql"] = sql }).ConfigureAwait(false);
         }

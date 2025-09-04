@@ -162,7 +162,7 @@ END;";
 
             var totalInserted = 0;
 
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
+            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 for (int i = 0; i < entityList.Count; i += batchSize)
@@ -185,16 +185,16 @@ END;";
                     }
 
                     var batchSw = Stopwatch.StartNew();
-                    totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                    totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                     batchSw.Stop();
                     BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                 }
 
-                await transaction.CommitAsync(ct);
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
             catch
             {
-                await transaction.RollbackAsync(ct);
+                await transaction.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
 
@@ -236,7 +236,7 @@ END;";
             
             var totalUpdated = 0;
             
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
+            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 await using var cmd = ctx.Connection.CreateCommand();
@@ -244,7 +244,7 @@ END;";
                 cmd.CommandText = BuildUpdate(m);
                 cmd.CommandTimeout = 30;
                 
-                await cmd.PrepareAsync(ct);
+                await cmd.PrepareAsync(ct).ConfigureAwait(false);
                 
                 foreach (var entity in entityList)
                 {
@@ -265,14 +265,14 @@ END;";
                         cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                     }
                     
-                    totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                    totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
                 
-                await transaction.CommitAsync(ct);
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
             catch
             {
-                await transaction.RollbackAsync(ct);
+                await transaction.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
             
@@ -298,7 +298,7 @@ END;";
                 batchSize = Math.Min(batchSize, MaxParameters);
             if (batchSize <= 0) batchSize = 1;
             
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
+            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 if (m.KeyColumns.Length == 1)
@@ -323,7 +323,7 @@ END;";
                         }
                         
                         cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} IN ({string.Join(",", paramNames)})";
-                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                     }
                 }
                 else
@@ -332,7 +332,7 @@ END;";
                     cmd.Transaction = transaction;
                     cmd.CommandText = BuildDelete(m);
                     cmd.CommandTimeout = 30;
-                    await cmd.PrepareAsync(ct);
+                    await cmd.PrepareAsync(ct).ConfigureAwait(false);
                     
                     foreach (var entity in entityList)
                     {
@@ -348,15 +348,15 @@ END;";
                             cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                         }
                         
-                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                     }
                 }
                 
-                await transaction.CommitAsync(ct);
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
             catch
             {
-                await transaction.RollbackAsync(ct);
+                await transaction.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
             

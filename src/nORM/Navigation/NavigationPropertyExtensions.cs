@@ -68,7 +68,7 @@ namespace nORM.Navigation
                 throw new InvalidOperationException("Entity must be loaded from a DbContext or have lazy loading enabled to use LoadAsync");
             
             var propertyInfo = GetPropertyInfo(navigationProperty);
-            await LoadNavigationPropertyAsync(entity, propertyInfo, navContext, ct);
+            await LoadNavigationPropertyAsync(entity, propertyInfo, navContext, ct).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -86,7 +86,7 @@ namespace nORM.Navigation
                 throw new InvalidOperationException("Entity must be loaded from a DbContext or have lazy loading enabled to use LoadAsync");
             
             var propertyInfo = GetPropertyInfo(navigationProperty);
-            await LoadNavigationPropertyAsync(entity, propertyInfo, navContext, ct);
+            await LoadNavigationPropertyAsync(entity, propertyInfo, navContext, ct).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -115,12 +115,12 @@ namespace nORM.Navigation
             // Check if this property has a relationship defined
             if (entityMapping.Relations.TryGetValue(property.Name, out var relation))
             {
-                await LoadRelationshipAsync(entity, property, relation, context, ct);
+                await LoadRelationshipAsync(entity, property, relation, context, ct).ConfigureAwait(false);
             }
             else
             {
                 // Try to infer the relationship
-                await LoadInferredRelationshipAsync(entity, property, context, ct);
+                await LoadInferredRelationshipAsync(entity, property, context, ct).ConfigureAwait(false);
             }
             
             context.MarkAsLoaded(property.Name);
@@ -259,7 +259,7 @@ namespace nORM.Navigation
             {
                 // Collection navigation property
                 var loader = _navigationLoaders.GetValue(context.DbContext, ctx => new BatchedNavigationLoader(ctx));
-                var results = await loader.LoadNavigationAsync(entity, property.Name, ct);
+                var results = await loader.LoadNavigationAsync(entity, property.Name, ct).ConfigureAwait(false);
 
                 var collectionType = typeof(List<>).MakeGenericType(relation.DependentType);
                 var collection = (IList)Activator.CreateInstance(collectionType)!;
@@ -273,7 +273,7 @@ namespace nORM.Navigation
             else
             {
                 // Reference navigation property (one-to-one)
-                var result = await ExecuteSingleQueryAsync(context.DbContext, dependentMapping, relation.ForeignKey, principalKeyValue, relation.DependentType, ct);
+                var result = await ExecuteSingleQueryAsync(context.DbContext, dependentMapping, relation.ForeignKey, principalKeyValue, relation.DependentType, ct).ConfigureAwait(false);
 
                 if (property.PropertyType.IsGenericType &&
                     property.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
@@ -328,7 +328,7 @@ namespace nORM.Navigation
                 if (property.PropertyType.IsGenericType && typeof(IEnumerable).IsAssignableFrom(property.PropertyType))
                 {
                     // Collection
-                    var results = await loader.LoadNavigationAsync(entity, property.Name, ct);
+                    var results = await loader.LoadNavigationAsync(entity, property.Name, ct).ConfigureAwait(false);
 
                     var collectionType = typeof(List<>).MakeGenericType(targetType);
                     var collection = (IList)Activator.CreateInstance(collectionType)!;
@@ -342,7 +342,7 @@ namespace nORM.Navigation
                 else
                 {
                     // Reference
-                    var list = await loader.LoadNavigationAsync(entity, property.Name, ct);
+                    var list = await loader.LoadNavigationAsync(entity, property.Name, ct).ConfigureAwait(false);
                     var result = list.FirstOrDefault();
 
                     if (property.PropertyType.IsGenericType &&
@@ -361,7 +361,7 @@ namespace nORM.Navigation
 
         private static async Task<object?> ExecuteSingleQueryAsync(DbContext context, TableMapping mapping, Column foreignKey, object keyValue, Type entityType, CancellationToken ct)
         {
-            await context.EnsureConnectionAsync(ct);
+            await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
             using var cmd = context.Connection.CreateCommand();
             cmd.CommandTimeout = (int)context.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             
@@ -378,10 +378,10 @@ namespace nORM.Navigation
 
             var materializer = Query.QueryTranslator.Rent(context).CreateMaterializer(mapping, entityType);
 
-            using var reader = await cmd.ExecuteReaderWithInterceptionAsync(context, CommandBehavior.Default, ct);
-            if (await reader.ReadAsync(ct))
+            using var reader = await cmd.ExecuteReaderWithInterceptionAsync(context, CommandBehavior.Default, ct).ConfigureAwait(false);
+            if (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
-                var entity = await materializer(reader, ct);
+                var entity = await materializer(reader, ct).ConfigureAwait(false);
                 var entry = context.ChangeTracker.Track(entity, EntityState.Unchanged, mapping);
                 entity = entry.Entity;
                 // Enable lazy loading for the loaded entity
