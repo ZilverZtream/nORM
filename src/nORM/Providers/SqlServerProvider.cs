@@ -106,7 +106,19 @@ namespace nORM.Providers
             => $"JSON_VALUE({columnName}, '{jsonPath}')";
 
         public override string GenerateCreateHistoryTableSql(TableMapping mapping)
-            => throw new NotImplementedException();
+        {
+            var historyTable = Escape(mapping.TableName + "_History");
+            var columns = string.Join(",\n    ", mapping.Columns.Select(c => $"{Escape(c.PropName)} {GetSqlType(c.Prop.PropertyType)}"));
+
+            return $@"
+CREATE TABLE {historyTable} (
+    [__VersionId] BIGINT IDENTITY(1,1) PRIMARY KEY,
+    [__ValidFrom] DATETIME2 NOT NULL,
+    [__ValidTo] DATETIME2 NOT NULL,
+    [__Operation] CHAR(1) NOT NULL,
+    {columns}
+);";
+        }
 
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
             => throw new NotImplementedException();
