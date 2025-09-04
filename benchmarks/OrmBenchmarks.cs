@@ -126,10 +126,15 @@ namespace nORM.Benchmarks
             _efContext = new EfCoreContext(_efConnectionString);
             await _efContext.Database.OpenConnectionAsync();
             await _efContext.Database.EnsureCreatedAsync();
-
+            
+            // 1. Add and save the users FIRST. This generates their IDs.
             _efContext.Users.AddRange(_testUsers);
+            await _efContext.SaveChangesAsync();
+
+            // 2. Now that users exist, add and save the orders.
             _efContext.Orders.AddRange(_testOrders);
             await _efContext.SaveChangesAsync();
+
             _efContext.ChangeTracker.Clear();
         }
 
