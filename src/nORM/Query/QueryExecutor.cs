@@ -53,39 +53,11 @@ namespace nORM.Query
                     await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct)
                         .ConfigureAwait(false);
 
-                    var materializationTasks = new List<Task<object>>(capacity: plan.ElementType == typeof(object) ? 100 : 1000);
-                    var batchSize = 0;
-                    const int maxBatchSize = 100;
-
                     while (await reader.ReadAsync(ct).ConfigureAwait(false))
                     {
-                        var materializeTask = plan.Materializer(reader, ct);
-
-                        if (materializeTask.IsCompletedSuccessfully)
-                        {
-                            var entity = materializeTask.Result;
-                            ProcessEntity(entity, trackable, entityMap);
-                            list.Add(entity);
-                        }
-                        else
-                        {
-                            materializationTasks.Add(materializeTask);
-                            batchSize++;
-
-                            if (batchSize >= maxBatchSize)
-                            {
-                                await ProcessMaterializationBatch(materializationTasks, list, trackable, entityMap)
-                                    .ConfigureAwait(false);
-                                materializationTasks.Clear();
-                                batchSize = 0;
-                            }
-                        }
-                    }
-
-                    if (materializationTasks.Count > 0)
-                    {
-                        await ProcessMaterializationBatch(materializationTasks, list, trackable, entityMap)
-                            .ConfigureAwait(false);
+                        var entity = await plan.Materializer(reader, ct).ConfigureAwait(false);
+                        ProcessEntity(entity, trackable, entityMap);
+                        list.Add(entity);
                     }
 
                     if (plan.SplitQuery)
@@ -104,16 +76,6 @@ namespace nORM.Query
                     throw;
                 }
             }, "MaterializeAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText }).ConfigureAwait(false);
-        }
-
-        private async Task ProcessMaterializationBatch(List<Task<object>> tasks, IList list, bool trackable, TableMapping? entityMap)
-        {
-            var entities = await Task.WhenAll(tasks).ConfigureAwait(false);
-            foreach (var entity in entities)
-            {
-                ProcessEntity(entity, trackable, entityMap);
-                list.Add(entity);
-            }
         }
 
         private void ProcessEntity(object entity, bool trackable, TableMapping? entityMap)
