@@ -71,12 +71,15 @@ namespace nORM.Providers
 
             var operationKey = $"BulkInsert_{m.Type.Name}";
             var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
+            var maxBatchForProvider = MaxParameters / Math.Max(1, cols.Count);
+            var effectiveBatchSize = Math.Max(1, Math.Min(sizing.OptimalBatchSize, maxBatchForProvider));
             // Logging infrastructure doesn't support arbitrary info; batch size can be inferred from performance metrics.
 
             var recordsAffected = 0;
-            for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
+            for (int i = 0; i < entityList.Count; i += effectiveBatchSize)
             {
-                var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
+                var batch = entityList.Skip(i).Take(effectiveBatchSize).ToList();
                 var batchSw = Stopwatch.StartNew();
                 recordsAffected += await ExecuteInsertBatch(ctx, m, batch, ct);
                 batchSw.Stop();
