@@ -104,13 +104,13 @@ namespace nORM.Core
         internal async Task<DbConnection> EnsureConnectionAsync(CancellationToken ct = default)
         {
             if (_cn.State != ConnectionState.Open)
-                await _cn.OpenAsync(ct);
+                await _cn.OpenAsync(ct).ConfigureAwait(false);
 
             if (!_sqliteInitialized && _p is SqliteProvider)
             {
                 await using var pragmaCmd = _cn.CreateCommand();
                 pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
-                await pragmaCmd.ExecuteNonQueryAsync(ct);
+                await pragmaCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 _sqliteInitialized = true;
             }
 
@@ -127,7 +127,7 @@ namespace nORM.Core
                 }
                 else
                 {
-                    Task.Run(async () => await EnsureConnectionAsync()).GetAwaiter().GetResult();
+                    Task.Run(async () => await EnsureConnectionAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
                 }
 
                 return _cn;
@@ -153,13 +153,13 @@ namespace nORM.Core
             {
                 return await _executionStrategy.ExecuteAsync(async (ctx, token) =>
                 {
-                    await ctx.EnsureConnectionAsync(token);
+                    await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                     await using var cmd = ctx.Connection.CreateCommand();
                     cmd.CommandText = "SELECT 1";
                     cmd.CommandTimeout = (int)TimeSpan.FromSeconds(5).TotalSeconds;
-                    var result = await cmd.ExecuteScalarWithInterceptionAsync(ctx, token);
+                    var result = await cmd.ExecuteScalarWithInterceptionAsync(ctx, token).ConfigureAwait(false);
                     return result is 1 or 1L;
-                }, ct);
+                }, ct).ConfigureAwait(false);
             }
             catch { return false; }
         }
@@ -230,7 +230,7 @@ namespace nORM.Core
                     return SaveChangesAsync().GetAwaiter().GetResult();
                 }
 
-                return Task.Run(async () => await SaveChangesAsync()).GetAwaiter().GetResult();
+                return Task.Run(async () => await SaveChangesAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
             }
             catch (AggregateException ex)
             {
@@ -250,16 +250,16 @@ namespace nORM.Core
             {
                 try
                 {
-                    return await SaveChangesInternalAsync(ct);
+                    return await SaveChangesInternalAsync(ct).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (IsRetryableException(ex))
                 {
                     var delay = TimeSpan.FromMilliseconds(baseDelay.TotalMilliseconds * Math.Pow(2, attempt));
-                    await Task.Delay(delay, ct);
+                    await Task.Delay(delay, ct).ConfigureAwait(false);
                 }
             }
 
-            return await SaveChangesInternalAsync(ct);
+            return await SaveChangesInternalAsync(ct).ConfigureAwait(false);
         }
 
         private async Task<int> SaveChangesInternalAsync(CancellationToken ct)
@@ -275,7 +275,7 @@ namespace nORM.Core
             if (saveInterceptors.Count > 0)
             {
                 foreach (var interceptor in saveInterceptors)
-                    await interceptor.SavingChangesAsync(this, changedEntries, ct);
+                    await interceptor.SavingChangesAsync(this, changedEntries, ct).ConfigureAwait(false);
             }
 
             var existingTransaction = Database.CurrentTransaction;
@@ -286,9 +286,9 @@ namespace nORM.Core
 
             if (ownsTransaction)
             {
-                await EnsureConnectionAsync(ct);
+                await EnsureConnectionAsync(ct).ConfigureAwait(false);
                 var isolationLevel = IsolationLevel.ReadCommitted; // Use a safe default.
-                transaction = await Connection.BeginTransactionAsync(isolationLevel, ct);
+                transaction = await Connection.BeginTransactionAsync(isolationLevel, ct).ConfigureAwait(false);
 
                 timeoutCts = new CancellationTokenSource(Options.TimeoutConfiguration.BaseTimeout);
                 linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
@@ -304,11 +304,11 @@ namespace nORM.Core
             {
                 foreach (var entry in changedEntries)
                 {
-                    totalAffected += await ProcessEntityChangeAsync(entry, transaction, ct);
+                    totalAffected += await ProcessEntityChangeAsync(entry, transaction, ct).ConfigureAwait(false);
                 }
 
                 if (ownsTransaction)
-                    await transaction.CommitAsync(ct);
+                    await transaction.CommitAsync(ct).ConfigureAwait(false);
 
                 var cache = Options.CacheProvider;
                 if (cache != null)
@@ -326,13 +326,13 @@ namespace nORM.Core
             catch
             {
                 if (ownsTransaction)
-                    await transaction.RollbackAsync(ct);
+                    await transaction.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
             finally
             {
                 if (ownsTransaction)
-                    await transaction.DisposeAsync();
+                    await transaction.DisposeAsync().ConfigureAwait(false);
                 linkedCts?.Dispose();
                 timeoutCts?.Dispose();
             }
@@ -340,7 +340,7 @@ namespace nORM.Core
             if (saveInterceptors.Count > 0)
             {
                 foreach (var interceptor in saveInterceptors)
-                    await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, ct);
+                    await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, ct).ConfigureAwait(false);
             }
 
             return totalAffected;
@@ -351,15 +351,15 @@ namespace nORM.Core
             switch (entry.State)
             {
                 case EntityState.Added:
-                    var inserted = await InvokeWriteAsync(nameof(InsertAsync), entry, transaction, ct);
+                    var inserted = await InvokeWriteAsync(nameof(InsertAsync), entry, transaction, ct).ConfigureAwait(false);
                     entry.AcceptChanges();
                     return inserted;
                 case EntityState.Modified:
-                    var updated = await InvokeWriteAsync(nameof(UpdateAsync), entry, transaction, ct);
+                    var updated = await InvokeWriteAsync(nameof(UpdateAsync), entry, transaction, ct).ConfigureAwait(false);
                     entry.AcceptChanges();
                     return updated;
                 case EntityState.Deleted:
-                    var deleted = await InvokeWriteAsync(nameof(DeleteAsync), entry, transaction, ct);
+                    var deleted = await InvokeWriteAsync(nameof(DeleteAsync), entry, transaction, ct).ConfigureAwait(false);
                     ChangeTracker.Remove(entry.Entity);
                     return deleted;
                 default:
@@ -425,22 +425,22 @@ namespace nORM.Core
 
             if (operation == WriteOperation.Insert && Options.RetryPolicy == null && tx == null)
             {
-                return await ExecuteFastInsert(entity, map, ct, null);
+                return await ExecuteFastInsert(entity, map, ct, null).ConfigureAwait(false);
             }
 
             if (tx != null)
             {
-                return await WriteWithTransactionAsync(entity, map, operation, tx, ct, ownsTransaction: false);
+                return await WriteWithTransactionAsync(entity, map, operation, tx, ct, ownsTransaction: false).ConfigureAwait(false);
             }
 
             return await _executionStrategy.ExecuteAsync((ctx, token) =>
-                WriteWithTransactionAsync(entity, map, operation, null, token, ownsTransaction: true), ct);
+                WriteWithTransactionAsync(entity, map, operation, null, token, ownsTransaction: true), ct).ConfigureAwait(false);
         }
 
         private async Task<int> WriteWithTransactionAsync<T>(T entity, TableMapping map, WriteOperation operation, DbTransaction? transaction, CancellationToken ct, bool ownsTransaction) where T : class
         {
-            await EnsureConnectionAsync(ct);
-            var currentTransaction = transaction ?? await Connection.BeginTransactionAsync(ct);
+            await EnsureConnectionAsync(ct).ConfigureAwait(false);
+            var currentTransaction = transaction ?? await Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 await using var cmd = Connection.CreateCommand();
@@ -457,28 +457,28 @@ namespace nORM.Core
 
                 AddParametersOptimized(cmd, map, entity, operation);
 
-                await cmd.PrepareAsync(ct);
+                await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
                 if (operation == WriteOperation.Insert && map.KeyColumns.Any(k => k.IsDbGenerated))
                 {
-                    var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct);
+                    var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
                     if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
-                    if (ownsTransaction) await currentTransaction.CommitAsync(ct);
+                    if (ownsTransaction) await currentTransaction.CommitAsync(ct).ConfigureAwait(false);
                     return 1;
                 }
 
-                var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct);
+                var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
                 if ((operation is WriteOperation.Update or WriteOperation.Delete) &&
                     map.TimestampColumn != null && recordsAffected == 0)
                 {
                     throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
                 }
-                if (ownsTransaction) await currentTransaction.CommitAsync(ct);
+                if (ownsTransaction) await currentTransaction.CommitAsync(ct).ConfigureAwait(false);
                 return recordsAffected;
             }
             catch
             {
-                if (ownsTransaction) await currentTransaction.RollbackAsync(ct);
+                if (ownsTransaction) await currentTransaction.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
         }
@@ -487,11 +487,11 @@ namespace nORM.Core
         {
             if (transaction != null)
             {
-                return await WriteWithTransactionAsync(entity, map, WriteOperation.Insert, transaction, ct, ownsTransaction: false);
+                return await WriteWithTransactionAsync(entity, map, WriteOperation.Insert, transaction, ct, ownsTransaction: false).ConfigureAwait(false);
             }
 
-            await EnsureConnectionAsync(ct);
-            await using var ownTransaction = await _cn.BeginTransactionAsync(ct);
+            await EnsureConnectionAsync(ct).ConfigureAwait(false);
+            await using var ownTransaction = await _cn.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 await using var cmd = _cn.CreateCommand();
@@ -508,23 +508,23 @@ namespace nORM.Core
                     }
                 }
 
-                await cmd.PrepareAsync(ct);
+                await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
                 if (map.KeyColumns.Any(k => k.IsDbGenerated))
                 {
-                    var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct);
+                    var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
                     if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
-                    await ownTransaction.CommitAsync(ct);
+                    await ownTransaction.CommitAsync(ct).ConfigureAwait(false);
                     return 1;
                 }
 
-                var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct);
-                await ownTransaction.CommitAsync(ct);
+                var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                await ownTransaction.CommitAsync(ct).ConfigureAwait(false);
                 return recordsAffected;
             }
             catch
             {
-                await ownTransaction.RollbackAsync(ct);
+                await ownTransaction.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
         }
@@ -562,32 +562,32 @@ namespace nORM.Core
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 NormValidator.ValidateBulkOperation(entities, "insert");
-                await ctx.EnsureConnectionAsync(token);
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var map = GetMapping(typeof(T));
                 foreach (var entity in entities)
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
                     SetTenantId(entity, map);
                 }
-                return await _p.BulkInsertAsync(ctx, map, entities, token);
+                return await _p.BulkInsertAsync(ctx, map, entities, token).ConfigureAwait(false);
             }, ct);
 
         public Task<int> BulkUpdateAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 NormValidator.ValidateBulkOperation(entities, "update");
-                await ctx.EnsureConnectionAsync(token);
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 foreach (var entity in entities) NormValidator.ValidateEntity(entity, nameof(entities));
-                return await _p.BulkUpdateAsync(ctx, GetMapping(typeof(T)), entities, token);
+                return await _p.BulkUpdateAsync(ctx, GetMapping(typeof(T)), entities, token).ConfigureAwait(false);
             }, ct);
 
         public Task<int> BulkDeleteAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 NormValidator.ValidateBulkOperation(entities, "delete");
-                await ctx.EnsureConnectionAsync(token);
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 foreach (var entity in entities) NormValidator.ValidateEntity(entity, nameof(entities));
-                return await _p.BulkDeleteAsync(ctx, GetMapping(typeof(T)), entities, token);
+                return await _p.BulkDeleteAsync(ctx, GetMapping(typeof(T)), entities, token).ConfigureAwait(false);
             }, ct);
         #endregion
 
@@ -661,7 +661,7 @@ namespace nORM.Core
         public Task<List<T>> QueryUnchangedAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
-                await ctx.EnsureConnectionAsync(token);
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
@@ -681,12 +681,12 @@ namespace nORM.Core
                     .ToDictionary(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase);
 
                 var list = new List<T>();
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
                 var fieldCount = reader.FieldCount;
                 var columns = new string[fieldCount];
                 for (int i = 0; i < fieldCount; i++) columns[i] = reader.GetName(i);
 
-                while (await reader.ReadAsync(token))
+                while (await reader.ReadAsync(token).ConfigureAwait(false))
                 {
                     var item = new T();
                     for (int i = 0; i < fieldCount; i++)
@@ -715,7 +715,7 @@ namespace nORM.Core
         public Task<List<T>> FromSqlRawAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
-                await ctx.EnsureConnectionAsync(token);
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
@@ -732,8 +732,8 @@ namespace nORM.Core
 
                 var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
-                while (await reader.ReadAsync(token)) list.Add((T)await materializer(reader, token));
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
+                while (await reader.ReadAsync(token).ConfigureAwait(false)) list.Add((T)await materializer(reader, token).ConfigureAwait(false));
 
                 ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
                 return list;
@@ -742,7 +742,7 @@ namespace nORM.Core
         public Task<List<T>> ExecuteStoredProcedureAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
-                await ctx.EnsureConnectionAsync(token);
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
@@ -764,8 +764,8 @@ namespace nORM.Core
 
                 var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
-                while (await reader.ReadAsync(token)) list.Add((T)await materializer(reader, token));
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
+                while (await reader.ReadAsync(token).ConfigureAwait(false)) list.Add((T)await materializer(reader, token).ConfigureAwait(false));
 
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
                 return list;
@@ -774,7 +774,7 @@ namespace nORM.Core
         public Task<StoredProcedureResult<T>> ExecuteStoredProcedureWithOutputAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
-                await ctx.EnsureConnectionAsync(token);
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
@@ -809,9 +809,9 @@ namespace nORM.Core
 
                 var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
-                while (await reader.ReadAsync(token)) list.Add((T)await materializer(reader, token));
-                await reader.DisposeAsync();
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
+                while (await reader.ReadAsync(token).ConfigureAwait(false)) list.Add((T)await materializer(reader, token).ConfigureAwait(false));
+                await reader.DisposeAsync().ConfigureAwait(false);
 
                 var outputs = new Dictionary<string, object?>();
                 foreach (var kv in outputParamMap)
@@ -844,16 +844,16 @@ namespace nORM.Core
         {
             await _executionStrategy.ExecuteAsync(async (ctx, ct) =>
             {
-                await ctx.EnsureConnectionAsync(ct);
+                await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 await using var cmd = ctx.Connection.CreateCommand();
                 var p0 = _p.ParamPrefix + "p0";
                 var p1 = _p.ParamPrefix + "p1";
                 cmd.CommandText = $"INSERT INTO __NormTemporalTags (TagName, Timestamp) VALUES ({p0}, {p1})";
                 cmd.AddParam(p0, tagName);
                 cmd.AddParam(p1, DateTime.UtcNow);
-                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 return 0;
-            }, default);
+            }, default).ConfigureAwait(false);
         }
 
         public void Dispose()

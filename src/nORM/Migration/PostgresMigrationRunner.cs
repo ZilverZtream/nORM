@@ -34,30 +34,30 @@ namespace nORM.Migration
 
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
         {
-            await EnsureHistoryTableAsync(ct);
-            var pending = await GetPendingMigrationsInternalAsync(ct);
+            await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
+            var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
             if (!pending.Any()) return;
 
-            await using var transaction = await _connection.BeginTransactionAsync(ct);
+            await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             foreach (var migration in pending)
             {
                 migration.Up(_connection, (DbTransaction)transaction);
-                await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct);
+                await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
             }
-            await transaction.CommitAsync(ct);
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
         }
 
         public async Task<bool> HasPendingMigrationsAsync(CancellationToken ct = default)
         {
-            await EnsureHistoryTableAsync(ct);
-            var pending = await GetPendingMigrationsInternalAsync(ct);
+            await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
+            var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
             return pending.Any();
         }
 
         public async Task<string[]> GetPendingMigrationsAsync(CancellationToken ct = default)
         {
-            await EnsureHistoryTableAsync(ct);
-            var pending = await GetPendingMigrationsInternalAsync(ct);
+            await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
+            var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
             return pending.Select(p => $"{p.Version}_{p.Name}").ToArray();
         }
 
@@ -69,7 +69,7 @@ namespace nORM.Migration
                 .OrderBy(m => m.Version)
                 .ToList();
 
-            var appliedVersions = await GetAppliedMigrationVersionsAsync(ct);
+            var appliedVersions = await GetAppliedMigrationVersionsAsync(ct).ConfigureAwait(false);
 
             return all.Where(m => !appliedVersions.Contains(m.Version)).ToList();
         }
@@ -82,7 +82,7 @@ namespace nORM.Migration
             cmd.AddParam("@Version", migration.Version);
             cmd.AddParam("@Name", migration.Name);
             cmd.AddParam("@AppliedOn", DateTime.UtcNow);
-            await ExecuteNonQueryAsync(cmd, ct);
+            await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
         }
 
         private async Task<HashSet<long>> GetAppliedMigrationVersionsAsync(CancellationToken ct)
@@ -92,8 +92,8 @@ namespace nORM.Migration
             cmd.CommandText = $"SELECT \"Version\" FROM \"{HistoryTableName}\"";
             try
             {
-                await using var reader = await ExecuteReaderAsync(cmd, ct);
-                while (await reader.ReadAsync(ct))
+                await using var reader = await ExecuteReaderAsync(cmd, ct).ConfigureAwait(false);
+                while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
                     versions.Add(reader.GetInt64(0));
                 }
@@ -109,7 +109,7 @@ namespace nORM.Migration
         {
             await using var cmd = _connection.CreateCommand();
             cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{HistoryTableName}\" (Version BIGINT PRIMARY KEY, Name TEXT NOT NULL, AppliedOn TIMESTAMP NOT NULL);";
-            await ExecuteNonQueryAsync(cmd, ct);
+            await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
         }
 
         private Task<int> ExecuteNonQueryAsync(DbCommand cmd, CancellationToken ct)

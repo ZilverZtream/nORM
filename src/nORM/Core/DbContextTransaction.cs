@@ -27,8 +27,8 @@ namespace nORM.Core
 
         public async Task CommitAsync(CancellationToken ct = default)
         {
-            await _transaction.CommitAsync(ct);
-            await DisposeAsync();
+            await _transaction.CommitAsync(ct).ConfigureAwait(false);
+            await DisposeAsync().ConfigureAwait(false);
         }
 
         public void Rollback()
@@ -39,8 +39,8 @@ namespace nORM.Core
 
         public async Task RollbackAsync(CancellationToken ct = default)
         {
-            await _transaction.RollbackAsync(ct);
-            await DisposeAsync();
+            await _transaction.RollbackAsync(ct).ConfigureAwait(false);
+            await DisposeAsync().ConfigureAwait(false);
         }
 
         public void Dispose()
@@ -58,7 +58,7 @@ namespace nORM.Core
             if (!_completed)
             {
                 _completed = true;
-                await _transaction.DisposeAsync();
+                await _transaction.DisposeAsync().ConfigureAwait(false);
                 _context.ClearTransaction(_transaction);
             }
         }
