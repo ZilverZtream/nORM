@@ -326,19 +326,8 @@ namespace nORM.Query
 
         public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
         {
-            var plan = GetPlan(expression, out var filtered);
-            var cache = _ctx.Options.CacheProvider;
-            string? cacheKey = null;
-            if (cache != null)
-            {
-                cacheKey = BuildCacheKey<T>(filtered, plan.Parameters);
-                if (cache.TryGet(cacheKey, out List<T>? cachedList) && cachedList != null)
-                {
-                    foreach (var item in cachedList)
-                        yield return item;
-                    yield break;
-                }
-            }
+            // Streaming queries bypass the cache to avoid materializing entire result sets in memory.
+            var plan = GetPlan(expression, out _);
 
             var sw = Stopwatch.StartNew();
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
@@ -354,10 +343,10 @@ namespace nORM.Query
                              plan.ElementType.IsClass &&
                              !plan.ElementType.Name.StartsWith("<>") &&
                              plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
-            TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
+            if (trackable)
+                _ctx.GetMapping(plan.ElementType);
 
             var count = 0;
-            var cacheList = cache != null ? new List<T>() : null;
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct)
                 .ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -370,13 +359,10 @@ namespace nORM.Query
                     _ctx.ChangeTracker.Track(entity!, EntityState.Unchanged, actualMap);
                 }
                 count++;
-                cacheList?.Add(entity);
                 yield return entity;
             }
 
             _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, count);
-            if (cache != null && cacheKey != null)
-                cache.Set(cacheKey, cacheList ?? new List<T>(), _ctx.Options.CacheExpiration, plan.Tables);
         }
 
         internal QueryPlan GetPlan(Expression expression, out Expression filtered)
