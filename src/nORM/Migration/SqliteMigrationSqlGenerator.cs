@@ -53,10 +53,12 @@ namespace nORM.Migration
                     .Select(c => $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
                 var remainingNames = remainingColumns.Select(c => $"\"{c.Name}\"").ToArray();
 
+                down.Add("PRAGMA foreign_keys=off");
                 down.Add($"CREATE TABLE \"__temp__{table.Name}\" ({string.Join(", ", remainingDefs)})");
                 down.Add($"INSERT INTO \"__temp__{table.Name}\" ({string.Join(", ", remainingNames)}) SELECT {string.Join(", ", remainingNames)} FROM \"{table.Name}\"");
                 down.Add($"DROP TABLE \"{table.Name}\"");
                 down.Add($"ALTER TABLE \"__temp__{table.Name}\" RENAME TO \"{table.Name}\"");
+                down.Add("PRAGMA foreign_keys=on");
             }
 
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
