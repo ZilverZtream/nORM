@@ -13,6 +13,7 @@ using nORM.Internal;
 using nORM.Mapping;
 using nORM.Providers;
 using nORM.SourceGeneration;
+using Microsoft.Extensions.Logging;
 
 #nullable enable
 

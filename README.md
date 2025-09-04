@@ -180,22 +180,10 @@ var context = new DbContext(pooledConnection, provider);
 ### Advanced Logging
 
 ```csharp
-public class CustomLogger : IDbContextLogger
-{
-    public void LogQuery(string sql, IReadOnlyDictionary<string, object> parameters, 
-                        TimeSpan duration, int recordCount)
-    {
-        Console.WriteLine($"Query executed in {duration.TotalMilliseconds}ms: {sql}");
-    }
-    
-    public void LogBulkOperation(string operation, string tableName, 
-                               int recordCount, TimeSpan duration)
-    {
-        Console.WriteLine($"{operation} {recordCount} records in {duration.TotalMilliseconds}ms");
-    }
-}
+var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+var logger = loggerFactory.CreateLogger("nORM");
 
-var options = new DbContextOptions { Logger = new CustomLogger() };
+var options = new DbContextOptions { Logger = logger };
 ```
 
 ### Fluent Configuration

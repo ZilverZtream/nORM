@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using nORM.Core;
 using nORM.Enterprise;
+using Microsoft.Extensions.Logging;
 
 #nullable enable
 
