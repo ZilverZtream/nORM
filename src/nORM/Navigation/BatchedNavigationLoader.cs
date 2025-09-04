@@ -111,7 +111,7 @@ namespace nORM.Navigation
             var mapping = _context.GetMapping(relation.DependentType);
             await _context.EnsureConnectionAsync(default).ConfigureAwait(false);
             using var cmd = _context.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)_context.Options.CommandTimeout.TotalSeconds;
+            cmd.CommandTimeout = (int)_context.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
             var paramNames = new List<string>();
             for (int i = 0; i < keys.Count; i++)

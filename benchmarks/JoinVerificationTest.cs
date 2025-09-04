@@ -26,7 +26,7 @@ namespace nORM.Benchmarks
             var options = new nORM.Configuration.DbContextOptions
             {
                 BulkBatchSize = 50,
-                CommandTimeout = TimeSpan.FromSeconds(30)
+                TimeoutConfiguration = { BaseTimeout = TimeSpan.FromSeconds(30) }
             };
             
             using var context = new nORM.Core.DbContext(connection, new SqliteProvider(), options);

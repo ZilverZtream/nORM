@@ -141,7 +141,7 @@ namespace nORM.Providers
                         DestinationTableName = m.EscTable,
                         BatchSize = batch.Count,
                         EnableStreaming = true,
-                        BulkCopyTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds
+                        BulkCopyTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds
                     };
 
                     foreach (var col in insertableCols)
@@ -179,7 +179,7 @@ namespace nORM.Providers
             var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetSqlType(c.Prop.PropertyType)}"));
             await using (var cmd = ctx.Connection.CreateCommand())
             {
-                cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TABLE {tempTableName} ({colDefs})";
                 await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
             }
@@ -190,7 +190,7 @@ namespace nORM.Providers
             var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
             await using (var cmd = ctx.Connection.CreateCommand())
             {
-                cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"UPDATE T1 SET {setClause} FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause}";
                 var updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, updatedCount, sw.Elapsed);
@@ -216,7 +216,7 @@ namespace nORM.Providers
                     DestinationTableName = destinationTableName,
                     BatchSize = batch.Count,
                     EnableStreaming = true,
-                    BulkCopyTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds
+                    BulkCopyTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds
                 };
 
                 foreach (var col in insertableCols)
@@ -244,7 +244,7 @@ namespace nORM.Providers
 
             await using (var cmd = ctx.Connection.CreateCommand())
             {
-                cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TABLE {tempTableName} ({keyColDefs})";
                 await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
             }
@@ -276,7 +276,7 @@ namespace nORM.Providers
             var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
             await using (var cmd = ctx.Connection.CreateCommand())
             {
-                cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"DELETE T1 FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause}";
                 var deletedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, deletedCount, sw.Elapsed);
