@@ -117,8 +117,8 @@ namespace nORM.Query
         {
             var sw = Stopwatch.StartNew();
             var plan = GetPlan(expression, out var filtered);
-            var cacheKey = BuildCacheKey<TResult>(filtered, plan.Parameters);
-            return await ExecuteWithCacheAsync(cacheKey, plan.Tables, async () =>
+
+            Func<Task<TResult>> queryExecutorFactory = async () =>
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 await using var cmd = _ctx.Connection.CreateCommand();
@@ -161,7 +161,18 @@ namespace nORM.Query
                 }
 
                 return (TResult)result!;
-            }, ct).ConfigureAwait(false);
+            };
+
+            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
+            {
+                var cacheKey = BuildCacheKeyWithValues<TResult>(filtered, plan.Parameters);
+                var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
+                return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                return await queryExecutorFactory().ConfigureAwait(false);
+            }
         }
 
         internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
@@ -174,8 +185,8 @@ namespace nORM.Query
         private async Task<TResult> ExecuteCompiledInternalAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
-            var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, parameters);
-            return await ExecuteWithCacheAsync(cacheKey, plan.Tables, async () =>
+
+            Func<Task<TResult>> queryExecutorFactory = async () =>
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 await using var cmd = _ctx.Connection.CreateCommand();
@@ -218,10 +229,21 @@ namespace nORM.Query
                 }
 
                 return (TResult)result!;
-            }, ct).ConfigureAwait(false);
+            };
+
+            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
+            {
+                var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, parameters);
+                var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
+                return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                return await queryExecutorFactory().ConfigureAwait(false);
+            }
         }
 
-        private async Task<TResult> ExecuteWithCacheAsync<TResult>(string cacheKey, IReadOnlyCollection<string> tables, Func<Task<TResult>> factory, CancellationToken ct)
+        private async Task<TResult> ExecuteWithCacheAsync<TResult>(string cacheKey, IReadOnlyCollection<string> tables, TimeSpan expiration, Func<Task<TResult>> factory, CancellationToken ct)
         {
             var cache = _ctx.Options.CacheProvider;
             if (cache == null)
@@ -238,7 +260,7 @@ namespace nORM.Query
                     return cached!;
 
                 var result = await factory().ConfigureAwait(false);
-                cache.Set(cacheKey, result!, _ctx.Options.CacheExpiration, tables);
+                cache.Set(cacheKey, result!, expiration, tables);
                 return result;
             }
             finally
@@ -402,7 +424,7 @@ namespace nORM.Query
             }
         }
 
-        private string BuildCacheKey<TResult>(Expression expression, IReadOnlyDictionary<string, object> parameters)
+        private string BuildCacheKeyWithValues<TResult>(Expression expression, IReadOnlyDictionary<string, object> parameters)
         {
             var hash = new HashCode();
             hash.Add(ExpressionFingerprint.Compute(expression));

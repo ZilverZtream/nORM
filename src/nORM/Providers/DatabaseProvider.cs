@@ -87,6 +87,7 @@ namespace nORM.Providers
                 BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
             }
 
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName);
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, recordsAffected, sw.Elapsed);
             return recordsAffected;
         }
@@ -156,6 +157,7 @@ namespace nORM.Providers
                 await transaction.RollbackAsync(ct);
                 throw;
             }
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName);
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, totalUpdated, sw.Elapsed);
             return totalUpdated;
         }
@@ -238,6 +240,7 @@ namespace nORM.Providers
                 throw;
             }
 
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName);
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
             return totalDeleted;
         }
