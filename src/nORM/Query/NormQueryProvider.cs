@@ -376,9 +376,10 @@ namespace nORM.Query
                 var entity = (T)await plan.Materializer(reader, ct).ConfigureAwait(false);
                 if (trackable)
                 {
-                    NavigationPropertyExtensions.EnableLazyLoading((object)entity!, _ctx);
                     var actualMap = _ctx.GetMapping(entity!.GetType());
-                    _ctx.ChangeTracker.Track(entity!, EntityState.Unchanged, actualMap);
+                    var entry = _ctx.ChangeTracker.Track(entity!, EntityState.Unchanged, actualMap);
+                    entity = (T)entry.Entity;
+                    NavigationPropertyExtensions.EnableLazyLoading((object)entity!, _ctx);
                 }
                 count++;
                 yield return entity;

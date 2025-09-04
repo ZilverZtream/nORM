@@ -343,6 +343,7 @@ namespace nORM.Benchmarks
         {
             return await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Where(u => u.IsActive)
+                .AsNoTracking()
                 .Take(10));
         }
 
@@ -398,6 +399,7 @@ namespace nORM.Benchmarks
         {
             return await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Where(u => u.IsActive && u.Age > 25 && u.City == "New York")
+                .AsNoTracking()
                 .OrderBy(u => u.Name)
                 .Skip(5)
                 .Take(20));
@@ -438,6 +440,7 @@ namespace nORM.Benchmarks
                     o => o.UserId,
                     (u, o) => new { u.Name, o.Amount, o.ProductName }
                 )
+                .AsNoTracking()
                 .Where(x => x.Amount > 100)
                 .Take(50));
             return result.Cast<object>().ToList();
