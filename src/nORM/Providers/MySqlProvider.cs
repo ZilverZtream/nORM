@@ -193,7 +193,7 @@ END;";
                         table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
 
                     var batchSw = Stopwatch.StartNew();
-                    await bulkCopy.WriteToServerAsync(table, ct);
+                    await bulkCopy.WriteToServerAsync(table, ct).ConfigureAwait(false);
                     batchSw.Stop();
                     totalInserted += table.Rows.Count;
                     BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
@@ -203,7 +203,7 @@ END;";
                 return totalInserted;
             }
 
-            var affected = await base.BulkInsertAsync(ctx, m, entityList, ct);
+            var affected = await base.BulkInsertAsync(ctx, m, entityList, ct).ConfigureAwait(false);
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, affected, sw.Elapsed);
             return affected;
         }
@@ -211,7 +211,7 @@ END;";
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
-            if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct);
+            if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct).ConfigureAwait(false);
 
             var sw = Stopwatch.StartNew();
             var tempTableName = $"`BulkUpdate_{Guid.NewGuid():N}`";
@@ -222,11 +222,11 @@ END;";
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TEMPORARY TABLE {tempTableName} ({colDefs})";
-                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
             }
 
             var tempMapping = new TableMapping(m.Type, this, ctx, null) { EscTable = tempTableName };
-            await BulkInsertAsync(ctx, tempMapping, entities, ct);
+            await BulkInsertAsync(ctx, tempMapping, entities, ct).ConfigureAwait(false);
 
             var setClause = string.Join(", ", nonKeyCols.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
             var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
@@ -234,7 +234,7 @@ END;";
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"UPDATE {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause} SET {setClause}";
-                var updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                var updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, updatedCount, sw.Elapsed);
                 return updatedCount;
             }

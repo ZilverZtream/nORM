@@ -29,7 +29,7 @@ namespace nORM.Scaffolding
         public static async Task ScaffoldAsync(DbConnection connection, DatabaseProvider provider, string outputDirectory, string namespaceName, string contextName = "AppDbContext")
         {
             if (connection.State != ConnectionState.Open)
-                await connection.OpenAsync();
+                await connection.OpenAsync().ConfigureAwait(false);
 
             Directory.CreateDirectory(outputDirectory);
             var tables = connection.GetSchema("Tables");
@@ -45,7 +45,7 @@ namespace nORM.Scaffolding
                 var entityName = ToPascalCase(tableName);
                 entityNames.Add(entityName);
 
-                var entityCode = await ScaffoldEntityAsync(connection, provider, tableName, entityName, namespaceName);
+                var entityCode = await ScaffoldEntityAsync(connection, provider, tableName, entityName, namespaceName).ConfigureAwait(false);
                 File.WriteAllText(Path.Combine(outputDirectory, entityName + ".cs"), entityCode);
             }
 
@@ -68,7 +68,7 @@ namespace nORM.Scaffolding
 
             await using var cmd = connection.CreateCommand();
             cmd.CommandText = $"SELECT * FROM {provider.Escape(tableName)} WHERE 1=0";
-            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo);
+            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
             var schema = reader.GetSchemaTable()!;
             foreach (DataRow row in schema.Rows)
             {

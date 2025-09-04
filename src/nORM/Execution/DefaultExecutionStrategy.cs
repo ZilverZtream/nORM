@@ -18,7 +18,7 @@ namespace nORM.Execution
         {
             try
             {
-                return await operation(_ctx, ct);
+                return await operation(_ctx, ct).ConfigureAwait(false);
             }
             catch (DbException ex)
             {
