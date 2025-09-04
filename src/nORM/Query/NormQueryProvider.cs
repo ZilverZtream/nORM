@@ -120,7 +120,7 @@ namespace nORM.Query
             var cacheKey = BuildCacheKey<TResult>(filtered, plan.Parameters);
             return await ExecuteWithCacheAsync(cacheKey, plan.Tables, async () =>
             {
-                await _ctx.EnsureConnectionAsync(ct);
+                await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 await using var cmd = _ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
@@ -129,7 +129,7 @@ namespace nORM.Query
                 object result;
                 if (plan.IsScalar)
                 {
-                    var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct);
+                    var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
                     _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                     if (scalarResult == null || scalarResult is DBNull) return default(TResult)!;
                     var resultType = typeof(TResult);
@@ -137,7 +137,7 @@ namespace nORM.Query
                 }
                 else
                 {
-                    var list = await _executor.MaterializeAsync(plan, cmd, ct);
+                    var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
                     _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, list.Count);
                     if (plan.SingleResult)
                     {
@@ -161,7 +161,7 @@ namespace nORM.Query
                 }
 
                 return (TResult)result!;
-            }, ct);
+            }, ct).ConfigureAwait(false);
         }
 
         internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
@@ -177,7 +177,7 @@ namespace nORM.Query
             var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, parameters);
             return await ExecuteWithCacheAsync(cacheKey, plan.Tables, async () =>
             {
-                await _ctx.EnsureConnectionAsync(ct);
+                await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 await using var cmd = _ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
@@ -186,7 +186,7 @@ namespace nORM.Query
                 object result;
                 if (plan.IsScalar)
                 {
-                    var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct);
+                    var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
                     _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                     if (scalarResult == null || scalarResult is DBNull) return default!;
                     var resultType = typeof(TResult);
@@ -194,7 +194,7 @@ namespace nORM.Query
                 }
                 else
                 {
-                    var list = await _executor.MaterializeAsync(plan, cmd, ct);
+                    var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
                     _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, list.Count);
                     if (plan.SingleResult)
                     {
@@ -218,26 +218,26 @@ namespace nORM.Query
                 }
 
                 return (TResult)result!;
-            }, ct);
+            }, ct).ConfigureAwait(false);
         }
 
         private async Task<TResult> ExecuteWithCacheAsync<TResult>(string cacheKey, IReadOnlyCollection<string> tables, Func<Task<TResult>> factory, CancellationToken ct)
         {
             var cache = _ctx.Options.CacheProvider;
             if (cache == null)
-                return await factory();
+                return await factory().ConfigureAwait(false);
 
             if (cache.TryGet(cacheKey, out TResult? cached))
                 return cached!;
 
             var semaphore = _cacheLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
-            await semaphore.WaitAsync(ct);
+            await semaphore.WaitAsync(ct).ConfigureAwait(false);
             try
             {
                 if (cache.TryGet(cacheKey, out cached))
                     return cached!;
 
-                var result = await factory();
+                var result = await factory().ConfigureAwait(false);
                 cache.Set(cacheKey, result!, _ctx.Options.CacheExpiration, tables);
                 return result;
             }
@@ -277,7 +277,7 @@ namespace nORM.Query
             _cudBuilder.ValidateCudPlan(plan.Sql);
             var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
 
-            await _ctx.EnsureConnectionAsync(ct);
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
             var finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
@@ -285,7 +285,7 @@ namespace nORM.Query
             foreach (var p in plan.Parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
 
-            var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct);
+            var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
             _ctx.Options.Logger?.LogQuery(finalSql, plan.Parameters, sw.Elapsed, affected);
             return affected;
         }
@@ -304,7 +304,7 @@ namespace nORM.Query
             var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
             var (setClause, setParams) = _cudBuilder.BuildSetClause(mapping, set);
 
-            await _ctx.EnsureConnectionAsync(ct);
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
             var finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
@@ -318,7 +318,7 @@ namespace nORM.Query
             foreach (var p in setParams)
                 allParams[p.Key] = p.Value;
 
-            var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct);
+            var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
             _ctx.Options.Logger?.LogQuery(finalSql, allParams, sw.Elapsed, affected);
             return affected;
         }
@@ -341,7 +341,7 @@ namespace nORM.Query
             }
 
             var sw = Stopwatch.StartNew();
-            await _ctx.EnsureConnectionAsync(ct);
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
@@ -358,10 +358,11 @@ namespace nORM.Query
 
             var count = 0;
             var cacheList = cache != null ? new List<T>() : null;
-            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
-            while (await reader.ReadAsync(ct))
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct)
+                .ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
-                var entity = (T)await plan.Materializer(reader, ct);
+                var entity = (T)await plan.Materializer(reader, ct).ConfigureAwait(false);
                 if (trackable)
                 {
                     NavigationPropertyExtensions.EnableLazyLoading((object)entity!, _ctx);

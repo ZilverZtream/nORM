@@ -18,16 +18,16 @@ namespace nORM.Internal
             var interceptors = ctx.Options.CommandInterceptors;
             if (interceptors.Count == 0)
             {
-                return await command.ExecuteNonQueryAsync(ct);
+                return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
             }
 
             foreach (var interceptor in interceptors)
             {
-                var interception = await interceptor.NonQueryExecutingAsync(command, ctx, ct);
+                var interception = await interceptor.NonQueryExecutingAsync(command, ctx, ct).ConfigureAwait(false);
                 if (interception.IsSuppressed)
                 {
                     foreach (var i in interceptors)
-                        await i.NonQueryExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, ct);
+                        await i.NonQueryExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, ct).ConfigureAwait(false);
                     return interception.Result;
                 }
             }
@@ -35,11 +35,11 @@ namespace nORM.Internal
             var sw = Stopwatch.StartNew();
             try
             {
-                var result = await command.ExecuteNonQueryAsync(ct);
+                var result = await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    await interceptor.NonQueryExecutedAsync(command, ctx, result, sw.Elapsed, ct);
+                    await interceptor.NonQueryExecutedAsync(command, ctx, result, sw.Elapsed, ct).ConfigureAwait(false);
                 }
                 return result;
             }
@@ -48,7 +48,7 @@ namespace nORM.Internal
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    await interceptor.CommandFailedAsync(command, ctx, ex, ct);
+                    await interceptor.CommandFailedAsync(command, ctx, ex, ct).ConfigureAwait(false);
                 }
                 throw;
             }
@@ -59,16 +59,16 @@ namespace nORM.Internal
             var interceptors = ctx.Options.CommandInterceptors;
             if (interceptors.Count == 0)
             {
-                return await command.ExecuteScalarAsync(ct);
+                return await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
             }
 
             foreach (var interceptor in interceptors)
             {
-                var interception = await interceptor.ScalarExecutingAsync(command, ctx, ct);
+                var interception = await interceptor.ScalarExecutingAsync(command, ctx, ct).ConfigureAwait(false);
                 if (interception.IsSuppressed)
                 {
                     foreach (var i in interceptors)
-                        await i.ScalarExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, ct);
+                        await i.ScalarExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, ct).ConfigureAwait(false);
                     return interception.Result;
                 }
             }
@@ -76,11 +76,11 @@ namespace nORM.Internal
             var sw = Stopwatch.StartNew();
             try
             {
-                var result = await command.ExecuteScalarAsync(ct);
+                var result = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    await interceptor.ScalarExecutedAsync(command, ctx, result, sw.Elapsed, ct);
+                    await interceptor.ScalarExecutedAsync(command, ctx, result, sw.Elapsed, ct).ConfigureAwait(false);
                 }
                 return result;
             }
@@ -89,7 +89,7 @@ namespace nORM.Internal
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    await interceptor.CommandFailedAsync(command, ctx, ex, ct);
+                    await interceptor.CommandFailedAsync(command, ctx, ex, ct).ConfigureAwait(false);
                 }
                 throw;
             }
@@ -100,16 +100,16 @@ namespace nORM.Internal
             var interceptors = ctx.Options.CommandInterceptors;
             if (interceptors.Count == 0)
             {
-                return await command.ExecuteReaderAsync(behavior, ct);
+                return await command.ExecuteReaderAsync(behavior, ct).ConfigureAwait(false);
             }
 
             foreach (var interceptor in interceptors)
             {
-                var interception = await interceptor.ReaderExecutingAsync(command, ctx, ct);
+                var interception = await interceptor.ReaderExecutingAsync(command, ctx, ct).ConfigureAwait(false);
                 if (interception.IsSuppressed)
                 {
                     foreach (var i in interceptors)
-                        await i.ReaderExecutedAsync(command, ctx, interception.Result!, TimeSpan.Zero, ct);
+                        await i.ReaderExecutedAsync(command, ctx, interception.Result!, TimeSpan.Zero, ct).ConfigureAwait(false);
                     return interception.Result!;
                 }
             }
@@ -117,11 +117,11 @@ namespace nORM.Internal
             var sw = Stopwatch.StartNew();
             try
             {
-                var reader = await command.ExecuteReaderAsync(behavior, ct);
+                var reader = await command.ExecuteReaderAsync(behavior, ct).ConfigureAwait(false);
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    await interceptor.ReaderExecutedAsync(command, ctx, reader, sw.Elapsed, ct);
+                    await interceptor.ReaderExecutedAsync(command, ctx, reader, sw.Elapsed, ct).ConfigureAwait(false);
                 }
                 return reader;
             }
@@ -130,7 +130,7 @@ namespace nORM.Internal
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    await interceptor.CommandFailedAsync(command, ctx, ex, ct);
+                    await interceptor.CommandFailedAsync(command, ctx, ex, ct).ConfigureAwait(false);
                 }
                 throw;
             }

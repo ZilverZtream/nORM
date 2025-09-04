@@ -38,7 +38,7 @@ namespace nORM.Query
                 try
                 {
                     if (plan.GroupJoinInfo != null)
-                        return await MaterializeGroupJoinAsync(plan, cmd, ct);
+                        return await MaterializeGroupJoinAsync(plan, cmd, ct).ConfigureAwait(false);
 
                     var listType = typeof(List<>).MakeGenericType(plan.ElementType);
                     var list = (IList)Activator.CreateInstance(listType)!;
@@ -50,26 +50,49 @@ namespace nORM.Query
 
                     TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
-                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
-                    while (await reader.ReadAsync(ct))
+                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct)
+                        .ConfigureAwait(false);
+
+                    var materializationTasks = new List<Task<object>>(capacity: plan.ElementType == typeof(object) ? 100 : 1000);
+                    var batchSize = 0;
+                    const int maxBatchSize = 100;
+
+                    while (await reader.ReadAsync(ct).ConfigureAwait(false))
                     {
-                        var entity = await plan.Materializer(reader, ct);
+                        var materializeTask = plan.Materializer(reader, ct);
 
-                        if (trackable)
+                        if (materializeTask.IsCompletedSuccessfully)
                         {
-                            NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
-                            var actualMap = _ctx.GetMapping(entity.GetType());
-                            _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, actualMap);
+                            var entity = materializeTask.Result;
+                            ProcessEntity(entity, trackable, entityMap);
+                            list.Add(entity);
                         }
+                        else
+                        {
+                            materializationTasks.Add(materializeTask);
+                            batchSize++;
 
-                        list.Add(entity);
+                            if (batchSize >= maxBatchSize)
+                            {
+                                await ProcessMaterializationBatch(materializationTasks, list, trackable, entityMap)
+                                    .ConfigureAwait(false);
+                                materializationTasks.Clear();
+                                batchSize = 0;
+                            }
+                        }
+                    }
+
+                    if (materializationTasks.Count > 0)
+                    {
+                        await ProcessMaterializationBatch(materializationTasks, list, trackable, entityMap)
+                            .ConfigureAwait(false);
                     }
 
                     if (plan.SplitQuery)
                     {
                         foreach (var include in plan.Includes)
                         {
-                            await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking);
+                            await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking).ConfigureAwait(false);
                         }
                     }
 
@@ -77,10 +100,31 @@ namespace nORM.Query
                 }
                 catch
                 {
-                    await cmd.DisposeAsync();
+                    await cmd.DisposeAsync().ConfigureAwait(false);
                     throw;
                 }
-            }, "MaterializeAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText });
+            }, "MaterializeAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText }).ConfigureAwait(false);
+        }
+
+        private async Task ProcessMaterializationBatch(List<Task<object>> tasks, IList list, bool trackable, TableMapping? entityMap)
+        {
+            var entities = await Task.WhenAll(tasks).ConfigureAwait(false);
+            foreach (var entity in entities)
+            {
+                ProcessEntity(entity, trackable, entityMap);
+                list.Add(entity);
+            }
+        }
+
+        private void ProcessEntity(object entity, bool trackable, TableMapping? entityMap)
+        {
+            if (!trackable) return;
+
+            NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
+            var actualMap = entityMap != null && entity.GetType() == entityMap.Type
+                ? entityMap
+                : _ctx.GetMapping(entity.GetType());
+            _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, actualMap);
         }
 
         private async Task<IList> MaterializeGroupJoinAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
@@ -103,15 +147,16 @@ namespace nORM.Query
                     var outerColumnCount = outerMap.Columns.Length;
                     var innerKeyIndex = outerColumnCount + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
 
-                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
+                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct)
+                        .ConfigureAwait(false);
 
                     object? currentOuter = null;
                     object? currentKey = null;
                     List<object> currentChildren = new();
 
-                    while (await reader.ReadAsync(ct))
+                    while (await reader.ReadAsync(ct).ConfigureAwait(false))
                     {
-                        var outer = await plan.Materializer(reader, ct);
+                        var outer = await plan.Materializer(reader, ct).ConfigureAwait(false);
                         var key = info.OuterKeySelector(outer) ?? DBNull.Value;
 
                         if (currentOuter == null || !Equals(currentKey, key))
@@ -159,10 +204,10 @@ namespace nORM.Query
                 }
                 catch
                 {
-                    await cmd.DisposeAsync();
+                    await cmd.DisposeAsync().ConfigureAwait(false);
                     throw;
                 }
-            }, "MaterializeGroupJoinAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText });
+            }, "MaterializeGroupJoinAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText }).ConfigureAwait(false);
 
             static object MaterializeEntity(DbDataReader reader, TableMapping map, int offset)
             {
