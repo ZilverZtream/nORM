@@ -117,22 +117,23 @@ namespace nORM.Core
             return _cn;
         }
 
-        public DbConnection Connection
+        internal DbConnection EnsureConnection()
         {
-            get
-            {
-                if (SynchronizationContext.Current == null)
-                {
-                    EnsureConnectionAsync().GetAwaiter().GetResult();
-                }
-                else
-                {
-                    Task.Run(async () => await EnsureConnectionAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
-                }
+            if (_cn.State != ConnectionState.Open)
+                _cn.Open();
 
-                return _cn;
+            if (!_sqliteInitialized && _p is SqliteProvider)
+            {
+                using var pragmaCmd = _cn.CreateCommand();
+                pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
+                pragmaCmd.ExecuteNonQuery();
+                _sqliteInitialized = true;
             }
+
+            return _cn;
         }
+
+        public DbConnection Connection => EnsureConnection();
         public DatabaseProvider Provider => _p;
 
         internal DbTransaction? CurrentTransaction
