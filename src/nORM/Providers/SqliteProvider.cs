@@ -111,8 +111,11 @@ namespace nORM.Providers
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
             if (cols.Length == 0) return 0;
 
-            // Respect SQLite's parameter limit and cap batches to 500 rows
-            var batchSize = Math.Min(500, MaxParameters / cols.Length);
+            var operationKey = $"Sqlite_BulkInsert_{m.Type.Name}";
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            var maxByParams = Math.Max(1, MaxParameters / cols.Length);
+            var batchSize = Math.Min(sizing.OptimalBatchSize, maxByParams);
+
             var totalInserted = 0;
 
             await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
@@ -137,7 +140,10 @@ namespace nORM.Providers
                         }
                     }
 
+                    var batchSw = Stopwatch.StartNew();
                     totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                    batchSw.Stop();
+                    BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                 }
 
                 await transaction.CommitAsync(ct);

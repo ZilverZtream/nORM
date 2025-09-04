@@ -118,26 +118,40 @@ namespace nORM.Providers
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
 
+            var entityList = entities.ToList();
+            if (!entityList.Any()) return 0;
+
             var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
+            var operationKey = $"SqlServer_BulkInsert_{m.Type.Name}";
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            // Logger does not expose informational log, so we skip logging batch strategy here.
+
             var totalInserted = 0;
 
             await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
             try
             {
-                using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection, SqlBulkCopyOptions.Default, (SqlTransaction)transaction)
+                for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
                 {
-                    DestinationTableName = m.EscTable,
-                    BatchSize = ctx.Options.BulkBatchSize,
-                    EnableStreaming = true,
-                    BulkCopyTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds
-                };
+                    var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
+                    using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection, SqlBulkCopyOptions.Default, (SqlTransaction)transaction)
+                    {
+                        DestinationTableName = m.EscTable,
+                        BatchSize = batch.Count,
+                        EnableStreaming = true,
+                        BulkCopyTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds
+                    };
 
-                foreach (var col in insertableCols)
-                    bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
+                    foreach (var col in insertableCols)
+                        bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
 
-                using var reader = new EntityDataReader<T>(entities, insertableCols);
-                await bulkCopy.WriteToServerAsync(reader, ct);
-                totalInserted = reader.RecordsProcessed;
+                    using var reader = new EntityDataReader<T>(batch, insertableCols);
+                    var batchSw = Stopwatch.StartNew();
+                    await bulkCopy.WriteToServerAsync(reader, ct);
+                    batchSw.Stop();
+                    totalInserted += reader.RecordsProcessed;
+                    BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
+                }
 
                 await transaction.CommitAsync(ct);
             }
@@ -185,20 +199,36 @@ namespace nORM.Providers
         private async Task<int> BulkInsertInternalAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, string destinationTableName, CancellationToken ct) where T : class
         {
             var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
-            using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
+            var entityList = entities.ToList();
+            if (!entityList.Any()) return 0;
+
+            var operationKey = $"SqlServer_BulkInsert_{destinationTableName}";
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+
+            var totalInserted = 0;
+            for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
             {
-                DestinationTableName = destinationTableName,
-                BatchSize = ctx.Options.BulkBatchSize,
-                EnableStreaming = true,
-                BulkCopyTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds
-            };
+                var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
+                using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
+                {
+                    DestinationTableName = destinationTableName,
+                    BatchSize = batch.Count,
+                    EnableStreaming = true,
+                    BulkCopyTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds
+                };
 
-            foreach (var col in insertableCols)
-                bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
+                foreach (var col in insertableCols)
+                    bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
 
-            using var reader = new EntityDataReader<T>(entities, insertableCols);
-            await bulkCopy.WriteToServerAsync(reader, ct);
-            return reader.RecordsProcessed;
+                using var reader = new EntityDataReader<T>(batch, insertableCols);
+                var batchSw = Stopwatch.StartNew();
+                await bulkCopy.WriteToServerAsync(reader, ct);
+                batchSw.Stop();
+                totalInserted += reader.RecordsProcessed;
+                BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
+            }
+
+            return totalInserted;
         }
 
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class

@@ -126,6 +126,9 @@ namespace nORM.Providers
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
             if (!cols.Any()) return 0;
 
+            var operationKey = $"Postgres_BulkInsert_{m.Type.Name}";
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+
             var npgConnType = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
             if (npgConnType != null && npgConnType.IsInstanceOfType(ctx.Connection))
             {
@@ -153,20 +156,23 @@ namespace nORM.Providers
                     if (importerObj is IAsyncDisposable iad) await iad.DisposeAsync();
                     else if (importerObj is IDisposable id) id.Dispose();
                 }
+                BatchSizer.RecordBatchPerformance(operationKey, entityList.Count, sw.Elapsed, entityList.Count);
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, entityList.Count, sw.Elapsed);
                 return entityList.Count;
             }
 
             var recordsAffected = 0;
-            var batchSize = CalculateOptimalBatchSize(cols.Length);
 
             await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
             try
             {
-                for (int i = 0; i < entityList.Count; i += batchSize)
+                for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
                 {
-                    var batch = entityList.Skip(i).Take(batchSize).ToList();
+                    var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
+                    var batchSw = Stopwatch.StartNew();
                     recordsAffected += await ExecutePostgresBatchInsert(ctx, transaction, m, cols, batch, ct);
+                    batchSw.Stop();
+                    BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                 }
 
                 await transaction.CommitAsync(ct);
@@ -179,16 +185,6 @@ namespace nORM.Providers
 
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, recordsAffected, sw.Elapsed);
             return recordsAffected;
-        }
-
-        private static int CalculateOptimalBatchSize(int columnCount)
-        {
-            // PostgreSQL handles large parameter counts well
-            var maxParams = 32767; // PostgreSQL parameter limit
-            var maxRowsPerBatch = maxParams / columnCount;
-            
-            // Cap at reasonable batch size for memory efficiency
-            return Math.Min(maxRowsPerBatch, 1000);
         }
 
         private async Task<int> ExecutePostgresBatchInsert<T>(DbContext ctx, System.Data.Common.DbTransaction transaction,
@@ -328,15 +324,18 @@ namespace nORM.Providers
                     if (importerObj is IAsyncDisposable iad) await iad.DisposeAsync();
                     else if (importerObj is IDisposable id) id.Dispose();
                 }
+                BatchSizer.RecordBatchPerformance($"Postgres_BulkInsert_{mapping.Type.Name}", entityList.Count, TimeSpan.Zero, entityList.Count);
                 return entityList.Count;
             }
 
-            var batchSize = CalculateOptimalBatchSize(cols.Length);
+            var operationKey = $"Postgres_BulkInsert_{mapping.Type.Name}";
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), mapping, operationKey, entityList.Count);
+
             var totalInserted = 0;
 
-            for (int i = 0; i < entityList.Count; i += batchSize)
+            for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
             {
-                var batch = entityList.Skip(i).Take(batchSize).ToList();
+                var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
                 var sql = BuildPostgresBatchInsertSql(mapping, cols, batch.Count).Replace(" ON CONFLICT DO NOTHING", "");
 
                 await using var cmd = ctx.Connection.CreateCommand();
@@ -352,7 +351,10 @@ namespace nORM.Providers
                     }
                 }
 
+                var batchSw = Stopwatch.StartNew();
                 totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                batchSw.Stop();
+                BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
             }
 
             return totalInserted;
