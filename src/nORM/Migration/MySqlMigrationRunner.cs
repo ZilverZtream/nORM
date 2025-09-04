@@ -15,20 +15,20 @@ using nORM.Providers;
 
 namespace nORM.Migration
 {
-    public class SqlServerMigrationRunner : IMigrationRunner
+    public class MySqlMigrationRunner : IMigrationRunner
     {
         private readonly DbConnection _connection;
         private readonly Assembly _migrationsAssembly;
         private readonly DbContext? _context;
-        internal const string HistoryTableName = "__NormMigrationsHistory";
+        private const string HistoryTableName = "__NormMigrationsHistory";
 
-        public SqlServerMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null)
+        public MySqlMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null)
         {
             _connection = connection;
             _migrationsAssembly = migrationsAssembly;
             if (options != null && options.CommandInterceptors.Count > 0)
             {
-                _context = new DbContext(connection, new SqlServerProvider(), options);
+                _context = new DbContext(connection, new MySqlProvider(new GenericParameterFactory(connection)), options);
             }
         }
 
@@ -78,7 +78,7 @@ namespace nORM.Migration
         {
             await using var cmd = _connection.CreateCommand();
             cmd.Transaction = transaction;
-            cmd.CommandText = $"INSERT INTO [{HistoryTableName}] (Version, Name, AppliedOn) VALUES (@Version, @Name, @AppliedOn)";
+            cmd.CommandText = $"INSERT INTO `{HistoryTableName}` (`Version`, `Name`, `AppliedOn`) VALUES (@Version, @Name, @AppliedOn);";
             cmd.AddParam("@Version", migration.Version);
             cmd.AddParam("@Name", migration.Name);
             cmd.AddParam("@AppliedOn", DateTime.UtcNow);
@@ -89,7 +89,7 @@ namespace nORM.Migration
         {
             var versions = new HashSet<long>();
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"SELECT [Version] FROM [{HistoryTableName}]";
+            cmd.CommandText = $"SELECT `Version` FROM `{HistoryTableName}`";
             try
             {
                 await using var reader = await ExecuteReaderAsync(cmd, ct);
@@ -108,7 +108,7 @@ namespace nORM.Migration
         private async Task EnsureHistoryTableAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"IF OBJECT_ID(N'{HistoryTableName}', N'U') IS NULL CREATE TABLE [{HistoryTableName}] (Version BIGINT PRIMARY KEY, Name NVARCHAR(255) NOT NULL, AppliedOn DATETIME2 NOT NULL);";
+            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS `{HistoryTableName}` (Version BIGINT PRIMARY KEY, Name VARCHAR(255) NOT NULL, AppliedOn DATETIME(6) NOT NULL);";
             await ExecuteNonQueryAsync(cmd, ct);
         }
 
@@ -117,5 +117,19 @@ namespace nORM.Migration
 
         private Task<DbDataReader> ExecuteReaderAsync(DbCommand cmd, CancellationToken ct)
             => _context != null ? cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct) : cmd.ExecuteReaderAsync(ct);
+
+        private sealed class GenericParameterFactory : IDbParameterFactory
+        {
+            private readonly DbConnection _connection;
+            public GenericParameterFactory(DbConnection connection) => _connection = connection;
+            public DbParameter CreateParameter(string name, object? value)
+            {
+                using var cmd = _connection.CreateCommand();
+                var p = cmd.CreateParameter();
+                p.ParameterName = name;
+                p.Value = value ?? DBNull.Value;
+                return p;
+            }
+        }
     }
 }
