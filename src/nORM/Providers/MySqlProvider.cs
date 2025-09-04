@@ -18,6 +18,12 @@ namespace nORM.Providers
     public sealed class MySqlProvider : DatabaseProvider
     {
         private static readonly ConcurrentLruCache<Type, DataTable> _tableSchemas = new(maxSize: 100);
+        private readonly IDbParameterFactory _parameterFactory;
+
+        public MySqlProvider(IDbParameterFactory parameterFactory)
+        {
+            _parameterFactory = parameterFactory ?? throw new ArgumentNullException(nameof(parameterFactory));
+        }
         public override int MaxSqlLength => 4_194_304;
         public override int MaxParameters => 65_535;
         public override string Escape(string id) => $"`{id}`";
@@ -47,23 +53,8 @@ namespace nORM.Providers
         
         public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT LAST_INSERT_ID();";
         
-        public override System.Data.Common.DbParameter CreateParameter(string name, object? value)
-        {
-            // MySQL uses MySqlConnector or MySql.Data parameters
-            // Try MySqlConnector first (recommended), then MySql.Data
-            var paramType = Type.GetType("MySqlConnector.MySqlParameter, MySqlConnector") ?? 
-                           Type.GetType("MySql.Data.MySqlClient.MySqlParameter, MySql.Data");
-            
-            if (paramType != null)
-            {
-                return (System.Data.Common.DbParameter)Activator.CreateInstance(paramType, name, value ?? DBNull.Value)!;
-            }
-            else
-            {
-                // Fallback for when MySQL package is not available
-                throw new InvalidOperationException("MySQL package is required for MySQL support. Please install either MySqlConnector or MySql.Data NuGet package.");
-            }
-        }
+        public override DbParameter CreateParameter(string name, object? value) =>
+            _parameterFactory.CreateParameter(name, value);
 
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)
         {
