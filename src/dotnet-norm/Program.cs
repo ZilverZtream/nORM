@@ -16,6 +16,7 @@ using nORM.Configuration;
 using nORM.Migration;
 using nORM.Providers;
 using nORM.Scaffolding;
+using nORM.Security;
 
 var root = new RootCommand("Command line tools for the nORM ORM framework");
 
@@ -33,8 +34,8 @@ scaffold.Add(nsOpt);
 scaffold.Add(ctxOpt);
 scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
 {
-    var conn = result.GetValue(connOpt)!;
     var prov = result.GetValue(providerOpt)!;
+    var conn = ConnectionStringValidator.ValidateAndSanitize(result.GetValue(connOpt)!, prov);
     var output = result.GetValue(outputOpt)!;
     var ns = result.GetValue(nsOpt)!;
     var ctx = result.GetValue(ctxOpt)!;
@@ -65,8 +66,8 @@ update.Add(migProvOpt);
 update.Add(assemblyOpt);
 update.SetAction(async (ParseResult result, CancellationToken _) =>
 {
-    var conn = result.GetValue(migConnOpt)!;
     var prov = result.GetValue(migProvOpt)!;
+    var conn = ConnectionStringValidator.ValidateAndSanitize(result.GetValue(migConnOpt)!, prov);
     var asmPath = result.GetValue(assemblyOpt)!;
     try
     {
@@ -104,8 +105,8 @@ drop.Add(dropConnOpt);
 drop.Add(dropProvOpt);
 drop.SetAction(async (ParseResult result, CancellationToken _) =>
 {
-    var conn = result.GetValue(dropConnOpt)!;
     var prov = result.GetValue(dropProvOpt)!;
+    var conn = ConnectionStringValidator.ValidateAndSanitize(result.GetValue(dropConnOpt)!, prov);
     try
     {
         if (prov.Equals("sqlite", StringComparison.OrdinalIgnoreCase))
