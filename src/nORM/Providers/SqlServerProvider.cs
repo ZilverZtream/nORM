@@ -11,6 +11,7 @@ using System.Data.Common;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
+using Microsoft.Extensions.Logging;
 
 #nullable enable
 

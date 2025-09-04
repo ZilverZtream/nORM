@@ -18,6 +18,7 @@ using System.Reflection;
 using nORM.Scaffolding;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 
 #nullable enable
 
