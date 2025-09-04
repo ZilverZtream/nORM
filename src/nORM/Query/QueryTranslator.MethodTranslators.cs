@@ -12,6 +12,7 @@ namespace nORM.Query
     {
         private static readonly Dictionary<string, IMethodCallTranslator> _methodTranslators = new()
         {
+            { "Cacheable", new CacheableTranslator() },
             { "Where", new WhereTranslator() },
             { "Select", new SelectTranslator() },
             { "OrderBy", new OrderByTranslator() },
@@ -80,6 +81,19 @@ namespace nORM.Query
                 }
             }
             return defaultAlias;
+        }
+
+        private sealed class CacheableTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                t._isCacheable = true;
+                if (QueryTranslator.TryGetConstantValue(node.Arguments[1], out var value) && value is TimeSpan ts)
+                {
+                    t._cacheExpiration = ts;
+                }
+                return t.Visit(node.Arguments[0]);
+            }
         }
 
         private sealed class WhereTranslator : IMethodCallTranslator
