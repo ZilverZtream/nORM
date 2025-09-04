@@ -121,7 +121,40 @@ CREATE TABLE {historyTable} (
         }
 
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
-            => throw new NotImplementedException();
+        {
+            var table = Escape(mapping.TableName);
+            var history = Escape(mapping.TableName + "_History");
+            var columns = string.Join(", ", mapping.Columns.Select(c => Escape(c.PropName)));
+            var insertedColumns = string.Join(", ", mapping.Columns.Select(c => "i." + Escape(c.PropName)));
+            var deletedColumns = string.Join(", ", mapping.Columns.Select(c => "d." + Escape(c.PropName)));
+            var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h.{Escape(c.PropName)} = d.{Escape(c.PropName)}"));
+
+            return $@"
+CREATE TRIGGER {Escape(mapping.TableName + "_TemporalInsert")} ON {table} AFTER INSERT AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columns})
+    SELECT GETUTCDATE(), '9999-12-31', 'I', {insertedColumns} FROM inserted i;
+END;
+GO
+
+CREATE TRIGGER {Escape(mapping.TableName + "_TemporalUpdate")} ON {table} AFTER UPDATE AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE h SET h.__ValidTo = GETUTCDATE() FROM {history} h JOIN deleted d ON {keyCondition} WHERE h.__ValidTo = '9999-12-31';
+    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columns})
+    SELECT GETUTCDATE(), '9999-12-31', 'U', {insertedColumns} FROM inserted i;
+END;
+GO
+
+CREATE TRIGGER {Escape(mapping.TableName + "_TemporalDelete")} ON {table} AFTER DELETE AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE h SET h.__ValidTo = GETUTCDATE() FROM {history} h JOIN deleted d ON {keyCondition} WHERE h.__ValidTo = '9999-12-31';
+    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columns})
+    SELECT GETUTCDATE(), GETUTCDATE(), 'D', {deletedColumns} FROM deleted d;
+END;";
+        }
 
         protected override void ValidateConnection(DbConnection connection)
         {
