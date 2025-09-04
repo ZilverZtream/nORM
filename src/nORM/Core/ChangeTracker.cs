@@ -72,9 +72,54 @@ namespace nORM.Core
 
         private static object? GetPrimaryKeyValue(object entity, TableMapping mapping)
         {
-            return mapping.KeyColumns.Length == 1
-                ? mapping.KeyColumns[0].Getter(entity)
-                : null; // Composite keys not yet supported
+            if (mapping.KeyColumns.Length == 1)
+                return mapping.KeyColumns[0].Getter(entity);
+
+            if (mapping.KeyColumns.Length > 1)
+            {
+                var values = new object?[mapping.KeyColumns.Length];
+                for (int i = 0; i < mapping.KeyColumns.Length; i++)
+                {
+                    values[i] = mapping.KeyColumns[i].Getter(entity);
+                }
+                return new CompositeKey(values);
+            }
+
+            return null;
+        }
+
+        private sealed class CompositeKey : IEquatable<CompositeKey>
+        {
+            private readonly object?[] _values;
+
+            public CompositeKey(object?[] values)
+            {
+                _values = values;
+            }
+
+            public bool Equals(CompositeKey? other)
+            {
+                if (other is null || other._values.Length != _values.Length)
+                    return false;
+
+                for (int i = 0; i < _values.Length; i++)
+                {
+                    if (!Equals(_values[i], other._values[i]))
+                        return false;
+                }
+
+                return true;
+            }
+
+            public override bool Equals(object? obj) => Equals(obj as CompositeKey);
+
+            public override int GetHashCode()
+            {
+                var hash = new HashCode();
+                foreach (var value in _values)
+                    hash.Add(value);
+                return hash.ToHashCode();
+            }
         }
     }
 }
