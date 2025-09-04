@@ -29,6 +29,7 @@ public abstract class TestBase
         {
             ProviderKind.Sqlite => (CreateOpenConnection(), new SqliteProvider()),
             ProviderKind.SqlServer => (CreateOpenConnection(), new SqlServerProvider()),
+            ProviderKind.MySql => (CreateOpenConnection(), new MySqlProvider()),
             _ => throw new NotSupportedException()
         };
     }
@@ -61,5 +62,6 @@ public abstract class TestBase
 public enum ProviderKind
 {
     Sqlite,
-    SqlServer
+    SqlServer,
+    MySql
 }

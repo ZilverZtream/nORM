@@ -27,14 +27,21 @@ namespace nORM.Providers
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
             EnsureValidParameterName(offsetParameterName, nameof(offsetParameterName));
 
-            if (limitParameterName != null)
+            // MySQL uses a single LIMIT clause for both limit and offset in the form
+            // "LIMIT offset, limit". The previous implementation only emitted the clause
+            // when a limit was present which meant that queries using only Skip() would
+            // ignore the offset. MySQL requires a limit value when an offset is specified,
+            // so when only an offset is provided we use the maximum unsigned BIGINT value
+            // to effectively indicate "no limit".
+            if (limitParameterName != null || offsetParameterName != null)
             {
                 sb.Append(" LIMIT ");
                 if (offsetParameterName != null)
                 {
                     sb.Append(offsetParameterName).Append(", ");
                 }
-                sb.Append(limitParameterName);
+
+                sb.Append(limitParameterName ?? "18446744073709551615");
             }
         }
         
