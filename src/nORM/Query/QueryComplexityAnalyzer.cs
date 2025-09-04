@@ -72,7 +72,9 @@ namespace nORM.Query
 
             protected override Expression VisitConstant(ConstantExpression node)
             {
-                if (node.Value is System.Collections.IEnumerable enumerable && node.Value is not string)
+                if (node.Value is System.Collections.IEnumerable enumerable &&
+                    node.Value is not string &&
+                    node.Value is not IQueryable)
                 {
                     var count = 0;
                     foreach (var _ in enumerable)
