@@ -43,6 +43,7 @@ namespace nORM.Query
         private bool _noTracking;
         private bool _splitQuery;
         private HashSet<string> _tables = new();
+        private TimeSpan _estimatedTimeout;
 
         private OptimizedSqlBuilder _sql => _clauses.Sql;
         private OptimizedSqlBuilder _where => _clauses.Where;
@@ -125,6 +126,7 @@ namespace nORM.Query
             _params = new Dictionary<string, object>();
             _clauses.Dispose();
             _clauses = new SqlClauseBuilder();
+            _estimatedTimeout = ctx.Options.CommandTimeout;
         }
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
@@ -148,6 +150,19 @@ namespace nORM.Query
 
         public QueryPlan Translate(Expression e)
         {
+            // Analyze query complexity before translation
+            var complexityInfo = QueryComplexityAnalyzer.AnalyzeQuery(e);
+
+            if (complexityInfo.WarningMessages.Any())
+            {
+                var warnings = string.Join("; ", complexityInfo.WarningMessages);
+                _ctx.Options.Logger?.LogQuery($"-- WARN: {warnings}", new Dictionary<string, object>(), TimeSpan.Zero, 0);
+            }
+
+            var timeoutMultiplier = Math.Max(1.0, complexityInfo.EstimatedCost / 1000.0);
+            var adjustedTimeout = TimeSpan.FromMilliseconds(_ctx.Options.CommandTimeout.TotalMilliseconds * timeoutMultiplier);
+            _estimatedTimeout = adjustedTimeout;
+
             // Determine root query type and handle TPH discriminator filters
             _rootType = GetElementType(e);
             _mapping = TrackMapping(_rootType);
@@ -229,7 +244,7 @@ namespace nORM.Query
 
             var elementType = _groupJoinInfo?.ResultType ?? materializerType;
 
-            var plan = new QueryPlan(_sql.ToString(), _params, _compiledParams, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray(), _splitQuery);
+            var plan = new QueryPlan(_sql.ToString(), _params, _compiledParams, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray(), _splitQuery, _estimatedTimeout);
             QueryPlanValidator.Validate(plan, _provider);
             return plan;
         }

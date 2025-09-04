@@ -12,7 +12,7 @@ namespace nORM.Tests;
 public class QueryPlanValidatorTests
 {
     private static QueryPlan CreatePlan(string sql, Dictionary<string, object> parameters)
-        => new(sql, parameters, new List<string>(), Materializer, typeof(int), false, false, false, string.Empty, new List<IncludePlan>(), null, Array.Empty<string>(), true);
+        => new(sql, parameters, new List<string>(), Materializer, typeof(int), false, false, false, string.Empty, new List<IncludePlan>(), null, Array.Empty<string>(), true, TimeSpan.FromSeconds(30));
 
     private static Task<object> Materializer(DbDataReader _, CancellationToken __) => Task.FromResult<object>(0);
 
