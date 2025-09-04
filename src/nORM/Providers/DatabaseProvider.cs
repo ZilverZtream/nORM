@@ -28,6 +28,7 @@ namespace nORM.Providers
         public abstract string GetIdentityRetrievalString(TableMapping m);
         public abstract DbParameter CreateParameter(string name, object? value);
         public abstract string? TranslateFunction(string name, Type declaringType, params string[] args);
+        public abstract string TranslateJsonPathAccess(string columnName, string jsonPath);
 
         public virtual char LikeEscapeChar => '\\';
 

@@ -35,6 +35,7 @@ public class BulkInsertTests
         public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT last_insert_rowid();";
         public override DbParameter CreateParameter(string name, object? value) => new SqliteParameter(name, value ?? DBNull.Value);
         public override string? TranslateFunction(string name, Type declaringType, params string[] args) => null;
+        public override string TranslateJsonPathAccess(string columnName, string jsonPath) => $"json_extract({columnName}, '{jsonPath}')";
 
         protected override void ValidateConnection(DbConnection connection)
         {
