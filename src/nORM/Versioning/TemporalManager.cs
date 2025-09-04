@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using nORM.Core;
+using nORM.Internal;
 using nORM.Mapping;
 
 namespace nORM.Versioning
@@ -50,9 +53,15 @@ namespace nORM.Versioning
 
         private static async Task ExecuteDdlAsync(DbContext context, string sql)
         {
-            await using var cmd = (await context.EnsureConnectionAsync()).CreateCommand();
-            cmd.CommandText = sql;
-            await cmd.ExecuteNonQueryAsync();
+            var handler = new NormExceptionHandler(NullLogger.Instance);
+
+            await handler.ExecuteWithExceptionHandling(async () =>
+            {
+                await using var cmd = (await context.EnsureConnectionAsync()).CreateCommand();
+                cmd.CommandText = sql;
+                await cmd.ExecuteNonQueryWithInterceptionAsync(context, default);
+                return 0;
+            }, "ExecuteDdlAsync", new Dictionary<string, object> { ["Sql"] = sql }).ConfigureAwait(false);
         }
     }
 }
