@@ -770,6 +770,58 @@ namespace nORM.Core
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
                 return list;
             }, ct);
+
+        public Task<StoredProcedureResult<T>> ExecuteStoredProcedureWithOutputAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()
+            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                await ctx.EnsureConnectionAsync(token);
+                var sw = Stopwatch.StartNew();
+                await using var cmd = ctx.Connection.CreateCommand();
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+                cmd.CommandText = procedureName;
+                cmd.CommandType = CommandType.StoredProcedure;
+                var paramDict = new Dictionary<string, object>();
+                if (parameters != null)
+                {
+                    foreach (var prop in parameters.GetType().GetProperties())
+                    {
+                        var pName = _p.ParamPrefix + prop.Name;
+                        var pValue = prop.GetValue(parameters);
+                        cmd.AddParam(pName, pValue);
+                        paramDict[pName] = pValue ?? DBNull.Value;
+                    }
+                }
+
+                var outputParamMap = new Dictionary<string, DbParameter>();
+                foreach (var op in outputParameters)
+                {
+                    var pName = _p.ParamPrefix + op.Name;
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = pName;
+                    p.DbType = op.DbType;
+                    p.Direction = ParameterDirection.Output;
+                    if (op.Size.HasValue) p.Size = op.Size.Value;
+                    cmd.Parameters.Add(p);
+                    outputParamMap[op.Name] = p;
+                }
+
+                NormValidator.ValidateRawSql(procedureName, paramDict);
+
+                var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
+                var list = new List<T>();
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
+                while (await reader.ReadAsync(token)) list.Add((T)await materializer(reader, token));
+                await reader.DisposeAsync();
+
+                var outputs = new Dictionary<string, object?>();
+                foreach (var kv in outputParamMap)
+                {
+                    outputs[kv.Key] = kv.Value.Value == DBNull.Value ? null : kv.Value.Value;
+                }
+
+                ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
+                return new StoredProcedureResult<T>(list, outputs);
+            }, ct);
         #endregion
 
         private void SetTenantId<T>(T entity, TableMapping map) where T : class
@@ -819,4 +871,8 @@ namespace nORM.Core
             GC.SuppressFinalize(this);
         }
     }
+
+    public sealed record OutputParameter(string Name, DbType DbType, int? Size = null);
+
+    public sealed record StoredProcedureResult<T>(List<T> Results, IReadOnlyDictionary<string, object?> OutputParameters);
 }
