@@ -117,6 +117,7 @@ namespace nORM.Query
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                var source = t.Visit(node.Arguments[0]);
                 if (node.Arguments[1] is ParameterExpression tp)
                 {
                     if (!t._paramMap.TryGetValue(tp, out var tName))
@@ -135,7 +136,7 @@ namespace nORM.Query
                     t._take = take;
                     t._takeParam = pName;
                 }
-                return t.Visit(node.Arguments[0]);
+                return source;
             }
         }
 
@@ -143,6 +144,7 @@ namespace nORM.Query
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                var source = t.Visit(node.Arguments[0]);
                 if (node.Arguments[1] is ParameterExpression sp)
                 {
                     if (!t._paramMap.TryGetValue(sp, out var sName))
@@ -161,7 +163,7 @@ namespace nORM.Query
                     t._skip = skip;
                     t._skipParam = pName;
                 }
-                return t.Visit(node.Arguments[0]);
+                return source;
             }
         }
 
