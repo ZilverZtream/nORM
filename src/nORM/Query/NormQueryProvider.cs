@@ -124,7 +124,7 @@ namespace nORM.Query
                 await using var cmd = _ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
-                foreach (var p in plan.Parameters) cmd.AddParam(p.Key, p.Value);
+                foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
 
                 object result;
                 if (plan.IsScalar)
@@ -181,7 +181,7 @@ namespace nORM.Query
                 await using var cmd = _ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
-                foreach (var p in parameters) cmd.AddParam(p.Key, p.Value);
+                foreach (var p in parameters) cmd.AddOptimizedParam(p.Key, p.Value);
 
                 object result;
                 if (plan.IsScalar)
@@ -283,7 +283,7 @@ namespace nORM.Query
             var finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
             cmd.CommandText = finalSql;
             foreach (var p in plan.Parameters)
-                cmd.AddParam(p.Key, p.Value);
+                cmd.AddOptimizedParam(p.Key, p.Value);
 
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct);
             _ctx.Options.Logger?.LogQuery(finalSql, plan.Parameters, sw.Elapsed, affected);
@@ -310,9 +310,9 @@ namespace nORM.Query
             var finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
             cmd.CommandText = finalSql;
             foreach (var p in plan.Parameters)
-                cmd.AddParam(p.Key, p.Value);
+                cmd.AddOptimizedParam(p.Key, p.Value);
             foreach (var p in setParams)
-                cmd.AddParam(p.Key, p.Value);
+                cmd.AddOptimizedParam(p.Key, p.Value);
 
             var allParams = plan.Parameters.ToDictionary(k => k.Key, v => v.Value);
             foreach (var p in setParams)
@@ -345,7 +345,7 @@ namespace nORM.Query
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
-            foreach (var p in plan.Parameters) cmd.AddParam(p.Key, p.Value);
+            foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
 
             if (plan.Includes.Count > 0 || plan.GroupJoinInfo != null)
                 throw new NotSupportedException("AsAsyncEnumerable does not support Include or GroupJoin operations.");
