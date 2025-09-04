@@ -252,6 +252,8 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task Insert_Single_EfCore()
         {
+            await using var context = new EfCoreContext(_efConnectionString);
+
             var user = new BenchmarkUser
             {
                 Name = "Test User EF",
@@ -264,20 +266,14 @@ namespace nORM.Benchmarks
                 Salary = 50_000
             };
 
-            _efContext!.Users.Add(user);
-            await _efContext.SaveChangesAsync();
-            _efContext.ChangeTracker.Clear();
+            context.Users.Add(user);
+            await context.SaveChangesAsync();
         }
 
         [Benchmark]
         public async Task Insert_Single_nORM()
         {
-            var options = new nORM.Configuration.DbContextOptions
-            {
-                BulkBatchSize = 50,
-                TimeoutConfiguration = { BaseTimeout = TimeSpan.FromSeconds(30) }
-            };
-
+            var options = new nORM.Configuration.DbContextOptions();
             await using var context = new nORM.Core.DbContext(_nOrmConnectionString, new SqliteProvider(), options);
 
             var user = new BenchmarkUser
@@ -298,6 +294,9 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task Insert_Single_Dapper()
         {
+            await using var connection = new SqliteConnection(_dapperConnectionString);
+            await connection.OpenAsync();
+
             var user = new BenchmarkUser
             {
                 Name = "Test User Dapper",
@@ -309,11 +308,12 @@ namespace nORM.Benchmarks
                 Department = "TestDept",
                 Salary = 50_000
             };
+
             var sql = @"
                 INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
                 VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
 
-            await _dapperConnection!.ExecuteAsync(sql, user);
+            await connection.ExecuteAsync(sql, user);
         }
 
         [Benchmark]
