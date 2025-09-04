@@ -99,6 +99,9 @@ namespace nORM.Providers
             return null;
         }
 
+        public override string TranslateJsonPathAccess(string columnName, string jsonPath)
+            => $"JSON_UNQUOTE(JSON_EXTRACT({columnName}, '{jsonPath}'))";
+
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);
