@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
 #nullable enable
@@ -8,7 +8,7 @@ namespace nORM.Internal
 {
     internal static class ShadowPropertyStore
     {
-        private static readonly ConditionalWeakTable<object, Dictionary<string, object?>> _values = new();
+        private static readonly ConditionalWeakTable<object, ConcurrentDictionary<string, object?>> _values = new();
 
         public static void Set(object entity, string name, object? value)
         {
