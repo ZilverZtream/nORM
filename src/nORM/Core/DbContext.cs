@@ -258,7 +258,7 @@ namespace nORM.Core
             if (ownsTransaction)
             {
                 await EnsureConnectionAsync(ct);
-                var isolationLevel = DetermineIsolationLevel(changedEntries);
+                var isolationLevel = IsolationLevel.ReadCommitted; // Use a safe default.
                 transaction = await Connection.BeginTransactionAsync(isolationLevel, ct);
 
                 timeoutCts = new CancellationTokenSource(Options.TimeoutConfiguration.BaseTimeout);
@@ -336,13 +336,6 @@ namespace nORM.Core
                 default:
                     return 0;
             }
-        }
-
-        private static IsolationLevel DetermineIsolationLevel(IEnumerable<EntityEntry> entries)
-        {
-            return entries.Any(e => e.State == EntityState.Deleted)
-                ? IsolationLevel.Serializable
-                : IsolationLevel.ReadCommitted;
         }
 
         private static bool IsRetryableException(Exception ex)
