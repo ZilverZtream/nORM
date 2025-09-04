@@ -130,7 +130,10 @@ namespace nORM.Query
                 }
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int take))
                 {
+                    var pName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                    t._params[pName] = take;
                     t._take = take;
+                    t._takeParam = pName;
                 }
                 return t.Visit(node.Arguments[0]);
             }
@@ -153,7 +156,10 @@ namespace nORM.Query
                 }
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int skip))
                 {
+                    var pName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                    t._params[pName] = skip;
                     t._skip = skip;
+                    t._skipParam = pName;
                 }
                 return t.Visit(node.Arguments[0]);
             }
@@ -272,6 +278,9 @@ namespace nORM.Query
                 }
 
                 t._take = 1;
+                var pName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                t._params[pName] = 1;
+                t._takeParam = pName;
                 t._singleResult = t._methodName == "ElementAt";
                 if (t._orderBy.Count == 0)
                     foreach (var key in t._mapping.KeyColumns)
@@ -299,6 +308,9 @@ namespace nORM.Query
                     ExpressionVisitorPool.Return(visitor);
                 }
                 t._take = 1;
+                var pName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                t._params[pName] = 1;
+                t._takeParam = pName;
                 t._singleResult = t._methodName == "First" || t._methodName == "Single";
                 return t.Visit(node.Arguments[0]);
             }
@@ -337,6 +349,9 @@ namespace nORM.Query
                         t._orderBy.Add((key.EscCol, false));
                 }
                 t._take = 1;
+                var pName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                t._params[pName] = 1;
+                t._takeParam = pName;
                 t._singleResult = t._methodName == "Last";
                 return lastSrc;
             }

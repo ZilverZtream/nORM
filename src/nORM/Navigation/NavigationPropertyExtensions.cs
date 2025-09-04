@@ -359,11 +359,13 @@ namespace nORM.Navigation
             var paramName = context.Provider.ParamPrefix + "fk";
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {foreignKey.EscCol} = {paramName}";
             cmd.AddParam(paramName, keyValue);
-            
+
             // Apply LIMIT 1 for single result
             var sql = new System.Text.StringBuilder(cmd.CommandText);
-            context.Provider.ApplyPaging(sql, 1, null, null, null);
+            var limitParam = context.Provider.ParamPrefix + "p_limit";
+            context.Provider.ApplyPaging(sql, 1, null, limitParam, null);
             cmd.CommandText = sql.ToString();
+            cmd.AddParam(limitParam, 1);
 
             var materializer = Query.QueryTranslator.Rent(context).CreateMaterializer(mapping, entityType);
 

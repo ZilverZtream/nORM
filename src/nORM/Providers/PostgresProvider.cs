@@ -28,13 +28,9 @@ namespace nORM.Providers
 
             if (limitParameterName != null)
                 sb.Append(" LIMIT ").Append(limitParameterName);
-            else if (limit.HasValue)
-                sb.Append($" LIMIT {limit}");
 
             if (offsetParameterName != null)
                 sb.Append(" OFFSET ").Append(offsetParameterName);
-            else if (offset.HasValue)
-                sb.Append($" OFFSET {offset}");
         }
         
         public override string GetIdentityRetrievalString(TableMapping m)
