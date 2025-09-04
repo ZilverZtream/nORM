@@ -187,7 +187,7 @@ namespace nORM.Providers
                     var batch = entityList.Skip(i).Take(batchSize).ToList();
                     await using var cmd = ctx.Connection.CreateCommand();
                     cmd.Transaction = transaction;
-                    cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                    cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
                     var paramNames = new List<string>();
                     var paramIndex = 0;

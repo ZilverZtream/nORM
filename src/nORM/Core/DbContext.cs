@@ -254,7 +254,7 @@ namespace nORM.Core
                 var isolationLevel = DetermineIsolationLevel(changedEntries);
                 transaction = await Connection.BeginTransactionAsync(isolationLevel, ct);
 
-                timeoutCts = new CancellationTokenSource(Options.CommandTimeout);
+                timeoutCts = new CancellationTokenSource(Options.TimeoutConfiguration.BaseTimeout);
                 linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
                 ct = linkedCts.Token;
             }
@@ -416,7 +416,7 @@ namespace nORM.Core
             {
                 await using var cmd = Connection.CreateCommand();
                 cmd.Transaction = currentTransaction;
-                cmd.CommandTimeout = (int)Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
                 cmd.CommandText = operation switch
                 {
@@ -635,7 +635,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
-                cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = sql;
                 var paramDict = new Dictionary<string, object>();
                 for (int i = 0; i < parameters.Length; i++)
@@ -689,7 +689,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
-                cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = sql;
                 var paramDict = new Dictionary<string, object>();
                 for (int i = 0; i < parameters.Length; i++)
@@ -716,7 +716,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
-                cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = procedureName;
                 cmd.CommandType = CommandType.StoredProcedure;
                 var paramDict = new Dictionary<string, object>();
