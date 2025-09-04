@@ -27,12 +27,14 @@ namespace nORM.Providers
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
             EnsureValidParameterName(offsetParameterName, nameof(offsetParameterName));
 
-            if (limitParameterName != null || limit.HasValue)
+            if (limitParameterName != null)
             {
                 sb.Append(" LIMIT ");
-                sb.Append(offsetParameterName ?? (offset ?? 0).ToString());
-                sb.Append(", ");
-                sb.Append(limitParameterName ?? limit!.Value.ToString());
+                if (offsetParameterName != null)
+                {
+                    sb.Append(offsetParameterName).Append(", ");
+                }
+                sb.Append(limitParameterName);
             }
         }
         

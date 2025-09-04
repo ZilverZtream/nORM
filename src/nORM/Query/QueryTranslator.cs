@@ -617,7 +617,9 @@ namespace nORM.Query
             {
                 subSqlBuilder.Append(subPlan.Sql);
             }
-            _ctx.Provider.ApplyPaging(subSqlBuilder.InnerBuilder, 1, null, null, null);
+            var limitParam = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
+            _params[limitParam] = 1;
+            _ctx.Provider.ApplyPaging(subSqlBuilder.InnerBuilder, 1, null, limitParam, null);
 
             switch (node.Method.Name)
             {
