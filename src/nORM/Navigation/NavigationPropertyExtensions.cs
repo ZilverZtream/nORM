@@ -250,7 +250,7 @@ namespace nORM.Navigation
             {
                 // Collection navigation property
                 var loader = _navigationLoaders.GetValue(context.DbContext, ctx => new BatchedNavigationLoader(ctx));
-                var results = await loader.LoadNavigationAsync<List<object>>(entity, property.Name, ct);
+                var results = await loader.LoadNavigationAsync(entity, property.Name, ct);
 
                 var collectionType = typeof(List<>).MakeGenericType(relation.DependentType);
                 var collection = (IList)Activator.CreateInstance(collectionType)!;
@@ -319,7 +319,7 @@ namespace nORM.Navigation
                 if (property.PropertyType.IsGenericType && typeof(IEnumerable).IsAssignableFrom(property.PropertyType))
                 {
                     // Collection
-                    var results = await loader.LoadNavigationAsync<List<object>>(entity, property.Name, ct);
+                    var results = await loader.LoadNavigationAsync(entity, property.Name, ct);
 
                     var collectionType = typeof(List<>).MakeGenericType(targetType);
                     var collection = (IList)Activator.CreateInstance(collectionType)!;
@@ -333,7 +333,7 @@ namespace nORM.Navigation
                 else
                 {
                     // Reference
-                    var list = await loader.LoadNavigationAsync<List<object>>(entity, property.Name, ct);
+                    var list = await loader.LoadNavigationAsync(entity, property.Name, ct);
                     var result = list.FirstOrDefault();
 
                     if (property.PropertyType.IsGenericType &&
