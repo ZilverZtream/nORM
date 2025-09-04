@@ -238,10 +238,10 @@ namespace nORM.SourceGenerators
             sb.AppendLine($"        cmd.CommandText = \"{sql}\";");
             sb.AppendLine($"        var materializer = CompiledMaterializerStore.Get<{entityTypeName}>();");
             sb.AppendLine($"        var list = new System.Collections.Generic.List<{entityTypeName}>();");
-            sb.AppendLine($"        await using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SequentialAccess, {ctParam});");
-            sb.AppendLine($"        while (await reader.ReadAsync({ctParam}))");
+            sb.AppendLine($"        await using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SequentialAccess, {ctParam}).ConfigureAwait(false);");
+            sb.AppendLine($"        while (await reader.ReadAsync({ctParam}).ConfigureAwait(false))");
             sb.AppendLine("        {");
-            sb.AppendLine($"            list.Add(await materializer(reader, {ctParam}));");
+            sb.AppendLine($"            list.Add(await materializer(reader, {ctParam}).ConfigureAwait(false));");
             sb.AppendLine("        }");
             sb.AppendLine("        return list;");
             sb.AppendLine("    }");
