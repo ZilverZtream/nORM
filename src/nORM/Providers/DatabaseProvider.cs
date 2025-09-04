@@ -61,6 +61,16 @@ namespace nORM.Providers
             return Task.FromResult(true);
         }
 
+        public virtual Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+        }
+
+        public virtual Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+        }
+
         #region Bulk Operations (Abstract & Fallback)
         public virtual async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
