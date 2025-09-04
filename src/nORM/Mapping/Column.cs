@@ -21,6 +21,44 @@ namespace nORM.Mapping
         public readonly Action<object, object?> Setter;
         public readonly MethodInfo SetterMethod;
 
+        internal Column(ColumnMappingCache.CachedPropertyInfo info, DatabaseProvider p, IEntityTypeConfiguration? fluentConfig, string? prefix = null,
+            Func<object, object?>? getterOverride = null, Action<object, object?>? setterOverride = null,
+            MethodInfo? setterMethodOverride = null)
+        {
+            Prop = info.Property;
+            PropName = (prefix != null ? prefix + "_" : "") + info.Property.Name;
+
+            var fluentColName = fluentConfig?.ColumnNames.TryGetValue(info.Property, out var name) == true ? name : null;
+            var colName = fluentColName ?? info.ColumnName ?? PropName;
+            EscCol = p.Escape(colName);
+
+            IsKey = (fluentConfig?.KeyProperties.Contains(info.Property) ?? false) || info.IsKey;
+            IsTimestamp = info.IsTimestamp;
+            IsDbGenerated = info.IsDbGenerated;
+            ForeignKeyPrincipalTypeName = info.ForeignKeyName;
+            if (ForeignKeyPrincipalTypeName == null && !IsKey)
+            {
+                var propName = info.Property.Name;
+                if (propName.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && propName.Length > 2)
+                {
+                    var principalName = propName[..^2];
+                    if (!string.Equals(principalName, "Id", StringComparison.OrdinalIgnoreCase))
+                        ForeignKeyPrincipalTypeName = principalName;
+                }
+                else
+                {
+                    var underscore = propName.IndexOf('_');
+                    if (underscore > 0)
+                        ForeignKeyPrincipalTypeName = propName.Substring(0, underscore);
+                }
+            }
+
+            Getter = getterOverride ?? info.Getter;
+            Setter = setterOverride ?? info.Setter;
+            SetterMethod = setterMethodOverride ?? info.Property.GetSetMethod()!;
+            IsShadow = false;
+        }
+
         public Column(PropertyInfo pi, DatabaseProvider p, IEntityTypeConfiguration? fluentConfig, string? prefix = null,
             Func<object, object?>? getterOverride = null, Action<object, object?>? setterOverride = null,
             MethodInfo? setterMethodOverride = null)
