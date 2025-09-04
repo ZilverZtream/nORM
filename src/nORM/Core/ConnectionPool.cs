@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Threading;
@@ -118,14 +119,22 @@ namespace nORM.Core
             if (_disposed) return;
             var threshold = DateTime.UtcNow - _idleLifetime;
 
-            while (_created > _minSize && _pool.TryPeek(out var item) && item.LastUsed < threshold)
+            var itemsToRequeue = new List<PooledItem>();
+            while (_created > _minSize && _pool.TryDequeue(out var item))
             {
-                if (_pool.TryDequeue(out var old))
+                if (item.LastUsed < threshold)
                 {
-                    old.Connection.Dispose();
+                    item.Connection.Dispose();
                     Interlocked.Decrement(ref _created);
                 }
+                else
+                {
+                    itemsToRequeue.Add(item);
+                }
             }
+
+            foreach (var item in itemsToRequeue)
+                _pool.Enqueue(item);
         }
 
         private void ThrowIfDisposed()
