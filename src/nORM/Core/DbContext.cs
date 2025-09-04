@@ -111,7 +111,15 @@ namespace nORM.Core
         {
             get
             {
-                AsyncExecutionContext.RunSync(() => EnsureConnectionAsync());
+                if (SynchronizationContext.Current == null)
+                {
+                    EnsureConnectionAsync().GetAwaiter().GetResult();
+                }
+                else
+                {
+                    Task.Run(async () => await EnsureConnectionAsync()).GetAwaiter().GetResult();
+                }
+
                 return _cn;
             }
         }
@@ -184,17 +192,16 @@ namespace nORM.Core
             return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(entity.GetType()));
         }
 
-        [Obsolete("Use SaveChangesAsync instead. This method may cause deadlocks.")]
         public int SaveChanges()
         {
-            if (SynchronizationContext.Current != null)
-            {
-                System.Diagnostics.Debug.WriteLine("SaveChanges() called in async context. Consider using SaveChangesAsync() instead.");
-            }
-
             try
             {
-                return AsyncExecutionContext.RunSync(() => SaveChangesAsync());
+                if (SynchronizationContext.Current == null)
+                {
+                    return SaveChangesAsync().GetAwaiter().GetResult();
+                }
+
+                return Task.Run(async () => await SaveChangesAsync()).GetAwaiter().GetResult();
             }
             catch (AggregateException ex)
             {
