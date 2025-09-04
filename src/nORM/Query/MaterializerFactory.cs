@@ -160,10 +160,25 @@ namespace nORM.Query
         {
             if (projection.Body is NewExpression newExpr)
             {
-                return newExpr.Arguments
-                    .OfType<MemberExpression>()
-                    .Select(m => mapping.Columns.First(c => c.Prop.Name == m.Member.Name))
-                    .ToArray();
+                var cols = new List<Column>(newExpr.Arguments.Count);
+                foreach (var arg in newExpr.Arguments)
+                {
+                    if (arg is MemberExpression m)
+                    {
+                        // Try to resolve against the current mapping first
+                        var col = mapping.Columns.FirstOrDefault(c => c.Prop.Name == m.Member.Name);
+                        if (col != null)
+                        {
+                            cols.Add(col);
+                        }
+                        else if (m.Member is PropertyInfo pi)
+                        {
+                            // Create a lightweight column for properties from other mappings
+                            cols.Add(new Column(pi, mapping.Provider, null));
+                        }
+                    }
+                }
+                return cols.ToArray();
             }
             return mapping.Columns;
         }
