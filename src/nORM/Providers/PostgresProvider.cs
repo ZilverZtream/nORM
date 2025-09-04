@@ -17,6 +17,13 @@ namespace nORM.Providers
 {
     public sealed class PostgresProvider : DatabaseProvider
     {
+        private readonly IDbParameterFactory _parameterFactory;
+
+        public PostgresProvider(IDbParameterFactory parameterFactory)
+        {
+            _parameterFactory = parameterFactory ?? throw new ArgumentNullException(nameof(parameterFactory));
+        }
+
         public override int MaxSqlLength => int.MaxValue;
         public override int MaxParameters => 32_767;
         public override string Escape(string id) => $"\"{id}\"";
@@ -39,22 +46,8 @@ namespace nORM.Providers
             return keyCol != null ? $" RETURNING {keyCol.EscCol}" : string.Empty;
         }
         
-        public override System.Data.Common.DbParameter CreateParameter(string name, object? value)
-        {
-            // PostgreSQL uses Npgsql parameters
-            // Since we don't have Npgsql reference, create a generic parameter
-            // In a real implementation, this would be: new NpgsqlParameter(name, value ?? DBNull.Value)
-            var paramType = Type.GetType("Npgsql.NpgsqlParameter, Npgsql");
-            if (paramType != null)
-            {
-                return (System.Data.Common.DbParameter)Activator.CreateInstance(paramType, name, value ?? DBNull.Value)!;
-            }
-            else
-            {
-                // Fallback for when Npgsql is not available
-                throw new InvalidOperationException("Npgsql package is required for PostgreSQL support. Please install the Npgsql NuGet package.");
-            }
-        }
+        public override DbParameter CreateParameter(string name, object? value) =>
+            _parameterFactory.CreateParameter(name, value);
 
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)
         {

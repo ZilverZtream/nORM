@@ -20,8 +20,8 @@ public class QueryPlanValidatorTests
     {
         yield return new object[] { new SqlServerProvider() };
         yield return new object[] { new SqliteProvider() };
-        yield return new object[] { new PostgresProvider() };
-        yield return new object[] { new MySqlProvider() };
+        yield return new object[] { new PostgresProvider(new SqliteParameterFactory()) };
+        yield return new object[] { new MySqlProvider(new SqliteParameterFactory()) };
     }
 
     [Theory]

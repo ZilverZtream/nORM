@@ -272,8 +272,8 @@ static DatabaseProvider CreateProvider(string provider) =>
     {
         "sqlserver" => new SqlServerProvider(),
         "sqlite" => new SqliteProvider(),
-        "postgres" or "postgresql" => new PostgresProvider(),
-        "mysql" => new MySqlProvider(),
+        "postgres" or "postgresql" => new PostgresProvider(new NpgsqlParameterFactory()),
+        "mysql" => new MySqlProvider(new MySqlParameterFactory()),
         _ => throw new ArgumentException($"Unsupported provider '{provider}'.")
     };
 
