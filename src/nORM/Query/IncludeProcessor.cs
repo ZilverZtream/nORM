@@ -61,8 +61,9 @@ namespace nORM.Query
                     var child = await childMaterializer(reader, ct);
                     if (!noTracking)
                     {
+                        var entry = _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
+                        child = entry.Entity;
                         NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
-                        _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
                     }
                     resultChildren.Add(child);
                 }
