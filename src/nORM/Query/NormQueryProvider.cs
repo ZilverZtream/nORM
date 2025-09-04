@@ -122,7 +122,7 @@ namespace nORM.Query
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 await using var cmd = _ctx.Connection.CreateCommand();
-                cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
                 foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
 
@@ -179,7 +179,7 @@ namespace nORM.Query
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 await using var cmd = _ctx.Connection.CreateCommand();
-                cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
                 foreach (var p in parameters) cmd.AddOptimizedParam(p.Key, p.Value);
 
@@ -279,7 +279,7 @@ namespace nORM.Query
 
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             var finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
             cmd.CommandText = finalSql;
             foreach (var p in plan.Parameters)
@@ -306,7 +306,7 @@ namespace nORM.Query
 
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             var finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
             cmd.CommandText = finalSql;
             foreach (var p in plan.Parameters)
@@ -343,7 +343,7 @@ namespace nORM.Query
             var sw = Stopwatch.StartNew();
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
             foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
 
