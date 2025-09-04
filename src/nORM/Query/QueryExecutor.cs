@@ -10,6 +10,8 @@ using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
 using nORM.Navigation;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace nORM.Query
 {
@@ -20,34 +22,36 @@ namespace nORM.Query
     {
         private readonly DbContext _ctx;
         private readonly IncludeProcessor _includeProcessor;
+        private readonly NormExceptionHandler _exceptionHandler;
 
-        public QueryExecutor(DbContext ctx, IncludeProcessor includeProcessor)
+        public QueryExecutor(DbContext ctx, IncludeProcessor includeProcessor, ILogger<QueryExecutor>? logger = null)
         {
             _ctx = ctx;
             _includeProcessor = includeProcessor;
+            _exceptionHandler = new NormExceptionHandler(logger ?? NullLogger<QueryExecutor>.Instance);
         }
 
         public async Task<IList> MaterializeAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
-            try
+            return await _exceptionHandler.ExecuteWithExceptionHandling(async () =>
             {
-                if (plan.GroupJoinInfo != null)
-                    return await MaterializeGroupJoinAsync(plan, cmd, ct);
-
-                var listType = typeof(List<>).MakeGenericType(plan.ElementType);
-                var list = (IList)Activator.CreateInstance(listType)!;
-
-                var trackable = !plan.NoTracking &&
-                                 plan.ElementType.IsClass &&
-                                 !plan.ElementType.Name.StartsWith("<>") &&
-                                 plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
-
-                TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
-
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
-                while (await reader.ReadAsync(ct))
+                try
                 {
-                    try
+                    if (plan.GroupJoinInfo != null)
+                        return await MaterializeGroupJoinAsync(plan, cmd, ct);
+
+                    var listType = typeof(List<>).MakeGenericType(plan.ElementType);
+                    var list = (IList)Activator.CreateInstance(listType)!;
+
+                    var trackable = !plan.NoTracking &&
+                                     plan.ElementType.IsClass &&
+                                     !plan.ElementType.Name.StartsWith("<>") &&
+                                     plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
+
+                    TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
+
+                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
+                    while (await reader.ReadAsync(ct))
                     {
                         var entity = await plan.Materializer(reader, ct);
 
@@ -60,57 +64,52 @@ namespace nORM.Query
 
                         list.Add(entity);
                     }
-                    catch (Exception ex)
-                    {
-                        Console.Error.WriteLine($"Failed to materialize entity at row {list.Count}: {ex}");
-                    }
-                }
 
-                if (plan.SplitQuery)
+                    if (plan.SplitQuery)
+                    {
+                        foreach (var include in plan.Includes)
+                        {
+                            await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking);
+                        }
+                    }
+
+                    return list;
+                }
+                catch
                 {
-                    foreach (var include in plan.Includes)
-                    {
-                        await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking);
-                    }
+                    await cmd.DisposeAsync();
+                    throw;
                 }
-
-                return list;
-            }
-            catch (Exception)
-            {
-                await cmd.DisposeAsync();
-                throw;
-            }
+            }, "MaterializeAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText });
         }
 
         private async Task<IList> MaterializeGroupJoinAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
             var info = plan.GroupJoinInfo!;
 
-            try
+            return await _exceptionHandler.ExecuteWithExceptionHandling(async () =>
             {
-                var listType = typeof(List<>).MakeGenericType(info.ResultType);
-                var resultList = (IList)Activator.CreateInstance(listType)!;
-
-                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
-                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith("<>") && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
-
-                var outerMap = _ctx.GetMapping(info.OuterType);
-                var innerMap = _ctx.GetMapping(info.InnerType);
-
-                var outerColumnCount = outerMap.Columns.Length;
-                var innerKeyIndex = outerColumnCount + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
-
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
-
-                object? currentOuter = null;
-                object? currentKey = null;
-                List<object> currentChildren = new();
-                var rowIndex = 0;
-
-                while (await reader.ReadAsync(ct))
+                try
                 {
-                    try
+                    var listType = typeof(List<>).MakeGenericType(info.ResultType);
+                    var resultList = (IList)Activator.CreateInstance(listType)!;
+
+                    var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
+                    var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith("<>") && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
+
+                    var outerMap = _ctx.GetMapping(info.OuterType);
+                    var innerMap = _ctx.GetMapping(info.InnerType);
+
+                    var outerColumnCount = outerMap.Columns.Length;
+                    var innerKeyIndex = outerColumnCount + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
+
+                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct);
+
+                    object? currentOuter = null;
+                    object? currentKey = null;
+                    List<object> currentChildren = new();
+
+                    while (await reader.ReadAsync(ct))
                     {
                         var outer = await plan.Materializer(reader, ct);
                         var key = info.OuterKeySelector(outer) ?? DBNull.Value;
@@ -148,27 +147,22 @@ namespace nORM.Query
                             currentChildren.Add(inner);
                         }
                     }
-                    catch (Exception ex)
+
+                    if (currentOuter != null)
                     {
-                        Console.Error.WriteLine($"Failed to materialize group join entity at row {rowIndex}: {ex}");
+                        var list = CreateList(info.InnerType, currentChildren);
+                        var result = info.ResultSelector(currentOuter, list.Cast<object>());
+                        resultList.Add(result);
                     }
-                    rowIndex++;
-                }
 
-                if (currentOuter != null)
+                    return resultList;
+                }
+                catch
                 {
-                    var list = CreateList(info.InnerType, currentChildren);
-                    var result = info.ResultSelector(currentOuter, list.Cast<object>());
-                    resultList.Add(result);
+                    await cmd.DisposeAsync();
+                    throw;
                 }
-
-                return resultList;
-            }
-            catch (Exception)
-            {
-                await cmd.DisposeAsync();
-                throw;
-            }
+            }, "MaterializeGroupJoinAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText });
 
             static object MaterializeEntity(DbDataReader reader, TableMapping map, int offset)
             {
