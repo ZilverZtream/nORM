@@ -57,6 +57,17 @@ namespace nORM.Core
 
         private static DbConnection CreateConnection(string connectionString, DatabaseProvider provider)
         {
+            var providerName = provider switch
+            {
+                SqlServerProvider => "sqlserver",
+                SqliteProvider => "sqlite",
+                PostgresProvider => "postgres",
+                MySqlProvider => "mysql",
+                _ => provider.GetType().Name
+            };
+
+            NormValidator.ValidateConnectionString(connectionString, providerName);
+
             if (provider is SqlServerProvider)
                 return new SqlConnection(connectionString);
             if (provider is SqliteProvider)
@@ -141,33 +152,33 @@ namespace nORM.Core
         #region Change Tracking
         public EntityEntry Add<T>(T entity) where T : class
         {
-            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            NormValidator.ValidateEntity(entity);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
             return ChangeTracker.Track(entity, EntityState.Added, GetMapping(typeof(T)));
         }
 
         public EntityEntry Attach<T>(T entity) where T : class
         {
-            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            NormValidator.ValidateEntity(entity);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
             return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(typeof(T)));
         }
 
         public EntityEntry Update<T>(T entity) where T : class
         {
-            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            NormValidator.ValidateEntity(entity);
             return ChangeTracker.Track(entity, EntityState.Modified, GetMapping(typeof(T)));
         }
 
         public EntityEntry Remove<T>(T entity) where T : class
         {
-            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            NormValidator.ValidateEntity(entity);
             return ChangeTracker.Track(entity, EntityState.Deleted, GetMapping(typeof(T)));
         }
 
         public EntityEntry Entry(object entity)
         {
-            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            NormValidator.ValidateEntity(entity, nameof(entity));
             var method = typeof(NavigationPropertyExtensions).GetMethod(nameof(NavigationPropertyExtensions.EnableLazyLoading))!;
             method.MakeGenericMethod(entity.GetType()).Invoke(null, new object[] { entity, this });
             return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(entity.GetType()));
@@ -505,23 +516,32 @@ namespace nORM.Core
         public Task<int> BulkInsertAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
+                NormValidator.ValidateBulkOperation(entities, "insert");
                 await ctx.EnsureConnectionAsync(token);
                 var map = GetMapping(typeof(T));
-                foreach (var entity in entities) SetTenantId(entity, map);
+                foreach (var entity in entities)
+                {
+                    NormValidator.ValidateEntity(entity, nameof(entities));
+                    SetTenantId(entity, map);
+                }
                 return await _p.BulkInsertAsync(ctx, map, entities, token);
             }, ct);
 
         public Task<int> BulkUpdateAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
+                NormValidator.ValidateBulkOperation(entities, "update");
                 await ctx.EnsureConnectionAsync(token);
+                foreach (var entity in entities) NormValidator.ValidateEntity(entity, nameof(entities));
                 return await _p.BulkUpdateAsync(ctx, GetMapping(typeof(T)), entities, token);
             }, ct);
 
         public Task<int> BulkDeleteAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
+                NormValidator.ValidateBulkOperation(entities, "delete");
                 await ctx.EnsureConnectionAsync(token);
+                foreach (var entity in entities) NormValidator.ValidateEntity(entity, nameof(entities));
                 return await _p.BulkDeleteAsync(ctx, GetMapping(typeof(T)), entities, token);
             }, ct);
         #endregion
@@ -609,6 +629,8 @@ namespace nORM.Core
                     paramDict[pName] = parameters[i];
                 }
 
+                NormValidator.ValidateRawSql(sql, paramDict);
+
                 var props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
                     .Where(p => p.CanWrite)
                     .ToDictionary(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase);
@@ -661,6 +683,8 @@ namespace nORM.Core
                     paramDict[pName] = parameters[i];
                 }
 
+                NormValidator.ValidateRawSql(sql, paramDict);
+
                 var materializer = Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token);
@@ -690,6 +714,8 @@ namespace nORM.Core
                         paramDict[pName] = pValue ?? DBNull.Value;
                     }
                 }
+
+                NormValidator.ValidateRawSql(procedureName, paramDict);
 
                 var materializer = Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
