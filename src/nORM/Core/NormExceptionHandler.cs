@@ -24,7 +24,7 @@ namespace nORM.Core
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                var result = await operation();
+                var result = await operation().ConfigureAwait(false);
                 _logger.LogInformation(
                     "Operation {OperationName} completed successfully in {Duration}ms [CorrelationId: {CorrelationId}]",
                     operationName, stopwatch.ElapsedMilliseconds, _correlationId);
