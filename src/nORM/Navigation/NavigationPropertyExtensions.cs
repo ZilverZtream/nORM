@@ -354,7 +354,7 @@ namespace nORM.Navigation
         {
             await context.EnsureConnectionAsync(ct);
             using var cmd = context.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)context.Options.CommandTimeout.TotalSeconds;
+            cmd.CommandTimeout = (int)context.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             
             var paramName = context.Provider.ParamPrefix + "fk";
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {foreignKey.EscCol} = {paramName}";

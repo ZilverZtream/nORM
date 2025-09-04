@@ -126,7 +126,7 @@ namespace nORM.Query
             _params = new Dictionary<string, object>();
             _clauses.Dispose();
             _clauses = new SqlClauseBuilder();
-            _estimatedTimeout = ctx.Options.CommandTimeout;
+            _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
         }
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
@@ -160,7 +160,7 @@ namespace nORM.Query
             }
 
             var timeoutMultiplier = Math.Max(1.0, complexityInfo.EstimatedCost / 1000.0);
-            var adjustedTimeout = TimeSpan.FromMilliseconds(_ctx.Options.CommandTimeout.TotalMilliseconds * timeoutMultiplier);
+            var adjustedTimeout = TimeSpan.FromMilliseconds(_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalMilliseconds * timeoutMultiplier);
             _estimatedTimeout = adjustedTimeout;
 
             // Determine root query type and handle TPH discriminator filters

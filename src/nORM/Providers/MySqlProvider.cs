@@ -132,7 +132,7 @@ namespace nORM.Providers
             {
                 dynamic bulkCopy = Activator.CreateInstance(bulkCopyType, ctx.Connection)!;
                 bulkCopy.DestinationTableName = m.EscTable.Trim('`');
-                bulkCopy.BulkCopyTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                bulkCopy.BulkCopyTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
                 var totalInserted = 0;
                 for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
@@ -170,7 +170,7 @@ namespace nORM.Providers
             var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetSqlType(c.Prop.PropertyType)}"));
             await using (var cmd = ctx.Connection.CreateCommand())
             {
-                cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TEMPORARY TABLE {tempTableName} ({colDefs})";
                 await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
             }
@@ -182,7 +182,7 @@ namespace nORM.Providers
             var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
             await using (var cmd = ctx.Connection.CreateCommand())
             {
-                cmd.CommandTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"UPDATE {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause} SET {setClause}";
                 var updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, updatedCount, sw.Elapsed);

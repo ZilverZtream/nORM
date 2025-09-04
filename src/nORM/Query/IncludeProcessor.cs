@@ -44,7 +44,7 @@ namespace nORM.Query
             var paramNames = new List<string>();
             await _ctx.EnsureConnectionAsync(ct);
             await using var cmd = _ctx.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)_ctx.Options.CommandTimeout.TotalSeconds;
+            cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             for (int i = 0; i < keys.Count; i++)
             {
                 var paramName = $"{_ctx.Provider.ParamPrefix}fk{i}";
