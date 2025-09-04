@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using nORM.Core;
 using nORM.Enterprise;
+using nORM.Execution;
 
 #nullable enable
 
@@ -10,18 +11,15 @@ namespace nORM.Configuration
 {
     public class DbContextOptions
     {
-        private TimeSpan _commandTimeout = TimeSpan.FromSeconds(30);
         private int _bulkBatchSize = 1000;
 
+        public AdaptiveTimeoutManager.TimeoutConfiguration TimeoutConfiguration { get; set; } = new();
+
+        [Obsolete("Use TimeoutConfiguration.BaseTimeout instead")]
         public TimeSpan CommandTimeout
         {
-            get => _commandTimeout;
-            set
-            {
-                if (value <= TimeSpan.Zero || value > TimeSpan.FromHours(1))
-                    throw new ArgumentOutOfRangeException(nameof(value), "CommandTimeout must be between 1 second and 1 hour");
-                _commandTimeout = value;
-            }
+            get => TimeoutConfiguration.BaseTimeout;
+            set => TimeoutConfiguration.BaseTimeout = value;
         }
 
         public int BulkBatchSize
@@ -74,6 +72,9 @@ namespace nORM.Configuration
                 if (RetryPolicy.BaseDelay <= TimeSpan.Zero)
                     throw new InvalidOperationException("BaseDelay must be positive");
             }
+
+            if (TimeoutConfiguration.BaseTimeout <= TimeSpan.Zero || TimeoutConfiguration.BaseTimeout > TimeSpan.FromHours(1))
+                throw new InvalidOperationException("BaseTimeout must be between 1 second and 1 hour");
         }
     }
 }
