@@ -144,7 +144,7 @@ namespace nORM.Core
                 try
                 {
                     var sw = System.Diagnostics.Stopwatch.StartNew();
-                    await using var cn = await pool.RentAsync();
+                    await using var cn = await pool.RentAsync().ConfigureAwait(false);
                     sw.Stop();
                     node.IsHealthy = true;
                     node.LastHealthCheck = DateTime.UtcNow;

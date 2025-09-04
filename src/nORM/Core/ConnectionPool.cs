@@ -158,7 +158,7 @@ namespace nORM.Core
         public async ValueTask DisposeAsync()
         {
             Dispose();
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
         }
 
         private sealed class PooledDbConnection : DbConnection

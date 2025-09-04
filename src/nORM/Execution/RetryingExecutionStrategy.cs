@@ -27,7 +27,7 @@ namespace nORM.Execution
             {
                 try
                 {
-                    return await operation(_ctx, ct);
+                    return await operation(_ctx, ct).ConfigureAwait(false);
                 }
                 catch (DbException ex)
                 {
@@ -39,7 +39,7 @@ namespace nORM.Execution
                         throw normEx;
                     }
                     var delay = TimeSpan.FromMilliseconds(_policy.BaseDelay.TotalMilliseconds * Math.Pow(2, retryCount));
-                    await Task.Delay(delay, ct);
+                    await Task.Delay(delay, ct).ConfigureAwait(false);
                     retryCount++;
                 }
             }

@@ -184,7 +184,7 @@ END;";
 
             var totalInserted = 0;
 
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
+            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
@@ -203,17 +203,17 @@ END;";
 
                     using var reader = new EntityDataReader<T>(batch, insertableCols);
                     var batchSw = Stopwatch.StartNew();
-                    await bulkCopy.WriteToServerAsync(reader, ct);
+                    await bulkCopy.WriteToServerAsync(reader, ct).ConfigureAwait(false);
                     batchSw.Stop();
                     totalInserted += reader.RecordsProcessed;
                     BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                 }
 
-                await transaction.CommitAsync(ct);
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
             catch
             {
-                await transaction.RollbackAsync(ct);
+                await transaction.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
 
@@ -224,7 +224,7 @@ END;";
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
-            if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct);
+            if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct).ConfigureAwait(false);
 
             var sw = Stopwatch.StartNew();
             var tempTableName = $"#BulkUpdate_{Guid.NewGuid():N}";
@@ -235,10 +235,10 @@ END;";
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TABLE {tempTableName} ({colDefs})";
-                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
             }
 
-            await BulkInsertInternalAsync(ctx, m, entities, tempTableName, ct);
+            await BulkInsertInternalAsync(ctx, m, entities, tempTableName, ct).ConfigureAwait(false);
 
             var setClause = string.Join(", ", nonKeyCols.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
             var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
@@ -246,7 +246,7 @@ END;";
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"UPDATE T1 SET {setClause} FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause}";
-                var updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                var updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, updatedCount, sw.Elapsed);
                 return updatedCount;
             }
@@ -278,7 +278,7 @@ END;";
 
                 using var reader = new EntityDataReader<T>(batch, insertableCols);
                 var batchSw = Stopwatch.StartNew();
-                await bulkCopy.WriteToServerAsync(reader, ct);
+                await bulkCopy.WriteToServerAsync(reader, ct).ConfigureAwait(false);
                 batchSw.Stop();
                 totalInserted += reader.RecordsProcessed;
                 BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
@@ -290,7 +290,7 @@ END;";
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
-            if (ctx.Options.UseBatchedBulkOps) return await base.BatchedDeleteAsync(ctx, m, entities, ct);
+            if (ctx.Options.UseBatchedBulkOps) return await base.BatchedDeleteAsync(ctx, m, entities, ct).ConfigureAwait(false);
 
             var sw = Stopwatch.StartNew();
             var tempTableName = $"#BulkDelete_{Guid.NewGuid():N}";
@@ -300,7 +300,7 @@ END;";
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TABLE {tempTableName} ({keyColDefs})";
-                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
             }
 
             using (var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
@@ -318,13 +318,13 @@ END;";
                     batchCount++;
                     if (batchCount >= ctx.Options.BulkBatchSize)
                     {
-                        await bulkCopy.WriteToServerAsync(table, ct);
+                        await bulkCopy.WriteToServerAsync(table, ct).ConfigureAwait(false);
                         table.Clear();
                         batchCount = 0;
                     }
                 }
                 if (batchCount > 0)
-                    await bulkCopy.WriteToServerAsync(table, ct);
+                    await bulkCopy.WriteToServerAsync(table, ct).ConfigureAwait(false);
             }
 
             var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
@@ -332,7 +332,7 @@ END;";
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"DELETE T1 FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause}";
-                var deletedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                var deletedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, deletedCount, sw.Elapsed);
                 return deletedCount;
             }

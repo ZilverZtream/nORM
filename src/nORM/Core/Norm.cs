@@ -39,7 +39,7 @@ namespace nORM.Core
                         parameters[name] = value!;
 
                 var execProvider = new NormQueryProvider(ctx);
-                return await execProvider.ExecuteCompiledAsync<List<T>>(cachedPlan, parameters, default);
+                return await execProvider.ExecuteCompiledAsync<List<T>>(cachedPlan, parameters, default).ConfigureAwait(false);
             };
         }
 

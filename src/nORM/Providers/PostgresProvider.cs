@@ -194,11 +194,11 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                             else importer.Write(val);
                         }
                     }
-                    await importer.CompleteAsync(ct);
+                    await importer.CompleteAsync(ct).ConfigureAwait(false);
                 }
                 finally
                 {
-                    if (importerObj is IAsyncDisposable iad) await iad.DisposeAsync();
+                    if (importerObj is IAsyncDisposable iad) await iad.DisposeAsync().ConfigureAwait(false);
                     else if (importerObj is IDisposable id) id.Dispose();
                 }
                 BatchSizer.RecordBatchPerformance(operationKey, entityList.Count, sw.Elapsed, entityList.Count);
@@ -208,23 +208,23 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
 
             var recordsAffected = 0;
 
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
+            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
                 {
                     var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
                     var batchSw = Stopwatch.StartNew();
-                    recordsAffected += await ExecutePostgresBatchInsert(ctx, transaction, m, cols, batch, ct);
+                    recordsAffected += await ExecutePostgresBatchInsert(ctx, transaction, m, cols, batch, ct).ConfigureAwait(false);
                     batchSw.Stop();
                     BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                 }
 
-                await transaction.CommitAsync(ct);
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
             catch
             {
-                await transaction.RollbackAsync(ct);
+                await transaction.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
 
@@ -254,7 +254,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 }
             }
             
-            return await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+            return await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
         }
 
         private string BuildPostgresBatchInsertSql(TableMapping mapping, Column[] cols, int batchSize)
@@ -296,7 +296,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             var nonKeyCols = m.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToList();
 
             var totalUpdated = 0;
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
+            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 // Create temporary table
@@ -306,12 +306,12 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                     cmd.Transaction = transaction;
                     cmd.CommandTimeout = 30;
                     cmd.CommandText = $"CREATE TEMP TABLE {tempTableName} ({colDefs}) ON COMMIT DROP";
-                    await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                    await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
 
                 // Insert data into temp table
                 var tempMapping = new TableMapping(m.Type, this, ctx, null) { EscTable = tempTableName };
-                await BulkInsertIntoTable(ctx, tempMapping, entities, transaction, ct);
+                await BulkInsertIntoTable(ctx, tempMapping, entities, transaction, ct).ConfigureAwait(false);
 
                 // Perform update join
                 var setClause = string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = temp.{c.EscCol}"));
@@ -322,14 +322,14 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                     cmd.Transaction = transaction;
                     cmd.CommandTimeout = 30;
                     cmd.CommandText = $"UPDATE {m.EscTable} SET {setClause} FROM {tempTableName} temp WHERE {joinClause}";
-                    totalUpdated = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                    totalUpdated = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
 
-                await transaction.CommitAsync(ct);
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
             catch
             {
-                await transaction.RollbackAsync(ct);
+                await transaction.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
 
@@ -362,11 +362,11 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                             else importer.Write(val);
                         }
                     }
-                    await importer.CompleteAsync(ct);
+                    await importer.CompleteAsync(ct).ConfigureAwait(false);
                 }
                 finally
                 {
-                    if (importerObj is IAsyncDisposable iad) await iad.DisposeAsync();
+                    if (importerObj is IAsyncDisposable iad) await iad.DisposeAsync().ConfigureAwait(false);
                     else if (importerObj is IDisposable id) id.Dispose();
                 }
                 BatchSizer.RecordBatchPerformance($"Postgres_BulkInsert_{mapping.Type.Name}", entityList.Count, TimeSpan.Zero, entityList.Count);
@@ -397,7 +397,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 }
 
                 var batchSw = Stopwatch.StartNew();
-                totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 batchSw.Stop();
                 BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
             }
@@ -416,7 +416,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 throw new Exception($"Cannot delete from '{m.EscTable}': no key columns defined.");
 
             var totalDeleted = 0;
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct);
+            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 // Use PostgreSQL's DELETE with VALUES clause for efficient bulk deletes
@@ -441,7 +441,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                         }
                         
                         cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} = ANY(ARRAY[{string.Join(",", paramNames)}])";
-                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                     }
                 }
                 else
@@ -450,7 +450,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                     await using var cmd = ctx.Connection.CreateCommand();
                     cmd.Transaction = transaction;
                     cmd.CommandText = BuildDelete(m);
-                    await cmd.PrepareAsync(ct);
+                    await cmd.PrepareAsync(ct).ConfigureAwait(false);
                     
                     foreach (var entity in entityList)
                     {
@@ -463,15 +463,15 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                         {
                             cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                         }
-                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct);
+                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                     }
                 }
 
-                await transaction.CommitAsync(ct);
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
             catch
             {
-                await transaction.RollbackAsync(ct);
+                await transaction.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
 

@@ -77,7 +77,7 @@ namespace nORM.Core
         {
             if (source.Provider is Query.NormQueryProvider)
             {
-                var list = await source.ToListAsync(ct);
+                var list = await source.ToListAsync(ct).ConfigureAwait(false);
                 return list.ToArray();
             }
             
@@ -100,7 +100,7 @@ namespace nORM.Core
                     nameof(Queryable.Any),
                     new[] { typeof(T) },
                     source.Expression);
-                return await normProvider.ExecuteAsync<bool>(anyExpression, ct);
+                return await normProvider.ExecuteAsync<bool>(anyExpression, ct).ConfigureAwait(false);
             }
             
             throw new NormUsageException(
