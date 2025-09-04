@@ -31,8 +31,12 @@ namespace nORM.Core
             if (depth > MaxEntityDepth)
                 throw new ArgumentException($"Entity graph exceeds maximum depth of {MaxEntityDepth} at {path}");
 
+            // Allow circular references without throwing errors by stopping
+            // recursion when an entity has already been visited. This prevents
+            // infinite loops in graphs with cycles while still validating the
+            // remainder of the object graph.
             if (!visited.Add(entity))
-                throw new ArgumentException($"Circular reference detected in entity graph at {path}");
+                return;
 
             try
             {

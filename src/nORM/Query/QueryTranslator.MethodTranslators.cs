@@ -63,15 +63,18 @@ namespace nORM.Query
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                var source = t.Visit(node.Arguments[0]);
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression lambda)
                 {
-                    var body = lambda.Body;
+                    lambda = t.ExpandProjection(lambda);
                     var param = lambda.Parameters[0];
-                    var alias = "T" + t._joinCounter;
-                    if (!t._correlatedParams.ContainsKey(param))
-                        t._correlatedParams[param] = (t._mapping, alias);
-                    var visitor = ExpressionVisitorPool.Get(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap);
-                    var sql = visitor.Translate(body);
+                    if (!t._correlatedParams.TryGetValue(param, out var info))
+                    {
+                        info = (t._mapping, "T" + t._joinCounter);
+                        t._correlatedParams[param] = info;
+                    }
+                    var visitor = ExpressionVisitorPool.Get(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
+                    var sql = visitor.Translate(lambda.Body);
                     var isGrouping = node.Arguments[0] is MethodCallExpression mc && mc.Method.Name == "GroupBy";
                     var target = isGrouping ? t._having : t._where;
                     if (target.Length > 0) target.Append(" AND ");
@@ -80,7 +83,7 @@ namespace nORM.Query
                         t._params[kvp.Key] = kvp.Value;
                     ExpressionVisitorPool.Return(visitor);
                 }
-                return t.Visit(node.Arguments[0]);
+                return source;
             }
         }
 
@@ -100,11 +103,14 @@ namespace nORM.Query
                 var source = t.Visit(node.Arguments[0]);
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression keySelector)
                 {
+                    keySelector = t.ExpandProjection(keySelector);
                     var param = keySelector.Parameters[0];
-                    var alias = "T" + t._joinCounter;
-                    if (!t._correlatedParams.ContainsKey(param))
-                        t._correlatedParams[param] = (t._mapping, alias);
-                    var visitor = ExpressionVisitorPool.Get(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap);
+                    if (!t._correlatedParams.TryGetValue(param, out var info))
+                    {
+                        info = (t._mapping, "T" + t._joinCounter);
+                        t._correlatedParams[param] = info;
+                    }
+                    var visitor = ExpressionVisitorPool.Get(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
                     var sql = visitor.Translate(keySelector.Body);
                     t._orderBy.Add((sql, !t._methodName.Contains("Descending")));
                     ExpressionVisitorPool.Return(visitor);
@@ -364,15 +370,20 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._isAggregate = true;
-                t._sql.Clear();
-                t._sql.Append("SELECT COUNT(*)");
+                var source = t.Visit(node.Arguments[0]);
+                // Reset projection and ensure method name reflects Count
+                t._projection = null;
+                t._methodName = node.Method.Name;
                 if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression countPredicate)
                 {
+                    countPredicate = t.ExpandProjection(countPredicate);
                     var param = countPredicate.Parameters[0];
-                    var alias = "T" + t._joinCounter;
-                    if (!t._correlatedParams.ContainsKey(param))
-                        t._correlatedParams[param] = (t._mapping, alias);
-                    var visitor = ExpressionVisitorPool.Get(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap);
+                    if (!t._correlatedParams.TryGetValue(param, out var info))
+                    {
+                        info = (t._mapping, "T" + t._joinCounter);
+                        t._correlatedParams[param] = info;
+                    }
+                    var visitor = ExpressionVisitorPool.Get(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
                     var sql = visitor.Translate(countPredicate.Body);
                     if (t._where.Length > 0) t._where.Append(" AND ");
                     t._where.Append($"({sql})");
@@ -380,7 +391,8 @@ namespace nORM.Query
                         t._params[kvp.Key] = kvp.Value;
                     ExpressionVisitorPool.Return(visitor);
                 }
-                return t.Visit(node.Arguments[0]);
+                var newArgs = new[] { source }.Concat(node.Arguments.Skip(1));
+                return node.Update(node.Object, newArgs);
             }
         }
 
