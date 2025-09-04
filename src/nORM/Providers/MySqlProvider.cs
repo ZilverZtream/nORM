@@ -121,20 +121,34 @@ namespace nORM.Providers
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
 
+            var operationKey = $"MySql_BulkInsert_{m.Type.Name}";
+            var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+
             var bulkCopyType = Type.GetType("MySqlConnector.MySqlBulkCopy, MySqlConnector");
             if (bulkCopyType != null && ctx.Connection.GetType().FullName == "MySqlConnector.MySqlConnection")
             {
                 dynamic bulkCopy = Activator.CreateInstance(bulkCopyType, ctx.Connection)!;
                 bulkCopy.DestinationTableName = m.EscTable.Trim('`');
+                bulkCopy.BulkCopyTimeout = (int)ctx.Options.CommandTimeout.TotalSeconds;
 
-                var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
-                using var table = GetDataTable(m, insertableCols);
-                foreach (var entity in entityList)
-                    table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
+                var totalInserted = 0;
+                for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
+                {
+                    var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
+                    using var table = GetDataTable(m, insertableCols);
+                    foreach (var entity in batch)
+                        table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
 
-                await bulkCopy.WriteToServerAsync(table, ct);
-                ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, table.Rows.Count, sw.Elapsed);
-                return table.Rows.Count;
+                    var batchSw = Stopwatch.StartNew();
+                    await bulkCopy.WriteToServerAsync(table, ct);
+                    batchSw.Stop();
+                    totalInserted += table.Rows.Count;
+                    BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
+                }
+
+                ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
+                return totalInserted;
             }
 
             var affected = await base.BulkInsertAsync(ctx, m, entityList, ct);

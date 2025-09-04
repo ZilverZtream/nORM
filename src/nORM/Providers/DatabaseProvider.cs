@@ -18,6 +18,7 @@ namespace nORM.Providers
     public abstract class DatabaseProvider
     {
         private static readonly ConcurrentLruCache<(Type Type, string Operation), string> _sqlCache = new(maxSize: 1000);
+        protected static readonly DynamicBatchSizer BatchSizer = new();
         
         public string ParamPrefix { get; protected init; } = "@";
         public virtual int MaxSqlLength => int.MaxValue;
@@ -61,23 +62,27 @@ namespace nORM.Providers
         {
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
-            int recordsAffected = 0;
-            var batchSize = ctx.Options.BulkBatchSize;
-            var batch = new List<T>(batchSize);
+            var entityList = entities.ToList();
+            if (!entityList.Any())
+            {
+                ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, 0, sw.Elapsed);
+                return 0;
+            }
 
-            foreach (var entity in entities)
+            var operationKey = $"BulkInsert_{m.Type.Name}";
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            // Logging infrastructure doesn't support arbitrary info; batch size can be inferred from performance metrics.
+
+            var recordsAffected = 0;
+            for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
             {
-                batch.Add(entity);
-                if (batch.Count >= batchSize)
-                {
-                    recordsAffected += await ExecuteInsertBatch(ctx, m, batch, ct);
-                    batch.Clear();
-                }
-            }
-            if (batch.Count > 0)
-            {
+                var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
+                var batchSw = Stopwatch.StartNew();
                 recordsAffected += await ExecuteInsertBatch(ctx, m, batch, ct);
+                batchSw.Stop();
+                BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
             }
+
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, recordsAffected, sw.Elapsed);
             return recordsAffected;
         }
