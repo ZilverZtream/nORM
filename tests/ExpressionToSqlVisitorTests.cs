@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using Xunit;
 using nORM.Query;
+using nORM.Core;
 
 namespace nORM.Tests
 {
@@ -24,6 +25,11 @@ namespace nORM.Tests
             public decimal DecimalValue { get; set; }
             public double DoubleValue { get; set; }
             public float FloatValue { get; set; }
+        }
+
+        private class JsonEntity
+        {
+            public string? ProfileData { get; set; }
         }
 
         public static IEnumerable<object[]> SimpleEqualityProviders()
@@ -108,6 +114,22 @@ namespace nORM.Tests
             Assert.Equal(expected, sql);
             Assert.Single(parameters);
             Assert.Equal("ABC", parameters["@p0"]);
+        }
+
+        [Theory]
+        [MemberData(nameof(SimpleEqualityProviders))]
+        public void Where_with_json_value_access(ProviderKind providerKind)
+        {
+            var setup = CreateProvider(providerKind);
+            using var connection = setup.Connection;
+            var provider = setup.Provider;
+
+            var (sql, parameters) = Translate<JsonEntity>(e => Json.Value<string>(e.ProfileData!, "$.address.city") == "New York", connection, provider);
+            var columnSql = $"T0.{provider.Escape("ProfileData")}";
+            var expected = $"({provider.TranslateJsonPathAccess(columnSql, "$.address.city")} = @p0)";
+            Assert.Equal(expected, sql);
+            Assert.Single(parameters);
+            Assert.Equal("New York", parameters["@p0"]);
         }
     }
 }

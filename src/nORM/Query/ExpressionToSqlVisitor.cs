@@ -207,6 +207,21 @@ namespace nORM.Query
                 return CreateSafeParameter(constVal);
             }
 
+            if (node.Method.DeclaringType == typeof(Json) && node.Method.Name == nameof(Json.Value))
+            {
+                var columnSql = GetSql(node.Arguments[0]);
+                if (TryGetConstantValue(node.Arguments[1], out var path) && path is string jsonPath)
+                {
+                    var jsonSql = _provider.TranslateJsonPathAccess(columnSql, jsonPath);
+                    _sql.Append(jsonSql);
+                    return node;
+                }
+                else
+                {
+                    throw new NormQueryTranslationException("JSONPath argument in Json.Value must be a constant string.");
+                }
+            }
+
             if (node.Method.DeclaringType == typeof(string))
             {
                 switch (node.Method.Name)
@@ -454,7 +469,7 @@ namespace nORM.Query
 
             var safeDeclaringTypes = new HashSet<Type>
             {
-                typeof(string), typeof(Math), typeof(DateTime), typeof(Convert), typeof(Enumerable), typeof(Queryable)
+                typeof(string), typeof(Math), typeof(DateTime), typeof(Convert), typeof(Enumerable), typeof(Queryable), typeof(Json)
             };
 
             if (method.DeclaringType == null || !safeDeclaringTypes.Contains(method.DeclaringType))
