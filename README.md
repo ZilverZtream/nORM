@@ -241,8 +241,15 @@ var users = await context.FromSqlRawAsync<User>(
 
 // Stored procedures
 var results = await context.ExecuteStoredProcedureAsync<UserStats>(
-    "sp_GetUserStatistics", 
+    "sp_GetUserStatistics",
     new { StartDate = DateTime.Now.AddMonths(-1) });
+
+// Stored procedures with OUTPUT parameters
+var spResult = await context.ExecuteStoredProcedureWithOutputAsync<UserStats>(
+    "sp_GetUserStatistics",
+    parameters: new { StartDate = DateTime.Now.AddMonths(-1) },
+    outputParameters: new[] { new OutputParameter("TotalUsers", DbType.Int32) });
+var totalUsers = (int)spResult.OutputParameters["TotalUsers"]!;
 ```
 
 ## 🔄 Migrations
