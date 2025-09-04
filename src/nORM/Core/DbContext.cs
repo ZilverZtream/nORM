@@ -22,7 +22,7 @@ using Microsoft.Data.Sqlite;
 
 namespace nORM.Core
 {
-    public class DbContext : IDisposable
+    public class DbContext : IDisposable, IAsyncDisposable
     {
         private readonly DbConnection _cn;
         private readonly DatabaseProvider _p;
@@ -776,6 +776,19 @@ namespace nORM.Core
         public object? GetShadowProperty(object entity, string name)
             => Internal.ShadowPropertyStore.Get(entity, name);
 
-        public void Dispose() => _cn?.Dispose();
+        public void Dispose()
+        {
+            _cn?.Dispose();
+            GC.SuppressFinalize(this);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_cn != null)
+            {
+                await _cn.DisposeAsync().ConfigureAwait(false);
+            }
+            GC.SuppressFinalize(this);
+        }
     }
 }
