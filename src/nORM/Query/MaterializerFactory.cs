@@ -161,8 +161,9 @@ namespace nORM.Query
             if (projection.Body is NewExpression newExpr)
             {
                 var cols = new List<Column>(newExpr.Arguments.Count);
-                foreach (var arg in newExpr.Arguments)
+                for (int i = 0; i < newExpr.Arguments.Count; i++)
                 {
+                    var arg = newExpr.Arguments[i];
                     if (arg is MemberExpression m)
                     {
                         // Try to resolve against the current mapping first
@@ -176,6 +177,11 @@ namespace nORM.Query
                             // Create a lightweight column for properties from other mappings
                             cols.Add(new Column(pi, mapping.Provider, null));
                         }
+                    }
+                    else if (arg is ParameterExpression p)
+                    {
+                        var memberName = newExpr.Members![i].Name;
+                        cols.Add(new Column(memberName, p.Type, mapping.Type, mapping.Provider, memberName));
                     }
                 }
                 return cols.ToArray();
