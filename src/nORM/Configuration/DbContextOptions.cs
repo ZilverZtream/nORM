@@ -50,7 +50,7 @@ namespace nORM.Configuration
 
         public DbContextOptions UseInMemoryCache()
         {
-            this.CacheProvider = new NormMemoryCacheProvider();
+            this.CacheProvider = new NormMemoryCacheProvider(() => this.TenantProvider?.GetCurrentTenantId());
             return this;
         }
 
