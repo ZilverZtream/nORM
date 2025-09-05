@@ -64,7 +64,12 @@ namespace nORM.Query
 
         public OptimizedSqlBuilder Append(string? value)
         {
-            _buffer.Append(value);
+            if (!string.IsNullOrEmpty(value))
+            {
+                var estimated = EstimateAdditionalCapacity(value);
+                _buffer.EnsureCapacity(_buffer.Length + estimated);
+                _buffer.Append(value);
+            }
             return this;
         }
 
@@ -96,6 +101,21 @@ namespace nORM.Query
         {
             _buffer.Remove(start, length);
             return this;
+        }
+
+        private static int EstimateAdditionalCapacity(string value)
+        {
+            var length = value.Length;
+            if (value.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+                return length + 128;
+            if (value.StartsWith("WHERE", StringComparison.OrdinalIgnoreCase) ||
+                value.StartsWith("ORDER BY", StringComparison.OrdinalIgnoreCase) ||
+                value.StartsWith("GROUP BY", StringComparison.OrdinalIgnoreCase) ||
+                value.StartsWith("HAVING", StringComparison.OrdinalIgnoreCase))
+                return length + 64;
+            if (value.Contains("JOIN", StringComparison.OrdinalIgnoreCase))
+                return length + 64;
+            return length + 32;
         }
 
         public string ToString(int start, int length) => _buffer.ToString(start, length);
