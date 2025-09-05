@@ -870,14 +870,7 @@ namespace nORM.Core
             {
                 for (int i = _disposables.Count - 1; i >= 0; i--)
                 {
-                    try
-                    {
-                        _disposables[i]?.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        Options.Logger?.LogError(ex, "Error disposing resource");
-                    }
+                    _disposables[i]?.Dispose();
                 }
 
                 _disposables.Clear();
@@ -904,14 +897,7 @@ namespace nORM.Core
             {
                 for (int i = _disposables.Count - 1; i >= 0; i--)
                 {
-                    try
-                    {
-                        _disposables[i]?.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        Options.Logger?.LogError(ex, "Error disposing resource");
-                    }
+                    _disposables[i]?.Dispose();
                 }
 
                 _disposables.Clear();
