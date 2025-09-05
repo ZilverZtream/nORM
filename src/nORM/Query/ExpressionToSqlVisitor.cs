@@ -33,6 +33,13 @@ namespace nORM.Query
         private Dictionary<ParameterExpression, string> _paramMap = null!;
         private bool _suppressNullCheck = false;
 
+        private readonly Dictionary<string, IMethodTranslator> _translators = new()
+        {
+            ["Contains"] = new ContainsTranslator(),
+            ["StartsWith"] = new StartsWithTranslator(),
+            ["EndsWith"] = new EndsWithTranslator()
+        };
+
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
@@ -237,58 +244,14 @@ namespace nORM.Query
                     throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "JSONPath argument in Json.Value must be a constant string."));
                 }
             }
+            if (_translators.TryGetValue(node.Method.Name, out var translator) && translator.CanTranslate(node))
+            {
+                translator.Translate(this, node);
+                return node;
+            }
 
             if (node.Method.DeclaringType == typeof(string))
             {
-                switch (node.Method.Name)
-                {
-                      case "Contains":
-                          Visit(node.Object);
-                          _sql.Append(" LIKE ");
-                          if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
-                          {
-                              var containsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                              var escChar = NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
-                              _sql.AppendParameterizedValue(containsParam, CreateSafeLikePattern(cs, LikeOperation.Contains), _params)
-                                  .Append($" ESCAPE '{escChar}'");
-                          }
-                          else
-                          {
-                              throw new NotSupportedException("Only constant values are supported in Contains().");
-                          }
-                          return node;
-                      case "StartsWith":
-                          Visit(node.Object);
-                          _sql.Append(" LIKE ");
-                          if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
-                          {
-                              var startsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                              var escChar = NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
-                              _sql.AppendParameterizedValue(startsParam, CreateSafeLikePattern(ss, LikeOperation.StartsWith), _params)
-                                  .Append($" ESCAPE '{escChar}'");
-                          }
-                          else
-                          {
-                              throw new NotSupportedException("Only constant values are supported in StartsWith().");
-                          }
-                          return node;
-                      case "EndsWith":
-                          Visit(node.Object);
-                          _sql.Append(" LIKE ");
-                          if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
-                          {
-                              var endsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                              var escChar = NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
-                              _sql.AppendParameterizedValue(endsParam, CreateSafeLikePattern(es, LikeOperation.EndsWith), _params)
-                                  .Append($" ESCAPE '{escChar}'");
-                          }
-                          else
-                          {
-                              throw new NotSupportedException("Only constant values are supported in EndsWith().");
-                          }
-                          return node;
-                }
-
                 var strArgs = new List<string>();
                 if (node.Object != null)
                     strArgs.Add(GetSql(node.Object));
@@ -701,6 +664,81 @@ namespace nORM.Query
             if (iface != null) return iface.GetGenericArguments()[0];
 
             throw new ArgumentException($"Cannot determine element type from expression of type {type}");
+        }
+
+        private interface IMethodTranslator
+        {
+            bool CanTranslate(MethodCallExpression node);
+            void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node);
+        }
+
+        private sealed class ContainsTranslator : IMethodTranslator
+        {
+            public bool CanTranslate(MethodCallExpression node)
+                => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
+
+            public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+            {
+                visitor.Visit(node.Object!);
+                visitor._sql.Append(" LIKE ");
+                if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
+                {
+                    var param = $"{visitor._provider.ParamPrefix}p{visitor._paramIndex++}";
+                    var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
+                    visitor._sql.AppendParameterizedValue(param, visitor.CreateSafeLikePattern(cs, LikeOperation.Contains), visitor._params)
+                        .Append($" ESCAPE '{escChar}'");
+                }
+                else
+                {
+                    throw new NotSupportedException("Only constant values are supported in Contains().");
+                }
+            }
+        }
+
+        private sealed class StartsWithTranslator : IMethodTranslator
+        {
+            public bool CanTranslate(MethodCallExpression node)
+                => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
+
+            public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+            {
+                visitor.Visit(node.Object!);
+                visitor._sql.Append(" LIKE ");
+                if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
+                {
+                    var param = $"{visitor._provider.ParamPrefix}p{visitor._paramIndex++}";
+                    var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
+                    visitor._sql.AppendParameterizedValue(param, visitor.CreateSafeLikePattern(ss, LikeOperation.StartsWith), visitor._params)
+                        .Append($" ESCAPE '{escChar}'");
+                }
+                else
+                {
+                    throw new NotSupportedException("Only constant values are supported in StartsWith().");
+                }
+            }
+        }
+
+        private sealed class EndsWithTranslator : IMethodTranslator
+        {
+            public bool CanTranslate(MethodCallExpression node)
+                => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
+
+            public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+            {
+                visitor.Visit(node.Object!);
+                visitor._sql.Append(" LIKE ");
+                if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
+                {
+                    var param = $"{visitor._provider.ParamPrefix}p{visitor._paramIndex++}";
+                    var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
+                    visitor._sql.AppendParameterizedValue(param, visitor.CreateSafeLikePattern(es, LikeOperation.EndsWith), visitor._params)
+                        .Append($" ESCAPE '{escChar}'");
+                }
+                else
+                {
+                    throw new NotSupportedException("Only constant values are supported in EndsWith().");
+                }
+            }
         }
 
     }
