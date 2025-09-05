@@ -20,8 +20,10 @@ namespace nORM.Query
     /// </summary>
     internal sealed class MaterializerFactory
     {
+        private const int DefaultCacheSize = 1000;
+        private static int _currentCacheSize = DefaultCacheSize;
         private static readonly ConcurrentLruCache<(int MappingTypeHash, int TargetTypeHash, int ProjectionHash, string TableName), Func<DbDataReader, CancellationToken, Task<object>>> _cache
-            = new(maxSize: 1000, timeToLive: TimeSpan.FromMinutes(10));
+            = new(maxSize: DefaultCacheSize, timeToLive: TimeSpan.FromMinutes(10));
         private static readonly IMemoryMonitor _memoryMonitor = new SystemMemoryMonitor();
         private const long LowMemoryThresholdBytes = 200L * 1024L * 1024L;
 
@@ -40,9 +42,16 @@ namespace nORM.Query
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
         {
-            if (_memoryMonitor.GetAvailableMemory() < LowMemoryThresholdBytes)
+            var available = _memoryMonitor.GetAvailableMemory();
+            if (available < LowMemoryThresholdBytes)
             {
-                _cache.Clear();
+                var scale = (double)available / LowMemoryThresholdBytes;
+                var newSize = Math.Max(10, (int)(_currentCacheSize * scale));
+                if (newSize < _currentCacheSize)
+                {
+                    _currentCacheSize = newSize;
+                    _cache.SetMaxSize(newSize);
+                }
             }
 
             var projectionHash = projection != null ? ExpressionFingerprint.Compute(projection) : 0;
