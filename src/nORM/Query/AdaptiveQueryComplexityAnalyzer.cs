@@ -2,18 +2,27 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
 using nORM.Core;
+using nORM.Configuration;
 
 namespace nORM.Query
 {
-    internal static class QueryComplexityAnalyzer
+    /// <summary>
+    /// Analyzes query expression trees and adapts complexity limits based on current system resources.
+    /// </summary>
+    internal sealed class AdaptiveQueryComplexityAnalyzer
     {
-        private const int MaxJoinDepth = 10;
-        private const int MaxWhereConditions = 50;
-        private const int MaxOrderByColumns = 10;
-        private const int MaxGroupByColumns = 20;
-        private const int MaxParameterCount = 2000;
-        private const int MaxEstimatedCost = 10000;
+        private readonly IMemoryMonitor _memoryMonitor;
+        private readonly SemaphoreSlim _complexQuerySemaphore;
+
+        private const int DefaultEnumerationLimit = 2000;
+
+        public AdaptiveQueryComplexityAnalyzer(IMemoryMonitor memoryMonitor, int maxConcurrentComplexQueries = 2)
+        {
+            _memoryMonitor = memoryMonitor;
+            _complexQuerySemaphore = new SemaphoreSlim(maxConcurrentComplexQueries);
+        }
 
         internal sealed class QueryComplexityInfo
         {
@@ -25,23 +34,85 @@ namespace nORM.Query
             public List<string> WarningMessages { get; } = new();
         }
 
-        public static QueryComplexityInfo AnalyzeQuery(Expression query)
+        private sealed class AdaptiveLimits
         {
-            var analyzer = new ComplexityVisitor();
-            analyzer.Visit(query);
-            return analyzer.GetComplexityInfo();
+            public int MaxJoinDepth { get; init; }
+            public int MaxWhereConditions { get; init; }
+            public int MaxParameterCount { get; init; }
+            public int MaxEstimatedCost { get; init; }
+            public int HighCostThreshold { get; init; }
+        }
+
+        public QueryComplexityInfo AnalyzeQuery(Expression query, DbContextOptions options)
+        {
+            if (query is null) throw new ArgumentNullException(nameof(query));
+            if (options is null) throw new ArgumentNullException(nameof(options));
+
+            var baseAnalysis = AnalyzeQueryStructure(query);
+
+            var availableMemory = _memoryMonitor.GetAvailableMemory();
+            var adaptedLimits = CalculateAdaptiveLimits(availableMemory, options);
+
+            ValidateAgainstAdaptiveLimits(baseAnalysis, adaptedLimits);
+
+            if (baseAnalysis.EstimatedCost > adaptedLimits.HighCostThreshold)
+            {
+                if (!_complexQuerySemaphore.Wait(TimeSpan.FromSeconds(1)))
+                    throw new NormQueryException("System is under high query load. Please retry later.");
+                _complexQuerySemaphore.Release();
+            }
+
+            return baseAnalysis;
+        }
+
+        private static QueryComplexityInfo AnalyzeQueryStructure(Expression query)
+        {
+            var visitor = new ComplexityVisitor();
+            visitor.Visit(query);
+            return visitor.GetComplexityInfo();
+        }
+
+        private static AdaptiveLimits CalculateAdaptiveLimits(long availableMemory, DbContextOptions options)
+        {
+            // Scale limits based on available memory in GB, clamped between 1 and 16
+            var memoryFactor = Math.Clamp((int)(availableMemory / (1024L * 1024L * 1024L)), 1, 16);
+            return new AdaptiveLimits
+            {
+                MaxJoinDepth = 10 * memoryFactor,
+                MaxWhereConditions = 50 * memoryFactor,
+                MaxParameterCount = 2000 * memoryFactor,
+                MaxEstimatedCost = 10000 * memoryFactor,
+                HighCostThreshold = 5000 * memoryFactor
+            };
+        }
+
+        private static void ValidateAgainstAdaptiveLimits(QueryComplexityInfo info, AdaptiveLimits limits)
+        {
+            if (info.JoinCount > limits.MaxJoinDepth)
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum join depth of {limits.MaxJoinDepth}"));
+
+            if (info.WhereConditionCount > limits.MaxWhereConditions)
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum WHERE conditions of {limits.MaxWhereConditions}"));
+
+            if (info.ParameterCount > limits.MaxParameterCount)
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum parameter count of {limits.MaxParameterCount}"));
+
+            if (info.EstimatedCost > limits.MaxEstimatedCost)
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query complexity too high (cost: {info.EstimatedCost}, max: {limits.MaxEstimatedCost}). Consider simplifying the query or breaking it into smaller operations."));
+
+            if (info.HasCartesianProduct)
+                info.WarningMessages.Add("Query may produce cartesian product - verify join conditions");
         }
 
         private sealed class ComplexityVisitor : ExpressionVisitor
         {
             private readonly QueryComplexityInfo _complexity = new();
             private readonly HashSet<Type> _joinedTypes = new();
-            private int _nestedSelectDepth = 0;
+            private int _nestedSelectDepth;
 
             public QueryComplexityInfo GetComplexityInfo()
             {
                 _complexity.EstimatedCost = CalculateEstimatedCost();
-                ValidateComplexity();
                 return _complexity;
             }
 
@@ -87,14 +158,12 @@ namespace nORM.Query
                         foreach (var _ in enumerable)
                         {
                             count++;
-                            if (count > MaxParameterCount)
+                            if (count > DefaultEnumerationLimit)
                                 break;
                         }
                     }
 
                     _complexity.ParameterCount += count;
-                    if (_complexity.ParameterCount > MaxParameterCount)
-                        throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum parameter count of {MaxParameterCount}"));
                 }
                 return base.VisitConstant(node);
             }
@@ -102,8 +171,6 @@ namespace nORM.Query
             private void AnalyzeJoin(MethodCallExpression node)
             {
                 _complexity.JoinCount++;
-                if (_complexity.JoinCount > MaxJoinDepth)
-                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum join depth of {MaxJoinDepth}"));
 
                 var outerType = GetElementType(node.Arguments[0]);
                 var innerType = GetElementType(node.Arguments[1]);
@@ -126,8 +193,6 @@ namespace nORM.Query
                 {
                     var conditionCount = CountConditions(lambda.Body);
                     _complexity.WhereConditionCount += conditionCount;
-                    if (_complexity.WhereConditionCount > MaxWhereConditions)
-                        throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum WHERE conditions of {MaxWhereConditions}"));
                 }
             }
 
@@ -162,16 +227,6 @@ namespace nORM.Query
                 var cartesianPenalty = _complexity.HasCartesianProduct ? 5000 : 0;
                 var nestingPenalty = _nestedSelectDepth * _nestedSelectDepth * 200;
                 return baseCost + joinCost + whereCost + cartesianPenalty + nestingPenalty;
-            }
-
-            private void ValidateComplexity()
-            {
-                if (_complexity.EstimatedCost > MaxEstimatedCost)
-                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
-                        $"Query complexity too high (cost: {_complexity.EstimatedCost}, max: {MaxEstimatedCost}). Consider simplifying the query or breaking it into smaller operations."));
-
-                if (_complexity.HasCartesianProduct)
-                    _complexity.WarningMessages.Add("Query may produce cartesian product - verify join conditions");
             }
 
             private static Type GetElementType(Expression expression)
