@@ -161,27 +161,34 @@ namespace nORM.Core
             return method;
         }
 
-        private static readonly IReadOnlyDictionary<Type, MethodInfo> SumMethods = BuildSelectorMethods(nameof(Queryable.Sum));
-        private static readonly IReadOnlyDictionary<Type, MethodInfo> AverageMethods = BuildSelectorMethods(nameof(Queryable.Average));
-        private static readonly MethodInfo MinMethod = BuildMinMaxMethod(nameof(Queryable.Min));
-        private static readonly MethodInfo MaxMethod = BuildMinMaxMethod(nameof(Queryable.Max));
+        private static readonly IReadOnlyDictionary<Type, MethodInfo> SumMethods;
+        private static readonly IReadOnlyDictionary<Type, MethodInfo> AverageMethods;
+        private static readonly MethodInfo MinMethod;
+        private static readonly MethodInfo MaxMethod;
 
-        private static IReadOnlyDictionary<Type, MethodInfo> BuildSelectorMethods(string name)
-            => typeof(Queryable).GetMethods()
-                .Where(m => m.Name == name &&
-                            m.GetParameters().Length == 2 &&
+        static AdvancedLinqExtensions()
+        {
+            var methods = typeof(Queryable).GetMethods()
+                .Where(m => m.GetParameters().Length == 2 &&
                             m.GetParameters()[1].ParameterType.IsGenericType &&
                             m.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(Expression<>))
+                .ToArray();
+
+            SumMethods = methods
+                .Where(m => m.Name == nameof(Queryable.Sum))
                 .ToDictionary(
                     m => m.GetParameters()[1].ParameterType.GetGenericArguments()[0].GetGenericArguments()[1],
                     m => m);
 
-        private static MethodInfo BuildMinMaxMethod(string name)
-            => typeof(Queryable).GetMethods()
-                .Single(m => m.Name == name &&
-                             m.GetParameters().Length == 2 &&
-                             m.GetParameters()[1].ParameterType.IsGenericType &&
-                             m.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(Expression<>));
+            AverageMethods = methods
+                .Where(m => m.Name == nameof(Queryable.Average))
+                .ToDictionary(
+                    m => m.GetParameters()[1].ParameterType.GetGenericArguments()[0].GetGenericArguments()[1],
+                    m => m);
+
+            MinMethod = methods.Single(m => m.Name == nameof(Queryable.Min));
+            MaxMethod = methods.Single(m => m.Name == nameof(Queryable.Max));
+        }
 
         #endregion
     }
