@@ -16,6 +16,7 @@ namespace nORM.Core
         private readonly Func<DbConnection> _connectionFactory;
         private readonly ConcurrentQueue<PooledItem> _pool = new();
         private readonly object _poolLock = new();
+        private readonly object _returnLock = new();
         private readonly SemaphoreSlim _semaphore;
         private readonly Timer _cleanupTimer;
         private readonly int _minSize;
@@ -102,23 +103,23 @@ namespace nORM.Core
 
         private void Return(DbConnection connection)
         {
-            if (_disposed)
+            lock (_returnLock)
             {
-                connection.Dispose();
-                return;
-            }
+                if (_disposed)
+                {
+                    connection.Dispose();
+                    return;
+                }
 
-            if (connection.State == ConnectionState.Open)
-            {
-                lock (_poolLock)
+                if (connection.State == ConnectionState.Open)
                 {
                     _pool.Enqueue(new PooledItem(connection));
                 }
-            }
-            else
-            {
-                connection.Dispose();
-                Interlocked.Decrement(ref _created);
+                else
+                {
+                    connection.Dispose();
+                    Interlocked.Decrement(ref _created);
+                }
             }
             _semaphore.Release();
         }
