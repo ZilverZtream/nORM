@@ -106,10 +106,16 @@ namespace nORM.Core
 
         internal void DetectChanges()
         {
-            foreach (var entry in _nonNotifyingEntries.Keys)
+            foreach (var kvp in _nonNotifyingEntries)
             {
+                if (kvp.Value == 0)
+                    continue;
+
+                var entry = kvp.Key;
                 if (entry.Entity != null)
                     entry.DetectChanges();
+
+                _nonNotifyingEntries[entry] = 0;
             }
 
             foreach (var entry in _dirtyEntries.Keys)
@@ -121,7 +127,17 @@ namespace nORM.Core
             _dirtyEntries.Clear();
         }
 
-        internal void MarkDirty(EntityEntry entry) => _dirtyEntries[entry] = 0;
+        internal void MarkDirty(EntityEntry entry)
+        {
+            if (_nonNotifyingEntries.ContainsKey(entry))
+            {
+                _nonNotifyingEntries[entry] = 1;
+            }
+            else
+            {
+                _dirtyEntries[entry] = 0;
+            }
+        }
 
         private static object? GetPrimaryKeyValue(object entity, TableMapping mapping)
         {

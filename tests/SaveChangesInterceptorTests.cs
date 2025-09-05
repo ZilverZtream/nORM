@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -82,6 +83,9 @@ public class SaveChangesInterceptorTests
         Assert.Equal(1, interceptor.LastResult);
 
         user.Name = "Bob";
+        var entry = ctx.ChangeTracker.Entries.Single();
+        var markDirty = typeof(ChangeTracker).GetMethod("MarkDirty", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        markDirty!.Invoke(ctx.ChangeTracker, new object[] { entry });
         await ctx.SaveChangesAsync();
         Assert.NotNull(user.ModifiedAt);
         Assert.Equal(2, interceptor.SavingCalls);
