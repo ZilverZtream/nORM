@@ -79,6 +79,24 @@ namespace nORM.Providers
             throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
 
+        public virtual Task InitializeConnectionAsync(DbConnection connection, CancellationToken ct) => Task.CompletedTask;
+
+        public virtual void InitializeConnection(DbConnection connection) { }
+
+        public virtual CommandType StoredProcedureCommandType => CommandType.StoredProcedure;
+
+        public virtual string BuildContainsClause(DbCommand cmd, string columnName, IReadOnlyList<object?> values)
+        {
+            var paramNames = new List<string>(values.Count);
+            for (int i = 0; i < values.Count; i++)
+            {
+                var pn = $"{ParamPrefix}p{i}";
+                cmd.AddParam(pn, values[i]);
+                paramNames.Add(pn);
+            }
+            return $"{columnName} IN ({string.Join(",", paramNames)})";
+        }
+
         protected virtual Task<bool> IsTransactionLogNearCapacityAsync(DbContext ctx, CancellationToken ct)
             => Task.FromResult(false);
 
