@@ -195,7 +195,9 @@ END;";
                 await cn.OpenAsync();
                 await using var cmd = cn.CreateCommand();
                 cmd.CommandText = "SELECT CAST(SERVERPROPERTY('ProductVersion') AS VARCHAR(20))";
-                var versionStr = (string)(await cmd.ExecuteScalarAsync() ?? throw new Exception("No version"));
+                var result = await cmd.ExecuteScalarAsync();
+                if (result is not string versionStr)
+                    throw new NormDatabaseException("Unable to retrieve database version.", cmd.CommandText, null, null);
                 var parts = versionStr.Split('.');
                 var version = new Version(int.Parse(parts[0]), int.Parse(parts[1]));
                 return version >= new Version(13, 0);
