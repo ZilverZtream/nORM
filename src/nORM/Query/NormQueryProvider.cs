@@ -512,7 +512,7 @@ namespace nORM.Query
             if (_ctx.Options.TenantProvider != null)
             {
                 var map = _ctx.GetMapping(entityType);
-                var tenantCol = map.Columns.FirstOrDefault(c => c.PropName == _ctx.Options.TenantColumnName);
+                var tenantCol = map.TenantColumn;
                 if (tenantCol != null)
                 {
                     var param = Expression.Parameter(entityType, "t");
