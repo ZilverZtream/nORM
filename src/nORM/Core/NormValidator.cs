@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Data.Common;
 using System.IO;
 using System.Linq;
@@ -19,13 +20,42 @@ namespace nORM.Core
         private const int MaxParameterCount = 2000;
         private const int MaxSqlLength = 100000;
 
+        private static readonly ConcurrentBag<HashSet<object>> HashSetPool = new();
+        private static readonly ConcurrentDictionary<Type, PropertyInfo[]> PropertyCache = new();
+
         public static void ValidateEntity<T>(T entity, string parameterName = "entity") where T : class
         {
             if (entity == null)
                 throw new ArgumentNullException(parameterName);
 
-            ValidateEntityGraph(entity!, new HashSet<object>(ReferenceEqualityComparer.Instance), 0, parameterName);
+            var visited = RentHashSet();
+            try
+            {
+                ValidateEntityGraph(entity!, visited, 0, parameterName);
+            }
+            finally
+            {
+                ReturnHashSet(visited);
+            }
         }
+
+        private static HashSet<object> RentHashSet()
+        {
+            if (!HashSetPool.TryTake(out var set))
+            {
+                set = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            }
+            return set;
+        }
+
+        private static void ReturnHashSet(HashSet<object> set)
+        {
+            set.Clear();
+            HashSetPool.Add(set);
+        }
+
+        private static PropertyInfo[] GetCachedProperties(Type type)
+            => PropertyCache.GetOrAdd(type, t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance));
 
         private static void ValidateEntityGraph(object entity, HashSet<object> visited, int depth, string path)
         {
@@ -41,7 +71,7 @@ namespace nORM.Core
 
             try
             {
-                var properties = entity.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                var properties = GetCachedProperties(entity.GetType());
 
                 foreach (var prop in properties)
                 {
@@ -58,15 +88,23 @@ namespace nORM.Core
 
                         foreach (var item in enumerable)
                         {
-                            if (item != null && item.GetType().IsClass && item.GetType() != typeof(string))
+                            if (item != null)
                             {
-                                ValidateEntityGraph(item, new HashSet<object>(visited), depth + 1, propPath);
+                                var itemType = item.GetType();
+                                if (itemType.IsClass && itemType != typeof(string))
+                                {
+                                    ValidateEntityGraph(item, visited, depth + 1, propPath);
+                                }
                             }
                         }
                     }
-                    else if (value.GetType().IsClass && value.GetType() != typeof(string))
+                    else
                     {
-                        ValidateEntityGraph(value, new HashSet<object>(visited), depth + 1, propPath);
+                        var valueType = value.GetType();
+                        if (valueType.IsClass && valueType != typeof(string))
+                        {
+                            ValidateEntityGraph(value, visited, depth + 1, propPath);
+                        }
                     }
                 }
             }
