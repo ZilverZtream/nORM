@@ -32,6 +32,7 @@ namespace nORM.Query
         private List<string> _compiledParams = null!;
         private Dictionary<ParameterExpression, string> _paramMap = null!;
         private bool _suppressNullCheck = false;
+        private readonly Dictionary<ConstKey, string> _constParamMap = new();
 
         private readonly Dictionary<string, IMethodTranslator> _translators = new()
         {
@@ -79,6 +80,7 @@ namespace nORM.Query
             if (context.ParamMap == null)
                 _ownedParamMap.Clear();
 
+            _constParamMap.Clear();
             _paramIndex = 0;
             _suppressNullCheck = false;
         }
@@ -99,6 +101,7 @@ namespace nORM.Query
             _parameter = null!;
             _tableAlias = string.Empty;
             _suppressNullCheck = false;
+            _constParamMap.Clear();
         }
 
         public string Translate(Expression expression)
@@ -156,8 +159,7 @@ namespace nORM.Query
 
             if (TryGetConstantValue(node, out var value))
             {
-                var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                _sql.AppendParameterizedValue(paramName, value, _params);
+                AppendConstant(value, node.Type);
                 return node;
             }
 
@@ -177,8 +179,7 @@ namespace nORM.Query
 
         protected override Expression VisitConstant(ConstantExpression node)
         {
-            var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-            _sql.AppendParameterizedValue(paramName, node.Value, _params);
+            AppendConstant(node.Value, node.Type);
             return node;
         }
 
@@ -542,6 +543,20 @@ namespace nORM.Query
             }
         }
 
+        private void AppendConstant(object? value, Type type)
+        {
+            var key = new ConstKey(value, type);
+            if (_constParamMap.TryGetValue(key, out var existing))
+            {
+                _sql.Append(existing);
+                return;
+            }
+
+            var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+            _sql.AppendParameterizedValue(paramName, value, _params);
+            _constParamMap[key] = paramName;
+        }
+
         private Expression CreateSafeParameter(object? value)
         {
             if (value is string str && str.Length > 8000)
@@ -550,8 +565,7 @@ namespace nORM.Query
             if (value is byte[] bytes && bytes.Length > 8000)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Binary parameter exceeds maximum length"));
 
-            var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-            _sql.AppendParameterizedValue(paramName, value, _params);
+            AppendConstant(value, value?.GetType() ?? typeof(object));
             return Expression.Constant(value);
         }
 
@@ -560,6 +574,22 @@ namespace nORM.Query
             Contains,
             StartsWith,
             EndsWith
+        }
+
+        private readonly struct ConstKey : IEquatable<ConstKey>
+        {
+            public readonly object? Value;
+            public readonly Type? Type;
+
+            public ConstKey(object? value, Type? type)
+            {
+                Value = value;
+                Type = type;
+            }
+
+            public bool Equals(ConstKey other) => Equals(Value, other.Value) && Type == other.Type;
+            public override bool Equals(object? obj) => obj is ConstKey other && Equals(other);
+            public override int GetHashCode() => HashCode.Combine(Value, Type);
         }
 
         private string CreateSafeLikePattern(string value, LikeOperation operation)
@@ -682,10 +712,9 @@ namespace nORM.Query
                 visitor._sql.Append(" LIKE ");
                 if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
                 {
-                    var param = $"{visitor._provider.ParamPrefix}p{visitor._paramIndex++}";
                     var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                    visitor._sql.AppendParameterizedValue(param, visitor.CreateSafeLikePattern(cs, LikeOperation.Contains), visitor._params)
-                        .Append($" ESCAPE '{escChar}'");
+                    visitor.AppendConstant(visitor.CreateSafeLikePattern(cs, LikeOperation.Contains), typeof(string));
+                    visitor._sql.Append($" ESCAPE '{escChar}'");
                 }
                 else
                 {
@@ -705,10 +734,9 @@ namespace nORM.Query
                 visitor._sql.Append(" LIKE ");
                 if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
                 {
-                    var param = $"{visitor._provider.ParamPrefix}p{visitor._paramIndex++}";
                     var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                    visitor._sql.AppendParameterizedValue(param, visitor.CreateSafeLikePattern(ss, LikeOperation.StartsWith), visitor._params)
-                        .Append($" ESCAPE '{escChar}'");
+                    visitor.AppendConstant(visitor.CreateSafeLikePattern(ss, LikeOperation.StartsWith), typeof(string));
+                    visitor._sql.Append($" ESCAPE '{escChar}'");
                 }
                 else
                 {
@@ -728,10 +756,9 @@ namespace nORM.Query
                 visitor._sql.Append(" LIKE ");
                 if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
                 {
-                    var param = $"{visitor._provider.ParamPrefix}p{visitor._paramIndex++}";
                     var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                    visitor._sql.AppendParameterizedValue(param, visitor.CreateSafeLikePattern(es, LikeOperation.EndsWith), visitor._params)
-                        .Append($" ESCAPE '{escChar}'");
+                    visitor.AppendConstant(visitor.CreateSafeLikePattern(es, LikeOperation.EndsWith), typeof(string));
+                    visitor._sql.Append($" ESCAPE '{escChar}'");
                 }
                 else
                 {
