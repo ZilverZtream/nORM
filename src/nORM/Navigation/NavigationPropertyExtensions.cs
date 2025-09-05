@@ -144,6 +144,14 @@ namespace nORM.Navigation
             context.MarkAsLoaded(property.Name);
         }
 
+        internal static void LoadNavigationProperty(object entity, PropertyInfo property, NavigationContext context, CancellationToken ct)
+        {
+            LoadNavigationPropertyAsync(entity, property, context, ct)
+                .ConfigureAwait(false)
+                .GetAwaiter()
+                .GetResult();
+        }
+
         private static void InitializeNavigationProperties(object entity, NavigationContext context)
         {
             var entityType = entity.GetType();
@@ -468,10 +476,11 @@ namespace nORM.Navigation
         {
             if (!_context.IsLoaded(_property.Name))
             {
-                NavigationPropertyExtensions
-                    .LoadNavigationPropertyAsync(_parent, _property, _context, CancellationToken.None)
-                    .GetAwaiter()
-                    .GetResult();
+                NavigationPropertyExtensions.LoadNavigationProperty(
+                    _parent,
+                    _property,
+                    _context,
+                    CancellationToken.None);
             }
 
             return (ICollection<T>)(_property.GetValue(_parent) ?? throw new InvalidOperationException("The collection could not be loaded."));
