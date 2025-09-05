@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 nORM (The Norm) is a modern, high-performance Object-Relational Mapping (ORM) library for .NET that combines the best of Entity Framework's features with Dapper's speed. Built for enterprise applications that demand both developer productivity and exceptional performance.
+For comprehensive guides see the [documentation](docs/index.md).
 
 ## 🚀 Why nORM?
 
