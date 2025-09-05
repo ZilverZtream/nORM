@@ -48,7 +48,13 @@ namespace nORM.Query
 
         public IQueryable<TElement> CreateQuery<TElement>(Expression expression)
         {
-            return (IQueryable<TElement>)CreateQueryInternal(typeof(TElement), expression);
+            var query = CreateQueryInternal(typeof(TElement), expression);
+            if (query is IQueryable<TElement> typedQuery)
+            {
+                return typedQuery;
+            }
+
+            throw new InvalidOperationException($"Unable to create IQueryable for type '{typeof(TElement)}'.");
         }
 
         private IQueryable CreateQueryInternal(Type elementType, Expression expression)
