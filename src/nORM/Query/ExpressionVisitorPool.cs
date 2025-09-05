@@ -7,23 +7,47 @@ using nORM.Providers;
 
 namespace nORM.Query;
 
+internal readonly struct VisitorContext
+{
+    public readonly DbContext Context;
+    public readonly TableMapping Mapping;
+    public readonly DatabaseProvider Provider;
+    public readonly ParameterExpression Parameter;
+    public readonly string TableAlias;
+    public readonly Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? Correlated;
+    public readonly List<string>? CompiledParams;
+    public readonly Dictionary<ParameterExpression, string>? ParamMap;
+
+    public VisitorContext(
+        DbContext context,
+        TableMapping mapping,
+        DatabaseProvider provider,
+        ParameterExpression parameter,
+        string tableAlias,
+        Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated,
+        List<string>? compiledParams,
+        Dictionary<ParameterExpression, string>? paramMap)
+    {
+        Context = context;
+        Mapping = mapping;
+        Provider = provider;
+        Parameter = parameter;
+        TableAlias = tableAlias;
+        Correlated = correlated;
+        CompiledParams = compiledParams;
+        ParamMap = paramMap;
+    }
+}
+
 internal static class ExpressionVisitorPool
 {
     private static readonly ObjectPool<ExpressionToSqlVisitor> _pool =
         new DefaultObjectPool<ExpressionToSqlVisitor>(new VisitorPooledObjectPolicy());
 
-    public static ExpressionToSqlVisitor Get(
-        DbContext ctx,
-        TableMapping mapping,
-        DatabaseProvider provider,
-        ParameterExpression parameter,
-        string tableAlias,
-        Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated = null,
-        List<string>? compiledParams = null,
-        Dictionary<ParameterExpression, string>? paramMap = null)
+    public static ExpressionToSqlVisitor Get(in VisitorContext context)
     {
         var visitor = _pool.Get();
-        visitor.Initialize(ctx, mapping, provider, parameter, tableAlias, correlated, compiledParams, paramMap);
+        visitor.Initialize(in context);
         return visitor;
     }
 
