@@ -93,12 +93,17 @@ namespace nORM.Core
 
         private static DbConnection CreateConnectionSafe(string connectionString, DatabaseProvider provider)
         {
+            DbConnection? connection = null;
+
             try
             {
-                return DbConnectionFactory.Create(connectionString, provider);
+                connection = DbConnectionFactory.Create(connectionString, provider);
+                return connection;
             }
             catch (Exception ex)
             {
+                connection?.Dispose();
+
                 var safeConnStr = NormValidator.MaskSensitiveConnectionStringData(connectionString);
                 throw new ArgumentException($"Invalid connection string format: {safeConnStr}", nameof(connectionString), ex);
             }
