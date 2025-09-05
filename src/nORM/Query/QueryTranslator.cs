@@ -511,7 +511,9 @@ namespace nORM.Query
                 using var joinSqlG = new OptimizedSqlBuilder(256);
                 var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                 var innerColumns = innerMapping.Columns.Select(c => $"{innerAliasG}.{c.EscCol}");
-                joinSqlG.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
+                joinSqlG.AppendSelect(ReadOnlySpan<char>.Empty);
+                joinSqlG.InnerBuilder.AppendJoin(", ", outerColumns.Concat(innerColumns));
+                joinSqlG.Append(' ');
                 joinSqlG.Append($"FROM {_mapping.EscTable} {outerAlias} ");
                 joinSqlG.Append($"LEFT JOIN {innerMapping.EscTable} {innerAliasG} ON {outerKeySqlG} = {innerKeySqlG}");
                 joinSqlG.Append($" ORDER BY {outerKeySqlG}");
@@ -582,18 +584,24 @@ namespace nORM.Query
                   {
                       var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                       var innerColumns = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                      joinSql.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
+                      joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                      joinSql.InnerBuilder.AppendJoin(", ", outerColumns.Concat(innerColumns));
+                      joinSql.Append(' ');
                   }
                   else
                   {
-                      joinSql.Append($"SELECT {string.Join(", ", neededColumns)} ");
+                      joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                      joinSql.InnerBuilder.AppendJoin(", ", neededColumns);
+                      joinSql.Append(' ');
                   }
               }
               else
               {
                   var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                   var innerColumns = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                  joinSql.Append($"SELECT {string.Join(", ", outerColumns.Concat(innerColumns))} ");
+                  joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                  joinSql.InnerBuilder.AppendJoin(", ", outerColumns.Concat(innerColumns));
+                  joinSql.Append(' ');
               }
 
               joinSql.Append($"FROM {_mapping.EscTable} {outerAlias} ");
@@ -661,23 +669,31 @@ namespace nORM.Query
                     {
                         var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                         var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                        joinSql.Append($"SELECT {string.Join(", ", outerCols.Concat(innerCols))} ");
+                        joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                        joinSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                        joinSql.Append(' ');
                     }
                     else
                     {
-                        joinSql.Append($"SELECT {string.Join(", ", neededColumns)} ");
+                        joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                        joinSql.InnerBuilder.AppendJoin(", ", neededColumns);
+                        joinSql.Append(' ');
                     }
                 }
                 else if (resultSelector == null)
                 {
                     var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                    joinSql.Append($"SELECT {string.Join(", ", innerCols)} ");
+                    joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                    joinSql.InnerBuilder.AppendJoin(", ", innerCols);
+                    joinSql.Append(' ');
                 }
                 else
                 {
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                     var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                    joinSql.Append($"SELECT {string.Join(", ", outerCols.Concat(innerCols))} ");
+                    joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                    joinSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                    joinSql.Append(' ');
                 }
 
                 joinSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
@@ -719,23 +735,31 @@ namespace nORM.Query
                 {
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                     var innerCols = crossMapping.Columns.Select(c => $"{crossAlias}.{c.EscCol}");
-                    crossSql.Append($"SELECT {string.Join(", ", outerCols.Concat(innerCols))} ");
+                    crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                    crossSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                    crossSql.Append(' ');
                 }
                 else
                 {
-                    crossSql.Append($"SELECT {string.Join(", ", neededColumns)} ");
+                    crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                    crossSql.InnerBuilder.AppendJoin(", ", neededColumns);
+                    crossSql.Append(' ');
                 }
             }
             else if (resultSelector == null)
             {
                 var innerCols = crossMapping.Columns.Select(c => $"{crossAlias}.{c.EscCol}");
-                crossSql.Append($"SELECT {string.Join(", ", innerCols)} ");
+                crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                crossSql.InnerBuilder.AppendJoin(", ", innerCols);
+                crossSql.Append(' ');
             }
             else
             {
                 var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                 var innerCols = crossMapping.Columns.Select(c => $"{crossAlias}.{c.EscCol}");
-                crossSql.Append($"SELECT {string.Join(", ", outerCols.Concat(innerCols))} ");
+                crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                crossSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                crossSql.Append(' ');
             }
 
             crossSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
@@ -1087,7 +1111,8 @@ namespace nORM.Query
             var sqlFunction = functionName.ToUpperInvariant();
             if (sqlFunction == "AVERAGE") sqlFunction = "AVG";
             
-            _sql.Append($"SELECT {sqlFunction}({columnSql})");
+            _sql.AppendSelect(ReadOnlySpan<char>.Empty);
+            _sql.AppendAggregateFunction(sqlFunction, columnSql);
             
             return node;
         }
@@ -1181,7 +1206,8 @@ namespace nORM.Query
                 }
             }
             
-            _sql.Append($"SELECT {string.Join(", ", selectItems)}");
+            _sql.AppendSelect(ReadOnlySpan<char>.Empty);
+            _sql.InnerBuilder.AppendJoin(", ", selectItems);
         }
 
         private string? TranslateGroupAggregateMethod(MethodCallExpression methodCall, string alias)
@@ -1299,7 +1325,8 @@ namespace nORM.Query
                 var sqlFunction = node.Method.Name.ToUpperInvariant();
                 if (sqlFunction == "AVERAGE") sqlFunction = "AVG";
                 
-                _sql.Append($"SELECT {sqlFunction}({columnSql})");
+                _sql.AppendSelect(ReadOnlySpan<char>.Empty);
+                _sql.AppendAggregateFunction(sqlFunction, columnSql);
             }
             
             return node;

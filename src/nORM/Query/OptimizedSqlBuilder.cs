@@ -27,10 +27,17 @@ namespace nORM.Query
             " IS NOT NULL ", " COUNT(*)", " SUM(", " AVG(", " MIN(", " MAX("
         };
 
+        // Pre-allocated templates for aggregate functions and SELECT clauses
+        private static readonly string[] SqlFunctions = { "COUNT", "SUM", "AVG", "MIN", "MAX" };
+        private static readonly ConcurrentDictionary<string, string> SqlTemplates = new();
+
         static OptimizedSqlBuilder()
         {
             foreach (var frag in CommonFragments)
                 _fragmentCache.TryAdd(frag, frag);
+
+            foreach (var fn in SqlFunctions)
+                SqlTemplates.TryAdd(fn, $"{fn}({{0}})");
         }
 
         private readonly StringBuilder _buffer;
@@ -88,6 +95,28 @@ namespace nORM.Query
         public OptimizedSqlBuilder AppendFragment(string fragment)
         {
             _buffer.Append(_fragmentCache.GetOrAdd(fragment, static f => f));
+            return this;
+        }
+
+        /// <summary>
+        /// Append an aggregate function without incurring string interpolation costs.
+        /// </summary>
+        public OptimizedSqlBuilder AppendAggregateFunction(string function, string column)
+        {
+            var template = SqlTemplates.GetOrAdd(function, f => $"{f}({{0}})");
+            _buffer.EnsureCapacity(_buffer.Length + function.Length + column.Length + 2);
+            _buffer.AppendFormat(template, column);
+            return this;
+        }
+
+        /// <summary>
+        /// Append a SELECT clause with pre-sized capacity.
+        /// </summary>
+        public OptimizedSqlBuilder AppendSelect(ReadOnlySpan<char> columns)
+        {
+            _buffer.EnsureCapacity(_buffer.Length + 7 + columns.Length);
+            _buffer.Append("SELECT ");
+            _buffer.Append(columns);
             return this;
         }
 
