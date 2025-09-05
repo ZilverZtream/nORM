@@ -247,9 +247,16 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
 
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
-                await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                }
+                catch (Exception rollbackEx)
+                {
+                    throw new AggregateException(ex, rollbackEx);
+                }
                 throw;
             }
 
