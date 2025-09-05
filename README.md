@@ -11,10 +11,14 @@ nORM (The Norm) is a modern, high-performance Object-Relational Mapping (ORM) li
 
 - **🏎️ Blazing Fast**: Dapper-speed IL materialization with zero-allocation query execution
 - **🔍 Full LINQ Support**: Complete LINQ provider with joins, grouping, subqueries, and complex projections
-- **🏢 Enterprise Ready**: Multi-tenancy, connection resilience, advanced logging, and migration framework
+- **🏢 Enterprise Ready**: Multi-tenancy, connection resilience, and advanced logging
+- **📦 Migrations**: Versioned schema changes with an easy migration runner
 - **📊 Bulk Operations**: High-performance bulk insert, update, and delete operations
+- **📄 Raw SQL & Stored Procedures**: Execute raw SQL queries and stored procedures with ease
+- **♻️ Connection Pooling**: Built-in pooling for efficient connection management
 - **🔧 Provider Agnostic**: Support for SQL Server, PostgreSQL, SQLite, and MySQL
 - **🔗 Smart Conventions**: Automatic relationship discovery using standard naming patterns
+- **🧩 Fluent Configuration**: Configure models with a flexible fluent API
 - **🎯 Simple API**: Clean, intuitive API that feels familiar to EF users
 - **🔨 Database Scaffolding**: Reverse-engineer existing databases into entity classes and a DbContext
 
@@ -286,17 +290,28 @@ nORM is built for performance:
 
 ### Benchmarks
 
-```
-BenchmarkDotNet=v0.13.1, OS=Windows 10.0.19043.1348
-Intel Core i7-8700K CPU 3.70GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
-.NET 8.0.0, X64 RyuJIT
-
-|         Method |     Mean |   Error |  StdDev | Allocated |
-|--------------- |---------:|--------:|--------:|----------:|
-|          nORM  |  12.3 μs | 0.15 μs | 0.14 μs |      32 B |
-|        EF Core |  45.2 μs | 0.89 μs | 0.83 μs |     184 B |
-|         Dapper |  11.8 μs | 0.12 μs | 0.11 μs |      24 B |
-```
+| Method               | Mean        | Memory    |
+|---------------------|------------:|----------:|
+| Query_Simple_nORM   |    62.54 us |  12.03 KB |
+| Count_nORM          |    66.75 us |   7.32 KB |
+| Query_Simple_RawAdo |    70.29 us |    6.1 KB |
+| Query_Simple_Dapper |    77.38 us |   6.76 KB |
+| Query_Simple_EfCore |    81.94 us |   8.89 KB |
+| Count_Dapper        |    83.41 us |   1.14 KB |
+| Insert_Single_nORM  |    87.20 us |  12.48 KB |
+| Count_EfCore        |   104.95 us |    4.7 KB |
+| Query_Join_Dapper   |   106.25 us |  14.43 KB |
+| Query_Complex_nORM  |   116.82 us |   9.66 KB |
+| Query_Join_nORM     |   131.11 us |  41.37 KB |
+| Query_Complex_Dapper |   189.78 us |  13.21 KB |
+| Query_Complex_EfCore |   191.30 us |  15.88 KB |
+| Query_Join_EfCore   |   214.23 us |  55.67 KB |
+| BulkInsert_nORM     | 1,497.19 us | 336.18 KB |
+| Insert_Single_RawAdo | 5,014.80 us |   2.2 KB |
+| Insert_Single_Dapper | 5,060.18 us |   4.96 KB |
+| Insert_Single_EfCore | 5,408.51 us |  67.53 KB |
+| BulkInsert_Dapper   | 5,905.85 us | 409.34 KB |
+| BulkInsert_EfCore   | 8,896.02 us | 1300.15 KB |
 
 ## 🤝 Contributing
 
@@ -321,9 +336,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- 📖 [Documentation](https://github.com/yourusername/nORM/wiki)
-- 🐛 [Issues](https://github.com/yourusername/nORM/issues)
-- 💬 [Discussions](https://github.com/yourusername/nORM/discussions)
+- 📖 [Documentation](https://github.com/zilverztream/nORM/wiki)
+- 🐛 [Issues](https://github.com/zilverztream/nORM/issues)
+- 💬 [Discussions](https://github.com/zilverztream/nORM/discussions)
 
 ---
 
