@@ -63,8 +63,8 @@ namespace nORM.Query
         // Initialize _groupJoinInfo in constructor to suppress warning
         // This field is used in complex join scenarios
 
-        private static readonly ThreadLocal<QueryTranslator> _threadLocalTranslator =
-            new(() => new QueryTranslator(), trackAllValues: false);
+        private static readonly ThreadLocal<QueryTranslator?> _threadLocalTranslator =
+            new(() => null, trackAllValues: false);
 
         private QueryTranslator()
         {
@@ -102,7 +102,12 @@ namespace nORM.Query
 
         internal static QueryTranslator Rent(DbContext ctx)
         {
-            var t = _threadLocalTranslator.Value!;
+            var t = _threadLocalTranslator.Value;
+            if (t is null)
+            {
+                t = new QueryTranslator();
+                _threadLocalTranslator.Value = t;
+            }
             t.Reset(ctx);
             return t;
         }
@@ -420,6 +425,10 @@ namespace nORM.Query
             catch
             {
                 // Swallow any exceptions to avoid masking disposal failures
+            }
+            finally
+            {
+                _threadLocalTranslator.Value = null;
             }
         }
 
