@@ -28,8 +28,12 @@ namespace nORM.Navigation
         internal static readonly ConditionalWeakTable<object, NavigationContext> _navigationContexts = new();
         private static readonly ConcurrentLruCache<Type, List<NavigationPropertyInfo>> _navigationPropertyCache = new(maxSize: 1000);
         private static readonly ConditionalWeakTable<DbContext, BatchedNavigationLoader> _navigationLoaders = new();
+        private static readonly ConcurrentDictionary<BatchedNavigationLoader, byte> _activeLoaders = new();
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
+
+        internal static void RegisterLoader(BatchedNavigationLoader loader) => _activeLoaders[loader] = 0;
+        internal static void UnregisterLoader(BatchedNavigationLoader loader) => _activeLoaders.TryRemove(loader, out _);
 
         /// <summary>
         /// Enables lazy loading for an entity instance
@@ -51,9 +55,19 @@ namespace nORM.Navigation
         /// </summary>
         public static void CleanupNavigationContext<T>(T entity) where T : class
         {
-            if (entity != null && _navigationContexts.TryGetValue(entity, out _))
+            if (entity != null && _navigationContexts.TryGetValue(entity, out var context))
             {
+                context?.Dispose();
                 _navigationContexts.Remove(entity);
+                CleanupFromBatchedLoaders(entity);
+            }
+        }
+
+        private static void CleanupFromBatchedLoaders(object entity)
+        {
+            foreach (var loader in _activeLoaders.Keys)
+            {
+                loader.RemovePendingLoadsForEntity(entity);
             }
         }
 
@@ -409,7 +423,7 @@ namespace nORM.Navigation
     /// <summary>
     /// Holds navigation context for an entity instance
     /// </summary>
-    public sealed class NavigationContext
+    public sealed class NavigationContext : IDisposable
     {
         private readonly ConcurrentDictionary<string, byte> _loadedProperties = new();
         
@@ -425,6 +439,8 @@ namespace nORM.Navigation
         public bool IsLoaded(string propertyName) => _loadedProperties.ContainsKey(propertyName);
         public void MarkAsLoaded(string propertyName) => _loadedProperties[propertyName] = 0;
         public void MarkAsUnloaded(string propertyName) => _loadedProperties.TryRemove(propertyName, out _);
+
+        public void Dispose() => _loadedProperties.Clear();
     }
 
     /// <summary>
