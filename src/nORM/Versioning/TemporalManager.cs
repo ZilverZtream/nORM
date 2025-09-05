@@ -55,13 +55,21 @@ namespace nORM.Versioning
         {
             var handler = new NormExceptionHandler(NullLogger.Instance);
 
-            await handler.ExecuteWithExceptionHandling(async () =>
+            var batches = sql.Split(new[] { "\r\nGO\r\n", "\nGO\n", "\r\nGO\n", "\nGO\r\n", "\rGO\r", "\nGO\r" }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var batch in batches)
             {
-                await using var cmd = (await context.EnsureConnectionAsync().ConfigureAwait(false)).CreateCommand();
-                cmd.CommandText = sql;
-                await cmd.ExecuteNonQueryWithInterceptionAsync(context, default).ConfigureAwait(false);
-                return 0;
-            }, "ExecuteDdlAsync", new Dictionary<string, object> { ["Sql"] = sql }).ConfigureAwait(false);
+                var trimmed = batch.Trim();
+                if (trimmed.Length == 0) continue;
+
+                await handler.ExecuteWithExceptionHandling(async () =>
+                {
+                    await using var cmd = (await context.EnsureConnectionAsync().ConfigureAwait(false)).CreateCommand();
+                    cmd.CommandText = trimmed;
+                    await cmd.ExecuteNonQueryWithInterceptionAsync(context, default).ConfigureAwait(false);
+                    return 0;
+                }, "ExecuteDdlAsync", new Dictionary<string, object> { ["Sql"] = trimmed }).ConfigureAwait(false);
+            }
         }
     }
 }

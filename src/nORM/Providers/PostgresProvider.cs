@@ -125,22 +125,32 @@ CREATE TABLE {historyTable} (
             var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.PropName)));
             var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.PropName)));
             var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.PropName)} = OLD.{Escape(c.PropName)}"));
+            var keyConditionH2 = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h2.{Escape(c.PropName)} = OLD.{Escape(c.PropName)}"));
             var functionName = Escape(mapping.TableName + "_TemporalFunction");
 
             return $@"
 CREATE OR REPLACE FUNCTION {functionName}() RETURNS TRIGGER AS $$
+DECLARE v_now TIMESTAMP := (now() at time zone 'utc');
 BEGIN
     IF (TG_OP = 'INSERT') THEN
         INSERT INTO {history} (""__ValidFrom"", ""__ValidTo"", ""__Operation"", {columns})
-        VALUES (now() at time zone 'utc', '9999-12-31', 'I', {newColumns});
+        VALUES (v_now, '9999-12-31', 'I', {newColumns});
     ELSIF (TG_OP = 'UPDATE') THEN
-        UPDATE {history} SET ""__ValidTo"" = now() at time zone 'utc' WHERE ""__ValidTo"" = '9999-12-31' AND {keyCondition};
+        UPDATE {history} SET ""__ValidTo"" = v_now
+        WHERE ""__ValidTo"" = '9999-12-31' AND {keyCondition}
+          AND NOT EXISTS (
+             SELECT 1 FROM {history} h2 WHERE h2.""__ValidFrom"" = v_now AND {keyConditionH2}
+          );
         INSERT INTO {history} (""__ValidFrom"", ""__ValidTo"", ""__Operation"", {columns})
-        VALUES (now() at time zone 'utc', '9999-12-31', 'U', {newColumns});
+        VALUES (v_now, '9999-12-31', 'U', {newColumns});
     ELSIF (TG_OP = 'DELETE') THEN
-        UPDATE {history} SET ""__ValidTo"" = now() at time zone 'utc' WHERE ""__ValidTo"" = '9999-12-31' AND {keyCondition};
+        UPDATE {history} SET ""__ValidTo"" = v_now
+        WHERE ""__ValidTo"" = '9999-12-31' AND {keyCondition}
+          AND NOT EXISTS (
+             SELECT 1 FROM {history} h2 WHERE h2.""__ValidFrom"" = v_now AND {keyConditionH2}
+          );
         INSERT INTO {history} (""__ValidFrom"", ""__ValidTo"", ""__Operation"", {columns})
-        VALUES (now() at time zone 'utc', now() at time zone 'utc', 'D', {oldColumns});
+        VALUES (v_now, v_now, 'D', {oldColumns});
     END IF;
     RETURN NULL;
 END;
