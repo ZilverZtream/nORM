@@ -24,6 +24,8 @@ namespace nORM.Mapping
         public readonly Column[] KeyColumns;
         public readonly Column? TimestampColumn;
         public readonly Column? TenantColumn;
+        public readonly Column[] InsertColumns;
+        public readonly Column[] UpdateColumns;
         public string TableName { get; }
         public readonly Dictionary<string, Relation> Relations = new();
         public readonly DatabaseProvider Provider;
@@ -88,6 +90,8 @@ namespace nORM.Mapping
             KeyColumns = Columns.Where(c => c.IsKey).ToArray();
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
             TenantColumn = Columns.FirstOrDefault(c => c.PropName == ctx.Options.TenantColumnName);
+            InsertColumns = Columns.Where(c => !c.IsDbGenerated).ToArray();
+            UpdateColumns = Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
 
             DiscoverRelations(ctx);
         }
