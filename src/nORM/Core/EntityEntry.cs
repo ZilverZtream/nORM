@@ -69,7 +69,7 @@ namespace nORM.Core
 
         internal void DetectChanges()
         {
-            if (State is EntityState.Added or EntityState.Deleted) return;
+            if (State is EntityState.Added or EntityState.Deleted or EntityState.Detached) return;
             if (_hasNotifiedChange) return;
 
             var hasChanges = false;
