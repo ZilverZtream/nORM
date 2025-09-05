@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Transactions;
+using System.Text.RegularExpressions;
 using nORM.Configuration;
 using nORM.Execution;
 using nORM.Mapping;
@@ -19,6 +20,7 @@ using nORM.Versioning;
 using nORM.Scaffolding;
 using nORM.Enterprise;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Reflection;
 
 #nullable enable
@@ -31,6 +33,7 @@ namespace nORM.Core
         private readonly DatabaseProvider _p;
         private readonly ConcurrentDictionary<Type, TableMapping> _m = new();
         private readonly IExecutionStrategy _executionStrategy;
+        private readonly AdaptiveTimeoutManager _timeoutManager;
         private readonly ModelBuilder _modelBuilder;
         private readonly DynamicEntityTypeGenerator _typeGenerator = new();
         private readonly ConcurrentDictionary<string, Type> _dynamicTypeCache = new();
@@ -72,6 +75,9 @@ namespace nORM.Core
             _executionStrategy = Options.RetryPolicy != null
                 ? new RetryingExecutionStrategy(this, Options.RetryPolicy)
                 : new DefaultExecutionStrategy(this);
+
+            _timeoutManager = new AdaptiveTimeoutManager(Options.TimeoutConfiguration,
+                Options.Logger ?? NullLogger.Instance);
 
             if (Options.IsTemporalVersioningEnabled)
             {
@@ -127,6 +133,20 @@ namespace nORM.Core
             }
 
             return _cn;
+        }
+
+        internal TimeSpan GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType operationType, string? sql = null, int recordCount = 1)
+        {
+            var complexity = EstimateQueryComplexity(sql);
+            return _timeoutManager.GetTimeoutForOperation(operationType, recordCount, complexity);
+        }
+
+        private static int EstimateQueryComplexity(string? sql)
+        {
+            if (string.IsNullOrWhiteSpace(sql)) return 1;
+            var joinCount = Regex.Matches(sql, "\\bJOIN\\b", RegexOptions.IgnoreCase).Count;
+            var subQueryCount = Math.Max(0, Regex.Matches(sql, "\\bSELECT\\b", RegexOptions.IgnoreCase).Count - 1);
+            return joinCount * 1000 + subQueryCount * 500;
         }
 
         public DbConnection Connection => EnsureConnection();
@@ -415,7 +435,6 @@ namespace nORM.Core
             {
                 await using var cmd = Connection.CreateCommand();
                 cmd.Transaction = currentTransaction;
-                cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
                 cmd.CommandText = operation switch
                 {
@@ -424,6 +443,15 @@ namespace nORM.Core
                     WriteOperation.Delete => _p.BuildDelete(map),
                     _ => throw new ArgumentOutOfRangeException(nameof(operation))
                 };
+
+                var opType = operation switch
+                {
+                    WriteOperation.Insert => AdaptiveTimeoutManager.OperationType.Insert,
+                    WriteOperation.Update => AdaptiveTimeoutManager.OperationType.Update,
+                    WriteOperation.Delete => AdaptiveTimeoutManager.OperationType.Delete,
+                    _ => AdaptiveTimeoutManager.OperationType.Insert
+                };
+                cmd.CommandTimeout = (int)GetAdaptiveTimeout(opType, cmd.CommandText).TotalSeconds;
 
                 AddParametersOptimized(cmd, map, entity, operation);
 
@@ -466,8 +494,8 @@ namespace nORM.Core
             {
                 await using var cmd = _cn.CreateCommand();
                 cmd.Transaction = ownTransaction;
-                cmd.CommandTimeout = 30;
                 cmd.CommandText = _p.BuildInsert(map);
+                cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText).TotalSeconds;
 
                 foreach (var col in map.Columns)
                 {
@@ -592,8 +620,8 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
-                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = sql;
+                cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
                 var paramDict = ParameterHelper.AddParameters(_p, cmd, parameters);
 
                 if (!NormValidator.IsSafeRawSql(sql))
@@ -643,8 +671,8 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
-                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = sql;
+                cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
                 var paramDict = ParameterHelper.AddParameters(_p, cmd, parameters);
 
                 if (!NormValidator.IsSafeRawSql(sql))
@@ -668,9 +696,9 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
-                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = procedureName;
                 cmd.CommandType = CommandType.StoredProcedure;
+                cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText).TotalSeconds;
                 var paramDict = new Dictionary<string, object>();
                 if (parameters != null)
                 {
@@ -703,9 +731,9 @@ namespace nORM.Core
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             var sw = Stopwatch.StartNew();
             await using var cmd = Connection.CreateCommand();
-            cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             cmd.CommandText = procedureName;
             cmd.CommandType = _p is SqliteProvider ? CommandType.Text : CommandType.StoredProcedure;
+            cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText).TotalSeconds;
             var paramDict = new Dictionary<string, object>();
             if (parameters != null)
             {
@@ -743,9 +771,9 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = ctx.Connection.CreateCommand();
-                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = procedureName;
                 cmd.CommandType = CommandType.StoredProcedure;
+                cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText).TotalSeconds;
                 var paramDict = new Dictionary<string, object>();
                 if (parameters != null)
                 {
