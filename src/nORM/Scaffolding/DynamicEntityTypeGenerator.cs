@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.Extensions.ObjectPool;
 
 namespace nORM.Scaffolding
 {
@@ -17,6 +18,8 @@ namespace nORM.Scaffolding
     public class DynamicEntityTypeGenerator
     {
         private sealed record ColumnInfo(string PropertyName, string TypeName);
+        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
+            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
         /// <summary>
         /// Generates a CLR type representing the specified table.
@@ -34,39 +37,47 @@ namespace nORM.Scaffolding
             var className = ToPascalCase(tableName);
             var columns = GetTableSchema(connection, tableName);
 
-            var sb = new StringBuilder();
-            sb.AppendLine("using System;");
-            sb.AppendLine("using System.ComponentModel.DataAnnotations;");
-            sb.AppendLine($"namespace nORM.Dynamic {{ public class {className} {{");
-            foreach (var col in columns)
+            var sb = _stringBuilderPool.Get();
+            try
             {
-                sb.AppendLine($"    public {col.TypeName} {col.PropertyName} {{ get; set; }}");
-            }
-            sb.AppendLine("} }");
+                sb.AppendLine("using System;");
+                sb.AppendLine("using System.ComponentModel.DataAnnotations;");
+                sb.AppendLine($"namespace nORM.Dynamic {{ public class {className} {{");
+                foreach (var col in columns)
+                {
+                    sb.AppendLine($"    public {col.TypeName} {col.PropertyName} {{ get; set; }}");
+                }
+                sb.AppendLine("} }");
 
-            var syntaxTree = CSharpSyntaxTree.ParseText(sb.ToString());
+                var syntaxTree = CSharpSyntaxTree.ParseText(sb.ToString());
             var references = AppDomain.CurrentDomain.GetAssemblies()
                 .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
                 .Select(a => MetadataReference.CreateFromFile(a.Location));
 
-            var compilation = CSharpCompilation.Create(
-                "nORM.Dynamic.Entities",
-                new[] { syntaxTree },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                var compilation = CSharpCompilation.Create(
+                    "nORM.Dynamic.Entities",
+                    new[] { syntaxTree },
+                    references,
+                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var ms = new MemoryStream();
-            var result = compilation.Emit(ms);
-            if (!result.Success)
-            {
-                var errors = string.Join(Environment.NewLine, result.Diagnostics
-                    .Where(d => d.Severity == DiagnosticSeverity.Error)
-                    .Select(d => d.ToString()));
-                throw new InvalidOperationException($"Failed to generate dynamic entity type. {errors}");
+                using var ms = new MemoryStream();
+                var result = compilation.Emit(ms);
+                if (!result.Success)
+                {
+                    var errors = string.Join(Environment.NewLine, result.Diagnostics
+                        .Where(d => d.Severity == DiagnosticSeverity.Error)
+                        .Select(d => d.ToString()));
+                    throw new InvalidOperationException($"Failed to generate dynamic entity type. {errors}");
+                }
+                ms.Seek(0, SeekOrigin.Begin);
+                var assembly = Assembly.Load(ms.ToArray());
+                return assembly.GetType($"nORM.Dynamic.{className}")!;
             }
-            ms.Seek(0, SeekOrigin.Begin);
-            var assembly = Assembly.Load(ms.ToArray());
-            return assembly.GetType($"nORM.Dynamic.{className}")!;
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
         }
 
         private static IEnumerable<ColumnInfo> GetTableSchema(DbConnection connection, string tableName)
@@ -103,15 +114,23 @@ namespace nORM.Scaffolding
         private static string ToPascalCase(string name)
         {
             var parts = name.Split(new[] { '_', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            var sb = new StringBuilder();
-            foreach (var part in parts)
+            var sb = _stringBuilderPool.Get();
+            try
             {
-                if (part.Length == 0) continue;
-                sb.Append(char.ToUpperInvariant(part[0]));
-                if (part.Length > 1)
-                    sb.Append(part[1..].ToLowerInvariant());
+                foreach (var part in parts)
+                {
+                    if (part.Length == 0) continue;
+                    sb.Append(char.ToUpperInvariant(part[0]));
+                    if (part.Length > 1)
+                        sb.Append(part[1..].ToLowerInvariant());
+                }
+                return sb.ToString();
             }
-            return sb.ToString();
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
         }
 
         private static string GetTypeName(Type type, bool nullable)

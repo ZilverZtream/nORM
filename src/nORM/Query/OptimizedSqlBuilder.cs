@@ -35,6 +35,7 @@ namespace nORM.Query
 
         private readonly StringBuilder _buffer;
         private readonly Dictionary<string, string> _parameterCache = new();
+        private readonly bool _returnToPool;
         private bool _hasWhere;
 
         public OptimizedSqlBuilder(int estimatedLength = 512)
@@ -43,6 +44,16 @@ namespace nORM.Query
             _buffer.Clear();
             if (_buffer.Capacity < estimatedLength)
                 _buffer.Capacity = estimatedLength;
+            _returnToPool = true;
+        }
+
+        public OptimizedSqlBuilder(StringBuilder builder, int estimatedLength = 512)
+        {
+            _buffer = builder;
+            _buffer.Clear();
+            if (_buffer.Capacity < estimatedLength)
+                _buffer.Capacity = estimatedLength;
+            _returnToPool = false;
         }
 
         /// <summary>Length of the underlying buffer.</summary>
@@ -167,7 +178,8 @@ namespace nORM.Query
             Clear();
             try
             {
-                _stringBuilderPool.Return(_buffer);
+                if (_returnToPool)
+                    _stringBuilderPool.Return(_buffer);
             }
             catch
             {

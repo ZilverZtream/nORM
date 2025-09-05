@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
+using Microsoft.Extensions.ObjectPool;
 using nORM.Mapping;
 using nORM.Providers;
 
@@ -15,7 +16,9 @@ namespace nORM.Query
         private readonly TableMapping _mapping;
         private readonly List<string> _groupBy;
         private readonly DatabaseProvider _provider;
-        private readonly StringBuilder _sb = new();
+        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
+            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
+        private StringBuilder _sb = null!;
 
         public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider)
         {
@@ -26,8 +29,17 @@ namespace nORM.Query
 
         public string Translate(Expression e)
         {
-            Visit(e);
-            return _sb.ToString();
+            _sb = _stringBuilderPool.Get();
+            try
+            {
+                Visit(e);
+                return _sb.ToString();
+            }
+            finally
+            {
+                _sb.Clear();
+                _stringBuilderPool.Return(_sb);
+            }
         }
 
         protected override Expression VisitNew(NewExpression node)

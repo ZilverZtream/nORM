@@ -11,6 +11,7 @@ using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 
 #nullable enable
 
@@ -20,6 +21,9 @@ namespace nORM.Providers
     {
         private readonly ConcurrentLruCache<(Type Type, string Operation), string> _sqlCache = new(maxSize: 1000);
         protected static readonly DynamicBatchSizer BatchSizer = new();
+
+        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
+            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
         
         public string ParamPrefix { get; protected init; } = "@";
         public virtual int MaxSqlLength => int.MaxValue;
@@ -109,26 +113,34 @@ namespace nORM.Providers
         protected async Task<int> ExecuteInsertBatch<T>(DbContext ctx, TableMapping m, List<T> batch, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
-            var sb = new StringBuilder();
-            var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
-            var colNames = string.Join(", ", cols.Select(c => c.EscCol));
-            sb.Append($"INSERT INTO {m.EscTable} ({colNames}) VALUES ");
-
-            await using var cmd = ctx.Connection.CreateCommand();
-            var pIndex = 0;
-            for (int i = 0; i < batch.Count; i++)
+            var sb = _stringBuilderPool.Get();
+            try
             {
-                sb.Append(i > 0 ? ",(" : "(");
-                for (int j = 0; j < cols.Count; j++)
+                var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
+                var colNames = string.Join(", ", cols.Select(c => c.EscCol));
+                sb.Append($"INSERT INTO {m.EscTable} ({colNames}) VALUES ");
+
+                await using var cmd = ctx.Connection.CreateCommand();
+                var pIndex = 0;
+                for (int i = 0; i < batch.Count; i++)
                 {
-                    var pName = $"{ParamPrefix}p{pIndex++}";
-                    cmd.AddParam(pName, cols[j].Getter(batch[i]));
-                    sb.Append(j > 0 ? $",{pName}" : pName);
+                    sb.Append(i > 0 ? ",(" : "(");
+                    for (int j = 0; j < cols.Count; j++)
+                    {
+                        var pName = $"{ParamPrefix}p{pIndex++}";
+                        cmd.AddParam(pName, cols[j].Getter(batch[i]));
+                        sb.Append(j > 0 ? $",{pName}" : pName);
+                    }
+                    sb.Append(")");
                 }
-                sb.Append(")");
+                cmd.CommandText = sb.ToString();
+                return await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
             }
-            cmd.CommandText = sb.ToString();
-            return await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
         }
 
         public virtual Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> e, CancellationToken ct) where T : class

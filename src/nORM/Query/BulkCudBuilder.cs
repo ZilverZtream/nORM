@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using System.Text;
 using nORM.Core;
 using nORM.Mapping;
+using Microsoft.Extensions.ObjectPool;
 
 namespace nORM.Query
 {
@@ -14,6 +15,9 @@ namespace nORM.Query
     internal sealed class BulkCudBuilder
     {
         private readonly DbContext _ctx;
+
+        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
+            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
         public BulkCudBuilder(DbContext ctx) => _ctx = ctx;
 
@@ -60,16 +64,24 @@ namespace nORM.Query
                 call = call.Object as MethodCallExpression;
             }
             assigns.Reverse();
-            var sb = new StringBuilder();
-            var parameters = new Dictionary<string, object>();
-            for (int i = 0; i < assigns.Count; i++)
+            var sb = _stringBuilderPool.Get();
+            try
             {
-                if (i > 0) sb.Append(", ");
-                var pName = _ctx.Provider.ParamPrefix + "u" + i;
-                sb.Append($"{assigns[i].Column} = {pName}");
-                parameters[pName] = assigns[i].Value ?? DBNull.Value;
+                var parameters = new Dictionary<string, object>();
+                for (int i = 0; i < assigns.Count; i++)
+                {
+                    if (i > 0) sb.Append(", ");
+                    var pName = _ctx.Provider.ParamPrefix + "u" + i;
+                    sb.Append($"{assigns[i].Column} = {pName}");
+                    parameters[pName] = assigns[i].Value ?? DBNull.Value;
+                }
+                return (sb.ToString(), parameters);
             }
-            return (sb.ToString(), parameters);
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
         }
 
         private static Expression StripQuotes(Expression e)
