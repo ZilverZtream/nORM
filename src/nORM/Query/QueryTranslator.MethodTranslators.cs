@@ -109,7 +109,7 @@ namespace nORM.Query
                     var param = lambda.Parameters[0];
                     if (!t._correlatedParams.TryGetValue(param, out var info))
                     {
-                        info = (t._mapping, "T" + t._joinCounter);
+                        info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
                         t._correlatedParams[param] = info;
                     }
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
@@ -147,7 +147,7 @@ namespace nORM.Query
                     var param = keySelector.Parameters[0];
                     if (!t._correlatedParams.TryGetValue(param, out var info))
                     {
-                        info = (t._mapping, "T" + t._joinCounter);
+                        info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
                         t._correlatedParams[param] = info;
                     }
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
@@ -345,7 +345,7 @@ namespace nORM.Query
                 if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression predicate)
                 {
                     var param = predicate.Parameters[0];
-                    var alias = "T" + t._joinCounter;
+                    var alias = t.EscapeAlias("T" + t._joinCounter);
                     if (!t._correlatedParams.ContainsKey(param))
                         t._correlatedParams[param] = (t._mapping, alias);
                     var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap);
@@ -373,7 +373,7 @@ namespace nORM.Query
                 if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression lastPredicate)
                 {
                     var param = lastPredicate.Parameters[0];
-                    var alias = "T" + t._joinCounter;
+                    var alias = t.EscapeAlias("T" + t._joinCounter);
                     if (!t._correlatedParams.ContainsKey(param))
                         t._correlatedParams[param] = (t._mapping, alias);
                     var vctxLast = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap);
@@ -423,7 +423,7 @@ namespace nORM.Query
                     var param = countPredicate.Parameters[0];
                     if (!t._correlatedParams.TryGetValue(param, out var info))
                     {
-                        info = (t._mapping, "T" + t._joinCounter);
+                        info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
                         t._correlatedParams[param] = info;
                     }
                     var vctxCount = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
