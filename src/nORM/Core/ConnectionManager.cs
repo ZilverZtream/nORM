@@ -193,30 +193,40 @@ namespace nORM.Core
 
         private async Task MonitorNodeHealthAsync(CancellationToken token)
         {
-            foreach (var node in _topology.Nodes)
-            {
-                if (_disposed || token.IsCancellationRequested)
-                    break;
+            if (_disposed || token.IsCancellationRequested)
+                return;
 
-                var pool = _connectionPools[node.ConnectionString];
-                try
+            try
+            {
+                await Parallel.ForEachAsync(_topology.Nodes, token, async (node, ct) =>
                 {
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
-                    await using var cn = await pool.RentAsync(token).ConfigureAwait(false);
-                    sw.Stop();
-                    node.IsHealthy = true;
-                    node.LastHealthCheck = DateTime.UtcNow;
-                    node.AverageLatency = sw.Elapsed;
-                }
-                catch (OperationCanceledException)
-                {
-                    return;
-                }
-                catch
-                {
-                    node.IsHealthy = false;
-                    node.LastHealthCheck = DateTime.UtcNow;
-                }
+                    if (_disposed || ct.IsCancellationRequested)
+                        return;
+
+                    var pool = _connectionPools[node.ConnectionString];
+                    try
+                    {
+                        var sw = System.Diagnostics.Stopwatch.StartNew();
+                        await using var cn = await pool.RentAsync(ct).ConfigureAwait(false);
+                        sw.Stop();
+                        node.IsHealthy = true;
+                        node.LastHealthCheck = DateTime.UtcNow;
+                        node.AverageLatency = sw.Elapsed;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Cancellation requested; exit iteration
+                    }
+                    catch
+                    {
+                        node.IsHealthy = false;
+                        node.LastHealthCheck = DateTime.UtcNow;
+                    }
+                }).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Cancellation requested; exit gracefully
             }
         }
 
