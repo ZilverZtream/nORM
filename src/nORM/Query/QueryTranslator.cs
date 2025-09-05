@@ -24,15 +24,15 @@ namespace nORM.Query
     internal sealed partial class QueryTranslator : ExpressionVisitor, IDisposable
     {
         private DbContext _ctx = null!;
-        private SqlClauseBuilder _clauses = new();
-        private Dictionary<string, object> _params = new();
+        private SqlBuilder _clauses = new();
         private readonly object _syncRoot = new();
         private readonly MaterializerFactory _materializerFactory = new();
         private TableMapping _mapping = null!;
         private Type? _rootType;
-        private int _paramIndex;
-        private List<string> _compiledParams = new();
-        private Dictionary<ParameterExpression, string> _paramMap = new();
+        private readonly ParameterManager _parameterManager = new();
+        private Dictionary<string, object> _params { get => _parameterManager.Parameters; set => _parameterManager.Parameters = value; }
+        private List<string> _compiledParams { get => _parameterManager.CompiledParameters; set => _parameterManager.CompiledParameters = value; }
+        private Dictionary<ParameterExpression, string> _paramMap { get => _parameterManager.ParameterMap; set => _parameterManager.ParameterMap = value; }
         private List<IncludePlan> _includes = new();
         private LambdaExpression? _projection;
         private bool _isAggregate;
@@ -100,7 +100,7 @@ namespace nORM.Query
             _mapping = mapping;
             _rootType = mapping.Type;
             _params = parameters;
-            _paramIndex = pIndex;
+            _parameterManager.Index = pIndex;
             _correlatedParams = correlated;
             _tables = tables;
             _compiledParams = compiledParams;
@@ -136,9 +136,7 @@ namespace nORM.Query
                 _provider = ctx.Provider;
                 _mapping = null!;
                 _rootType = null;
-                _paramIndex = 0;
-                _compiledParams = new List<string>();
-                _paramMap = new Dictionary<ParameterExpression, string>();
+                _parameterManager.Reset();
                 _includes = new List<IncludePlan>();
                 _projection = null;
                 _isAggregate = false;
@@ -150,9 +148,8 @@ namespace nORM.Query
                 _noTracking = false;
                 _splitQuery = false;
                 _tables = new HashSet<string>();
-                _params = new Dictionary<string, object>();
                 _clauses?.Dispose();
-                _clauses = new SqlClauseBuilder();
+                _clauses = new SqlBuilder();
                 _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
                 _isCacheable = false;
                 _cacheExpiration = null;
@@ -165,16 +162,13 @@ namespace nORM.Query
             lock (_syncRoot)
             {
                 _clauses?.Dispose();
-                _clauses = new SqlClauseBuilder();
+                _clauses = new SqlBuilder();
 
                 _ctx = null!;
                 _provider = null!;
                 _mapping = null!;
                 _rootType = null;
-                _paramIndex = 0;
-                _params = new Dictionary<string, object>();
-                _compiledParams = new List<string>();
-                _paramMap = new Dictionary<ParameterExpression, string>();
+                _parameterManager.Reset();
                 _includes = new List<IncludePlan>();
                 _projection = null;
                 _isAggregate = false;
@@ -270,7 +264,7 @@ namespace nORM.Query
                         var discAttr = _t._rootType.GetCustomAttribute<DiscriminatorValueAttribute>();
                         if (discAttr != null)
                         {
-                            var paramName = _t._ctx.Provider.ParamPrefix + "p" + _t._paramIndex++;
+                            var paramName = _t._ctx.Provider.ParamPrefix + "p" + _t._parameterManager.Index++;
                             _t._params[paramName] = discAttr.Value;
                             _t._where.Append($"({_t._mapping.DiscriminatorColumn!.EscCol} = {paramName})");
                         }
@@ -302,7 +296,7 @@ namespace nORM.Query
                     if (_t._asOfTimestamp.HasValue)
                     {
                         alias ??= "T0";
-                        var timeParamName = _t._provider.ParamPrefix + "p" + _t._paramIndex++;
+                        var timeParamName = _t._provider.ParamPrefix + "p" + _t._parameterManager.Index++;
                         _t._params[timeParamName] = _t._asOfTimestamp.Value;
                         var historyTable = _t._provider.Escape(_t._mapping.TableName + "_History");
                         var cols = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
@@ -470,7 +464,7 @@ namespace nORM.Query
                     defaultSql = $", {defSql}";
                 }
 
-                var offsetParam = _provider.ParamPrefix + "p" + _paramIndex++;
+                var offsetParam = _provider.ParamPrefix + "p" + _parameterManager.Index++;
                 _params[offsetParam] = wf.Offset;
                 return $"{wf.FunctionName}({valueSql}, {offsetParam}{defaultSql}) OVER ({overClause})";
             }
@@ -479,9 +473,9 @@ namespace nORM.Query
 
         private string TranslateSubExpression(Expression e)
         {
-            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
+            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
             var subPlan = subTranslator.Translate(e);
-            _paramIndex = subTranslator._paramIndex;
+            _parameterManager.Index = subTranslator._parameterManager.Index;
             return subPlan.Sql;
         }
 
@@ -582,9 +576,9 @@ namespace nORM.Query
                 _params[kvp.Key] = kvp.Value;
             ExpressionVisitorPool.Return(innerKeyVisitor);
 
-            SetupJoinProjection(resultSelector, innerMapping, outerAlias, innerAlias);
+            JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
-            var sql = BuildJoinClause(_mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
+            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
             _sql.Clear();
             _sql.Append(sql);
 
@@ -632,9 +626,9 @@ namespace nORM.Query
                 _params[kvp.Key] = kvp.Value;
             ExpressionVisitorPool.Return(innerKeyVisitor);
 
-            SetupJoinProjection(null, innerMapping, outerAlias, innerAlias);
+            JoinBuilder.SetupJoinProjection(null, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
-            var sql = BuildJoinClause(_mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
+            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
             _sql.Clear();
             _sql.Append(sql);
 
@@ -659,58 +653,6 @@ namespace nORM.Query
             }
 
             return node;
-        }
-
-        private string BuildJoinClause(TableMapping outerMapping, string outerAlias, TableMapping innerMapping, string innerAlias, string joinType, string outerKeySql, string innerKeySql, string? orderBy = null)
-        {
-            using var joinSql = new OptimizedSqlBuilder(256);
-
-            if (_projection?.Body is NewExpression newExpr)
-            {
-                var neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping);
-                if (neededColumns.Count == 0)
-                {
-                    var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                    var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                    joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                    joinSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
-                    joinSql.Append(' ');
-                }
-                else
-                {
-                    joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                    joinSql.InnerBuilder.AppendJoin(", ", neededColumns);
-                    joinSql.Append(' ');
-                }
-            }
-            else
-            {
-                var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                joinSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
-                joinSql.Append(' ');
-            }
-
-            joinSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
-            joinSql.Append($"{joinType} {innerMapping.EscTable} {innerAlias} ");
-            joinSql.Append($"ON {outerKeySql} = {innerKeySql}");
-            if (orderBy != null)
-                joinSql.Append($" ORDER BY {orderBy}");
-
-            return joinSql.ToSqlString();
-        }
-
-        private void SetupJoinProjection(LambdaExpression? resultSelector, TableMapping innerMapping, string outerAlias, string innerAlias)
-        {
-            _projection = resultSelector;
-            if (resultSelector != null)
-            {
-                if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
-                    _correlatedParams[resultSelector.Parameters[0]] = (_mapping, outerAlias);
-                if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
-                    _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
-            }
         }
 
         private Expression HandleSelectMany(MethodCallExpression node)
@@ -758,7 +700,7 @@ namespace nORM.Query
 
                 if (_projection?.Body is NewExpression newExpr)
                 {
-                    var neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping);
+                    var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping);
                     if (neededColumns.Count == 0)
                     {
                         var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
@@ -824,7 +766,7 @@ namespace nORM.Query
 
             if (_projection?.Body is NewExpression crossNew)
             {
-                var neededColumns = ExtractNeededColumns(crossNew, outerMapping, crossMapping);
+                var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, outerMapping, crossMapping);
                 if (neededColumns.Count == 0)
                 {
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
@@ -902,9 +844,9 @@ namespace nORM.Query
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
             }
 
-            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
+            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
             var subPlan = subTranslator.Translate(source);
-            _paramIndex = subTranslator._paramIndex;
+            _parameterManager.Index = subTranslator._parameterManager.Index;
             _mapping = subTranslator._mapping;
 
             using var subSqlBuilder = new OptimizedSqlBuilder();
@@ -918,7 +860,7 @@ namespace nORM.Query
             {
                 subSqlBuilder.Append(subPlan.Sql);
             }
-            var limitParam = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
+            var limitParam = _ctx.Provider.ParamPrefix + "p" + _parameterManager.Index++;
             _params[limitParam] = 1;
             _ctx.Provider.ApplyPaging(subSqlBuilder.InnerBuilder, 1, null, limitParam, null);
 
@@ -1011,7 +953,7 @@ namespace nORM.Query
 
             if (node.Value != null)
             {
-                var paramName = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
+                var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.Index++;
                 _params[paramName] = node.Value;
                 _sql.Append(paramName);
             }
@@ -1029,7 +971,7 @@ namespace nORM.Query
                 return node;
             }
 
-            var paramName = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
+            var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.Index++;
             _params[paramName] = DBNull.Value;
             _compiledParams.Add(paramName);
             _paramMap[node] = paramName;
@@ -1077,7 +1019,7 @@ namespace nORM.Query
 
             if (TryGetConstantValue(node, out var value))
             {
-                var paramName = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
+                var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.Index++;
                 _params[paramName] = value ?? DBNull.Value;
                 _sql.Append(paramName);
                 return node;
@@ -1119,44 +1061,6 @@ namespace nORM.Query
             mc.Arguments.Count > 0
                 ? mc.Arguments[0]
                 : expression;
-
-        private static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping)
-        {
-            var neededColumns = new List<string>();
-            var outerAlias = "T0";
-            var innerAlias = "T1";
-
-            foreach (var arg in newExpr.Arguments)
-            {
-                if (arg is MemberExpression memberExpr && memberExpr.Expression is ParameterExpression paramExpr)
-                {
-                    var isOuterTable = paramExpr.Type == outerMapping.Type;
-                    var mapping = isOuterTable ? outerMapping : innerMapping;
-                    var alias = isOuterTable ? outerAlias : innerAlias;
-
-                    if (mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
-                    {
-                        var colSql = $"{alias}.{column.EscCol}";
-                        if (!neededColumns.Contains(colSql))
-                            neededColumns.Add(colSql);
-                    }
-                }
-                else if (arg is ParameterExpression param)
-                {
-                    var isOuter = param.Type == outerMapping.Type;
-                    var mapping = isOuter ? outerMapping : innerMapping;
-                    var alias = isOuter ? outerAlias : innerAlias;
-                    foreach (var col in mapping.Columns)
-                    {
-                        var colSql = $"{alias}.{col.EscCol}";
-                        if (!neededColumns.Contains(colSql))
-                            neededColumns.Add(colSql);
-                    }
-                }
-            }
-
-            return neededColumns;
-        }
 
         private static bool IsRecordType(Type type) =>
             type.GetMethod("<Clone>$", BindingFlags.Instance | BindingFlags.NonPublic) != null;
