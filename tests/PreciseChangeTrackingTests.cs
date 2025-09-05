@@ -22,7 +22,7 @@ namespace nORM.Tests
     public class PreciseChangeTrackingTests
     {
         [Fact]
-        public void Hash_collision_not_detected_by_default()
+        public void Hash_collision_detected_by_default()
         {
             using var cn = new SqliteConnection("Data Source=:memory:");
             cn.Open();
@@ -33,7 +33,7 @@ namespace nORM.Tests
             var detect = typeof(ChangeTracker).GetMethod("DetectChanges", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             detect!.Invoke(ctx.ChangeTracker, null);
             var state = ctx.ChangeTracker.Entries.Single().State;
-            Assert.Equal(EntityState.Unchanged, state);
+            Assert.Equal(EntityState.Modified, state);
         }
 
         [Fact]
