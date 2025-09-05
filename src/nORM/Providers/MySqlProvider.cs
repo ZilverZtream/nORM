@@ -160,11 +160,29 @@ END;";
                 throw new InvalidOperationException("A MySqlConnection is required for MySqlProvider. Please install MySqlConnector or MySql.Data.");
         }
 
-        public override Task<bool> IsAvailableAsync()
+        public override async Task<bool> IsAvailableAsync()
         {
-            return Task.FromResult(
-                Type.GetType("MySqlConnector.MySqlConnection, MySqlConnector") != null ||
-                Type.GetType("MySql.Data.MySqlClient.MySqlConnection, MySql.Data") != null);
+            var type =
+                Type.GetType("MySqlConnector.MySqlConnection, MySqlConnector") ??
+                Type.GetType("MySql.Data.MySqlClient.MySqlConnection, MySql.Data");
+            if (type == null) return false;
+
+            await using var cn = (DbConnection)Activator.CreateInstance(type)!;
+            cn.ConnectionString =
+                "Server=localhost;Database=test;User=root;Password=;Allow User Variables=true";
+            try
+            {
+                await cn.OpenAsync();
+                await using var cmd = cn.CreateCommand();
+                cmd.CommandText = "SELECT VERSION()";
+                var versionStr = (string)(await cmd.ExecuteScalarAsync() ?? throw new Exception("No version"));
+                var version = new Version(versionStr.Split('-')[0]);
+                return version >= new Version(8, 0);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
