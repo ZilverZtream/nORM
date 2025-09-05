@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading;
 
 namespace nORM.Query
 {
@@ -14,14 +15,23 @@ namespace nORM.Query
         public Dictionary<string, object> Parameters { get; set; } = new();
         public List<string> CompiledParameters { get; set; } = new();
         public Dictionary<ParameterExpression, string> ParameterMap { get; set; } = new();
-        public int Index;
+
+        private int _index;
+
+        public int Index
+        {
+            get => Volatile.Read(ref _index);
+            set => Volatile.Write(ref _index, value);
+        }
+
+        public int GetNextIndex() => Interlocked.Increment(ref _index) - 1;
 
         public void Reset()
         {
             Parameters = new Dictionary<string, object>();
             CompiledParameters = new List<string>();
             ParameterMap = new Dictionary<ParameterExpression, string>();
-            Index = 0;
+            Volatile.Write(ref _index, 0);
         }
     }
 }

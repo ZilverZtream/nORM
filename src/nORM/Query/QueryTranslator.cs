@@ -33,6 +33,7 @@ namespace nORM.Query
         private Dictionary<string, object> _params { get => _parameterManager.Parameters; set => _parameterManager.Parameters = value; }
         private List<string> _compiledParams { get => _parameterManager.CompiledParameters; set => _parameterManager.CompiledParameters = value; }
         private Dictionary<ParameterExpression, string> _paramMap { get => _parameterManager.ParameterMap; set => _parameterManager.ParameterMap = value; }
+        internal int ParameterIndex => _parameterManager.Index;
         private List<IncludePlan> _includes = new();
         private LambdaExpression? _projection;
         private bool _isAggregate;
@@ -91,7 +92,7 @@ namespace nORM.Query
             DbContext ctx,
             TableMapping mapping,
             Dictionary<string, object> parameters,
-            ref int pIndex,
+            int pIndex,
             Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlated,
             HashSet<string> tables,
             List<string> compiledParams,
@@ -118,14 +119,14 @@ namespace nORM.Query
             DbContext ctx,
             TableMapping mapping,
             Dictionary<string, object> parameters,
-            ref int pIndex,
+            int pIndex,
             Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlated,
             HashSet<string> tables,
             List<string> compiledParams,
             Dictionary<ParameterExpression, string> paramMap,
             int joinStart = 0,
             int recursionDepth = 0)
-            => new QueryTranslator(ctx, mapping, parameters, ref pIndex, correlated, tables, compiledParams, paramMap, joinStart, recursionDepth);
+            => new QueryTranslator(ctx, mapping, parameters, pIndex, correlated, tables, compiledParams, paramMap, joinStart, recursionDepth);
 
         internal static QueryTranslator Rent(DbContext ctx)
         {
@@ -272,7 +273,7 @@ namespace nORM.Query
                         var discAttr = _t._rootType.GetCustomAttribute<DiscriminatorValueAttribute>();
                         if (discAttr != null)
                         {
-                            var paramName = _t._ctx.Provider.ParamPrefix + "p" + _t._parameterManager.Index++;
+                            var paramName = _t._ctx.Provider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
                             _t._params[paramName] = discAttr.Value;
                             _t._where.Append($"({_t._mapping.DiscriminatorColumn!.EscCol} = {paramName})");
                         }
@@ -304,7 +305,7 @@ namespace nORM.Query
                     if (_t._asOfTimestamp.HasValue)
                     {
                         alias ??= "T0";
-                        var timeParamName = _t._provider.ParamPrefix + "p" + _t._parameterManager.Index++;
+                        var timeParamName = _t._provider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
                         _t._params[timeParamName] = _t._asOfTimestamp.Value;
                         var historyTable = _t._provider.Escape(_t._mapping.TableName + "_History");
                         var cols = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
@@ -472,7 +473,7 @@ namespace nORM.Query
                     defaultSql = $", {defSql}";
                 }
 
-                var offsetParam = _provider.ParamPrefix + "p" + _parameterManager.Index++;
+                var offsetParam = _provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
                 _params[offsetParam] = wf.Offset;
                 return $"{wf.FunctionName}({valueSql}, {offsetParam}{defaultSql}) OVER ({overClause})";
             }
@@ -484,9 +485,9 @@ namespace nORM.Query
             if (_recursionDepth >= MaxRecursionDepth)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum translation depth of {MaxRecursionDepth}"));
 
-            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
+            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
             var subPlan = subTranslator.Translate(e);
-            _parameterManager.Index = subTranslator._parameterManager.Index;
+            _parameterManager.Index = subTranslator.ParameterIndex;
             return subPlan.Sql;
         }
 
@@ -855,9 +856,9 @@ namespace nORM.Query
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
             }
 
-            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
+            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
-            _parameterManager.Index = subTranslator._parameterManager.Index;
+            _parameterManager.Index = subTranslator.ParameterIndex;
             _mapping = subTranslator._mapping;
 
             using var subSqlBuilder = new OptimizedSqlBuilder();
@@ -871,7 +872,7 @@ namespace nORM.Query
             {
                 subSqlBuilder.Append(subPlan.Sql);
             }
-            var limitParam = _ctx.Provider.ParamPrefix + "p" + _parameterManager.Index++;
+            var limitParam = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
             _params[limitParam] = 1;
             _ctx.Provider.ApplyPaging(subSqlBuilder.InnerBuilder, 1, null, limitParam, null);
 
@@ -964,7 +965,7 @@ namespace nORM.Query
 
             if (node.Value != null)
             {
-                var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.Index++;
+                var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
                 _params[paramName] = node.Value;
                 _sql.Append(paramName);
             }
@@ -982,7 +983,7 @@ namespace nORM.Query
                 return node;
             }
 
-            var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.Index++;
+            var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
             _params[paramName] = DBNull.Value;
             _compiledParams.Add(paramName);
             _paramMap[node] = paramName;
@@ -1030,7 +1031,7 @@ namespace nORM.Query
 
             if (TryGetConstantValue(node, out var value))
             {
-                var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.Index++;
+                var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
                 _params[paramName] = value ?? DBNull.Value;
                 _sql.Append(paramName);
                 return node;
