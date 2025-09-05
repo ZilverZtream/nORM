@@ -835,7 +835,7 @@ namespace nORM.Core
         private void SetTenantId<T>(T entity, TableMapping map) where T : class
         {
             if (Options.TenantProvider == null) return;
-            var tenantCol = map.Columns.FirstOrDefault(c => c.PropName == Options.TenantColumnName);
+            var tenantCol = map.TenantColumn;
             if (tenantCol != null)
             {
                 tenantCol.Setter(entity, Options.TenantProvider.GetCurrentTenantId());
