@@ -947,7 +947,7 @@ namespace nORM.Query
                 if (_correlatedParams.TryGetValue(pe, out var info))
                 {
                     var col = info.Mapping.Columns.First(c => c.Prop.Name == node.Member.Name);
-                    _sql.Append($"{GetSafeTableAlias(info.Alias)}.{col.EscCol}");
+                    _sql.Append($"{ValidateTableAlias(info.Alias)}.{col.EscCol}");
                 }
                 else
                 {
@@ -968,11 +968,11 @@ namespace nORM.Query
             throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, $"Member '{node.Member.Name}'"));
         }
 
-        private string GetSafeTableAlias(string alias)
+        private string ValidateTableAlias(string alias)
         {
             if (!IsValidIdentifier(alias))
                 throw new NormQueryException($"Invalid table alias: {alias}");
-            return _provider.Escape(alias);
+            return alias;
         }
 
         private static bool IsValidIdentifier(string identifier) =>
