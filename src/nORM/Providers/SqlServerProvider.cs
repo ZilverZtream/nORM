@@ -182,9 +182,28 @@ END;";
                 throw new InvalidOperationException("A SqlConnection is required for SqlServerProvider.");
         }
 
-        public override Task<bool> IsAvailableAsync()
+        public override async Task<bool> IsAvailableAsync()
         {
-            return Task.FromResult(Type.GetType("Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient") != null);
+            var type = Type.GetType("Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient");
+            if (type == null) return false;
+
+            await using var cn = (DbConnection)Activator.CreateInstance(type)!;
+            cn.ConnectionString =
+                "Server=localhost;Database=master;Integrated Security=true;TrustServerCertificate=True;Connect Timeout=1";
+            try
+            {
+                await cn.OpenAsync();
+                await using var cmd = cn.CreateCommand();
+                cmd.CommandText = "SELECT CAST(SERVERPROPERTY('ProductVersion') AS VARCHAR(20))";
+                var versionStr = (string)(await cmd.ExecuteScalarAsync() ?? throw new Exception("No version"));
+                var parts = versionStr.Split('.');
+                var version = new Version(int.Parse(parts[0]), int.Parse(parts[1]));
+                return version >= new Version(13, 0);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)

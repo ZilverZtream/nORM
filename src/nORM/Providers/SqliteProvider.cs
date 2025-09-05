@@ -144,9 +144,26 @@ END;";
                 throw new InvalidOperationException("A SqliteConnection is required for SqliteProvider.");
         }
 
-        public override Task<bool> IsAvailableAsync()
+        public override async Task<bool> IsAvailableAsync()
         {
-            return Task.FromResult(Type.GetType("Microsoft.Data.Sqlite.SqliteConnection, Microsoft.Data.Sqlite") != null);
+            var type = Type.GetType("Microsoft.Data.Sqlite.SqliteConnection, Microsoft.Data.Sqlite");
+            if (type == null) return false;
+
+            await using var cn = (DbConnection)Activator.CreateInstance(type)!;
+            cn.ConnectionString = "Data Source=:memory:";
+            try
+            {
+                await cn.OpenAsync();
+                await using var cmd = cn.CreateCommand();
+                cmd.CommandText = "select sqlite_version()";
+                var versionStr = (string)(await cmd.ExecuteScalarAsync() ?? throw new Exception("No version"));
+                var version = new Version(versionStr);
+                return version >= new Version(3, 9);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)

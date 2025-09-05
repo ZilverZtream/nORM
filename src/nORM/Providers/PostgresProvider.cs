@@ -169,9 +169,26 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 throw new InvalidOperationException("A NpgsqlConnection is required for PostgresProvider.");
         }
 
-        public override Task<bool> IsAvailableAsync()
+        public override async Task<bool> IsAvailableAsync()
         {
-            return Task.FromResult(Type.GetType("Npgsql.NpgsqlConnection, Npgsql") != null);
+            var type = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
+            if (type == null) return false;
+
+            await using var cn = (DbConnection)Activator.CreateInstance(type)!;
+            cn.ConnectionString = "Host=localhost;Database=postgres;Username=postgres;Password=;Timeout=1";
+            try
+            {
+                await cn.OpenAsync();
+                await using var cmd = cn.CreateCommand();
+                cmd.CommandText = "SHOW server_version";
+                var versionStr = (string)(await cmd.ExecuteScalarAsync() ?? throw new Exception("No version"));
+                var version = new Version(versionStr.Split(' ')[0]);
+                return version >= new Version(9, 5);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
