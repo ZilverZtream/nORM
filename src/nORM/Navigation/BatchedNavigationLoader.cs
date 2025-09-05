@@ -123,7 +123,7 @@ namespace nORM.Navigation
                 cmd.AddParam(pn, keys[i]);
             }
 
-            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({string.Join(",", paramNames)})";
+            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({PooledStringBuilder.Join(paramNames, ",")})";
 
             using var translator = Query.QueryTranslator.Rent(_context);
             var materializer = translator.CreateMaterializer(mapping, relation.DependentType);
