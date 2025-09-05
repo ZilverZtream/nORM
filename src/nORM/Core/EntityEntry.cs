@@ -20,18 +20,20 @@ namespace nORM.Core
         private readonly Func<object, int>[] _getHashCodes;
         private readonly Func<object, object?>[] _getValues;
         private readonly DbContextOptions _options;
+        private readonly Action<EntityEntry>? _markDirty;
         private bool _hasNotifiedChange;
 
         public object? Entity { get; private set; }
         public EntityState State { get; internal set; }
         internal TableMapping Mapping => _mapping;
 
-        internal EntityEntry(object entity, EntityState state, TableMapping mapping, DbContextOptions options)
+        internal EntityEntry(object entity, EntityState state, TableMapping mapping, DbContextOptions options, Action<EntityEntry>? markDirty = null)
         {
             Entity = entity;
             State = state;
             _mapping = mapping;
             _options = options;
+            _markDirty = markDirty;
             _nonKeyColumns = mapping.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
             _getHashCodes = new Func<object, int>[_nonKeyColumns.Length];
             _getValues = new Func<object, object?>[_nonKeyColumns.Length];
@@ -53,6 +55,7 @@ namespace nORM.Core
                     if (State is EntityState.Added or EntityState.Deleted) return;
                     _hasNotifiedChange = true;
                     State = EntityState.Modified;
+                    _markDirty?.Invoke(this);
                 };
             }
         }
