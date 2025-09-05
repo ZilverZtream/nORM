@@ -32,6 +32,7 @@ namespace nORM.Query
         private List<string> _compiledParams = null!;
         private Dictionary<ParameterExpression, string> _paramMap = null!;
         private bool _suppressNullCheck = false;
+        private const int _constParamMapLimit = 1024;
         private readonly Dictionary<ConstKey, string> _constParamMap = new();
 
         private readonly Dictionary<string, IMethodTranslator> _translators = new()
@@ -554,6 +555,10 @@ namespace nORM.Query
 
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
             _sql.AppendParameterizedValue(paramName, value, _params);
+
+            if (_constParamMap.Count >= _constParamMapLimit)
+                _constParamMap.Clear();
+
             _constParamMap[key] = paramName;
         }
 
