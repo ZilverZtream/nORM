@@ -271,12 +271,13 @@ namespace nORM.Query
             await semaphore.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                if (cache.TryGet(cacheKey, out cached))
-                    return cached!;
+                if (!cache.TryGet(cacheKey, out cached))
+                {
+                    cached = await factory().ConfigureAwait(false);
+                    cache.Set(cacheKey, cached!, expiration, tables);
+                }
 
-                var result = await factory().ConfigureAwait(false);
-                cache.Set(cacheKey, result!, expiration, tables);
-                return result;
+                return cached!;
             }
             finally
             {
