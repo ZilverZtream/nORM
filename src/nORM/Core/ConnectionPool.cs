@@ -21,6 +21,7 @@ namespace nORM.Core
         private readonly int _minSize;
         private readonly TimeSpan _idleLifetime;
         private int _created;
+        private int _returning;
         private bool _disposed;
 
         private sealed class PooledItem
@@ -111,25 +112,33 @@ namespace nORM.Core
 
         private void Return(DbConnection connection)
         {
-            lock (_poolLock)
+            Interlocked.Increment(ref _returning);
+            try
             {
-                if (_disposed)
+                lock (_poolLock)
                 {
-                    connection.Dispose();
-                    return;
-                }
+                    if (_disposed)
+                    {
+                        connection.Dispose();
+                        return;
+                    }
 
-                if (connection.State == ConnectionState.Open)
-                {
-                    _pool.Enqueue(new PooledItem(connection));
-                }
-                else
-                {
-                    connection.Dispose();
-                    Interlocked.Decrement(ref _created);
+                    if (connection.State == ConnectionState.Open)
+                    {
+                        _pool.Enqueue(new PooledItem(connection));
+                    }
+                    else
+                    {
+                        connection.Dispose();
+                        Interlocked.Decrement(ref _created);
+                    }
                 }
             }
-            _semaphore.Release();
+            finally
+            {
+                Interlocked.Decrement(ref _returning);
+                _semaphore.Release();
+            }
         }
 
         private void CleanupCallback(object? state)
@@ -140,7 +149,7 @@ namespace nORM.Core
             var itemsToRequeue = new List<PooledItem>();
             lock (_poolLock)
             {
-                while (_created > _minSize && _pool.TryDequeue(out var item))
+                while (_created - Volatile.Read(ref _returning) > _minSize && _pool.TryDequeue(out var item))
                 {
                     if (item.LastUsed < threshold)
                     {
