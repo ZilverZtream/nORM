@@ -20,6 +20,7 @@ namespace nORM.Mapping
         public readonly Type Type;
         public string EscTable;
         public readonly Column[] Columns;
+        public readonly Dictionary<string, Column> ColumnsByName;
         public readonly Column[] KeyColumns;
         public readonly Column? TimestampColumn;
         public readonly Column? TenantColumn;
@@ -82,6 +83,7 @@ namespace nORM.Mapping
             }
 
             Columns = cols.ToArray();
+            ColumnsByName = Columns.ToDictionary(c => c.Prop.Name, StringComparer.Ordinal);
 
             KeyColumns = Columns.Where(c => c.IsKey).ToArray();
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
