@@ -637,15 +637,22 @@ namespace nORM.Query
             return segment;
         }
 
-        private static bool TryGetConstantValue(Expression e, out object? value)
+        private static bool TryGetConstantValue(Expression e, out object? value, HashSet<Expression>? visited = null)
         {
+            visited ??= new HashSet<Expression>(ReferenceEqualityComparer.Instance);
+            if (!visited.Add(e))
+            {
+                value = null;
+                return false;
+            }
+
             switch (e)
             {
                 case ConstantExpression ce:
                     value = ce.Value;
                     return true;
                 case MemberExpression me:
-                    if (me.Expression != null && TryGetConstantValue(me.Expression, out var obj))
+                    if (me.Expression != null && TryGetConstantValue(me.Expression, out var obj, visited))
                     {
                         value = me.Member switch
                         {
@@ -658,7 +665,7 @@ namespace nORM.Query
                     break;
                 case MethodCallExpression mce:
                     object? instance = null;
-                    if (mce.Object != null && !TryGetConstantValue(mce.Object, out instance))
+                    if (mce.Object != null && !TryGetConstantValue(mce.Object, out instance, visited))
                     {
                         value = null;
                         return false;
@@ -667,7 +674,7 @@ namespace nORM.Query
                     var args = new object?[mce.Arguments.Count];
                     for (int i = 0; i < mce.Arguments.Count; i++)
                     {
-                        if (!TryGetConstantValue(mce.Arguments[i], out var argVal))
+                        if (!TryGetConstantValue(mce.Arguments[i], out var argVal, visited))
                         {
                             value = null;
                             return false;
