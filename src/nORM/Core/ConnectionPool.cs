@@ -71,33 +71,42 @@ namespace nORM.Core
         {
             ThrowIfDisposed();
             await _semaphore.WaitAsync(ct).ConfigureAwait(false);
-            PooledItem? item = null;
-            lock (_poolLock)
+            try
             {
-                _pool.TryDequeue(out item);
-            }
+                while (true)
+                {
+                    PooledItem? item = null;
+                    lock (_poolLock)
+                    {
+                        if (!_pool.TryDequeue(out item))
+                            break;
+                    }
 
-            if (item != null)
+                    try
+                    {
+                        if (item.Connection.State == ConnectionState.Open)
+                        {
+                            item.LastUsed = DateTime.UtcNow;
+                            return new PooledDbConnection(this, item.Connection);
+                        }
+                    }
+                    catch
+                    {
+                        item.Connection.Dispose();
+                        Interlocked.Decrement(ref _created);
+                    }
+                }
+
+                var cn = _connectionFactory();
+                await cn.OpenAsync(ct).ConfigureAwait(false);
+                Interlocked.Increment(ref _created);
+                return new PooledDbConnection(this, cn);
+            }
+            catch
             {
-                try
-                {
-                    if (item.Connection.State != ConnectionState.Open)
-                        await item.Connection.OpenAsync(ct).ConfigureAwait(false);
-                }
-                catch
-                {
-                    item.Connection.Dispose();
-                    Interlocked.Decrement(ref _created);
-                    return await RentAsync(ct).ConfigureAwait(false);
-                }
-                item.LastUsed = DateTime.UtcNow;
-                return new PooledDbConnection(this, item.Connection);
+                _semaphore.Release();
+                throw;
             }
-
-            var cn = _connectionFactory();
-            await cn.OpenAsync(ct).ConfigureAwait(false);
-            Interlocked.Increment(ref _created);
-            return new PooledDbConnection(this, cn);
         }
 
         private void Return(DbConnection connection)
