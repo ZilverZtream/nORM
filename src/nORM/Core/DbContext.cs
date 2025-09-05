@@ -560,12 +560,12 @@ namespace nORM.Core
             switch (operation)
             {
                 case WriteOperation.Insert:
-                    foreach (var col in map.Columns.Where(c => !c.IsDbGenerated))
+                    foreach (var col in map.InsertColumns)
                         cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
                     break;
-                    
+
                 case WriteOperation.Update:
-                    foreach (var col in map.Columns.Where(c => !c.IsKey && !c.IsTimestamp))
+                    foreach (var col in map.UpdateColumns)
                         cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
                     foreach (var col in map.KeyColumns)
                         cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
