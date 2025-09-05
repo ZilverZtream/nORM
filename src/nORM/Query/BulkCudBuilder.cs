@@ -45,10 +45,63 @@ namespace nORM.Query
             var whereIndex = upper.IndexOf(" WHERE", StringComparison.Ordinal);
             if (whereIndex < 0) return string.Empty;
             var where = sql.Substring(whereIndex);
-            if (!string.IsNullOrEmpty(alias))
-                where = where.Replace(alias + ".", "");
+            where = RemoveAliasFromWhereClause(where, alias);
             return where;
         }
+
+        private static string RemoveAliasFromWhereClause(string where, string? alias)
+        {
+            var sb = new StringBuilder(where.Length);
+            bool inString = false;
+            bool inBracket = false;
+
+            for (int i = 0; i < where.Length; i++)
+            {
+                char c = where[i];
+
+                if (!inString && c == '[')
+                {
+                    inBracket = true;
+                }
+                else if (inBracket)
+                {
+                    if (c == ']') inBracket = false;
+                }
+                else if (c == '\'')
+                {
+                    inString = !inString;
+                }
+
+                if (!inString && !inBracket)
+                {
+                    if (!string.IsNullOrEmpty(alias) &&
+                        where.AsSpan(i).StartsWith(alias, StringComparison.OrdinalIgnoreCase) &&
+                        i + alias.Length < where.Length && where[i + alias.Length] == '.' &&
+                        (i == 0 || !IsIdentifierChar(where[i - 1])))
+                    {
+                        i += alias.Length; // skip alias and dot
+                        continue;
+                    }
+
+                    if (c == 'T' && (i == 0 || !IsIdentifierChar(where[i - 1])))
+                    {
+                        int j = i + 1;
+                        while (j < where.Length && char.IsDigit(where[j])) j++;
+                        if (j > i + 1 && j < where.Length && where[j] == '.')
+                        {
+                            i = j; // skip alias and dot
+                            continue;
+                        }
+                    }
+                }
+
+                sb.Append(c);
+            }
+
+            return sb.ToString();
+        }
+
+        private static bool IsIdentifierChar(char c) => char.IsLetterOrDigit(c) || c == '_' || c == '$';
 
         public (string Sql, Dictionary<string, object> Params) BuildSetClause<T>(TableMapping mapping, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set)
         {
