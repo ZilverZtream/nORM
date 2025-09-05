@@ -408,7 +408,8 @@ namespace nORM.Query
                 if (_planCache.TryGetValue(cacheKey, out cached))
                     return cached!;
 
-                var plan = new QueryTranslator(_ctx).Translate(filtered);
+                using var translator = new QueryTranslator(_ctx);
+                var plan = translator.Translate(filtered);
 
                 var options = new MemoryCacheEntryOptions
                 {

@@ -165,7 +165,14 @@ namespace nORM.Query
         public void Dispose()
         {
             Clear();
-            _stringBuilderPool.Return(_buffer);
+            try
+            {
+                _stringBuilderPool.Return(_buffer);
+            }
+            catch
+            {
+                // Swallow to avoid leaking if the pool rejects the builder
+            }
         }
     }
 }
