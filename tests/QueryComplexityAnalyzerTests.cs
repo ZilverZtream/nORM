@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using Xunit;
+using nORM.Query;
+using nORM.Configuration;
 using nORM.Core;
 
 namespace nORM.Tests;
@@ -57,6 +59,12 @@ public class QueryComplexityAnalyzerTests : TestBase
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
+    private class TestMemoryMonitor : IMemoryMonitor
+    {
+        public long Available { get; set; } = 512L * 1024 * 1024;
+        public long GetAvailableMemory() => Available;
+    }
+
     private static IQueryable<Product> BuildDeepJoins(IQueryable<Product> q)
     {
         var query = q;
@@ -71,11 +79,8 @@ public class QueryComplexityAnalyzerTests : TestBase
     public void Excessive_join_depth_throws()
     {
         var query = BuildDeepJoins(new List<Product>().AsQueryable());
-        var analyzerType = typeof(nORM.Query.QueryTranslator).Assembly.GetType("nORM.Query.QueryComplexityAnalyzer", true)!;
-        var analyzeMethod = analyzerType.GetMethod("AnalyzeQuery", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
-        var ex = Assert.Throws<System.Reflection.TargetInvocationException>(() =>
-            analyzeMethod.Invoke(null, new object[] { query.Expression }));
-        Assert.IsType<NormQueryException>(ex.InnerException);
+        var analyzer = new AdaptiveQueryComplexityAnalyzer(new TestMemoryMonitor());
+        Assert.Throws<NormQueryException>(() => analyzer.AnalyzeQuery(query.Expression, new DbContextOptions()));
     }
 
     [Fact]
@@ -84,12 +89,8 @@ public class QueryComplexityAnalyzerTests : TestBase
         const int MaxParameterCount = 2000;
         var ids = new CountingEnumerable(5000);
         var expr = Expression.Constant(ids);
-        var analyzerType = typeof(nORM.Query.QueryTranslator).Assembly.GetType("nORM.Query.QueryComplexityAnalyzer", true)!;
-        var analyzeMethod = analyzerType.GetMethod("AnalyzeQuery", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
-
-        var ex = Assert.Throws<System.Reflection.TargetInvocationException>(() =>
-            analyzeMethod.Invoke(null, new object[] { expr }));
-        Assert.IsType<NormQueryException>(ex.InnerException);
+        var analyzer = new AdaptiveQueryComplexityAnalyzer(new TestMemoryMonitor());
+        Assert.Throws<NormQueryException>(() => analyzer.AnalyzeQuery(expr, new DbContextOptions()));
         Assert.True(ids.IterationCount <= MaxParameterCount + 1);
     }
 
@@ -98,11 +99,9 @@ public class QueryComplexityAnalyzerTests : TestBase
     {
         var ids = new CountingCollection(5);
         var expr = Expression.Constant(ids);
-        var analyzerType = typeof(nORM.Query.QueryTranslator).Assembly.GetType("nORM.Query.QueryComplexityAnalyzer", true)!;
-        var analyzeMethod = analyzerType.GetMethod("AnalyzeQuery", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
-
-        var result = analyzeMethod.Invoke(null, new object[] { expr })!;
-        var paramCount = (int)result.GetType().GetProperty("ParameterCount")!.GetValue(result)!;
+        var analyzer = new AdaptiveQueryComplexityAnalyzer(new TestMemoryMonitor());
+        var result = analyzer.AnalyzeQuery(expr, new DbContextOptions());
+        var paramCount = result.ParameterCount;
 
         Assert.Equal(5, paramCount);
         Assert.Equal(0, ids.EnumerationCount);
