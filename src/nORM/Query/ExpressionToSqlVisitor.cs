@@ -453,7 +453,7 @@ namespace nORM.Query
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
 
-            using var subTranslator = new QueryTranslator(_ctx, mapping, _params, ref _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count);
+            using var subTranslator = QueryTranslator.Create(_ctx, mapping, _params, ref _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count);
             var subPlan = subTranslator.Translate(source);
 
             _sql.Append(negate ? "NOT EXISTS(" : "EXISTS(");
@@ -466,7 +466,7 @@ namespace nORM.Query
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
 
-            using var subTranslator = new QueryTranslator(_ctx, mapping, _params, ref _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count);
+            using var subTranslator = QueryTranslator.Create(_ctx, mapping, _params, ref _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count);
             var subPlan = subTranslator.Translate(source);
 
             Visit(value);
