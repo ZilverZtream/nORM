@@ -5,6 +5,7 @@ using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Microsoft.SqlServer.TransactSql.ScriptDom;
 
 #nullable enable
 
@@ -134,10 +135,45 @@ namespace nORM.Core
             if (string.IsNullOrWhiteSpace(sql))
                 return false;
 
-            var lowerSql = sql.ToLowerInvariant();
-            if (lowerSql.Contains("drop ") || lowerSql.Contains("alter ") ||
-                lowerSql.Contains("truncate ") || lowerSql.Contains("exec "))
-                return false;
+            using var reader = new StringReader(sql);
+            var parser = new TSql150Parser(false);
+            var fragment = parser.Parse(reader, out var errors);
+
+            if (errors != null && errors.Count > 0)
+            {
+                var lowerSql = sql.ToLowerInvariant();
+                return !(lowerSql.Contains("drop ") || lowerSql.Contains("alter ") ||
+                         lowerSql.Contains("truncate ") || lowerSql.Contains("exec "));
+            }
+
+            if (fragment is TSqlScript script)
+            {
+                foreach (var batch in script.Batches)
+                {
+                    foreach (var statement in batch.Statements)
+                    {
+                        var typeName = statement.GetType().Name;
+                        if (typeName.Contains("Drop", StringComparison.OrdinalIgnoreCase) ||
+                            typeName.Contains("Alter", StringComparison.OrdinalIgnoreCase) ||
+                            typeName.Contains("Truncate", StringComparison.OrdinalIgnoreCase) ||
+                            typeName.Contains("Execute", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                var typeName = fragment.GetType().Name;
+                if (typeName.Contains("Drop", StringComparison.OrdinalIgnoreCase) ||
+                    typeName.Contains("Alter", StringComparison.OrdinalIgnoreCase) ||
+                    typeName.Contains("Truncate", StringComparison.OrdinalIgnoreCase) ||
+                    typeName.Contains("Execute", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
 
             return true;
         }
