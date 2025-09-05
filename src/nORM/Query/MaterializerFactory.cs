@@ -28,6 +28,8 @@ namespace nORM.Query
         // Cache constructor info and delegates to avoid repeated reflection in hot paths
         private static readonly ConcurrentDictionary<Type, ConstructorInfo> _constructorCache = new();
         private static readonly ConcurrentDictionary<Type, Func<object?[], object>> _constructorDelegates = new();
+        private static readonly ConcurrentDictionary<Type, ConstructorInfo?> _parameterlessCtorCache = new();
+        private static readonly ConcurrentDictionary<Type, Func<object>> _parameterlessCtorDelegates = new();
         private static readonly ConcurrentDictionary<Type, bool> _simpleTypeCache = new();
 
         private static bool IsSimpleType(Type type)
@@ -121,7 +123,7 @@ namespace nORM.Query
                 ? mapping.Columns
                 : ExtractColumnsFromProjection(mapping, projection);
 
-            var parameterlessCtor = targetType.GetConstructor(Type.EmptyTypes);
+            var parameterlessCtor = _parameterlessCtorCache.GetOrAdd(targetType, t => t.GetConstructor(Type.EmptyTypes));
 
             if (parameterlessCtor != null && columns.All(c => c.Prop.DeclaringType == targetType && c.Prop.GetSetMethod() != null))
             {
@@ -129,9 +131,16 @@ namespace nORM.Query
             }
             if (parameterlessCtor != null)
             {
+                var parameterlessCtorDelegate = _parameterlessCtorDelegates.GetOrAdd(targetType, t =>
+                {
+                    var newExpr = Expression.New(t);
+                    var body = Expression.Convert(newExpr, typeof(object));
+                    return Expression.Lambda<Func<object>>(body).Compile();
+                });
+
                 return reader =>
                 {
-                    var entity = parameterlessCtor.Invoke(null);
+                    var entity = parameterlessCtorDelegate();
                     for (int i = 0; i < columns.Length; i++)
                     {
                         if (reader.IsDBNull(i)) continue;
