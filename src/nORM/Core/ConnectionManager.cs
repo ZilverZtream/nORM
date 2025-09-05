@@ -152,16 +152,26 @@ namespace nORM.Core
             if (_disposed || _disposeCts.IsCancellationRequested)
                 return;
 
+            await MonitorNodeHealthAsync(_disposeCts.Token).ConfigureAwait(false);
+
+            if (_disposed || _disposeCts.IsCancellationRequested)
+                return;
+
+            RefreshTopologyState();
+        }
+
+        private async Task MonitorNodeHealthAsync(CancellationToken token)
+        {
             foreach (var node in _topology.Nodes)
             {
-                if (_disposed || _disposeCts.IsCancellationRequested)
+                if (_disposed || token.IsCancellationRequested)
                     break;
 
                 var pool = _connectionPools[node.ConnectionString];
                 try
                 {
                     var sw = System.Diagnostics.Stopwatch.StartNew();
-                    await using var cn = await pool.RentAsync(_disposeCts.Token).ConfigureAwait(false);
+                    await using var cn = await pool.RentAsync(token).ConfigureAwait(false);
                     sw.Stop();
                     node.IsHealthy = true;
                     node.LastHealthCheck = DateTime.UtcNow;
@@ -177,10 +187,10 @@ namespace nORM.Core
                     node.LastHealthCheck = DateTime.UtcNow;
                 }
             }
+        }
 
-            if (_disposed || _disposeCts.IsCancellationRequested)
-                return;
-
+        private void RefreshTopologyState()
+        {
             DeterminePrimaryNode();
             UpdateAvailableReadReplicas();
         }
@@ -190,7 +200,7 @@ namespace nORM.Core
             await _failoverSemaphore.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                DeterminePrimaryNode();
+                RefreshTopologyState();
                 if (_currentPrimary == null)
                 {
                     _logger.LogError("Failover attempted but no healthy primary nodes found");
