@@ -275,7 +275,7 @@ namespace nORM.Benchmarks
                     Age = reader.GetInt32(reader.GetOrdinal("Age")),
                     City = reader.GetString(reader.GetOrdinal("City")),
                     Department = reader.GetString(reader.GetOrdinal("Department")),
-                    Salary = reader.GetDecimal(reader.GetOrdinal("Salary"))
+                    Salary = (double)reader.GetDecimal(reader.GetOrdinal("Salary"))
                 });
             }
 
@@ -342,7 +342,7 @@ namespace nORM.Benchmarks
         {
             var result = await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Join(
-                    _nOrmContext.Query<BenchmarkOrder>(),
+                    _nOrmContext!.Query<BenchmarkOrder>(),
                     u => u.Id,
                     o => o.UserId,
                     (u, o) => new JoinDto { Name = u.Name, Amount = o.Amount, ProductName = o.ProductName }
