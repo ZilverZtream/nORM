@@ -65,7 +65,7 @@ namespace nORM.Query
             }
             else
             {
-                _sb.Append(_mapping.Columns.First(c => c.Prop.Name == node.Member.Name).EscCol);
+                _sb.Append(_mapping.ColumnsByName[node.Member.Name].EscCol);
             }
             return node;
         }
@@ -78,7 +78,7 @@ namespace nORM.Query
                 var lambda = (LambdaExpression)StripQuotes(node.Arguments[1]);
                 if (lambda.Body is MemberExpression me)
                 {
-                    _sb.Append(_mapping.Columns.First(c => c.Prop.Name == me.Member.Name).EscCol);
+                    _sb.Append(_mapping.ColumnsByName[me.Member.Name].EscCol);
                 }
             }
             else if (node.Method.Name.ToUpper() != "COUNT")

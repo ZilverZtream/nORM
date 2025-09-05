@@ -143,8 +143,7 @@ namespace nORM.Query
         {
             if (node.Expression is ParameterExpression pe && _parameterMappings.TryGetValue(pe, out var info))
             {
-                var column = info.Mapping.Columns.FirstOrDefault(c => c.Prop.Name == node.Member.Name);
-                if (column != null)
+                if (info.Mapping.ColumnsByName.TryGetValue(node.Member.Name, out var column))
                 {
                     // Table aliases are generated internally (e.g. T0, T1) and are not influenced
                     // by user input, so escaping them adds unnecessary quoting that breaks

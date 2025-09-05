@@ -58,7 +58,7 @@ namespace nORM.Query
             {
                 var lambda = (LambdaExpression)StripQuotes(call.Arguments[0]);
                 var member = (MemberExpression)lambda.Body;
-                var column = mapping.Columns.First(c => c.Prop.Name == member.Member.Name).EscCol;
+                var column = mapping.ColumnsByName[member.Member.Name].EscCol;
                 var value = Expression.Lambda(call.Arguments[1]).Compile().DynamicInvoke();
                 assigns.Add((column, value));
                 call = call.Object as MethodCallExpression;

@@ -375,7 +375,7 @@ namespace nORM.Query
                     var alias = ne.Members![i].Name;
                     if (arg is MemberExpression me)
                     {
-                        var col = _mapping.Columns.First(c => c.Prop.Name == me.Member.Name);
+                        var col = _mapping.ColumnsByName[me.Member.Name];
                         sb.Append(col.EscCol).Append(" AS ").Append(_provider.Escape(alias));
                     }
                     else if (arg is ParameterExpression p && paramMap.TryGetValue(p, out var wf))
@@ -1023,12 +1023,12 @@ namespace nORM.Query
             {
                 if (_correlatedParams.TryGetValue(pe, out var info))
                 {
-                    var col = info.Mapping.Columns.First(c => c.Prop.Name == node.Member.Name);
+                    var col = info.Mapping.ColumnsByName[node.Member.Name];
                     _sql.Append($"{ValidateTableAlias(info.Alias)}.{col.EscCol}");
                 }
                 else
                 {
-                    var col = _mapping.Columns.First(c => c.Prop.Name == node.Member.Name);
+                    var col = _mapping.ColumnsByName[node.Member.Name];
                     _sql.Append(col.EscCol);
                 }
                 return node;
@@ -1093,8 +1093,7 @@ namespace nORM.Query
                     var mapping = isOuterTable ? outerMapping : innerMapping;
                     var alias = isOuterTable ? outerAlias : innerAlias;
 
-                    var column = mapping.Columns.FirstOrDefault(c => c.Prop.Name == memberExpr.Member.Name);
-                    if (column != null)
+                    if (mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
                     {
                         var colSql = $"{alias}.{column.EscCol}";
                         if (!neededColumns.Contains(colSql))

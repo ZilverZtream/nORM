@@ -71,7 +71,7 @@ namespace nORM.Query
                     kvp =>
                     {
                         var dmap = kvp.Value;
-                        var indices = dmap.Columns.Select(c => Array.FindIndex(mapping.Columns, bc => bc.Prop.Name == c.Prop.Name)).ToArray();
+                        var indices = dmap.Columns.Select(c => Array.IndexOf(mapping.Columns, mapping.ColumnsByName[c.Prop.Name])).ToArray();
                         return (Func<DbDataReader, object>)(reader =>
                         {
                             var entity = Activator.CreateInstance(dmap.Type)!;
@@ -217,8 +217,7 @@ namespace nORM.Query
                     if (arg is MemberExpression m)
                     {
                         // Try to resolve against the current mapping first
-                        var col = mapping.Columns.FirstOrDefault(c => c.Prop.Name == m.Member.Name);
-                        if (col != null)
+                        if (mapping.ColumnsByName.TryGetValue(m.Member.Name, out var col))
                         {
                             cols.Add(col);
                         }
