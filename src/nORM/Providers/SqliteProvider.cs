@@ -26,6 +26,24 @@ namespace nORM.Providers
         public override int MaxSqlLength => 1_000_000;
         public override int MaxParameters => 999;
         public override string Escape(string id) => $"\"{id}\"";
+
+        public override CommandType StoredProcedureCommandType => CommandType.Text;
+
+        public override async Task InitializeConnectionAsync(DbConnection connection, CancellationToken ct)
+        {
+            ValidateConnection(connection);
+            await using var pragmaCmd = connection.CreateCommand();
+            pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
+            await pragmaCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        public override void InitializeConnection(DbConnection connection)
+        {
+            ValidateConnection(connection);
+            using var pragmaCmd = connection.CreateCommand();
+            pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
+            pragmaCmd.ExecuteNonQuery();
+        }
         
         public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
         {

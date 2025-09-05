@@ -38,8 +38,8 @@ namespace nORM.Core
         private readonly DynamicEntityTypeGenerator _typeGenerator = new();
         private readonly ConcurrentDictionary<string, Type> _dynamicTypeCache = new();
         private readonly LinkedList<WeakReference<IDisposable>> _disposables = new();
-        private bool _sqliteInitialized;
-        private readonly SemaphoreSlim _sqliteInitLock = new(1, 1);
+        private bool _providerInitialized;
+        private readonly SemaphoreSlim _providerInitLock = new(1, 1);
         private DbTransaction? _currentTransaction;
         private bool _disposed;
 
@@ -114,22 +114,20 @@ namespace nORM.Core
             if (_cn.State != ConnectionState.Open)
                 await _cn.OpenAsync(ct).ConfigureAwait(false);
 
-            if (!_sqliteInitialized && _p is SqliteProvider)
+            if (!_providerInitialized)
             {
-                await _sqliteInitLock.WaitAsync(ct).ConfigureAwait(false);
+                await _providerInitLock.WaitAsync(ct).ConfigureAwait(false);
                 try
                 {
-                    if (!_sqliteInitialized)
+                    if (!_providerInitialized)
                     {
-                        await using var pragmaCmd = _cn.CreateCommand();
-                        pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
-                        await pragmaCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                        _sqliteInitialized = true;
+                        await _p.InitializeConnectionAsync(_cn, ct).ConfigureAwait(false);
+                        _providerInitialized = true;
                     }
                 }
                 finally
                 {
-                    _sqliteInitLock.Release();
+                    _providerInitLock.Release();
                 }
             }
 
@@ -141,22 +139,20 @@ namespace nORM.Core
             if (_cn.State != ConnectionState.Open)
                 _cn.Open();
 
-            if (!_sqliteInitialized && _p is SqliteProvider)
+            if (!_providerInitialized)
             {
-                _sqliteInitLock.Wait();
+                _providerInitLock.Wait();
                 try
                 {
-                    if (!_sqliteInitialized)
+                    if (!_providerInitialized)
                     {
-                        using var pragmaCmd = _cn.CreateCommand();
-                        pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
-                        pragmaCmd.ExecuteNonQuery();
-                        _sqliteInitialized = true;
+                        _p.InitializeConnection(_cn);
+                        _providerInitialized = true;
                     }
                 }
                 finally
                 {
-                    _sqliteInitLock.Release();
+                    _providerInitLock.Release();
                 }
             }
 
@@ -760,7 +756,7 @@ namespace nORM.Core
             var sw = Stopwatch.StartNew();
             await using var cmd = Connection.CreateCommand();
             cmd.CommandText = procedureName;
-            cmd.CommandType = _p is SqliteProvider ? CommandType.Text : CommandType.StoredProcedure;
+            cmd.CommandType = _p.StoredProcedureCommandType;
             cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText).TotalSeconds;
             var paramDict = new Dictionary<string, object>();
             if (parameters != null)

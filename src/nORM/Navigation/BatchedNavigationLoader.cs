@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Core;
@@ -117,34 +116,8 @@ namespace nORM.Navigation
             await _context.EnsureConnectionAsync(default).ConfigureAwait(false);
             using var cmd = _context.Connection.CreateCommand();
 
-            if (_context.Provider is PostgresProvider)
-            {
-                var pName = _context.Provider.ParamPrefix + "p0";
-                var p = cmd.CreateParameter();
-                p.ParameterName = pName;
-                p.Value = keys.ToArray();
-                cmd.Parameters.Add(p);
-                cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {relation.ForeignKey.EscCol} = ANY({pName})";
-            }
-            else if (_context.Provider is SqlServerProvider)
-            {
-                var pName = _context.Provider.ParamPrefix + "p0";
-                var joined = string.Join(",", keys.Select(k => Convert.ToString(k, CultureInfo.InvariantCulture)));
-                cmd.AddParam(pName, joined);
-                cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {relation.ForeignKey.EscCol} IN (SELECT value FROM STRING_SPLIT({pName}, ','))";
-            }
-            else
-            {
-                var paramNames = new List<string>();
-                for (int i = 0; i < keys.Count; i++)
-                {
-                    var pn = _context.Provider.ParamPrefix + "p" + i;
-                    paramNames.Add(pn);
-                    cmd.AddParam(pn, keys[i]);
-                }
-
-                cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({PooledStringBuilder.Join(paramNames, ",")})";
-            }
+            var where = _context.Provider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, keys);
+            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";
 
             cmd.CommandTimeout = (int)_context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
 
