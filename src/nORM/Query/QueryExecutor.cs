@@ -35,57 +35,42 @@ namespace nORM.Query
 
         public async Task<IList> MaterializeAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
+            await using var command = cmd;
             return await _exceptionHandler.ExecuteWithExceptionHandling(async () =>
             {
-                try
+                if (plan.GroupJoinInfo != null)
+                    return await MaterializeGroupJoinAsync(plan, command, ct).ConfigureAwait(false);
+
+                var listType = typeof(List<>).MakeGenericType(plan.ElementType);
+                var list = (IList)Activator.CreateInstance(listType)!;
+
+                var trackable = !plan.NoTracking &&
+                                 plan.ElementType.IsClass &&
+                                 !plan.ElementType.Name.StartsWith("<>") &&
+                                 plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
+
+                TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
+
+                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct)
+                    .ConfigureAwait(false);
+
+                while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
-                    if (plan.GroupJoinInfo != null)
-                        return await MaterializeGroupJoinAsync(plan, cmd, ct).ConfigureAwait(false);
-
-                    var listType = typeof(List<>).MakeGenericType(plan.ElementType);
-                    var list = (IList)Activator.CreateInstance(listType)!;
-
-                    var trackable = !plan.NoTracking &&
-                                     plan.ElementType.IsClass &&
-                                     !plan.ElementType.Name.StartsWith("<>") &&
-                                     plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
-
-                    TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
-
-                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct)
-                        .ConfigureAwait(false);
-
-                    while (await reader.ReadAsync(ct).ConfigureAwait(false))
-                    {
-                        var entity = await plan.Materializer(reader, ct).ConfigureAwait(false);
-                        entity = ProcessEntity(entity, trackable, entityMap);
-                        list.Add(entity);
-                    }
-
-                    if (plan.SplitQuery)
-                    {
-                        foreach (var include in plan.Includes)
-                        {
-                            await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking).ConfigureAwait(false);
-                        }
-                    }
-
-                    return list;
+                    var entity = await plan.Materializer(reader, ct).ConfigureAwait(false);
+                    entity = ProcessEntity(entity, trackable, entityMap);
+                    list.Add(entity);
                 }
-                catch (Exception)
+
+                if (plan.SplitQuery)
                 {
-                    try
+                    foreach (var include in plan.Includes)
                     {
-                        await cmd.DisposeAsync().ConfigureAwait(false);
+                        await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking).ConfigureAwait(false);
                     }
-                    catch (Exception disposeEx)
-                    {
-                        _logger.LogError(disposeEx, "Error disposing DbCommand.");
-                    }
-
-                    throw;
                 }
-            }, "MaterializeAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText }).ConfigureAwait(false);
+
+                return list;
+            }, "MaterializeAsync", new Dictionary<string, object> { ["Sql"] = command.CommandText }).ConfigureAwait(false);
         }
 
         private object ProcessEntity(object entity, bool trackable, TableMapping? entityMap)
