@@ -69,6 +69,9 @@ namespace nORM.Query
         private static readonly ObjectPool<QueryTranslator> _translatorPool =
             new DefaultObjectPool<QueryTranslator>(new QueryTranslatorPooledObjectPolicy());
 
+        private static readonly ObjectPool<List<string>> _selectItemsPool =
+            new DefaultObjectPool<List<string>>(new ListPooledObjectPolicy<string>());
+
         private static readonly AdaptiveQueryComplexityAnalyzer _complexityAnalyzer =
             new AdaptiveQueryComplexityAnalyzer(new SystemMemoryMonitor());
 
@@ -508,6 +511,17 @@ namespace nORM.Query
             public override QueryTranslator Create() => new QueryTranslator();
 
             public override bool Return(QueryTranslator obj)
+            {
+                obj.Clear();
+                return true;
+            }
+        }
+
+        private sealed class ListPooledObjectPolicy<T> : PooledObjectPolicy<List<T>>
+        {
+            public override List<T> Create() => new List<T>();
+
+            public override bool Return(List<T> obj)
             {
                 obj.Clear();
                 return true;
@@ -1242,51 +1256,66 @@ namespace nORM.Query
 
         private void BuildGroupBySelectClause(LambdaExpression resultSelector, string groupBySql, string alias)
         {
-            var selectItems = new List<string>();
-            
-            // Add the grouping key
-            selectItems.Add($"{groupBySql} AS GroupKey");
-            
-            // Analyze the result selector body to find aggregates
-            if (resultSelector.Body is NewExpression newExpr)
+            var selectItems = _selectItemsPool.Get();
+            try
             {
-                for (int i = 0; i < newExpr.Arguments.Count; i++)
+                var builder = PooledStringBuilder.Rent();
+                builder.Append(groupBySql).Append(" AS GroupKey");
+                selectItems.Add(builder.ToString());
+                PooledStringBuilder.Return(builder);
+
+                // Analyze the result selector body to find aggregates
+                if (resultSelector.Body is NewExpression newExpr)
                 {
-                    var arg = newExpr.Arguments[i];
-                    var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
-                    
-                    if (arg is MethodCallExpression methodCall)
+                    for (int i = 0; i < newExpr.Arguments.Count; i++)
                     {
-                        var aggregateSql = TranslateGroupAggregateMethod(methodCall, alias);
-                        if (aggregateSql != null)
+                        var arg = newExpr.Arguments[i];
+                        var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
+
+                        if (arg is MethodCallExpression methodCall)
                         {
-                            selectItems.Add($"{aggregateSql} AS {memberName}");
+                            var aggregateSql = TranslateGroupAggregateMethod(methodCall, alias);
+                            if (aggregateSql != null)
+                            {
+                                builder = PooledStringBuilder.Rent();
+                                builder.Append(aggregateSql).Append(" AS ").Append(memberName);
+                                selectItems.Add(builder.ToString());
+                                PooledStringBuilder.Return(builder);
+                            }
+                        }
+                        else if (arg is ParameterExpression param && param == resultSelector.Parameters[0])
+                        {
+                            // This is the key parameter, already added
+                            continue;
+                        }
+                        else
+                        {
+                            // Try to translate as regular expression
+                            if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                                _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
+                            var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
+                            var visitor = ExpressionVisitorPool.Get(in vctx);
+                            var sql = visitor.Translate(arg);
+
+                            builder = PooledStringBuilder.Rent();
+                            builder.Append(sql).Append(" AS ").Append(memberName);
+                            selectItems.Add(builder.ToString());
+                            PooledStringBuilder.Return(builder);
+
+                            foreach (var kvp in visitor.GetParameters())
+                                _params[kvp.Key] = kvp.Value;
+                            ExpressionVisitorPool.Return(visitor);
                         }
                     }
-                    else if (arg is ParameterExpression param && param == resultSelector.Parameters[0])
-                    {
-                        // This is the key parameter, already added
-                        continue;
-                    }
-                    else
-                    {
-                        // Try to translate as regular expression
-                        if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
-                            _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
-                        var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
-                        var visitor = ExpressionVisitorPool.Get(in vctx);
-                        var sql = visitor.Translate(arg);
-                        selectItems.Add($"{sql} AS {memberName}");
-
-                        foreach (var kvp in visitor.GetParameters())
-                            _params[kvp.Key] = kvp.Value;
-                        ExpressionVisitorPool.Return(visitor);
-                    }
                 }
+
+                _sql.AppendSelect(ReadOnlySpan<char>.Empty);
+                _sql.InnerBuilder.AppendJoin(", ", selectItems);
             }
-            
-            _sql.AppendSelect(ReadOnlySpan<char>.Empty);
-            _sql.InnerBuilder.AppendJoin(", ", selectItems);
+            finally
+            {
+                _selectItemsPool.Return(selectItems);
+            }
         }
 
         private string? TranslateGroupAggregateMethod(MethodCallExpression methodCall, string alias)
