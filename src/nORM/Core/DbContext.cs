@@ -18,6 +18,7 @@ using nORM.Navigation;
 using nORM.Versioning;
 using System.Reflection;
 using nORM.Scaffolding;
+using nORM.Enterprise;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -257,16 +258,19 @@ namespace nORM.Core
 
         public int SaveChanges()
         {
-            // Current implementation can cause deadlocks
-            // Should use ConfigureAwait(false) and proper async context handling
-            if (SynchronizationContext.Current != null)
-            {
-                // Use Task.Run to avoid deadlocks
-                return Task.Run(async () => await SaveChangesAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
-            }
-
-            // For contexts without SynchronizationContext, use GetAwaiter().GetResult()
             return SaveChangesAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+
+        public DbContextOptions UseDeadlockResilientSaveChanges()
+        {
+            Options.RetryPolicy = new RetryPolicy
+            {
+                MaxRetries = 3,
+                BaseDelay = TimeSpan.FromSeconds(1),
+                ShouldRetry = ex => ex is DbException dbEx &&
+                    (int?)dbEx.GetType().GetProperty("Number")?.GetValue(dbEx) == 1205
+            };
+            return Options;
         }
 
         public Task<int> SaveChangesAsync(CancellationToken ct = default)
