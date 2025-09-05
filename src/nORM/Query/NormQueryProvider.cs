@@ -271,13 +271,21 @@ namespace nORM.Query
             var hash = new HashCode();
             hash.Add(plan.Sql);
             hash.Add(typeof(TResult));
+
+            var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
+            if (_ctx.Options.TenantProvider != null)
+            {
+                if (tenant == null)
+                    throw new InvalidOperationException("Tenant context required but not available");
+                hash.Add("TENANT:" + tenant.ToString());
+            }
+
             foreach (var kvp in parameters.OrderBy(k => k.Key))
             {
                 hash.Add(kvp.Key);
                 hash.Add(kvp.Value?.GetHashCode() ?? 0);
             }
-            var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
-            if (tenant != null) hash.Add(tenant);
+
             return hash.ToHashCode().ToString();
         }
 
@@ -404,13 +412,21 @@ namespace nORM.Query
             var hash = new HashCode();
             hash.Add(ExpressionFingerprint.Compute(expression));
             hash.Add(typeof(TResult));
+
+            var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
+            if (_ctx.Options.TenantProvider != null)
+            {
+                if (tenant == null)
+                    throw new InvalidOperationException("Tenant context required but not available");
+                hash.Add("TENANT:" + tenant.ToString());
+            }
+
             foreach (var kvp in parameters.OrderBy(k => k.Key))
             {
                 hash.Add(kvp.Key);
                 hash.Add(kvp.Value?.GetHashCode() ?? 0);
             }
-            var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
-            if (tenant != null) hash.Add(tenant);
+
             return hash.ToHashCode().ToString();
         }
 
