@@ -226,19 +226,16 @@ namespace nORM.Core
 
         public int SaveChanges()
         {
-            try
+            // Current implementation can cause deadlocks
+            // Should use ConfigureAwait(false) and proper async context handling
+            if (SynchronizationContext.Current != null)
             {
-                if (SynchronizationContext.Current == null)
-                {
-                    return SaveChangesAsync().GetAwaiter().GetResult();
-                }
-
+                // Use Task.Run to avoid deadlocks
                 return Task.Run(async () => await SaveChangesAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
             }
-            catch (AggregateException ex)
-            {
-                throw ex.GetBaseException();
-            }
+
+            // For contexts without SynchronizationContext, use GetAwaiter().GetResult()
+            return SaveChangesAsync().ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         public Task<int> SaveChangesAsync(CancellationToken ct = default)
