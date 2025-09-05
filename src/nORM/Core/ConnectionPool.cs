@@ -15,6 +15,7 @@ namespace nORM.Core
     {
         private readonly Func<DbConnection> _connectionFactory;
         private readonly ConcurrentQueue<PooledItem> _pool = new();
+        private readonly object _poolLock = new();
         private readonly SemaphoreSlim _semaphore;
         private readonly Timer _cleanupTimer;
         private readonly int _minSize;
@@ -70,8 +71,13 @@ namespace nORM.Core
         {
             ThrowIfDisposed();
             await _semaphore.WaitAsync(ct).ConfigureAwait(false);
+            PooledItem? item = null;
+            lock (_poolLock)
+            {
+                _pool.TryDequeue(out item);
+            }
 
-            if (_pool.TryDequeue(out var item))
+            if (item != null)
             {
                 try
                 {
@@ -104,7 +110,10 @@ namespace nORM.Core
 
             if (connection.State == ConnectionState.Open)
             {
-                _pool.Enqueue(new PooledItem(connection));
+                lock (_poolLock)
+                {
+                    _pool.Enqueue(new PooledItem(connection));
+                }
             }
             else
             {
@@ -120,21 +129,24 @@ namespace nORM.Core
             var threshold = DateTime.UtcNow - _idleLifetime;
 
             var itemsToRequeue = new List<PooledItem>();
-            while (_created > _minSize && _pool.TryDequeue(out var item))
+            lock (_poolLock)
             {
-                if (item.LastUsed < threshold)
+                while (_created > _minSize && _pool.TryDequeue(out var item))
                 {
-                    item.Connection.Dispose();
-                    Interlocked.Decrement(ref _created);
+                    if (item.LastUsed < threshold)
+                    {
+                        item.Connection.Dispose();
+                        Interlocked.Decrement(ref _created);
+                    }
+                    else
+                    {
+                        itemsToRequeue.Add(item);
+                    }
                 }
-                else
-                {
-                    itemsToRequeue.Add(item);
-                }
-            }
 
-            foreach (var item in itemsToRequeue)
-                _pool.Enqueue(item);
+                foreach (var item in itemsToRequeue)
+                    _pool.Enqueue(item);
+            }
         }
 
         private void ThrowIfDisposed()
