@@ -278,23 +278,22 @@ namespace nORM.Core
 
         private async Task<int> SaveChangesWithRetryAsync(CancellationToken ct)
         {
-            const int maxRetries = 3;
-            var baseDelay = TimeSpan.FromMilliseconds(100);
+            var policy = Options.RetryPolicy;
+            var maxRetries = policy?.MaxRetries ?? 1;
+            var baseDelay = policy?.BaseDelay ?? TimeSpan.Zero;
 
-            for (int attempt = 0; attempt < maxRetries - 1; attempt++)
+            for (var attempt = 0; ; attempt++)
             {
                 try
                 {
                     return await SaveChangesInternalAsync(ct).ConfigureAwait(false);
                 }
-                catch (Exception ex) when (IsRetryableException(ex))
+                catch (Exception ex) when (attempt < maxRetries - 1 && IsRetryableException(ex))
                 {
                     var delay = TimeSpan.FromMilliseconds(baseDelay.TotalMilliseconds * Math.Pow(2, attempt));
                     await Task.Delay(delay, ct).ConfigureAwait(false);
                 }
             }
-
-            return await SaveChangesInternalAsync(ct).ConfigureAwait(false);
         }
 
         private async Task<int> SaveChangesInternalAsync(CancellationToken ct)
@@ -413,14 +412,15 @@ namespace nORM.Core
             }
         }
 
-        private static bool IsRetryableException(Exception ex)
+        private bool IsRetryableException(Exception ex)
         {
-            return ex switch
+            if (ex is DbException dbEx && Options.RetryPolicy != null)
             {
-                SqlException sqlEx => sqlEx.Number is 1205 or 1222,
-                TimeoutException => true,
-                _ => false
-            };
+                if (Options.RetryPolicy.ShouldRetry(dbEx))
+                    return true;
+            }
+
+            return ex is TimeoutException;
         }
 
         private Task<int> InvokeWriteAsync(string methodName, EntityEntry entry, DbTransaction? transaction, CancellationToken ct)
