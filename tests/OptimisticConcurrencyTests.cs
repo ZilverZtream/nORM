@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
@@ -44,6 +45,9 @@ public class OptimisticConcurrencyTests
         }
 
         user.Name = "Bob";
+        var entry = ctx.ChangeTracker.Entries.Single();
+        var markDirty = typeof(ChangeTracker).GetMethod("MarkDirty", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        markDirty!.Invoke(ctx.ChangeTracker, new object[] { entry });
         await Assert.ThrowsAsync<DbConcurrencyException>(() => ctx.SaveChangesAsync());
     }
 
