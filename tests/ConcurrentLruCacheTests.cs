@@ -26,5 +26,14 @@ public class ConcurrentLruCacheTests
         Assert.Equal(1, cache.Misses);
         Assert.Equal(0.5, cache.HitRate);
     }
+
+    [Fact]
+    public void Cache_can_be_cleared()
+    {
+        var cache = new ConcurrentLruCache<int, string>(maxSize: 10, timeToLive: TimeSpan.FromMinutes(1));
+        cache.GetOrAdd(1, _ => "value");
+        cache.Clear();
+        Assert.False(cache.TryGet(1, out _));
+    }
 }
 

@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using nORM.Internal;
 using nORM.Mapping;
 using nORM.SourceGeneration;
+using nORM.Core;
 
 namespace nORM.Query
 {
@@ -21,6 +22,8 @@ namespace nORM.Query
     {
         private static readonly ConcurrentLruCache<(int MappingTypeHash, int TargetTypeHash, int ProjectionHash, string TableName), Func<DbDataReader, CancellationToken, Task<object>>> _cache
             = new(maxSize: 1000, timeToLive: TimeSpan.FromMinutes(10));
+        private static readonly IMemoryMonitor _memoryMonitor = new SystemMemoryMonitor();
+        private const long LowMemoryThresholdBytes = 200L * 1024L * 1024L;
 
         // Cache constructor info and delegates to avoid repeated reflection in hot paths
         private static readonly ConcurrentDictionary<Type, ConstructorInfo> _constructorCache = new();
@@ -31,6 +34,11 @@ namespace nORM.Query
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
         {
+            if (_memoryMonitor.GetAvailableMemory() < LowMemoryThresholdBytes)
+            {
+                _cache.Clear();
+            }
+
             var projectionHash = projection != null ? ExpressionFingerprint.Compute(projection) : 0;
             var cacheKey = (mapping.Type.GetHashCode(), targetType.GetHashCode(), projectionHash, mapping.TableName);
 
