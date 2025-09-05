@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Linq;
 using nORM.Configuration;
 using nORM.Mapping;
@@ -15,6 +16,8 @@ namespace nORM.Core
     {
         private readonly ConcurrentDictionary<object, EntityEntry> _entriesByReference = new(RefComparer.Instance);
         private readonly ConcurrentDictionary<Type, ConcurrentDictionary<object, EntityEntry>> _entriesByKey = new();
+        private readonly ConcurrentDictionary<EntityEntry, byte> _nonNotifyingEntries = new();
+        private readonly ConcurrentDictionary<EntityEntry, byte> _dirtyEntries = new();
         private readonly DbContextOptions _options;
 
         public ChangeTracker(DbContextOptions options)
@@ -32,8 +35,10 @@ namespace nORM.Core
                 return existing;
             }
 
-            var entry = new EntityEntry(entity, state, mapping, _options);
+            var entry = new EntityEntry(entity, state, mapping, _options, MarkDirty);
             _entriesByReference[entity] = entry;
+            if (entity is not INotifyPropertyChanged)
+                _nonNotifyingEntries[entry] = 0;
             if (pk != null)
             {
                 var typeEntries = _entriesByKey.GetOrAdd(
@@ -50,6 +55,8 @@ namespace nORM.Core
             if (_entriesByReference.TryRemove(entity, out var entry))
             {
                 entry.DetachEntity();
+                _nonNotifyingEntries.TryRemove(entry, out _);
+                _dirtyEntries.TryRemove(entry, out _);
                 var pk = GetPrimaryKeyValue(entity, entry.Mapping);
                 if (pk != null && _entriesByKey.TryGetValue(entry.Mapping.Type, out var typeEntries))
                 {
@@ -91,16 +98,22 @@ namespace nORM.Core
 
         internal void DetectChanges()
         {
-            var entriesSnapshot = _entriesByReference.Values.ToList();
-            foreach (var entry in entriesSnapshot)
+            foreach (var entry in _nonNotifyingEntries.Keys)
             {
-                var entity = entry.Entity;
-                if (entity != null && _entriesByReference.ContainsKey(entity))
-                {
+                if (entry.Entity != null)
                     entry.DetectChanges();
-                }
             }
+
+            foreach (var entry in _dirtyEntries.Keys)
+            {
+                if (entry.Entity != null)
+                    entry.DetectChanges();
+            }
+
+            _dirtyEntries.Clear();
         }
+
+        internal void MarkDirty(EntityEntry entry) => _dirtyEntries[entry] = 0;
 
         private static object? GetPrimaryKeyValue(object entity, TableMapping mapping)
         {
