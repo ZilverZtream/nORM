@@ -307,33 +307,9 @@ namespace nORM.Core
                     await interceptor.SavingChangesAsync(this, changedEntries, ct).ConfigureAwait(false);
             }
 
-            var existingTransaction = Database.CurrentTransaction;
-            var ambientTransaction = Transaction.Current;
-            var ownsTransaction = existingTransaction == null && ambientTransaction == null;
-            DbTransaction? transaction;
-            CancellationTokenSource? timeoutCts = null;
-            CancellationTokenSource? linkedCts = null;
-
-            if (ambientTransaction != null && existingTransaction == null)
-            {
-                await EnsureConnectionAsync(ct).ConfigureAwait(false);
-                Connection.EnlistTransaction(ambientTransaction);
-                transaction = null;
-            }
-            else if (ownsTransaction)
-            {
-                await EnsureConnectionAsync(ct).ConfigureAwait(false);
-                var isolationLevel = System.Data.IsolationLevel.ReadCommitted; // Use a safe default.
-                transaction = await Connection.BeginTransactionAsync(isolationLevel, ct).ConfigureAwait(false);
-
-                timeoutCts = new CancellationTokenSource(Options.TimeoutConfiguration.BaseTimeout);
-                linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
-                ct = linkedCts.Token;
-            }
-            else
-            {
-                transaction = existingTransaction!;
-            }
+            await using var transactionManager = await TransactionManager.CreateAsync(this, ct).ConfigureAwait(false);
+            ct = transactionManager.Token;
+            var transaction = transactionManager.Transaction;
 
             var totalAffected = 0;
             try
@@ -343,8 +319,7 @@ namespace nORM.Core
                     totalAffected += await ProcessEntityChangeAsync(entry, transaction, ct).ConfigureAwait(false);
                 }
 
-                if (ownsTransaction)
-                    await transaction!.CommitAsync(ct).ConfigureAwait(false);
+                await transactionManager.CommitAsync().ConfigureAwait(false);
 
                 var cache = Options.CacheProvider;
                 if (cache != null)
@@ -364,16 +339,8 @@ namespace nORM.Core
             }
             catch
             {
-                if (ownsTransaction)
-                    await transaction!.RollbackAsync(ct).ConfigureAwait(false);
+                await transactionManager.RollbackAsync().ConfigureAwait(false);
                 throw;
-            }
-            finally
-            {
-                if (ownsTransaction)
-                    await transaction!.DisposeAsync().ConfigureAwait(false);
-                linkedCts?.Dispose();
-                timeoutCts?.Dispose();
             }
 
             if (saveInterceptors.Count > 0)
