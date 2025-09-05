@@ -26,7 +26,7 @@ namespace nORM.Query
 
             if (projection?.Body is NewExpression newExpr)
             {
-                var neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping);
+                var neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
                 if (neededColumns.Count == 0)
                 {
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
@@ -79,11 +79,9 @@ namespace nORM.Query
             }
         }
 
-        public static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping)
+        public static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
         {
             var neededColumns = new List<string>();
-            var outerAlias = "T0";
-            var innerAlias = "T1";
 
             foreach (var arg in newExpr.Arguments)
             {
