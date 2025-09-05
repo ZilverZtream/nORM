@@ -44,35 +44,32 @@ namespace nORM.Query
                                       List<string>? compiledParams = null,
                                       Dictionary<ParameterExpression, string>? paramMap = null)
         {
-            Initialize(ctx, mapping, provider, parameter, tableAlias, correlated, compiledParams, paramMap);
+            var context = new VisitorContext(ctx, mapping, provider, parameter, tableAlias, correlated, compiledParams, paramMap);
+            Initialize(in context);
         }
 
-        public void Initialize(DbContext ctx, TableMapping mapping, DatabaseProvider provider,
-                               ParameterExpression parameter, string tableAlias,
-                               Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated = null,
-                               List<string>? compiledParams = null,
-                               Dictionary<ParameterExpression, string>? paramMap = null)
+        public void Initialize(in VisitorContext context)
         {
-            _ctx = ctx;
-            _mapping = mapping;
-            _provider = provider;
-            _parameter = parameter;
-            _tableAlias = tableAlias;
+            _ctx = context.Context;
+            _mapping = context.Mapping;
+            _provider = context.Provider;
+            _parameter = context.Parameter;
+            _tableAlias = context.TableAlias;
 
             _parameterMappings.Clear();
-            if (correlated != null)
+            if (context.Correlated != null)
             {
-                foreach (var kvp in correlated)
+                foreach (var kvp in context.Correlated)
                     _parameterMappings[kvp.Key] = kvp.Value;
             }
-            _parameterMappings[parameter] = (mapping, tableAlias);
+            _parameterMappings[context.Parameter] = (context.Mapping, context.TableAlias);
 
-            _compiledParams = compiledParams ?? _ownedCompiledParams;
-            if (compiledParams == null)
+            _compiledParams = context.CompiledParams ?? _ownedCompiledParams;
+            if (context.CompiledParams == null)
                 _ownedCompiledParams.Clear();
 
-            _paramMap = paramMap ?? _ownedParamMap;
-            if (paramMap == null)
+            _paramMap = context.ParamMap ?? _ownedParamMap;
+            if (context.ParamMap == null)
                 _ownedParamMap.Clear();
 
             _paramIndex = 0;
@@ -317,7 +314,8 @@ namespace nORM.Query
                             if (node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression countSelector)
                             {
                                 var info = _parameterMappings[cp];
-                                var visitor = ExpressionVisitorPool.Get(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
+                                var vctx = new VisitorContext(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
+                                var visitor = ExpressionVisitorPool.Get(in vctx);
                                 var predSql = visitor.Translate(countSelector.Body);
                                 foreach (var kvp in visitor.GetParameters())
                                     _params[kvp.Key] = kvp.Value;
@@ -341,7 +339,8 @@ namespace nORM.Query
                             if (selector != null)
                             {
                                 var info = _parameterMappings[gp];
-                                var visitor = ExpressionVisitorPool.Get(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
+                                var vctx = new VisitorContext(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
+                                var visitor = ExpressionVisitorPool.Get(in vctx);
                                 var colSql = visitor.Translate(selector.Body);
                                 foreach (var kvp in visitor.GetParameters())
                                     _params[kvp.Key] = kvp.Value;
