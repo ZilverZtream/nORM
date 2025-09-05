@@ -475,7 +475,12 @@ namespace nORM.Query
                     defaultSql = $", {defSql}";
                 }
 
-                var offsetParam = _provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+                string offsetParam;
+                do
+                {
+                    offsetParam = _provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+                }
+                while (_params.ContainsKey(offsetParam));
                 _params[offsetParam] = wf.Offset;
                 return $"{wf.FunctionName}({valueSql}, {offsetParam}{defaultSql}) OVER ({overClause})";
             }
