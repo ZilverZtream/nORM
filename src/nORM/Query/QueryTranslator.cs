@@ -211,140 +211,164 @@ namespace nORM.Query
         }
 
         public QueryPlan Translate(Expression e)
+            => new TranslationBuilder(this, e)
+                .Validate()
+                .Setup()
+                .Generate();
+
+        private sealed class TranslationBuilder
         {
-            if (e == null) throw new ArgumentNullException(nameof(e));
-            if (_ctx == null) throw new InvalidOperationException("QueryTranslator not properly initialized");
-            if (_provider == null) throw new InvalidOperationException("Provider not set");
+            private readonly QueryTranslator _t;
+            private readonly Expression _expression;
 
-            // Analyze query complexity before translation
-            var complexityInfo = _complexityAnalyzer.AnalyzeQuery(e, _ctx.Options);
-
-            if (complexityInfo.WarningMessages.Any())
+            public TranslationBuilder(QueryTranslator translator, Expression expression)
             {
-                var warnings = string.Join("; ", complexityInfo.WarningMessages);
-                _ctx.Options.Logger?.LogQuery($"-- WARN: {warnings}", new Dictionary<string, object>(), TimeSpan.Zero, 0);
+                _t = translator;
+                _expression = expression;
             }
 
-            var timeoutMultiplier = Math.Max(1.0, complexityInfo.EstimatedCost / 1000.0);
-            var adjustedTimeout = TimeSpan.FromMilliseconds(_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalMilliseconds * timeoutMultiplier);
-            _estimatedTimeout = adjustedTimeout;
-
-            // Determine root query type and handle TPH discriminator filters
-            var rootExpr = UnwrapQueryExpression(e);
-            _rootType = GetElementType(rootExpr);
-            _mapping = TrackMapping(_rootType);
-
-            // Walk up inheritance hierarchy to find base mapping with discriminator
-            var baseType = _rootType.BaseType;
-            while (baseType != null && baseType != typeof(object))
+            public TranslationBuilder Validate()
             {
-                var baseMap = TrackMapping(baseType);
-                if (baseMap.DiscriminatorColumn != null)
+                if (_expression == null) throw new ArgumentNullException(nameof(_expression));
+                if (_t._ctx == null) throw new InvalidOperationException("QueryTranslator not properly initialized");
+                if (_t._provider == null) throw new InvalidOperationException("Provider not set");
+
+                var complexityInfo = _complexityAnalyzer.AnalyzeQuery(_expression, _t._ctx.Options);
+                if (complexityInfo.WarningMessages.Any())
                 {
-                    _mapping = baseMap;
-                    var discAttr = _rootType.GetCustomAttribute<DiscriminatorValueAttribute>();
-                    if (discAttr != null)
-                    {
-                        var paramName = _ctx.Provider.ParamPrefix + "p" + _paramIndex++;
-                        _params[paramName] = discAttr.Value;
-                        _where.Append($"({_mapping.DiscriminatorColumn!.EscCol} = {paramName})");
-                    }
-                    break;
+                    var warnings = string.Join("; ", complexityInfo.WarningMessages);
+                    _t._ctx.Options.Logger?.LogQuery($"-- WARN: {warnings}", new Dictionary<string, object>(), TimeSpan.Zero, 0);
                 }
-                baseType = baseType.BaseType;
+
+                var timeoutMultiplier = Math.Max(1.0, complexityInfo.EstimatedCost / 1000.0);
+                var adjustedTimeout = TimeSpan.FromMilliseconds(_t._ctx.Options.TimeoutConfiguration.BaseTimeout.TotalMilliseconds * timeoutMultiplier);
+                _t._estimatedTimeout = adjustedTimeout;
+
+                return this;
             }
 
-            Visit(e);
-
-            var materializerType = _projection?.Body.Type ?? _rootType ?? _mapping.Type;
-            if (_isAggregate && _groupBy.Count == 0 && (e as MethodCallExpression)?.Method.Name is "Count" or "LongCount")
+            public TranslationBuilder Setup()
             {
-                materializerType = typeof(int);
-            }
+                var rootExpr = UnwrapQueryExpression(_expression);
+                _t._rootType = GetElementType(rootExpr);
+                _t._mapping = _t.TrackMapping(_t._rootType);
 
-            var materializer = _materializerFactory.CreateMaterializer(_mapping, materializerType, _projection);
-            var isScalar = _isAggregate && _groupBy.Count == 0;
-
-            if (_sql.Length == 0)
-            {
-                var fromClause = _mapping.EscTable;
-                var alias = _correlatedParams.Count > 0 ? _correlatedParams.Values.First().Alias : null;
-                if (_asOfTimestamp.HasValue)
+                var baseType = _t._rootType.BaseType;
+                while (baseType != null && baseType != typeof(object))
                 {
-                    alias ??= "T0";
-                    var timeParamName = _provider.ParamPrefix + "p" + _paramIndex++;
-                    _params[timeParamName] = _asOfTimestamp.Value;
-                    var historyTable = _provider.Escape(_mapping.TableName + "_History");
-                    var cols = PooledStringBuilder.Join(_mapping.Columns.Select(c => c.EscCol));
-                    var temporalQuery = $@"
+                    var baseMap = _t.TrackMapping(baseType);
+                    if (baseMap.DiscriminatorColumn != null)
+                    {
+                        _t._mapping = baseMap;
+                        var discAttr = _t._rootType.GetCustomAttribute<DiscriminatorValueAttribute>();
+                        if (discAttr != null)
+                        {
+                            var paramName = _t._ctx.Provider.ParamPrefix + "p" + _t._paramIndex++;
+                            _t._params[paramName] = discAttr.Value;
+                            _t._where.Append($"({_t._mapping.DiscriminatorColumn!.EscCol} = {paramName})");
+                        }
+                        break;
+                    }
+                    baseType = baseType.BaseType;
+                }
+
+                return this;
+            }
+
+            public QueryPlan Generate()
+            {
+                _t.Visit(_expression);
+
+                var materializerType = _t._projection?.Body.Type ?? _t._rootType ?? _t._mapping.Type;
+                if (_t._isAggregate && _t._groupBy.Count == 0 && (_expression as MethodCallExpression)?.Method.Name is "Count" or "LongCount")
+                {
+                    materializerType = typeof(int);
+                }
+
+                var materializer = _t._materializerFactory.CreateMaterializer(_t._mapping, materializerType, _t._projection);
+                var isScalar = _t._isAggregate && _t._groupBy.Count == 0;
+
+                if (_t._sql.Length == 0)
+                {
+                    var fromClause = _t._mapping.EscTable;
+                    var alias = _t._correlatedParams.Count > 0 ? _t._correlatedParams.Values.First().Alias : null;
+                    if (_t._asOfTimestamp.HasValue)
+                    {
+                        alias ??= "T0";
+                        var timeParamName = _t._provider.ParamPrefix + "p" + _t._paramIndex++;
+                        _t._params[timeParamName] = _t._asOfTimestamp.Value;
+                        var historyTable = _t._provider.Escape(_t._mapping.TableName + "_History");
+                        var cols = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
+                        var temporalQuery = $@"
 (
-    SELECT {cols} FROM {_mapping.EscTable} T1
-    WHERE {timeParamName} >= T1.{_provider.Escape("__ValidFrom")} AND {timeParamName} < T1.{_provider.Escape("__ValidTo")}
+    SELECT {cols} FROM {_t._mapping.EscTable} T1
+    WHERE {timeParamName} >= T1.{_t._provider.Escape("__ValidFrom")} AND {timeParamName} < T1.{_t._provider.Escape("__ValidTo")}
     UNION ALL
     SELECT {cols} FROM {historyTable} T2
-    WHERE {timeParamName} >= T2.{_provider.Escape("__ValidFrom")} AND {timeParamName} < T2.{_provider.Escape("__ValidTo")}
+    WHERE {timeParamName} >= T2.{_t._provider.Escape("__ValidFrom")} AND {timeParamName} < T2.{_t._provider.Escape("__ValidTo")}
 )";
-                    fromClause = temporalQuery;
-                }
-
-                if (_isAggregate && _groupBy.Count == 0)
-                {
-                    _sql.AppendFragment("SELECT COUNT(*) FROM ").Append(fromClause);
-                    if (alias != null) _sql.Append(' ').Append(alias);
-                }
-                else
-                {
-                    var windowFuncs = _clauses.WindowFunctions;
-                    if (windowFuncs.Count > 0 && _projection == null)
-                        _projection = windowFuncs[^1].ResultSelector;
-
-                    string select;
-                    if (windowFuncs.Count > 0 && _projection != null)
-                    {
-                        var orderByForOverClause = _orderBy.Any()
-                            ? $"ORDER BY {PooledStringBuilder.JoinOrderBy(_orderBy)}"
-                            : "ORDER BY (SELECT NULL)";
-                        select = BuildSelectWithWindowFunctions(_projection, windowFuncs, orderByForOverClause);
+                        fromClause = temporalQuery;
                     }
-                    else if (_projection != null)
+
+                    if (_t._isAggregate && _t._groupBy.Count == 0)
                     {
-                        var selectVisitor = new SelectClauseVisitor(_mapping, _groupBy, _provider);
-                        select = selectVisitor.Translate(_projection.Body);
+                        _t._sql.AppendFragment("SELECT COUNT(*) FROM ").Append(fromClause);
+                        if (alias != null) _t._sql.Append(' ').Append(alias);
                     }
                     else
                     {
-                        select = PooledStringBuilder.Join(_mapping.Columns.Select(c => c.EscCol));
+                        var windowFuncs = _t._clauses.WindowFunctions;
+                        if (windowFuncs.Count > 0 && _t._projection == null)
+                            _t._projection = windowFuncs[^1].ResultSelector;
+
+                        string select;
+                        if (windowFuncs.Count > 0 && _t._projection != null)
+                        {
+                            var orderByForOverClause = _t._orderBy.Any()
+                                ? $"ORDER BY {PooledStringBuilder.JoinOrderBy(_t._orderBy)}"
+                                : "ORDER BY (SELECT NULL)";
+                            select = _t.BuildSelectWithWindowFunctions(_t._projection, windowFuncs, orderByForOverClause);
+                        }
+                        else if (_t._projection != null)
+                        {
+                            var selectVisitor = new SelectClauseVisitor(_t._mapping, _t._groupBy, _t._provider);
+                            select = selectVisitor.Translate(_t._projection.Body);
+                        }
+                        else
+                        {
+                            select = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
+                        }
+
+                        var distinct = _t._isDistinct ? "DISTINCT " : string.Empty;
+                        using var prefix = new OptimizedSqlBuilder(select.Length + _t._mapping.EscTable.Length + 32);
+                        prefix.AppendFragment("SELECT ").Append(distinct).Append(select).AppendFragment(" FROM ").Append(fromClause);
+                        if (alias != null) prefix.Append(' ').Append(alias);
+                        _t._sql.Insert(0, prefix.ToSqlString());
                     }
-
-                    var distinct = _isDistinct ? "DISTINCT " : string.Empty;
-                    using var prefix = new OptimizedSqlBuilder(select.Length + _mapping.EscTable.Length + 32);
-                    prefix.AppendFragment("SELECT ").Append(distinct).Append(select).AppendFragment(" FROM ").Append(fromClause);
-                    if (alias != null) prefix.Append(' ').Append(alias);
-                    _sql.Insert(0, prefix.ToSqlString());
                 }
+
+                if (_t._where.Length > 0)
+                {
+                    _t._sql.AppendFragment(" WHERE ").Append(_t._where.ToSqlString());
+                }
+
+                if (_t._groupBy.Count > 0)
+                    _t._sql.AppendFragment(" GROUP BY ").Append(PooledStringBuilder.Join(_t._groupBy));
+                if (_t._having.Length > 0)
+                    _t._sql.AppendFragment(" HAVING ").Append(_t._having.ToSqlString());
+                if (_t._orderBy.Count > 0)
+                    _t._sql.AppendFragment(" ORDER BY ").Append(PooledStringBuilder.JoinOrderBy(_t._orderBy));
+                _t._ctx.Provider.ApplyPaging(_t._sql.InnerBuilder, _t._take, _t._skip, _t._takeParam, _t._skipParam);
+
+                var singleResult = _t._singleResult || _t._methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
+                    or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
+
+                var elementType = _t._groupJoinInfo?.ResultType ?? materializerType;
+
+                var plan = new QueryPlan(_t._sql.ToString(), _t._params, _t._compiledParams, materializer, elementType, isScalar, singleResult, _t._noTracking, _t._methodName, _t._includes, _t._groupJoinInfo, _t._tables.ToArray(), _t._splitQuery, _t._estimatedTimeout, _t._isCacheable, _t._cacheExpiration);
+                QueryPlanValidator.Validate(plan, _t._provider);
+                return plan;
             }
-
-            if (_where.Length > 0)
-            {
-                _sql.AppendFragment(" WHERE ").Append(_where.ToSqlString());
-            }
-
-            if (_groupBy.Count > 0)
-                _sql.AppendFragment(" GROUP BY ").Append(PooledStringBuilder.Join(_groupBy));
-            if (_having.Length > 0)
-                _sql.AppendFragment(" HAVING ").Append(_having.ToSqlString());
-            if (_orderBy.Count > 0)
-                _sql.AppendFragment(" ORDER BY ").Append(PooledStringBuilder.JoinOrderBy(_orderBy));
-            _ctx.Provider.ApplyPaging(_sql.InnerBuilder, _take, _skip, _takeParam, _skipParam);
-
-            var singleResult = _singleResult || _methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
-                or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
-
-            var elementType = _groupJoinInfo?.ResultType ?? materializerType;
-
-            var plan = new QueryPlan(_sql.ToString(), _params, _compiledParams, materializer, elementType, isScalar, singleResult, _noTracking, _methodName, _includes, _groupJoinInfo, _tables.ToArray(), _splitQuery, _estimatedTimeout, _isCacheable, _cacheExpiration);
-            QueryPlanValidator.Validate(plan, _provider);
-            return plan;
         }
 
         private TableMapping TrackMapping(Type type)
