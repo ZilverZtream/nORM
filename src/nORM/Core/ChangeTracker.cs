@@ -94,7 +94,8 @@ namespace nORM.Core
             var entriesSnapshot = _entriesByReference.Values.ToList();
             foreach (var entry in entriesSnapshot)
             {
-                if (_entriesByReference.ContainsKey(entry.Entity))
+                var entity = entry.Entity;
+                if (entity != null && _entriesByReference.ContainsKey(entity))
                 {
                     entry.DetectChanges();
                 }

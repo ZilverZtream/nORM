@@ -62,7 +62,7 @@ namespace nORM.Query
                     if (!noTracking)
                     {
                         var entry = _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
-                        child = entry.Entity;
+                        child = entry.Entity!;
                         NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
                     }
                     resultChildren.Add(child);

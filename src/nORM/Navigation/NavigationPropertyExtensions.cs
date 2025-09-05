@@ -410,7 +410,7 @@ namespace nORM.Navigation
             {
                 var entity = await materializer(reader, ct).ConfigureAwait(false);
                 var entry = context.ChangeTracker.Track(entity, EntityState.Unchanged, mapping);
-                entity = entry.Entity;
+                entity = entry.Entity!;
                 // Enable lazy loading for the loaded entity
                 _navigationContexts.GetValue(entity, _ => new NavigationContext(context, entityType));
                 return entity;
