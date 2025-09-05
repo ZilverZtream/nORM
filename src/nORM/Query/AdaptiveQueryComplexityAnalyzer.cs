@@ -60,6 +60,9 @@ namespace nORM.Query
                 if (!_complexQuerySemaphore.Wait(TimeSpan.FromSeconds(1)))
                     throw new NormQueryException("System is under high query load. Please retry later.");
                 _complexQuerySemaphore.Release();
+                throw new NormQueryException(string.Format(
+                    ErrorMessages.QueryTranslationFailed,
+                    $"Query complexity too high (cost: {baseAnalysis.EstimatedCost}, threshold: {adaptedLimits.HighCostThreshold})."));
             }
 
             return baseAnalysis;
