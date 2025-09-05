@@ -256,11 +256,6 @@ namespace nORM.Core
             return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(entity.GetType()));
         }
 
-        public int SaveChanges()
-        {
-            return SaveChangesAsync().ConfigureAwait(false).GetAwaiter().GetResult();
-        }
-
         public DbContextOptions UseDeadlockResilientSaveChanges()
         {
             Options.RetryPolicy = new RetryPolicy
