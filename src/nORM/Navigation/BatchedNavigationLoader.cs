@@ -134,7 +134,7 @@ namespace nORM.Navigation
             {
                 var entity = await materializer(reader, default).ConfigureAwait(false);
                 var entry = _context.ChangeTracker.Track(entity, EntityState.Unchanged, mapping);
-                entity = entry.Entity;
+                entity = entry.Entity!;
                 NavigationPropertyExtensions._navigationContexts.GetValue(entity, _ => new NavigationContext(_context, relation.DependentType));
                 results.Add(entity);
             }

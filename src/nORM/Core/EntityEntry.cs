@@ -22,7 +22,7 @@ namespace nORM.Core
         private readonly DbContextOptions _options;
         private bool _hasNotifiedChange;
 
-        public object Entity { get; }
+        public object? Entity { get; private set; }
         public EntityState State { get; internal set; }
         internal TableMapping Mapping => _mapping;
 
@@ -59,10 +59,16 @@ namespace nORM.Core
 
         private void CaptureOriginalValues()
         {
+            var entity = Entity;
+            if (entity is null)
+            {
+                DetachEntity();
+                return;
+            }
             for (int i = 0; i < _nonKeyColumns.Length; i++)
             {
-                _originalHashes[i] = _getHashCodes[i](Entity);
-                _originalValues[i] = _getValues[i](Entity);
+                _originalHashes[i] = _getHashCodes[i](entity);
+                _originalValues[i] = _getValues[i](entity);
                 _changedProperties[i] = false;
             }
         }
@@ -72,18 +78,25 @@ namespace nORM.Core
             if (State is EntityState.Added or EntityState.Deleted or EntityState.Detached) return;
             if (_hasNotifiedChange) return;
 
+            var entity = Entity;
+            if (entity is null)
+            {
+                DetachEntity();
+                return;
+            }
+
             var hasChanges = false;
             for (int i = 0; i < _nonKeyColumns.Length; i++)
             {
                 bool changed;
                 if (_options.UsePreciseChangeTracking)
                 {
-                    var currentValue = _getValues[i](Entity);
+                    var currentValue = _getValues[i](entity);
                     changed = !Equals(currentValue, _originalValues[i]);
                 }
                 else
                 {
-                    var currentHash = _getHashCodes[i](Entity);
+                    var currentHash = _getHashCodes[i](entity);
                     changed = currentHash != _originalHashes[i];
                 }
                 _changedProperties[i] = changed;
@@ -106,7 +119,10 @@ namespace nORM.Core
         internal void DetachEntity()
         {
             State = EntityState.Detached;
-            NavigationPropertyExtensions.CleanupNavigationContext(Entity);
+            var entity = Entity;
+            if (entity != null)
+                NavigationPropertyExtensions.CleanupNavigationContext(entity);
+            Entity = null;
         }
     }
 }

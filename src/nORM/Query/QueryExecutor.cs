@@ -96,7 +96,7 @@ namespace nORM.Query
                 ? entityMap
                 : _ctx.GetMapping(entity.GetType());
             var entry = _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, actualMap);
-            entity = entry.Entity;
+            entity = entry.Entity!;
             NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
             return entity;
         }
@@ -146,9 +146,9 @@ namespace nORM.Query
                             if (trackOuter)
                             {
                                 var actualMap = _ctx.GetMapping(outer.GetType());
-                                var entry = _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
-                                outer = entry.Entity;
-                                NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
+                                  var entry = _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
+                                  outer = entry.Entity!;
+                                  NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
                             }
 
                             currentOuter = outer;
@@ -161,9 +161,9 @@ namespace nORM.Query
                             if (trackInner)
                             {
                                 var actualMap = _ctx.GetMapping(inner.GetType());
-                                var entry = _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualMap);
-                                inner = entry.Entity;
-                                NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
+                                  var entry = _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualMap);
+                                  inner = entry.Entity!;
+                                  NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
                             }
                             currentChildren.Add(inner);
                         }

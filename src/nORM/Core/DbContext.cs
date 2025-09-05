@@ -358,8 +358,11 @@ namespace nORM.Core
                     var tags = new HashSet<string>();
                     foreach (var entry in changedEntries)
                     {
-                        var map = GetMapping(entry.Entity.GetType());
-                        tags.Add(map.TableName);
+                        if (entry.Entity is { } entity)
+                        {
+                            var map = GetMapping(entity.GetType());
+                            tags.Add(map.TableName);
+                        }
                     }
                     foreach (var tag in tags)
                         cache.InvalidateTag(tag);
@@ -402,7 +405,8 @@ namespace nORM.Core
                     return updated;
                 case EntityState.Deleted:
                     var deleted = await InvokeWriteAsync(nameof(DeleteAsync), entry, transaction, ct).ConfigureAwait(false);
-                    ChangeTracker.Remove(entry.Entity, true);
+                      if (entry.Entity is { } entityToRemove)
+                          ChangeTracker.Remove(entityToRemove, true);
                     return deleted;
                 default:
                     return 0;
@@ -423,7 +427,7 @@ namespace nORM.Core
         {
             var method = typeof(DbContext).GetMethods()
                 .First(m => m.Name == methodName && m.GetParameters().Length == 3)
-                .MakeGenericMethod(entry.Entity.GetType());
+                  .MakeGenericMethod((entry.Entity ?? throw new InvalidOperationException("Entity is null")).GetType());
             return (Task<int>)method.Invoke(this, new object?[] { entry.Entity, transaction, ct })!;
         }
         #endregion
