@@ -53,13 +53,33 @@ namespace nORM.Core
             _minSize = opts.MinPoolSize;
             _idleLifetime = opts.ConnectionIdleLifetime;
 
-            // Pre-warm pool with minimum number of connections
-            for (int i = 0; i < _minSize; i++)
+            // Pre-warm pool with minimum number of connections gradually
+            if (_minSize > 0)
             {
-                var cn = connectionFactory();
-                cn.Open();
-                _pool.Enqueue(new PooledItem(cn));
-                Interlocked.Increment(ref _created);
+                Task.Run(async () =>
+                {
+                    for (int i = 0; i < _minSize && !_disposed; i++)
+                    {
+                        if (!HasSufficientMemory())
+                            break;
+
+                        DbConnection? cn = null;
+                        try
+                        {
+                            cn = connectionFactory();
+                            await cn.OpenAsync().ConfigureAwait(false);
+                            _pool.Enqueue(new PooledItem(cn));
+                            Interlocked.Increment(ref _created);
+                        }
+                        catch
+                        {
+                            cn?.Dispose();
+                            break;
+                        }
+
+                        await Task.Delay(50).ConfigureAwait(false);
+                    }
+                });
             }
 
             _cleanupTimer = new Timer(CleanupCallback, null, _idleLifetime, _idleLifetime);
@@ -163,6 +183,18 @@ namespace nORM.Core
                 foreach (var item in itemsToRequeue)
                     _pool.Enqueue(item);
             }
+        }
+
+        private static bool HasSufficientMemory()
+        {
+            var info = GC.GetGCMemoryInfo();
+            var available = info.TotalAvailableMemoryBytes;
+            if (available <= 0)
+                return true;
+
+            var used = GC.GetTotalMemory(false);
+            // Keep at least 10MB of free memory before creating new connections
+            return available - used > 10 * 1024 * 1024;
         }
 
         private void ThrowIfDisposed()
