@@ -33,6 +33,8 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
         private static readonly ConcurrentDictionary<Type, int> _typeHashCodes = new();
+        private static long _totalPlanSize;
+        private static int _planSizeSamples;
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
@@ -120,10 +122,13 @@ namespace nORM.Query
 
         private static int CalculatePlanCacheSize(GCMemoryInfo info)
         {
-            const int approxPlanSize = 16 * 1024; // 16KB per plan
+            var samples = Volatile.Read(ref _planSizeSamples);
+            var avgPlanSize = samples == 0
+                ? 16 * 1024 // fallback to 16KB if no samples yet
+                : (int)(Volatile.Read(ref _totalPlanSize) / samples);
             const long maxCacheBytes = 64L * 1024 * 1024; // limit to 64MB overall
             var cacheBytes = Math.Min(info.TotalAvailableMemoryBytes / 100, maxCacheBytes);
-            var size = (int)(cacheBytes / approxPlanSize);
+            var size = (int)(cacheBytes / avgPlanSize);
             return Math.Clamp(size, 100, 10000);
         }
 
@@ -469,7 +474,12 @@ namespace nORM.Query
             return _planCache.GetOrAdd(cacheKey, _ =>
             {
                 using var translator = new QueryTranslator(_ctx);
+                var before = GC.GetAllocatedBytesForCurrentThread();
                 var plan = translator.Translate(localFiltered);
+                var after = GC.GetAllocatedBytesForCurrentThread();
+                var size = after - before;
+                Interlocked.Add(ref _totalPlanSize, size);
+                Interlocked.Increment(ref _planSizeSamples);
                 return plan with { Fingerprint = fingerprint };
             });
         }
