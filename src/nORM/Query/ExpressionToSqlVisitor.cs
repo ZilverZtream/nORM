@@ -210,7 +210,7 @@ namespace nORM.Query
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             if (!IsTranslatableMethod(node.Method))
-                throw new NormQueryTranslationException($"Method '{node.Method.Name}' cannot be translated to SQL");
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Method '{node.Method.Name}' cannot be translated to SQL"));
 
             if (!_suppressNullCheck && RequiresNullCheck(node))
             {
@@ -233,7 +233,7 @@ namespace nORM.Query
                 }
                 else
                 {
-                    throw new NormQueryTranslationException("JSONPath argument in Json.Value must be a constant string.");
+                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "JSONPath argument in Json.Value must be a constant string."));
                 }
             }
 
@@ -556,10 +556,10 @@ namespace nORM.Query
         private Expression CreateSafeParameter(object? value)
         {
             if (value is string str && str.Length > 8000)
-                throw new NormQueryTranslationException("String parameter exceeds maximum length");
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "String parameter exceeds maximum length"));
 
             if (value is byte[] bytes && bytes.Length > 8000)
-                throw new NormQueryTranslationException("Binary parameter exceeds maximum length");
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Binary parameter exceeds maximum length"));
 
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
             _sql.AppendParameterizedValue(paramName, value, _params);
