@@ -42,7 +42,7 @@ namespace nORM.Providers
 
         public virtual string EscapeLikePattern(string value)
         {
-            var esc = LikeEscapeChar.ToString();
+            var esc = NormValidator.ValidateLikeEscapeChar(LikeEscapeChar).ToString();
             return value
                 .Replace(esc, esc + esc)
                 .Replace("%", esc + "%")

@@ -142,6 +142,16 @@ namespace nORM.Core
             return true;
         }
 
+        private static readonly HashSet<char> AllowedLikeEscapeChars = new("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,-./:;<=>?@[]^_{|}~\\");
+
+        public static char ValidateLikeEscapeChar(char escapeChar)
+        {
+            if (!AllowedLikeEscapeChars.Contains(escapeChar))
+                throw new ArgumentException($"Invalid LIKE escape character: {escapeChar}");
+
+            return escapeChar;
+        }
+
         public static void ValidateConnectionString(string connectionString, string provider)
         {
             if (string.IsNullOrWhiteSpace(connectionString))
