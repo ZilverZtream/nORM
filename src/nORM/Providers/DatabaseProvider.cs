@@ -52,7 +52,10 @@ namespace nORM.Providers
         protected virtual void ValidateConnection(DbConnection connection)
         {
             if (connection.State != ConnectionState.Open)
-                throw new InvalidOperationException($"Connection must be open for {GetType().Name}");
+            {
+                var safeConnStr = NormValidator.MaskSensitiveConnectionStringData(connection.ConnectionString);
+                throw new InvalidOperationException($"Connection must be open for {GetType().Name}. Connection: {safeConnStr}");
+            }
         }
 
         protected void EnsureValidParameterName(string? parameterName, string argumentName)
