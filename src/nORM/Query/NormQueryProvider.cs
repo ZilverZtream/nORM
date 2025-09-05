@@ -11,7 +11,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
 using System.Runtime.CompilerServices;
-using Microsoft.Extensions.Caching.Memory;
 using nORM.Core;
 using nORM.Execution;
 using nORM.Internal;
@@ -26,12 +25,7 @@ namespace nORM.Query
     internal sealed class NormQueryProvider : IQueryProvider
     {
         internal readonly DbContext _ctx;
-        private static readonly MemoryCache _planCache = new(new MemoryCacheOptions
-        {
-            SizeLimit = 1000,
-            CompactionPercentage = 0.25
-        });
-        private static readonly SemaphoreSlim _cacheSemaphore = new(1, 1);
+        private static readonly ConcurrentDictionary<int, QueryPlan> _planCache = new();
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
@@ -397,34 +391,12 @@ namespace nORM.Query
             var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
             var cacheKey = HashCode.Combine(fingerprint, tenantHash, elementType.GetHashCode(), filtered.Type.GetHashCode());
 
-            if (_planCache.TryGetValue(cacheKey, out QueryPlan? cached))
+            var localFiltered = filtered;
+            return _planCache.GetOrAdd(cacheKey, _ =>
             {
-                return cached!;
-            }
-
-            _cacheSemaphore.Wait();
-            try
-            {
-                if (_planCache.TryGetValue(cacheKey, out cached))
-                    return cached!;
-
                 using var translator = new QueryTranslator(_ctx);
-                var plan = translator.Translate(filtered);
-
-                var options = new MemoryCacheEntryOptions
-                {
-                    Size = 1,
-                    SlidingExpiration = TimeSpan.FromMinutes(30),
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(2)
-                };
-
-                _planCache.Set(cacheKey, plan, options);
-                return plan;
-            }
-            finally
-            {
-                _cacheSemaphore.Release();
-            }
+                return translator.Translate(localFiltered);
+            });
         }
 
         private string BuildCacheKeyWithValues<TResult>(Expression expression, IReadOnlyDictionary<string, object> parameters)
