@@ -80,7 +80,7 @@ namespace nORM.Query
             Reset(ctx);
         }
 
-        internal QueryTranslator(
+        private QueryTranslator(
             DbContext ctx,
             TableMapping mapping,
             Dictionary<string, object> parameters,
@@ -104,6 +104,18 @@ namespace nORM.Query
             _tables.Add(mapping.TableName);
             _joinCounter = joinStart;
         }
+
+        internal static QueryTranslator Create(
+            DbContext ctx,
+            TableMapping mapping,
+            Dictionary<string, object> parameters,
+            ref int pIndex,
+            Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlated,
+            HashSet<string> tables,
+            List<string> compiledParams,
+            Dictionary<ParameterExpression, string> paramMap,
+            int joinStart = 0)
+            => new QueryTranslator(ctx, mapping, parameters, ref pIndex, correlated, tables, compiledParams, paramMap, joinStart);
 
         internal static QueryTranslator Rent(DbContext ctx)
         {
@@ -452,7 +464,7 @@ namespace nORM.Query
 
         private string TranslateSubExpression(Expression e)
         {
-            using var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
+            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
             var subPlan = subTranslator.Translate(e);
             _paramIndex = subTranslator._paramIndex;
             return subPlan.Sql;
@@ -861,7 +873,7 @@ namespace nORM.Query
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
             }
 
-            using var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
+            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator._paramIndex;
             _mapping = subTranslator._mapping;
