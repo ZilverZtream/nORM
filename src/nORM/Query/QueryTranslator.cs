@@ -66,6 +66,9 @@ namespace nORM.Query
         private static ThreadLocal<QueryTranslator?> _threadLocalTranslator =
             new(() => null, trackAllValues: false);
 
+        private static readonly AdaptiveQueryComplexityAnalyzer _complexityAnalyzer =
+            new AdaptiveQueryComplexityAnalyzer(new SystemMemoryMonitor());
+
         private QueryTranslator()
         {
         }
@@ -177,7 +180,7 @@ namespace nORM.Query
             if (_provider == null) throw new InvalidOperationException("Provider not set");
 
             // Analyze query complexity before translation
-            var complexityInfo = QueryComplexityAnalyzer.AnalyzeQuery(e);
+            var complexityInfo = _complexityAnalyzer.AnalyzeQuery(e, _ctx.Options);
 
             if (complexityInfo.WarningMessages.Any())
             {
