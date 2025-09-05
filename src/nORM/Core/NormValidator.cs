@@ -6,6 +6,7 @@ using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Microsoft.Extensions.ObjectPool;
 using Microsoft.SqlServer.TransactSql.ScriptDom;
 
 #nullable enable
@@ -20,7 +21,8 @@ namespace nORM.Core
         private const int MaxParameterCount = 2000;
         private const int MaxSqlLength = 100000;
 
-        private static readonly ConcurrentBag<HashSet<object>> HashSetPool = new();
+        private static readonly ObjectPool<HashSet<object>> HashSetPool =
+            new DefaultObjectPool<HashSet<object>>(new HashSetPolicy(), Environment.ProcessorCount * 2);
         private static readonly ConcurrentDictionary<Type, PropertyInfo[]> PropertyCache = new();
 
         public static void ValidateEntity<T>(T entity, string parameterName = "entity") where T : class
@@ -39,19 +41,20 @@ namespace nORM.Core
             }
         }
 
-        private static HashSet<object> RentHashSet()
-        {
-            if (!HashSetPool.TryTake(out var set))
-            {
-                set = new HashSet<object>(ReferenceEqualityComparer.Instance);
-            }
-            return set;
-        }
+        private static HashSet<object> RentHashSet() => HashSetPool.Get();
 
-        private static void ReturnHashSet(HashSet<object> set)
+        private static void ReturnHashSet(HashSet<object> set) => HashSetPool.Return(set);
+
+        private sealed class HashSetPolicy : PooledObjectPolicy<HashSet<object>>
         {
-            set.Clear();
-            HashSetPool.Add(set);
+            public override HashSet<object> Create()
+                => new HashSet<object>(ReferenceEqualityComparer.Instance);
+
+            public override bool Return(HashSet<object> obj)
+            {
+                obj.Clear();
+                return true;
+            }
         }
 
         private static PropertyInfo[] GetCachedProperties(Type type)
