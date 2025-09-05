@@ -266,10 +266,69 @@ END;";
             }
         }
         
-        public override Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> e, CancellationToken ct) where T : class
+        public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
-            return base.BatchedDeleteAsync(ctx, m, e, ct);
+            if (ctx.Options.UseBatchedBulkOps) return await base.BatchedDeleteAsync(ctx, m, entities, ct).ConfigureAwait(false);
+
+            var sw = Stopwatch.StartNew();
+            var entityList = entities.ToList();
+            if (!entityList.Any()) return 0;
+
+            var keyCols = m.KeyColumns.ToList();
+            if (!keyCols.Any())
+                throw new Exception($"Cannot delete from '{m.EscTable}': no key columns defined.");
+
+            var operationKey = $"MySql_BulkDelete_{m.Type.Name}";
+            var paramsPerEntity = keyCols.Count;
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            var maxBatchForProvider = MaxParameters / Math.Max(1, paramsPerEntity);
+            var batchSize = Math.Max(1, Math.Min(sizing.OptimalBatchSize, maxBatchForProvider));
+
+            var totalDeleted = 0;
+            for (int i = 0; i < entityList.Count; i += batchSize)
+            {
+                var batch = entityList.Skip(i).Take(batchSize).ToList();
+                await using var cmd = ctx.Connection.CreateCommand();
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+
+                var valueClauses = new List<string>();
+                var paramIndex = 0;
+                foreach (var entity in batch)
+                {
+                    var paramNames = new List<string>();
+                    foreach (var col in keyCols)
+                    {
+                        var pName = $"{ParamPrefix}p{paramIndex++}";
+                        cmd.AddParam(pName, col.Getter(entity));
+                        paramNames.Add(pName);
+                    }
+                    if (keyCols.Count == 1)
+                        valueClauses.Add(paramNames[0]);
+                    else
+                        valueClauses.Add($"({string.Join(", ", paramNames)})");
+                }
+
+                string whereClause;
+                if (keyCols.Count == 1)
+                {
+                    whereClause = $"{keyCols[0].EscCol} IN ({string.Join(", ", valueClauses)})";
+                }
+                else
+                {
+                    var cols = string.Join(", ", keyCols.Select(c => c.EscCol));
+                    whereClause = $"({cols}) IN ({string.Join(", ", valueClauses)})";
+                }
+
+                cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {whereClause}";
+                var batchSw = Stopwatch.StartNew();
+                totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                batchSw.Stop();
+                BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
+            }
+
+            ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
+            return totalDeleted;
         }
 
         private static string GetSqlType(Type t)
