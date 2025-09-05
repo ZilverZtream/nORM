@@ -81,8 +81,21 @@ namespace nORM.Core
         }
 
         public DbContext(string connectionString, DatabaseProvider p, DbContextOptions? options = null)
-            : this(CreateConnection(connectionString, p), p, options)
+            : this(CreateConnectionSafe(connectionString, p), p, options)
         {
+        }
+
+        private static DbConnection CreateConnectionSafe(string connectionString, DatabaseProvider provider)
+        {
+            try
+            {
+                return CreateConnection(connectionString, provider);
+            }
+            catch (Exception ex)
+            {
+                var safeConnStr = NormValidator.MaskSensitiveConnectionStringData(connectionString);
+                throw new ArgumentException($"Invalid connection string format: {safeConnStr}", nameof(connectionString), ex);
+            }
         }
 
         private static DbConnection CreateConnection(string connectionString, DatabaseProvider provider)
