@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -53,26 +52,15 @@ namespace nORM.Core
         // No async methods here to avoid constraint conflicts
     }
 
-    internal sealed class NormQueryableImpl<T> : INormQueryable<T> where T : class, new()
+    internal sealed class NormQueryableImpl<T> : NormQueryableBase<T>, INormQueryable<T> where T : class, new()
     {
-        public Expression Expression { get; }
-        public Type ElementType => typeof(T);
-        public IQueryProvider Provider { get; }
-
-        public NormQueryableImpl(DbContext ctx)
+        public NormQueryableImpl(DbContext ctx) : base(ctx)
         {
-            Expression = Expression.Constant(this);
-            Provider = new NormQueryProvider(ctx);
         }
 
-        public NormQueryableImpl(IQueryProvider provider, Expression expression)
+        public NormQueryableImpl(IQueryProvider provider, Expression expression) : base(provider, expression)
         {
-            Provider = provider;
-            Expression = expression;
         }
-
-        public IEnumerator<T> GetEnumerator() => Provider.Execute<IEnumerable<T>>(Expression).GetEnumerator();
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         public INormIncludableQueryable<T, TProperty> Include<TProperty>(Expression<Func<T, TProperty>> path)
         {
@@ -126,42 +114,22 @@ namespace nORM.Core
     /// Internal queryable implementation without constraints, used for intermediate query operations
     /// like Join that produce anonymous types or other types without parameterless constructors.
     /// </summary>
-    internal sealed class NormQueryableImplUnconstrained<T> : INormQueryableInternal<T>
+    internal sealed class NormQueryableImplUnconstrained<T> : NormQueryableBase<T>, INormQueryableInternal<T>
     {
-        public Expression Expression { get; }
-        public Type ElementType => typeof(T);
-        public IQueryProvider Provider { get; }
-
-        public NormQueryableImplUnconstrained(DbContext ctx)
+        public NormQueryableImplUnconstrained(DbContext ctx) : base(ctx)
         {
-            Provider = new NormQueryProvider(ctx);
-            Expression = Expression.Constant(this);
         }
 
-        public NormQueryableImplUnconstrained(IQueryProvider provider, Expression expression)
+        public NormQueryableImplUnconstrained(IQueryProvider provider, Expression expression) : base(provider, expression)
         {
-            Provider = provider;
-            Expression = expression;
         }
-
-        public IEnumerator<T> GetEnumerator() => Provider.Execute<IEnumerable<T>>(Expression).GetEnumerator();
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
-    internal sealed class NormIncludableQueryable<T, TProperty> : INormIncludableQueryable<T, TProperty> where T : class, new()
+    internal sealed class NormIncludableQueryable<T, TProperty> : NormQueryableBase<T>, INormIncludableQueryable<T, TProperty> where T : class, new()
     {
-        public Expression Expression { get; }
-        public Type ElementType => typeof(T);
-        public IQueryProvider Provider { get; }
-
-        public NormIncludableQueryable(IQueryProvider provider, Expression expression)
+        public NormIncludableQueryable(IQueryProvider provider, Expression expression) : base(provider, expression)
         {
-            Provider = provider;
-            Expression = expression;
         }
-
-        public IEnumerator<T> GetEnumerator() => Provider.Execute<IEnumerable<T>>(Expression).GetEnumerator();
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         public INormIncludableQueryable<T, TProperty2> Include<TProperty2>(Expression<Func<T, TProperty2>> path)
         {
