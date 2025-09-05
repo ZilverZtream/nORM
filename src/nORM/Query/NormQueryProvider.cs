@@ -10,7 +10,7 @@ using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
-using System.Security.Cryptography;
+using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using nORM.Core;
 using nORM.Execution;
@@ -293,9 +293,9 @@ namespace nORM.Query
                 sb.Append('|').Append(kvp.Key).Append('=').Append(kvp.Value?.GetHashCode() ?? 0);
             }
 
-            using var sha = SHA256.Create();
             var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-            return Convert.ToHexString(sha.ComputeHash(bytes));
+            var hash = XxHash128.Hash(bytes);
+            return Convert.ToHexString(hash);
         }
 
         private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
@@ -440,9 +440,9 @@ namespace nORM.Query
                 sb.Append('|').Append(kvp.Key).Append('=').Append(kvp.Value?.GetHashCode() ?? 0);
             }
 
-            using var sha = SHA256.Create();
             var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-            return Convert.ToHexString(sha.ComputeHash(bytes));
+            var hash = XxHash128.Hash(bytes);
+            return Convert.ToHexString(hash);
         }
 
         private static Expression UnwrapQueryExpression(Expression expression)
