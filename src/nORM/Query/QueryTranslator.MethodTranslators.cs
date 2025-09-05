@@ -169,7 +169,7 @@ namespace nORM.Query
                 {
                     if (!t._paramMap.TryGetValue(tp, out var tName))
                     {
-                        tName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                        tName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                         t._params[tName] = DBNull.Value;
                         t._compiledParams.Add(tName);
                         t._paramMap[tp] = tName;
@@ -178,7 +178,7 @@ namespace nORM.Query
                 }
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int take))
                 {
-                    var pName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                    var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                     t._params[pName] = take;
                     t._take = take;
                     t._takeParam = pName;
@@ -196,7 +196,7 @@ namespace nORM.Query
                 {
                     if (!t._paramMap.TryGetValue(sp, out var sName))
                     {
-                        sName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                        sName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                         t._params[sName] = DBNull.Value;
                         t._compiledParams.Add(sName);
                         t._paramMap[sp] = sName;
@@ -205,7 +205,7 @@ namespace nORM.Query
                 }
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int skip))
                 {
-                    var pName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                    var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                     t._params[pName] = skip;
                     t._skip = skip;
                     t._skipParam = pName;
@@ -299,7 +299,7 @@ namespace nORM.Query
                 {
                     if (!t._paramMap.TryGetValue(eaParam, out var eName))
                     {
-                        eName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                        eName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                         t._params[eName] = DBNull.Value;
                         t._compiledParams.Add(eName);
                         t._paramMap[eaParam] = eName;
@@ -327,7 +327,7 @@ namespace nORM.Query
                 }
 
                 t._take = 1;
-                var pName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                 t._params[pName] = 1;
                 t._takeParam = pName;
                 t._singleResult = t._methodName == "ElementAt";
@@ -358,7 +358,7 @@ namespace nORM.Query
                     ExpressionVisitorPool.Return(visitor);
                 }
                 t._take = 1;
-                var pName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                 t._params[pName] = 1;
                 t._takeParam = pName;
                 t._singleResult = t._methodName == "First" || t._methodName == "Single";
@@ -400,7 +400,7 @@ namespace nORM.Query
                         t._orderBy.Add((key.EscCol, false));
                 }
                 t._take = 1;
-                var pName = t._ctx.Provider.ParamPrefix + "p" + t._paramIndex++;
+                var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                 t._params[pName] = 1;
                 t._takeParam = pName;
                 t._singleResult = t._methodName == "Last";

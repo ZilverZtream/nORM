@@ -5,8 +5,10 @@ namespace nORM.Query
 {
     /// <summary>
     /// Container for the various SQL clause builders used by <see cref="QueryTranslator"/>.
+    /// Renamed from <c>SqlClauseBuilder</c> to emphasize its role as a focused
+    /// SQL construction utility.
     /// </summary>
-    internal sealed class SqlClauseBuilder : IDisposable
+    internal sealed class SqlBuilder : IDisposable
     {
         public OptimizedSqlBuilder Sql { get; } = new();
         public OptimizedSqlBuilder Where { get; } = new();
