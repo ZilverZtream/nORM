@@ -43,9 +43,24 @@ namespace nORM.Core
 
         public DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options = null)
         {
-            _cn = cn;
-            _p = p;
+            _cn = cn ?? throw new ArgumentNullException(nameof(cn));
+            _p = p ?? throw new ArgumentNullException(nameof(p));
             Options = options ?? new DbContextOptions();
+
+            Options.Validate();
+
+            if (string.IsNullOrWhiteSpace(Options.TenantColumnName))
+                throw new ArgumentException("TenantColumnName cannot be null or empty");
+
+            if (Options.CacheExpiration <= TimeSpan.Zero)
+                throw new ArgumentException("CacheExpiration must be positive");
+
+            if (Options.CommandInterceptors.Any(i => i == null))
+                throw new ArgumentException("CommandInterceptors cannot contain null entries");
+
+            if (Options.SaveChangesInterceptors.Any(i => i == null))
+                throw new ArgumentException("SaveChangesInterceptors cannot contain null entries");
+
             ChangeTracker = new ChangeTracker(Options);
             _modelBuilder = new ModelBuilder();
             Options.OnModelCreating?.Invoke(_modelBuilder);
