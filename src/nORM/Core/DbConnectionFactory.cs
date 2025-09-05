@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Data.Common;
+using System.Linq.Expressions;
 using nORM.Internal;
 using nORM.Providers;
 using Microsoft.Data.SqlClient;
@@ -36,7 +37,7 @@ internal static class DbConnectionFactory
                 var type = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
                 if (type == null)
                     throw new InvalidOperationException("Npgsql package is required for PostgreSQL support. Please install the Npgsql NuGet package.");
-                return cs => (DbConnection)Activator.CreateInstance(type, cs)!;
+                return CreateConnectionFactory(type);
             }
             if (typeof(MySqlProvider).IsAssignableFrom(t))
             {
@@ -44,13 +45,24 @@ internal static class DbConnectionFactory
                            Type.GetType("MySql.Data.MySqlClient.MySqlConnection, MySql.Data");
                 if (type == null)
                     throw new InvalidOperationException("MySQL package is required for MySQL support. Please install MySqlConnector or MySql.Data.");
-                return cs => (DbConnection)Activator.CreateInstance(type, cs)!;
+                return CreateConnectionFactory(type);
             }
 
             throw new NotSupportedException($"Unsupported provider type: {t.Name}");
         });
 
         return factory(connectionString);
+    }
+
+    private static Func<string, DbConnection> CreateConnectionFactory(Type connectionType)
+    {
+        var constructor = connectionType.GetConstructor(new[] { typeof(string) });
+        if (constructor == null)
+            throw new InvalidOperationException($"{connectionType.Name} must have a constructor with a single string parameter.");
+
+        var csParam = Expression.Parameter(typeof(string), "cs");
+        var newExpr = Expression.New(constructor, csParam);
+        return Expression.Lambda<Func<string, DbConnection>>(newExpr, csParam).Compile();
     }
 }
 
