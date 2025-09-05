@@ -142,6 +142,10 @@ namespace nORM.Query
                 var column = info.Mapping.Columns.FirstOrDefault(c => c.Prop.Name == node.Member.Name);
                 if (column != null)
                 {
+                    // Table aliases are generated internally (e.g. T0, T1) and are not influenced
+                    // by user input, so escaping them adds unnecessary quoting that breaks
+                    // expected SQL output. Use the alias directly while keeping column names
+                    // escaped to avoid injection.
                     _sql.Append($"{info.Alias}.{column.EscCol}");
                     return node;
                 }

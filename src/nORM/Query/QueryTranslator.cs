@@ -231,7 +231,14 @@ namespace nORM.Query
                     _params[timeParamName] = _asOfTimestamp.Value;
                     var historyTable = _provider.Escape(_mapping.TableName + "_History");
                     var cols = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
-                    var temporalQuery = $@"\n(\n    SELECT {cols} FROM {_mapping.EscTable}\n    WHERE {timeParamName} >= __ValidFrom AND {timeParamName} < __ValidTo\n    UNION ALL\n    SELECT {cols} FROM {historyTable}\n    WHERE {timeParamName} >= __ValidFrom AND {timeParamName} < __ValidTo\n)";
+                    var temporalQuery = $@"
+(
+    SELECT {cols} FROM {_mapping.EscTable} T1
+    WHERE {timeParamName} >= T1.{_provider.Escape("__ValidFrom")} AND {timeParamName} < T1.{_provider.Escape("__ValidTo")}
+    UNION ALL
+    SELECT {cols} FROM {historyTable} T2
+    WHERE {timeParamName} >= T2.{_provider.Escape("__ValidFrom")} AND {timeParamName} < T2.{_provider.Escape("__ValidTo")}
+)";
                     fromClause = temporalQuery;
                 }
 
@@ -376,7 +383,9 @@ namespace nORM.Query
                     defaultSql = $", {defSql}";
                 }
 
-                return $"{wf.FunctionName}({valueSql}, {wf.Offset}{defaultSql}) OVER ({overClause})";
+                var offsetParam = _provider.ParamPrefix + "p" + _paramIndex++;
+                _params[offsetParam] = wf.Offset;
+                return $"{wf.FunctionName}({valueSql}, {offsetParam}{defaultSql}) OVER ({overClause})";
             }
             return $"{wf.FunctionName}() OVER ({overClause})";
         }
