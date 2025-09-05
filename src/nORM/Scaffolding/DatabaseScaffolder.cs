@@ -34,26 +34,33 @@ namespace nORM.Scaffolding
             if (connection.State != ConnectionState.Open)
                 await connection.OpenAsync().ConfigureAwait(false);
 
-            Directory.CreateDirectory(outputDirectory);
-            var tables = connection.GetSchema("Tables");
-            var entityNames = new List<string>();
-
-            foreach (DataRow table in tables.Rows)
+            try
             {
-                var tableType = table.Table.Columns.Contains("TABLE_TYPE") ? table["TABLE_TYPE"]?.ToString() : null;
-                if (tableType != null && !string.Equals(tableType, "TABLE", StringComparison.OrdinalIgnoreCase))
-                    continue;
+                Directory.CreateDirectory(outputDirectory);
+                var tables = await connection.GetSchemaAsync("Tables").ConfigureAwait(false);
+                var entityNames = new List<string>();
 
-                var tableName = table["TABLE_NAME"]!.ToString()!;
-                var entityName = ToPascalCase(tableName);
-                entityNames.Add(entityName);
+                foreach (DataRow table in tables.Rows)
+                {
+                    var tableType = table.Table.Columns.Contains("TABLE_TYPE") ? table["TABLE_TYPE"]?.ToString() : null;
+                    if (tableType != null && !string.Equals(tableType, "TABLE", StringComparison.OrdinalIgnoreCase))
+                        continue;
 
-                var entityCode = await ScaffoldEntityAsync(connection, provider, tableName, entityName, namespaceName).ConfigureAwait(false);
-                File.WriteAllText(Path.Combine(outputDirectory, entityName + ".cs"), entityCode);
+                    var tableName = table["TABLE_NAME"]!.ToString()!;
+                    var entityName = ToPascalCase(tableName);
+                    entityNames.Add(entityName);
+
+                    var entityCode = await ScaffoldEntityAsync(connection, provider, tableName, entityName, namespaceName).ConfigureAwait(false);
+                    await File.WriteAllTextAsync(Path.Combine(outputDirectory, entityName + ".cs"), entityCode).ConfigureAwait(false);
+                }
+
+                var ctxCode = ScaffoldContext(namespaceName, contextName, entityNames);
+                await File.WriteAllTextAsync(Path.Combine(outputDirectory, contextName + ".cs"), ctxCode).ConfigureAwait(false);
             }
-
-            var ctxCode = ScaffoldContext(namespaceName, contextName, entityNames);
-            File.WriteAllText(Path.Combine(outputDirectory, contextName + ".cs"), ctxCode);
+            finally
+            {
+                await connection.CloseAsync().ConfigureAwait(false);
+            }
         }
 
         private static async Task<string> ScaffoldEntityAsync(DbConnection connection, DatabaseProvider provider, string tableName, string entityName, string namespaceName)
