@@ -19,7 +19,7 @@ using Microsoft.Extensions.Logging;
 
 namespace nORM.Query
 {
-    internal sealed partial class QueryTranslator : ExpressionVisitor
+    internal sealed partial class QueryTranslator : ExpressionVisitor, IDisposable
     {
         private DbContext _ctx = null!;
         private SqlClauseBuilder _clauses = new();
@@ -128,8 +128,18 @@ namespace nORM.Query
             _splitQuery = false;
             _tables = new HashSet<string>();
             _params = new Dictionary<string, object>();
-            _clauses.Dispose();
-            _clauses = new SqlClauseBuilder();
+            try
+            {
+                _clauses?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _ctx.Options.Logger?.LogError(ex, "Failed to dispose SqlClauseBuilder");
+            }
+            finally
+            {
+                _clauses = new SqlClauseBuilder();
+            }
             _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
             _isCacheable = false;
             _cacheExpiration = null;
@@ -368,7 +378,7 @@ namespace nORM.Query
 
         private string TranslateSubExpression(Expression e)
         {
-            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
+            using var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
             var subPlan = subTranslator.Translate(e);
             _paramIndex = subTranslator._paramIndex;
             return subPlan.Sql;
@@ -385,6 +395,18 @@ namespace nORM.Query
             if (result == null || result == DBNull.Value)
                 throw new NormQueryTranslationException($"Tag '{tagName}' not found.");
             return Convert.ToDateTime(result);
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                _clauses?.Dispose();
+            }
+            catch
+            {
+                // Swallow any exceptions to avoid masking disposal failures
+            }
         }
 
 
@@ -730,7 +752,7 @@ namespace nORM.Query
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
             }
 
-            var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
+            using var subTranslator = new QueryTranslator(_ctx, _mapping, _params, ref _paramIndex, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator._paramIndex;
             _mapping = subTranslator._mapping;
