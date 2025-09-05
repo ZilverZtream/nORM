@@ -206,27 +206,45 @@ END;";
             var bulkCopyType = Type.GetType("MySqlConnector.MySqlBulkCopy, MySqlConnector");
             if (bulkCopyType != null && ctx.Connection.GetType().FullName == "MySqlConnector.MySqlConnection")
             {
-                dynamic bulkCopy = Activator.CreateInstance(bulkCopyType, ctx.Connection)!;
-                bulkCopy.DestinationTableName = m.EscTable.Trim('`');
-                bulkCopy.BulkCopyTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-
-                var totalInserted = 0;
-                for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
+                await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                try
                 {
-                    var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
-                    using var table = GetDataTable(m, insertableCols);
-                    foreach (var entity in batch)
-                        table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
+                    dynamic bulkCopy = Activator.CreateInstance(bulkCopyType, ctx.Connection)!;
+                    bulkCopy.DestinationTableName = m.EscTable.Trim('`');
+                    bulkCopy.BulkCopyTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+                    bulkCopy.Transaction = transaction;
 
-                    var batchSw = Stopwatch.StartNew();
-                    await bulkCopy.WriteToServerAsync(table, ct).ConfigureAwait(false);
-                    batchSw.Stop();
-                    totalInserted += table.Rows.Count;
-                    BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
+                    var totalInserted = 0;
+                    for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
+                    {
+                        var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
+                        using var table = GetDataTable(m, insertableCols);
+                        foreach (var entity in batch)
+                            table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
+
+                        var batchSw = Stopwatch.StartNew();
+                        await bulkCopy.WriteToServerAsync(table, ct).ConfigureAwait(false);
+                        batchSw.Stop();
+                        totalInserted += table.Rows.Count;
+                        BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
+                    }
+
+                    await transaction.CommitAsync(ct).ConfigureAwait(false);
+                    ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
+                    return totalInserted;
                 }
-
-                ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
-                return totalInserted;
+                catch (Exception ex)
+                {
+                    try
+                    {
+                        await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                    }
+                    catch (Exception rollbackEx)
+                    {
+                        throw new AggregateException(ex, rollbackEx);
+                    }
+                    throw;
+                }
             }
 
             var affected = await base.BulkInsertAsync(ctx, m, entityList, ct).ConfigureAwait(false);
