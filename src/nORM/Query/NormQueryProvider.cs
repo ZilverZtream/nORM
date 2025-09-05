@@ -10,6 +10,7 @@ using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
+using System.Security.Cryptography;
 using System.Runtime.CompilerServices;
 using nORM.Core;
 using nORM.Execution;
@@ -268,25 +269,26 @@ namespace nORM.Query
 
         private string BuildCacheKeyFromPlan<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
         {
-            var hash = new HashCode();
-            hash.Add(plan.Sql);
-            hash.Add(typeof(TResult));
+            var sb = new StringBuilder();
+            sb.Append(plan.Sql);
+            sb.Append('|').Append(typeof(TResult).FullName);
 
             var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             if (_ctx.Options.TenantProvider != null)
             {
                 if (tenant == null)
                     throw new InvalidOperationException("Tenant context required but not available");
-                hash.Add("TENANT:" + tenant.ToString());
+                sb.Append("|TENANT:").Append(tenant);
             }
 
             foreach (var kvp in parameters.OrderBy(k => k.Key))
             {
-                hash.Add(kvp.Key);
-                hash.Add(kvp.Value?.GetHashCode() ?? 0);
+                sb.Append('|').Append(kvp.Key).Append('=').Append(kvp.Value?.GetHashCode() ?? 0);
             }
 
-            return hash.ToHashCode().ToString();
+            using var sha = SHA256.Create();
+            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+            return Convert.ToHexString(sha.ComputeHash(bytes));
         }
 
         private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
@@ -409,25 +411,26 @@ namespace nORM.Query
 
         private string BuildCacheKeyWithValues<TResult>(Expression expression, IReadOnlyDictionary<string, object> parameters)
         {
-            var hash = new HashCode();
-            hash.Add(ExpressionFingerprint.Compute(expression));
-            hash.Add(typeof(TResult));
+            var sb = new StringBuilder();
+            sb.Append(ExpressionFingerprint.Compute(expression));
+            sb.Append('|').Append(typeof(TResult).FullName);
 
             var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             if (_ctx.Options.TenantProvider != null)
             {
                 if (tenant == null)
                     throw new InvalidOperationException("Tenant context required but not available");
-                hash.Add("TENANT:" + tenant.ToString());
+                sb.Append("|TENANT:").Append(tenant);
             }
 
             foreach (var kvp in parameters.OrderBy(k => k.Key))
             {
-                hash.Add(kvp.Key);
-                hash.Add(kvp.Value?.GetHashCode() ?? 0);
+                sb.Append('|').Append(kvp.Key).Append('=').Append(kvp.Value?.GetHashCode() ?? 0);
             }
 
-            return hash.ToHashCode().ToString();
+            using var sha = SHA256.Create();
+            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+            return Convert.ToHexString(sha.ComputeHash(bytes));
         }
 
         private static Expression UnwrapQueryExpression(Expression expression)
