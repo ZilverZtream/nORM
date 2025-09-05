@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
+using System.Transactions;
 using nORM.Configuration;
 using nORM.Execution;
 using nORM.Mapping;
@@ -296,15 +297,22 @@ namespace nORM.Core
             }
 
             var existingTransaction = Database.CurrentTransaction;
-            var ownsTransaction = existingTransaction == null;
-            DbTransaction transaction;
+            var ambientTransaction = Transaction.Current;
+            var ownsTransaction = existingTransaction == null && ambientTransaction == null;
+            DbTransaction? transaction;
             CancellationTokenSource? timeoutCts = null;
             CancellationTokenSource? linkedCts = null;
 
-            if (ownsTransaction)
+            if (ambientTransaction != null && existingTransaction == null)
             {
                 await EnsureConnectionAsync(ct).ConfigureAwait(false);
-                var isolationLevel = IsolationLevel.ReadCommitted; // Use a safe default.
+                Connection.EnlistTransaction(ambientTransaction);
+                transaction = null;
+            }
+            else if (ownsTransaction)
+            {
+                await EnsureConnectionAsync(ct).ConfigureAwait(false);
+                var isolationLevel = System.Data.IsolationLevel.ReadCommitted; // Use a safe default.
                 transaction = await Connection.BeginTransactionAsync(isolationLevel, ct).ConfigureAwait(false);
 
                 timeoutCts = new CancellationTokenSource(Options.TimeoutConfiguration.BaseTimeout);
@@ -325,7 +333,7 @@ namespace nORM.Core
                 }
 
                 if (ownsTransaction)
-                    await transaction.CommitAsync(ct).ConfigureAwait(false);
+                    await transaction!.CommitAsync(ct).ConfigureAwait(false);
 
                 var cache = Options.CacheProvider;
                 if (cache != null)
@@ -343,13 +351,13 @@ namespace nORM.Core
             catch
             {
                 if (ownsTransaction)
-                    await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                    await transaction!.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
             finally
             {
                 if (ownsTransaction)
-                    await transaction.DisposeAsync().ConfigureAwait(false);
+                    await transaction!.DisposeAsync().ConfigureAwait(false);
                 linkedCts?.Dispose();
                 timeoutCts?.Dispose();
             }
@@ -363,7 +371,7 @@ namespace nORM.Core
             return totalAffected;
         }
 
-        private async Task<int> ProcessEntityChangeAsync(EntityEntry entry, DbTransaction transaction, CancellationToken ct)
+        private async Task<int> ProcessEntityChangeAsync(EntityEntry entry, DbTransaction? transaction, CancellationToken ct)
         {
             switch (entry.State)
             {
@@ -394,7 +402,7 @@ namespace nORM.Core
             };
         }
 
-        private Task<int> InvokeWriteAsync(string methodName, EntityEntry entry, DbTransaction transaction, CancellationToken ct)
+        private Task<int> InvokeWriteAsync(string methodName, EntityEntry entry, DbTransaction? transaction, CancellationToken ct)
         {
             var method = typeof(DbContext).GetMethods()
                 .First(m => m.Name == methodName && m.GetParameters().Length == 3)
