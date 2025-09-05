@@ -129,31 +129,49 @@ CREATE TABLE {historyTable} (
             var insertedColumns = string.Join(", ", mapping.Columns.Select(c => "i." + Escape(c.PropName)));
             var deletedColumns = string.Join(", ", mapping.Columns.Select(c => "d." + Escape(c.PropName)));
             var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h.{Escape(c.PropName)} = d.{Escape(c.PropName)}"));
+            var keyConditionH2 = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h2.{Escape(c.PropName)} = d.{Escape(c.PropName)}"));
 
             return $@"
 CREATE TRIGGER {Escape(mapping.TableName + "_TemporalInsert")} ON {table} AFTER INSERT AS
 BEGIN
     SET NOCOUNT ON;
+    DECLARE @Now DATETIME2 = SYSUTCDATETIME();
     INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columns})
-    SELECT GETUTCDATE(), '9999-12-31', 'I', {insertedColumns} FROM inserted i;
+    SELECT @Now, '9999-12-31', 'I', {insertedColumns} FROM inserted i;
 END;
 GO
 
 CREATE TRIGGER {Escape(mapping.TableName + "_TemporalUpdate")} ON {table} AFTER UPDATE AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE h SET h.__ValidTo = GETUTCDATE() FROM {history} h JOIN deleted d ON {keyCondition} WHERE h.__ValidTo = '9999-12-31';
+    DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+    UPDATE h SET h.__ValidTo = @Now
+    FROM {history} h
+    JOIN deleted d ON {keyCondition}
+    WHERE h.__ValidTo = '9999-12-31'
+      AND NOT EXISTS (
+        SELECT 1 FROM {history} h2
+        WHERE h2.__ValidFrom = @Now AND {keyConditionH2}
+    );
     INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columns})
-    SELECT GETUTCDATE(), '9999-12-31', 'U', {insertedColumns} FROM inserted i;
+    SELECT @Now, '9999-12-31', 'U', {insertedColumns} FROM inserted i;
 END;
 GO
 
 CREATE TRIGGER {Escape(mapping.TableName + "_TemporalDelete")} ON {table} AFTER DELETE AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE h SET h.__ValidTo = GETUTCDATE() FROM {history} h JOIN deleted d ON {keyCondition} WHERE h.__ValidTo = '9999-12-31';
+    DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+    UPDATE h SET h.__ValidTo = @Now
+    FROM {history} h
+    JOIN deleted d ON {keyCondition}
+    WHERE h.__ValidTo = '9999-12-31'
+      AND NOT EXISTS (
+        SELECT 1 FROM {history} h2
+        WHERE h2.__ValidFrom = @Now AND {keyConditionH2}
+    );
     INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columns})
-    SELECT GETUTCDATE(), GETUTCDATE(), 'D', {deletedColumns} FROM deleted d;
+    SELECT @Now, @Now, 'D', {deletedColumns} FROM deleted d;
 END;";
         }
 
