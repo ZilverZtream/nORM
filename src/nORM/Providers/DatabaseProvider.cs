@@ -201,7 +201,7 @@ namespace nORM.Providers
             if (!entityList.Any()) return 0;
 
             if (!m.KeyColumns.Any())
-                throw new Exception($"Cannot delete from '{m.EscTable}': no key columns defined.");
+                throw new NormConfigurationException($"Cannot delete from '{m.EscTable}': no key columns defined.");
 
             var totalDeleted = 0;
             var keyColumns = m.KeyColumns.ToList();
