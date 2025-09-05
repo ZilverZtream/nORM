@@ -32,6 +32,9 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
         private static readonly ConcurrentDictionary<Type, int> _typeHashCodes = new();
+        private const ulong FnvOffset = 14695981039346656037UL;
+        private const ulong FnvPrime = 1099511628211UL;
+        private static readonly ConcurrentDictionary<(int Fingerprint, Type ResultType), ulong> _cacheKeyBaseHashes = new();
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
@@ -203,7 +206,7 @@ namespace nORM.Query
 
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
-                var cacheKey = BuildCacheKeyWithValues<TResult>(filtered, plan.Parameters);
+                var cacheKey = BuildCacheKeyWithValues<TResult>(plan, plan.Parameters);
                 var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
                 return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
             }
@@ -441,52 +444,58 @@ namespace nORM.Query
             filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(UnwrapQueryExpression(filtered));
             var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
-            var cacheKey = BuildPlanCacheKey(filtered, tenantHash, elementType);
+            var fingerprint = ExpressionFingerprint.Compute(filtered);
+            var cacheKey = BuildPlanCacheKey(fingerprint, tenantHash, elementType, filtered.Type);
 
             var localFiltered = filtered;
             return _planCache.GetOrAdd(cacheKey, _ =>
             {
                 using var translator = new QueryTranslator(_ctx);
-                return translator.Translate(localFiltered);
+                var plan = translator.Translate(localFiltered);
+                return plan with { Fingerprint = fingerprint };
             });
         }
 
-        private string BuildPlanCacheKey(Expression expression, int tenantHash, Type elementType)
+        private string BuildPlanCacheKey(int fingerprint, int tenantHash, Type elementType, Type expressionType)
         {
-            var fingerprint = ExpressionFingerprint.Compute(expression);
             var sb = new StringBuilder();
             sb.Append(fingerprint)
               .Append(':').Append(tenantHash)
               .Append(':').Append(GetTypeHash(elementType))
-              .Append(':').Append(GetTypeHash(expression.Type));
+              .Append(':').Append(GetTypeHash(expressionType));
             return sb.ToString();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int GetTypeHash(Type type) => _typeHashCodes.GetOrAdd(type, static t => t.GetHashCode());
 
-        private string BuildCacheKeyWithValues<TResult>(Expression expression, IReadOnlyDictionary<string, object> parameters)
+        private string BuildCacheKeyWithValues<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
         {
-            var sb = new StringBuilder();
-            sb.Append(ExpressionFingerprint.Compute(expression));
-            sb.Append('|').Append(typeof(TResult).FullName);
+            static ulong ComputeBaseHash((int Fingerprint, Type ResultType) key)
+            {
+                ulong h = FnvOffset;
+                h = (h ^ (uint)key.Fingerprint) * FnvPrime;
+                h = (h ^ (uint)StringComparer.Ordinal.GetHashCode(key.ResultType.FullName!)) * FnvPrime;
+                return h;
+            }
+
+            ulong hash = _cacheKeyBaseHashes.GetOrAdd((plan.Fingerprint, typeof(TResult)), ComputeBaseHash);
 
             var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             if (_ctx.Options.TenantProvider != null)
             {
                 if (tenant == null)
                     throw new InvalidOperationException("Tenant context required but not available");
-                sb.Append("|TENANT:").Append(tenant);
+                hash = (hash ^ (uint)StringComparer.Ordinal.GetHashCode(tenant)) * FnvPrime;
             }
 
             foreach (var kvp in parameters.OrderBy(k => k.Key))
             {
-                sb.Append('|').Append(kvp.Key).Append('=').Append(kvp.Value?.GetHashCode() ?? 0);
+                hash = (hash ^ (uint)StringComparer.Ordinal.GetHashCode(kvp.Key)) * FnvPrime;
+                hash = (hash ^ (uint)(kvp.Value?.GetHashCode() ?? 0)) * FnvPrime;
             }
 
-            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-            var hash = XxHash128.Hash(bytes);
-            return Convert.ToHexString(hash);
+            return hash.ToString("X16");
         }
 
         private static Expression UnwrapQueryExpression(Expression expression)
