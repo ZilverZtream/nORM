@@ -251,8 +251,9 @@ namespace nORM.Query
                           if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
                           {
                               var containsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                              var escChar = NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
                               _sql.AppendParameterizedValue(containsParam, CreateSafeLikePattern(cs, LikeOperation.Contains), _params)
-                                  .Append($" ESCAPE '{_provider.LikeEscapeChar}'");
+                                  .Append($" ESCAPE '{escChar}'");
                           }
                           else
                           {
@@ -265,8 +266,9 @@ namespace nORM.Query
                           if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
                           {
                               var startsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                              var escChar = NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
                               _sql.AppendParameterizedValue(startsParam, CreateSafeLikePattern(ss, LikeOperation.StartsWith), _params)
-                                  .Append($" ESCAPE '{_provider.LikeEscapeChar}'");
+                                  .Append($" ESCAPE '{escChar}'");
                           }
                           else
                           {
@@ -279,8 +281,9 @@ namespace nORM.Query
                           if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
                           {
                               var endsParam = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                              var escChar = NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
                               _sql.AppendParameterizedValue(endsParam, CreateSafeLikePattern(es, LikeOperation.EndsWith), _params)
-                                  .Append($" ESCAPE '{_provider.LikeEscapeChar}'");
+                                  .Append($" ESCAPE '{escChar}'");
                           }
                           else
                           {
@@ -597,12 +600,7 @@ namespace nORM.Query
         {
             if (string.IsNullOrEmpty(value)) return string.Empty;
 
-            // Validate and double-escape
-            var escaped = value
-                .Replace("\\", "\\\\")  // Escape backslashes first
-                .Replace("%", "\\%")
-                .Replace("_", "\\_")
-                .Replace("[", "\\[");
+            var escaped = _provider.EscapeLikePattern(value);
 
             return operation switch
             {
