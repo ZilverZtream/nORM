@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using nORM.Configuration;
@@ -45,7 +46,7 @@ namespace nORM.Core
             return entry;
         }
 
-        internal void Remove(object entity)
+        internal void Remove(object entity, bool cascade = false)
         {
             if (_entriesByReference.TryGetValue(entity, out var entry))
             {
@@ -57,6 +58,33 @@ namespace nORM.Core
                     typeEntries.Remove(pk);
                     if (typeEntries.Count == 0)
                         _entriesByKey.Remove(entry.Mapping.Type);
+                }
+
+                if (cascade)
+                {
+                    CascadeDelete(entity, entry.Mapping);
+                }
+            }
+        }
+
+        private void CascadeDelete(object entity, TableMapping mapping)
+        {
+            foreach (var relation in mapping.Relations.Values)
+            {
+                if (!relation.CascadeDelete)
+                    continue;
+
+                var navValue = relation.NavProp.GetValue(entity);
+                if (navValue is IEnumerable collection)
+                {
+                    foreach (var child in collection)
+                    {
+                        Remove(child, true);
+                    }
+                }
+                else if (navValue != null)
+                {
+                    Remove(navValue, true);
                 }
             }
         }
