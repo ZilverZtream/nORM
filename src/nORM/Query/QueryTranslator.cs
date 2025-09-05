@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.ObjectPool;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
@@ -63,8 +64,8 @@ namespace nORM.Query
         // Initialize _groupJoinInfo in constructor to suppress warning
         // This field is used in complex join scenarios
 
-        private static ThreadLocal<QueryTranslator?> _threadLocalTranslator =
-            new(() => null, trackAllValues: false);
+        private static readonly ObjectPool<QueryTranslator> _translatorPool =
+            new DefaultObjectPool<QueryTranslator>(new QueryTranslatorPooledObjectPolicy());
 
         private static readonly AdaptiveQueryComplexityAnalyzer _complexityAnalyzer =
             new AdaptiveQueryComplexityAnalyzer(new SystemMemoryMonitor());
@@ -105,12 +106,7 @@ namespace nORM.Query
 
         internal static QueryTranslator Rent(DbContext ctx)
         {
-            var t = _threadLocalTranslator.Value;
-            if (t is null)
-            {
-                t = new QueryTranslator();
-                _threadLocalTranslator.Value = t;
-            }
+            var t = _translatorPool.Get();
             t.Reset(ctx);
             return t;
         }
@@ -149,6 +145,46 @@ namespace nORM.Query
                 _clauses = new SqlClauseBuilder();
             }
             _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
+            _isCacheable = false;
+            _cacheExpiration = null;
+            _asOfTimestamp = null;
+        }
+
+        private void Clear()
+        {
+            try
+            {
+                _clauses?.Dispose();
+            }
+            catch
+            {
+                // Swallow any exceptions to avoid masking disposal failures
+            }
+            finally
+            {
+                _clauses = new SqlClauseBuilder();
+            }
+
+            _ctx = null!;
+            _provider = null!;
+            _mapping = null!;
+            _rootType = null;
+            _paramIndex = 0;
+            _params = new Dictionary<string, object>();
+            _compiledParams = new List<string>();
+            _paramMap = new Dictionary<ParameterExpression, string>();
+            _includes = new List<IncludePlan>();
+            _projection = null;
+            _isAggregate = false;
+            _methodName = string.Empty;
+            _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+            _groupJoinInfo = null;
+            _joinCounter = 0;
+            _singleResult = false;
+            _noTracking = false;
+            _splitQuery = false;
+            _tables = new HashSet<string>();
+            _estimatedTimeout = default;
             _isCacheable = false;
             _cacheExpiration = null;
             _asOfTimestamp = null;
@@ -424,19 +460,17 @@ namespace nORM.Query
 
         public void Dispose()
         {
-            try
+            _translatorPool.Return(this);
+        }
+
+        private sealed class QueryTranslatorPooledObjectPolicy : PooledObjectPolicy<QueryTranslator>
+        {
+            public override QueryTranslator Create() => new QueryTranslator();
+
+            public override bool Return(QueryTranslator obj)
             {
-                _clauses?.Dispose();
-            }
-            catch
-            {
-                // Swallow any exceptions to avoid masking disposal failures
-            }
-            finally
-            {
-                // Clear thread-local reference to avoid retaining disposed translators
-                if (_threadLocalTranslator.IsValueCreated)
-                    _threadLocalTranslator.Value = null;
+                obj.Clear();
+                return true;
             }
         }
 
