@@ -389,24 +389,40 @@ namespace nORM.Query
                         return node;
                     }
 
-                    var exceedsLimit = _provider.MaxParameters != int.MaxValue && (_paramIndex + items.Count) > _provider.MaxParameters;
-
-                    Visit(valueExpr);
-                    _sql.Append(" IN (");
-                    for (int i = 0; i < items.Count; i++)
+                    var maxBatchSize = Math.Max(1, Math.Min(1000, _provider.MaxParameters - _paramIndex - 10));
+                    if (items.Count > maxBatchSize)
                     {
-                        if (i > 0) _sql.Append(", ");
-                        if (exceedsLimit)
+                        _sql.Append("(");
+                        for (int batch = 0; batch < items.Count; batch += maxBatchSize)
                         {
-                            AppendSqlLiteral(items[i]);
+                            if (batch > 0) _sql.Append(" OR ");
+                            var batchItems = items.Skip(batch).Take(maxBatchSize);
+                            Visit(valueExpr);
+                            _sql.Append(" IN (");
+                            bool first = true;
+                            foreach (var item in batchItems)
+                            {
+                                if (!first) _sql.Append(", ");
+                                var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                                _sql.AppendParameterizedValue(paramName, item, _params);
+                                first = false;
+                            }
+                            _sql.Append(")");
                         }
-                        else
+                        _sql.Append(")");
+                    }
+                    else
+                    {
+                        Visit(valueExpr);
+                        _sql.Append(" IN (");
+                        for (int i = 0; i < items.Count; i++)
                         {
+                            if (i > 0) _sql.Append(", ");
                             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
                             _sql.AppendParameterizedValue(paramName, items[i], _params);
                         }
+                        _sql.Append(")");
                     }
-                    _sql.Append(")");
                     return node;
                 }
             }
@@ -595,60 +611,6 @@ namespace nORM.Query
                 LikeOperation.EndsWith => $"%{escaped}",
                 _ => escaped
             };
-        }
-
-        private void AppendSqlLiteral(object? value)
-        {
-            if (value == null || value == DBNull.Value)
-            {
-                _sql.Append("NULL");
-                return;
-            }
-
-            switch (Type.GetTypeCode(value.GetType()))
-            {
-                case TypeCode.Boolean:
-                    _sql.Append((bool)value ? "1" : "0");
-                    return;
-                case TypeCode.String:
-                    var s = (string)value;
-                    _sql.Append('\'').Append(s.Replace("'", "''")).Append('\'');
-                    return;
-                case TypeCode.Char:
-                    var c = (char)value;
-                    _sql.Append('\'').Append(c == '\'' ? "''" : c.ToString()).Append('\'');
-                    return;
-                case TypeCode.DateTime:
-                    var dt = (DateTime)value;
-                    _sql.Append('\'').Append(dt.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture)).Append('\'');
-                    return;
-            }
-
-            if (value is DateTimeOffset dto)
-            {
-                _sql.Append('\'').Append(dto.ToString("yyyy-MM-dd HH:mm:ss.fffffff zzz", CultureInfo.InvariantCulture)).Append('\'');
-            }
-            else if (value is Guid guid)
-            {
-                _sql.Append('\'').Append(guid.ToString()).Append('\'');
-            }
-            else if (value is byte[] bytes)
-            {
-                _sql.Append("0x").Append(Convert.ToHexString(bytes));
-            }
-            else if (value.GetType().IsEnum)
-            {
-                var enumVal = Convert.ToInt64(value, CultureInfo.InvariantCulture);
-                _sql.Append(enumVal.ToString(CultureInfo.InvariantCulture));
-            }
-            else if (value is IFormattable formattable)
-            {
-                _sql.Append(formattable.ToString(null, CultureInfo.InvariantCulture));
-            }
-            else
-            {
-                _sql.Append(value.ToString());
-            }
         }
 
         private static Type GetRootElementType(Expression source)

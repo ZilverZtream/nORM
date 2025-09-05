@@ -91,7 +91,9 @@ namespace nORM.Providers
             var operationKey = $"BulkInsert_{m.Type.Name}";
             var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
-            var maxBatchForProvider = MaxParameters / Math.Max(1, cols.Count);
+            var maxBatchForProvider = MaxParameters == int.MaxValue
+                ? 1000
+                : Math.Max(1, Math.Min(1000, (MaxParameters - 10) / Math.Max(1, cols.Count)));
             var effectiveBatchSize = Math.Max(1, Math.Min(sizing.OptimalBatchSize, maxBatchForProvider));
             // Logging infrastructure doesn't support arbitrary info; batch size can be inferred from performance metrics.
 
@@ -202,12 +204,11 @@ namespace nORM.Providers
             var keyColumns = m.KeyColumns.ToList();
 
             // Determine maximum entities per batch based on provider parameter limit
-            var batchSize = ctx.Options.BulkBatchSize;
+            var batchSize = Math.Min(ctx.Options.BulkBatchSize, 1000);
             if (MaxParameters != int.MaxValue)
             {
                 var paramsPerEntity = Math.Max(1, keyColumns.Count);
-                var maxBatchByParams = MaxParameters / paramsPerEntity;
-                if (maxBatchByParams <= 0) maxBatchByParams = 1;
+                var maxBatchByParams = Math.Max(1, (MaxParameters - 10) / paramsPerEntity);
                 batchSize = Math.Min(batchSize, maxBatchByParams);
             }
 
