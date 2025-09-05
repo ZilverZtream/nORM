@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
@@ -17,12 +18,12 @@ namespace nORM.Query
     /// </summary>
     internal sealed class MaterializerFactory
     {
-        private static readonly ConcurrentLruCache<(Type MappingType, Type TargetType, string? ProjectionKey), Func<DbDataReader, CancellationToken, Task<object>>> _cache = new(maxSize: 1000);
+        private static readonly ConcurrentLruCache<(int MappingTypeHash, int TargetTypeHash, int ProjectionHash, string TableName), Func<DbDataReader, CancellationToken, Task<object>>> _cache = new(maxSize: 1000);
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
         {
-            var projectionKey = projection?.ToString();
-            var cacheKey = (mapping.Type, targetType, projectionKey);
+            var projectionHash = projection != null ? ExpressionFingerprint.Compute(projection) : 0;
+            var cacheKey = (mapping.Type.GetHashCode(), targetType.GetHashCode(), projectionHash, mapping.TableName);
 
             if (projection == null && CompiledMaterializerStore.TryGet(targetType, out var precompiled))
             {
@@ -33,6 +34,7 @@ namespace nORM.Query
             return _cache.GetOrAdd(cacheKey, _ =>
             {
                 var sync = CreateMaterializerInternal(mapping, targetType, projection);
+                ValidateMaterializer(sync, mapping, targetType);
                 return (reader, ct) => Task.FromResult(sync(reader));
             });
         }
@@ -211,6 +213,90 @@ namespace nORM.Query
             expressions.Add(Expression.Convert(entityVar, typeof(object)));
             var block = Expression.Block(new[] { entityVar }, expressions);
             return Expression.Lambda<Func<DbDataReader, object>>(block, readerParam).Compile();
+        }
+
+        private static void ValidateMaterializer(Func<DbDataReader, object> materializer, TableMapping mapping, Type targetType)
+        {
+            _ = targetType;
+            using var reader = new ValidationDbDataReader(mapping.Columns.Length);
+            materializer(reader);
+        }
+
+        private sealed class ValidationDbDataReader : DbDataReader
+        {
+            private readonly int _fieldCount;
+
+            public ValidationDbDataReader(int fieldCount)
+            {
+                _fieldCount = fieldCount;
+            }
+
+            public override int FieldCount => _fieldCount;
+
+            public override bool IsDBNull(int ordinal) => true;
+
+            public override Task<bool> IsDBNullAsync(int ordinal, CancellationToken cancellationToken) => Task.FromResult(true);
+
+            public override object GetValue(int ordinal) => DBNull.Value;
+
+            public override int GetValues(object[] values)
+            {
+                Array.Fill(values, DBNull.Value);
+                return Math.Min(values.Length, _fieldCount);
+            }
+
+            public override string GetName(int ordinal) => throw new NotSupportedException();
+
+            public override int GetOrdinal(string name) => throw new NotSupportedException();
+
+            public override string GetDataTypeName(int ordinal) => nameof(Object);
+
+            public override Type GetFieldType(int ordinal) => typeof(object);
+
+            public override bool HasRows => false;
+
+            public override bool IsClosed => false;
+
+            public override int RecordsAffected => 0;
+
+            public override object this[int ordinal] => DBNull.Value;
+
+            public override object this[string name] => DBNull.Value;
+
+            public override IEnumerator GetEnumerator() => Array.Empty<object>().GetEnumerator();
+
+            public override bool Read() => false;
+
+            public override Task<bool> ReadAsync(CancellationToken cancellationToken) => Task.FromResult(false);
+
+            public override bool NextResult() => false;
+
+            public override Task<bool> NextResultAsync(CancellationToken cancellationToken) => Task.FromResult(false);
+
+            public override int Depth => 0;
+
+            public override int VisibleFieldCount => _fieldCount;
+
+            public override bool GetBoolean(int ordinal) => default;
+            public override byte GetByte(int ordinal) => default;
+            public override long GetBytes(int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length) => 0;
+            public override char GetChar(int ordinal) => default;
+            public override long GetChars(int ordinal, long dataOffset, char[]? buffer, int bufferOffset, int length) => 0;
+            public override Guid GetGuid(int ordinal) => default;
+            public override short GetInt16(int ordinal) => default;
+            public override int GetInt32(int ordinal) => default;
+            public override long GetInt64(int ordinal) => default;
+            public override DateTime GetDateTime(int ordinal) => default;
+            public override decimal GetDecimal(int ordinal) => default;
+            public override double GetDouble(int ordinal) => default;
+            public override float GetFloat(int ordinal) => default;
+            public override string GetString(int ordinal) => string.Empty;
+
+            public override T GetFieldValue<T>(int ordinal) => default!;
+
+            public override Task<T> GetFieldValueAsync<T>(int ordinal, CancellationToken cancellationToken) => Task.FromResult(default(T)!);
+
+            public override System.Data.DataTable GetSchemaTable() => throw new NotSupportedException();
         }
 
         private static Expression GetOptimizedReaderCall(ParameterExpression reader, Type propertyType, int index)
