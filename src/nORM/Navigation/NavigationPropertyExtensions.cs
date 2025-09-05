@@ -14,6 +14,7 @@ using Microsoft.Extensions.ObjectPool;
 using nORM.Core;
 using nORM.Mapping;
 using nORM.Internal;
+using nORM.Execution;
 
 #nullable enable
 
@@ -388,10 +389,10 @@ namespace nORM.Navigation
         {
             await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
             using var cmd = context.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)context.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-            
+
             var paramName = context.Provider.ParamPrefix + "fk";
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {foreignKey.EscCol} = {paramName}";
+            cmd.CommandTimeout = (int)context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.SimpleSelect, cmd.CommandText).TotalSeconds;
             cmd.AddParam(paramName, keyValue);
 
             // Apply LIMIT 1 for single result
