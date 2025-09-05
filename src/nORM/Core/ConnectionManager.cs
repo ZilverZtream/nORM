@@ -24,6 +24,8 @@ namespace nORM.Core
         private readonly Timer _healthCheckTimer;
         private readonly SemaphoreSlim _failoverSemaphore = new(1, 1);
         private readonly SemaphoreSlim _poolInitSemaphore = new(1, 1);
+        private readonly CancellationTokenSource _disposeCts = new();
+        private bool _disposed;
 
         private readonly ConcurrentDictionary<string, ConnectionPool> _connectionPools = new();
         private volatile DatabaseTopology.DatabaseNode? _currentPrimary;
@@ -147,17 +149,27 @@ namespace nORM.Core
 
         private async void PerformHealthChecks(object? state)
         {
+            if (_disposed || _disposeCts.IsCancellationRequested)
+                return;
+
             foreach (var node in _topology.Nodes)
             {
+                if (_disposed || _disposeCts.IsCancellationRequested)
+                    break;
+
                 var pool = _connectionPools[node.ConnectionString];
                 try
                 {
                     var sw = System.Diagnostics.Stopwatch.StartNew();
-                    await using var cn = await pool.RentAsync().ConfigureAwait(false);
+                    await using var cn = await pool.RentAsync(_disposeCts.Token).ConfigureAwait(false);
                     sw.Stop();
                     node.IsHealthy = true;
                     node.LastHealthCheck = DateTime.UtcNow;
                     node.AverageLatency = sw.Elapsed;
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
                 }
                 catch
                 {
@@ -165,6 +177,10 @@ namespace nORM.Core
                     node.LastHealthCheck = DateTime.UtcNow;
                 }
             }
+
+            if (_disposed || _disposeCts.IsCancellationRequested)
+                return;
+
             DeterminePrimaryNode();
             UpdateAvailableReadReplicas();
         }
@@ -188,16 +204,25 @@ namespace nORM.Core
 
         public void Dispose()
         {
+            if (_disposed)
+                return;
+            _disposed = true;
+
             List<Exception>? exceptions = null;
 
             try
             {
+                _disposeCts.Cancel();
                 _healthCheckTimer.Dispose();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error disposing health check timer");
                 exceptions = new List<Exception> { ex };
+            }
+            finally
+            {
+                _disposeCts.Dispose();
             }
 
             foreach (var pool in _connectionPools.Values)
