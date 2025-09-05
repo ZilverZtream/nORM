@@ -434,9 +434,9 @@ namespace nORM.Query
             }
             finally
             {
-                // Properly dispose ThreadLocal to prevent memory leaks
-                _threadLocalTranslator.Dispose();
-                _threadLocalTranslator = new(() => null, trackAllValues: false);
+                // Clear thread-local reference to avoid retaining disposed translators
+                if (_threadLocalTranslator.IsValueCreated)
+                    _threadLocalTranslator.Value = null;
             }
         }
 
