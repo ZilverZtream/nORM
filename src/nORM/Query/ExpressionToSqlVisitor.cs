@@ -392,7 +392,12 @@ namespace nORM.Query
                         return node;
                     }
 
-                    var maxBatchSize = Math.Max(1, Math.Min(1000, _provider.MaxParameters - _paramIndex - 10));
+                    var remainingParams = _provider.MaxParameters - _paramIndex - 10;
+                    if (remainingParams <= 0 || items.Count > remainingParams)
+                        throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
+                            $"IN clause exceeds maximum parameter count of {remainingParams}"));
+
+                    var maxBatchSize = Math.Max(1, Math.Min(1000, remainingParams));
                     if (items.Count > maxBatchSize)
                     {
                         _sql.Append("(");
