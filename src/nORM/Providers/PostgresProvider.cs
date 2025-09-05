@@ -102,6 +102,16 @@ namespace nORM.Providers
             return $"jsonb_extract_path_text({columnName}, {pgPath})";
         }
 
+        public override string BuildContainsClause(DbCommand cmd, string columnName, IReadOnlyList<object?> values)
+        {
+            var pName = ParamPrefix + "p0";
+            var p = cmd.CreateParameter();
+            p.ParameterName = pName;
+            p.Value = values.ToArray();
+            cmd.Parameters.Add(p);
+            return $"{columnName} = ANY({pName})";
+        }
+
         public override string GenerateCreateHistoryTableSql(TableMapping mapping)
         {
             var historyTable = Escape(mapping.TableName + "_History");
