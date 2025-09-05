@@ -28,6 +28,7 @@ namespace nORM.Query
             IList current = parents;
             foreach (var relation in include.Path)
             {
+                ct.ThrowIfCancellationRequested();
                 current = await EagerLoadLevelAsync(relation, current, ct, noTracking).ConfigureAwait(false);
                 if (current.Count == 0) break;
             }
@@ -55,6 +56,7 @@ namespace nORM.Query
             var hasKeys = false;
             foreach (var keyBatch in keyEnumerable.Chunk(maxPerBatch))
             {
+                ct.ThrowIfCancellationRequested();
                 hasKeys = true;
                 await using var cmd = _ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
@@ -62,6 +64,7 @@ namespace nORM.Query
                 var paramNames = new List<string>();
                 for (int i = 0; i < keyBatch.Length; i++)
                 {
+                    ct.ThrowIfCancellationRequested();
                     var pn = $"{_ctx.Provider.ParamPrefix}fk{i}";
                     paramNames.Add(pn);
                     cmd.AddParam(pn, keyBatch[i]!);
@@ -72,6 +75,7 @@ namespace nORM.Query
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
+                    ct.ThrowIfCancellationRequested();
                     var child = await childMaterializer(reader, ct).ConfigureAwait(false);
                     if (!noTracking)
                     {
@@ -95,13 +99,18 @@ namespace nORM.Query
 
             foreach (var p in parents.Cast<object>())
             {
+                ct.ThrowIfCancellationRequested();
                 var pk = relation.PrincipalKey.Getter(p);
                 var listType = typeof(List<>).MakeGenericType(relation.DependentType);
                 var childList = (IList)System.Activator.CreateInstance(listType)!;
 
                 if (pk != null && childGroups.TryGetValue(pk, out var c))
                 {
-                    foreach (var item in c) childList.Add(item);
+                    foreach (var item in c)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        childList.Add(item);
+                    }
                 }
 
                 relation.NavProp.SetValue(p, childList);
