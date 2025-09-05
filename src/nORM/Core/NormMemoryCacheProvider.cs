@@ -19,6 +19,23 @@ namespace nORM.Core
         });
 
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _tagTokens = new();
+        private readonly Func<object?>? _getTenantId;
+
+        public NormMemoryCacheProvider(Func<object?>? getTenantId = null)
+        {
+            _getTenantId = getTenantId;
+        }
+
+        private string QualifyTag(string tag)
+        {
+            if (_getTenantId == null)
+                return tag;
+
+            var tenant = _getTenantId();
+            if (tenant == null)
+                throw new InvalidOperationException("Tenant context required but not available");
+            return $"TENANT:{tenant}:{tag}";
+        }
 
         public bool TryGet<T>(string key, out T? value)
         {
@@ -33,7 +50,8 @@ namespace nORM.Core
 
             foreach (var tag in tags)
             {
-                var tokenSource = _tagTokens.GetOrAdd(tag, _ => new CancellationTokenSource());
+                var qualified = QualifyTag(tag);
+                var tokenSource = _tagTokens.GetOrAdd(qualified, _ => new CancellationTokenSource());
                 options.AddExpirationToken(new CancellationChangeToken(tokenSource.Token));
             }
 
@@ -42,7 +60,8 @@ namespace nORM.Core
 
         public void InvalidateTag(string tag)
         {
-            if (_tagTokens.TryRemove(tag, out var tokenSource))
+            var qualified = QualifyTag(tag);
+            if (_tagTokens.TryRemove(qualified, out var tokenSource))
             {
                 tokenSource.Cancel();
                 tokenSource.Dispose();
