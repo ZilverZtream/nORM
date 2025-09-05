@@ -16,12 +16,10 @@ using nORM.Providers;
 using nORM.Internal;
 using nORM.Navigation;
 using nORM.Versioning;
-using System.Reflection;
 using nORM.Scaffolding;
 using nORM.Enterprise;
-using Microsoft.Data.SqlClient;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
 
 #nullable enable
 
@@ -90,49 +88,13 @@ namespace nORM.Core
         {
             try
             {
-                return CreateConnection(connectionString, provider);
+                return DbConnectionFactory.Create(connectionString, provider);
             }
             catch (Exception ex)
             {
                 var safeConnStr = NormValidator.MaskSensitiveConnectionStringData(connectionString);
                 throw new ArgumentException($"Invalid connection string format: {safeConnStr}", nameof(connectionString), ex);
             }
-        }
-
-        private static DbConnection CreateConnection(string connectionString, DatabaseProvider provider)
-        {
-            var providerName = provider switch
-            {
-                SqlServerProvider => "sqlserver",
-                SqliteProvider => "sqlite",
-                PostgresProvider => "postgres",
-                MySqlProvider => "mysql",
-                _ => provider.GetType().Name
-            };
-
-            NormValidator.ValidateConnectionString(connectionString, providerName);
-
-            if (provider is SqlServerProvider)
-                return new SqlConnection(connectionString);
-            if (provider is SqliteProvider)
-                return new SqliteConnection(connectionString);
-            if (provider is PostgresProvider)
-            {
-                var type = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
-                if (type == null)
-                    throw new InvalidOperationException("Npgsql package is required for PostgreSQL support. Please install the Npgsql NuGet package.");
-                return (DbConnection)Activator.CreateInstance(type, connectionString)!;
-            }
-            if (provider is MySqlProvider)
-            {
-                var type = Type.GetType("MySqlConnector.MySqlConnection, MySqlConnector") ??
-                           Type.GetType("MySql.Data.MySqlClient.MySqlConnection, MySql.Data");
-                if (type == null)
-                    throw new InvalidOperationException("MySQL package is required for MySQL support. Please install MySqlConnector or MySql.Data.");
-                return (DbConnection)Activator.CreateInstance(type, connectionString)!;
-            }
-
-            throw new NotSupportedException($"Unsupported provider type: {provider.GetType().Name}");
         }
 
         internal async Task<DbConnection> EnsureConnectionAsync(CancellationToken ct = default)
