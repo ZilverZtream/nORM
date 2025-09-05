@@ -66,6 +66,25 @@ namespace nORM.Internal
             }
         }
 
+        public bool TryGet(TKey key, out TValue value)
+        {
+            if (_cache.TryGetValue(key, out var existingNode))
+            {
+                lock (_lock)
+                {
+                    if (existingNode.List != null)
+                    {
+                        _lruList.Remove(existingNode);
+                        _lruList.AddFirst(existingNode);
+                        value = existingNode.Value.Value;
+                        return true;
+                    }
+                }
+            }
+            value = default!;
+            return false;
+        }
+
         private record CacheItem(TKey Key, TValue Value);
     }
 }
