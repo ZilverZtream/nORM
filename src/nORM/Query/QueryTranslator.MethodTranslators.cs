@@ -271,7 +271,7 @@ namespace nORM.Query
                     "Union" => "UNION",
                     "Intersect" => "INTERSECT",
                     "Except" => "EXCEPT",
-                    _ => throw new NormUnsupportedFeatureException("Set operation not supported")
+                    _ => throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "Set operation"))
                 };
                 t._sql.Clear();
                 t._sql.Append($"({leftSql}) {setOp} ({rightSql})");
@@ -320,7 +320,7 @@ namespace nORM.Query
                 }
                 else
                 {
-                    throw new NormUnsupportedFeatureException("ElementAt requires constant integer index or parameter.");
+                    throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "ElementAt without constant integer index"));
                 }
 
                 t._take = 1;
@@ -471,7 +471,7 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var resultSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
-                    ?? throw new NormQueryTranslationException("WithRowNumber requires a result selector");
+                    ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "WithRowNumber requires a result selector"));
                 var alias = GetWindowAlias(resultSelector, 1, "RowNumber");
                 var wf = new WindowFunctionInfo("ROW_NUMBER", null, 0, null, alias, resultSelector.Parameters[1], resultSelector);
                 t._clauses.WindowFunctions.Add(wf);
@@ -484,7 +484,7 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var resultSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
-                    ?? throw new NormQueryTranslationException("WithRank requires a result selector");
+                    ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "WithRank requires a result selector"));
                 var alias = GetWindowAlias(resultSelector, 1, "Rank");
                 var wf = new WindowFunctionInfo("RANK", null, 0, null, alias, resultSelector.Parameters[1], resultSelector);
                 t._clauses.WindowFunctions.Add(wf);
@@ -497,7 +497,7 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var resultSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
-                    ?? throw new NormQueryTranslationException("WithDenseRank requires a result selector");
+                    ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "WithDenseRank requires a result selector"));
                 var alias = GetWindowAlias(resultSelector, 1, "DenseRank");
                 var wf = new WindowFunctionInfo("DENSE_RANK", null, 0, null, alias, resultSelector.Parameters[1], resultSelector);
                 t._clauses.WindowFunctions.Add(wf);
@@ -510,10 +510,10 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var valueSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
-                    ?? throw new NormQueryTranslationException("WithLag requires a value selector");
+                    ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "WithLag requires a value selector"));
                 int offset = TryGetIntValue(node.Arguments[2], out var off) ? off : 1;
                 var resultSelector = StripQuotes(node.Arguments[3]) as LambdaExpression
-                    ?? throw new NormQueryTranslationException("WithLag requires a result selector");
+                    ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "WithLag requires a result selector"));
                 LambdaExpression? defaultSelector = null;
                 if (node.Arguments.Count > 4)
                     defaultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
@@ -529,10 +529,10 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var valueSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
-                    ?? throw new NormQueryTranslationException("WithLead requires a value selector");
+                    ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "WithLead requires a value selector"));
                 int offset = TryGetIntValue(node.Arguments[2], out var off) ? off : 1;
                 var resultSelector = StripQuotes(node.Arguments[3]) as LambdaExpression
-                    ?? throw new NormQueryTranslationException("WithLead requires a result selector");
+                    ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "WithLead requires a result selector"));
                 LambdaExpression? defaultSelector = null;
                 if (node.Arguments.Count > 4)
                     defaultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
@@ -630,7 +630,7 @@ namespace nORM.Query
                 }
                 else
                 {
-                    throw new NormQueryTranslationException(".AsOf() requires a constant DateTime or string tag.");
+                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, ".AsOf() requires a constant DateTime or string tag."));
                 }
                 return t.Visit(node.Arguments[0]);
             }
