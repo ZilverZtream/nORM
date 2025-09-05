@@ -62,6 +62,9 @@ namespace nORM.Versioning
                 var trimmed = batch.Trim();
                 if (trimmed.Length == 0) continue;
 
+                if (!IsValidDdl(trimmed))
+                    throw new NormQueryException($"Invalid DDL: {trimmed}");
+
                 await handler.ExecuteWithExceptionHandling(async () =>
                 {
                     await using var cmd = (await context.EnsureConnectionAsync().ConfigureAwait(false)).CreateCommand();
@@ -70,6 +73,12 @@ namespace nORM.Versioning
                     return 0;
                 }, "ExecuteDdlAsync", new Dictionary<string, object> { ["Sql"] = trimmed }).ConfigureAwait(false);
             }
+        }
+
+        private static bool IsValidDdl(string ddl)
+        {
+            var lower = ddl.ToLowerInvariant();
+            return lower.StartsWith("create") || lower.StartsWith("alter") || lower.StartsWith("drop");
         }
     }
 }
