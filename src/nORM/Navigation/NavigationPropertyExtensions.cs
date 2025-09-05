@@ -402,7 +402,8 @@ namespace nORM.Navigation
                 _stringBuilderPool.Return(sb);
             }
 
-            var materializer = Query.QueryTranslator.Rent(context).CreateMaterializer(mapping, entityType);
+            using var translator = Query.QueryTranslator.Rent(context);
+            var materializer = translator.CreateMaterializer(mapping, entityType);
 
             using var reader = await cmd.ExecuteReaderWithInterceptionAsync(context, CommandBehavior.Default, ct).ConfigureAwait(false);
             if (await reader.ReadAsync(ct).ConfigureAwait(false))

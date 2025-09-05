@@ -736,7 +736,8 @@ namespace nORM.Core
 
                 NormValidator.ValidateRawSql(sql, paramDict);
 
-                var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
+                using var translator = global::nORM.Query.QueryTranslator.Rent(this);
+                var materializer = translator.CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
                 while (await reader.ReadAsync(token).ConfigureAwait(false)) list.Add((T)await materializer(reader, token).ConfigureAwait(false));
@@ -771,7 +772,8 @@ namespace nORM.Core
 
                 NormValidator.ValidateRawSql(procedureName, paramDict);
 
-                var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
+                using var translator = global::nORM.Query.QueryTranslator.Rent(this);
+                var materializer = translator.CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
                 while (await reader.ReadAsync(token).ConfigureAwait(false)) list.Add((T)await materializer(reader, token).ConfigureAwait(false));
@@ -805,7 +807,8 @@ namespace nORM.Core
 
             NormValidator.ValidateRawSql(procedureName, paramDict);
 
-            var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
+            using var translator = global::nORM.Query.QueryTranslator.Rent(this);
+            var materializer = translator.CreateMaterializer(GetMapping(typeof(T)), typeof(T));
             var count = 0;
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.SequentialAccess, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -857,7 +860,8 @@ namespace nORM.Core
 
                 NormValidator.ValidateRawSql(procedureName, paramDict);
 
-                var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
+                using var translator = global::nORM.Query.QueryTranslator.Rent(this);
+                var materializer = translator.CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
                 while (await reader.ReadAsync(token).ConfigureAwait(false)) list.Add((T)await materializer(reader, token).ConfigureAwait(false));

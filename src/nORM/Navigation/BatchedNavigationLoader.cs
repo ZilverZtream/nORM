@@ -125,7 +125,8 @@ namespace nORM.Navigation
 
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({string.Join(",", paramNames)})";
 
-            var materializer = Query.QueryTranslator.Rent(_context).CreateMaterializer(mapping, relation.DependentType);
+            using var translator = Query.QueryTranslator.Rent(_context);
+            var materializer = translator.CreateMaterializer(mapping, relation.DependentType);
             var results = new List<object>();
 
             using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, default).ConfigureAwait(false);
