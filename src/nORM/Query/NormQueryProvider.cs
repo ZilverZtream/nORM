@@ -122,8 +122,9 @@ namespace nORM.Query
 
         private static int CalculatePlanCacheSize(GCMemoryInfo info)
         {
-            const int approxPlanSize = 4 * 1024; // 4KB
-            var cacheBytes = info.TotalAvailableMemoryBytes / 100; // 1% of available memory
+            const int approxPlanSize = 16 * 1024; // 16KB per plan
+            const long maxCacheBytes = 64L * 1024 * 1024; // limit to 64MB overall
+            var cacheBytes = Math.Min(info.TotalAvailableMemoryBytes / 100, maxCacheBytes);
             var size = (int)(cacheBytes / approxPlanSize);
             return Math.Clamp(size, 100, 10000);
         }
