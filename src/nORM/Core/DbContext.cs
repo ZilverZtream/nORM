@@ -38,6 +38,8 @@ namespace nORM.Core
         private readonly DynamicEntityTypeGenerator _typeGenerator = new();
         private readonly ConcurrentDictionary<string, Type> _dynamicTypeCache = new();
         private readonly LinkedList<WeakReference<IDisposable>> _disposables = new();
+        private readonly object _disposablesLock = new();
+        private readonly Timer _cleanupTimer;
         private bool _providerInitialized;
         private readonly SemaphoreSlim _providerInitLock = new(1, 1);
         private DbTransaction? _currentTransaction;
@@ -84,6 +86,8 @@ namespace nORM.Core
             {
                 TemporalManager.InitializeAsync(this).GetAwaiter().GetResult();
             }
+
+            _cleanupTimer = new Timer(_ => CleanupDisposables(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
 
         public DbContext(string connectionString, DatabaseProvider p, DbContextOptions? options = null)
@@ -882,16 +886,21 @@ namespace nORM.Core
         {
             if (!_disposed && disposing)
             {
-                for (var node = _disposables.First; node != null;)
+                _cleanupTimer?.Dispose();
+                lock (_disposablesLock)
                 {
-                    var next = node.Next;
-                    if (node.Value.TryGetTarget(out var d))
+                    CleanupDisposablesInternal();
+                    for (var node = _disposables.First; node != null;)
                     {
-                        d.Dispose();
-                    }
+                        var next = node.Next;
+                        if (node.Value.TryGetTarget(out var d))
+                        {
+                            d.Dispose();
+                        }
 
-                    _disposables.Remove(node);
-                    node = next;
+                        _disposables.Remove(node);
+                        node = next;
+                    }
                 }
 
                 _cn?.Dispose();
@@ -899,7 +908,7 @@ namespace nORM.Core
             }
         }
 
-        private void CleanupDisposables()
+        private void CleanupDisposablesInternal()
         {
             for (var node = _disposables.First; node != null;)
             {
@@ -913,12 +922,23 @@ namespace nORM.Core
             }
         }
 
+        private void CleanupDisposables(object? state = null)
+        {
+            lock (_disposablesLock)
+            {
+                CleanupDisposablesInternal();
+            }
+        }
+
         public void RegisterForDisposal(IDisposable disposable)
         {
             if (disposable != null)
             {
-                CleanupDisposables();
-                _disposables.AddLast(new WeakReference<IDisposable>(disposable));
+                lock (_disposablesLock)
+                {
+                    CleanupDisposablesInternal();
+                    _disposables.AddLast(new WeakReference<IDisposable>(disposable));
+                }
             }
         }
 
@@ -932,16 +952,21 @@ namespace nORM.Core
         {
             if (!_disposed)
             {
-                for (var node = _disposables.First; node != null;)
+                _cleanupTimer?.Dispose();
+                lock (_disposablesLock)
                 {
-                    var next = node.Next;
-                    if (node.Value.TryGetTarget(out var d))
+                    CleanupDisposablesInternal();
+                    for (var node = _disposables.First; node != null;)
                     {
-                        d.Dispose();
-                    }
+                        var next = node.Next;
+                        if (node.Value.TryGetTarget(out var d))
+                        {
+                            d.Dispose();
+                        }
 
-                    _disposables.Remove(node);
-                    node = next;
+                        _disposables.Remove(node);
+                        node = next;
+                    }
                 }
 
                 if (_cn != null)
