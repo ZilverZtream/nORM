@@ -10,6 +10,7 @@ using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
 using nORM.Navigation;
+using nORM.Execution;
 
 namespace nORM.Query
 {
@@ -59,7 +60,6 @@ namespace nORM.Query
                 ct.ThrowIfCancellationRequested();
                 hasKeys = true;
                 await using var cmd = _ctx.Connection.CreateCommand();
-                cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
                 var paramNames = new List<string>();
                 for (int i = 0; i < keyBatch.Length; i++)
@@ -71,6 +71,7 @@ namespace nORM.Query
                 }
 
                 cmd.CommandText = $"SELECT * FROM {childMap.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({PooledStringBuilder.Join(paramNames, ",")})";
+                cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
 
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))

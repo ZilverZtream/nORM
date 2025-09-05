@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
+using nORM.Execution;
 
 namespace nORM.Navigation
 {
@@ -113,7 +114,6 @@ namespace nORM.Navigation
             var mapping = _context.GetMapping(relation.DependentType);
             await _context.EnsureConnectionAsync(default).ConfigureAwait(false);
             using var cmd = _context.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)_context.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
             var paramNames = new List<string>();
             for (int i = 0; i < keys.Count; i++)
@@ -124,6 +124,7 @@ namespace nORM.Navigation
             }
 
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({PooledStringBuilder.Join(paramNames, ",")})";
+            cmd.CommandTimeout = (int)_context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
 
             using var translator = Query.QueryTranslator.Rent(_context);
             var materializer = translator.CreateMaterializer(mapping, relation.DependentType);
