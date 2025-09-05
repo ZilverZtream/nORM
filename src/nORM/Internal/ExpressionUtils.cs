@@ -1,5 +1,6 @@
 using System;
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -41,32 +42,46 @@ namespace nORM.Internal
             return timeout > maxTimeout ? maxTimeout : timeout;
         }
 
-        public static TDelegate CompileWithTimeout<TDelegate>(Expression<TDelegate> expression, CancellationToken token)
+        public static TDelegate CompileWithFallback<TDelegate>(Expression<TDelegate> expression, CancellationToken token)
         {
+            if (!RuntimeFeature.IsDynamicCodeSupported || !RuntimeFeature.IsDynamicCodeCompiled)
+                return expression.Compile(preferInterpretation: true);
+
             var task = Task.Run(() => expression.Compile(), token);
             try
             {
                 task.Wait(token);
+                return task.Result;
             }
-            catch (OperationCanceledException ex)
+            catch (OperationCanceledException)
             {
-                throw new TimeoutException("Expression compilation timed out", ex);
+                return expression.Compile(preferInterpretation: true);
             }
-            return task.Result;
+            catch (PlatformNotSupportedException)
+            {
+                return expression.Compile(preferInterpretation: true);
+            }
         }
 
-        public static Delegate CompileWithTimeout(LambdaExpression expression, CancellationToken token)
+        public static Delegate CompileWithFallback(LambdaExpression expression, CancellationToken token)
         {
+            if (!RuntimeFeature.IsDynamicCodeSupported || !RuntimeFeature.IsDynamicCodeCompiled)
+                return expression.Compile(preferInterpretation: true);
+
             var task = Task.Run(expression.Compile, token);
             try
             {
                 task.Wait(token);
+                return task.Result;
             }
-            catch (OperationCanceledException ex)
+            catch (OperationCanceledException)
             {
-                throw new TimeoutException("Expression compilation timed out", ex);
+                return expression.Compile(preferInterpretation: true);
             }
-            return task.Result;
+            catch (PlatformNotSupportedException)
+            {
+                return expression.Compile(preferInterpretation: true);
+            }
         }
 
         private sealed class ComplexityVisitor : ExpressionVisitor
