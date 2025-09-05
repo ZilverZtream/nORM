@@ -312,192 +312,105 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
+            if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct).ConfigureAwait(false);
+
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
 
-            // Use PostgreSQL's UPDATE ... FROM with VALUES for efficient bulk updates
-            var tempTableName = $"temp_update_{Guid.NewGuid():N}";
             var nonKeyCols = m.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToList();
+            var keyCols = m.KeyColumns.ToList();
+            var valueCols = keyCols.Concat(nonKeyCols).ToList();
+            if (m.TimestampColumn != null) valueCols.Add(m.TimestampColumn);
+
+            var paramsPerEntity = valueCols.Count;
+            var operationKey = $"Postgres_BulkUpdate_{m.Type.Name}";
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            var maxBatchForProvider = MaxParameters / Math.Max(1, paramsPerEntity);
+            var batchSize = Math.Max(1, Math.Min(sizing.OptimalBatchSize, maxBatchForProvider));
 
             var totalUpdated = 0;
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-            try
+            for (int i = 0; i < entityList.Count; i += batchSize)
             {
-                // Create temporary table
-                var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetPostgresType(c.Prop.PropertyType)}"));
-                await using (var cmd = ctx.Connection.CreateCommand())
+                var batch = entityList.Skip(i).Take(batchSize).ToList();
+                await using var cmd = ctx.Connection.CreateCommand();
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+
+                var sb = new StringBuilder();
+                sb.Append($"UPDATE {m.EscTable} AS t SET ");
+                sb.Append(string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = v.{c.EscCol}")));
+                sb.Append(" FROM (VALUES ");
+
+                var valueRows = new List<string>();
+                var paramIndex = 0;
+                foreach (var entity in batch)
                 {
-                    cmd.Transaction = transaction;
-                    cmd.CommandTimeout = 30;
-                    cmd.CommandText = $"CREATE TEMP TABLE {tempTableName} ({colDefs}) ON COMMIT DROP";
-                    await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                    var paramNames = new List<string>();
+                    foreach (var col in valueCols)
+                    {
+                        var pName = $"{ParamPrefix}p{paramIndex++}";
+                        cmd.AddParam(pName, col.Getter(entity));
+                        paramNames.Add(pName);
+                    }
+                    valueRows.Add($"({string.Join(", ", paramNames)})");
                 }
 
-                // Insert data into temp table
-                var tempMapping = new TableMapping(m.Type, this, ctx, null) { EscTable = tempTableName };
-                await BulkInsertIntoTable(ctx, tempMapping, entities, transaction, ct).ConfigureAwait(false);
+                sb.Append(string.Join(", ", valueRows));
+                sb.Append(") AS v (");
+                sb.Append(string.Join(", ", valueCols.Select(c => c.EscCol)));
+                sb.Append(") WHERE ");
 
-                // Perform update join
-                var setClause = string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = temp.{c.EscCol}"));
-                var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"{m.EscTable}.{c.EscCol} = temp.{c.EscCol}"));
-                
-                await using (var cmd = ctx.Connection.CreateCommand())
-                {
-                    cmd.Transaction = transaction;
-                    cmd.CommandTimeout = 30;
-                    cmd.CommandText = $"UPDATE {m.EscTable} SET {setClause} FROM {tempTableName} temp WHERE {joinClause}";
-                    totalUpdated = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
-                }
+                var joinConditions = keyCols.Select(c => $"t.{c.EscCol} = v.{c.EscCol}").ToList();
+                if (m.TimestampColumn != null)
+                    joinConditions.Add($"t.{m.TimestampColumn.EscCol} = v.{m.TimestampColumn.EscCol}");
+                sb.Append(string.Join(" AND ", joinConditions));
 
-                await transaction.CommitAsync(ct).ConfigureAwait(false);
-            }
-            catch
-            {
-                await transaction.RollbackAsync(ct).ConfigureAwait(false);
-                throw;
+                cmd.CommandText = sb.ToString();
+
+                var batchSw = Stopwatch.StartNew();
+                totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                batchSw.Stop();
+                BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
             }
 
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, totalUpdated, sw.Elapsed);
             return totalUpdated;
         }
 
-        private async Task<int> BulkInsertIntoTable<T>(DbContext ctx, TableMapping mapping, IEnumerable<T> entities, 
-            System.Data.Common.DbTransaction transaction, CancellationToken ct) where T : class
-        {
-            var entityList = entities.ToList();
-            var cols = mapping.Columns.Where(c => !c.IsDbGenerated).ToArray();
-            var npgConnType = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
-            if (npgConnType != null && npgConnType.IsInstanceOfType(ctx.Connection))
-            {
-                var copySql = $"COPY {mapping.EscTable} ({string.Join(", ", cols.Select(c => c.EscCol))}) FROM STDIN (FORMAT BINARY)";
-                var beginMethod = ctx.Connection.GetType().GetMethod("BeginBinaryImport", new[] { typeof(string) });
-                var importerObj = beginMethod?.Invoke(ctx.Connection, new object[] { copySql });
-                if (importerObj == null) throw new InvalidOperationException("BeginBinaryImport not available");
-                try
-                {
-                    dynamic importer = importerObj;
-                    foreach (var entity in entityList)
-                    {
-                        importer.StartRow();
-                        foreach (var col in cols)
-                        {
-                            var val = col.Getter(entity);
-                            if (val == null) importer.WriteNull();
-                            else importer.Write(val);
-                        }
-                    }
-                    await importer.CompleteAsync(ct).ConfigureAwait(false);
-                }
-                finally
-                {
-                    if (importerObj is IAsyncDisposable iad) await iad.DisposeAsync().ConfigureAwait(false);
-                    else if (importerObj is IDisposable id) id.Dispose();
-                }
-                BatchSizer.RecordBatchPerformance($"Postgres_BulkInsert_{mapping.Type.Name}", entityList.Count, TimeSpan.Zero, entityList.Count);
-                return entityList.Count;
-            }
-
-            var operationKey = $"Postgres_BulkInsert_{mapping.Type.Name}";
-            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), mapping, operationKey, entityList.Count);
-
-            var totalInserted = 0;
-
-            for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
-            {
-                var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
-                var sql = BuildPostgresBatchInsertSql(mapping, cols, batch.Count).Replace(" ON CONFLICT DO NOTHING", "");
-
-                await using var cmd = ctx.Connection.CreateCommand();
-                cmd.Transaction = transaction;
-                cmd.CommandText = sql;
-
-                var paramIndex = 0;
-                foreach (var entity in batch)
-                {
-                    foreach (var col in cols)
-                    {
-                        cmd.AddParam($"{ParamPrefix}p{paramIndex++}", col.Getter(entity) ?? DBNull.Value);
-                    }
-                }
-
-                var batchSw = Stopwatch.StartNew();
-                totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
-                batchSw.Stop();
-                BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
-            }
-
-            return totalInserted;
-        }
-
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
+            if (ctx.Options.UseBatchedBulkOps) return await base.BatchedDeleteAsync(ctx, m, entities, ct).ConfigureAwait(false);
+
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
 
-            if (!m.KeyColumns.Any())
-                throw new Exception($"Cannot delete from '{m.EscTable}': no key columns defined.");
+            if (m.KeyColumns.Length != 1)
+                return await base.BatchedDeleteAsync(ctx, m, entityList, ct).ConfigureAwait(false);
+
+            var keyCol = m.KeyColumns[0];
+            var operationKey = $"Postgres_BulkDelete_{m.Type.Name}";
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            var batchSize = Math.Max(1, sizing.OptimalBatchSize);
 
             var totalDeleted = 0;
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-            try
+            for (int i = 0; i < entityList.Count; i += batchSize)
             {
-                // Use PostgreSQL's DELETE with VALUES clause for efficient bulk deletes
-                if (m.KeyColumns.Length == 1)
-                {
-                    var keyCol = m.KeyColumns[0];
-                    var batchSize = 1000;
-                    
-                    for (int i = 0; i < entityList.Count; i += batchSize)
-                    {
-                        var batch = entityList.Skip(i).Take(batchSize).ToList();
-                        await using var cmd = ctx.Connection.CreateCommand();
-                        cmd.Transaction = transaction;
-                        cmd.CommandTimeout = 30;
-                        
-                        var paramNames = new List<string>();
-                        for (int j = 0; j < batch.Count; j++)
-                        {
-                            var paramName = $"{ParamPrefix}p{j}";
-                            paramNames.Add(paramName);
-                            cmd.AddParam(paramName, keyCol.Getter(batch[j]));
-                        }
-                        
-                        cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} = ANY(ARRAY[{string.Join(",", paramNames)}])";
-                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
-                    }
-                }
-                else
-                {
-                    // For composite keys, use individual deletes with prepared statement
-                    await using var cmd = ctx.Connection.CreateCommand();
-                    cmd.Transaction = transaction;
-                    cmd.CommandText = BuildDelete(m);
-                    await cmd.PrepareAsync(ct).ConfigureAwait(false);
-                    
-                    foreach (var entity in entityList)
-                    {
-                        cmd.Parameters.Clear();
-                        foreach (var col in m.KeyColumns)
-                        {
-                            cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
-                        }
-                        if (m.TimestampColumn != null)
-                        {
-                            cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
-                        }
-                        totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
-                    }
-                }
-
-                await transaction.CommitAsync(ct).ConfigureAwait(false);
-            }
-            catch
-            {
-                await transaction.RollbackAsync(ct).ConfigureAwait(false);
-                throw;
+                var batch = entityList.Skip(i).Take(batchSize).ToList();
+                var keys = batch.Select(e => keyCol.Getter(e)).ToArray();
+                await using var cmd = ctx.Connection.CreateCommand();
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+                var pName = $"{ParamPrefix}p0";
+                var p = cmd.CreateParameter();
+                p.ParameterName = pName;
+                p.Value = keys;
+                cmd.Parameters.Add(p);
+                cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} = ANY({pName})";
+                var batchSw = Stopwatch.StartNew();
+                totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                batchSw.Stop();
+                BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
             }
 
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
