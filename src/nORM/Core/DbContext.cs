@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 using nORM.Configuration;
 using nORM.Execution;
 using nORM.Mapping;
@@ -730,6 +731,41 @@ namespace nORM.Core
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
                 return list;
             }, ct);
+
+        public async IAsyncEnumerable<T> ExecuteStoredProcedureAsAsyncEnumerable<T>(string procedureName, [EnumeratorCancellation] CancellationToken ct = default, object? parameters = null) where T : class, new()
+        {
+            await EnsureConnectionAsync(ct).ConfigureAwait(false);
+            var sw = Stopwatch.StartNew();
+            await using var cmd = Connection.CreateCommand();
+            cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+            cmd.CommandText = procedureName;
+            cmd.CommandType = _p is SqliteProvider ? CommandType.Text : CommandType.StoredProcedure;
+            var paramDict = new Dictionary<string, object>();
+            if (parameters != null)
+            {
+                foreach (var prop in parameters.GetType().GetProperties())
+                {
+                    var pName = _p.ParamPrefix + prop.Name;
+                    var pValue = prop.GetValue(parameters);
+                    cmd.AddParam(pName, pValue);
+                    paramDict[pName] = pValue ?? DBNull.Value;
+                }
+            }
+
+            NormValidator.ValidateRawSql(procedureName, paramDict);
+
+            var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
+            var count = 0;
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.SequentialAccess, ct).ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                var entity = (T)await materializer(reader, ct).ConfigureAwait(false);
+                count++;
+                yield return entity;
+            }
+
+            Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, count);
+        }
 
         public Task<StoredProcedureResult<T>> ExecuteStoredProcedureWithOutputAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
