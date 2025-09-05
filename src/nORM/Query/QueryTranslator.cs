@@ -406,16 +406,16 @@ namespace nORM.Query
             return subPlan.Sql;
         }
 
-        private DateTime GetTimestampForTag(string tagName)
+        private async Task<DateTime> GetTimestampForTagAsync(string tagName, CancellationToken ct = default)
         {
-            _ctx.EnsureConnectionAsync().GetAwaiter().GetResult();
-            using var cmd = _ctx.Connection.CreateCommand();
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
+            await using var cmd = _ctx.Connection.CreateCommand();
             var pName = _provider.ParamPrefix + "p0";
             cmd.CommandText = $"SELECT Timestamp FROM __NormTemporalTags WHERE TagName = {pName}";
             cmd.AddParam(pName, tagName);
-            var result = cmd.ExecuteScalar();
+            var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
             if (result == null || result == DBNull.Value)
-                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Tag '{tagName}' not found."));
+                throw new NormQueryException($"Tag '{tagName}' not found.");
             return Convert.ToDateTime(result);
         }
 

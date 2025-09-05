@@ -3,6 +3,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using nORM.Core;
 using nORM.Mapping;
 
@@ -630,7 +631,7 @@ namespace nORM.Query
                     }
                     else if (value is string tagName)
                     {
-                        t._asOfTimestamp = t.GetTimestampForTag(tagName);
+                        t._asOfTimestamp = t.GetTimestampForTagAsync(tagName).GetAwaiter().GetResult();
                     }
                 }
                 else
