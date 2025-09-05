@@ -26,6 +26,7 @@ namespace nORM.Query
         private DbContext _ctx = null!;
         private SqlClauseBuilder _clauses = new();
         private Dictionary<string, object> _params = new();
+        private readonly object _syncRoot = new();
         private readonly MaterializerFactory _materializerFactory = new();
         private TableMapping _mapping = null!;
         private Type? _rootType;
@@ -126,61 +127,67 @@ namespace nORM.Query
 
         private void Reset(DbContext ctx)
         {
-            _ctx = ctx;
-            _provider = ctx.Provider;
-            _mapping = null!;
-            _rootType = null;
-            _paramIndex = 0;
-            _compiledParams = new List<string>();
-            _paramMap = new Dictionary<ParameterExpression, string>();
-            _includes = new List<IncludePlan>();
-            _projection = null;
-            _isAggregate = false;
-            _methodName = string.Empty;
-            _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
-            _groupJoinInfo = null;
-            _joinCounter = 0;
-            _singleResult = false;
-            _noTracking = false;
-            _splitQuery = false;
-            _tables = new HashSet<string>();
-            _params = new Dictionary<string, object>();
-            _clauses?.Dispose();
-            _clauses = new SqlClauseBuilder();
-            _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
-            _isCacheable = false;
-            _cacheExpiration = null;
-            _asOfTimestamp = null;
+            lock (_syncRoot)
+            {
+                _ctx = ctx;
+                _provider = ctx.Provider;
+                _mapping = null!;
+                _rootType = null;
+                _paramIndex = 0;
+                _compiledParams = new List<string>();
+                _paramMap = new Dictionary<ParameterExpression, string>();
+                _includes = new List<IncludePlan>();
+                _projection = null;
+                _isAggregate = false;
+                _methodName = string.Empty;
+                _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+                _groupJoinInfo = null;
+                _joinCounter = 0;
+                _singleResult = false;
+                _noTracking = false;
+                _splitQuery = false;
+                _tables = new HashSet<string>();
+                _params = new Dictionary<string, object>();
+                _clauses?.Dispose();
+                _clauses = new SqlClauseBuilder();
+                _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
+                _isCacheable = false;
+                _cacheExpiration = null;
+                _asOfTimestamp = null;
+            }
         }
 
         private void Clear()
         {
-            _clauses?.Dispose();
-            _clauses = new SqlClauseBuilder();
+            lock (_syncRoot)
+            {
+                _clauses?.Dispose();
+                _clauses = new SqlClauseBuilder();
 
-            _ctx = null!;
-            _provider = null!;
-            _mapping = null!;
-            _rootType = null;
-            _paramIndex = 0;
-            _params = new Dictionary<string, object>();
-            _compiledParams = new List<string>();
-            _paramMap = new Dictionary<ParameterExpression, string>();
-            _includes = new List<IncludePlan>();
-            _projection = null;
-            _isAggregate = false;
-            _methodName = string.Empty;
-            _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
-            _groupJoinInfo = null;
-            _joinCounter = 0;
-            _singleResult = false;
-            _noTracking = false;
-            _splitQuery = false;
-            _tables = new HashSet<string>();
-            _estimatedTimeout = default;
-            _isCacheable = false;
-            _cacheExpiration = null;
-            _asOfTimestamp = null;
+                _ctx = null!;
+                _provider = null!;
+                _mapping = null!;
+                _rootType = null;
+                _paramIndex = 0;
+                _params = new Dictionary<string, object>();
+                _compiledParams = new List<string>();
+                _paramMap = new Dictionary<ParameterExpression, string>();
+                _includes = new List<IncludePlan>();
+                _projection = null;
+                _isAggregate = false;
+                _methodName = string.Empty;
+                _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+                _groupJoinInfo = null;
+                _joinCounter = 0;
+                _singleResult = false;
+                _noTracking = false;
+                _splitQuery = false;
+                _tables = new HashSet<string>();
+                _estimatedTimeout = default;
+                _isCacheable = false;
+                _cacheExpiration = null;
+                _asOfTimestamp = null;
+            }
         }
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
@@ -203,10 +210,15 @@ namespace nORM.Query
         }
 
         public QueryPlan Translate(Expression e)
-            => new TranslationBuilder(this, e)
-                .Validate()
-                .Setup()
-                .Generate();
+        {
+            lock (_syncRoot)
+            {
+                return new TranslationBuilder(this, e)
+                    .Validate()
+                    .Setup()
+                    .Generate();
+            }
+        }
 
         private sealed class TranslationBuilder
         {
@@ -485,7 +497,10 @@ namespace nORM.Query
 
         public void Dispose()
         {
-            _translatorPool.Return(this);
+            lock (_syncRoot)
+            {
+                _translatorPool.Return(this);
+            }
         }
 
         private sealed class QueryTranslatorPooledObjectPolicy : PooledObjectPolicy<QueryTranslator>
