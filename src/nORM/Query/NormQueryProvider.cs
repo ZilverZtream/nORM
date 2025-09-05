@@ -389,7 +389,7 @@ namespace nORM.Query
                 {
                     var actualMap = _ctx.GetMapping(entity!.GetType());
                     var entry = _ctx.ChangeTracker.Track(entity!, EntityState.Unchanged, actualMap);
-                    entity = (T)entry.Entity;
+                    entity = (T)entry.Entity!;
                     NavigationPropertyExtensions.EnableLazyLoading((object)entity!, _ctx);
                 }
                 count++;
