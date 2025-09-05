@@ -20,5 +20,5 @@ namespace nORM.Configuration
     public record OwnedNavigation(Type OwnedType, IEntityTypeConfiguration? Configuration);
     public record ShadowPropertyConfiguration(Type ClrType, string? ColumnName = null);
     public record RelationshipConfiguration(PropertyInfo PrincipalNavigation, Type DependentType,
-        PropertyInfo? DependentNavigation, PropertyInfo? PrincipalKey, PropertyInfo ForeignKey);
+        PropertyInfo? DependentNavigation, PropertyInfo? PrincipalKey, PropertyInfo ForeignKey, bool CascadeDelete = true);
 }

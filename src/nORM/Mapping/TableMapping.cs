@@ -111,7 +111,7 @@ namespace nORM.Mapping
                     }
                     var foreignKey = dependentMap.Columns.FirstOrDefault(c => c.Prop == rel.ForeignKey)
                         ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Foreign key '{rel.ForeignKey.Name}' not found on entity {dependentMap.Type.Name}"));
-                    Relations[rel.PrincipalNavigation.Name] = new Relation(rel.PrincipalNavigation, rel.DependentType, principalKey, foreignKey);
+                    Relations[rel.PrincipalNavigation.Name] = new Relation(rel.PrincipalNavigation, rel.DependentType, principalKey, foreignKey, rel.CascadeDelete);
                 }
             }
 
@@ -154,6 +154,6 @@ namespace nORM.Mapping
             }
         }
 
-        public record Relation(PropertyInfo NavProp, Type DependentType, Column PrincipalKey, Column ForeignKey);
+        public record Relation(PropertyInfo NavProp, Type DependentType, Column PrincipalKey, Column ForeignKey, bool CascadeDelete = true);
     }
 }
