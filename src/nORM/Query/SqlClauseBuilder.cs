@@ -22,9 +22,32 @@ namespace nORM.Query
 
         public void Dispose()
         {
-            Sql.Dispose();
-            Where.Dispose();
-            Having.Dispose();
+            try
+            {
+                Sql.Dispose();
+            }
+            catch
+            {
+                // ignore to ensure other builders are returned to the pool
+            }
+
+            try
+            {
+                Where.Dispose();
+            }
+            catch
+            {
+                // ignore to ensure Having is still disposed
+            }
+
+            try
+            {
+                Having.Dispose();
+            }
+            catch
+            {
+                // final attempt; swallow any exception
+            }
         }
     }
 }
