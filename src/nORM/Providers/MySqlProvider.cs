@@ -175,7 +175,9 @@ END;";
                 await cn.OpenAsync();
                 await using var cmd = cn.CreateCommand();
                 cmd.CommandText = "SELECT VERSION()";
-                var versionStr = (string)(await cmd.ExecuteScalarAsync() ?? throw new Exception("No version"));
+                var result = await cmd.ExecuteScalarAsync();
+                if (result is not string versionStr)
+                    throw new NormDatabaseException("Unable to retrieve database version.", cmd.CommandText, null, null);
                 var version = new Version(versionStr.Split('-')[0]);
                 return version >= new Version(8, 0);
             }
@@ -313,7 +315,7 @@ END;";
 
             var keyCols = m.KeyColumns.ToList();
             if (!keyCols.Any())
-                throw new Exception($"Cannot delete from '{m.EscTable}': no key columns defined.");
+                throw new NormConfigurationException($"Cannot delete from '{m.EscTable}': no key columns defined.");
 
             var operationKey = $"MySql_BulkDelete_{m.Type.Name}";
             var paramsPerEntity = keyCols.Count;

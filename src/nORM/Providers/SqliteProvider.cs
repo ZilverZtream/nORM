@@ -156,7 +156,9 @@ END;";
                 await cn.OpenAsync();
                 await using var cmd = cn.CreateCommand();
                 cmd.CommandText = "select sqlite_version()";
-                var versionStr = (string)(await cmd.ExecuteScalarAsync() ?? throw new Exception("No version"));
+                var result = await cmd.ExecuteScalarAsync();
+                if (result is not string versionStr)
+                    throw new NormDatabaseException("Unable to retrieve database version.", cmd.CommandText, null, null);
                 var version = new Version(versionStr);
                 return version >= new Version(3, 9);
             }
@@ -339,7 +341,7 @@ END;";
             if (!entityList.Any()) return 0;
             
             if (!m.KeyColumns.Any())
-                throw new System.Exception($"Cannot delete from '{m.EscTable}': no key columns defined.");
+                throw new NormConfigurationException($"Cannot delete from '{m.EscTable}': no key columns defined.");
             
             var totalDeleted = 0;
             // Respect provider parameter limits when batching deletes

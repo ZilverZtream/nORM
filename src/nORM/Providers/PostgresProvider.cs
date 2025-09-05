@@ -181,7 +181,9 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 await cn.OpenAsync();
                 await using var cmd = cn.CreateCommand();
                 cmd.CommandText = "SHOW server_version";
-                var versionStr = (string)(await cmd.ExecuteScalarAsync() ?? throw new Exception("No version"));
+                var result = await cmd.ExecuteScalarAsync();
+                if (result is not string versionStr)
+                    throw new NormDatabaseException("Unable to retrieve database version.", cmd.CommandText, null, null);
                 var version = new Version(versionStr.Split(' ')[0]);
                 return version >= new Version(9, 5);
             }
