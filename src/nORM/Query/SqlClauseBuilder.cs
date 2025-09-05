@@ -22,31 +22,38 @@ namespace nORM.Query
 
         public void Dispose()
         {
+            var exceptions = new List<Exception>();
+
             try
             {
                 Sql.Dispose();
             }
-            catch
+            catch (Exception ex)
             {
-                // ignore to ensure other builders are returned to the pool
+                exceptions.Add(ex);
             }
 
             try
             {
                 Where.Dispose();
             }
-            catch
+            catch (Exception ex)
             {
-                // ignore to ensure Having is still disposed
+                exceptions.Add(ex);
             }
 
             try
             {
                 Having.Dispose();
             }
-            catch
+            catch (Exception ex)
             {
-                // final attempt; swallow any exception
+                exceptions.Add(ex);
+            }
+
+            if (exceptions.Count > 0)
+            {
+                throw new AggregateException("Disposal failures", exceptions);
             }
         }
     }
