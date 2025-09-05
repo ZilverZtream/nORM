@@ -21,6 +21,7 @@ namespace nORM.Navigation
         {
             _context = context;
             _batchTimer = new Timer(ProcessBatch, null, TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(10));
+            NavigationPropertyExtensions.RegisterLoader(this);
             _context.RegisterForDisposal(this);
         }
 
@@ -139,8 +140,28 @@ namespace nORM.Navigation
             return results;
         }
 
+        internal void RemovePendingLoadsForEntity(object entity)
+        {
+            _batchSemaphore.Wait();
+            try
+            {
+                foreach (var key in _pendingLoads.Keys.ToList())
+                {
+                    var list = _pendingLoads[key];
+                    list.RemoveAll(e => ReferenceEquals(e.Entity, entity));
+                    if (list.Count == 0)
+                        _pendingLoads.Remove(key);
+                }
+            }
+            finally
+            {
+                _batchSemaphore.Release();
+            }
+        }
+
         public void Dispose()
         {
+            NavigationPropertyExtensions.UnregisterLoader(this);
             _batchTimer.Dispose();
             _batchSemaphore.Dispose();
         }
