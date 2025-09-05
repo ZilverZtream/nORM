@@ -22,6 +22,7 @@ namespace nORM.Core
         private readonly Timer _healthCheckTimer;
         private readonly SemaphoreSlim _failoverSemaphore = new(1, 1);
         private readonly SemaphoreSlim _poolInitSemaphore = new(1, 1);
+        private readonly SemaphoreSlim _healthCheckSemaphore = new(1, 1);
         private readonly CancellationTokenSource _disposeCts = new();
         private bool _disposed;
 
@@ -46,7 +47,11 @@ namespace nORM.Core
             DeterminePrimaryNode();
             UpdateAvailableReadReplicas();
 
-            _healthCheckTimer = new Timer(PerformHealthChecks, null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
+            _healthCheckTimer = new Timer(static state =>
+            {
+                var manager = (ConnectionManager)state!;
+                _ = manager.PerformHealthChecksAsync(manager._disposeCts.Token);
+            }, this, TimeSpan.Zero, TimeSpan.FromSeconds(30));
         }
 
         private void InitializeConnectionPools()
@@ -178,17 +183,39 @@ namespace nORM.Core
             }
         }
 
-        private async void PerformHealthChecks(object? state)
+        private async Task PerformHealthChecksAsync(CancellationToken token)
         {
-            if (_disposed || _disposeCts.IsCancellationRequested)
+            if (_disposed || token.IsCancellationRequested)
                 return;
 
-            await MonitorNodeHealthAsync(_disposeCts.Token).ConfigureAwait(false);
-
-            if (_disposed || _disposeCts.IsCancellationRequested)
+            if (!await _healthCheckSemaphore.WaitAsync(0, token).ConfigureAwait(false))
                 return;
 
-            RefreshTopologyState();
+            try
+            {
+                await MonitorNodeHealthAsync(token).ConfigureAwait(false);
+
+                if (_disposed || token.IsCancellationRequested)
+                    return;
+
+                await _failoverSemaphore.WaitAsync(token).ConfigureAwait(false);
+                try
+                {
+                    RefreshTopologyState();
+                }
+                finally
+                {
+                    _failoverSemaphore.Release();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Cancellation requested; exit gracefully
+            }
+            finally
+            {
+                _healthCheckSemaphore.Release();
+            }
         }
 
         private async Task MonitorNodeHealthAsync(CancellationToken token)
@@ -269,6 +296,7 @@ namespace nORM.Core
 
             _failoverSemaphore.Dispose();
             _poolInitSemaphore.Dispose();
+            _healthCheckSemaphore.Dispose();
         }
     }
 }
