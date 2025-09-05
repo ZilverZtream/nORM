@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Core;
@@ -25,6 +26,10 @@ namespace nORM.Query
         private readonly NormExceptionHandler _exceptionHandler;
         private readonly ILogger<QueryExecutor> _logger;
 
+        private static readonly Regex LimitRegex = new("\\bLIMIT\\s+(?<value>[\\w@]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex TopRegex = new("\\bTOP\\s*(?:\\(\\s*)?(?<value>[\\w@]+)(?:\\s*\\))?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex FetchRegex = new("\\bFETCH\\s+(?:FIRST|NEXT)\\s+(?<value>[\\w@]+)\\s+ROWS\\s+ONLY", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         public QueryExecutor(DbContext ctx, IncludeProcessor includeProcessor, ILogger<QueryExecutor>? logger = null)
         {
             _ctx = ctx;
@@ -42,7 +47,8 @@ namespace nORM.Query
                     return await MaterializeGroupJoinAsync(plan, command, ct).ConfigureAwait(false);
 
                 var listType = typeof(List<>).MakeGenericType(plan.ElementType);
-                var list = (IList)Activator.CreateInstance(listType)!;
+                var capacity = plan.SingleResult ? 1 : EstimateCapacity(plan.Sql, plan.Parameters);
+                var list = (IList)Activator.CreateInstance(listType, capacity)!;
 
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
@@ -84,6 +90,30 @@ namespace nORM.Query
             entity = entry.Entity!;
             NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
             return entity;
+        }
+
+        private static int EstimateCapacity(string sql, IReadOnlyDictionary<string, object> parameters)
+        {
+            foreach (var regex in new[] { LimitRegex, TopRegex, FetchRegex })
+            {
+                var match = regex.Match(sql);
+                if (!match.Success) continue;
+                var val = match.Groups["value"].Value;
+                if (int.TryParse(val, out var number)) return number;
+                if (parameters.TryGetValue(val, out var param))
+                {
+                    try
+                    {
+                        return Convert.ToInt32(param);
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
+                }
+            }
+
+            return 0;
         }
 
         private async Task<IList> MaterializeGroupJoinAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
