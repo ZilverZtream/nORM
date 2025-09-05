@@ -162,7 +162,7 @@ namespace nORM.Query
                 .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
             if (iface != null) return iface.GetGenericArguments()[0];
 
-            throw new NormQueryTranslationException($"Cannot determine element type from expression of type {type}");
+            throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Cannot determine element type from expression of type {type}"));
         }
 
         public QueryPlan Translate(Expression e)
@@ -306,7 +306,7 @@ namespace nORM.Query
         private string BuildSelectWithWindowFunctions(LambdaExpression projection, List<WindowFunctionInfo> windowFuncs, string overClause)
         {
             if (projection.Body is not NewExpression ne)
-                throw new NormQueryTranslationException("Window function projection must be an anonymous object initializer.");
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Window function projection must be an anonymous object initializer."));
 
             var paramMap = windowFuncs.ToDictionary(w => w.ResultParameter, w => w);
             var items = new List<string>();
@@ -398,7 +398,7 @@ namespace nORM.Query
             cmd.AddParam(pName, tagName);
             var result = cmd.ExecuteScalar();
             if (result == null || result == DBNull.Value)
-                throw new NormQueryTranslationException($"Tag '{tagName}' not found.");
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Tag '{tagName}' not found."));
             return Convert.ToDateTime(result);
         }
 
@@ -437,7 +437,7 @@ namespace nORM.Query
             // node.Arguments[4] = result selector
 
             if (node.Arguments.Count < 5)
-                throw new NormQueryTranslationException("Join operation requires 5 arguments");
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join operation requires 5 arguments"));
 
             var outerQuery = node.Arguments[0];
             var innerQuery = node.Arguments[1];
@@ -446,7 +446,7 @@ namespace nORM.Query
             var resultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
 
             if (outerKeySelector == null || innerKeySelector == null || resultSelector == null)
-                throw new NormQueryTranslationException("Join selectors must be lambda expressions");
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join selectors must be lambda expressions"));
 
             // Visit the outer query first to establish the base table
             Visit(outerQuery);
@@ -591,11 +591,11 @@ namespace nORM.Query
             // 2. SelectMany(collectionSelector, resultSelector) - joins and projects
 
             if (node.Arguments.Count < 2)
-                throw new NormQueryTranslationException("SelectMany requires at least 2 arguments");
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "SelectMany requires at least 2 arguments"));
 
             var sourceQuery = node.Arguments[0];
             var collectionSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
-                                   ?? throw new NormQueryTranslationException("Collection selector must be a lambda expression");
+                                   ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Collection selector must be a lambda expression"));
 
             // Visit the source query first to establish base mapping
             Visit(sourceQuery);
@@ -906,7 +906,7 @@ namespace nORM.Query
                 ExpressionType.LessThanOrEqual => " <= ",
                 ExpressionType.AndAlso => " AND ",
                 ExpressionType.OrElse => " OR ",
-                _ => throw new NormUnsupportedFeatureException($"Op '{node.NodeType}' not supported.")
+                _ => throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, $"Op '{node.NodeType}'"))
             });
             Visit(node.Right);
             _sql.Append(")");
@@ -938,7 +938,7 @@ namespace nORM.Query
                 return node;
             }
 
-            throw new NormUnsupportedFeatureException($"Member '{node.Member.Name}' is not supported in this context.");
+            throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, $"Member '{node.Member.Name}'"));
         }
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
@@ -1026,7 +1026,7 @@ namespace nORM.Query
             var functionConstant = node.Arguments[2] as ConstantExpression;
             
             if (selectorLambda == null || functionConstant?.Value is not string functionName)
-                throw new NormQueryTranslationException("Invalid aggregate expression structure");
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Invalid aggregate expression structure"));
 
             Visit(sourceQuery);
             
@@ -1059,7 +1059,7 @@ namespace nORM.Query
             var keySelectorLambda = StripQuotes(node.Arguments[1]) as LambdaExpression;
             
             if (keySelectorLambda == null)
-                throw new NormQueryTranslationException("GroupBy key selector must be a lambda expression");
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "GroupBy key selector must be a lambda expression"));
 
             Visit(sourceQuery);
             
@@ -1265,7 +1265,7 @@ namespace nORM.Query
             var predicate = node.Arguments[1] as LambdaExpression;
             
             if (predicate == null)
-                throw new NormQueryTranslationException("All operation requires a predicate");
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "All operation requires a predicate"));
 
             Visit(sourceQuery);
             

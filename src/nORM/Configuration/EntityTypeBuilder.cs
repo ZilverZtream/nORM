@@ -193,7 +193,7 @@ namespace nORM.Configuration
                     }
                     else
                     {
-                        throw new NormConfigurationException($"Principal key must be specified for relationship '{_principalNavigation.Name}' on entity {typeof(TEntity).Name}.");
+                        throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Principal key must be specified for relationship '{_principalNavigation.Name}' on entity {typeof(TEntity).Name}"));
                     }
                     _parent._config.AddRelationship(new RelationshipConfiguration(_principalNavigation, typeof(TDependent), _dependentNavigation, principalKey, fkProp));
                     return _parent;

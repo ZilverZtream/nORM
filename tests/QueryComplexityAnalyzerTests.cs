@@ -75,7 +75,7 @@ public class QueryComplexityAnalyzerTests : TestBase
         var analyzeMethod = analyzerType.GetMethod("AnalyzeQuery", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
         var ex = Assert.Throws<System.Reflection.TargetInvocationException>(() =>
             analyzeMethod.Invoke(null, new object[] { query.Expression }));
-        Assert.IsType<NormQueryTranslationException>(ex.InnerException);
+        Assert.IsType<NormQueryException>(ex.InnerException);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public class QueryComplexityAnalyzerTests : TestBase
 
         var ex = Assert.Throws<System.Reflection.TargetInvocationException>(() =>
             analyzeMethod.Invoke(null, new object[] { expr }));
-        Assert.IsType<NormQueryTranslationException>(ex.InnerException);
+        Assert.IsType<NormQueryException>(ex.InnerException);
         Assert.True(ids.IterationCount <= MaxParameterCount + 1);
     }
 

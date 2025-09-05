@@ -94,7 +94,7 @@ namespace nORM.Query
 
                     _complexity.ParameterCount += count;
                     if (_complexity.ParameterCount > MaxParameterCount)
-                        throw new NormQueryTranslationException($"Query exceeds maximum parameter count of {MaxParameterCount}");
+                        throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum parameter count of {MaxParameterCount}"));
                 }
                 return base.VisitConstant(node);
             }
@@ -103,7 +103,7 @@ namespace nORM.Query
             {
                 _complexity.JoinCount++;
                 if (_complexity.JoinCount > MaxJoinDepth)
-                    throw new NormQueryTranslationException($"Query exceeds maximum join depth of {MaxJoinDepth}");
+                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum join depth of {MaxJoinDepth}"));
 
                 var outerType = GetElementType(node.Arguments[0]);
                 var innerType = GetElementType(node.Arguments[1]);
@@ -127,7 +127,7 @@ namespace nORM.Query
                     var conditionCount = CountConditions(lambda.Body);
                     _complexity.WhereConditionCount += conditionCount;
                     if (_complexity.WhereConditionCount > MaxWhereConditions)
-                        throw new NormQueryTranslationException($"Query exceeds maximum WHERE conditions of {MaxWhereConditions}");
+                        throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum WHERE conditions of {MaxWhereConditions}"));
                 }
             }
 
@@ -167,9 +167,8 @@ namespace nORM.Query
             private void ValidateComplexity()
             {
                 if (_complexity.EstimatedCost > MaxEstimatedCost)
-                    throw new NormQueryTranslationException(
-                        $"Query complexity too high (cost: {_complexity.EstimatedCost}, max: {MaxEstimatedCost}). " +
-                        "Consider simplifying the query or breaking it into smaller operations.");
+                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
+                        $"Query complexity too high (cost: {_complexity.EstimatedCost}, max: {MaxEstimatedCost}). Consider simplifying the query or breaking it into smaller operations."));
 
                 if (_complexity.HasCartesianProduct)
                     _complexity.WarningMessages.Add("Query may produce cartesian product - verify join conditions");
