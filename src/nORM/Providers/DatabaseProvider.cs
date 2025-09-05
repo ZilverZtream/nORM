@@ -79,6 +79,9 @@ namespace nORM.Providers
             throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
 
+        protected virtual Task<bool> IsTransactionLogNearCapacityAsync(DbContext ctx, CancellationToken ct)
+            => Task.FromResult(false);
+
         #region Bulk Operations (Abstract & Fallback)
         public virtual async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
@@ -101,13 +104,22 @@ namespace nORM.Providers
             // Logging infrastructure doesn't support arbitrary info; batch size can be inferred from performance metrics.
 
             var recordsAffected = 0;
-            for (int i = 0; i < entityList.Count; i += effectiveBatchSize)
+            var index = 0;
+            while (index < entityList.Count)
             {
-                var batch = entityList.Skip(i).Take(effectiveBatchSize).ToList();
+                var availableMemory = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+                if (availableMemory < sizing.EstimatedMemoryUsage * 2)
+                    effectiveBatchSize = Math.Max(1, effectiveBatchSize / 2);
+
+                if (await IsTransactionLogNearCapacityAsync(ctx, ct).ConfigureAwait(false))
+                    effectiveBatchSize = Math.Max(1, effectiveBatchSize / 2);
+
+                var batch = entityList.Skip(index).Take(effectiveBatchSize).ToList();
                 var batchSw = Stopwatch.StartNew();
                 recordsAffected += await ExecuteInsertBatch(ctx, m, batch, ct).ConfigureAwait(false);
                 batchSw.Stop();
                 BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
+                index += batch.Count;
             }
 
             ctx.Options.CacheProvider?.InvalidateTag(m.TableName);
