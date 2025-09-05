@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -38,24 +39,37 @@ namespace nORM.Query
             if (parents.Count == 0) return resultChildren;
 
             var childMap = _ctx.GetMapping(relation.DependentType);
-            var keys = parents.Cast<object>().Select(relation.PrincipalKey.Getter).Where(k => k != null).Distinct().ToList();
-            if (keys.Count == 0) return resultChildren;
-
-            var paramNames = new List<string>();
-            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = _ctx.Connection.CreateCommand();
-            cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-            for (int i = 0; i < keys.Count; i++)
-            {
-                var paramName = $"{_ctx.Provider.ParamPrefix}fk{i}";
-                paramNames.Add(paramName);
-                cmd.AddParam(paramName, keys[i]!);
-            }
-            cmd.CommandText = $"SELECT * FROM {childMap.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({string.Join(",", paramNames)})";
-
             var childMaterializer = _materializerFactory.CreateMaterializer(childMap, childMap.Type);
-            await using (var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false))
+
+            // Limit the number of parameters per query to avoid memory pressure
+            var maxPerBatch = Math.Max(1, Math.Min(1000, _ctx.Provider.MaxParameters - 10));
+            var childGroups = new Dictionary<object, List<object>>();
+
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
+
+            var keyEnumerable = parents.Cast<object>()
+                                       .Select(relation.PrincipalKey.Getter)
+                                       .Where(k => k != null)
+                                       .Distinct();
+
+            var hasKeys = false;
+            foreach (var keyBatch in keyEnumerable.Chunk(maxPerBatch))
             {
+                hasKeys = true;
+                await using var cmd = _ctx.Connection.CreateCommand();
+                cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+
+                var paramNames = new List<string>();
+                for (int i = 0; i < keyBatch.Length; i++)
+                {
+                    var pn = $"{_ctx.Provider.ParamPrefix}fk{i}";
+                    paramNames.Add(pn);
+                    cmd.AddParam(pn, keyBatch[i]!);
+                }
+
+                cmd.CommandText = $"SELECT * FROM {childMap.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({string.Join(",", paramNames)})";
+
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
                     var child = await childMaterializer(reader, ct).ConfigureAwait(false);
@@ -66,12 +80,18 @@ namespace nORM.Query
                         NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
                     }
                     resultChildren.Add(child);
+
+                    var fk = relation.ForeignKey.Getter(child);
+                    if (fk != null)
+                    {
+                        if (!childGroups.TryGetValue(fk, out var list))
+                            childGroups[fk] = list = new List<object>();
+                        list.Add(child);
+                    }
                 }
             }
 
-            var childGroups = resultChildren
-                .GroupBy(relation.ForeignKey.Getter)
-                .ToDictionary(g => g.Key!, g => g.ToList());
+            if (!hasKeys) return resultChildren;
 
             foreach (var p in parents.Cast<object>())
             {
