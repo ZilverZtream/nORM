@@ -23,12 +23,14 @@ namespace nORM.Query
         private readonly DbContext _ctx;
         private readonly IncludeProcessor _includeProcessor;
         private readonly NormExceptionHandler _exceptionHandler;
+        private readonly ILogger<QueryExecutor> _logger;
 
         public QueryExecutor(DbContext ctx, IncludeProcessor includeProcessor, ILogger<QueryExecutor>? logger = null)
         {
             _ctx = ctx;
             _includeProcessor = includeProcessor;
-            _exceptionHandler = new NormExceptionHandler(logger ?? NullLogger<QueryExecutor>.Instance);
+            _logger = logger ?? NullLogger<QueryExecutor>.Instance;
+            _exceptionHandler = new NormExceptionHandler(_logger);
         }
 
         public async Task<IList> MaterializeAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
@@ -70,9 +72,17 @@ namespace nORM.Query
 
                     return list;
                 }
-                catch
+                catch (Exception)
                 {
-                    await cmd.DisposeAsync().ConfigureAwait(false);
+                    try
+                    {
+                        await cmd.DisposeAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception disposeEx)
+                    {
+                        _logger.LogError(disposeEx, "Error disposing DbCommand.");
+                    }
+
                     throw;
                 }
             }, "MaterializeAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText }).ConfigureAwait(false);
@@ -168,9 +178,17 @@ namespace nORM.Query
 
                     return resultList;
                 }
-                catch
+                catch (Exception)
                 {
-                    await cmd.DisposeAsync().ConfigureAwait(false);
+                    try
+                    {
+                        await cmd.DisposeAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception disposeEx)
+                    {
+                        _logger.LogError(disposeEx, "Error disposing DbCommand.");
+                    }
+
                     throw;
                 }
             }, "MaterializeGroupJoinAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText }).ConfigureAwait(false);
