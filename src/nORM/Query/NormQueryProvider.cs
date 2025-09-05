@@ -26,7 +26,8 @@ namespace nORM.Query
     internal sealed class NormQueryProvider : IQueryProvider
     {
         internal readonly DbContext _ctx;
-        private static readonly ConcurrentDictionary<int, QueryPlan> _planCache = new();
+        private static readonly ConcurrentLruCache<string, QueryPlan> _planCache =
+            new(maxSize: 10000, timeToLive: TimeSpan.FromHours(1));
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
@@ -403,9 +404,8 @@ namespace nORM.Query
         {
             filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(UnwrapQueryExpression(filtered));
-            var fingerprint = ExpressionFingerprint.Compute(filtered);
             var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
-            var cacheKey = HashCode.Combine(fingerprint, tenantHash, elementType.GetHashCode(), filtered.Type.GetHashCode());
+            var cacheKey = BuildPlanCacheKey(filtered, tenantHash, elementType);
 
             var localFiltered = filtered;
             return _planCache.GetOrAdd(cacheKey, _ =>
@@ -413,6 +413,12 @@ namespace nORM.Query
                 using var translator = new QueryTranslator(_ctx);
                 return translator.Translate(localFiltered);
             });
+        }
+
+        private string BuildPlanCacheKey(Expression expression, int tenantHash, Type elementType)
+        {
+            var fingerprint = ExpressionFingerprint.Compute(expression);
+            return $"{fingerprint}:{tenantHash}:{elementType.GetHashCode()}:{expression.Type.GetHashCode()}";
         }
 
         private string BuildCacheKeyWithValues<TResult>(Expression expression, IReadOnlyDictionary<string, object> parameters)
