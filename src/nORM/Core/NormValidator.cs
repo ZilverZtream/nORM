@@ -31,7 +31,7 @@ namespace nORM.Core
             var visited = RentHashSet();
             try
             {
-                ValidateEntityGraph(entity!, visited, 0, parameterName);
+                ValidateEntityGraph(entity!, visited, parameterName);
             }
             finally
             {
@@ -57,20 +57,25 @@ namespace nORM.Core
         private static PropertyInfo[] GetCachedProperties(Type type)
             => PropertyCache.GetOrAdd(type, t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance));
 
-        private static void ValidateEntityGraph(object entity, HashSet<object> visited, int depth, string path)
+        private static void ValidateEntityGraph(object rootEntity, HashSet<object> visited, string rootPath)
         {
-            if (depth > MaxEntityDepth)
-                throw new ArgumentException($"Entity graph exceeds maximum depth of {MaxEntityDepth} at {path}");
+            var stack = new Stack<(object Entity, int Depth, string Path)>();
+            stack.Push((rootEntity, 0, rootPath));
 
-            // Allow circular references without throwing errors by stopping
-            // recursion when an entity has already been visited. This prevents
-            // infinite loops in graphs with cycles while still validating the
-            // remainder of the object graph.
-            if (!visited.Add(entity))
-                return;
-
-            try
+            while (stack.Count > 0)
             {
+                var (entity, depth, path) = stack.Pop();
+
+                if (depth > MaxEntityDepth)
+                    throw new ArgumentException($"Entity graph exceeds maximum depth of {MaxEntityDepth} at {path}");
+
+                // Allow circular references without throwing errors by stopping
+                // validation when an entity has already been visited. This prevents
+                // infinite loops in graphs with cycles while still validating the
+                // remainder of the object graph.
+                if (!visited.Add(entity))
+                    continue;
+
                 var properties = GetCachedProperties(entity.GetType());
 
                 foreach (var prop in properties)
@@ -88,13 +93,12 @@ namespace nORM.Core
 
                         foreach (var item in enumerable)
                         {
-                            if (item != null)
+                            if (item == null) continue;
+
+                            var itemType = item.GetType();
+                            if (itemType.IsClass && itemType != typeof(string))
                             {
-                                var itemType = item.GetType();
-                                if (itemType.IsClass && itemType != typeof(string))
-                                {
-                                    ValidateEntityGraph(item, visited, depth + 1, propPath);
-                                }
+                                stack.Push((item, depth + 1, propPath));
                             }
                         }
                     }
@@ -103,14 +107,10 @@ namespace nORM.Core
                         var valueType = value.GetType();
                         if (valueType.IsClass && valueType != typeof(string))
                         {
-                            ValidateEntityGraph(value, visited, depth + 1, propPath);
+                            stack.Push((value, depth + 1, propPath));
                         }
                     }
                 }
-            }
-            finally
-            {
-                visited.Remove(entity);
             }
         }
 
