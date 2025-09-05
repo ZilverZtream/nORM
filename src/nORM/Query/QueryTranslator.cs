@@ -1311,7 +1311,11 @@ namespace nORM.Query
             var castParam = Expression.Convert(objParam, parameterType);
             var body = new ParameterReplacer(keySelector.Parameters[0], castParam).Visit(keySelector.Body)!;
             var convertBody = Expression.Convert(body, typeof(object));
-            var invoker = Expression.Lambda<Func<object, object>>(convertBody, objParam).Compile();
+            var lambda = Expression.Lambda<Func<object, object>>(convertBody, objParam);
+
+            ExpressionUtils.ValidateExpression(lambda);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var invoker = ExpressionUtils.CompileWithTimeout(lambda, cts.Token);
 
             return obj =>
             {
@@ -1348,7 +1352,9 @@ namespace nORM.Query
             body = Expression.Convert(body, typeof(object));
 
             var lambda = Expression.Lambda<Func<object, IEnumerable<object>, object>>(body, outerParam, innerParam);
-            return lambda.Compile();
+            ExpressionUtils.ValidateExpression(lambda);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            return ExpressionUtils.CompileWithTimeout(lambda, cts.Token);
         }
 
         private sealed class ParameterReplacer : ExpressionVisitor
