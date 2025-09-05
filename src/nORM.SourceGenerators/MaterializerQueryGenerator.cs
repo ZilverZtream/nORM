@@ -63,9 +63,9 @@ namespace nORM.SourceGenerators
             {
                 if (queryAttr != null && TryGetAttribute(method.Symbol, queryAttr, out var attrData))
                 {
-                    if (attrData?.ConstructorArguments.Length == 1 && attrData.ConstructorArguments[0].Value is INamedTypeSymbol ent)
+                    if (attrData?.ConstructorArguments.Length == 1 && attrData.ConstructorArguments[0].Value is string sql)
                     {
-                        GenerateQuery(method.Symbol, ent, context);
+                        GenerateQuery(method.Symbol, sql, context);
                     }
                 }
             }
@@ -191,35 +191,24 @@ namespace nORM.SourceGenerators
             return $"reader.GetFieldValue<{typeName}>({index})";
         }
 
-        private void GenerateQuery(IMethodSymbol method, INamedTypeSymbol entity, GeneratorExecutionContext context)
+        private void GenerateQuery(IMethodSymbol method, string sql, GeneratorExecutionContext context)
         {
             var cls = method.ContainingType;
             var ns = cls.ContainingNamespace.IsGlobalNamespace ? null : cls.ContainingNamespace.ToDisplayString();
             var className = cls.Name;
             var methodName = method.Name;
-            var entityTypeName = entity.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
-            var tableAttr = entity.GetAttributes().FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == "System.ComponentModel.DataAnnotations.Schema.TableAttribute");
-            var tableName = tableAttr != null && tableAttr.ConstructorArguments.Length > 0
-                ? tableAttr.ConstructorArguments[0].Value?.ToString() ?? entity.Name
-                : entity.Name;
+            if (!TryGetEntityType(method.ReturnType, out var entity))
+                return;
 
-            var props = entity.GetMembers().OfType<IPropertySymbol>()
-                .Where(p => !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
-                .ToList();
-
-            var cols = props.Select(p =>
-            {
-                var colAttr = p.GetAttributes().FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == "System.ComponentModel.DataAnnotations.Schema.ColumnAttribute");
-                return colAttr != null && colAttr.ConstructorArguments.Length > 0
-                    ? colAttr.ConstructorArguments[0].Value?.ToString() ?? p.Name
-                    : p.Name;
-            }).ToList();
-
-            var sql = $"SELECT {string.Join(", ", cols)} FROM {tableName}";
+            var entityTypeName = entity!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
             var ctxParam = method.Parameters[0].Name;
-            var ctParam = method.Parameters.Length > 1 ? method.Parameters[1].Name : "ct";
+            var ctSymbol = method.Parameters.FirstOrDefault(p => p.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == "global::System.Threading.CancellationToken");
+            var ctParam = ctSymbol?.Name;
+            var queryParams = method.Parameters.Skip(1).Where(p => !SymbolEqualityComparer.Default.Equals(p, ctSymbol)).ToList();
+
+            var paramList = string.Join(", ", method.Parameters.Select(p => $"{p.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)} {p.Name}"));
 
             var sb = new StringBuilder();
             sb.AppendLine("using System;");
@@ -232,22 +221,70 @@ namespace nORM.SourceGenerators
             if (ns != null) sb.AppendLine($"namespace {ns};");
             sb.AppendLine($"public static partial class {className}");
             sb.AppendLine("{");
-            sb.AppendLine($"    public static async partial System.Threading.Tasks.Task<System.Collections.Generic.List<{entityTypeName}>> {methodName}(nORM.Core.DbContext {ctxParam}, System.Threading.CancellationToken {ctParam})");
+            sb.AppendLine($"    public static async partial System.Threading.Tasks.Task<System.Collections.Generic.List<{entityTypeName}>> {methodName}({paramList})");
             sb.AppendLine("    {");
             sb.AppendLine($"        await using var cmd = {ctxParam}.Connection.CreateCommand();");
-            sb.AppendLine($"        cmd.CommandText = \"{sql}\";");
+            var escapedSql = sql.Replace("\"", "\"\"");
+            sb.AppendLine($"        cmd.CommandText = @\"{escapedSql}\";");
+            foreach (var p in queryParams)
+            {
+                sb.AppendLine($"        var p_{p.Name} = cmd.CreateParameter();");
+                sb.AppendLine($"        p_{p.Name}.ParameterName = \"@{p.Name}\";");
+                sb.AppendLine($"        p_{p.Name}.Value = {GetParameterValueExpression(p)};");
+                sb.AppendLine($"        cmd.Parameters.Add(p_{p.Name});");
+            }
             sb.AppendLine($"        var materializer = CompiledMaterializerStore.Get<{entityTypeName}>();");
             sb.AppendLine($"        var list = new System.Collections.Generic.List<{entityTypeName}>();");
-            sb.AppendLine($"        await using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SequentialAccess, {ctParam}).ConfigureAwait(false);");
-            sb.AppendLine($"        while (await reader.ReadAsync({ctParam}).ConfigureAwait(false))");
+            var ctArg = ctParam ?? "System.Threading.CancellationToken.None";
+            sb.AppendLine($"        await using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SequentialAccess, {ctArg}).ConfigureAwait(false);");
+            sb.AppendLine($"        while (await reader.ReadAsync({ctArg}).ConfigureAwait(false))");
             sb.AppendLine("        {");
-            sb.AppendLine($"            list.Add(await materializer(reader, {ctParam}).ConfigureAwait(false));");
+            sb.AppendLine($"            list.Add(await materializer(reader, {ctArg}).ConfigureAwait(false));");
             sb.AppendLine("        }");
             sb.AppendLine("        return list;");
             sb.AppendLine("    }");
             sb.AppendLine("}");
 
             context.AddSource($"{className}_{methodName}_Query.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
+        }
+
+        private static bool TryGetEntityType(ITypeSymbol returnType, out INamedTypeSymbol? entity)
+        {
+            entity = null;
+            if (returnType is INamedTypeSymbol taskType &&
+                taskType.IsGenericType &&
+                taskType.Name == "Task" &&
+                taskType.ContainingNamespace.ToDisplayString() == "System.Threading.Tasks")
+            {
+                if (taskType.TypeArguments[0] is INamedTypeSymbol listType &&
+                    listType.IsGenericType &&
+                    listType.Name == "List" &&
+                    listType.ContainingNamespace.ToDisplayString() == "System.Collections.Generic")
+                {
+                    if (listType.TypeArguments[0] is INamedTypeSymbol ent)
+                    {
+                        entity = ent;
+                    }
+                }
+            }
+
+            return entity != null;
+        }
+
+        private static string GetParameterValueExpression(IParameterSymbol param)
+        {
+            var type = param.Type;
+            if (type.IsReferenceType || param.NullableAnnotation == NullableAnnotation.Annotated)
+            {
+                return $"{param.Name} ?? (object)DBNull.Value";
+            }
+
+            if (type is INamedTypeSymbol named && named.IsGenericType && named.ConstructedFrom.SpecialType == SpecialType.System_Nullable_T)
+            {
+                return $"{param.Name}.HasValue ? {param.Name}.Value : (object)DBNull.Value";
+            }
+
+            return param.Name;
         }
     }
 }
