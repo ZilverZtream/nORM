@@ -18,7 +18,7 @@ namespace nORM.Providers
 {
     public abstract class DatabaseProvider
     {
-        private static readonly ConcurrentLruCache<(Type Type, string Operation), string> _sqlCache = new(maxSize: 1000);
+        private readonly ConcurrentLruCache<(Type Type, string Operation), string> _sqlCache = new(maxSize: 1000);
         protected static readonly DynamicBatchSizer BatchSizer = new();
         
         public string ParamPrefix { get; protected init; } = "@";
