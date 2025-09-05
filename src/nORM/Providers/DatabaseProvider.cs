@@ -280,7 +280,11 @@ namespace nORM.Providers
         public string BuildInsert(TableMapping m)
         {
             return _sqlCache.GetOrAdd((m.Type, "INSERT"), _ => {
-                var cols = m.Columns.Where(c => !c.IsDbGenerated);
+                var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
+                if (cols.Length == 0)
+                {
+                    return $"INSERT INTO {m.EscTable} DEFAULT VALUES{GetIdentityRetrievalString(m)}";
+                }
                 var colNames = string.Join(", ", cols.Select(c => c.EscCol));
                 var valParams = string.Join(", ", cols.Select(c => ParamPrefix + c.PropName));
                 return $"INSERT INTO {m.EscTable} ({colNames}) VALUES ({valParams}){GetIdentityRetrievalString(m)}";

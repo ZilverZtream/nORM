@@ -221,12 +221,10 @@ namespace nORM.Navigation
 
         private static bool IsNavigationProperty(PropertyInfo property)
         {
-            // A navigation property is:
-            // 1. A reference to another entity type (class)
-            // 2. A collection of entity types
-            // 3. Not a primitive type or string
-            // 4. Not explicitly marked as NotMapped
-            
+            // A navigation property is one of:
+            // 1. A collection of entity types
+            // 2. A LazyNavigationReference<T> for reference navigation
+
             if (property.PropertyType.IsPrimitive ||
                 property.PropertyType == typeof(string) ||
                 property.PropertyType == typeof(DateTime) ||
@@ -234,14 +232,14 @@ namespace nORM.Navigation
                 property.PropertyType == typeof(Guid))
                 return false;
 
-            if (property.PropertyType.IsValueType) // Enums, structs, etc.
+            if (property.PropertyType.IsValueType)
                 return false;
 
             if (property.PropertyType.GetCustomAttribute<OwnedAttribute>() != null)
                 return false;
-                
-            // Check if it's a collection
-            if (typeof(IEnumerable).IsAssignableFrom(property.PropertyType) && 
+
+            // Collection navigation property
+            if (typeof(IEnumerable).IsAssignableFrom(property.PropertyType) &&
                 property.PropertyType != typeof(string))
             {
                 if (property.PropertyType.IsGenericType)
@@ -251,9 +249,10 @@ namespace nORM.Navigation
                 }
                 return false;
             }
-            
-            // It's a reference navigation property if it's a class (excluding string)
-            return property.PropertyType.IsClass;
+
+            // Reference navigation property must be LazyNavigationReference<T>
+            return property.PropertyType.IsGenericType &&
+                   property.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>);
         }
 
         private static PropertyInfo GetPropertyInfo<T, TProperty>(System.Linq.Expressions.Expression<Func<T, TProperty>> expression)
