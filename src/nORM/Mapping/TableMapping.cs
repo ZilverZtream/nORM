@@ -99,7 +99,7 @@ namespace nORM.Mapping
                     if (rel.PrincipalKey != null)
                     {
                         principalKey = Columns.FirstOrDefault(c => c.Prop == rel.PrincipalKey)
-                            ?? throw new NormConfigurationException($"Principal key '{rel.PrincipalKey.Name}' not found on entity {Type.Name}.");
+                            ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Principal key '{rel.PrincipalKey.Name}' not found on entity {Type.Name}"));
                     }
                     else if (KeyColumns.Length == 1)
                     {
@@ -107,10 +107,10 @@ namespace nORM.Mapping
                     }
                     else
                     {
-                        throw new NormConfigurationException($"Principal key must be specified for relationship '{rel.PrincipalNavigation.Name}' on entity {Type.Name}.");
+                        throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Principal key must be specified for relationship '{rel.PrincipalNavigation.Name}' on entity {Type.Name}"));
                     }
                     var foreignKey = dependentMap.Columns.FirstOrDefault(c => c.Prop == rel.ForeignKey)
-                        ?? throw new NormConfigurationException($"Foreign key '{rel.ForeignKey.Name}' not found on entity {dependentMap.Type.Name}.");
+                        ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Foreign key '{rel.ForeignKey.Name}' not found on entity {dependentMap.Type.Name}"));
                     Relations[rel.PrincipalNavigation.Name] = new Relation(rel.PrincipalNavigation, rel.DependentType, principalKey, foreignKey);
                 }
             }
