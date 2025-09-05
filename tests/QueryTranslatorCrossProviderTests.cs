@@ -44,7 +44,7 @@ public class QueryTranslatorCrossProviderTests : TestBase
     {
         var cols = Columns(provider);
         var table = provider.Escape("Product");
-        return $"SELECT {cols} FROM {table}" + (alias ? " T0" : string.Empty);
+        return $"SELECT {cols} FROM {table}" + (alias ? $" {provider.Escape("T0")}" : string.Empty);
     }
 
     [Theory]
@@ -83,7 +83,8 @@ public class QueryTranslatorCrossProviderTests : TestBase
         using var connection = setup.Connection;
         var provider = setup.Provider;
         var (sql, _, _) = TranslateQuery<Product, Product>(q => q.OrderBy(p => p.Name).ThenBy(p => p.Id), connection, provider);
-        var expected = $"{BaseSelect(provider, true)} ORDER BY T0.{provider.Escape("Name")} ASC, T0.{provider.Escape("Id")} ASC";
+        var t0 = provider.Escape("T0");
+        var expected = $"{BaseSelect(provider, true)} ORDER BY {t0}.{provider.Escape("Name")} ASC, {t0}.{provider.Escape("Id")} ASC";
         Assert.Equal(expected, sql);
     }
 
@@ -95,7 +96,8 @@ public class QueryTranslatorCrossProviderTests : TestBase
         using var connection = setup.Connection;
         var provider = setup.Provider;
         var (sql, _, _) = TranslateQuery<Product, Product>(q => q.OrderByDescending(p => p.Name).ThenByDescending(p => p.Id), connection, provider);
-        var expected = $"{BaseSelect(provider, true)} ORDER BY T0.{provider.Escape("Name")} DESC, T0.{provider.Escape("Id")} DESC";
+        var t0 = provider.Escape("T0");
+        var expected = $"{BaseSelect(provider, true)} ORDER BY {t0}.{provider.Escape("Name")} DESC, {t0}.{provider.Escape("Id")} DESC";
         Assert.Equal(expected, sql);
     }
 
@@ -143,7 +145,8 @@ public class QueryTranslatorCrossProviderTests : TestBase
         using var connection = setup.Connection;
         var provider = setup.Provider;
         var (sql, parameters, _) = TranslateQuery<Product, Product>(q => q.OrderBy(p => p.Id).Skip(20).Take(10), connection, provider);
-        var sb = new StringBuilder($"{BaseSelect(provider, true)} ORDER BY T0.{provider.Escape("Id")} ASC");
+        var t0 = provider.Escape("T0");
+        var sb = new StringBuilder($"{BaseSelect(provider, true)} ORDER BY {t0}.{provider.Escape("Id")} ASC");
         var offsetParam = provider.ParamPrefix + "p0";
         var limitParam = provider.ParamPrefix + "p1";
         provider.ApplyPaging(sb, 10, 20, limitParam, offsetParam);
@@ -175,7 +178,16 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var (sql, parameters, elementType) = TranslateQuery<Product, Product>(q => q.SelectMany(p => q), connection, provider);
         var cols = Columns(provider);
         var table = provider.Escape("Product");
-        var expected = $"SELECT T1.{cols.Replace(", ", ", T1.")} FROM {table} T0 CROSS JOIN {table} T1";
+        var t0 = provider.Escape("T0");
+        var t1 = provider.Escape("T1");
+        var colsWithAlias = string.Join(", ", new[] {
+            $"{t1}.{provider.Escape("Id")}",
+            $"{t1}.{provider.Escape("Name")}",
+            $"{t1}.{provider.Escape("Price")}",
+            $"{t1}.{provider.Escape("CategoryId")}",
+            $"{t1}.{provider.Escape("IsAvailable")}"
+        });
+        var expected = $"SELECT {colsWithAlias} FROM {table} {t0} CROSS JOIN {table} {t1}";
         Assert.Equal(expected, sql);
         Assert.Empty(parameters);
         Assert.Equal(typeof(Product), elementType);
@@ -205,8 +217,9 @@ public class QueryTranslatorCrossProviderTests : TestBase
             connection,
             provider);
 
-        var orderBy = $"ORDER BY T0.{provider.Escape("Id")} ASC";
-        var expected = $"SELECT {provider.Escape("Id")} AS {provider.Escape("Id")}, ROW_NUMBER() OVER ({orderBy}) AS {provider.Escape("RowNumber")} FROM {provider.Escape("Product")} T0 {orderBy}";
+        var t0 = provider.Escape("T0");
+        var orderBy = $"ORDER BY {t0}.{provider.Escape("Id")} ASC";
+        var expected = $"SELECT {provider.Escape("Id")} AS {provider.Escape("Id")}, ROW_NUMBER() OVER ({orderBy}) AS {provider.Escape("RowNumber")} FROM {provider.Escape("Product")} {t0} {orderBy}";
         Assert.Equal(expected, sql);
     }
 
@@ -264,7 +277,8 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var table = provider.Escape("Product");
         var col = provider.Escape("CategoryId");
         var paramName = provider.ParamPrefix + "p0";
-        var expected = $"SELECT T0.{col} FROM {table} T0 GROUP BY T0.{col} HAVING ((COUNT(*) > {paramName}))";
+        var t0 = provider.Escape("T0");
+        var expected = $"SELECT {t0}.{col} FROM {table} {t0} GROUP BY {t0}.{col} HAVING ((COUNT(*) > {paramName}))";
         Assert.Equal(expected, sql);
         Assert.Equal(10, parameters[paramName]);
         Assert.Equal(typeof(int), elementType);

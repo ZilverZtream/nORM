@@ -65,7 +65,8 @@ namespace nORM.Tests
             var provider = setup.Provider;
 
             var (sql, parameters) = Translate<Product>(p => p.Id == 5, connection, provider);
-            var expected = $"(T0.{provider.Escape("Id")} = @p0)";
+            var t0 = provider.Escape("T0");
+            var expected = $"({t0}.{provider.Escape("Id")} = @p0)";
             Assert.Equal(expected, sql);
             Assert.Single(parameters);
             Assert.Equal(5, parameters["@p0"]);
@@ -80,7 +81,8 @@ namespace nORM.Tests
             var provider = setup.Provider;
 
             var (sql, parameters) = Translate(predicate, connection, provider);
-            var expectedSql = $"(T0.{provider.Escape(column)} > @p0)";
+            var t0 = provider.Escape("T0");
+            var expectedSql = $"({t0}.{provider.Escape(column)} > @p0)";
             Assert.Equal(expectedSql, sql);
             Assert.Single(parameters);
             Assert.Equal(expectedParam, parameters["@p0"]);
@@ -96,7 +98,8 @@ namespace nORM.Tests
 
             Expression<Func<Product, bool>> expr = p => p.Id == 5 && p.Id > 5;
             var (sql, parameters) = Translate(expr, connection, provider);
-            var expected = $"((T0.{provider.Escape("Id")} = @p0) AND (T0.{provider.Escape("Id")} > @p0))";
+            var t0 = provider.Escape("T0");
+            var expected = $"(({t0}.{provider.Escape("Id")} = @p0) AND ({t0}.{provider.Escape("Id")} > @p0))";
             Assert.Equal(expected, sql);
             Assert.Single(parameters);
             Assert.Equal(5, parameters["@p0"]);
@@ -111,7 +114,8 @@ namespace nORM.Tests
             var provider = setup.Provider;
 
             var (sql, parameters) = Translate<Product>(p => p.Name!.ToUpper() == "ABC", connection, provider);
-            var expected = $"(UPPER(T0.{provider.Escape("Name")}) = @p0)";
+            var t0 = provider.Escape("T0");
+            var expected = $"(UPPER({t0}.{provider.Escape("Name")}) = @p0)";
             Assert.Equal(expected, sql);
             Assert.Single(parameters);
             Assert.Equal("ABC", parameters["@p0"]);
@@ -126,7 +130,8 @@ namespace nORM.Tests
             var provider = setup.Provider;
 
             var (sql, parameters) = Translate<Product>(p => CustomFunctions.Soundex(p.Name!) == "ABC", connection, provider);
-            var expected = $"(SOUNDEX(T0.{provider.Escape("Name")}) = @p0)";
+            var t0 = provider.Escape("T0");
+            var expected = $"(SOUNDEX({t0}.{provider.Escape("Name")}) = @p0)";
             Assert.Equal(expected, sql);
             Assert.Single(parameters);
             Assert.Equal("ABC", parameters["@p0"]);
@@ -141,7 +146,8 @@ namespace nORM.Tests
             var provider = setup.Provider;
 
             var (sql, parameters) = Translate<JsonEntity>(e => Json.Value<string>(e.ProfileData!, "$.address.city") == "New York", connection, provider);
-            var columnSql = $"T0.{provider.Escape("ProfileData")}";
+            var t0 = provider.Escape("T0");
+            var columnSql = $"{t0}.{provider.Escape("ProfileData")}";
             var expected = $"({provider.TranslateJsonPathAccess(columnSql, "$.address.city")} = @p0)";
             Assert.Equal(expected, sql);
             Assert.Single(parameters);
