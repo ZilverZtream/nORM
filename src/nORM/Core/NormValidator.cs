@@ -153,7 +153,25 @@ namespace nORM.Core
             }
             catch (Exception ex)
             {
-                throw new ArgumentException("Invalid connection string format", ex);
+                var safeConnStr = MaskSensitiveConnectionStringData(connectionString);
+                throw new ArgumentException($"Invalid connection string format: {safeConnStr}", ex);
+            }
+        }
+
+        internal static string MaskSensitiveConnectionStringData(string connectionString)
+        {
+            var builder = new DbConnectionStringBuilder();
+            try
+            {
+                builder.ConnectionString = connectionString;
+                if (builder.ContainsKey("Password")) builder["Password"] = "***";
+                if (builder.ContainsKey("Pwd")) builder["Pwd"] = "***";
+                if (builder.ContainsKey("User Password")) builder["User Password"] = "***";
+                return builder.ConnectionString;
+            }
+            catch
+            {
+                return "[INVALID_CONNECTION_STRING]";
             }
         }
 
