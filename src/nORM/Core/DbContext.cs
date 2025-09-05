@@ -437,7 +437,7 @@ namespace nORM.Core
             if (entity is null) throw new ArgumentNullException(nameof(entity));
 
             var map = GetMapping(typeof(T));
-            if (operation == WriteOperation.Insert) SetTenantId(entity, map);
+            ValidateTenantContext(entity, map, operation);
 
             var tx = transaction ?? Database.CurrentTransaction;
 
@@ -593,7 +593,7 @@ namespace nORM.Core
                 foreach (var entity in entities)
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
-                    SetTenantId(entity, map);
+                    ValidateTenantContext(entity, map, WriteOperation.Insert);
                 }
                 return await _p.BulkInsertAsync(ctx, map, entities, token).ConfigureAwait(false);
             }, ct);
@@ -603,8 +603,13 @@ namespace nORM.Core
             {
                 NormValidator.ValidateBulkOperation(entities, "update");
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
-                foreach (var entity in entities) NormValidator.ValidateEntity(entity, nameof(entities));
-                return await _p.BulkUpdateAsync(ctx, GetMapping(typeof(T)), entities, token).ConfigureAwait(false);
+                var map = GetMapping(typeof(T));
+                foreach (var entity in entities)
+                {
+                    NormValidator.ValidateEntity(entity, nameof(entities));
+                    ValidateTenantContext(entity, map, WriteOperation.Update);
+                }
+                return await _p.BulkUpdateAsync(ctx, map, entities, token).ConfigureAwait(false);
             }, ct);
 
         public Task<int> BulkDeleteAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
@@ -612,8 +617,13 @@ namespace nORM.Core
             {
                 NormValidator.ValidateBulkOperation(entities, "delete");
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
-                foreach (var entity in entities) NormValidator.ValidateEntity(entity, nameof(entities));
-                return await _p.BulkDeleteAsync(ctx, GetMapping(typeof(T)), entities, token).ConfigureAwait(false);
+                var map = GetMapping(typeof(T));
+                foreach (var entity in entities)
+                {
+                    NormValidator.ValidateEntity(entity, nameof(entities));
+                    ValidateTenantContext(entity, map, WriteOperation.Delete);
+                }
+                return await _p.BulkDeleteAsync(ctx, map, entities, token).ConfigureAwait(false);
             }, ct);
         #endregion
 
@@ -850,13 +860,31 @@ namespace nORM.Core
             }, ct);
         #endregion
 
-        private void SetTenantId<T>(T entity, TableMapping map) where T : class
+        private void ValidateTenantContext<T>(T entity, TableMapping map, WriteOperation operation) where T : class
         {
             if (Options.TenantProvider == null) return;
             var tenantCol = map.TenantColumn;
-            if (tenantCol != null)
+            if (tenantCol == null) return;
+
+            var tenantId = Options.TenantProvider.GetCurrentTenantId();
+            if (tenantId == null)
+                throw new InvalidOperationException("Tenant context required but not available");
+
+            var entityTenant = tenantCol.Getter(entity);
+            if (entityTenant == null)
             {
-                tenantCol.Setter(entity, Options.TenantProvider.GetCurrentTenantId());
+                if (operation == WriteOperation.Insert)
+                {
+                    tenantCol.Setter(entity, tenantId);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Tenant context required but not available");
+                }
+            }
+            else if (!Equals(entityTenant, tenantId))
+            {
+                throw new InvalidOperationException("Tenant context mismatch");
             }
         }
 
