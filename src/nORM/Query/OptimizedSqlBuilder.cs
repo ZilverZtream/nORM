@@ -41,7 +41,7 @@ namespace nORM.Query
         }
 
         private readonly StringBuilder _buffer;
-        private readonly Dictionary<string, string> _parameterCache = new();
+        private readonly Dictionary<(Type? type, int hash), string> _parameterCache = new();
         private readonly bool _returnToPool;
         private bool _hasWhere;
 
@@ -180,8 +180,9 @@ namespace nORM.Query
 
         public OptimizedSqlBuilder AppendParameterizedValue(string parameterName, object? value, Dictionary<string, object> parameters)
         {
+            var type = value?.GetType();
             var valueHash = value?.GetHashCode() ?? 0;
-            var cacheKey = $"{value?.GetType().Name}_{valueHash}";
+            var cacheKey = (type, valueHash);
             if (_parameterCache.TryGetValue(cacheKey, out var existing))
             {
                 _buffer.Append(existing);
