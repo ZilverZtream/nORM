@@ -25,7 +25,8 @@ namespace nORM.Query
         bool SplitQuery,
         TimeSpan CommandTimeout,
         bool IsCacheable,
-        TimeSpan? CacheExpiration
+        TimeSpan? CacheExpiration,
+        int Fingerprint = 0
     );
 
     internal sealed record IncludePlan(List<TableMapping.Relation> Path);
