@@ -670,6 +670,9 @@ namespace nORM.Core
                     paramDict[pName] = parameters[i];
                 }
 
+                if (!NormValidator.IsSafeRawSql(sql))
+                    throw new NormUsageException("Potential SQL injection detected in raw query.");
+
                 NormValidator.ValidateRawSql(sql, paramDict);
 
                 var props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -724,6 +727,9 @@ namespace nORM.Core
                     paramDict[pName] = parameters[i];
                 }
 
+                if (!NormValidator.IsSafeRawSql(sql))
+                    throw new NormUsageException("Potential SQL injection detected in raw query.");
+
                 NormValidator.ValidateRawSql(sql, paramDict);
 
                 var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
@@ -756,6 +762,9 @@ namespace nORM.Core
                     }
                 }
 
+                if (!NormValidator.IsSafeRawSql(procedureName))
+                    throw new NormUsageException("Potential SQL injection detected in raw query.");
+
                 NormValidator.ValidateRawSql(procedureName, paramDict);
 
                 var materializer = global::nORM.Query.QueryTranslator.Rent(this).CreateMaterializer(GetMapping(typeof(T)), typeof(T));
@@ -786,6 +795,9 @@ namespace nORM.Core
                     paramDict[pName] = pValue ?? DBNull.Value;
                 }
             }
+
+            if (!NormValidator.IsSafeRawSql(procedureName))
+                throw new NormUsageException("Potential SQL injection detected in raw query.");
 
             NormValidator.ValidateRawSql(procedureName, paramDict);
 
@@ -835,6 +847,9 @@ namespace nORM.Core
                     cmd.Parameters.Add(p);
                     outputParamMap[op.Name] = p;
                 }
+
+                if (!NormValidator.IsSafeRawSql(procedureName))
+                    throw new NormUsageException("Potential SQL injection detected in raw query.");
 
                 NormValidator.ValidateRawSql(procedureName, paramDict);
 

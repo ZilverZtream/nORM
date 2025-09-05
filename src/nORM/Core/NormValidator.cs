@@ -129,6 +129,19 @@ namespace nORM.Core
                 throw new ArgumentException($"Parameter count {parameters.Count} exceeds maximum of {MaxParameterCount}");
         }
 
+        internal static bool IsSafeRawSql(string sql)
+        {
+            if (string.IsNullOrWhiteSpace(sql))
+                return false;
+
+            var lowerSql = sql.ToLowerInvariant();
+            if (lowerSql.Contains("drop ") || lowerSql.Contains("alter ") ||
+                lowerSql.Contains("truncate ") || lowerSql.Contains("exec "))
+                return false;
+
+            return true;
+        }
+
         public static void ValidateConnectionString(string connectionString, string provider)
         {
             if (string.IsNullOrWhiteSpace(connectionString))
