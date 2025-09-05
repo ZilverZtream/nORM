@@ -9,6 +9,8 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Data;
+using System.Text;
+using Microsoft.Extensions.ObjectPool;
 using nORM.Core;
 using nORM.Mapping;
 using nORM.Internal;
@@ -26,6 +28,8 @@ namespace nORM.Navigation
         internal static readonly ConditionalWeakTable<object, NavigationContext> _navigationContexts = new();
         private static readonly ConcurrentLruCache<Type, List<NavigationPropertyInfo>> _navigationPropertyCache = new(maxSize: 1000);
         private static readonly ConditionalWeakTable<DbContext, BatchedNavigationLoader> _navigationLoaders = new();
+        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
+            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
         /// <summary>
         /// Enables lazy loading for an entity instance
@@ -370,11 +374,20 @@ namespace nORM.Navigation
             cmd.AddParam(paramName, keyValue);
 
             // Apply LIMIT 1 for single result
-            var sql = new System.Text.StringBuilder(cmd.CommandText);
-            var limitParam = context.Provider.ParamPrefix + "p_limit";
-            context.Provider.ApplyPaging(sql, 1, null, limitParam, null);
-            cmd.CommandText = sql.ToString();
-            cmd.AddParam(limitParam, 1);
+            var sb = _stringBuilderPool.Get();
+            try
+            {
+                sb.Append(cmd.CommandText);
+                var limitParam = context.Provider.ParamPrefix + "p_limit";
+                context.Provider.ApplyPaging(sb, 1, null, limitParam, null);
+                cmd.CommandText = sb.ToString();
+                cmd.AddParam(limitParam, 1);
+            }
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
 
             var materializer = Query.QueryTranslator.Rent(context).CreateMaterializer(mapping, entityType);
 
