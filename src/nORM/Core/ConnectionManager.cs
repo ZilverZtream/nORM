@@ -188,10 +188,54 @@ namespace nORM.Core
 
         public void Dispose()
         {
-            _healthCheckTimer.Dispose();
+            List<Exception>? exceptions = null;
+
+            try
+            {
+                _healthCheckTimer.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error disposing health check timer");
+                exceptions = new List<Exception> { ex };
+            }
+
             foreach (var pool in _connectionPools.Values)
             {
-                pool.Dispose();
+                try
+                {
+                    pool.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error disposing connection pool");
+                    (exceptions ??= new List<Exception>()).Add(ex);
+                }
+            }
+
+            try
+            {
+                _failoverSemaphore.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error disposing failover semaphore");
+                (exceptions ??= new List<Exception>()).Add(ex);
+            }
+
+            try
+            {
+                _poolInitSemaphore.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error disposing initialization semaphore");
+                (exceptions ??= new List<Exception>()).Add(ex);
+            }
+
+            if (exceptions != null)
+            {
+                throw new AggregateException("One or more errors occurred during ConnectionManager disposal", exceptions);
             }
         }
     }
