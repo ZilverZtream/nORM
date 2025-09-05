@@ -52,7 +52,7 @@ namespace nORM.Core
 
         private const int MaxCascadeDepth = 100;
 
-        internal void Remove(object entity, bool cascade = false, int depth = 0, HashSet<object>? visited = null)
+        internal void Remove(object entity, bool cascade = false)
         {
             if (_entriesByReference.TryRemove(entity, out var entry))
             {
@@ -69,35 +69,49 @@ namespace nORM.Core
 
                 if (cascade)
                 {
-                    visited ??= new HashSet<object>(RefComparer.Instance);
-                    visited.Add(entity);
-                    CascadeDelete(entity, entry.Mapping, depth, visited);
+                    CascadeDelete(entity, entry.Mapping);
                 }
             }
         }
 
-        private void CascadeDelete(object entity, TableMapping mapping, int depth, HashSet<object> visited)
+        private void CascadeDelete(object rootEntity, TableMapping rootMapping)
         {
-            if (depth >= MaxCascadeDepth)
-                return;
+            var queue = new Queue<(object Entity, TableMapping Mapping, int Depth)>();
+            var visited = new HashSet<object>(RefComparer.Instance);
 
-            foreach (var relation in mapping.Relations.Values)
+            queue.Enqueue((rootEntity, rootMapping, 0));
+            visited.Add(rootEntity);
+
+            while (queue.Count > 0)
             {
-                if (!relation.CascadeDelete)
+                var (entity, mapping, depth) = queue.Dequeue();
+                if (depth >= MaxCascadeDepth)
                     continue;
 
-                var navValue = relation.NavProp.GetValue(entity);
-                if (navValue is IEnumerable collection)
+                foreach (var relation in mapping.Relations.Values)
                 {
-                    foreach (var child in collection)
+                    if (!relation.CascadeDelete)
+                        continue;
+
+                    var navValue = relation.NavProp.GetValue(entity);
+                    if (navValue is IEnumerable collection)
                     {
-                        if (child != null && visited.Add(child))
-                            Remove(child, true, depth + 1, visited);
+                        foreach (var child in collection)
+                        {
+                            if (child != null && visited.Add(child) &&
+                                _entriesByReference.TryGetValue(child, out var childEntry))
+                            {
+                                queue.Enqueue((child, childEntry.Mapping, depth + 1));
+                                Remove(child, false);
+                            }
+                        }
                     }
-                }
-                else if (navValue != null && visited.Add(navValue))
-                {
-                    Remove(navValue, true, depth + 1, visited);
+                    else if (navValue != null && visited.Add(navValue) &&
+                             _entriesByReference.TryGetValue(navValue, out var childEntry))
+                    {
+                        queue.Enqueue((navValue, childEntry.Mapping, depth + 1));
+                        Remove(navValue, false);
+                    }
                 }
             }
         }
