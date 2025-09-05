@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using nORM.Configuration;
 using nORM.Mapping;
@@ -12,8 +13,8 @@ namespace nORM.Core
 {
     public sealed class ChangeTracker
     {
-        private readonly Dictionary<object, EntityEntry> _entriesByReference = new(RefComparer.Instance);
-        private readonly Dictionary<Type, Dictionary<object, EntityEntry>> _entriesByKey = new();
+        private readonly ConcurrentDictionary<object, EntityEntry> _entriesByReference = new(RefComparer.Instance);
+        private readonly ConcurrentDictionary<Type, ConcurrentDictionary<object, EntityEntry>> _entriesByKey = new();
         private readonly DbContextOptions _options;
 
         public ChangeTracker(DbContextOptions options)
@@ -24,8 +25,8 @@ namespace nORM.Core
         internal EntityEntry Track(object entity, EntityState state, TableMapping mapping)
         {
             var pk = GetPrimaryKeyValue(entity, mapping);
-            if (pk != null && _entriesByKey.TryGetValue(mapping.Type, out var typeEntries) &&
-                typeEntries.TryGetValue(pk, out var existing))
+            if (pk != null && _entriesByKey.TryGetValue(mapping.Type, out var existingTypeEntries) &&
+                existingTypeEntries.TryGetValue(pk, out var existing))
             {
                 existing.State = state;
                 return existing;
@@ -35,11 +36,9 @@ namespace nORM.Core
             _entriesByReference[entity] = entry;
             if (pk != null)
             {
-                if (!_entriesByKey.TryGetValue(mapping.Type, out typeEntries))
-                {
-                    typeEntries = new Dictionary<object, EntityEntry>();
-                    _entriesByKey[mapping.Type] = typeEntries;
-                }
+                var typeEntries = _entriesByKey.GetOrAdd(
+                    mapping.Type,
+                    _ => new ConcurrentDictionary<object, EntityEntry>());
                 typeEntries[pk] = entry;
             }
 
@@ -48,16 +47,15 @@ namespace nORM.Core
 
         internal void Remove(object entity, bool cascade = false)
         {
-            if (_entriesByReference.TryGetValue(entity, out var entry))
+            if (_entriesByReference.TryRemove(entity, out var entry))
             {
                 entry.DetachEntity();
-                _entriesByReference.Remove(entity);
                 var pk = GetPrimaryKeyValue(entity, entry.Mapping);
                 if (pk != null && _entriesByKey.TryGetValue(entry.Mapping.Type, out var typeEntries))
                 {
-                    typeEntries.Remove(pk);
-                    if (typeEntries.Count == 0)
-                        _entriesByKey.Remove(entry.Mapping.Type);
+                    typeEntries.TryRemove(pk, out _);
+                    if (typeEntries.IsEmpty)
+                        _entriesByKey.TryRemove(entry.Mapping.Type, out _);
                 }
 
                 if (cascade)
