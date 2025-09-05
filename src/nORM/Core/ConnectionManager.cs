@@ -6,8 +6,6 @@ using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using nORM.Providers;
 
@@ -63,27 +61,7 @@ namespace nORM.Core
 
         private DbConnection CreateConnection(string connectionString)
         {
-            // Reuse logic similar to DbContext.CreateConnection
-            if (_provider is SqlServerProvider)
-                return new SqlConnection(connectionString);
-            if (_provider is SqliteProvider)
-                return new SqliteConnection(connectionString);
-            if (_provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-            {
-                var type = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
-                if (type == null)
-                    throw new InvalidOperationException("Npgsql package is required for PostgreSQL support. Please install the Npgsql NuGet package.");
-                return (DbConnection)Activator.CreateInstance(type, connectionString)!;
-            }
-            if (_provider.GetType().Name.Contains("MySql", StringComparison.OrdinalIgnoreCase))
-            {
-                var type = Type.GetType("MySqlConnector.MySqlConnection, MySqlConnector") ??
-                           Type.GetType("MySql.Data.MySqlClient.MySqlConnection, MySql.Data");
-                if (type == null)
-                    throw new InvalidOperationException("MySQL package is required for MySQL support. Please install MySqlConnector or MySql.Data.");
-                return (DbConnection)Activator.CreateInstance(type, connectionString)!;
-            }
-            throw new NotSupportedException($"Unsupported provider type: {_provider.GetType().Name}");
+            return DbConnectionFactory.Create(connectionString, _provider);
         }
 
         private void DeterminePrimaryNode()
