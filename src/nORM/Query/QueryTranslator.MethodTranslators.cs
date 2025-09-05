@@ -220,7 +220,7 @@ namespace nORM.Query
             public JoinTranslator(bool isGroupJoin) => _isGroupJoin = isGroupJoin;
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                return _isGroupJoin ? t.HandleGroupJoin(node) : t.HandleJoin(node, false);
+                return _isGroupJoin ? t.HandleGroupJoin(node) : t.HandleInnerJoin(node);
             }
         }
 
