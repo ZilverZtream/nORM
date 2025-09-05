@@ -28,6 +28,10 @@ namespace nORM.Query
         // Cache constructor info and delegates to avoid repeated reflection in hot paths
         private static readonly ConcurrentDictionary<Type, ConstructorInfo> _constructorCache = new();
         private static readonly ConcurrentDictionary<Type, Func<object?[], object>> _constructorDelegates = new();
+        private static readonly ConcurrentDictionary<Type, bool> _simpleTypeCache = new();
+
+        private static bool IsSimpleType(Type type)
+            => _simpleTypeCache.GetOrAdd(type, static t => t.IsPrimitive || t == typeof(decimal) || t == typeof(string));
 
         internal static (long Hits, long Misses, double HitRate) CacheStats
             => (_cache.Hits, _cache.Misses, _cache.HitRate);
@@ -95,7 +99,7 @@ namespace nORM.Query
             }
 
             // Handle simple scalar types directly
-            if (targetType.IsPrimitive || targetType == typeof(decimal) || targetType == typeof(string))
+            if (IsSimpleType(targetType))
             {
                 return reader =>
                 {
