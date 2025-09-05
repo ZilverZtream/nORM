@@ -91,7 +91,7 @@ namespace nORM.Internal
             ExpressionUtils.ValidateExpression(expression);
             var timeout = ExpressionUtils.GetCompilationTimeout(expression);
             using var cts = new CancellationTokenSource(timeout);
-            var del = ExpressionUtils.CompileWithTimeout(Expression.Lambda(expression), cts.Token);
+            var del = ExpressionUtils.CompileWithFallback(Expression.Lambda(expression), cts.Token);
             return del.DynamicInvoke();
         }
 

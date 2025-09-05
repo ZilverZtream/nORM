@@ -1403,7 +1403,7 @@ namespace nORM.Query
             ExpressionUtils.ValidateExpression(lambda);
             var timeout = ExpressionUtils.GetCompilationTimeout(lambda);
             using var cts = new CancellationTokenSource(timeout);
-            var invoker = ExpressionUtils.CompileWithTimeout(lambda, cts.Token);
+            var invoker = ExpressionUtils.CompileWithFallback(lambda, cts.Token);
 
             return obj =>
             {
@@ -1443,7 +1443,7 @@ namespace nORM.Query
             ExpressionUtils.ValidateExpression(lambda);
             var timeout = ExpressionUtils.GetCompilationTimeout(lambda);
             using var cts = new CancellationTokenSource(timeout);
-            return ExpressionUtils.CompileWithTimeout(lambda, cts.Token);
+            return ExpressionUtils.CompileWithFallback(lambda, cts.Token);
         }
 
         private sealed class ParameterReplacer : ExpressionVisitor
