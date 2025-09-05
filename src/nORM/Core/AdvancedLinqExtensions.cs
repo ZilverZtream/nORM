@@ -142,10 +142,10 @@ namespace nORM.Core
 
             MethodInfo genericMethod = function switch
             {
-                "Sum" => GetAggregateMethod(SumMethods, selector.ReturnType).MakeGenericMethod(sourceType),
-                "Average" => GetAggregateMethod(AverageMethods, selector.ReturnType).MakeGenericMethod(sourceType),
-                "Min" => MinMethod.MakeGenericMethod(sourceType, selector.ReturnType),
-                "Max" => MaxMethod.MakeGenericMethod(sourceType, selector.ReturnType),
+                "Sum" => GetAggregateMethod(SumMethods.Value, selector.ReturnType).MakeGenericMethod(sourceType),
+                "Average" => GetAggregateMethod(AverageMethods.Value, selector.ReturnType).MakeGenericMethod(sourceType),
+                "Min" => MinMethod.Value.MakeGenericMethod(sourceType, selector.ReturnType),
+                "Max" => MaxMethod.Value.MakeGenericMethod(sourceType, selector.ReturnType),
                 _ => throw new InvalidOperationException($"Unsupported aggregate function '{function}'.")
             };
 
@@ -161,34 +161,32 @@ namespace nORM.Core
             return method;
         }
 
-        private static readonly IReadOnlyDictionary<Type, MethodInfo> SumMethods;
-        private static readonly IReadOnlyDictionary<Type, MethodInfo> AverageMethods;
-        private static readonly MethodInfo MinMethod;
-        private static readonly MethodInfo MaxMethod;
-
-        static AdvancedLinqExtensions()
-        {
-            var methods = typeof(Queryable).GetMethods()
+        private static readonly Lazy<MethodInfo[]> QueryableMethods = new(() =>
+            typeof(Queryable).GetMethods()
                 .Where(m => m.GetParameters().Length == 2 &&
                             m.GetParameters()[1].ParameterType.IsGenericType &&
                             m.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(Expression<>))
-                .ToArray();
+                .ToArray());
 
-            SumMethods = methods
+        private static readonly Lazy<IReadOnlyDictionary<Type, MethodInfo>> SumMethods = new(() =>
+            QueryableMethods.Value
                 .Where(m => m.Name == nameof(Queryable.Sum))
                 .ToDictionary(
                     m => m.GetParameters()[1].ParameterType.GetGenericArguments()[0].GetGenericArguments()[1],
-                    m => m);
+                    m => m));
 
-            AverageMethods = methods
+        private static readonly Lazy<IReadOnlyDictionary<Type, MethodInfo>> AverageMethods = new(() =>
+            QueryableMethods.Value
                 .Where(m => m.Name == nameof(Queryable.Average))
                 .ToDictionary(
                     m => m.GetParameters()[1].ParameterType.GetGenericArguments()[0].GetGenericArguments()[1],
-                    m => m);
+                    m => m));
 
-            MinMethod = methods.Single(m => m.Name == nameof(Queryable.Min));
-            MaxMethod = methods.Single(m => m.Name == nameof(Queryable.Max));
-        }
+        private static readonly Lazy<MethodInfo> MinMethod = new(() =>
+            QueryableMethods.Value.Single(m => m.Name == nameof(Queryable.Min)));
+
+        private static readonly Lazy<MethodInfo> MaxMethod = new(() =>
+            QueryableMethods.Value.Single(m => m.Name == nameof(Queryable.Max)));
 
         #endregion
     }
