@@ -167,6 +167,10 @@ namespace nORM.Query
 
         public QueryPlan Translate(Expression e)
         {
+            if (e == null) throw new ArgumentNullException(nameof(e));
+            if (_ctx == null) throw new InvalidOperationException("QueryTranslator not properly initialized");
+            if (_provider == null) throw new InvalidOperationException("Provider not set");
+
             // Analyze query complexity before translation
             var complexityInfo = QueryComplexityAnalyzer.AnalyzeQuery(e);
 
@@ -293,7 +297,8 @@ namespace nORM.Query
 
         private TableMapping TrackMapping(Type type)
         {
-            var map = _ctx.GetMapping(type);
+            if (type == null) throw new ArgumentNullException(nameof(type));
+            var map = _ctx?.GetMapping(type) ?? throw new InvalidOperationException("Context not available");
             _tables.Add(map.TableName);
             return map;
         }
