@@ -50,7 +50,9 @@ namespace nORM.Core
             return entry;
         }
 
-        internal void Remove(object entity, bool cascade = false)
+        private const int MaxCascadeDepth = 100;
+
+        internal void Remove(object entity, bool cascade = false, int depth = 0, HashSet<object>? visited = null)
         {
             if (_entriesByReference.TryRemove(entity, out var entry))
             {
@@ -67,13 +69,18 @@ namespace nORM.Core
 
                 if (cascade)
                 {
-                    CascadeDelete(entity, entry.Mapping);
+                    visited ??= new HashSet<object>(RefComparer.Instance);
+                    visited.Add(entity);
+                    CascadeDelete(entity, entry.Mapping, depth, visited);
                 }
             }
         }
 
-        private void CascadeDelete(object entity, TableMapping mapping)
+        private void CascadeDelete(object entity, TableMapping mapping, int depth, HashSet<object> visited)
         {
+            if (depth >= MaxCascadeDepth)
+                return;
+
             foreach (var relation in mapping.Relations.Values)
             {
                 if (!relation.CascadeDelete)
@@ -84,12 +91,13 @@ namespace nORM.Core
                 {
                     foreach (var child in collection)
                     {
-                        Remove(child, true);
+                        if (child != null && visited.Add(child))
+                            Remove(child, true, depth + 1, visited);
                     }
                 }
-                else if (navValue != null)
+                else if (navValue != null && visited.Add(navValue))
                 {
-                    Remove(navValue, true);
+                    Remove(navValue, true, depth + 1, visited);
                 }
             }
         }
