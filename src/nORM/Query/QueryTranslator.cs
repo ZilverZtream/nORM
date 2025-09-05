@@ -63,7 +63,7 @@ namespace nORM.Query
         // Initialize _groupJoinInfo in constructor to suppress warning
         // This field is used in complex join scenarios
 
-        private static readonly ThreadLocal<QueryTranslator?> _threadLocalTranslator =
+        private static ThreadLocal<QueryTranslator?> _threadLocalTranslator =
             new(() => null, trackAllValues: false);
 
         private QueryTranslator()
@@ -428,7 +428,9 @@ namespace nORM.Query
             }
             finally
             {
-                _threadLocalTranslator.Value = null;
+                // Properly dispose ThreadLocal to prevent memory leaks
+                _threadLocalTranslator.Dispose();
+                _threadLocalTranslator = new(() => null, trackAllValues: false);
             }
         }
 
