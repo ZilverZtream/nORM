@@ -12,6 +12,7 @@ using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 
 #nullable enable
 
@@ -105,6 +106,14 @@ namespace nORM.Providers
 
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
             => $"JSON_VALUE({columnName}, '{jsonPath}')";
+
+        public override string BuildContainsClause(DbCommand cmd, string columnName, IReadOnlyList<object?> values)
+        {
+            var pName = ParamPrefix + "p0";
+            var joined = string.Join(",", values.Select(v => Convert.ToString(v, CultureInfo.InvariantCulture)));
+            cmd.AddParam(pName, joined);
+            return $"{columnName} IN (SELECT value FROM STRING_SPLIT({pName}, ','))";
+        }
 
         public override string GenerateCreateHistoryTableSql(TableMapping mapping)
         {
