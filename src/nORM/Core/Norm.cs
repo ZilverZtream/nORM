@@ -21,7 +21,8 @@ namespace nORM.Core
 
             ExpressionUtils.ValidateExpression(queryExpression);
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var timeout = ExpressionUtils.GetCompilationTimeout(queryExpression);
+            using var cts = new CancellationTokenSource(timeout);
             return CompileWithTimeout<TContext, TParam, T>(queryExpression, cts.Token);
         }
 
@@ -95,7 +96,8 @@ namespace nORM.Core
                 if (node.Method.DeclaringType == typeof(NormQueryable) && node.Method.Name == "Query")
                 {
                     ExpressionUtils.ValidateExpression(node);
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    var timeout = ExpressionUtils.GetCompilationTimeout(node);
+                    using var cts = new CancellationTokenSource(timeout);
                     var del = ExpressionUtils.CompileWithTimeout(Expression.Lambda(node), cts.Token);
                     var result = del.DynamicInvoke();
                     return Expression.Constant(result, node.Type);

@@ -32,6 +32,15 @@ namespace nORM.Internal
                 throw new InvalidOperationException($"Expression too deep: {complexity.Depth} levels");
         }
 
+        public static TimeSpan GetCompilationTimeout(Expression expression)
+        {
+            var complexity = AnalyzeExpressionComplexity(expression);
+            var multiplier = Math.Max(1, Math.Max(complexity.NodeCount / 1000, complexity.Depth / 10));
+            var timeout = TimeSpan.FromSeconds(30 * multiplier);
+            var maxTimeout = TimeSpan.FromMinutes(5);
+            return timeout > maxTimeout ? maxTimeout : timeout;
+        }
+
         public static TDelegate CompileWithTimeout<TDelegate>(Expression<TDelegate> expression, CancellationToken token)
         {
             var task = Task.Run(() => expression.Compile(), token);

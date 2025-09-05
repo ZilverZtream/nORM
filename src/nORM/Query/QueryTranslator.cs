@@ -1323,7 +1323,8 @@ namespace nORM.Query
             var lambda = Expression.Lambda<Func<object, object>>(convertBody, objParam);
 
             ExpressionUtils.ValidateExpression(lambda);
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var timeout = ExpressionUtils.GetCompilationTimeout(lambda);
+            using var cts = new CancellationTokenSource(timeout);
             var invoker = ExpressionUtils.CompileWithTimeout(lambda, cts.Token);
 
             return obj =>
@@ -1362,7 +1363,8 @@ namespace nORM.Query
 
             var lambda = Expression.Lambda<Func<object, IEnumerable<object>, object>>(body, outerParam, innerParam);
             ExpressionUtils.ValidateExpression(lambda);
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var timeout = ExpressionUtils.GetCompilationTimeout(lambda);
+            using var cts = new CancellationTokenSource(timeout);
             return ExpressionUtils.CompileWithTimeout(lambda, cts.Token);
         }
 
