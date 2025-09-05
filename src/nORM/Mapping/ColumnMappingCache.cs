@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -70,6 +71,25 @@ namespace nORM.Mapping
                     if (attributes.OfType<NotMappedAttribute>().Any())
                         continue;
 
+                    var propType = prop.PropertyType;
+
+                    // Skip collection navigation properties
+                    if (propType != typeof(string) && propType != typeof(byte[]) && typeof(IEnumerable).IsAssignableFrom(propType))
+                        continue;
+
+                    var ownedAttribute = attributes.OfType<OwnedAttribute>().FirstOrDefault();
+
+                    // Skip reference navigation properties (entities)
+                    if (!propType.IsValueType && propType != typeof(string) && propType != typeof(byte[]) &&
+                        ownedAttribute == null && propType.GetCustomAttribute<OwnedAttribute>() == null)
+                    {
+                        var entityProps = propType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                        var looksLikeEntity = entityProps.Any(p => p.GetCustomAttribute<KeyAttribute>() != null ||
+                            string.Equals(p.Name, "Id", StringComparison.OrdinalIgnoreCase));
+                        if (looksLikeEntity)
+                            continue;
+                    }
+
                     var propertyInfo = new CachedPropertyInfo
                     {
                         Property = prop,
@@ -84,8 +104,7 @@ namespace nORM.Mapping
                         Setter = CreateOptimizedSetter(prop)
                     };
 
-                    var ownedAttribute = attributes.OfType<OwnedAttribute>().FirstOrDefault();
-                    if (ownedAttribute != null || prop.PropertyType.GetCustomAttribute<OwnedAttribute>() != null)
+                    if (ownedAttribute != null || propType.GetCustomAttribute<OwnedAttribute>() != null)
                     {
                         propertyInfo.OwnedTypeInfo = GetCachedTypeInfo(prop.PropertyType);
                     }
