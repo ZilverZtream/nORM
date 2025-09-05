@@ -57,7 +57,11 @@ namespace nORM.Query
         {
             if (node.Expression is ParameterExpression p && p.Type.IsGenericType && p.Type.GetGenericTypeDefinition() == typeof(IGrouping<,>) && node.Member.Name == "Key")
             {
-                _sb.Append(string.Join(", ", _groupBy));
+                for (int i = 0; i < _groupBy.Count; i++)
+                {
+                    if (i > 0) _sb.Append(", ");
+                    _sb.Append(_groupBy[i]);
+                }
             }
             else
             {

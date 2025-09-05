@@ -9,6 +9,7 @@ using System.Reflection.Emit;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.ObjectPool;
+using System.Text;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
@@ -274,7 +275,7 @@ namespace nORM.Query
                     var timeParamName = _provider.ParamPrefix + "p" + _paramIndex++;
                     _params[timeParamName] = _asOfTimestamp.Value;
                     var historyTable = _provider.Escape(_mapping.TableName + "_History");
-                    var cols = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
+                    var cols = PooledStringBuilder.Join(_mapping.Columns.Select(c => c.EscCol));
                     var temporalQuery = $@"
 (
     SELECT {cols} FROM {_mapping.EscTable} T1
@@ -301,7 +302,7 @@ namespace nORM.Query
                     if (windowFuncs.Count > 0 && _projection != null)
                     {
                         var orderByForOverClause = _orderBy.Any()
-                            ? $"ORDER BY {string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}"))}"
+                            ? $"ORDER BY {PooledStringBuilder.JoinOrderBy(_orderBy)}"
                             : "ORDER BY (SELECT NULL)";
                         select = BuildSelectWithWindowFunctions(_projection, windowFuncs, orderByForOverClause);
                     }
@@ -312,7 +313,7 @@ namespace nORM.Query
                     }
                     else
                     {
-                        select = string.Join(", ", _mapping.Columns.Select(c => c.EscCol));
+                        select = PooledStringBuilder.Join(_mapping.Columns.Select(c => c.EscCol));
                     }
 
                     var distinct = _isDistinct ? "DISTINCT " : string.Empty;
@@ -329,11 +330,11 @@ namespace nORM.Query
             }
 
             if (_groupBy.Count > 0)
-                _sql.AppendFragment(" GROUP BY ").Append(string.Join(", ", _groupBy));
+                _sql.AppendFragment(" GROUP BY ").Append(PooledStringBuilder.Join(_groupBy));
             if (_having.Length > 0)
                 _sql.AppendFragment(" HAVING ").Append(_having.ToSqlString());
             if (_orderBy.Count > 0)
-                _sql.AppendFragment(" ORDER BY ").Append(string.Join(", ", _orderBy.Select(o => $"{o.col} {(o.asc ? "ASC" : "DESC")}")));
+                _sql.AppendFragment(" ORDER BY ").Append(PooledStringBuilder.JoinOrderBy(_orderBy));
             _ctx.Provider.ApplyPaging(_sql.InnerBuilder, _take, _skip, _takeParam, _skipParam);
 
             var singleResult = _singleResult || _methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
@@ -360,39 +361,47 @@ namespace nORM.Query
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Window function projection must be an anonymous object initializer."));
 
             var paramMap = windowFuncs.ToDictionary(w => w.ResultParameter, w => w);
-            var items = new List<string>();
-            for (int i = 0; i < ne.Arguments.Count; i++)
+            var sb = PooledStringBuilder.Rent();
+            try
             {
-                var arg = ne.Arguments[i];
-                var alias = ne.Members![i].Name;
-                if (arg is MemberExpression me)
+                for (int i = 0; i < ne.Arguments.Count; i++)
                 {
-                    var col = _mapping.Columns.First(c => c.Prop.Name == me.Member.Name);
-                    items.Add($"{col.EscCol} AS {_provider.Escape(alias)}");
-                }
-                else if (arg is ParameterExpression p && paramMap.TryGetValue(p, out var wf))
-                {
-                    var wfSql = BuildWindowFunctionSql(wf, overClause);
-                    items.Add($"{wfSql} AS {_provider.Escape(alias)}");
-                }
-                else
-                {
-                    var param = projection.Parameters[0];
-                    if (!_correlatedParams.TryGetValue(param, out var info))
+                    if (i > 0) sb.Append(", ");
+                    var arg = ne.Arguments[i];
+                    var alias = ne.Members![i].Name;
+                    if (arg is MemberExpression me)
                     {
-                        info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? "T" + _joinCounter);
-                        _correlatedParams[param] = info;
+                        var col = _mapping.Columns.First(c => c.Prop.Name == me.Member.Name);
+                        sb.Append(col.EscCol).Append(" AS ").Append(_provider.Escape(alias));
                     }
-                    var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap);
-                    var visitor = ExpressionVisitorPool.Get(in vctx);
-                    var sql = visitor.Translate(arg);
-                    foreach (var kvp in visitor.GetParameters())
-                        _params[kvp.Key] = kvp.Value;
-                    ExpressionVisitorPool.Return(visitor);
-                    items.Add($"{sql} AS {_provider.Escape(alias)}");
+                    else if (arg is ParameterExpression p && paramMap.TryGetValue(p, out var wf))
+                    {
+                        var wfSql = BuildWindowFunctionSql(wf, overClause);
+                        sb.Append(wfSql).Append(" AS ").Append(_provider.Escape(alias));
+                    }
+                    else
+                    {
+                        var param = projection.Parameters[0];
+                        if (!_correlatedParams.TryGetValue(param, out var info))
+                        {
+                            info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? "T" + _joinCounter);
+                            _correlatedParams[param] = info;
+                        }
+                        var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap);
+                        var visitor = ExpressionVisitorPool.Get(in vctx);
+                        var sql = visitor.Translate(arg);
+                        foreach (var kvp in visitor.GetParameters())
+                            _params[kvp.Key] = kvp.Value;
+                        ExpressionVisitorPool.Return(visitor);
+                        sb.Append(sql).Append(" AS ").Append(_provider.Escape(alias));
+                    }
                 }
+                return sb.ToString();
             }
-            return string.Join(", ", items);
+            finally
+            {
+                PooledStringBuilder.Return(sb);
+            }
         }
 
         private string BuildWindowFunctionSql(WindowFunctionInfo wf, string overClause)
