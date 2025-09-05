@@ -453,15 +453,8 @@ namespace nORM.Query
             return base.VisitMethodCall(node);
         }
 
-        private Expression HandleJoin(MethodCallExpression node, bool isGroupJoin = false)
+        private Expression HandleInnerJoin(MethodCallExpression node)
         {
-            // Join signature: Join<TOuter, TInner, TKey, TResult>(outer, inner, outerKeySelector, innerKeySelector, resultSelector)
-            // node.Arguments[0] = outer query
-            // node.Arguments[1] = inner query  
-            // node.Arguments[2] = outer key selector
-            // node.Arguments[3] = inner key selector
-            // node.Arguments[4] = result selector
-
             if (node.Arguments.Count < 5)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join operation requires 5 arguments"));
 
@@ -474,81 +467,13 @@ namespace nORM.Query
             if (outerKeySelector == null || innerKeySelector == null || resultSelector == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join selectors must be lambda expressions"));
 
-            // Visit the outer query first to establish the base table
             Visit(outerQuery);
 
-            // Get the inner table mapping
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
 
-            // Generate table aliases
             var outerAlias = "T0";
-
-            if (isGroupJoin)
-            {
-                var outerType = outerKeySelector.Parameters[0].Type;
-                var innerType = innerKeySelector.Parameters[0].Type;
-                var resultType = resultSelector.Body.Type;
-
-                var innerAliasG = "T" + (++_joinCounter);
-
-                if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
-                    _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
-                var vctxOuterG = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
-                var outerKeyVisitorG = ExpressionVisitorPool.Get(in vctxOuterG);
-                var outerKeySqlG = outerKeyVisitorG.Translate(outerKeySelector.Body);
-
-                if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
-                    _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAliasG);
-                var vctxInnerG = new VisitorContext(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAliasG, _correlatedParams, _compiledParams, _paramMap);
-                var innerKeyVisitorG = ExpressionVisitorPool.Get(in vctxInnerG);
-                var innerKeySqlG = innerKeyVisitorG.Translate(innerKeySelector.Body);
-
-                foreach (var kvp in outerKeyVisitorG.GetParameters())
-                    _params[kvp.Key] = kvp.Value;
-                ExpressionVisitorPool.Return(outerKeyVisitorG);
-                foreach (var kvp in innerKeyVisitorG.GetParameters())
-                    _params[kvp.Key] = kvp.Value;
-                ExpressionVisitorPool.Return(innerKeyVisitorG);
-
-                using var joinSqlG = new OptimizedSqlBuilder(256);
-                var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                var innerColumns = innerMapping.Columns.Select(c => $"{innerAliasG}.{c.EscCol}");
-                joinSqlG.AppendSelect(ReadOnlySpan<char>.Empty);
-                joinSqlG.InnerBuilder.AppendJoin(", ", outerColumns.Concat(innerColumns));
-                joinSqlG.Append(' ');
-                joinSqlG.Append($"FROM {_mapping.EscTable} {outerAlias} ");
-                joinSqlG.Append($"LEFT JOIN {innerMapping.EscTable} {innerAliasG} ON {outerKeySqlG} = {innerKeySqlG}");
-                joinSqlG.Append($" ORDER BY {outerKeySqlG}");
-
-                _sql.Clear();
-                _sql.Append(joinSqlG.ToSqlString());
-
-                // Reset projection so outer entities are materialized directly
-                _projection = null;
-
-                var innerKeyColumn = innerMapping.Columns.FirstOrDefault(c =>
-                    ExtractPropertyName(innerKeySelector.Body) == c.PropName);
-                if (innerKeyColumn != null)
-                {
-                    var outerKeyFunc = CreateObjectKeySelector(outerKeySelector);
-                    var resultSelectorFunc = CompileGroupJoinResultSelector(resultSelector);
-                    _groupJoinInfo = new GroupJoinInfo(
-                        outerType,
-                        innerType,
-                        resultType,
-                        outerKeyFunc,
-                        innerKeyColumn,
-                        resultSelectorFunc
-                    );
-                }
-
-                return node;
-            }
-
             var innerAlias = "T" + (++_joinCounter);
-
-            var joinType = "INNER JOIN";
 
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
@@ -569,57 +494,135 @@ namespace nORM.Query
                 _params[kvp.Key] = kvp.Value;
             ExpressionVisitorPool.Return(innerKeyVisitor);
 
-              if (resultSelector != null)
-              {
-                  _projection = resultSelector;
-                  if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
-                      _correlatedParams[resultSelector.Parameters[0]] = (_mapping, outerAlias);
-                  if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
-                      _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
-              }
+            SetupJoinProjection(resultSelector, innerMapping, outerAlias, innerAlias);
 
-              using var joinSql = new OptimizedSqlBuilder(256);
+            var sql = BuildJoinClause(_mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
+            _sql.Clear();
+            _sql.Append(sql);
 
-              if (_projection?.Body is NewExpression newExpr)
-              {
-                  var neededColumns = ExtractNeededColumns(newExpr, _mapping, innerMapping);
-                  if (neededColumns.Count == 0)
-                  {
-                      var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                      var innerColumns = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                      joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                      joinSql.InnerBuilder.AppendJoin(", ", outerColumns.Concat(innerColumns));
-                      joinSql.Append(' ');
-                  }
-                  else
-                  {
-                      joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                      joinSql.InnerBuilder.AppendJoin(", ", neededColumns);
-                      joinSql.Append(' ');
-                  }
-              }
-              else
-              {
-                  var outerColumns = _mapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                  var innerColumns = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                  joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                  joinSql.InnerBuilder.AppendJoin(", ", outerColumns.Concat(innerColumns));
-                  joinSql.Append(' ');
-              }
-
-              joinSql.Append($"FROM {_mapping.EscTable} {outerAlias} ");
-              joinSql.Append($"{joinType} {innerMapping.EscTable} {innerAlias} ");
-              joinSql.Append($"ON {outerKeySql} = {innerKeySql}");
-
-              _sql.Clear();
-              _sql.Append(joinSql.ToSqlString());
-
-              return node;
-          }
+            return node;
+        }
 
         private Expression HandleGroupJoin(MethodCallExpression node)
         {
-            return HandleJoin(node, isGroupJoin: true);
+            if (node.Arguments.Count < 5)
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join operation requires 5 arguments"));
+
+            var outerQuery = node.Arguments[0];
+            var innerQuery = node.Arguments[1];
+            var outerKeySelector = StripQuotes(node.Arguments[2]) as LambdaExpression;
+            var innerKeySelector = StripQuotes(node.Arguments[3]) as LambdaExpression;
+            var resultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
+
+            if (outerKeySelector == null || innerKeySelector == null || resultSelector == null)
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join selectors must be lambda expressions"));
+
+            Visit(outerQuery);
+
+            var innerElementType = GetElementType(innerQuery);
+            var innerMapping = TrackMapping(innerElementType);
+
+            var outerAlias = "T0";
+            var innerAlias = "T" + (++_joinCounter);
+
+            if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
+                _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
+            var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
+            var outerKeyVisitor = ExpressionVisitorPool.Get(in vctxOuter);
+            var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
+
+            if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
+                _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
+            var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap);
+            var innerKeyVisitor = ExpressionVisitorPool.Get(in vctxInner);
+            var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
+
+            foreach (var kvp in outerKeyVisitor.GetParameters())
+                _params[kvp.Key] = kvp.Value;
+            ExpressionVisitorPool.Return(outerKeyVisitor);
+            foreach (var kvp in innerKeyVisitor.GetParameters())
+                _params[kvp.Key] = kvp.Value;
+            ExpressionVisitorPool.Return(innerKeyVisitor);
+
+            SetupJoinProjection(null, innerMapping, outerAlias, innerAlias);
+
+            var sql = BuildJoinClause(_mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
+            _sql.Clear();
+            _sql.Append(sql);
+
+            var outerType = outerKeySelector.Parameters[0].Type;
+            var innerType = innerKeySelector.Parameters[0].Type;
+            var resultType = resultSelector.Body.Type;
+
+            var innerKeyColumn = innerMapping.Columns.FirstOrDefault(c =>
+                ExtractPropertyName(innerKeySelector.Body) == c.PropName);
+            if (innerKeyColumn != null)
+            {
+                var outerKeyFunc = CreateObjectKeySelector(outerKeySelector);
+                var resultSelectorFunc = CompileGroupJoinResultSelector(resultSelector);
+                _groupJoinInfo = new GroupJoinInfo(
+                    outerType,
+                    innerType,
+                    resultType,
+                    outerKeyFunc,
+                    innerKeyColumn,
+                    resultSelectorFunc
+                );
+            }
+
+            return node;
+        }
+
+        private string BuildJoinClause(TableMapping outerMapping, string outerAlias, TableMapping innerMapping, string innerAlias, string joinType, string outerKeySql, string innerKeySql, string? orderBy = null)
+        {
+            using var joinSql = new OptimizedSqlBuilder(256);
+
+            if (_projection?.Body is NewExpression newExpr)
+            {
+                var neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping);
+                if (neededColumns.Count == 0)
+                {
+                    var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+                    var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
+                    joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                    joinSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                    joinSql.Append(' ');
+                }
+                else
+                {
+                    joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                    joinSql.InnerBuilder.AppendJoin(", ", neededColumns);
+                    joinSql.Append(' ');
+                }
+            }
+            else
+            {
+                var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+                var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
+                joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                joinSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                joinSql.Append(' ');
+            }
+
+            joinSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
+            joinSql.Append($"{joinType} {innerMapping.EscTable} {innerAlias} ");
+            joinSql.Append($"ON {outerKeySql} = {innerKeySql}");
+            if (orderBy != null)
+                joinSql.Append($" ORDER BY {orderBy}");
+
+            return joinSql.ToSqlString();
+        }
+
+        private void SetupJoinProjection(LambdaExpression? resultSelector, TableMapping innerMapping, string outerAlias, string innerAlias)
+        {
+            _projection = resultSelector;
+            if (resultSelector != null)
+            {
+                if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                    _correlatedParams[resultSelector.Parameters[0]] = (_mapping, outerAlias);
+                if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
+                    _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
+            }
         }
 
         private Expression HandleSelectMany(MethodCallExpression node)
