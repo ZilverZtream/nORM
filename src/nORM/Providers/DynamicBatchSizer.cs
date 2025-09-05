@@ -23,6 +23,7 @@ namespace nORM.Providers
         }
 
         private readonly ConcurrentDictionary<string, BatchPerformanceHistory> _performanceHistory = new();
+        private readonly ConcurrentDictionary<Type, (int RecordSize, int MemoryBasedBatchSize)> _entityBatchSizeCache = new();
 
         private class BatchPerformanceHistory
         {
@@ -41,8 +42,15 @@ namespace nORM.Providers
             if (!sampleList.Any())
                 return new BatchSizingResult { OptimalBatchSize = MinBatchSize };
 
-            var recordSize = EstimateRecordSize(sampleList.First(), mapping);
-            var memoryBasedBatchSize = Math.Max(MinBatchSize, MaxMemoryPerBatch / recordSize);
+            var cacheEntry = _entityBatchSizeCache.GetOrAdd(typeof(T), _ =>
+            {
+                var size = EstimateRecordSize(sampleList.First(), mapping);
+                var memorySize = Math.Max(MinBatchSize, MaxMemoryPerBatch / size);
+                return (size, memorySize);
+            });
+
+            var recordSize = cacheEntry.RecordSize;
+            var memoryBasedBatchSize = cacheEntry.MemoryBasedBatchSize;
 
             var historicalOptimal = GetHistoricalOptimalBatchSize(operationKey, recordSize);
 
