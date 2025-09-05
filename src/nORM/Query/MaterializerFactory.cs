@@ -56,7 +56,11 @@ namespace nORM.Query
             {
                 var sync = CreateMaterializerInternal(mapping, targetType, projection);
                 ValidateMaterializer(sync, mapping, targetType);
-                return (reader, ct) => Task.FromResult(sync(reader));
+                return (reader, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return Task.FromResult(sync(reader));
+                };
             });
         }
 
