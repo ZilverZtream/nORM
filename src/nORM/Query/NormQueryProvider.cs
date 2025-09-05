@@ -27,7 +27,8 @@ namespace nORM.Query
     {
         internal readonly DbContext _ctx;
         private static readonly ConcurrentLruCache<string, QueryPlan> _planCache =
-            new(maxSize: 10000, timeToLive: TimeSpan.FromHours(1));
+            new(maxSize: CalculateInitialPlanCacheSize(), timeToLive: TimeSpan.FromHours(1));
+        private static readonly Timer _planCacheMonitor = new(AdjustPlanCacheSize, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
         private static readonly ConcurrentDictionary<Type, int> _typeHashCodes = new();
@@ -101,6 +102,27 @@ namespace nORM.Query
                     _cacheLocks.TryRemove(kvp.Key, out _);
                 }
             }
+        }
+
+        private static int CalculateInitialPlanCacheSize()
+            => CalculatePlanCacheSize(GC.GetGCMemoryInfo());
+
+        private static void AdjustPlanCacheSize(object? state)
+        {
+            var info = GC.GetGCMemoryInfo();
+            if (info.MemoryLoadBytes >= info.HighMemoryLoadThresholdBytes)
+            {
+                _planCache.Clear();
+            }
+            _planCache.SetMaxSize(CalculatePlanCacheSize(info));
+        }
+
+        private static int CalculatePlanCacheSize(GCMemoryInfo info)
+        {
+            const int approxPlanSize = 4 * 1024; // 4KB
+            var cacheBytes = info.TotalAvailableMemoryBytes / 100; // 1% of available memory
+            var size = (int)(cacheBytes / approxPlanSize);
+            return Math.Clamp(size, 100, 10000);
         }
 
         public TResult Execute<TResult>(Expression expression) 

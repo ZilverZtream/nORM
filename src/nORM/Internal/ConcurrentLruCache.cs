@@ -13,7 +13,7 @@ namespace nORM.Internal
         private readonly LinkedList<CacheItem> _lruList = new();
         // Protects access to _lruList, which is not thread-safe.
         private readonly object _lock = new();
-        private readonly int _maxSize;
+        private int _maxSize;
         private readonly TimeSpan? _timeToLive;
         private long _hits;
         private long _misses;
@@ -120,6 +120,20 @@ namespace nORM.Internal
             {
                 _cache.Clear();
                 _lruList.Clear();
+            }
+        }
+
+        public void SetMaxSize(int maxSize)
+        {
+            lock (_lock)
+            {
+                _maxSize = maxSize;
+                while (_lruList.Count > _maxSize)
+                {
+                    var lastNode = _lruList.Last!;
+                    _lruList.RemoveLast();
+                    _cache.TryRemove(lastNode.Value.Key, out _);
+                }
             }
         }
 
