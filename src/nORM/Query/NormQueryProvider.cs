@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using System.Text;
 using System.IO.Hashing;
 using System.Runtime.CompilerServices;
+using System.Globalization;
 using nORM.Core;
 using nORM.Execution;
 using nORM.Internal;
@@ -32,9 +33,6 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
         private static readonly ConcurrentDictionary<Type, int> _typeHashCodes = new();
-        private const ulong FnvOffset = 14695981039346656037UL;
-        private const ulong FnvPrime = 1099511628211UL;
-        private static readonly ConcurrentDictionary<(int Fingerprint, Type ResultType), ulong> _cacheKeyBaseHashes = new();
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
@@ -330,7 +328,26 @@ namespace nORM.Query
 
             foreach (var kvp in parameters.OrderBy(k => k.Key))
             {
-                sb.Append('|').Append(kvp.Key).Append('=').Append(kvp.Value?.GetHashCode() ?? 0);
+                sb.Append('|').Append(kvp.Key).Append('=');
+                if (kvp.Value is null)
+                {
+                    sb.Append("null");
+                    continue;
+                }
+
+                sb.Append(kvp.Value.GetType().FullName).Append(':');
+                if (kvp.Value is byte[] bytesValue)
+                {
+                    sb.Append(Convert.ToHexString(bytesValue));
+                }
+                else if (kvp.Value is IFormattable formattable)
+                {
+                    sb.Append(formattable.ToString(null, CultureInfo.InvariantCulture));
+                }
+                else
+                {
+                    sb.Append(kvp.Value.ToString());
+                }
             }
 
             var bytes = Encoding.UTF8.GetBytes(sb.ToString());
@@ -472,31 +489,7 @@ namespace nORM.Query
 
         private string BuildCacheKeyWithValues<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
         {
-            static ulong ComputeBaseHash((int Fingerprint, Type ResultType) key)
-            {
-                ulong h = FnvOffset;
-                h = (h ^ (uint)key.Fingerprint) * FnvPrime;
-                h = (h ^ (uint)StringComparer.Ordinal.GetHashCode(key.ResultType.FullName!)) * FnvPrime;
-                return h;
-            }
-
-            ulong hash = _cacheKeyBaseHashes.GetOrAdd((plan.Fingerprint, typeof(TResult)), ComputeBaseHash);
-
-            var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
-            if (_ctx.Options.TenantProvider != null)
-            {
-                if (tenant == null)
-                    throw new InvalidOperationException("Tenant context required but not available");
-                hash = (hash ^ (uint)StringComparer.Ordinal.GetHashCode(tenant)) * FnvPrime;
-            }
-
-            foreach (var kvp in parameters.OrderBy(k => k.Key))
-            {
-                hash = (hash ^ (uint)StringComparer.Ordinal.GetHashCode(kvp.Key)) * FnvPrime;
-                hash = (hash ^ (uint)(kvp.Value?.GetHashCode() ?? 0)) * FnvPrime;
-            }
-
-            return hash.ToString("X16");
+            return BuildCacheKeyFromPlan<TResult>(plan, parameters);
         }
 
         private static Expression UnwrapQueryExpression(Expression expression)
