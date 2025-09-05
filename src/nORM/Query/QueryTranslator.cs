@@ -52,6 +52,9 @@ namespace nORM.Query
         private TimeSpan? _cacheExpiration;
         private DateTime? _asOfTimestamp;
 
+        private const int MaxRecursionDepth = 100;
+        private int _recursionDepth;
+
         private OptimizedSqlBuilder _sql => _clauses.Sql;
         private OptimizedSqlBuilder _where => _clauses.Where;
         private OptimizedSqlBuilder _having => _clauses.Having;
@@ -93,7 +96,8 @@ namespace nORM.Query
             HashSet<string> tables,
             List<string> compiledParams,
             Dictionary<ParameterExpression, string> paramMap,
-            int joinStart = 0)
+            int joinStart = 0,
+            int recursionDepth = 0)
         {
             _ctx = ctx;
             _provider = ctx.Provider;
@@ -107,6 +111,7 @@ namespace nORM.Query
             _paramMap = paramMap;
             _tables.Add(mapping.TableName);
             _joinCounter = joinStart;
+            _recursionDepth = recursionDepth;
         }
 
         internal static QueryTranslator Create(
@@ -118,8 +123,9 @@ namespace nORM.Query
             HashSet<string> tables,
             List<string> compiledParams,
             Dictionary<ParameterExpression, string> paramMap,
-            int joinStart = 0)
-            => new QueryTranslator(ctx, mapping, parameters, ref pIndex, correlated, tables, compiledParams, paramMap, joinStart);
+            int joinStart = 0,
+            int recursionDepth = 0)
+            => new QueryTranslator(ctx, mapping, parameters, ref pIndex, correlated, tables, compiledParams, paramMap, joinStart, recursionDepth);
 
         internal static QueryTranslator Rent(DbContext ctx)
         {
@@ -144,6 +150,7 @@ namespace nORM.Query
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
                 _groupJoinInfo = null;
                 _joinCounter = 0;
+                _recursionDepth = 0;
                 _singleResult = false;
                 _noTracking = false;
                 _splitQuery = false;
@@ -176,6 +183,7 @@ namespace nORM.Query
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
                 _groupJoinInfo = null;
                 _joinCounter = 0;
+                _recursionDepth = 0;
                 _singleResult = false;
                 _noTracking = false;
                 _splitQuery = false;
@@ -473,7 +481,10 @@ namespace nORM.Query
 
         private string TranslateSubExpression(Expression e)
         {
-            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
+            if (_recursionDepth >= MaxRecursionDepth)
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum translation depth of {MaxRecursionDepth}"));
+
+            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
             var subPlan = subTranslator.Translate(e);
             _parameterManager.Index = subTranslator._parameterManager.Index;
             return subPlan.Sql;
@@ -844,7 +855,7 @@ namespace nORM.Query
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
             }
 
-            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter);
+            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, ref _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _parameterManager.Index = subTranslator._parameterManager.Index;
             _mapping = subTranslator._mapping;
