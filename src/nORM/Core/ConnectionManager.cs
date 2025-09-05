@@ -30,6 +30,12 @@ namespace nORM.Core
         private volatile List<DatabaseTopology.DatabaseNode> _availableReadReplicas = new();
         private int _readReplicaIndex;
 
+        private readonly object _circuitBreakerLock = new();
+        private int _consecutiveFailures;
+        private DateTime _nextRetry = DateTime.MinValue;
+        private readonly TimeSpan _baseDelay = TimeSpan.FromSeconds(1);
+        private readonly TimeSpan _maxDelay = TimeSpan.FromSeconds(30);
+
         public ConnectionManager(DatabaseTopology topology, DatabaseProvider provider, ILogger logger)
         {
             _topology = topology ?? throw new ArgumentNullException(nameof(topology));
@@ -82,17 +88,41 @@ namespace nORM.Core
 
         public async Task<DbConnection> GetWriteConnectionAsync(CancellationToken ct = default)
         {
+            lock (_circuitBreakerLock)
+            {
+                if (DateTime.UtcNow < _nextRetry)
+                    throw new NormConnectionException("Circuit breaker is open; skipping connection attempt");
+            }
+
             var primary = _currentPrimary;
             if (primary == null || !primary.IsHealthy)
             {
                 await FailoverToPrimaryAsync(ct).ConfigureAwait(false);
                 primary = _currentPrimary;
                 if (primary == null)
+                {
+                    RegisterFailure();
                     throw new NormConnectionException("No healthy primary database available");
+                }
             }
 
             var pool = _connectionPools[primary.ConnectionString];
-            return await pool.RentAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var cn = await pool.RentAsync(ct).ConfigureAwait(false);
+                ResetCircuitBreaker();
+                return cn;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                RegisterFailure();
+                _logger.LogError(ex, "Failed to acquire write connection");
+                throw;
+            }
         }
 
         public async Task<DbConnection> GetReadConnectionAsync(CancellationToken ct = default)
@@ -123,6 +153,29 @@ namespace nORM.Core
         {
             var index = Interlocked.Increment(ref _readReplicaIndex);
             return replicas[index % replicas.Count];
+        }
+
+        private void RegisterFailure()
+        {
+            lock (_circuitBreakerLock)
+            {
+                _consecutiveFailures++;
+                var delayTicks = (long)(_baseDelay.Ticks * Math.Pow(2, _consecutiveFailures - 1));
+                if (delayTicks > _maxDelay.Ticks)
+                    delayTicks = _maxDelay.Ticks;
+                var delay = TimeSpan.FromTicks(delayTicks);
+                _nextRetry = DateTime.UtcNow + delay;
+                _logger.LogWarning("Write connection failure. Circuit breaker open for {Delay}", delay);
+            }
+        }
+
+        private void ResetCircuitBreaker()
+        {
+            lock (_circuitBreakerLock)
+            {
+                _consecutiveFailures = 0;
+                _nextRetry = DateTime.MinValue;
+            }
         }
 
         private async void PerformHealthChecks(object? state)
