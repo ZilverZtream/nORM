@@ -29,6 +29,7 @@ namespace nORM.Query
         private static readonly ConcurrentLruCache<string, QueryPlan> _planCache =
             new(maxSize: 10000, timeToLive: TimeSpan.FromHours(1));
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
+        private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
@@ -88,6 +89,17 @@ namespace nORM.Query
             // Check for public parameterless constructor
             var defaultConstructor = elementType.GetConstructor(Type.EmptyTypes);
             return defaultConstructor != null && defaultConstructor.IsPublic;
+        }
+
+        private static void CleanupCacheLocks(object? state)
+        {
+            foreach (var kvp in _cacheLocks)
+            {
+                if (kvp.Value.CurrentCount == 1)
+                {
+                    _cacheLocks.TryRemove(kvp.Key, out _);
+                }
+            }
         }
 
         public TResult Execute<TResult>(Expression expression) 
