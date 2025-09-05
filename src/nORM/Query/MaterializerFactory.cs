@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
@@ -20,6 +21,10 @@ namespace nORM.Query
     {
         private static readonly ConcurrentLruCache<(int MappingTypeHash, int TargetTypeHash, int ProjectionHash, string TableName), Func<DbDataReader, CancellationToken, Task<object>>> _cache
             = new(maxSize: 1000, timeToLive: TimeSpan.FromMinutes(10));
+
+        // Cache constructor info and delegates to avoid repeated reflection in hot paths
+        private static readonly ConcurrentDictionary<Type, ConstructorInfo> _constructorCache = new();
+        private static readonly ConcurrentDictionary<Type, Func<object?[], object>> _constructorDelegates = new();
 
         internal static (long Hits, long Misses, double HitRate) CacheStats
             => (_cache.Hits, _cache.Misses, _cache.HitRate);
@@ -126,40 +131,67 @@ namespace nORM.Query
             }
 
             // Constructor with parameters (record types, anonymous types, etc.)
-            var ctor = targetType.GetConstructors()
-                .OrderByDescending(c => c.GetParameters().Length)
-                .FirstOrDefault(c =>
-                {
-                    var ps = c.GetParameters();
-                    if (ps.Length != columns.Length) return false;
-                    for (int i = 0; i < ps.Length; i++)
-                    {
-                        if (!string.Equals(ps[i].Name, columns[i].Prop.Name, StringComparison.OrdinalIgnoreCase))
-                            return false;
-                    }
-                    return true;
-                }) ?? throw new InvalidOperationException($"Type {targetType} has no suitable constructor");
+            var ctor = GetCachedConstructor(targetType, columns);
+            var ctorParams = ctor.GetParameters();
+            var ctorDelegate = _constructorDelegates.GetOrAdd(targetType, _ => CreateConstructorDelegate(ctor));
 
             return reader =>
             {
                 var args = new object?[columns.Length];
-                var parameters = ctor.GetParameters();
                 for (int i = 0; i < columns.Length; i++)
                 {
                     if (reader.IsDBNull(i))
                     {
-                        args[i] = parameters[i].ParameterType.IsValueType ? Activator.CreateInstance(parameters[i].ParameterType) : null;
+                        args[i] = ctorParams[i].ParameterType.IsValueType ? Activator.CreateInstance(ctorParams[i].ParameterType) : null;
                         continue;
                     }
-                    var paramType = parameters[i].ParameterType;
+                    var paramType = ctorParams[i].ParameterType;
                     var readerMethod = Methods.GetReaderMethod(paramType);
                     var value = readerMethod.Invoke(reader, new object[] { i });
                     if (readerMethod == Methods.GetValue)
                         value = Convert.ChangeType(value!, paramType);
                     args[i] = value;
                 }
-                return ctor.Invoke(args)!;
+                return ctorDelegate(args)!;
             };
+        }
+
+        private static ConstructorInfo GetCachedConstructor(Type type, Column[] columns)
+        {
+            return _constructorCache.GetOrAdd(type, t =>
+            {
+                return t.GetConstructors()
+                    .FirstOrDefault(c =>
+                    {
+                        var parameters = c.GetParameters();
+                        if (parameters.Length != columns.Length) return false;
+
+                        for (int i = 0; i < parameters.Length; i++)
+                        {
+                            if (!string.Equals(parameters[i].Name, columns[i].Prop.Name, StringComparison.OrdinalIgnoreCase))
+                                return false;
+                        }
+                        return true;
+                    }) ?? throw new InvalidOperationException($"No suitable constructor for {type}");
+            });
+        }
+
+        private static Func<object?[], object> CreateConstructorDelegate(ConstructorInfo ctor)
+        {
+            var argsParam = Expression.Parameter(typeof(object[]), "args");
+            var ctorParams = ctor.GetParameters();
+            var argExprs = new Expression[ctorParams.Length];
+            for (int i = 0; i < ctorParams.Length; i++)
+            {
+                var index = Expression.Constant(i);
+                var access = Expression.ArrayIndex(argsParam, index);
+                var convert = Expression.Convert(access, ctorParams[i].ParameterType);
+                argExprs[i] = convert;
+            }
+            var newExpr = Expression.New(ctor, argExprs);
+            var body = Expression.Convert(newExpr, typeof(object));
+            var lambda = Expression.Lambda<Func<object?[], object>>(body, argsParam);
+            return lambda.Compile();
         }
 
         private static Column[] ExtractColumnsFromProjection(TableMapping mapping, LambdaExpression projection)
