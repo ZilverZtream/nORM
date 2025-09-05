@@ -304,18 +304,20 @@ namespace nORM.Query
                     var alias = _t._correlatedParams.Count > 0 ? _t._correlatedParams.Values.First().Alias : null;
                     if (_t._asOfTimestamp.HasValue)
                     {
-                        alias ??= "T0";
+                        alias ??= _t.EscapeAlias("T0");
                         var timeParamName = _t._provider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
                         _t._params[timeParamName] = _t._asOfTimestamp.Value;
                         var historyTable = _t._provider.Escape(_t._mapping.TableName + "_History");
                         var cols = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
+                        var t1 = _t.EscapeAlias("T1");
+                        var t2 = _t.EscapeAlias("T2");
                         var temporalQuery = $@"
 (
-    SELECT {cols} FROM {_t._mapping.EscTable} T1
-    WHERE {timeParamName} >= T1.{_t._provider.Escape("__ValidFrom")} AND {timeParamName} < T1.{_t._provider.Escape("__ValidTo")}
+    SELECT {cols} FROM {_t._mapping.EscTable} {t1}
+    WHERE {timeParamName} >= {t1}.{_t._provider.Escape("__ValidFrom")} AND {timeParamName} < {t1}.{_t._provider.Escape("__ValidTo")}
     UNION ALL
-    SELECT {cols} FROM {historyTable} T2
-    WHERE {timeParamName} >= T2.{_t._provider.Escape("__ValidFrom")} AND {timeParamName} < T2.{_t._provider.Escape("__ValidTo")}
+    SELECT {cols} FROM {historyTable} {t2}
+    WHERE {timeParamName} >= {t2}.{_t._provider.Escape("__ValidFrom")} AND {timeParamName} < {t2}.{_t._provider.Escape("__ValidTo")}
 )";
                         fromClause = temporalQuery;
                     }
@@ -418,7 +420,7 @@ namespace nORM.Query
                         var param = projection.Parameters[0];
                         if (!_correlatedParams.TryGetValue(param, out var info))
                         {
-                            info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? "T" + _joinCounter);
+                            info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                             _correlatedParams[param] = info;
                         }
                         var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap);
@@ -445,7 +447,7 @@ namespace nORM.Query
                 var param = wf.ValueSelector.Parameters[0];
                 if (!_correlatedParams.TryGetValue(param, out var info))
                 {
-                    info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? "T" + _joinCounter);
+                    info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                     _correlatedParams[param] = info;
                 }
                 var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap);
@@ -461,7 +463,7 @@ namespace nORM.Query
                     var dParam = wf.DefaultValueSelector.Parameters[0];
                     if (!_correlatedParams.TryGetValue(dParam, out info))
                     {
-                        info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? "T" + _joinCounter);
+                        info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                         _correlatedParams[dParam] = info;
                     }
                     var vctx2 = new VisitorContext(_ctx, _mapping, _provider, dParam, info.Alias, _correlatedParams, _compiledParams, _paramMap);
@@ -566,8 +568,8 @@ namespace nORM.Query
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
 
-            var outerAlias = "T0";
-            var innerAlias = "T" + (++_joinCounter);
+            var outerAlias = EscapeAlias("T0");
+            var innerAlias = EscapeAlias("T" + (++_joinCounter));
 
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
@@ -616,8 +618,8 @@ namespace nORM.Query
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
 
-            var outerAlias = "T0";
-            var innerAlias = "T" + (++_joinCounter);
+            var outerAlias = EscapeAlias("T0");
+            var innerAlias = EscapeAlias("T" + (++_joinCounter));
 
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
@@ -684,7 +686,7 @@ namespace nORM.Query
             Visit(sourceQuery);
 
             var outerMapping = _mapping;
-            var outerAlias = "T0";
+            var outerAlias = EscapeAlias("T0");
 
             // Track the outer parameter for correlated references
             if (!_correlatedParams.ContainsKey(collectionSelector.Parameters[0]))
@@ -700,7 +702,7 @@ namespace nORM.Query
                 outerMapping.Relations.TryGetValue(memberExpr.Member.Name, out var relation))
             {
                 var innerMapping = TrackMapping(relation.DependentType);
-                var innerAlias = "T" + (++_joinCounter);
+                var innerAlias = EscapeAlias("T" + (++_joinCounter));
 
                 if (resultSelector != null && resultSelector.Parameters.Count > 1 &&
                     !_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
@@ -712,7 +714,7 @@ namespace nORM.Query
 
                 if (_projection?.Body is NewExpression newExpr)
                 {
-                    var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping);
+                    var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
                     if (neededColumns.Count == 0)
                     {
                         var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
@@ -766,7 +768,7 @@ namespace nORM.Query
             // Otherwise treat as CROSS JOIN
             var innerType = GetElementType(collectionSelector.Body);
             var crossMapping = TrackMapping(innerType);
-            var crossAlias = "T" + (++_joinCounter);
+            var crossAlias = EscapeAlias("T" + (++_joinCounter));
 
             if (resultSelector != null && resultSelector.Parameters.Count > 1 &&
                 !_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
@@ -778,7 +780,7 @@ namespace nORM.Query
 
             if (_projection?.Body is NewExpression crossNew)
             {
-                var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, outerMapping, crossMapping);
+                var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, outerMapping, crossMapping, outerAlias, crossAlias);
                 if (neededColumns.Count == 0)
                 {
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
@@ -1019,7 +1021,7 @@ namespace nORM.Query
                 if (_correlatedParams.TryGetValue(pe, out var info))
                 {
                     var col = info.Mapping.ColumnsByName[node.Member.Name];
-                    _sql.Append($"{ValidateTableAlias(info.Alias)}.{col.EscCol}");
+                    _sql.Append($"{info.Alias}.{col.EscCol}");
                 }
                 else
                 {
@@ -1040,17 +1042,12 @@ namespace nORM.Query
             throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, $"Member '{node.Member.Name}'"));
         }
 
-        private string ValidateTableAlias(string alias)
+        private string EscapeAlias(string alias)
         {
-            if (!IsValidIdentifier(alias))
+            if (string.IsNullOrWhiteSpace(alias))
                 throw new NormQueryException($"Invalid table alias: {alias}");
-            return alias;
+            return _provider.Escape(alias);
         }
-
-        private static bool IsValidIdentifier(string identifier) =>
-            !string.IsNullOrEmpty(identifier) &&
-            identifier.All(c => char.IsLetterOrDigit(c) || c == '_') &&
-            char.IsLetter(identifier[0]);
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
 
@@ -1103,7 +1100,7 @@ namespace nORM.Query
             Visit(sourceQuery);
             
             var param = selectorLambda.Parameters[0];
-            var alias = "T" + _joinCounter;
+            var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
             var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
@@ -1138,7 +1135,7 @@ namespace nORM.Query
             Visit(sourceQuery);
             
             var param = keySelectorLambda.Parameters[0];
-            var alias = "T" + _joinCounter;
+            var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
             var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
@@ -1332,7 +1329,7 @@ namespace nORM.Query
             if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression selector)
             {
                 var param = selector.Parameters[0];
-                var alias = "T" + _joinCounter;
+                var alias = EscapeAlias("T" + _joinCounter);
                 if (!_correlatedParams.ContainsKey(param))
                     _correlatedParams[param] = (_mapping, alias);
                 var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
@@ -1369,7 +1366,7 @@ namespace nORM.Query
             
             // Create negated predicate: NOT (predicate)
             var param = predicate.Parameters[0];
-            var alias = "T" + _joinCounter;
+            var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
             var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
