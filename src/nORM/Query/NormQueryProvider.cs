@@ -30,6 +30,7 @@ namespace nORM.Query
             new(maxSize: 10000, timeToLive: TimeSpan.FromHours(1));
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
+        private static readonly ConcurrentDictionary<Type, int> _typeHashCodes = new();
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
@@ -431,8 +432,16 @@ namespace nORM.Query
         private string BuildPlanCacheKey(Expression expression, int tenantHash, Type elementType)
         {
             var fingerprint = ExpressionFingerprint.Compute(expression);
-            return $"{fingerprint}:{tenantHash}:{elementType.GetHashCode()}:{expression.Type.GetHashCode()}";
+            var sb = new StringBuilder();
+            sb.Append(fingerprint)
+              .Append(':').Append(tenantHash)
+              .Append(':').Append(GetTypeHash(elementType))
+              .Append(':').Append(GetTypeHash(expression.Type));
+            return sb.ToString();
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int GetTypeHash(Type type) => _typeHashCodes.GetOrAdd(type, static t => t.GetHashCode());
 
         private string BuildCacheKeyWithValues<TResult>(Expression expression, IReadOnlyDictionary<string, object> parameters)
         {
