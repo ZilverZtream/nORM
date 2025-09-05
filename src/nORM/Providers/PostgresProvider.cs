@@ -17,7 +17,7 @@ using Microsoft.Extensions.ObjectPool;
 
 namespace nORM.Providers
 {
-    public sealed class PostgresProvider : DatabaseProvider
+    public sealed class PostgresProvider : BulkOperationProvider
     {
         private readonly IDbParameterFactory _parameterFactory;
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
@@ -227,7 +227,6 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             if (!cols.Any()) return 0;
 
             var operationKey = $"Postgres_BulkInsert_{m.Type.Name}";
-            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
 
             var npgConnType = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
             if (npgConnType != null && npgConnType.IsInstanceOfType(ctx.Connection))
@@ -261,34 +260,8 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 return entityList.Count;
             }
 
-            var recordsAffected = 0;
-
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-            try
-            {
-                for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
-                {
-                    var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
-                    var batchSw = Stopwatch.StartNew();
-                    recordsAffected += await ExecutePostgresBatchInsert(ctx, transaction, m, cols, batch, ct).ConfigureAwait(false);
-                    batchSw.Stop();
-                    BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
-                }
-
-                await transaction.CommitAsync(ct).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                try
-                {
-                    await transaction.RollbackAsync(ct).ConfigureAwait(false);
-                }
-                catch (Exception rollbackEx)
-                {
-                    throw new AggregateException(ex, rollbackEx);
-                }
-                throw;
-            }
+            var recordsAffected = await ExecuteBulkOperationAsync(ctx, m, entityList, operationKey,
+                (batch, tx, token) => ExecutePostgresBatchInsert(ctx, tx, m, cols, batch, token), ct).ConfigureAwait(false);
 
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, recordsAffected, sw.Elapsed);
             return recordsAffected;
