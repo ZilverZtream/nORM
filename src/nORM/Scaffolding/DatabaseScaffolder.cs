@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using nORM.Core;
 using nORM.Configuration;
 using nORM.Providers;
+using Microsoft.Extensions.ObjectPool;
 
 namespace nORM.Scaffolding
 {
@@ -18,6 +19,8 @@ namespace nORM.Scaffolding
     /// </summary>
     public static class DatabaseScaffolder
     {
+        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
+            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
         /// <summary>
         /// Generates entity classes and a DbContext based on the current database schema.
         /// </summary>
@@ -55,63 +58,79 @@ namespace nORM.Scaffolding
 
         private static async Task<string> ScaffoldEntityAsync(DbConnection connection, DatabaseProvider provider, string tableName, string entityName, string namespaceName)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine("using System;");
-            sb.AppendLine("using System.ComponentModel.DataAnnotations;");
-            sb.AppendLine("using System.ComponentModel.DataAnnotations.Schema;");
-            sb.AppendLine();
-            sb.AppendLine($"namespace {namespaceName};");
-            sb.AppendLine();
-            sb.AppendLine($"[Table(\"{tableName}\")]" );
-            sb.AppendLine($"public class {entityName}");
-            sb.AppendLine("{");
-
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = $"SELECT * FROM {provider.Escape(tableName)} WHERE 1=0";
-            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
-            var schema = reader.GetSchemaTable()!;
-            foreach (DataRow row in schema.Rows)
+            var sb = _stringBuilderPool.Get();
+            try
             {
-                var colName = row["ColumnName"]!.ToString()!;
-                var propName = ToPascalCase(colName);
-                var clrType = (Type)row["DataType"]!;
-                var allowNull = row["AllowDBNull"] is bool b && b;
-                var isNullable = allowNull && clrType.IsValueType;
-                var typeName = GetTypeName(clrType, isNullable);
-                var isKey = row.Table.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
-                var isAuto = row.Table.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai;
+                sb.AppendLine("using System;");
+                sb.AppendLine("using System.ComponentModel.DataAnnotations;");
+                sb.AppendLine("using System.ComponentModel.DataAnnotations.Schema;");
+                sb.AppendLine();
+                sb.AppendLine($"namespace {namespaceName};");
+                sb.AppendLine();
+                sb.AppendLine($"[Table(\"{tableName}\")]" );
+                sb.AppendLine($"public class {entityName}");
+                sb.AppendLine("{");
 
-                sb.AppendLine("    /// <summary>");
-                sb.AppendLine($"    /// Maps to column {colName}");
-                sb.AppendLine("    /// </summary>");
-                if (isKey)
-                    sb.AppendLine("    [Key]");
-                if (isAuto)
-                    sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
-                sb.AppendLine($"    [Column(\"{colName}\")]\n    public {typeName} {propName} {{ get; set; }}\n");
+                await using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"SELECT * FROM {provider.Escape(tableName)} WHERE 1=0";
+                await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
+                var schema = reader.GetSchemaTable()!;
+                foreach (DataRow row in schema.Rows)
+                {
+                    var colName = row["ColumnName"]!.ToString()!;
+                    var propName = ToPascalCase(colName);
+                    var clrType = (Type)row["DataType"]!;
+                    var allowNull = row["AllowDBNull"] is bool b && b;
+                    var isNullable = allowNull && clrType.IsValueType;
+                    var typeName = GetTypeName(clrType, isNullable);
+                    var isKey = row.Table.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
+                    var isAuto = row.Table.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai;
+
+                    sb.AppendLine("    /// <summary>");
+                    sb.AppendLine($"    /// Maps to column {colName}");
+                    sb.AppendLine("    /// </summary>");
+                    if (isKey)
+                        sb.AppendLine("    [Key]");
+                    if (isAuto)
+                        sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
+                    sb.AppendLine($"    [Column(\"{colName}\")]\n    public {typeName} {propName} {{ get; set; }}\n");
+                }
+
+                sb.AppendLine("}");
+                return sb.ToString();
             }
-
-            sb.AppendLine("}");
-            return sb.ToString();
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
         }
 
         private static string ScaffoldContext(string namespaceName, string contextName, IEnumerable<string> entities)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine("using System.Data.Common;");
-            sb.AppendLine("using nORM.Core;");
-            sb.AppendLine("using nORM.Configuration;");
-            sb.AppendLine("using nORM.Providers;");
-            sb.AppendLine();
-            sb.AppendLine($"namespace {namespaceName};");
-            sb.AppendLine();
-            sb.AppendLine($"public class {contextName} : DbContext");
-            sb.AppendLine("{");
-            sb.AppendLine($"    public {contextName}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, options) {{ }}\n");
-            foreach (var entity in entities.OrderBy(e => e))
-                sb.AppendLine($"    public INormQueryable<{entity}> {entity}s => this.Query<{entity}>();");
-            sb.AppendLine("}");
-            return sb.ToString();
+            var sb = _stringBuilderPool.Get();
+            try
+            {
+                sb.AppendLine("using System.Data.Common;");
+                sb.AppendLine("using nORM.Core;");
+                sb.AppendLine("using nORM.Configuration;");
+                sb.AppendLine("using nORM.Providers;");
+                sb.AppendLine();
+                sb.AppendLine($"namespace {namespaceName};");
+                sb.AppendLine();
+                sb.AppendLine($"public class {contextName} : DbContext");
+                sb.AppendLine("{");
+                sb.AppendLine($"    public {contextName}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, options) {{ }}\n");
+                foreach (var entity in entities.OrderBy(e => e))
+                    sb.AppendLine($"    public INormQueryable<{entity}> {entity}s => this.Query<{entity}>();");
+                sb.AppendLine("}");
+                return sb.ToString();
+            }
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
         }
 
         private static string GetTypeName(Type type, bool nullable)
@@ -139,15 +158,23 @@ namespace nORM.Scaffolding
         private static string ToPascalCase(string name)
         {
             var parts = name.Split(new[] { '_', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            var sb = new StringBuilder();
-            foreach (var part in parts)
+            var sb = _stringBuilderPool.Get();
+            try
             {
-                if (part.Length == 0) continue;
-                sb.Append(char.ToUpperInvariant(part[0]));
-                if (part.Length > 1)
-                    sb.Append(part[1..].ToLowerInvariant());
+                foreach (var part in parts)
+                {
+                    if (part.Length == 0) continue;
+                    sb.Append(char.ToUpperInvariant(part[0]));
+                    if (part.Length > 1)
+                        sb.Append(part[1..].ToLowerInvariant());
+                }
+                return sb.ToString();
             }
-            return sb.ToString();
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
         }
     }
 }

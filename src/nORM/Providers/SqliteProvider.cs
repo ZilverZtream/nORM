@@ -12,6 +12,7 @@ using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 
 #nullable enable
 
@@ -19,6 +20,9 @@ namespace nORM.Providers
 {
     public sealed class SqliteProvider : DatabaseProvider
     {
+        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
+            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
+
         public override int MaxSqlLength => 1_000_000;
         public override int MaxParameters => 999;
         public override string Escape(string id) => $"\"{id}\"";
@@ -226,25 +230,33 @@ END;";
         private string BuildBatchInsertSql(TableMapping m, Column[] cols, int batchSize)
         {
             var colNames = string.Join(", ", cols.Select(c => c.EscCol));
-            var sb = new StringBuilder();
-            sb.Append($"INSERT INTO {m.EscTable} ({colNames}) VALUES ");
-
-            var paramIndex = 0;
-            for (int i = 0; i < batchSize; i++)
+            var sb = _stringBuilderPool.Get();
+            try
             {
-                if (i > 0) sb.Append(", ");
-                sb.Append("(");
+                sb.Append($"INSERT INTO {m.EscTable} ({colNames}) VALUES ");
 
-                for (int j = 0; j < cols.Length; j++)
+                var paramIndex = 0;
+                for (int i = 0; i < batchSize; i++)
                 {
-                    if (j > 0) sb.Append(", ");
-                    sb.Append($"{ParamPrefix}p{paramIndex++}");
+                    if (i > 0) sb.Append(", ");
+                    sb.Append("(");
+
+                    for (int j = 0; j < cols.Length; j++)
+                    {
+                        if (j > 0) sb.Append(", ");
+                        sb.Append($"{ParamPrefix}p{paramIndex++}");
+                    }
+
+                    sb.Append(")");
                 }
 
-                sb.Append(")");
+                return sb.ToString();
             }
-
-            return sb.ToString();
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
         }
         
         // Optimized bulk update for SQLite

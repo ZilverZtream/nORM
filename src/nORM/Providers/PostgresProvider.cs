@@ -11,6 +11,7 @@ using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 
 #nullable enable
 
@@ -19,6 +20,8 @@ namespace nORM.Providers
     public sealed class PostgresProvider : DatabaseProvider
     {
         private readonly IDbParameterFactory _parameterFactory;
+        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
+            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
         public PostgresProvider(IDbParameterFactory parameterFactory)
         {
@@ -292,28 +295,36 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         private string BuildPostgresBatchInsertSql(TableMapping mapping, Column[] cols, int batchSize)
         {
             var colNames = string.Join(", ", cols.Select(c => c.EscCol));
-            var sb = new StringBuilder();
-            sb.Append($"INSERT INTO {mapping.EscTable} ({colNames}) VALUES ");
-            
-            var paramIndex = 0;
-            for (int i = 0; i < batchSize; i++)
+            var sb = _stringBuilderPool.Get();
+            try
             {
-                if (i > 0) sb.Append(", ");
-                sb.Append("(");
-                
-                for (int j = 0; j < cols.Length; j++)
+                sb.Append($"INSERT INTO {mapping.EscTable} ({colNames}) VALUES ");
+
+                var paramIndex = 0;
+                for (int i = 0; i < batchSize; i++)
                 {
-                    if (j > 0) sb.Append(", ");
-                    sb.Append($"{ParamPrefix}p{paramIndex++}");
+                    if (i > 0) sb.Append(", ");
+                    sb.Append("(");
+
+                    for (int j = 0; j < cols.Length; j++)
+                    {
+                        if (j > 0) sb.Append(", ");
+                        sb.Append($"{ParamPrefix}p{paramIndex++}");
+                    }
+
+                    sb.Append(")");
                 }
-                
-                sb.Append(")");
+
+                // Add ON CONFLICT clause for upsert scenarios if needed
+                sb.Append(" ON CONFLICT DO NOTHING");
+
+                return sb.ToString();
             }
-            
-            // Add ON CONFLICT clause for upsert scenarios if needed
-            sb.Append(" ON CONFLICT DO NOTHING");
-            
-            return sb.ToString();
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
         }
 
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
@@ -343,41 +354,49 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 await using var cmd = ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
-                var sb = new StringBuilder();
-                sb.Append($"UPDATE {m.EscTable} AS t SET ");
-                sb.Append(string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = v.{c.EscCol}")));
-                sb.Append(" FROM (VALUES ");
-
-                var valueRows = new List<string>();
-                var paramIndex = 0;
-                foreach (var entity in batch)
+                var sb = _stringBuilderPool.Get();
+                try
                 {
-                    var paramNames = new List<string>();
-                    foreach (var col in valueCols)
+                    sb.Append($"UPDATE {m.EscTable} AS t SET ");
+                    sb.Append(string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = v.{c.EscCol}")));
+                    sb.Append(" FROM (VALUES ");
+
+                    var valueRows = new List<string>();
+                    var paramIndex = 0;
+                    foreach (var entity in batch)
                     {
-                        var pName = $"{ParamPrefix}p{paramIndex++}";
-                        cmd.AddParam(pName, col.Getter(entity));
-                        paramNames.Add(pName);
+                        var paramNames = new List<string>();
+                        foreach (var col in valueCols)
+                        {
+                            var pName = $"{ParamPrefix}p{paramIndex++}";
+                            cmd.AddParam(pName, col.Getter(entity));
+                            paramNames.Add(pName);
+                        }
+                        valueRows.Add($"({string.Join(", ", paramNames)})");
                     }
-                    valueRows.Add($"({string.Join(", ", paramNames)})");
+
+                    sb.Append(string.Join(", ", valueRows));
+                    sb.Append(") AS v (");
+                    sb.Append(string.Join(", ", valueCols.Select(c => c.EscCol)));
+                    sb.Append(") WHERE ");
+
+                    var joinConditions = keyCols.Select(c => $"t.{c.EscCol} = v.{c.EscCol}").ToList();
+                    if (m.TimestampColumn != null)
+                        joinConditions.Add($"t.{m.TimestampColumn.EscCol} = v.{m.TimestampColumn.EscCol}");
+                    sb.Append(string.Join(" AND ", joinConditions));
+
+                    cmd.CommandText = sb.ToString();
+
+                    var batchSw = Stopwatch.StartNew();
+                    totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                    batchSw.Stop();
+                    BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                 }
-
-                sb.Append(string.Join(", ", valueRows));
-                sb.Append(") AS v (");
-                sb.Append(string.Join(", ", valueCols.Select(c => c.EscCol)));
-                sb.Append(") WHERE ");
-
-                var joinConditions = keyCols.Select(c => $"t.{c.EscCol} = v.{c.EscCol}").ToList();
-                if (m.TimestampColumn != null)
-                    joinConditions.Add($"t.{m.TimestampColumn.EscCol} = v.{m.TimestampColumn.EscCol}");
-                sb.Append(string.Join(" AND ", joinConditions));
-
-                cmd.CommandText = sb.ToString();
-
-                var batchSw = Stopwatch.StartNew();
-                totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
-                batchSw.Stop();
-                BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
+                finally
+                {
+                    sb.Clear();
+                    _stringBuilderPool.Return(sb);
+                }
             }
 
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, totalUpdated, sw.Elapsed);
