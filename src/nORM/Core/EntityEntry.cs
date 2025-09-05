@@ -100,7 +100,16 @@ namespace nORM.Core
                 else
                 {
                     var currentHash = _getHashCodes[i](entity);
-                    changed = currentHash != _originalHashes[i];
+                    if (currentHash != _originalHashes[i])
+                    {
+                        changed = true;
+                    }
+                    else
+                    {
+                        // Hash collision - verify using precise comparison
+                        var currentValue = _getValues[i](entity);
+                        changed = !Equals(currentValue, _originalValues[i]);
+                    }
                 }
                 _changedProperties[i] = changed;
                 hasChanges |= changed;
