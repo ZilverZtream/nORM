@@ -632,13 +632,7 @@ namespace nORM.Core
                 await using var cmd = ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = sql;
-                var paramDict = new Dictionary<string, object>();
-                for (int i = 0; i < parameters.Length; i++)
-                {
-                    var pName = $"{_p.ParamPrefix}p{i}";
-                    cmd.AddParam(pName, parameters[i]);
-                    paramDict[pName] = parameters[i];
-                }
+                var paramDict = ParameterHelper.AddParameters(_p, cmd, parameters);
 
                 if (!NormValidator.IsSafeRawSql(sql))
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
@@ -689,13 +683,7 @@ namespace nORM.Core
                 await using var cmd = ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = sql;
-                var paramDict = new Dictionary<string, object>();
-                for (int i = 0; i < parameters.Length; i++)
-                {
-                    var pName = $"{_p.ParamPrefix}p{i}";
-                    cmd.AddParam(pName, parameters[i]);
-                    paramDict[pName] = parameters[i];
-                }
+                var paramDict = ParameterHelper.AddParameters(_p, cmd, parameters);
 
                 if (!NormValidator.IsSafeRawSql(sql))
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
