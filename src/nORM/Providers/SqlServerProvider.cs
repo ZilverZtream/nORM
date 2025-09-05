@@ -17,7 +17,7 @@ using Microsoft.Extensions.Logging;
 
 namespace nORM.Providers
 {
-    public sealed class SqlServerProvider : DatabaseProvider
+    public sealed class SqlServerProvider : BulkOperationProvider
     {
         private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: 100);
         public override int MaxSqlLength => 8_000;
@@ -237,18 +237,12 @@ END;";
 
             var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
             var operationKey = $"SqlServer_BulkInsert_{m.Type.Name}";
-            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
             // Logger does not expose informational log, so we skip logging batch strategy here.
 
-            var totalInserted = 0;
-
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-            try
-            {
-                for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
+            var totalInserted = await ExecuteBulkOperationAsync(ctx, m, entityList, operationKey,
+                async (batch, tx, token) =>
                 {
-                    var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
-                    using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection, SqlBulkCopyOptions.Default, (SqlTransaction)transaction)
+                    using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection, SqlBulkCopyOptions.Default, (SqlTransaction)tx)
                     {
                         DestinationTableName = m.EscTable,
                         BatchSize = batch.Count,
@@ -260,27 +254,9 @@ END;";
                         bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
 
                     using var reader = new EntityDataReader<T>(batch, insertableCols);
-                    var batchSw = Stopwatch.StartNew();
-                    await bulkCopy.WriteToServerAsync(reader, ct).ConfigureAwait(false);
-                    batchSw.Stop();
-                    totalInserted += reader.RecordsProcessed;
-                    BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
-                }
-
-                await transaction.CommitAsync(ct).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                try
-                {
-                    await transaction.RollbackAsync(ct).ConfigureAwait(false);
-                }
-                catch (Exception rollbackEx)
-                {
-                    throw new AggregateException(ex, rollbackEx);
-                }
-                throw;
-            }
+                    await bulkCopy.WriteToServerAsync(reader, token).ConfigureAwait(false);
+                    return reader.RecordsProcessed;
+                }, ct).ConfigureAwait(false);
 
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
             return totalInserted;
