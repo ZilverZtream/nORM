@@ -34,8 +34,10 @@ namespace nORM.Core
         private readonly ModelBuilder _modelBuilder;
         private readonly DynamicEntityTypeGenerator _typeGenerator = new();
         private readonly ConcurrentDictionary<string, Type> _dynamicTypeCache = new();
+        private readonly List<IDisposable> _disposables = new();
         private bool _sqliteInitialized;
         private DbTransaction? _currentTransaction;
+        private bool _disposed;
 
         public DbContextOptions Options { get; }
         public ChangeTracker ChangeTracker { get; }
@@ -864,18 +866,66 @@ namespace nORM.Core
             }, default).ConfigureAwait(false);
         }
 
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed && disposing)
+            {
+                for (int i = _disposables.Count - 1; i >= 0; i--)
+                {
+                    try
+                    {
+                        _disposables[i]?.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Options.Logger?.LogError(ex, "Error disposing resource");
+                    }
+                }
+
+                _disposables.Clear();
+                _cn?.Dispose();
+                _disposed = true;
+            }
+        }
+
+        public void RegisterForDisposal(IDisposable disposable)
+        {
+            if (disposable != null)
+                _disposables.Add(disposable);
+        }
+
         public void Dispose()
         {
-            _cn?.Dispose();
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
 
         public async ValueTask DisposeAsync()
         {
-            if (_cn != null)
+            if (!_disposed)
             {
-                await _cn.DisposeAsync().ConfigureAwait(false);
+                for (int i = _disposables.Count - 1; i >= 0; i--)
+                {
+                    try
+                    {
+                        _disposables[i]?.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Options.Logger?.LogError(ex, "Error disposing resource");
+                    }
+                }
+
+                _disposables.Clear();
+
+                if (_cn != null)
+                {
+                    await _cn.DisposeAsync().ConfigureAwait(false);
+                }
+
+                _disposed = true;
             }
+
             GC.SuppressFinalize(this);
         }
     }

@@ -21,6 +21,7 @@ namespace nORM.Navigation
         {
             _context = context;
             _batchTimer = new Timer(ProcessBatch, null, TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(10));
+            _context.RegisterForDisposal(this);
         }
 
         public async Task<List<object>> LoadNavigationAsync(object entity, string propertyName, CancellationToken ct = default)
