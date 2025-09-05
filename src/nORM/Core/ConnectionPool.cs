@@ -16,7 +16,6 @@ namespace nORM.Core
         private readonly Func<DbConnection> _connectionFactory;
         private readonly ConcurrentQueue<PooledItem> _pool = new();
         private readonly object _poolLock = new();
-        private readonly object _returnLock = new();
         private readonly SemaphoreSlim _semaphore;
         private readonly Timer _cleanupTimer;
         private readonly int _minSize;
@@ -103,7 +102,7 @@ namespace nORM.Core
 
         private void Return(DbConnection connection)
         {
-            lock (_returnLock)
+            lock (_poolLock)
             {
                 if (_disposed)
                 {
