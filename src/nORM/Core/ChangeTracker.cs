@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using nORM.Configuration;
 using nORM.Mapping;
 using RefComparer = System.Collections.Generic.ReferenceEqualityComparer;
@@ -64,9 +65,13 @@ namespace nORM.Core
 
         internal void DetectChanges()
         {
-            foreach (var entry in _entriesByReference.Values)
+            var entriesSnapshot = _entriesByReference.Values.ToList();
+            foreach (var entry in entriesSnapshot)
             {
-                entry.DetectChanges();
+                if (_entriesByReference.ContainsKey(entry.Entity))
+                {
+                    entry.DetectChanges();
+                }
             }
         }
 
