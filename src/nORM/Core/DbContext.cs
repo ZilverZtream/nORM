@@ -37,7 +37,7 @@ namespace nORM.Core
         private readonly ModelBuilder _modelBuilder;
         private readonly DynamicEntityTypeGenerator _typeGenerator = new();
         private readonly ConcurrentDictionary<string, Type> _dynamicTypeCache = new();
-        private readonly List<WeakReference<IDisposable>> _disposables = new();
+        private readonly LinkedList<WeakReference<IDisposable>> _disposables = new();
         private bool _sqliteInitialized;
         private readonly SemaphoreSlim _sqliteInitLock = new(1, 1);
         private DbTransaction? _currentTransaction;
@@ -881,15 +881,18 @@ namespace nORM.Core
         {
             if (!_disposed && disposing)
             {
-                for (int i = _disposables.Count - 1; i >= 0; i--)
+                for (var node = _disposables.First; node != null;)
                 {
-                    if (_disposables[i].TryGetTarget(out var d))
+                    var next = node.Next;
+                    if (node.Value.TryGetTarget(out var d))
                     {
                         d.Dispose();
                     }
+
+                    _disposables.Remove(node);
+                    node = next;
                 }
 
-                _disposables.Clear();
                 _cn?.Dispose();
                 _disposed = true;
             }
@@ -897,12 +900,15 @@ namespace nORM.Core
 
         private void CleanupDisposables()
         {
-            for (int i = _disposables.Count - 1; i >= 0; i--)
+            for (var node = _disposables.First; node != null;)
             {
-                if (!_disposables[i].TryGetTarget(out _))
+                var next = node.Next;
+                if (!node.Value.TryGetTarget(out _))
                 {
-                    _disposables.RemoveAt(i);
+                    _disposables.Remove(node);
                 }
+
+                node = next;
             }
         }
 
@@ -911,7 +917,7 @@ namespace nORM.Core
             if (disposable != null)
             {
                 CleanupDisposables();
-                _disposables.Add(new WeakReference<IDisposable>(disposable));
+                _disposables.AddLast(new WeakReference<IDisposable>(disposable));
             }
         }
 
@@ -925,15 +931,17 @@ namespace nORM.Core
         {
             if (!_disposed)
             {
-                for (int i = _disposables.Count - 1; i >= 0; i--)
+                for (var node = _disposables.First; node != null;)
                 {
-                    if (_disposables[i].TryGetTarget(out var d))
+                    var next = node.Next;
+                    if (node.Value.TryGetTarget(out var d))
                     {
                         d.Dispose();
                     }
-                }
 
-                _disposables.Clear();
+                    _disposables.Remove(node);
+                    node = next;
+                }
 
                 if (_cn != null)
                 {
