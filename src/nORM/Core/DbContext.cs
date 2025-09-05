@@ -39,6 +39,7 @@ namespace nORM.Core
         private readonly ConcurrentDictionary<string, Type> _dynamicTypeCache = new();
         private readonly List<WeakReference<IDisposable>> _disposables = new();
         private bool _sqliteInitialized;
+        private readonly SemaphoreSlim _sqliteInitLock = new(1, 1);
         private DbTransaction? _currentTransaction;
         private bool _disposed;
 
@@ -110,10 +111,21 @@ namespace nORM.Core
 
             if (!_sqliteInitialized && _p is SqliteProvider)
             {
-                await using var pragmaCmd = _cn.CreateCommand();
-                pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
-                await pragmaCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                _sqliteInitialized = true;
+                await _sqliteInitLock.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    if (!_sqliteInitialized)
+                    {
+                        await using var pragmaCmd = _cn.CreateCommand();
+                        pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
+                        await pragmaCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                        _sqliteInitialized = true;
+                    }
+                }
+                finally
+                {
+                    _sqliteInitLock.Release();
+                }
             }
 
             return _cn;
@@ -126,10 +138,21 @@ namespace nORM.Core
 
             if (!_sqliteInitialized && _p is SqliteProvider)
             {
-                using var pragmaCmd = _cn.CreateCommand();
-                pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
-                pragmaCmd.ExecuteNonQuery();
-                _sqliteInitialized = true;
+                _sqliteInitLock.Wait();
+                try
+                {
+                    if (!_sqliteInitialized)
+                    {
+                        using var pragmaCmd = _cn.CreateCommand();
+                        pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
+                        pragmaCmd.ExecuteNonQuery();
+                        _sqliteInitialized = true;
+                    }
+                }
+                finally
+                {
+                    _sqliteInitLock.Release();
+                }
             }
 
             return _cn;
