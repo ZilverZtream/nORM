@@ -88,6 +88,22 @@ namespace nORM.Tests
 
         [Theory]
         [MemberData(nameof(SimpleEqualityProviders))]
+        public void Where_with_duplicate_constants_uses_single_parameter(ProviderKind providerKind)
+        {
+            var setup = CreateProvider(providerKind);
+            using var connection = setup.Connection;
+            var provider = setup.Provider;
+
+            Expression<Func<Product, bool>> expr = p => p.Id == 5 && p.Id > 5;
+            var (sql, parameters) = Translate(expr, connection, provider);
+            var expected = $"((T0.{provider.Escape("Id")} = @p0) AND (T0.{provider.Escape("Id")} > @p0))";
+            Assert.Equal(expected, sql);
+            Assert.Single(parameters);
+            Assert.Equal(5, parameters["@p0"]);
+        }
+
+        [Theory]
+        [MemberData(nameof(SimpleEqualityProviders))]
         public void Where_with_string_method_translation(ProviderKind providerKind)
         {
             var setup = CreateProvider(providerKind);
