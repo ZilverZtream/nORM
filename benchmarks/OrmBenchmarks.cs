@@ -160,93 +160,69 @@ namespace nORM.Benchmarks
             await _dapperConnection.OpenAsync();
         }
 
+        private static BenchmarkUser NewUser(string source)
+        {
+            return new BenchmarkUser
+            {
+                Name = $"Test User {source}",
+                Email = $"test@{source.ToLower()}.com",
+                CreatedAt = DateTime.Now,
+                IsActive = true,
+                Age = 25,
+                City = "TestCity",
+                Department = "TestDept",
+                Salary = 50_000
+            };
+        }
+
+        private static void AddUserParams(SqliteCommand cmd, BenchmarkUser user)
+        {
+            cmd.Parameters.Add(new SqliteParameter("@Name", DbType.String) { Value = user.Name });
+            cmd.Parameters.Add(new SqliteParameter("@Email", DbType.String) { Value = user.Email });
+            cmd.Parameters.Add(new SqliteParameter("@CreatedAt", DbType.DateTime) { Value = user.CreatedAt });
+            cmd.Parameters.Add(new SqliteParameter("@IsActive", DbType.Int32) { Value = user.IsActive ? 1 : 0 });
+            cmd.Parameters.Add(new SqliteParameter("@Age", DbType.Int32) { Value = user.Age });
+            cmd.Parameters.Add(new SqliteParameter("@City", DbType.String) { Value = user.City });
+            cmd.Parameters.Add(new SqliteParameter("@Department", DbType.String) { Value = user.Department });
+            cmd.Parameters.Add(new SqliteParameter("@Salary", DbType.Decimal) { Value = user.Salary });
+        }
+
         // ========== SINGLE INSERT BENCHMARKS ==========
 
         [Benchmark]
         public async Task Insert_Single_EfCore()
         {
-            await using var context = new EfCoreContext(_efConnectionString);
-
-            var user = new BenchmarkUser
-            {
-                Name = "Test User EF",
-                Email = "test@ef.com",
-                CreatedAt = DateTime.Now,
-                IsActive = true,
-                Age = 25,
-                City = "TestCity",
-                Department = "TestDept",
-                Salary = 50_000
-            };
-
-            context.Users.Add(user);
-            await context.SaveChangesAsync();
+            var userEf = NewUser("EF");
+            _efContext!.Users.Add(userEf);
+            await _efContext.SaveChangesAsync();
+            _efContext.ChangeTracker.Clear();
         }
 
         [Benchmark]
         public async Task Insert_Single_nORM()
         {
-            var options = new nORM.Configuration.DbContextOptions();
-            await using var context = new nORM.Core.DbContext(_nOrmConnectionString, new SqliteProvider(), options);
-
-            var user = new BenchmarkUser
-            {
-                Name = "Test User nORM",
-                Email = "test@norm.com",
-                CreatedAt = DateTime.Now,
-                IsActive = true,
-                Age = 25,
-                City = "TestCity",
-                Department = "TestDept",
-                Salary = 50_000
-            };
-
-            await context.InsertAsync(user);
+            var userNorm = NewUser("nORM");
+            await _nOrmContext!.InsertAsync(userNorm);
         }
 
         [Benchmark]
         public async Task Insert_Single_Dapper()
         {
-            await using var connection = new SqliteConnection(_dapperConnectionString);
-            await connection.OpenAsync();
-
-            var user = new BenchmarkUser
-            {
-                Name = "Test User Dapper",
-                Email = "test@dapper.com",
-                CreatedAt = DateTime.Now,
-                IsActive = true,
-                Age = 25,
-                City = "TestCity",
-                Department = "TestDept",
-                Salary = 50_000
-            };
-
-            var sql = @"
-                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
-                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
-
-            await connection.ExecuteAsync(sql, user);
+            var userDap = NewUser("Dapper");
+            const string sql = @"INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
+                     VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
+            await _dapperConnection!.ExecuteAsync(sql, userDap);
         }
 
         [Benchmark]
         public async Task Insert_Single_RawAdo()
         {
-            var sql = @"
-                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
-                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
-            using var command = _dapperConnection!.CreateCommand();
-            command.CommandText = sql;
-            command.Parameters.AddWithValue("@Name", "Test User ADO");
-            command.Parameters.AddWithValue("@Email", "test@ado.com");
-            command.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("O"));
-            command.Parameters.AddWithValue("@IsActive", 1);
-            command.Parameters.AddWithValue("@Age", 25);
-            command.Parameters.AddWithValue("@City", "TestCity");
-            command.Parameters.AddWithValue("@Department", "TestDept");
-            command.Parameters.AddWithValue("@Salary", 50_000);
-
-            await command.ExecuteNonQueryAsync();
+            const string sql = @"INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
+                     VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
+            await using var cmd = _dapperConnection!.CreateCommand();
+            cmd.CommandText = sql;
+            AddUserParams(cmd, NewUser("ADO"));
+            await cmd.ExecuteNonQueryAsync();
         }
 
         // ========== QUERY BENCHMARKS ==========
@@ -254,9 +230,10 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Simple_EfCore()
         {
-            return await EfQueryableExtensions.ToListAsync(_efContext!.Users
-                .Where(u => u.IsActive)
-                .Take(10));
+            return await EfQueryableExtensions.ToListAsync(
+                EfQueryableExtensions.AsNoTracking(_efContext!.Users)
+                    .Where(u => u.IsActive)
+                    .Take(10));
         }
 
         [Benchmark]
@@ -271,7 +248,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Simple_Dapper()
         {
-            var sql = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
+            var sql = "SELECT Id, Name, Email, CreatedAt, IsActive, Age, City, Department, Salary FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
             var result = await _dapperConnection!.QueryAsync<BenchmarkUser>(sql);
             return result.ToList();
         }
@@ -279,7 +256,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Simple_RawAdo()
         {
-            var sql = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
+            var sql = "SELECT Id, Name, Email, CreatedAt, IsActive, Age, City, Department, Salary FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
             using var command = _dapperConnection!.CreateCommand();
             command.CommandText = sql;
 
@@ -290,15 +267,15 @@ namespace nORM.Benchmarks
             {
                 users.Add(new BenchmarkUser
                 {
-                    Id = reader.GetInt32("Id"),
-                    Name = reader.GetString("Name"),
-                    Email = reader.GetString("Email"),
-                    CreatedAt = DateTime.Parse(reader.GetString("CreatedAt")),
-                    IsActive = reader.GetInt32("IsActive") == 1,
-                    Age = reader.GetInt32("Age"),
-                    City = reader.GetString("City"),
-                    Department = reader.GetString("Department"),
-                    Salary = reader.GetDouble("Salary")
+                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                    Email = reader.GetString(reader.GetOrdinal("Email")),
+                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                    IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
+                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
+                    City = reader.GetString(reader.GetOrdinal("City")),
+                    Department = reader.GetString(reader.GetOrdinal("Department")),
+                    Salary = reader.GetDecimal(reader.GetOrdinal("Salary"))
                 });
             }
 
@@ -310,11 +287,12 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Complex_EfCore()
         {
-            return await EfQueryableExtensions.ToListAsync(_efContext!.Users
-                .Where(u => u.IsActive && u.Age > 25 && u.City == "New York")
-                .OrderBy(u => u.Name)
-                .Skip(5)
-                .Take(20));
+            return await EfQueryableExtensions.ToListAsync(
+                EfQueryableExtensions.AsNoTracking(_efContext!.Users)
+                    .Where(u => u.IsActive && u.Age > 25 && u.City == "New York")
+                    .OrderBy(u => u.Name)
+                    .Skip(5)
+                    .Take(20));
         }
 
         [Benchmark]
@@ -332,7 +310,8 @@ namespace nORM.Benchmarks
         public async Task<List<BenchmarkUser>> Query_Complex_Dapper()
         {
             var sql = @"
-                SELECT * FROM BenchmarkUser
+                SELECT Id, Name, Email, CreatedAt, IsActive, Age, City, Department, Salary
+                FROM BenchmarkUser
                 WHERE IsActive = 1 AND Age > @Age AND City = @City
                 ORDER BY Name
                 LIMIT 20 OFFSET 5";
@@ -344,33 +323,38 @@ namespace nORM.Benchmarks
         // ========== JOIN BENCHMARKS ==========
 
         [Benchmark]
-        public async Task<List<object>> Query_Join_EfCore()
+        public async Task<List<JoinDto>> Query_Join_EfCore()
         {
-            var result = await EfQueryableExtensions.ToListAsync(_efContext!.Users
-                .Join(_efContext.Orders, u => u.Id, o => o.UserId, (u, o) => new { u.Name, o.Amount, o.ProductName })
-                .Where(x => x.Amount > 100)
-                .Take(50));
-            return result.Cast<object>().ToList();
+            var result = await EfQueryableExtensions.ToListAsync(
+                EfQueryableExtensions.AsNoTracking(_efContext!.Users)
+                    .Join(
+                        EfQueryableExtensions.AsNoTracking(_efContext.Orders),
+                        u => u.Id,
+                        o => o.UserId,
+                        (u, o) => new JoinDto { Name = u.Name, Amount = o.Amount, ProductName = o.ProductName })
+                    .Where(x => x.Amount > 100)
+                    .Take(50));
+            return result;
         }
 
         [Benchmark]
-        public async Task<List<object>> Query_Join_nORM()
+        public async Task<List<JoinDto>> Query_Join_nORM()
         {
             var result = await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Join(
-                    _nOrmContext!.Query<BenchmarkOrder>(),
+                    _nOrmContext.Query<BenchmarkOrder>(),
                     u => u.Id,
                     o => o.UserId,
-                    (u, o) => new { u.Name, o.Amount, o.ProductName }
+                    (u, o) => new JoinDto { Name = u.Name, Amount = o.Amount, ProductName = o.ProductName }
                 )
                 .AsNoTracking()
                 .Where(x => x.Amount > 100)
                 .Take(50));
-            return result.Cast<object>().ToList();
+            return result;
         }
 
         [Benchmark]
-        public async Task<List<object>> Query_Join_Dapper()
+        public async Task<List<JoinDto>> Query_Join_Dapper()
         {
             var sql = @"
                 SELECT u.Name, o.Amount, o.ProductName
@@ -379,8 +363,8 @@ namespace nORM.Benchmarks
                 WHERE o.Amount > @Amount
                 LIMIT 50";
 
-            var result = await _dapperConnection!.QueryAsync(sql, new { Amount = 100 });
-            return result.Cast<object>().ToList();
+            var result = await _dapperConnection!.QueryAsync<JoinDto>(sql, new { Amount = 100 });
+            return result.ToList();
         }
 
         // ========== COUNT BENCHMARKS ==========
@@ -485,6 +469,13 @@ namespace nORM.Benchmarks
             }
             catch { /* Ignore cleanup errors */ }
         }
+    }
+
+    public class JoinDto
+    {
+        public string Name { get; set; } = "";
+        public decimal Amount { get; set; }
+        public string ProductName { get; set; } = "";
     }
 }
 
