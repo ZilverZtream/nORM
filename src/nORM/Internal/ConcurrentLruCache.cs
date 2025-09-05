@@ -114,6 +114,15 @@ namespace nORM.Internal
             return false;
         }
 
+        public void Clear()
+        {
+            lock (_lock)
+            {
+                _cache.Clear();
+                _lruList.Clear();
+            }
+        }
+
         public long Hits => Interlocked.Read(ref _hits);
         public long Misses => Interlocked.Read(ref _misses);
         public double HitRate => Hits + Misses == 0 ? 0 : (double)Hits / (Hits + Misses);
