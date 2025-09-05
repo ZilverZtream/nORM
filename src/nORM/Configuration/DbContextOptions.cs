@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using nORM.Core;
 using nORM.Enterprise;
@@ -93,6 +94,18 @@ namespace nORM.Configuration
 
             if (TimeoutConfiguration.BaseTimeout <= TimeSpan.Zero || TimeoutConfiguration.BaseTimeout > TimeSpan.FromHours(1))
                 throw new InvalidOperationException("BaseTimeout must be between 1 second and 1 hour");
+
+            if (string.IsNullOrWhiteSpace(TenantColumnName))
+                throw new InvalidOperationException("TenantColumnName cannot be null or empty");
+
+            if (CacheExpiration <= TimeSpan.Zero)
+                throw new InvalidOperationException("CacheExpiration must be positive");
+
+            if (CommandInterceptors.Any(i => i == null))
+                throw new InvalidOperationException("CommandInterceptors cannot contain null entries");
+
+            if (SaveChangesInterceptors.Any(i => i == null))
+                throw new InvalidOperationException("SaveChangesInterceptors cannot contain null entries");
         }
     }
 }
