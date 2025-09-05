@@ -329,23 +329,13 @@ namespace nORM.Core
                     totalAffected += await ProcessEntityChangeAsync(entry, transaction, ct).ConfigureAwait(false);
                 }
 
-                await transactionManager.CommitAsync().ConfigureAwait(false);
-
-                var cache = Options.CacheProvider;
-                if (cache != null)
+                if (saveInterceptors.Count > 0)
                 {
-                    var tags = new HashSet<string>();
-                    foreach (var entry in changedEntries)
-                    {
-                        if (entry.Entity is { } entity)
-                        {
-                            var map = GetMapping(entity.GetType());
-                            tags.Add(map.TableName);
-                        }
-                    }
-                    foreach (var tag in tags)
-                        cache.InvalidateTag(tag);
+                    foreach (var interceptor in saveInterceptors)
+                        await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, ct).ConfigureAwait(false);
                 }
+
+                await transactionManager.CommitAsync().ConfigureAwait(false);
             }
             catch
             {
@@ -353,10 +343,20 @@ namespace nORM.Core
                 throw;
             }
 
-            if (saveInterceptors.Count > 0)
+            var cache = Options.CacheProvider;
+            if (cache != null)
             {
-                foreach (var interceptor in saveInterceptors)
-                    await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, ct).ConfigureAwait(false);
+                var tags = new HashSet<string>();
+                foreach (var entry in changedEntries)
+                {
+                    if (entry.Entity is { } entity)
+                    {
+                        var map = GetMapping(entity.GetType());
+                        tags.Add(map.TableName);
+                    }
+                }
+                foreach (var tag in tags)
+                    cache.InvalidateTag(tag);
             }
 
             return totalAffected;
