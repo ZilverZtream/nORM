@@ -112,18 +112,16 @@ namespace nORM.Core
 
         private void Return(DbConnection connection)
         {
-            Interlocked.Increment(ref _returning);
-            try
+            lock (_poolLock)
             {
-                lock (_poolLock)
+                _returning++;
+                try
                 {
                     if (_disposed)
                     {
                         connection.Dispose();
-                        return;
                     }
-
-                    if (connection.State == ConnectionState.Open)
+                    else if (connection.State == ConnectionState.Open)
                     {
                         _pool.Enqueue(new PooledItem(connection));
                     }
@@ -133,12 +131,12 @@ namespace nORM.Core
                         Interlocked.Decrement(ref _created);
                     }
                 }
+                finally
+                {
+                    _returning--;
+                }
             }
-            finally
-            {
-                Interlocked.Decrement(ref _returning);
-                _semaphore.Release();
-            }
+            _semaphore.Release();
         }
 
         private void CleanupCallback(object? state)
@@ -149,7 +147,7 @@ namespace nORM.Core
             var itemsToRequeue = new List<PooledItem>();
             lock (_poolLock)
             {
-                while (_created - Volatile.Read(ref _returning) > _minSize && _pool.TryDequeue(out var item))
+                while (_created - _returning > _minSize && _pool.TryDequeue(out var item))
                 {
                     if (item.LastUsed < threshold)
                     {
