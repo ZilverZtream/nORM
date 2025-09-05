@@ -402,7 +402,7 @@ namespace nORM.Core
                     return updated;
                 case EntityState.Deleted:
                     var deleted = await InvokeWriteAsync(nameof(DeleteAsync), entry, transaction, ct).ConfigureAwait(false);
-                    ChangeTracker.Remove(entry.Entity);
+                    ChangeTracker.Remove(entry.Entity, true);
                     return deleted;
                 default:
                     return 0;
