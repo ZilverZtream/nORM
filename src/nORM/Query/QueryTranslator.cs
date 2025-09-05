@@ -133,18 +133,8 @@ namespace nORM.Query
             _splitQuery = false;
             _tables = new HashSet<string>();
             _params = new Dictionary<string, object>();
-            try
-            {
-                _clauses?.Dispose();
-            }
-            catch (Exception ex)
-            {
-                _ctx.Options.Logger?.LogError(ex, "Failed to dispose SqlClauseBuilder");
-            }
-            finally
-            {
-                _clauses = new SqlClauseBuilder();
-            }
+            _clauses?.Dispose();
+            _clauses = new SqlClauseBuilder();
             _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
             _isCacheable = false;
             _cacheExpiration = null;
@@ -153,18 +143,8 @@ namespace nORM.Query
 
         private void Clear()
         {
-            try
-            {
-                _clauses?.Dispose();
-            }
-            catch
-            {
-                // Swallow any exceptions to avoid masking disposal failures
-            }
-            finally
-            {
-                _clauses = new SqlClauseBuilder();
-            }
+            _clauses?.Dispose();
+            _clauses = new SqlClauseBuilder();
 
             _ctx = null!;
             _provider = null!;
