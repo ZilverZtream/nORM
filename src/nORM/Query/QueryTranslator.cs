@@ -1470,7 +1470,16 @@ namespace nORM.Query
         {
             protected override Expression VisitMember(MemberExpression node)
             {
-                if (node.Expression is NewExpression newExpr && newExpr.Members != null)
+                if (node.Expression is MemberInitExpression memberInit)
+                {
+                    foreach (var binding in memberInit.Bindings)
+                    {
+                        if (binding is MemberAssignment assignment &&
+                            assignment.Member.Name == node.Member.Name)
+                            return Visit(assignment.Expression);
+                    }
+                }
+                else if (node.Expression is NewExpression newExpr && newExpr.Members != null)
                 {
                     for (int i = 0; i < newExpr.Members.Count; i++)
                     {
