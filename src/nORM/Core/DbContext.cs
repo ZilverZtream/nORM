@@ -36,7 +36,7 @@ namespace nORM.Core
         private readonly ModelBuilder _modelBuilder;
         private readonly DynamicEntityTypeGenerator _typeGenerator = new();
         private readonly ConcurrentDictionary<string, Type> _dynamicTypeCache = new();
-        private readonly List<IDisposable> _disposables = new();
+        private readonly List<WeakReference<IDisposable>> _disposables = new();
         private bool _sqliteInitialized;
         private DbTransaction? _currentTransaction;
         private bool _disposed;
@@ -870,7 +870,10 @@ namespace nORM.Core
             {
                 for (int i = _disposables.Count - 1; i >= 0; i--)
                 {
-                    _disposables[i]?.Dispose();
+                    if (_disposables[i].TryGetTarget(out var d))
+                    {
+                        d.Dispose();
+                    }
                 }
 
                 _disposables.Clear();
@@ -879,10 +882,24 @@ namespace nORM.Core
             }
         }
 
+        private void CleanupDisposables()
+        {
+            for (int i = _disposables.Count - 1; i >= 0; i--)
+            {
+                if (!_disposables[i].TryGetTarget(out _))
+                {
+                    _disposables.RemoveAt(i);
+                }
+            }
+        }
+
         public void RegisterForDisposal(IDisposable disposable)
         {
             if (disposable != null)
-                _disposables.Add(disposable);
+            {
+                CleanupDisposables();
+                _disposables.Add(new WeakReference<IDisposable>(disposable));
+            }
         }
 
         public void Dispose()
@@ -897,7 +914,10 @@ namespace nORM.Core
             {
                 for (int i = _disposables.Count - 1; i >= 0; i--)
                 {
-                    _disposables[i]?.Dispose();
+                    if (_disposables[i].TryGetTarget(out var d))
+                    {
+                        d.Dispose();
+                    }
                 }
 
                 _disposables.Clear();
