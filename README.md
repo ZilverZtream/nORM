@@ -11,7 +11,6 @@ nORM (The Norm) is a modern, high-performance Object-Relational Mapping (ORM) li
 
 - **🏎️ Blazing Fast**: Dapper-speed IL materialization with zero-allocation query execution
 - **🔍 Full LINQ Support**: Complete LINQ provider with joins, grouping, subqueries, and complex projections
-- **🏢 Enterprise Ready**: Multi-tenancy, connection resilience, and advanced logging
 - **📦 Migrations**: Versioned schema changes with an easy migration runner
 - **📊 Bulk Operations**: High-performance bulk insert, update, and delete operations
 - **📄 Raw SQL & Stored Procedures**: Execute raw SQL queries and stored procedures with ease
@@ -21,6 +20,20 @@ nORM (The Norm) is a modern, high-performance Object-Relational Mapping (ORM) li
 - **🧩 Fluent Configuration**: Configure models with a flexible fluent API
 - **🎯 Simple API**: Clean, intuitive API that feels familiar to EF users
 - **🔨 Database Scaffolding**: Reverse-engineer existing databases into entity classes and a DbContext
+- **📄 LINQ to JSON**: Query JSON columns using JSON path expressions
+- **⚙️ Zero-Configuration**: Auto-discover schemas and query tables without entity classes
+- **📈 Window Functions**: Use ROW_NUMBER, RANK, LAG, and more through LINQ
+- **⏳ Temporal Queries**: Query historical data and tag-based versioning
+- **🔌 Advanced Connection Management**: Connection pooling, read replicas, and failover
+- **🧠 Query Compilation**: Compile LINQ queries for reuse
+- **🔗 Navigation Properties**: Automatic lazy loading and batched retrieval
+- **🛠️ Interceptors**: Hook into command execution and SaveChanges
+- **🏢 Multi-Tenancy**: Tenant-aware filtering and caching
+- **🗃️ Advanced Caching**: Cache query results with invalidation
+- **🔁 Retry Policies**: Built-in strategies for transient fault handling
+- **🚫 Global Query Filters**: Apply filters such as soft deletes globally
+- **🧩 Source Generation**: Compile-time query optimization
+- **💧 Streaming Queries**: IAsyncEnumerable support for large result sets
 
 ## 📦 Installation
 
@@ -128,6 +141,123 @@ await DatabaseScaffolder.ScaffoldAsync(
 
 This generates entity classes and a DbContext from the existing database schema,
 providing a quick starting point for new projects.
+
+## ✨ Advanced Features
+
+### LINQ to JSON
+
+```csharp
+var results = await context.Query<Product>()
+    .Where(p => Json.Value<string>(p.Metadata, "$.category") == "electronics")
+    .ToListAsync();
+```
+
+### Zero-Configuration & Auto-Discovery
+
+```csharp
+// Query any table without defining entity classes
+var users = await context.Query("Users").ToListAsync();
+
+// Auto-scaffold entire database
+await DatabaseScaffolder.ScaffoldAsync(connection, provider, outputDir, "MyApp.Entities");
+```
+
+### Window Functions
+
+```csharp
+var ranked = await context.Query<Sale>()
+    .WithRowNumber((sale, rowNum) => new { sale.Amount, RowNumber = rowNum })
+    .WithRank((sale, rank) => new { sale.Amount, Rank = rank })
+    .ToListAsync();
+```
+
+### Temporal Queries & Versioning
+
+```csharp
+// Query data as it existed at a specific time
+var historical = await context.Query<Product>()
+    .AsOf(DateTime.Parse("2023-01-01"))
+    .ToListAsync();
+
+// Query data as of a tagged point in time
+await context.CreateTagAsync("release-v1.0");
+var releaseData = await context.Query<Product>()
+    .AsOf("release-v1.0")
+    .ToListAsync();
+```
+
+### Advanced Connection Management
+
+```csharp
+var topology = new DatabaseTopology();
+topology.AddNode("primary", "Server=.;Database=MyApp;Trusted_Connection=true");
+topology.AddReadReplica("replica", "Server=replica;Database=MyApp;Trusted_Connection=true");
+
+var manager = new ConnectionManager(topology);
+await using var readConnection = await manager.GetReadConnectionAsync();
+```
+
+### Query Compilation
+
+```csharp
+var compiled = Norm.CompileQuery<MyContext, int, User>(
+    (ctx, id) => ctx.Query<User>().Where(u => u.Id == id)
+);
+
+var user = await compiled(context, 123);
+```
+
+### Navigation Properties & Lazy Loading
+
+```csharp
+var order = await context.Query<Order>().FirstAsync();
+// Accessing navigation property triggers automatic lazy loading
+var items = order.Items;
+```
+
+### Interceptors
+
+```csharp
+public class LoggingInterceptor : IDbCommandInterceptor
+{
+    public Task BeforeExecuteAsync(DbCommand command)
+    {
+        Console.WriteLine(command.CommandText);
+        return Task.CompletedTask;
+    }
+}
+
+options.AddInterceptor(new LoggingInterceptor());
+```
+
+### Advanced Caching
+
+```csharp
+var products = await context.Query<Product>()
+    .Where(p => p.Category == "Electronics")
+    .Cacheable(TimeSpan.FromMinutes(30))
+    .ToListAsync();
+```
+
+### Global Query Filters
+
+```csharp
+options.AddGlobalFilter<ISoftDeletable>(e => !e.IsDeleted);
+```
+
+### Source Generation
+
+Compile-time query optimization through the `SourceGeneration` tooling allows
+generating high-performance query pipelines during build.
+
+### Streaming Queries
+
+```csharp
+await foreach (var user in context.Query<User>().AsAsyncEnumerable())
+{
+    // process each user without loading entire result set into memory
+}
+```
 
 ## 🏢 Enterprise Features
 
