@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 
 #nullable enable
 
@@ -13,10 +14,14 @@ namespace nORM.Internal
         // Protects access to _lruList, which is not thread-safe.
         private readonly object _lock = new();
         private readonly int _maxSize;
+        private readonly TimeSpan? _timeToLive;
+        private long _hits;
+        private long _misses;
 
-        public ConcurrentLruCache(int maxSize)
+        public ConcurrentLruCache(int maxSize, TimeSpan? timeToLive = null)
         {
             _maxSize = maxSize;
+            _timeToLive = timeToLive;
         }
 
         public TValue GetOrAdd(TKey key, Func<TKey, TValue> factory)
@@ -30,9 +35,16 @@ namespace nORM.Internal
                     // A simple check is to see if it still has a list.
                     if (existingNode.List != null)
                     {
+                        if (!IsExpired(existingNode.Value))
+                        {
+                            _lruList.Remove(existingNode);
+                            _lruList.AddFirst(existingNode);
+                            Interlocked.Increment(ref _hits);
+                            return existingNode.Value.Value;
+                        }
+
                         _lruList.Remove(existingNode);
-                        _lruList.AddFirst(existingNode);
-                        return existingNode.Value.Value;
+                        _cache.TryRemove(existingNode.Value.Key, out _);
                     }
                 }
             }
@@ -43,14 +55,21 @@ namespace nORM.Internal
                 // Double-check if another thread added it while we were waiting for the lock.
                 if (_cache.TryGetValue(key, out existingNode))
                 {
+                    if (!IsExpired(existingNode.Value))
+                    {
+                        _lruList.Remove(existingNode);
+                        _lruList.AddFirst(existingNode);
+                        Interlocked.Increment(ref _hits);
+                        return existingNode.Value.Value;
+                    }
+
                     _lruList.Remove(existingNode);
-                    _lruList.AddFirst(existingNode);
-                    return existingNode.Value.Value;
+                    _cache.TryRemove(existingNode.Value.Key, out _);
                 }
 
                 // We are the first, create and add the new item.
                 var value = factory(key);
-                var newNode = new LinkedListNode<CacheItem>(new CacheItem(key, value));
+                var newNode = new LinkedListNode<CacheItem>(new CacheItem(key, value, DateTimeOffset.UtcNow));
 
                 _cache[key] = newNode; // Use indexer now that we are in a lock.
                 _lruList.AddFirst(newNode);
@@ -62,6 +81,7 @@ namespace nORM.Internal
                     _cache.TryRemove(lastNode.Value.Key, out _);
                 }
 
+                Interlocked.Increment(ref _misses);
                 return value;
             }
         }
@@ -74,18 +94,34 @@ namespace nORM.Internal
                 {
                     if (existingNode.List != null)
                     {
+                        if (!IsExpired(existingNode.Value))
+                        {
+                            _lruList.Remove(existingNode);
+                            _lruList.AddFirst(existingNode);
+                            value = existingNode.Value.Value;
+                            Interlocked.Increment(ref _hits);
+                            return true;
+                        }
+
                         _lruList.Remove(existingNode);
-                        _lruList.AddFirst(existingNode);
-                        value = existingNode.Value.Value;
-                        return true;
+                        _cache.TryRemove(existingNode.Value.Key, out _);
                     }
                 }
             }
+
+            Interlocked.Increment(ref _misses);
             value = default!;
             return false;
         }
 
-        private record CacheItem(TKey Key, TValue Value);
+        public long Hits => Interlocked.Read(ref _hits);
+        public long Misses => Interlocked.Read(ref _misses);
+        public double HitRate => Hits + Misses == 0 ? 0 : (double)Hits / (Hits + Misses);
+
+        private bool IsExpired(CacheItem item)
+            => _timeToLive.HasValue && DateTimeOffset.UtcNow - item.Created > _timeToLive.Value;
+
+        private record CacheItem(TKey Key, TValue Value, DateTimeOffset Created);
     }
 }
 

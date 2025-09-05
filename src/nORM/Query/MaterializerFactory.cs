@@ -18,7 +18,11 @@ namespace nORM.Query
     /// </summary>
     internal sealed class MaterializerFactory
     {
-        private static readonly ConcurrentLruCache<(int MappingTypeHash, int TargetTypeHash, int ProjectionHash, string TableName), Func<DbDataReader, CancellationToken, Task<object>>> _cache = new(maxSize: 1000);
+        private static readonly ConcurrentLruCache<(int MappingTypeHash, int TargetTypeHash, int ProjectionHash, string TableName), Func<DbDataReader, CancellationToken, Task<object>>> _cache
+            = new(maxSize: 1000, timeToLive: TimeSpan.FromMinutes(10));
+
+        internal static (long Hits, long Misses, double HitRate) CacheStats
+            => (_cache.Hits, _cache.Misses, _cache.HitRate);
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
         {
