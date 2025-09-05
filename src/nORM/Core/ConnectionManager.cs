@@ -225,16 +225,17 @@ namespace nORM.Core
 
             try
             {
-                await Parallel.ForEachAsync(_topology.Nodes, token, async (node, ct) =>
+                foreach (var node in _topology.Nodes)
                 {
-                    if (_disposed || ct.IsCancellationRequested)
-                        return;
+                    if (_disposed || token.IsCancellationRequested)
+                        break;
 
                     var pool = _connectionPools[node.ConnectionString];
+                    DbConnection? cn = null;
                     try
                     {
                         var sw = System.Diagnostics.Stopwatch.StartNew();
-                        await using var cn = await pool.RentAsync(ct).ConfigureAwait(false);
+                        cn = await pool.RentAsync(token).ConfigureAwait(false);
                         sw.Stop();
                         node.IsHealthy = true;
                         node.LastHealthCheck = DateTime.UtcNow;
@@ -242,14 +243,20 @@ namespace nORM.Core
                     }
                     catch (OperationCanceledException)
                     {
-                        // Cancellation requested; exit iteration
+                        // Cancellation requested; exit iteration after cleanup
+                        break;
                     }
                     catch
                     {
                         node.IsHealthy = false;
                         node.LastHealthCheck = DateTime.UtcNow;
                     }
-                }).ConfigureAwait(false);
+                    finally
+                    {
+                        if (cn != null)
+                            await cn.DisposeAsync().ConfigureAwait(false);
+                    }
+                }
             }
             catch (OperationCanceledException)
             {
