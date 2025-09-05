@@ -9,6 +9,8 @@ using System.Globalization;
 using nORM.Core;
 using nORM.Mapping;
 using nORM.Providers;
+using System.Text;
+using Microsoft.Extensions.ObjectPool;
 
 #nullable enable
 
@@ -30,6 +32,9 @@ namespace nORM.Query
         private List<string> _compiledParams = null!;
         private Dictionary<ParameterExpression, string> _paramMap = null!;
         private bool _suppressNullCheck = false;
+
+        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
+            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
         internal ExpressionToSqlVisitor() { }
 
@@ -94,10 +99,19 @@ namespace nORM.Query
 
         public string Translate(Expression expression)
         {
-            using var builder = new OptimizedSqlBuilder();
-            _sql = builder;
-            Visit(expression);
-            return builder.ToSqlString();
+            var sb = _stringBuilderPool.Get();
+            try
+            {
+                using var builder = new OptimizedSqlBuilder(sb);
+                _sql = builder;
+                Visit(expression);
+                return sb.ToString();
+            }
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
         }
 
         protected override Expression VisitBinary(BinaryExpression node)
