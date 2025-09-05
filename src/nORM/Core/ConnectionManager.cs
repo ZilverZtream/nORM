@@ -23,6 +23,7 @@ namespace nORM.Core
         private readonly ILogger _logger;
         private readonly Timer _healthCheckTimer;
         private readonly SemaphoreSlim _failoverSemaphore = new(1, 1);
+        private readonly SemaphoreSlim _poolInitSemaphore = new(1, 1);
 
         private readonly ConcurrentDictionary<string, ConnectionPool> _connectionPools = new();
         private volatile DatabaseTopology.DatabaseNode? _currentPrimary;
@@ -44,9 +45,17 @@ namespace nORM.Core
 
         private void InitializeConnectionPools()
         {
-            foreach (var node in _topology.Nodes)
+            _poolInitSemaphore.Wait();
+            try
             {
-                _connectionPools[node.ConnectionString] = new ConnectionPool(() => CreateConnection(node.ConnectionString));
+                foreach (var node in _topology.Nodes)
+                {
+                    _connectionPools.GetOrAdd(node.ConnectionString, cs => new ConnectionPool(() => CreateConnection(cs)));
+                }
+            }
+            finally
+            {
+                _poolInitSemaphore.Release();
             }
         }
 
