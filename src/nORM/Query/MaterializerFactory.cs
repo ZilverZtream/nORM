@@ -156,8 +156,9 @@ namespace nORM.Query
                         var col = columns[i];
                         var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
                         var value = readerMethod.Invoke(reader, new object[] { i });
-                        if (readerMethod == Methods.GetValue)
-                            value = Convert.ChangeType(value!, col.Prop.PropertyType);
+                        var targetType = col.Prop.PropertyType;
+                        if (readerMethod == Methods.GetValue || (value != null && value.GetType() != targetType))
+                            value = Convert.ChangeType(value!, targetType);
                         col.Setter(entity, value);
                     }
                     return entity!;
@@ -182,7 +183,7 @@ namespace nORM.Query
                     var paramType = ctorParams[i].ParameterType;
                     var readerMethod = Methods.GetReaderMethod(paramType);
                     var value = readerMethod.Invoke(reader, new object[] { i });
-                    if (readerMethod == Methods.GetValue)
+                    if (readerMethod == Methods.GetValue || (value != null && value.GetType() != paramType))
                         value = Convert.ChangeType(value!, paramType);
                     args[i] = value;
                 }
@@ -257,6 +258,21 @@ namespace nORM.Query
                 }
                 return cols.ToArray();
             }
+
+            if (projection.Body is MemberInitExpression initExpr)
+            {
+                var cols = new List<Column>(initExpr.Bindings.Count);
+                foreach (var binding in initExpr.Bindings.OfType<MemberAssignment>())
+                {
+                    if (binding.Member is PropertyInfo pi)
+                    {
+                        // Create columns based on the target DTO properties
+                        cols.Add(new Column(pi, mapping.Provider, null));
+                    }
+                }
+                return cols.ToArray();
+            }
+
             return mapping.Columns;
         }
 
