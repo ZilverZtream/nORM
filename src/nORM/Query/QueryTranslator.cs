@@ -579,7 +579,7 @@ namespace nORM.Query
             var outerAlias = EscapeAlias("T0");
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
 
-            // Set up parameter correlations for BOTH tables
+            // Set up parameter correlations for key selectors
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
             if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
@@ -600,20 +600,18 @@ namespace nORM.Query
                 _params[kvp.Key] = kvp.Value;
             ExpressionVisitorPool.Return(innerKeyVisitor);
 
-            // CRITICAL: Set up correlations for the result selector parameters
-            // This allows WHERE clauses on projected DTOs to work correctly
+            // Set up correlations for result selector parameters
             if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
                 _correlatedParams[resultSelector.Parameters[0]] = (_mapping, outerAlias);
             if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
                 _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
 
-            JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
-            if (_projection != null)
-                SetupProjectionPropertyMapping(_projection, _mapping, outerAlias, innerMapping, innerAlias);
-            else
-                _projectionPropertyMap.Clear();
+            // CRITICAL: Set up property mapping for projected DTO
+            SetupProjectionPropertyMapping(resultSelector, _mapping, outerAlias, innerMapping, innerAlias);
 
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql, _correlatedParams);
+            JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
+
+            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
             _sql.Clear();
             _sql.Append(sql);
 
@@ -663,7 +661,7 @@ namespace nORM.Query
 
             JoinBuilder.SetupJoinProjection(null, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, _correlatedParams, outerKeySql);
+            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
             _sql.Clear();
             _sql.Append(sql);
 
@@ -735,7 +733,7 @@ namespace nORM.Query
 
                 if (_projection?.Body is NewExpression newExpr)
                 {
-                    var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias, _correlatedParams);
+                    var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
                     if (neededColumns.Count == 0)
                     {
                         var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
@@ -803,7 +801,7 @@ namespace nORM.Query
 
             if (_projection?.Body is NewExpression crossNew)
             {
-                var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, outerMapping, crossMapping, outerAlias, crossAlias, _correlatedParams);
+                var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, outerMapping, crossMapping, outerAlias, crossAlias);
                 if (neededColumns.Count == 0)
                 {
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
