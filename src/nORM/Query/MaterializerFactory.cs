@@ -388,17 +388,21 @@ namespace nORM.Query
         {
             var underlyingType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
 
-            Expression call = underlyingType.Name switch
-            {
-                nameof(Int32) => Expression.Call(reader, Methods.GetInt32, Expression.Constant(index)),
-                nameof(String) => Expression.Call(reader, Methods.GetString, Expression.Constant(index)),
-                nameof(DateTime) => Expression.Call(reader, Methods.GetDateTime, Expression.Constant(index)),
-                nameof(Boolean) => Expression.Call(reader, Methods.GetBoolean, Expression.Constant(index)),
-                _ => Expression.Call(reader, Methods.GetValue, Expression.Constant(index))
-            };
+            // Use the same reader method resolution as the non-optimized path to ensure
+            // proper handling for all simple types (e.g. decimals, floats, enums, etc.)
+            var method = Methods.GetReaderMethod(underlyingType);
+            Expression call = Expression.Call(reader, method, Expression.Constant(index));
 
             if (call.Type != propertyType)
+            {
+                // Convert.ChangeType is used in the non-optimized path when using GetValue or
+                // when the underlying type doesn't match the property type. Here we rely on
+                // Expression.Convert which will unbox or cast appropriately for the resolved
+                // reader method. When GetValue is used and the provider returns a different
+                // type, the cast may still fail, matching the behaviour of the non-optimized
+                // materializer.
                 call = Expression.Convert(call, propertyType);
+            }
 
             return call;
         }
