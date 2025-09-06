@@ -39,6 +39,7 @@ namespace nORM.Query
         private bool _isAggregate;
         private string _methodName = "";
         private Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams = new();
+        private Dictionary<string, (TableMapping Mapping, string Alias, string ColumnName)> _projectionPropertyMap = new();
 #pragma warning disable CS0649 // Field is never assigned to, and will always have its default value - used in complex join scenarios
         private GroupJoinInfo? _groupJoinInfo;
 #pragma warning restore CS0649
@@ -149,6 +150,7 @@ namespace nORM.Query
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+                _projectionPropertyMap = new Dictionary<string, (TableMapping Mapping, string Alias, string ColumnName)>();
                 _groupJoinInfo = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
@@ -182,6 +184,7 @@ namespace nORM.Query
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+                _projectionPropertyMap = new Dictionary<string, (TableMapping Mapping, string Alias, string ColumnName)>();
                 _groupJoinInfo = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
@@ -605,8 +608,12 @@ namespace nORM.Query
                 _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
 
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
+            if (_projection != null)
+                SetupProjectionPropertyMapping(_projection);
+            else
+                _projectionPropertyMap.Clear();
 
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
+            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql, _correlatedParams);
             _sql.Clear();
             _sql.Append(sql);
 
@@ -656,7 +663,7 @@ namespace nORM.Query
 
             JoinBuilder.SetupJoinProjection(null, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
+            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, _correlatedParams, outerKeySql);
             _sql.Clear();
             _sql.Append(sql);
 
@@ -728,7 +735,7 @@ namespace nORM.Query
 
                 if (_projection?.Body is NewExpression newExpr)
                 {
-                    var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
+                    var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, _correlatedParams);
                     if (neededColumns.Count == 0)
                     {
                         var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
@@ -770,9 +777,11 @@ namespace nORM.Query
                 if (resultSelector != null)
                 {
                     _projection = resultSelector;
+                    SetupProjectionPropertyMapping(resultSelector);
                 }
                 else
                 {
+                    _projectionPropertyMap.Clear();
                     _mapping = innerMapping;
                 }
 
@@ -794,7 +803,7 @@ namespace nORM.Query
 
             if (_projection?.Body is NewExpression crossNew)
             {
-                var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, outerMapping, crossMapping, outerAlias, crossAlias);
+                var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, _correlatedParams);
                 if (neededColumns.Count == 0)
                 {
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
@@ -835,9 +844,11 @@ namespace nORM.Query
             if (resultSelector != null)
             {
                 _projection = resultSelector;
+                SetupProjectionPropertyMapping(resultSelector);
             }
             else
             {
+                _projectionPropertyMap.Clear();
                 _mapping = crossMapping;
             }
 
@@ -1028,21 +1039,68 @@ namespace nORM.Query
             return node;
         }
 
+        private void SetupProjectionPropertyMapping(LambdaExpression projection)
+        {
+            _projectionPropertyMap.Clear();
+
+            void Register(string memberName, string propName, ParameterExpression param)
+            {
+                if (_correlatedParams.TryGetValue(param, out var info) &&
+                    info.Mapping.ColumnsByName.ContainsKey(propName))
+                {
+                    _projectionPropertyMap[memberName] = (info.Mapping, info.Alias, propName);
+                }
+            }
+
+            if (projection.Body is NewExpression newExpr && newExpr.Members != null)
+            {
+                for (int i = 0; i < newExpr.Arguments.Count; i++)
+                {
+                    if (newExpr.Arguments[i] is MemberExpression memberExpr &&
+                        memberExpr.Expression is ParameterExpression param)
+                    {
+                        Register(newExpr.Members[i].Name, memberExpr.Member.Name, param);
+                    }
+                }
+            }
+            else if (projection.Body is MemberInitExpression initExpr)
+            {
+                foreach (var binding in initExpr.Bindings.OfType<MemberAssignment>())
+                {
+                    if (binding.Expression is MemberExpression memberExpr &&
+                        memberExpr.Expression is ParameterExpression param)
+                    {
+                        Register(binding.Member.Name, memberExpr.Member.Name, param);
+                    }
+                }
+            }
+        }
+
         protected override Expression VisitMember(MemberExpression node)
         {
             if (node.Expression is ParameterExpression pe)
             {
                 if (_correlatedParams.TryGetValue(pe, out var info))
                 {
-                    var col = info.Mapping.ColumnsByName[node.Member.Name];
-                    _sql.Append($"{info.Alias}.{col.EscCol}");
+                    if (info.Mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
+                    {
+                        _sql.Append($"{info.Alias}.{col.EscCol}");
+                        return node;
+                    }
                 }
-                else
+
+                if (_projectionPropertyMap.TryGetValue(node.Member.Name, out var mappingInfo))
                 {
-                    var col = _mapping.ColumnsByName[node.Member.Name];
-                    _sql.Append(col.EscCol);
+                    var sourceCol = mappingInfo.Mapping.ColumnsByName[mappingInfo.ColumnName];
+                    _sql.Append($"{mappingInfo.Alias}.{sourceCol.EscCol}");
+                    return node;
                 }
-                return node;
+
+                if (_mapping.ColumnsByName.TryGetValue(node.Member.Name, out var column))
+                {
+                    _sql.Append(column.EscCol);
+                    return node;
+                }
             }
 
             if (TryGetConstantValue(node, out var value))
@@ -1169,7 +1227,8 @@ namespace nORM.Query
                 if (resultSelector != null)
                 {
                     _projection = resultSelector;
-                    
+                    _projectionPropertyMap.Clear();
+
                     // Clear the default select and let the projection handling rebuild it
                     _sql.Clear();
                     
