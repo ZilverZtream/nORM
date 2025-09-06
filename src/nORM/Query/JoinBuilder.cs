@@ -24,23 +24,21 @@ namespace nORM.Query
         {
             using var joinSql = new OptimizedSqlBuilder(256);
 
+            List<string> neededColumns = null!;
             if (projection?.Body is NewExpression newExpr)
             {
-                var neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
-                if (neededColumns.Count == 0)
-                {
-                    var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                    var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                    joinSql.AppendSelect(System.ReadOnlySpan<char>.Empty);
-                    joinSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
-                    joinSql.Append(' ');
-                }
-                else
-                {
-                    joinSql.AppendSelect(System.ReadOnlySpan<char>.Empty);
-                    joinSql.InnerBuilder.AppendJoin(", ", neededColumns);
-                    joinSql.Append(' ');
-                }
+                neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
+            }
+            else if (projection?.Body is MemberInitExpression initExpr)
+            {
+                neededColumns = ExtractNeededColumns(initExpr, outerMapping, innerMapping, outerAlias, innerAlias);
+            }
+
+            if (projection != null && neededColumns.Count > 0)
+            {
+                joinSql.AppendSelect(System.ReadOnlySpan<char>.Empty);
+                joinSql.InnerBuilder.AppendJoin(", ", neededColumns);
+                joinSql.Append(' ');
             }
             else
             {
@@ -80,10 +78,19 @@ namespace nORM.Query
         }
 
         public static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
+            => ExtractNeededColumns(newExpr.Arguments, outerMapping, innerMapping, outerAlias, innerAlias);
+
+        public static List<string> ExtractNeededColumns(MemberInitExpression initExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
+        {
+            var exprs = initExpr.Bindings.OfType<MemberAssignment>().Select(b => b.Expression);
+            return ExtractNeededColumns(exprs, outerMapping, innerMapping, outerAlias, innerAlias);
+        }
+
+        private static List<string> ExtractNeededColumns(IEnumerable<Expression> args, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
         {
             var neededColumns = new List<string>();
 
-            foreach (var arg in newExpr.Arguments)
+            foreach (var arg in args)
             {
                 if (arg is MemberExpression memberExpr && memberExpr.Expression is ParameterExpression paramExpr)
                 {
