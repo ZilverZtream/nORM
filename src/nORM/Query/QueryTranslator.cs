@@ -39,6 +39,7 @@ namespace nORM.Query
         private bool _isAggregate;
         private string _methodName = "";
         private Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams = new();
+        private Dictionary<string, (TableMapping Mapping, string Alias, string ColumnName)> _projectionPropertyMap = new();
 #pragma warning disable CS0649 // Field is never assigned to, and will always have its default value - used in complex join scenarios
         private GroupJoinInfo? _groupJoinInfo;
 #pragma warning restore CS0649
@@ -149,6 +150,7 @@ namespace nORM.Query
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+                _projectionPropertyMap = new Dictionary<string, (TableMapping Mapping, string Alias, string ColumnName)>();
                 _groupJoinInfo = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
@@ -182,6 +184,7 @@ namespace nORM.Query
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+                _projectionPropertyMap = new Dictionary<string, (TableMapping Mapping, string Alias, string ColumnName)>();
                 _groupJoinInfo = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
@@ -605,6 +608,10 @@ namespace nORM.Query
                 _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
 
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
+            if (_projection != null)
+                SetupProjectionPropertyMapping(_projection, _mapping, outerAlias, innerMapping, innerAlias);
+            else
+                _projectionPropertyMap.Clear();
 
             var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
             _sql.Clear();
@@ -770,9 +777,11 @@ namespace nORM.Query
                 if (resultSelector != null)
                 {
                     _projection = resultSelector;
+                    SetupProjectionPropertyMapping(resultSelector, outerMapping, outerAlias, innerMapping, innerAlias);
                 }
                 else
                 {
+                    _projectionPropertyMap.Clear();
                     _mapping = innerMapping;
                 }
 
@@ -835,9 +844,11 @@ namespace nORM.Query
             if (resultSelector != null)
             {
                 _projection = resultSelector;
+                SetupProjectionPropertyMapping(resultSelector, outerMapping, outerAlias, crossMapping, crossAlias);
             }
             else
             {
+                _projectionPropertyMap.Clear();
                 _mapping = crossMapping;
             }
 
@@ -1028,21 +1039,80 @@ namespace nORM.Query
             return node;
         }
 
+        private void SetupProjectionPropertyMapping(LambdaExpression projection, TableMapping outerMapping, string outerAlias, TableMapping innerMapping, string innerAlias)
+        {
+            _projectionPropertyMap.Clear();
+
+            if (projection.Body is NewExpression newExpr && newExpr.Members != null)
+            {
+                for (int i = 0; i < newExpr.Arguments.Count; i++)
+                {
+                    var arg = newExpr.Arguments[i];
+                    var memberName = newExpr.Members[i].Name;
+
+                    if (arg is MemberExpression memberExpr && memberExpr.Expression is ParameterExpression param)
+                    {
+                        var propName = memberExpr.Member.Name;
+
+                        if (param.Type == outerMapping.Type && outerMapping.ColumnsByName.ContainsKey(propName))
+                        {
+                            _projectionPropertyMap[memberName] = (outerMapping, outerAlias, propName);
+                        }
+                        else if (param.Type == innerMapping.Type && innerMapping.ColumnsByName.ContainsKey(propName))
+                        {
+                            _projectionPropertyMap[memberName] = (innerMapping, innerAlias, propName);
+                        }
+                    }
+                }
+            }
+            else if (projection.Body is MemberInitExpression initExpr)
+            {
+                foreach (var binding in initExpr.Bindings.OfType<MemberAssignment>())
+                {
+                    var memberName = binding.Member.Name;
+
+                    if (binding.Expression is MemberExpression memberExpr && memberExpr.Expression is ParameterExpression param)
+                    {
+                        var propName = memberExpr.Member.Name;
+
+                        if (param.Type == outerMapping.Type && outerMapping.ColumnsByName.ContainsKey(propName))
+                        {
+                            _projectionPropertyMap[memberName] = (outerMapping, outerAlias, propName);
+                        }
+                        else if (param.Type == innerMapping.Type && innerMapping.ColumnsByName.ContainsKey(propName))
+                        {
+                            _projectionPropertyMap[memberName] = (innerMapping, innerAlias, propName);
+                        }
+                    }
+                }
+            }
+        }
+
         protected override Expression VisitMember(MemberExpression node)
         {
             if (node.Expression is ParameterExpression pe)
             {
                 if (_correlatedParams.TryGetValue(pe, out var info))
                 {
-                    var col = info.Mapping.ColumnsByName[node.Member.Name];
-                    _sql.Append($"{info.Alias}.{col.EscCol}");
+                    if (info.Mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
+                    {
+                        _sql.Append($"{info.Alias}.{col.EscCol}");
+                        return node;
+                    }
                 }
-                else
+
+                if (_projectionPropertyMap.TryGetValue(node.Member.Name, out var mappingInfo))
                 {
-                    var col = _mapping.ColumnsByName[node.Member.Name];
-                    _sql.Append(col.EscCol);
+                    var sourceCol = mappingInfo.Mapping.ColumnsByName[mappingInfo.ColumnName];
+                    _sql.Append($"{mappingInfo.Alias}.{sourceCol.EscCol}");
+                    return node;
                 }
-                return node;
+
+                if (_mapping.ColumnsByName.TryGetValue(node.Member.Name, out var column))
+                {
+                    _sql.Append(column.EscCol);
+                    return node;
+                }
             }
 
             if (TryGetConstantValue(node, out var value))
@@ -1169,7 +1239,8 @@ namespace nORM.Query
                 if (resultSelector != null)
                 {
                     _projection = resultSelector;
-                    
+                    _projectionPropertyMap.Clear();
+
                     // Clear the default select and let the projection handling rebuild it
                     _sql.Clear();
                     
