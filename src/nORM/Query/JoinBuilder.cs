@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
 using nORM.Mapping;
 
 namespace nORM.Query
@@ -97,7 +96,8 @@ namespace nORM.Query
             Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlatedParams)
         {
             var neededColumns = new List<string>();
-            var sb = new StringBuilder();
+            using var sb = new OptimizedSqlBuilder(64);
+            var paramBuffer = new List<ParameterExpression>();
 
             foreach (var arg in args)
             {
@@ -109,7 +109,7 @@ namespace nORM.Query
                         {
                             sb.Clear();
                             sb.Append(info.Alias).Append('.').Append(column.EscCol);
-                            var colSql = sb.ToString();
+                            var colSql = sb.ToSqlString();
                             if (!neededColumns.Contains(colSql))
                                 neededColumns.Add(colSql);
                         }
@@ -138,7 +138,7 @@ namespace nORM.Query
                         {
                             sb.Clear();
                             sb.Append(alias).Append('.').Append(column.EscCol);
-                            var colSql = sb.ToString();
+                            var colSql = sb.ToSqlString();
                             if (!neededColumns.Contains(colSql))
                                 neededColumns.Add(colSql);
                         }
@@ -155,8 +155,10 @@ namespace nORM.Query
                 }
                 else
                 {
-                    foreach (var p in ExtractParameters(arg))
+                    ExtractParameters(arg, paramBuffer);
+                    foreach (var p in paramBuffer)
                         AddAllColumnsForParameter(p);
+                    paramBuffer.Clear();
                 }
             }
 
@@ -191,13 +193,13 @@ namespace nORM.Query
                 {
                     sb.Clear();
                     sb.Append(alias).Append('.').Append(col.EscCol);
-                    var colSql = sb.ToString();
+                    var colSql = sb.ToSqlString();
                     if (!neededColumns.Contains(colSql))
                         neededColumns.Add(colSql);
                 }
             }
 
-            static IEnumerable<ParameterExpression> ExtractParameters(Expression expr)
+            static void ExtractParameters(Expression expr, List<ParameterExpression> result)
             {
                 var stack = new Stack<Expression>();
                 stack.Push(expr);
@@ -206,7 +208,7 @@ namespace nORM.Query
                     var current = stack.Pop();
                     if (current is ParameterExpression pe)
                     {
-                        yield return pe;
+                        result.Add(pe);
                         continue;
                     }
 

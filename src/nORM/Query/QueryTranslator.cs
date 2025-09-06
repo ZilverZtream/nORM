@@ -580,7 +580,7 @@ namespace nORM.Query
             var outerAlias = EscapeAlias("T0");
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
 
-            var correlationBackup = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)?>(2);
+            var correlationBackup = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)?>(4);
 
             void Correlate(ParameterExpression param, TableMapping mapping, string alias)
             {
@@ -593,6 +593,8 @@ namespace nORM.Query
 
             Correlate(outerKeySelector.Parameters[0], _mapping, outerAlias);
             Correlate(innerKeySelector.Parameters[0], innerMapping, innerAlias);
+            Correlate(resultSelector.Parameters[0], _mapping, outerAlias);
+            Correlate(resultSelector.Parameters[1], innerMapping, innerAlias);
 
             var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
             var outerKeyVisitor = ExpressionVisitorPool.Get(in vctxOuter);
@@ -608,9 +610,6 @@ namespace nORM.Query
             foreach (var kvp in innerKeyVisitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
             ExpressionVisitorPool.Return(innerKeyVisitor);
-
-            _correlatedParams[resultSelector.Parameters[0]] = (_mapping, outerAlias);
-            _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
 
             try
             {
@@ -630,10 +629,16 @@ namespace nORM.Query
             {
                 foreach (var kvp in correlationBackup)
                 {
+                    var isProjectionParam = kvp.Key == resultSelector.Parameters[0] || kvp.Key == resultSelector.Parameters[1];
                     if (kvp.Value.HasValue)
+                    {
                         _correlatedParams[kvp.Key] = kvp.Value.Value;
-                    else
+                    }
+                    else if (!isProjectionParam)
+                    {
                         _correlatedParams.Remove(kvp.Key);
+                    }
+                    // if it's a projection param with no previous value, keep the new correlation
                 }
             }
         }
