@@ -94,9 +94,25 @@ namespace nORM.Query
             {
                 if (arg is MemberExpression memberExpr && memberExpr.Expression is ParameterExpression paramExpr)
                 {
-                    var isOuterTable = paramExpr.Type == outerMapping.Type;
-                    var mapping = isOuterTable ? outerMapping : innerMapping;
-                    var alias = isOuterTable ? outerAlias : innerAlias;
+                    // Determine which table this parameter refers to
+                    TableMapping mapping;
+                    string alias;
+
+                    if (paramExpr.Type == outerMapping.Type)
+                    {
+                        mapping = outerMapping;
+                        alias = outerAlias;
+                    }
+                    else if (paramExpr.Type == innerMapping.Type)
+                    {
+                        mapping = innerMapping;
+                        alias = innerAlias;
+                    }
+                    else
+                    {
+                        // Skip if we can't determine the table
+                        continue;
+                    }
 
                     if (mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
                     {
@@ -104,15 +120,59 @@ namespace nORM.Query
                         if (!neededColumns.Contains(colSql))
                             neededColumns.Add(colSql);
                     }
+                    else
+                    {
+                        // If column not found, this might be a computed or unmapped property
+                        // Log warning and skip
+                        System.Diagnostics.Debug.WriteLine($"Warning: Column '{memberExpr.Member.Name}' not found in mapping for type '{mapping.Type.Name}'");
+                    }
                 }
                 else if (arg is ParameterExpression param)
                 {
-                    var isOuter = param.Type == outerMapping.Type;
-                    var mapping = isOuter ? outerMapping : innerMapping;
-                    var alias = isOuter ? outerAlias : innerAlias;
+                    // This represents selecting all columns from a table
+                    TableMapping mapping;
+                    string alias;
+
+                    if (param.Type == outerMapping.Type)
+                    {
+                        mapping = outerMapping;
+                        alias = outerAlias;
+                    }
+                    else if (param.Type == innerMapping.Type)
+                    {
+                        mapping = innerMapping;
+                        alias = innerAlias;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
                     foreach (var col in mapping.Columns)
                     {
                         var colSql = $"{alias}.{col.EscCol}";
+                        if (!neededColumns.Contains(colSql))
+                            neededColumns.Add(colSql);
+                    }
+                }
+                else if (arg is ConstantExpression || arg is UnaryExpression)
+                {
+                    // Constants or conversions don't add columns
+                    continue;
+                }
+                else
+                {
+                    // For complex expressions, we might need all columns
+                    // This is a safe fallback but not optimal
+                    foreach (var col in outerMapping.Columns)
+                    {
+                        var colSql = $"{outerAlias}.{col.EscCol}";
+                        if (!neededColumns.Contains(colSql))
+                            neededColumns.Add(colSql);
+                    }
+                    foreach (var col in innerMapping.Columns)
+                    {
+                        var colSql = $"{innerAlias}.{col.EscCol}";
                         if (!neededColumns.Contains(colSql))
                             neededColumns.Add(colSql);
                     }
