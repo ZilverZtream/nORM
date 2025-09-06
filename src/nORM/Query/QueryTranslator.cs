@@ -576,14 +576,16 @@ namespace nORM.Query
             var outerAlias = EscapeAlias("T0");
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
 
+            // Set up parameter correlations for BOTH tables
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
+            if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
+                _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
+
             var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
             var outerKeyVisitor = ExpressionVisitorPool.Get(in vctxOuter);
             var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
 
-            if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
-                _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
             var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap);
             var innerKeyVisitor = ExpressionVisitorPool.Get(in vctxInner);
             var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
@@ -594,6 +596,13 @@ namespace nORM.Query
             foreach (var kvp in innerKeyVisitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
             ExpressionVisitorPool.Return(innerKeyVisitor);
+
+            // CRITICAL: Set up correlations for the result selector parameters
+            // This allows WHERE clauses on projected DTOs to work correctly
+            if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                _correlatedParams[resultSelector.Parameters[0]] = (_mapping, outerAlias);
+            if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
+                _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
 
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
