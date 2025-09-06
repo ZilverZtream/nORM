@@ -19,6 +19,12 @@ public class JoinTests : TestBase
         public decimal Amount { get; set; }
     }
 
+    private class SelfJoinDto
+    {
+        public decimal OuterAmount { get; set; }
+        public decimal InnerAmount { get; set; }
+    }
+
     [Theory]
     [MemberData(nameof(Providers))]
     public void Where_on_join_projection_translates(ProviderKind providerKind)
@@ -33,6 +39,30 @@ public class JoinTests : TestBase
             connection, provider);
 
         Assert.Contains(provider.Escape("Amount"), sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public void Self_join_projection_maps_properties_to_correct_aliases(ProviderKind providerKind)
+    {
+        var setup = CreateProvider(providerKind);
+        using var connection = setup.Connection;
+        var provider = setup.Provider;
+
+        var (sql, _, _) = TranslateQuery<Order, SelfJoinDto>(q =>
+            q.Join(q, o => o.Id, o2 => o2.Id, (o, o2) => new SelfJoinDto
+            {
+                OuterAmount = o.Amount,
+                InnerAmount = o2.Amount
+            })
+            .Where(x => x.InnerAmount > 0 && x.OuterAmount > 0),
+            connection, provider);
+
+        var col = provider.Escape("Amount");
+        var outerAlias = provider.Escape("T0");
+        var innerAlias = provider.Escape("T1");
+        Assert.Contains($"{outerAlias}.{col}", sql);
+        Assert.Contains($"{innerAlias}.{col}", sql);
     }
 
     public static IEnumerable<object[]> Providers()

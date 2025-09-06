@@ -20,6 +20,7 @@ namespace nORM.Query
             string joinType,
             string outerKeySql,
             string innerKeySql,
+            Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlatedParams,
             string? orderBy = null)
         {
             using var joinSql = new OptimizedSqlBuilder(256);
@@ -27,11 +28,11 @@ namespace nORM.Query
             List<string> neededColumns = null!;
             if (projection?.Body is NewExpression newExpr)
             {
-                neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
+                neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias, correlatedParams);
             }
             else if (projection?.Body is MemberInitExpression initExpr)
             {
-                neededColumns = ExtractNeededColumns(initExpr, outerMapping, innerMapping, outerAlias, innerAlias);
+                neededColumns = ExtractNeededColumns(initExpr, outerMapping, innerMapping, outerAlias, innerAlias, correlatedParams);
             }
 
             if (projection != null && neededColumns.Count > 0)
@@ -77,16 +78,16 @@ namespace nORM.Query
             }
         }
 
-        public static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
-            => ExtractNeededColumns(newExpr.Arguments, outerMapping, innerMapping, outerAlias, innerAlias);
+        public static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias, Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlatedParams)
+            => ExtractNeededColumns(newExpr.Arguments, outerMapping, innerMapping, outerAlias, innerAlias, correlatedParams);
 
-        public static List<string> ExtractNeededColumns(MemberInitExpression initExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
+        public static List<string> ExtractNeededColumns(MemberInitExpression initExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias, Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlatedParams)
         {
             var exprs = initExpr.Bindings.OfType<MemberAssignment>().Select(b => b.Expression);
-            return ExtractNeededColumns(exprs, outerMapping, innerMapping, outerAlias, innerAlias);
+            return ExtractNeededColumns(exprs, outerMapping, innerMapping, outerAlias, innerAlias, correlatedParams);
         }
 
-        private static List<string> ExtractNeededColumns(IEnumerable<Expression> args, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
+        private static List<string> ExtractNeededColumns(IEnumerable<Expression> args, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias, Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlatedParams)
         {
             var neededColumns = new List<string>();
 
@@ -94,65 +95,81 @@ namespace nORM.Query
             {
                 if (arg is MemberExpression memberExpr && memberExpr.Expression is ParameterExpression paramExpr)
                 {
-                    // Determine which table this parameter refers to
-                    TableMapping mapping;
-                    string alias;
-
-                    if (paramExpr.Type == outerMapping.Type)
+                    if (correlatedParams.TryGetValue(paramExpr, out var info))
                     {
-                        mapping = outerMapping;
-                        alias = outerAlias;
-                    }
-                    else if (paramExpr.Type == innerMapping.Type)
-                    {
-                        mapping = innerMapping;
-                        alias = innerAlias;
+                        if (info.Mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
+                        {
+                            var colSql = $"{info.Alias}.{column.EscCol}";
+                            if (!neededColumns.Contains(colSql))
+                                neededColumns.Add(colSql);
+                        }
                     }
                     else
                     {
-                        // Skip if we can't determine the table
-                        continue;
-                    }
+                        // Fallback to type-based resolution if parameter not correlated
+                        TableMapping mapping;
+                        string alias;
 
-                    if (mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
-                    {
-                        var colSql = $"{alias}.{column.EscCol}";
-                        if (!neededColumns.Contains(colSql))
-                            neededColumns.Add(colSql);
-                    }
-                    else
-                    {
-                        // If column not found, this might be a computed or unmapped property
-                        // Log warning and skip
-                        System.Diagnostics.Debug.WriteLine($"Warning: Column '{memberExpr.Member.Name}' not found in mapping for type '{mapping.Type.Name}'");
+                        if (paramExpr.Type == outerMapping.Type)
+                        {
+                            mapping = outerMapping;
+                            alias = outerAlias;
+                        }
+                        else if (paramExpr.Type == innerMapping.Type)
+                        {
+                            mapping = innerMapping;
+                            alias = innerAlias;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+
+                        if (mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
+                        {
+                            var colSql = $"{alias}.{column.EscCol}";
+                            if (!neededColumns.Contains(colSql))
+                                neededColumns.Add(colSql);
+                        }
                     }
                 }
                 else if (arg is ParameterExpression param)
                 {
-                    // This represents selecting all columns from a table
-                    TableMapping mapping;
-                    string alias;
-
-                    if (param.Type == outerMapping.Type)
+                    if (correlatedParams.TryGetValue(param, out var info))
                     {
-                        mapping = outerMapping;
-                        alias = outerAlias;
-                    }
-                    else if (param.Type == innerMapping.Type)
-                    {
-                        mapping = innerMapping;
-                        alias = innerAlias;
+                        foreach (var col in info.Mapping.Columns)
+                        {
+                            var colSql = $"{info.Alias}.{col.EscCol}";
+                            if (!neededColumns.Contains(colSql))
+                                neededColumns.Add(colSql);
+                        }
                     }
                     else
                     {
-                        continue;
-                    }
+                        TableMapping mapping;
+                        string alias;
 
-                    foreach (var col in mapping.Columns)
-                    {
-                        var colSql = $"{alias}.{col.EscCol}";
-                        if (!neededColumns.Contains(colSql))
-                            neededColumns.Add(colSql);
+                        if (param.Type == outerMapping.Type)
+                        {
+                            mapping = outerMapping;
+                            alias = outerAlias;
+                        }
+                        else if (param.Type == innerMapping.Type)
+                        {
+                            mapping = innerMapping;
+                            alias = innerAlias;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+
+                        foreach (var col in mapping.Columns)
+                        {
+                            var colSql = $"{alias}.{col.EscCol}";
+                            if (!neededColumns.Contains(colSql))
+                                neededColumns.Add(colSql);
+                        }
                     }
                 }
                 else if (arg is ConstantExpression || arg is UnaryExpression)
