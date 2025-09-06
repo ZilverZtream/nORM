@@ -382,6 +382,7 @@ namespace nORM.Query
 
                 var plan = new QueryPlan(_t._sql.ToString(), _t._params, _t._compiledParams, materializer, elementType, isScalar, singleResult, _t._noTracking, _t._methodName, _t._includes, _t._groupJoinInfo, _t._tables.ToArray(), _t._splitQuery, _t._estimatedTimeout, _t._isCacheable, _t._cacheExpiration);
                 QueryPlanValidator.Validate(plan, _t._provider);
+                _t._projectionPropertyMap.Clear();
                 return plan;
             }
         }
@@ -579,11 +580,19 @@ namespace nORM.Query
             var outerAlias = EscapeAlias("T0");
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
 
-            // Set up parameter correlations for BOTH tables
-            if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
-                _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
-            if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
-                _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
+            var correlationBackup = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)?>(2);
+
+            void Correlate(ParameterExpression param, TableMapping mapping, string alias)
+            {
+                if (_correlatedParams.TryGetValue(param, out var existing))
+                    correlationBackup[param] = existing;
+                else
+                    correlationBackup[param] = null;
+                _correlatedParams[param] = (mapping, alias);
+            }
+
+            Correlate(outerKeySelector.Parameters[0], _mapping, outerAlias);
+            Correlate(innerKeySelector.Parameters[0], innerMapping, innerAlias);
 
             var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
             var outerKeyVisitor = ExpressionVisitorPool.Get(in vctxOuter);
@@ -600,24 +609,33 @@ namespace nORM.Query
                 _params[kvp.Key] = kvp.Value;
             ExpressionVisitorPool.Return(innerKeyVisitor);
 
-            // CRITICAL: Set up correlations for the result selector parameters
-            // This allows WHERE clauses on projected DTOs to work correctly
-            if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
-                _correlatedParams[resultSelector.Parameters[0]] = (_mapping, outerAlias);
-            if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
-                _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
+            _correlatedParams[resultSelector.Parameters[0]] = (_mapping, outerAlias);
+            _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
 
-            JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
-            if (_projection != null)
-                SetupProjectionPropertyMapping(_projection, _mapping, outerAlias, innerMapping, innerAlias);
-            else
-                _projectionPropertyMap.Clear();
+            try
+            {
+                JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
+                if (_projection != null)
+                    SetupProjectionPropertyMapping(_projection, _mapping, outerAlias, innerMapping, innerAlias);
+                else
+                    _projectionPropertyMap.Clear();
 
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql, _correlatedParams);
-            _sql.Clear();
-            _sql.Append(sql);
+                var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql, _correlatedParams);
+                _sql.Clear();
+                _sql.Append(sql);
 
-            return node;
+                return node;
+            }
+            finally
+            {
+                foreach (var kvp in correlationBackup)
+                {
+                    if (kvp.Value.HasValue)
+                        _correlatedParams[kvp.Key] = kvp.Value.Value;
+                    else
+                        _correlatedParams.Remove(kvp.Key);
+                }
+            }
         }
 
         private Expression HandleGroupJoin(MethodCallExpression node)
