@@ -239,15 +239,38 @@ namespace nORM.Query
                     var arg = newExpr.Arguments[i];
                     if (arg is MemberExpression m)
                     {
-                        // Try to resolve against the current mapping first
-                        if (mapping.ColumnsByName.TryGetValue(m.Member.Name, out var col))
+                        // For join projections, we need to track the parameter to determine which table
+                        if (m.Expression is ParameterExpression param)
                         {
-                            cols.Add(col);
+                            // This should resolve against the appropriate table mapping via correlatedParams
+                            // For now, create a column that represents the projected property
+                            var propName = m.Member.Name;
+                            var memberName = newExpr.Members?[i]?.Name ?? propName;
+
+                            // Try to find column in current mapping first
+                            if (mapping.ColumnsByName.TryGetValue(propName, out var col))
+                            {
+                                cols.Add(col);
+                            }
+                            else
+                            {
+                                // Create a column that represents the source property
+                                // The actual SQL generation should happen in JoinBuilder
+                                cols.Add(new Column(propName, m.Type, param.Type, mapping.Provider, memberName));
+                            }
                         }
-                        else if (m.Member is PropertyInfo pi)
+                        else
                         {
-                            // Create a lightweight column for properties from other mappings
-                            cols.Add(new Column(pi, mapping.Provider, null));
+                            // Try to resolve against the current mapping
+                            if (mapping.ColumnsByName.TryGetValue(m.Member.Name, out var col))
+                            {
+                                cols.Add(col);
+                            }
+                            else if (m.Member is PropertyInfo pi)
+                            {
+                                // Create a lightweight column for properties from other mappings
+                                cols.Add(new Column(pi, mapping.Provider, null));
+                            }
                         }
                     }
                     else if (arg is ParameterExpression p)
@@ -264,7 +287,27 @@ namespace nORM.Query
                 var cols = new List<Column>(initExpr.Bindings.Count);
                 foreach (var binding in initExpr.Bindings.OfType<MemberAssignment>())
                 {
-                    if (binding.Member is PropertyInfo pi)
+                    if (binding.Expression is MemberExpression m && m.Expression is ParameterExpression param)
+                    {
+                        var propName = m.Member.Name;
+                        var memberName = binding.Member.Name;
+
+                        if (binding.Member is PropertyInfo targetProp && targetProp.DeclaringType != mapping.Type)
+                        {
+                            // Projecting into a different DTO type; use the target property
+                            cols.Add(new Column(targetProp, mapping.Provider, null));
+                        }
+                        else if (mapping.ColumnsByName.TryGetValue(propName, out var col))
+                        {
+                            cols.Add(col);
+                        }
+                        else
+                        {
+                            // Create column representing the source property
+                            cols.Add(new Column(propName, m.Type, param.Type, mapping.Provider, memberName));
+                        }
+                    }
+                    else if (binding.Member is PropertyInfo pi)
                     {
                         // Create columns based on the target DTO properties
                         cols.Add(new Column(pi, mapping.Provider, null));
