@@ -609,11 +609,11 @@ namespace nORM.Query
 
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
             if (_projection != null)
-                SetupProjectionPropertyMapping(_projection, _mapping, outerAlias, innerMapping, innerAlias);
+                SetupProjectionPropertyMapping(_projection);
             else
                 _projectionPropertyMap.Clear();
 
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
+            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql, _correlatedParams);
             _sql.Clear();
             _sql.Append(sql);
 
@@ -663,7 +663,7 @@ namespace nORM.Query
 
             JoinBuilder.SetupJoinProjection(null, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
+            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, _correlatedParams, outerKeySql);
             _sql.Clear();
             _sql.Append(sql);
 
@@ -735,7 +735,7 @@ namespace nORM.Query
 
                 if (_projection?.Body is NewExpression newExpr)
                 {
-                    var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
+                    var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias, _correlatedParams);
                     if (neededColumns.Count == 0)
                     {
                         var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
@@ -777,7 +777,7 @@ namespace nORM.Query
                 if (resultSelector != null)
                 {
                     _projection = resultSelector;
-                    SetupProjectionPropertyMapping(resultSelector, outerMapping, outerAlias, innerMapping, innerAlias);
+                    SetupProjectionPropertyMapping(_projection!);
                 }
                 else
                 {
@@ -803,7 +803,7 @@ namespace nORM.Query
 
             if (_projection?.Body is NewExpression crossNew)
             {
-                var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, outerMapping, crossMapping, outerAlias, crossAlias);
+                var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, outerMapping, crossMapping, outerAlias, crossAlias, _correlatedParams);
                 if (neededColumns.Count == 0)
                 {
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
@@ -844,7 +844,7 @@ namespace nORM.Query
             if (resultSelector != null)
             {
                 _projection = resultSelector;
-                SetupProjectionPropertyMapping(resultSelector, outerMapping, outerAlias, crossMapping, crossAlias);
+                SetupProjectionPropertyMapping(_projection!);
             }
             else
             {
@@ -1039,7 +1039,7 @@ namespace nORM.Query
             return node;
         }
 
-        private void SetupProjectionPropertyMapping(LambdaExpression projection, TableMapping outerMapping, string outerAlias, TableMapping innerMapping, string innerAlias)
+        private void SetupProjectionPropertyMapping(LambdaExpression projection)
         {
             _projectionPropertyMap.Clear();
 
@@ -1054,13 +1054,10 @@ namespace nORM.Query
                     {
                         var propName = memberExpr.Member.Name;
 
-                        if (param.Type == outerMapping.Type && outerMapping.ColumnsByName.ContainsKey(propName))
+                        if (_correlatedParams.TryGetValue(param, out var info) &&
+                            info.Mapping.ColumnsByName.ContainsKey(propName))
                         {
-                            _projectionPropertyMap[memberName] = (outerMapping, outerAlias, propName);
-                        }
-                        else if (param.Type == innerMapping.Type && innerMapping.ColumnsByName.ContainsKey(propName))
-                        {
-                            _projectionPropertyMap[memberName] = (innerMapping, innerAlias, propName);
+                            _projectionPropertyMap[memberName] = (info.Mapping, info.Alias, propName);
                         }
                     }
                 }
@@ -1075,13 +1072,10 @@ namespace nORM.Query
                     {
                         var propName = memberExpr.Member.Name;
 
-                        if (param.Type == outerMapping.Type && outerMapping.ColumnsByName.ContainsKey(propName))
+                        if (_correlatedParams.TryGetValue(param, out var info) &&
+                            info.Mapping.ColumnsByName.ContainsKey(propName))
                         {
-                            _projectionPropertyMap[memberName] = (outerMapping, outerAlias, propName);
-                        }
-                        else if (param.Type == innerMapping.Type && innerMapping.ColumnsByName.ContainsKey(propName))
-                        {
-                            _projectionPropertyMap[memberName] = (innerMapping, innerAlias, propName);
+                            _projectionPropertyMap[memberName] = (info.Mapping, info.Alias, propName);
                         }
                     }
                 }
