@@ -20,7 +20,6 @@ namespace nORM.Query
             string joinType,
             string outerKeySql,
             string innerKeySql,
-            Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlatedParams,
             string? orderBy = null)
         {
             using var joinSql = new OptimizedSqlBuilder(256);
@@ -28,11 +27,11 @@ namespace nORM.Query
             List<string> neededColumns = null!;
             if (projection?.Body is NewExpression newExpr)
             {
-                neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias, correlatedParams);
+                neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
             }
             else if (projection?.Body is MemberInitExpression initExpr)
             {
-                neededColumns = ExtractNeededColumns(initExpr, outerMapping, innerMapping, outerAlias, innerAlias, correlatedParams);
+                neededColumns = ExtractNeededColumns(initExpr, outerMapping, innerMapping, outerAlias, innerAlias);
             }
 
             if (projection != null && neededColumns.Count > 0)
@@ -78,16 +77,16 @@ namespace nORM.Query
             }
         }
 
-        public static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias, Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlatedParams)
-            => ExtractNeededColumns(newExpr.Arguments, outerMapping, innerMapping, outerAlias, innerAlias, correlatedParams);
+        public static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
+            => ExtractNeededColumns(newExpr.Arguments, outerMapping, innerMapping, outerAlias, innerAlias);
 
-        public static List<string> ExtractNeededColumns(MemberInitExpression initExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias, Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlatedParams)
+        public static List<string> ExtractNeededColumns(MemberInitExpression initExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
         {
             var exprs = initExpr.Bindings.OfType<MemberAssignment>().Select(b => b.Expression);
-            return ExtractNeededColumns(exprs, outerMapping, innerMapping, outerAlias, innerAlias, correlatedParams);
+            return ExtractNeededColumns(exprs, outerMapping, innerMapping, outerAlias, innerAlias);
         }
 
-        private static List<string> ExtractNeededColumns(IEnumerable<Expression> args, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias, Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlatedParams)
+        private static List<string> ExtractNeededColumns(IEnumerable<Expression> args, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
         {
             var neededColumns = new List<string>();
 
@@ -95,81 +94,56 @@ namespace nORM.Query
             {
                 if (arg is MemberExpression memberExpr && memberExpr.Expression is ParameterExpression paramExpr)
                 {
-                    if (correlatedParams.TryGetValue(paramExpr, out var info))
+                    TableMapping mapping;
+                    string alias;
+
+                    if (paramExpr.Type == outerMapping.Type)
                     {
-                        if (info.Mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
-                        {
-                            var colSql = $"{info.Alias}.{column.EscCol}";
-                            if (!neededColumns.Contains(colSql))
-                                neededColumns.Add(colSql);
-                        }
+                        mapping = outerMapping;
+                        alias = outerAlias;
+                    }
+                    else if (paramExpr.Type == innerMapping.Type)
+                    {
+                        mapping = innerMapping;
+                        alias = innerAlias;
                     }
                     else
                     {
-                        // Fallback to type-based resolution if parameter not correlated
-                        TableMapping mapping;
-                        string alias;
+                        continue;
+                    }
 
-                        if (paramExpr.Type == outerMapping.Type)
-                        {
-                            mapping = outerMapping;
-                            alias = outerAlias;
-                        }
-                        else if (paramExpr.Type == innerMapping.Type)
-                        {
-                            mapping = innerMapping;
-                            alias = innerAlias;
-                        }
-                        else
-                        {
-                            continue;
-                        }
-
-                        if (mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
-                        {
-                            var colSql = $"{alias}.{column.EscCol}";
-                            if (!neededColumns.Contains(colSql))
-                                neededColumns.Add(colSql);
-                        }
+                    if (mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
+                    {
+                        var colSql = $"{alias}.{column.EscCol}";
+                        if (!neededColumns.Contains(colSql))
+                            neededColumns.Add(colSql);
                     }
                 }
                 else if (arg is ParameterExpression param)
                 {
-                    if (correlatedParams.TryGetValue(param, out var info))
+                    TableMapping mapping;
+                    string alias;
+
+                    if (param.Type == outerMapping.Type)
                     {
-                        foreach (var col in info.Mapping.Columns)
-                        {
-                            var colSql = $"{info.Alias}.{col.EscCol}";
-                            if (!neededColumns.Contains(colSql))
-                                neededColumns.Add(colSql);
-                        }
+                        mapping = outerMapping;
+                        alias = outerAlias;
+                    }
+                    else if (param.Type == innerMapping.Type)
+                    {
+                        mapping = innerMapping;
+                        alias = innerAlias;
                     }
                     else
                     {
-                        TableMapping mapping;
-                        string alias;
+                        continue;
+                    }
 
-                        if (param.Type == outerMapping.Type)
-                        {
-                            mapping = outerMapping;
-                            alias = outerAlias;
-                        }
-                        else if (param.Type == innerMapping.Type)
-                        {
-                            mapping = innerMapping;
-                            alias = innerAlias;
-                        }
-                        else
-                        {
-                            continue;
-                        }
-
-                        foreach (var col in mapping.Columns)
-                        {
-                            var colSql = $"{alias}.{col.EscCol}";
-                            if (!neededColumns.Contains(colSql))
-                                neededColumns.Add(colSql);
-                        }
+                    foreach (var col in mapping.Columns)
+                    {
+                        var colSql = $"{alias}.{col.EscCol}";
+                        if (!neededColumns.Contains(colSql))
+                            neededColumns.Add(colSql);
                     }
                 }
                 else if (arg is ConstantExpression || arg is UnaryExpression)
