@@ -886,35 +886,88 @@ namespace nORM.Query
 
         private bool IsSimpleQueryPattern(Expression expression)
         {
-            // Simple select all: Query<T>()
-            if (expression is ConstantExpression)
+            static Expression Unwrap(Expression expr)
+            {
+                while (expr is MethodCallExpression m)
+                {
+                    if (m.Method.Name == "AsNoTracking" && m.Arguments.Count == 1)
+                    {
+                        expr = m.Arguments[0];
+                        continue;
+                    }
+
+                    if (m.Method.Name == "Take" && m.Arguments.Count == 2 && m.Arguments[1] is ConstantExpression)
+                    {
+                        expr = m.Arguments[0];
+                        continue;
+                    }
+
+                    break;
+                }
+
+                return expr;
+            }
+
+            var core = Unwrap(expression);
+            if (core is ConstantExpression)
                 return true;
 
-            // Simple where: Query<T>().Where(x => x.Prop == value)
-            if (expression is MethodCallExpression { Method.Name: "Where" } whereCall &&
-                whereCall.Arguments.Count == 2 &&
-                whereCall.Arguments[0] is ConstantExpression)
-                return true;
+            if (core is MethodCallExpression { Method.Name: "Where", Arguments: { Count: 2 } } whereCall)
+            {
+                var source = Unwrap(whereCall.Arguments[0]);
+                return source is ConstantExpression;
+            }
 
             return false;
         }
 
         private async Task<List<T>> ExecuteFastListAsync<T>(Expression expression, CancellationToken ct) where T : class, new()
         {
+            // Parse expression for optional Where/Take/AsNoTracking
+            int? take = null;
+            MethodCallExpression? whereCall = null;
+            var current = expression;
+            while (current is MethodCallExpression m)
+            {
+                if (m.Method.Name == "Take" && m.Arguments.Count == 2 && m.Arguments[1] is ConstantExpression ce)
+                {
+                    take = (int)ce.Value!;
+                    current = m.Arguments[0];
+                    continue;
+                }
+
+                if (m.Method.Name == "AsNoTracking" && m.Arguments.Count == 1)
+                {
+                    current = m.Arguments[0];
+                    continue;
+                }
+
+                if (m.Method.Name == "Where" && m.Arguments.Count == 2)
+                {
+                    whereCall = m;
+                    current = m.Arguments[0];
+                    continue;
+                }
+
+                throw new InvalidOperationException("Fast path failed - using normal path");
+            }
+
+            if (current is not ConstantExpression)
+                throw new InvalidOperationException("Fast path failed - using normal path");
+
             // Get the entity mapping
             var rootType = GetElementType(expression);
             var mapping = _ctx.GetMapping(rootType);
-            
+
             // Build simple SELECT statement
             var columns = string.Join(", ", mapping.Columns.Select(c => c.EscCol));
             var sql = $"SELECT {columns} FROM {mapping.EscTable}";
-            
-            // Check for simple WHERE clause
+
+            // Process WHERE clause if present
             object? paramValue = null;
             string? paramName = null;
-            
-            if (expression is MethodCallExpression { Method.Name: "Where" } whereCall &&
-                whereCall.Arguments.Count == 2 &&
+
+            if (whereCall != null &&
                 whereCall.Arguments[1] is UnaryExpression { Operand: LambdaExpression lambda } &&
                 lambda.Body is BinaryExpression { NodeType: ExpressionType.Equal } binary &&
                 binary.Left is MemberExpression member)
@@ -930,17 +983,21 @@ namespace nORM.Query
                     }
                     catch
                     {
-                        // Fall back to normal path if we can't extract the value
                         throw new InvalidOperationException("Fast path failed - using normal path");
                     }
                 }
             }
-            
+
+            if (take.HasValue)
+            {
+                sql += $" LIMIT {take.Value}";
+            }
+
             // Execute the query
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandText = sql;
-            
+
             if (paramName != null && paramValue != null)
             {
                 var param = cmd.CreateParameter();
@@ -948,10 +1005,10 @@ namespace nORM.Query
                 param.Value = paramValue;
                 cmd.Parameters.Add(param);
             }
-            
+
             var results = new List<T>();
             using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
-            
+
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
                 var entity = new T();
@@ -961,7 +1018,7 @@ namespace nORM.Query
                     {
                         var column = mapping.Columns[i];
                         var value = reader.GetValue(i);
-                        
+
                         // Handle type conversion
                         if (value != null)
                         {
@@ -978,13 +1035,13 @@ namespace nORM.Query
                                 }
                             }
                         }
-                        
+
                         column.Setter(entity, value);
                     }
                 }
                 results.Add(entity);
             }
-            
+
             return results;
         }
     }
