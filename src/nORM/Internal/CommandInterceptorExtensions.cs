@@ -54,6 +54,47 @@ namespace nORM.Internal
             }
         }
 
+        public static int ExecuteNonQueryWithInterception(this DbCommand command, DbContext ctx)
+        {
+            var interceptors = ctx.Options.CommandInterceptors;
+            if (interceptors.Count == 0)
+            {
+                return command.ExecuteNonQuery();
+            }
+
+            foreach (var interceptor in interceptors)
+            {
+                var interception = interceptor.NonQueryExecutingAsync(command, ctx, CancellationToken.None).GetAwaiter().GetResult();
+                if (interception.IsSuppressed)
+                {
+                    foreach (var i in interceptors)
+                        i.NonQueryExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, CancellationToken.None).GetAwaiter().GetResult();
+                    return interception.Result;
+                }
+            }
+
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var result = command.ExecuteNonQuery();
+                sw.Stop();
+                foreach (var interceptor in interceptors)
+                {
+                    interceptor.NonQueryExecutedAsync(command, ctx, result, sw.Elapsed, CancellationToken.None).GetAwaiter().GetResult();
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                foreach (var interceptor in interceptors)
+                {
+                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).GetAwaiter().GetResult();
+                }
+                throw;
+            }
+        }
+
         public static async Task<object?> ExecuteScalarWithInterceptionAsync(this DbCommand command, DbContext ctx, CancellationToken ct)
         {
             var interceptors = ctx.Options.CommandInterceptors;
@@ -95,6 +136,47 @@ namespace nORM.Internal
             }
         }
 
+        public static object? ExecuteScalarWithInterception(this DbCommand command, DbContext ctx)
+        {
+            var interceptors = ctx.Options.CommandInterceptors;
+            if (interceptors.Count == 0)
+            {
+                return command.ExecuteScalar();
+            }
+
+            foreach (var interceptor in interceptors)
+            {
+                var interception = interceptor.ScalarExecutingAsync(command, ctx, CancellationToken.None).GetAwaiter().GetResult();
+                if (interception.IsSuppressed)
+                {
+                    foreach (var i in interceptors)
+                        i.ScalarExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, CancellationToken.None).GetAwaiter().GetResult();
+                    return interception.Result;
+                }
+            }
+
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var result = command.ExecuteScalar();
+                sw.Stop();
+                foreach (var interceptor in interceptors)
+                {
+                    interceptor.ScalarExecutedAsync(command, ctx, result, sw.Elapsed, CancellationToken.None).GetAwaiter().GetResult();
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                foreach (var interceptor in interceptors)
+                {
+                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).GetAwaiter().GetResult();
+                }
+                throw;
+            }
+        }
+
         public static async Task<DbDataReader> ExecuteReaderWithInterceptionAsync(this DbCommand command, DbContext ctx, CommandBehavior behavior, CancellationToken ct)
         {
             var interceptors = ctx.Options.CommandInterceptors;
@@ -131,6 +213,47 @@ namespace nORM.Internal
                 foreach (var interceptor in interceptors)
                 {
                     await interceptor.CommandFailedAsync(command, ctx, ex, ct).ConfigureAwait(false);
+                }
+                throw;
+            }
+        }
+
+        public static DbDataReader ExecuteReaderWithInterception(this DbCommand command, DbContext ctx, CommandBehavior behavior)
+        {
+            var interceptors = ctx.Options.CommandInterceptors;
+            if (interceptors.Count == 0)
+            {
+                return command.ExecuteReader(behavior);
+            }
+
+            foreach (var interceptor in interceptors)
+            {
+                var interception = interceptor.ReaderExecutingAsync(command, ctx, CancellationToken.None).GetAwaiter().GetResult();
+                if (interception.IsSuppressed)
+                {
+                    foreach (var i in interceptors)
+                        i.ReaderExecutedAsync(command, ctx, interception.Result!, TimeSpan.Zero, CancellationToken.None).GetAwaiter().GetResult();
+                    return interception.Result!;
+                }
+            }
+
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var reader = command.ExecuteReader(behavior);
+                sw.Stop();
+                foreach (var interceptor in interceptors)
+                {
+                    interceptor.ReaderExecutedAsync(command, ctx, reader, sw.Elapsed, CancellationToken.None).GetAwaiter().GetResult();
+                }
+                return reader;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                foreach (var interceptor in interceptors)
+                {
+                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).GetAwaiter().GetResult();
                 }
                 throw;
             }

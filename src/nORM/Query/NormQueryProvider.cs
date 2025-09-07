@@ -133,8 +133,18 @@ namespace nORM.Query
             return Math.Clamp(size, 100, 10000);
         }
 
-        public TResult Execute<TResult>(Expression expression) 
+        public TResult Execute<TResult>(Expression expression)
             => ExecuteAsync<TResult>(expression, CancellationToken.None).GetAwaiter().GetResult();
+
+        public TResult ExecuteSync<TResult>(Expression expression)
+        {
+            if (TryGetSimpleQuery(expression, out var sql, out var parameters))
+            {
+                return ExecuteSimpleSync<TResult>(sql, parameters);
+            }
+
+            return Execute<TResult>(expression);
+        }
             
         public object? Execute(Expression expression) => Execute<object>(expression);
 
@@ -440,6 +450,72 @@ namespace nORM.Query
                 cmd.AddOptimizedParam(p.Key, p.Value);
 
             var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
+            _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, list.Count);
+
+            if (returnsList)
+            {
+                return (TResult)list;
+            }
+
+            return list.Count > 0 ? (TResult)list.Cast<object>().First()! : default!;
+        }
+
+        private TResult ExecuteSimpleSync<TResult>(string sql, Dictionary<string, object> parameters)
+        {
+            var sw = Stopwatch.StartNew();
+
+            Type resultType = typeof(TResult);
+            bool returnsList = false;
+            Type elementType;
+
+            if (resultType.IsGenericType)
+            {
+                var genDef = resultType.GetGenericTypeDefinition();
+                if (genDef == typeof(List<>) || genDef == typeof(IEnumerable<>))
+                {
+                    elementType = resultType.GetGenericArguments()[0];
+                    returnsList = true;
+                }
+                else
+                {
+                    elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
+                }
+            }
+            else
+            {
+                elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
+            }
+
+            var mapping = _ctx.GetMapping(elementType);
+            var materializer = new MaterializerFactory().CreateMaterializer(mapping, elementType);
+
+            var plan = new QueryPlan(
+                sql,
+                parameters,
+                Array.Empty<string>(),
+                materializer,
+                elementType,
+                IsScalar: false,
+                SingleResult: !returnsList,
+                NoTracking: false,
+                MethodName: returnsList ? "ToList" : nameof(Queryable.FirstOrDefault),
+                Includes: new List<IncludePlan>(),
+                GroupJoinInfo: null,
+                Tables: new List<string> { mapping.TableName },
+                SplitQuery: false,
+                CommandTimeout: _ctx.Options.TimeoutConfiguration.BaseTimeout,
+                IsCacheable: false,
+                CacheExpiration: null
+            );
+
+            _ctx.EnsureConnection();
+            using var cmd = _ctx.Connection.CreateCommand();
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+            cmd.CommandText = sql;
+            foreach (var p in parameters)
+                cmd.AddOptimizedParam(p.Key, p.Value);
+
+            var list = _executor.Materialize(plan, cmd);
             _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, list.Count);
 
             if (returnsList)
