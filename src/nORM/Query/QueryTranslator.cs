@@ -30,7 +30,7 @@ namespace nORM.Query
         private TableMapping _mapping = null!;
         private Type? _rootType;
         private readonly ParameterManager _parameterManager = new();
-        private Dictionary<string, object> _params { get => _parameterManager.Parameters; set => _parameterManager.Parameters = value; }
+        private IDictionary<string, object> _params { get => _parameterManager.Parameters; set => _parameterManager.Parameters = value; }
         private List<string> _compiledParams { get => _parameterManager.CompiledParameters; set => _parameterManager.CompiledParameters = value; }
         private Dictionary<ParameterExpression, string> _paramMap { get => _parameterManager.ParameterMap; set => _parameterManager.ParameterMap = value; }
         internal int ParameterIndex => _parameterManager.Index;
@@ -91,7 +91,7 @@ namespace nORM.Query
         private QueryTranslator(
             DbContext ctx,
             TableMapping mapping,
-            Dictionary<string, object> parameters,
+            IDictionary<string, object> parameters,
             int pIndex,
             Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlated,
             HashSet<string> tables,
@@ -118,7 +118,7 @@ namespace nORM.Query
         internal static QueryTranslator Create(
             DbContext ctx,
             TableMapping mapping,
-            Dictionary<string, object> parameters,
+            IDictionary<string, object> parameters,
             int pIndex,
             Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> correlated,
             HashSet<string> tables,
@@ -377,7 +377,7 @@ namespace nORM.Query
 
                 var elementType = _t._groupJoinInfo?.ResultType ?? materializerType;
 
-                var plan = new QueryPlan(_t._sql.ToString(), _t._params, _t._compiledParams, materializer, elementType, isScalar, singleResult, _t._noTracking, _t._methodName, _t._includes, _t._groupJoinInfo, _t._tables.ToArray(), _t._splitQuery, _t._estimatedTimeout, _t._isCacheable, _t._cacheExpiration);
+                var plan = new QueryPlan(_t._sql.ToString(), (IReadOnlyDictionary<string, object>)_t._params, _t._compiledParams, materializer, elementType, isScalar, singleResult, _t._noTracking, _t._methodName, _t._includes, _t._groupJoinInfo, _t._tables.ToArray(), _t._splitQuery, _t._estimatedTimeout, _t._isCacheable, _t._cacheExpiration);
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
             }
