@@ -263,7 +263,7 @@ namespace nORM.Benchmarks
         public async Task<List<BenchmarkUser>> Query_Simple_nORM()
         {
             return await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
-                .Where(u => u.IsActive)
+                .Where(u => u.IsActive == true)
                 .AsNoTracking()
                 .Take(10));
         }
