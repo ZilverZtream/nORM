@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using Microsoft.Extensions.ObjectPool;
 using nORM.Mapping;
 
@@ -14,8 +15,14 @@ namespace nORM.Query
     /// </summary>
     internal sealed class OptimizedSqlBuilder : IDisposable
     {
-        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
+        private static readonly ObjectPool<StringBuilder> _pool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
+
+        private static readonly ThreadLocal<StringBuilder> _threadLocalBuilder =
+            new(() => new StringBuilder(512));
+
+        private static readonly ObjectPool<Dictionary<(Type? type, int hash), string>> _parameterCachePool =
+            new DefaultObjectPool<Dictionary<(Type? type, int hash), string>>(new DictionaryPooledObjectPolicy());
 
         private static readonly ConcurrentDictionary<string, string> _fragmentCache = new();
 
@@ -41,16 +48,17 @@ namespace nORM.Query
         }
 
         private readonly StringBuilder _buffer;
-        private readonly Dictionary<(Type? type, int hash), string> _parameterCache = new();
+        private readonly Dictionary<(Type? type, int hash), string> _parameterCache;
         private readonly bool _returnToPool;
         private bool _hasWhere;
 
         public OptimizedSqlBuilder(int estimatedLength = 512)
         {
-            _buffer = _stringBuilderPool.Get();
+            _buffer = _pool.Get();
             _buffer.Clear();
             if (_buffer.Capacity < estimatedLength)
                 _buffer.Capacity = estimatedLength;
+            _parameterCache = _parameterCachePool.Get();
             _returnToPool = true;
         }
 
@@ -60,6 +68,7 @@ namespace nORM.Query
             _buffer.Clear();
             if (_buffer.Capacity < estimatedLength)
                 _buffer.Capacity = estimatedLength;
+            _parameterCache = _parameterCachePool.Get();
             _returnToPool = false;
         }
 
@@ -204,7 +213,8 @@ namespace nORM.Query
                 return;
             }
 
-            var sb = new StringBuilder(256);
+            var sb = _threadLocalBuilder.Value!;
+            sb.Clear();
             sb.Append(distinct ? "SELECT DISTINCT " : "SELECT ");
             var first = true;
             foreach (var col in mapping.Columns)
@@ -226,8 +236,20 @@ namespace nORM.Query
         public void Dispose()
         {
             Clear();
+            _parameterCachePool.Return(_parameterCache);
             if (_returnToPool)
-                _stringBuilderPool.Return(_buffer);
+                _pool.Return(_buffer);
+        }
+
+        private sealed class DictionaryPooledObjectPolicy : PooledObjectPolicy<Dictionary<(Type? type, int hash), string>>
+        {
+            public override Dictionary<(Type? type, int hash), string> Create() => new();
+
+            public override bool Return(Dictionary<(Type? type, int hash), string> obj)
+            {
+                obj.Clear();
+                return true;
+            }
         }
     }
 }
