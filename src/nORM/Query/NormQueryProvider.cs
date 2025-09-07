@@ -38,6 +38,7 @@ namespace nORM.Query
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
+        private readonly ConcurrentDictionary<string, string> _simpleSqlCache = new();
 
         public NormQueryProvider(DbContext ctx)
         {
@@ -139,6 +140,14 @@ namespace nORM.Query
 
         public Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken ct)
         {
+            if (TryGetSimpleQuery(expression, out var sql, out var parameters))
+            {
+                Func<CancellationToken, Task<TResult>> factory = token => ExecuteSimpleAsync<TResult>(sql, parameters, token);
+                return _ctx.Options.RetryPolicy != null
+                    ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => factory(token), ct)
+                    : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => factory(token), ct);
+            }
+
             return _ctx.Options.RetryPolicy != null
                ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteInternalAsync<TResult>(expression, token), ct)
                : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteInternalAsync<TResult>(expression, token), ct);
@@ -286,6 +295,166 @@ namespace nORM.Query
             {
                 return await queryExecutorFactory().ConfigureAwait(false);
             }
+        }
+
+        private bool TryGetSimpleQuery(Expression expr, out string sql, out Dictionary<string, object> parameters)
+        {
+            sql = string.Empty;
+            parameters = new Dictionary<string, object>();
+
+            if (_ctx.Options.GlobalFilters.Count > 0 || _ctx.Options.TenantProvider != null)
+                return false;
+
+            // Traverse to find root query and optional Where predicate
+            MethodCallExpression? whereCall = null;
+            Expression current = expr;
+
+            // Unwrap result operators like First/Single
+            while (current is MethodCallExpression mc && mc.Method.DeclaringType == typeof(Queryable))
+            {
+                if (mc.Method.Name == nameof(Queryable.Where))
+                {
+                    if (whereCall != null) return false; // only support single Where
+                    whereCall = mc;
+                    current = mc.Arguments[0];
+                }
+                else if (mc.Method.Name is nameof(Queryable.First) or nameof(Queryable.FirstOrDefault) or nameof(Queryable.Single) or nameof(Queryable.SingleOrDefault))
+                {
+                    current = mc.Arguments[0];
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            if (current is not ConstantExpression constant)
+                return false;
+
+            var elementType = GetElementType(constant);
+            var map = _ctx.GetMapping(elementType);
+
+            var cacheKey = ExpressionFingerprint.Compute(expr) + ":" + elementType.FullName;
+
+            if (!_simpleSqlCache.TryGetValue(cacheKey, out var cachedSql))
+            {
+                var sb = new StringBuilder();
+                sb.Append("SELECT ");
+                sb.Append(string.Join(", ", map.Columns.Select(c => c.EscCol)));
+                sb.Append(" FROM ").Append(map.EscTable);
+
+                if (whereCall != null)
+                {
+                    var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
+                    if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
+                        return false;
+
+                    if (be.Left is not MemberExpression me)
+                        return false;
+
+                    if (!map.ColumnsByName.TryGetValue(me.Member.Name, out var column))
+                        return false;
+
+                    var paramName = _ctx.Provider.ParamPrefix + "p0";
+                    sb.Append(" WHERE ").Append(column.EscCol).Append(" = ").Append(paramName);
+
+                    var value = Expression.Lambda(be.Right, lambda.Parameters).Compile().DynamicInvoke(new object?[] { null });
+                    parameters[paramName] = value!;
+                }
+
+                sql = sb.ToString();
+                _simpleSqlCache[cacheKey] = sql;
+                return true;
+            }
+
+            sql = cachedSql!;
+
+            // SQL cached; still need parameter value if where present
+            if (whereCall != null)
+            {
+                var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
+                if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
+                    return false;
+
+                var paramName = _ctx.Provider.ParamPrefix + "p0";
+                var value = Expression.Lambda(be.Right, lambda.Parameters).Compile().DynamicInvoke(new object?[] { null });
+                parameters[paramName] = value!;
+            }
+
+            return true;
+        }
+
+        private async Task<TResult> ExecuteSimpleAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
+        {
+            var sw = Stopwatch.StartNew();
+
+            Type resultType = typeof(TResult);
+            bool returnsList = false;
+            Type elementType;
+
+            if (resultType.IsGenericType)
+            {
+                var genDef = resultType.GetGenericTypeDefinition();
+                if (genDef == typeof(List<>) || genDef == typeof(IEnumerable<>))
+                {
+                    elementType = resultType.GetGenericArguments()[0];
+                    returnsList = true;
+                }
+                else
+                {
+                    elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
+                }
+            }
+            else
+            {
+                elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
+            }
+
+            var mapping = _ctx.GetMapping(elementType);
+            var materializer = new MaterializerFactory().CreateMaterializer(mapping, elementType);
+
+            var plan = new QueryPlan(
+                sql,
+                parameters,
+                Array.Empty<string>(),
+                materializer,
+                elementType,
+                IsScalar: false,
+                SingleResult: !returnsList,
+                NoTracking: false,
+                MethodName: returnsList ? "ToList" : nameof(Queryable.FirstOrDefault),
+                Includes: new List<IncludePlan>(),
+                GroupJoinInfo: null,
+                Tables: new List<string> { mapping.TableName },
+                SplitQuery: false,
+                CommandTimeout: _ctx.Options.TimeoutConfiguration.BaseTimeout,
+                IsCacheable: false,
+                CacheExpiration: null
+            );
+
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
+            await using var cmd = _ctx.Connection.CreateCommand();
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+            cmd.CommandText = sql;
+            foreach (var p in parameters)
+                cmd.AddOptimizedParam(p.Key, p.Value);
+
+            var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
+            _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, list.Count);
+
+            if (returnsList)
+            {
+                return (TResult)list;
+            }
+
+            return list.Count > 0 ? (TResult)list.Cast<object>().First()! : default!;
+        }
+
+        private static Expression StripQuotes(Expression e)
+        {
+            while (e.NodeType == ExpressionType.Quote)
+                e = ((UnaryExpression)e).Operand;
+            return e;
         }
 
         private async Task<TResult> ExecuteWithCacheAsync<TResult>(string cacheKey, IReadOnlyCollection<string> tables, TimeSpan expiration, Func<Task<TResult>> factory, CancellationToken ct)
