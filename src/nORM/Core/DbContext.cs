@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Transactions;
 using System.Text.RegularExpressions;
+using System.Text;
 using nORM.Configuration;
 using nORM.Execution;
 using nORM.Mapping;
@@ -324,9 +325,129 @@ namespace nORM.Core
             var totalAffected = 0;
             try
             {
-                foreach (var entry in changedEntries)
+                foreach (var group in changedEntries.GroupBy(e => (e.State, e.Mapping)))
                 {
-                    totalAffected += await ProcessEntityChangeAsync(entry, transaction, ct).ConfigureAwait(false);
+                    var entries = group.ToList();
+                    if (entries.Count == 0)
+                        continue;
+
+                    var map = group.Key.Mapping;
+                    var state = group.Key.State;
+
+                    var paramsPerEntity = state switch
+                    {
+                        EntityState.Added => map.InsertColumns.Length,
+                        EntityState.Modified => map.UpdateColumns.Length + map.KeyColumns.Length + (map.TimestampColumn != null ? 1 : 0),
+                        EntityState.Deleted => map.KeyColumns.Length + (map.TimestampColumn != null ? 1 : 0),
+                        _ => 0
+                    };
+                    var batchSize = entries.Count;
+                    if (_p.MaxParameters != int.MaxValue)
+                    {
+                        var maxParams = Math.Max(1, _p.MaxParameters - 10);
+                        batchSize = Math.Max(1, maxParams / Math.Max(1, paramsPerEntity));
+                    }
+
+                    var templateLength = state switch
+                    {
+                        EntityState.Added => BuildInsertBatch(map, 0).Length + 1,
+                        EntityState.Modified => BuildUpdateBatch(map, 0).Length + 1,
+                        EntityState.Deleted => BuildDeleteBatch(map, 0).Length + 1,
+                        _ => 0
+                    };
+
+                    for (int start = 0; start < entries.Count; start += batchSize)
+                    {
+                        var batch = entries.Skip(start).Take(Math.Min(batchSize, entries.Count - start)).ToList();
+
+                        await using var cmd = Connection.CreateCommand();
+                        cmd.Transaction = transaction;
+
+                        var sql = new System.Text.StringBuilder(templateLength * batch.Count);
+                        var paramIndex = 0;
+
+                        switch (state)
+                        {
+                            case EntityState.Added:
+                                foreach (var entry in batch)
+                                {
+                                    sql.Append(BuildInsertBatch(map, paramIndex)).Append(';');
+                                    paramIndex = AddParametersBatched(cmd, map,
+                                        entry.Entity ?? throw new InvalidOperationException("Entity is null"),
+                                        WriteOperation.Insert, paramIndex);
+                                }
+                                cmd.CommandText = sql.ToString();
+                                cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText).TotalSeconds;
+                                await cmd.PrepareAsync(ct).ConfigureAwait(false);
+                                if (map.KeyColumns.Any(k => k.IsDbGenerated))
+                                {
+                                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, ct).ConfigureAwait(false);
+                                    int i = 0;
+                                    do
+                                    {
+                                        if (await reader.ReadAsync(ct))
+                                        {
+                                            var newId = reader.GetValue(0);
+                                            var entity = batch[i].Entity;
+                                            if (entity != null)
+                                                map.SetPrimaryKey(entity, newId);
+                                        }
+                                        batch[i].AcceptChanges();
+                                        i++;
+                                    }
+                                    while (await reader.NextResultAsync(ct) && i < batch.Count);
+                                    totalAffected += reader.RecordsAffected;
+                                }
+                                else
+                                {
+                                    totalAffected += await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                                    foreach (var entry in batch)
+                                        entry.AcceptChanges();
+                                }
+                                break;
+
+                            case EntityState.Modified:
+                                foreach (var entry in batch)
+                                {
+                                    sql.Append(BuildUpdateBatch(map, paramIndex)).Append(';');
+                                    paramIndex = AddParametersBatched(cmd, map,
+                                        entry.Entity ?? throw new InvalidOperationException("Entity is null"),
+                                        WriteOperation.Update, paramIndex);
+                                }
+                                cmd.CommandText = sql.ToString();
+                                cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Update, cmd.CommandText).TotalSeconds;
+                                await cmd.PrepareAsync(ct).ConfigureAwait(false);
+                                var updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                                if (map.TimestampColumn != null && updated != batch.Count)
+                                    throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+                                foreach (var entry in batch)
+                                    entry.AcceptChanges();
+                                totalAffected += updated;
+                                break;
+
+                            case EntityState.Deleted:
+                                foreach (var entry in batch)
+                                {
+                                    sql.Append(BuildDeleteBatch(map, paramIndex)).Append(';');
+                                    paramIndex = AddParametersBatched(cmd, map,
+                                        entry.Entity ?? throw new InvalidOperationException("Entity is null"),
+                                        WriteOperation.Delete, paramIndex);
+                                }
+                                cmd.CommandText = sql.ToString();
+                                cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Delete, cmd.CommandText).TotalSeconds;
+                                await cmd.PrepareAsync(ct).ConfigureAwait(false);
+                                var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                                if (map.TimestampColumn != null && deleted != batch.Count)
+                                    throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+                                foreach (var entry in batch)
+                                {
+                                    if (entry.Entity is { } entityToRemove)
+                                        ChangeTracker.Remove(entityToRemove, true);
+                                }
+                                totalAffected += deleted;
+                                break;
+                        }
+                    }
                 }
 
                 if (saveInterceptors.Count > 0)
@@ -362,28 +483,6 @@ namespace nORM.Core
             return totalAffected;
         }
 
-        private async Task<int> ProcessEntityChangeAsync(EntityEntry entry, DbTransaction? transaction, CancellationToken ct)
-        {
-            switch (entry.State)
-            {
-                case EntityState.Added:
-                    var inserted = await InvokeWriteAsync(nameof(InsertAsync), entry, transaction, ct).ConfigureAwait(false);
-                    entry.AcceptChanges();
-                    return inserted;
-                case EntityState.Modified:
-                    var updated = await InvokeWriteAsync(nameof(UpdateAsync), entry, transaction, ct).ConfigureAwait(false);
-                    entry.AcceptChanges();
-                    return updated;
-                case EntityState.Deleted:
-                    var deleted = await InvokeWriteAsync(nameof(DeleteAsync), entry, transaction, ct).ConfigureAwait(false);
-                      if (entry.Entity is { } entityToRemove)
-                          ChangeTracker.Remove(entityToRemove, true);
-                    return deleted;
-                default:
-                    return 0;
-            }
-        }
-
         private bool IsRetryableException(Exception ex)
         {
             if (ex is DbException dbEx && Options.RetryPolicy != null)
@@ -395,13 +494,6 @@ namespace nORM.Core
             return ex is TimeoutException;
         }
 
-        private Task<int> InvokeWriteAsync(string methodName, EntityEntry entry, DbTransaction? transaction, CancellationToken ct)
-        {
-            var method = typeof(DbContext).GetMethods()
-                .First(m => m.Name == methodName && m.GetParameters().Length == 3)
-                  .MakeGenericMethod((entry.Entity ?? throw new InvalidOperationException("Entity is null")).GetType());
-            return (Task<int>)method.Invoke(this, new object?[] { entry.Entity, transaction, ct })!;
-        }
         #endregion
 
         #region Standard CRUD
@@ -580,6 +672,75 @@ namespace nORM.Core
                         cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, map.TimestampColumn.Getter(entity));
                     break;
             }
+        }
+
+        private string BuildInsertBatch(TableMapping map, int startParamIndex)
+        {
+            var cols = map.InsertColumns;
+            if (cols.Length == 0)
+                return $"INSERT INTO {map.EscTable} DEFAULT VALUES{_p.GetIdentityRetrievalString(map)}";
+            var colNames = string.Join(", ", cols.Select(c => c.EscCol));
+            var paramNames = string.Join(", ", cols.Select((c, i) => $"{_p.ParamPrefix}p{startParamIndex + i}"));
+            return $"INSERT INTO {map.EscTable} ({colNames}) VALUES ({paramNames}){_p.GetIdentityRetrievalString(map)}";
+        }
+
+        private string BuildUpdateBatch(TableMapping map, int startParamIndex)
+        {
+            var setSb = new StringBuilder();
+            var idx = startParamIndex;
+            for (int i = 0; i < map.UpdateColumns.Length; i++)
+            {
+                if (i > 0) setSb.Append(", ");
+                setSb.Append(map.UpdateColumns[i].EscCol)
+                    .Append('=')
+                    .Append(_p.ParamPrefix).Append('p').Append(idx++);
+            }
+            var whereParts = new List<string>();
+            foreach (var col in map.KeyColumns)
+                whereParts.Add($"{col.EscCol}={_p.ParamPrefix}p{idx++}");
+            if (map.TimestampColumn != null)
+                whereParts.Add($"{map.TimestampColumn.EscCol}={_p.ParamPrefix}p{idx++}");
+            var where = string.Join(" AND ", whereParts);
+            return $"UPDATE {map.EscTable} SET {setSb} WHERE {where}";
+        }
+
+        private string BuildDeleteBatch(TableMapping map, int startParamIndex)
+        {
+            var idx = startParamIndex;
+            var whereParts = new List<string>();
+            foreach (var col in map.KeyColumns)
+                whereParts.Add($"{col.EscCol}={_p.ParamPrefix}p{idx++}");
+            if (map.TimestampColumn != null)
+                whereParts.Add($"{map.TimestampColumn.EscCol}={_p.ParamPrefix}p{idx++}");
+            var where = string.Join(" AND ", whereParts);
+            return $"DELETE FROM {map.EscTable} WHERE {where}";
+        }
+
+        private int AddParametersBatched(DbCommand cmd, TableMapping map, object entity, WriteOperation operation, int startIndex)
+        {
+            var index = startIndex;
+            switch (operation)
+            {
+                case WriteOperation.Insert:
+                    foreach (var col in map.InsertColumns)
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
+                    break;
+                case WriteOperation.Update:
+                    foreach (var col in map.UpdateColumns)
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
+                    foreach (var col in map.KeyColumns)
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
+                    if (map.TimestampColumn != null)
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", map.TimestampColumn.Getter(entity));
+                    break;
+                case WriteOperation.Delete:
+                    foreach (var col in map.KeyColumns)
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
+                    if (map.TimestampColumn != null)
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", map.TimestampColumn.Getter(entity));
+                    break;
+            }
+            return index;
         }
         #endregion
 
