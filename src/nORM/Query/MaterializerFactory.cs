@@ -6,6 +6,7 @@ using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Internal;
@@ -33,12 +34,80 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<Type, ConstructorInfo?> _parameterlessCtorCache = new();
         private static readonly ConcurrentDictionary<Type, Func<object>> _parameterlessCtorDelegates = new();
         private static readonly ConcurrentDictionary<Type, bool> _simpleTypeCache = new();
+        private static readonly ConcurrentDictionary<Type, Func<DbDataReader, object>> _fastMaterializers = new();
 
         private static bool IsSimpleType(Type type)
             => _simpleTypeCache.GetOrAdd(type, static t => t.IsPrimitive || t == typeof(decimal) || t == typeof(string));
 
         internal static (long Hits, long Misses, double HitRate) CacheStats
             => (_cache.Hits, _cache.Misses, _cache.HitRate);
+
+        public static void PrecompileCommonPatterns<T>() where T : class, new()
+        {
+            var key = typeof(T);
+            if (!_fastMaterializers.ContainsKey(key))
+            {
+                _fastMaterializers[key] = CreateILMaterializer<T>();
+            }
+        }
+
+        private static Func<DbDataReader, object> CreateILMaterializer<T>() where T : class, new()
+        {
+            var method = new DynamicMethod("Materialize", typeof(object), new[] { typeof(DbDataReader) }, typeof(MaterializerFactory), true);
+            var il = method.GetILGenerator();
+
+            var ctor = typeof(T).GetConstructor(Type.EmptyTypes)!;
+            var props = typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public);
+
+            il.DeclareLocal(typeof(T)); // local 0: entity
+            il.Emit(OpCodes.Newobj, ctor);
+            il.Emit(OpCodes.Stloc_0);
+
+            for (int i = 0; i < props.Length; i++)
+            {
+                var prop = props[i];
+                if (!prop.CanWrite) continue;
+
+                var skip = il.DefineLabel();
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldc_I4, i);
+                il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
+                il.Emit(OpCodes.Brtrue_S, skip);
+
+                il.Emit(OpCodes.Ldloc_0);
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldc_I4, i);
+                il.Emit(OpCodes.Callvirt, Methods.GetValue);
+
+                var pType = prop.PropertyType;
+                var underlying = Nullable.GetUnderlyingType(pType);
+                if (underlying != null)
+                {
+                    il.Emit(OpCodes.Ldtoken, underlying);
+                    il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
+                    il.Emit(OpCodes.Call, typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) })!);
+                    il.Emit(OpCodes.Unbox_Any, underlying);
+                    var ctorNullable = pType.GetConstructor(new[] { underlying })!;
+                    il.Emit(OpCodes.Newobj, ctorNullable);
+                }
+                else if (pType.IsValueType)
+                {
+                    il.Emit(OpCodes.Unbox_Any, pType);
+                }
+                else
+                {
+                    il.Emit(OpCodes.Castclass, pType);
+                }
+
+                il.Emit(OpCodes.Callvirt, prop.GetSetMethod()!);
+                il.MarkLabel(skip);
+            }
+
+            il.Emit(OpCodes.Ldloc_0);
+            il.Emit(OpCodes.Ret);
+
+            return (Func<DbDataReader, object>)method.CreateDelegate(typeof(Func<DbDataReader, object>));
+        }
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
         {
@@ -61,6 +130,15 @@ namespace nORM.Query
             {
                 _cache.GetOrAdd(cacheKey, _ => precompiled);
                 return precompiled;
+            }
+
+            if (projection == null && _fastMaterializers.TryGetValue(targetType, out var fast))
+            {
+                return _cache.GetOrAdd(cacheKey, _ => (reader, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return Task.FromResult(fast(reader));
+                });
             }
 
             return _cache.GetOrAdd(cacheKey, _ =>
