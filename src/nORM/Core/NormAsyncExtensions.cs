@@ -70,6 +70,37 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Converts nORM query to List synchronously - only works with nORM queries
+        /// </summary>
+        public static List<T> ToListSync<T>(this IQueryable<T> source) where T : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                return normProvider.ExecuteSync<List<T>>(source.Expression);
+            }
+
+            throw new NormUsageException("ToListSync can only be used with nORM queries.");
+        }
+
+        /// <summary>
+        /// Counts nORM query results synchronously - only works with nORM queries
+        /// </summary>
+        public static int CountSync<T>(this IQueryable<T> source) where T : class
+        {
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var countExpression = Expression.Call(
+                    typeof(Queryable),
+                    nameof(Queryable.Count),
+                    new[] { typeof(T) },
+                    source.Expression);
+                return normProvider.ExecuteSync<int>(countExpression);
+            }
+
+            throw new NormUsageException("CountSync can only be used with nORM queries.");
+        }
+
+        /// <summary>
         /// Converts nORM query to Array asynchronously - only works with nORM queries  
         /// </summary>
         public static async Task<T[]> ToArrayAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
