@@ -15,7 +15,7 @@ using nORM.Execution;
 namespace nORM.Query
 {
     /// <summary>
-    /// Handles eager loading of navigation properties.
+    /// Handles eager loading of navigation properties using multi-result-set queries.
     /// </summary>
     internal sealed class IncludeProcessor
     {
@@ -24,94 +24,156 @@ namespace nORM.Query
 
         public IncludeProcessor(DbContext ctx) => _ctx = ctx;
 
+        /// <summary>
+        /// Eagerly loads all relations defined in the <paramref name="include"/> for the given <paramref name="parents"/>
+        /// using a single round trip per batch of keys.
+        /// </summary>
         public async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct, bool noTracking)
         {
-            IList current = parents;
-            foreach (var relation in include.Path)
+            if (parents.Count == 0 || include.Path.Count == 0)
+                return;
+
+            var firstRelation = include.Path[0];
+
+            // Build lookup of parent entities by key to allow batching
+            var parentLookup = new Dictionary<object, List<object>>();
+            foreach (var p in parents.Cast<object>())
             {
-                ct.ThrowIfCancellationRequested();
-                current = await EagerLoadLevelAsync(relation, current, ct, noTracking).ConfigureAwait(false);
-                if (current.Count == 0) break;
+                var key = firstRelation.PrincipalKey.Getter(p);
+                if (key == null)
+                {
+                    AssignEmptyList(p, firstRelation);
+                    continue;
+                }
+
+                if (!parentLookup.TryGetValue(key, out var list))
+                    parentLookup[key] = list = new List<object>();
+                list.Add(p);
             }
-        }
 
-        private async Task<IList> EagerLoadLevelAsync(TableMapping.Relation relation, IList parents, CancellationToken ct, bool noTracking)
-        {
-            var resultChildren = new List<object>();
-            if (parents.Count == 0) return resultChildren;
+            if (parentLookup.Count == 0)
+                return;
 
-            var childMap = _ctx.GetMapping(relation.DependentType);
-            var childMaterializer = _materializerFactory.CreateMaterializer(childMap, childMap.Type);
+            // Pre-compute mappings and materializers for the relations
+            var mappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
+            var materializers = mappings
+                .Select(m => _materializerFactory.CreateMaterializer(m, m.Type))
+                .ToArray();
 
-            // Limit the number of parameters per query to avoid memory pressure
+            // Limit parameters per query to avoid memory pressure
             var maxPerBatch = Math.Max(1, Math.Min(1000, _ctx.Provider.MaxParameters - 10));
-            var childGroups = new Dictionary<object, List<object>>();
+            var keys = parentLookup.Keys.ToArray();
 
-            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-
-            var keyEnumerable = parents.Cast<object>()
-                                       .Select(relation.PrincipalKey.Getter)
-                                       .Where(k => k != null)
-                                       .Distinct();
-
-            var hasKeys = false;
-            foreach (var keyBatch in keyEnumerable.Chunk(maxPerBatch))
+            foreach (var keyBatch in keys.Chunk(maxPerBatch))
             {
                 ct.ThrowIfCancellationRequested();
-                hasKeys = true;
+
+                await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 await using var cmd = _ctx.Connection.CreateCommand();
 
                 var paramNames = new List<string>();
                 for (int i = 0; i < keyBatch.Length; i++)
                 {
-                    ct.ThrowIfCancellationRequested();
                     var pn = $"{_ctx.Provider.ParamPrefix}fk{i}";
-                    paramNames.Add(pn);
                     cmd.AddParam(pn, keyBatch[i]!);
+                    paramNames.Add(pn);
                 }
 
-                cmd.CommandText = $"SELECT * FROM {childMap.EscTable} WHERE {relation.ForeignKey.EscCol} IN ({PooledStringBuilder.Join(paramNames, ",")})";
+                cmd.CommandText = BuildSql(include.Path, mappings, paramNames);
                 cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
 
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
-                while (await reader.ReadAsync(ct).ConfigureAwait(false))
-                {
-                    ct.ThrowIfCancellationRequested();
-                    var child = await childMaterializer(reader, ct).ConfigureAwait(false);
-                    if (!noTracking)
-                    {
-                        var entry = _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
-                        child = entry.Entity!;
-                        NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
-                    }
-                    resultChildren.Add(child);
 
-                    var fk = relation.ForeignKey.Getter(child);
-                    if (fk != null)
-                    {
-                        if (!childGroups.TryGetValue(fk, out var list))
-                            childGroups[fk] = list = new List<object>();
-                        list.Add(child);
-                    }
+                // Collect parent objects for the current batch
+                IList currentParents = keyBatch.SelectMany(k => parentLookup[k]).ToList();
+
+                for (int level = 0; level < include.Path.Count; level++)
+                {
+                    currentParents = await ProcessLevelAsync(include.Path[level], mappings[level], materializers[level], currentParents, reader, ct, noTracking).ConfigureAwait(false);
+                    if (level < include.Path.Count - 1)
+                        await reader.NextResultAsync(ct).ConfigureAwait(false);
                 }
             }
+        }
 
-            if (!hasKeys) return resultChildren;
+        private static void AssignEmptyList(object parent, TableMapping.Relation relation)
+        {
+            var listType = typeof(List<>).MakeGenericType(relation.DependentType);
+            var childList = (IList)Activator.CreateInstance(listType)!;
+            relation.NavProp.SetValue(parent, childList);
+        }
+
+        private static string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames)
+        {
+            var current = $"({PooledStringBuilder.Join(paramNames, ",")})";
+            var sb = PooledStringBuilder.Rent();
+            try
+            {
+                for (int i = 0; i < path.Count; i++)
+                {
+                    var relation = path[i];
+                    var map = mappings[i];
+                    sb.Append("SELECT * FROM ").Append(map.EscTable)
+                      .Append(" WHERE ").Append(relation.ForeignKey.EscCol)
+                      .Append(" IN ").Append(current).Append(';');
+
+                    var pkCol = map.KeyColumns[0].EscCol;
+                    current = $"(SELECT {pkCol} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current})";
+                }
+
+                return sb.ToString().TrimEnd(';');
+            }
+            finally
+            {
+                PooledStringBuilder.Return(sb);
+            }
+        }
+
+        private async Task<IList> ProcessLevelAsync(
+            TableMapping.Relation relation,
+            TableMapping childMap,
+            Func<DbDataReader, CancellationToken, Task<object>> materializer,
+            IList parents,
+            DbDataReader reader,
+            CancellationToken ct,
+            bool noTracking)
+        {
+            var resultChildren = new List<object>();
+            var childGroups = new Dictionary<object, List<object>>();
+
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                ct.ThrowIfCancellationRequested();
+                var child = await materializer(reader, ct).ConfigureAwait(false);
+                if (!noTracking)
+                {
+                    var entry = _ctx.ChangeTracker.Track(child, EntityState.Unchanged, childMap);
+                    child = entry.Entity!;
+                    NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
+                }
+
+                resultChildren.Add(child);
+
+                var fk = relation.ForeignKey.Getter(child);
+                if (fk != null)
+                {
+                    if (!childGroups.TryGetValue(fk, out var list))
+                        childGroups[fk] = list = new List<object>();
+                    list.Add(child);
+                }
+            }
 
             foreach (var p in parents.Cast<object>())
             {
                 ct.ThrowIfCancellationRequested();
                 var pk = relation.PrincipalKey.Getter(p);
                 var listType = typeof(List<>).MakeGenericType(relation.DependentType);
-                var childList = (IList)System.Activator.CreateInstance(listType)!;
+                var childList = (IList)Activator.CreateInstance(listType)!;
 
                 if (pk != null && childGroups.TryGetValue(pk, out var c))
                 {
                     foreach (var item in c)
-                    {
-                        ct.ThrowIfCancellationRequested();
                         childList.Add(item);
-                    }
                 }
 
                 relation.NavProp.SetValue(p, childList);
@@ -121,3 +183,4 @@ namespace nORM.Query
         }
     }
 }
+
