@@ -35,6 +35,7 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<Type, Func<object>> _parameterlessCtorDelegates = new();
         private static readonly ConcurrentDictionary<Type, bool> _simpleTypeCache = new();
         private static readonly ConcurrentDictionary<Type, Func<DbDataReader, object>> _fastMaterializers = new();
+        private static readonly ConcurrentDictionary<Type, Action<object, DbDataReader>[]> _setterCache = new();
 
         private static bool IsSimpleType(Type type)
             => _simpleTypeCache.GetOrAdd(type, static t => t.IsPrimitive || t == typeof(decimal) || t == typeof(string));
@@ -224,6 +225,31 @@ namespace nORM.Query
                     var body = Expression.Convert(newExpr, typeof(object));
                     return Expression.Lambda<Func<object>>(body).Compile();
                 });
+
+                var properties = targetType.GetProperties();
+                var canOptimize = columns.Length <= properties.Length;
+                for (int i = 0; i < columns.Length && i < properties.Length; i++)
+                {
+                    if (columns[i].Prop != properties[i])
+                    {
+                        canOptimize = false;
+                        break;
+                    }
+                }
+
+                if (canOptimize)
+                {
+                    var setters = GetOptimizedSetters(targetType);
+                    return reader =>
+                    {
+                        var entity = parameterlessCtorDelegate();
+                        for (int i = 0; i < columns.Length && i < setters.Length; i++)
+                        {
+                            setters[i](entity, reader);
+                        }
+                        return entity!;
+                    };
+                }
 
                 return reader =>
                 {
@@ -463,6 +489,40 @@ namespace nORM.Query
                 call = Expression.Convert(call, propertyType);
 
             return call;
+        }
+
+        private static Action<object, DbDataReader>[] GetOptimizedSetters<T>()
+            => GetOptimizedSetters(typeof(T));
+
+        private static Action<object, DbDataReader>[] GetOptimizedSetters(Type type)
+        {
+            return _setterCache.GetOrAdd(type, t =>
+            {
+                var properties = t.GetProperties();
+                var setters = new Action<object, DbDataReader>[properties.Length];
+
+                for (int i = 0; i < properties.Length; i++)
+                {
+                    var prop = properties[i];
+                    // Create compiled delegate instead of using PropertyInfo.SetValue
+                    setters[i] = CreateOptimizedSetter(prop, i);
+                }
+
+                return setters;
+            });
+        }
+
+        private static Action<object, DbDataReader> CreateOptimizedSetter(PropertyInfo property, int index)
+        {
+            var targetParam = Expression.Parameter(typeof(object), "target");
+            var readerParam = Expression.Parameter(typeof(DbDataReader), "reader");
+
+            var isDbNull = Expression.Call(readerParam, Methods.IsDbNull, Expression.Constant(index));
+            var getValue = GetOptimizedReaderCall(readerParam, property.PropertyType, index);
+            var assign = Expression.Call(Expression.Convert(targetParam, property.DeclaringType!), property.GetSetMethod()!, getValue);
+            var body = Expression.IfThen(Expression.Not(isDbNull), assign);
+
+            return Expression.Lambda<Action<object, DbDataReader>>(body, targetParam, readerParam).Compile();
         }
 
     }
