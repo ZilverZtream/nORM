@@ -33,6 +33,7 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
         private static readonly ConcurrentDictionary<Type, int> _typeHashCodes = new();
+        private static readonly ConcurrentLruCache<int, QueryPlan> _sqlCache = new(maxSize: 1000);
         private static long _totalPlanSize;
         private static int _planSizeSamples;
         private readonly QueryExecutor _executor;
@@ -713,20 +714,31 @@ namespace nORM.Query
             var elementType = GetElementType(UnwrapQueryExpression(filtered));
             var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
             var fingerprint = ExpressionFingerprint.Compute(filtered);
+            var combinedHash = HashCode.Combine(fingerprint, tenantHash, GetTypeHash(elementType), GetTypeHash(filtered.Type));
+
+            if (_sqlCache.TryGet(combinedHash, out var cached))
+            {
+                var clonedParams = new Dictionary<string, object>(cached.Parameters);
+                return cached with { Parameters = clonedParams };
+            }
+
             var cacheKey = BuildPlanCacheKey(fingerprint, tenantHash, elementType, filtered.Type);
 
             var localFiltered = filtered;
-            return _planCache.GetOrAdd(cacheKey, _ =>
+            var plan = _planCache.GetOrAdd(cacheKey, _ =>
             {
                 using var translator = new QueryTranslator(_ctx);
                 var before = GC.GetAllocatedBytesForCurrentThread();
-                var plan = translator.Translate(localFiltered);
+                var p = translator.Translate(localFiltered);
                 var after = GC.GetAllocatedBytesForCurrentThread();
                 var size = after - before;
                 Interlocked.Add(ref _totalPlanSize, size);
                 Interlocked.Increment(ref _planSizeSamples);
-                return plan with { Fingerprint = fingerprint };
+                return p with { Fingerprint = fingerprint };
             });
+
+            _sqlCache.GetOrAdd(combinedHash, _ => plan);
+            return plan with { Parameters = new Dictionary<string, object>(plan.Parameters) };
         }
 
         private string BuildPlanCacheKey(int fingerprint, int tenantHash, Type elementType, Type expressionType)
