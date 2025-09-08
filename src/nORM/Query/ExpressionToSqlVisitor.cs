@@ -16,7 +16,7 @@ using Microsoft.Extensions.ObjectPool;
 
 namespace nORM.Query
 {
-    internal sealed class ExpressionToSqlVisitor : ExpressionVisitor
+    internal sealed class ExpressionToSqlVisitor : ExpressionVisitor, nORM.Internal.IResettable
     {
         private DbContext _ctx = null!;
         private TableMapping _mapping = null!;
@@ -309,12 +309,12 @@ namespace nORM.Query
                             {
                                 var info = _parameterMappings[cp];
                                 var vctx = new VisitorContext(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
-                                var visitor = ExpressionVisitorPool.Get(in vctx);
+                                var visitor = FastExpressionVisitorPool.Get(in vctx);
                                 var predSql = visitor.Translate(countSelector.Body);
                                 foreach (var kvp in visitor.GetParameters())
                                     _params[kvp.Key] = kvp.Value;
                                 _sql.Append($"COUNT(CASE WHEN {predSql} THEN 1 ELSE NULL END)");
-                                ExpressionVisitorPool.Return(visitor);
+                                FastExpressionVisitorPool.Return(visitor);
                             }
                             else
                             {
@@ -334,7 +334,7 @@ namespace nORM.Query
                             {
                                 var info = _parameterMappings[gp];
                                 var vctx = new VisitorContext(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
-                                var visitor = ExpressionVisitorPool.Get(in vctx);
+                                var visitor = FastExpressionVisitorPool.Get(in vctx);
                                 var colSql = visitor.Translate(selector.Body);
                                 foreach (var kvp in visitor.GetParameters())
                                     _params[kvp.Key] = kvp.Value;
@@ -347,7 +347,7 @@ namespace nORM.Query
                                     _ => "",
                                 };
                                 _sql.Append($"{fn}({colSql})");
-                                ExpressionVisitorPool.Return(visitor);
+                                FastExpressionVisitorPool.Return(visitor);
                                 return node;
                             }
                         }
@@ -684,7 +684,7 @@ namespace nORM.Query
                 case MemberExpression me:
                     if (me.Expression != null && TryGetConstantValue(me.Expression, out var obj, visited))
                     {
-                        value = ExpressionVisitorPool.GetMemberValue(me.Member, obj);
+                        value = FastExpressionVisitorPool.GetMemberValue(me.Member, obj);
                         return true;
                     }
                     break;
