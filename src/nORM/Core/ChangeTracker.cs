@@ -223,10 +223,15 @@ namespace nORM.Core
 
             public override int GetHashCode()
             {
-                var hash = new HashCode();
-                foreach (var value in _values)
-                    hash.Add(value);
-                return hash.ToHashCode();
+                unchecked
+                {
+                    var hash = 17;
+                    foreach (var value in _values)
+                    {
+                        hash = hash * 23 + (value?.GetHashCode() ?? 0);
+                    }
+                    return hash;
+                }
             }
         }
     }
