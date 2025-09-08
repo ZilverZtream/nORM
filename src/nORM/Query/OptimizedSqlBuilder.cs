@@ -1,6 +1,6 @@
 using System;
 using System.Text;
-using nORM.Internal;
+using Microsoft.Extensions.ObjectPool;
 
 namespace nORM.Query
 {
@@ -11,7 +11,8 @@ namespace nORM.Query
     /// </summary>
     internal sealed class OptimizedSqlBuilder : IDisposable
     {
-        private static readonly LockFreeObjectPool<StringBuilder> _pool = new();
+        private static readonly ObjectPool<StringBuilder> _pool =
+            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
         private readonly StringBuilder _builder;
         private readonly bool _pooled;
 
