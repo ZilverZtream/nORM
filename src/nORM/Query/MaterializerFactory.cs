@@ -372,20 +372,16 @@ namespace nORM.Query
             var ctorParams = ctor.GetParameters();
             var ctorDelegate = _constructorDelegates.GetOrAdd(targetType, _ => CreateConstructorDelegate(ctor));
             var paramGetters = ctorParams.Select((p, i) => CreateReaderGetter(p.ParameterType, i)).ToArray();
-            var defaultFactories = ctorParams.Select(p => _parameterlessCtorDelegates.GetOrAdd(p.ParameterType, t =>
-            {
-                var body = Expression.Convert(Expression.New(t), typeof(object));
-                return Expression.Lambda<Func<object>>(body).Compile();
-            })).ToArray();
 
             return reader =>
             {
-                var args = new object?[columns.Length];
-                for (int i = 0; i < columns.Length; i++)
+                var args = new object?[ctorParams.Length];
+                for (int i = 0; i < ctorParams.Length; i++)
                 {
                     if (reader.IsDBNull(i))
                     {
-                        args[i] = ctorParams[i].ParameterType.IsValueType ? defaultFactories[i]() : null;
+                        var paramType = ctorParams[i].ParameterType;
+                        args[i] = paramType.IsValueType ? Activator.CreateInstance(paramType) : default;
                         continue;
                     }
                     args[i] = paramGetters[i](reader);
