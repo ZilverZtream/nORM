@@ -60,9 +60,12 @@ namespace nORM.Query
                 .Select(m => _materializerFactory.CreateMaterializer(m, m.Type))
                 .ToArray();
 
-            // Limit parameters per query to avoid memory pressure
-            var maxPerBatch = Math.Max(1, Math.Min(1000, _ctx.Provider.MaxParameters - 10));
+            // Determine optimal batch size based on provider parameter limits and relationship depth
             var keys = parentLookup.Keys.ToArray();
+            var maxParams = _ctx.Provider.MaxParameters;
+            var maxPerBatch = maxParams == int.MaxValue
+                ? keys.Length
+                : Math.Max(1, (maxParams - 10) / Math.Max(1, include.Path.Count));
 
             foreach (var keyBatch in keys.Chunk(maxPerBatch))
             {
