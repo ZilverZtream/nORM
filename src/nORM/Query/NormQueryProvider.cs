@@ -152,38 +152,11 @@ namespace nORM.Query
 
         public Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken ct)
         {
-            // Fast path for List<T> results with simple queries
-            var resultType = typeof(TResult);
-            if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(List<>))
-            {
-                var entityType = resultType.GetGenericArguments()[0];
-                if (entityType.IsClass && entityType.GetConstructor(Type.EmptyTypes) != null)
-                {
-                    try
-                    {
-                        // Check if this is a simple query pattern we can optimize
-                        if (IsSimpleQueryPattern(expression))
-                        {
-                            var method = typeof(NormQueryProvider).GetMethod(nameof(ExecuteFastListAsync),
-                                BindingFlags.NonPublic | BindingFlags.Instance)!
-                                .MakeGenericMethod(entityType);
+            // Fast path – bypass translator for recognized simple patterns
+            if (TryExecuteFastPath<TResult>(expression, out var fastResult))
+                return fastResult;
 
-                            var task = (Task)method.Invoke(this, new object[] { expression, ct })!;
-                            return task.ContinueWith(t =>
-                            {
-                                var result = t.GetType().GetProperty("Result")!.GetValue(t);
-                                return (TResult)result!;
-                            }, TaskContinuationOptions.ExecuteSynchronously);
-                        }
-                    }
-                    catch
-                    {
-                        // If fast path fails, fall through to normal path
-                    }
-                }
-            }
-
-            // Original execution path (unchanged)
+            // Original execution path
             if (TryGetSimpleQuery(expression, out var sql, out var parameters))
             {
                 Func<CancellationToken, Task<TResult>> factory = token => ExecuteSimpleAsync<TResult>(sql, parameters, token);
@@ -209,6 +182,45 @@ namespace nORM.Query
             return _ctx.Options.RetryPolicy != null
                 ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteUpdateInternalAsync(expression, set, token), ct)
                 : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteUpdateInternalAsync(expression, set, token), ct);
+        }
+
+        private bool TryExecuteFastPath<TResult>(Expression expression, out Task<TResult> result)
+        {
+            result = default!;
+
+            var resultType = typeof(TResult);
+            if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(List<>))
+            {
+                var elementType = resultType.GetGenericArguments()[0];
+                if (elementType.IsClass && elementType.GetConstructor(Type.EmptyTypes) != null)
+                {
+                    try
+                    {
+                        var method = typeof(FastPathQueryExecutor)
+                            .GetMethod(nameof(FastPathQueryExecutor.TryExecute), BindingFlags.Public | BindingFlags.Static)!
+                            .MakeGenericMethod(elementType);
+
+                        object?[] args = { expression, _ctx, null };
+                        var success = (bool)method.Invoke(null, args)!;
+                        if (success)
+                        {
+                            var task = (Task)args[2]!;
+                            result = task.ContinueWith(t =>
+                            {
+                                var resProp = t.GetType().GetProperty("Result");
+                                return (TResult)resProp!.GetValue(t)!;
+                            }, TaskContinuationOptions.ExecuteSynchronously);
+                            return true;
+                        }
+                    }
+                    catch
+                    {
+                        // ignore and fall back to full translation path
+                    }
+                }
+            }
+
+            return false;
         }
 
         private async Task<TResult> ExecuteInternalAsync<TResult>(Expression expression, CancellationToken ct)
@@ -905,173 +917,5 @@ namespace nORM.Query
             throw new ArgumentException($"Cannot determine element type from expression of type {type}");
         }
 
-        private bool IsSimpleQueryPattern(Expression expression)
-        {
-            static Expression Unwrap(Expression expr)
-            {
-                while (expr is MethodCallExpression m)
-                {
-                    if (m.Method.Name == "AsNoTracking")
-                    {
-                        if (m.Arguments.Count == 1) expr = m.Arguments[0];
-                        else break;
-                        continue;
-                    }
-                    if (m.Method.Name == "Take" && m.Arguments.Count == 2 && m.Arguments[1] is ConstantExpression)
-                    {
-                        expr = m.Arguments[0];
-                        continue;
-                    }
-                    break;
-                }
-                return expr;
-            }
-
-            var core = Unwrap(expression);
-            if (core is ConstantExpression)
-                return true;
-
-            if (core is MethodCallExpression { Method.Name: "Where", Arguments: { Count: 2 } } whereCall)
-            {
-                var source = Unwrap(whereCall.Arguments[0]);
-                if (source is not ConstantExpression) return false;
-
-                // Accept: u => u.BoolProp   OR   u => u.BoolProp == true   OR simple equality on scalar
-                var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
-                var body = lambda.Body;
-
-                if (body is MemberExpression me && me.Type == typeof(bool))
-                    return true;
-
-                if (body is UnaryExpression { Operand: MemberExpression me2 } uex && me2.Type == typeof(bool))
-                    return true;
-
-                if (body is BinaryExpression be)
-                {
-                    if (be.NodeType == ExpressionType.Equal) return true;
-                    if ((be.NodeType == ExpressionType.GreaterThan || be.NodeType == ExpressionType.GreaterThanOrEqual) &&
-                        be.Left is MemberExpression && (be.Right is ConstantExpression || be.Right is MemberExpression { Expression: ConstantExpression }))
-                        return true;
-                }
-            }
-
-            return false;
-        }
-
-        private async Task<List<T>> ExecuteFastListAsync<T>(Expression expression, CancellationToken ct) where T : class, new()
-        {
-            // Parse expression for optional Where/Take/AsNoTracking
-            int? take = null;
-            MethodCallExpression? whereCall = null;
-            var current = expression;
-            while (current is MethodCallExpression m)
-            {
-                if (m.Method.Name == "Take" && m.Arguments.Count == 2 && m.Arguments[1] is ConstantExpression ce)
-                {
-                    take = (int)ce.Value!;
-                    current = m.Arguments[0];
-                    continue;
-                }
-
-                if (m.Method.Name == "AsNoTracking" && m.Arguments.Count == 1)
-                {
-                    current = m.Arguments[0];
-                    continue;
-                }
-
-                if (m.Method.Name == "Where" && m.Arguments.Count == 2)
-                {
-                    whereCall = m;
-                    current = m.Arguments[0];
-                    continue;
-                }
-
-                throw new InvalidOperationException("Fast path failed - using normal path");
-            }
-
-            if (current is not ConstantExpression)
-                throw new InvalidOperationException("Fast path failed - using normal path");
-
-            // Get the entity mapping
-            var rootType = GetElementType(expression);
-            var mapping = _ctx.GetMapping(rootType);
-
-            // Build simple SELECT statement
-            var columns = string.Join(", ", mapping.Columns.Select(c => c.EscCol));
-            var sql = $"SELECT {columns} FROM {mapping.EscTable}";
-
-            // Process WHERE clause if present
-            object? paramValue = null;
-            string? paramName = null;
-
-            if (whereCall != null &&
-                whereCall.Arguments[1] is UnaryExpression { Operand: LambdaExpression lambda } &&
-                lambda.Body is BinaryExpression { NodeType: ExpressionType.Equal } binary &&
-                binary.Left is MemberExpression member)
-            {
-                var propName = member.Member.Name;
-                if (mapping.ColumnsByName.TryGetValue(propName, out var column))
-                {
-                    try
-                    {
-                        paramValue = Expression.Lambda(binary.Right).Compile().DynamicInvoke();
-                        paramName = _ctx.Provider.ParamPrefix + "p0";
-                        sql += $" WHERE {column.EscCol} = {paramName}";
-                    }
-                    catch
-                    {
-                        throw new InvalidOperationException("Fast path failed - using normal path");
-                    }
-                }
-            }
-
-            if (take.HasValue)
-            {
-                sql += $" LIMIT {take.Value}";
-            }
-
-            // Execute the query
-            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            using var cmd = _ctx.Connection.CreateCommand();
-            cmd.CommandText = sql;
-
-            if (paramName != null && paramValue != null)
-            {
-                var param = cmd.CreateParameter();
-                param.ParameterName = paramName;
-                param.Value = paramValue;
-                cmd.Parameters.Add(param);
-            }
-
-            var results = new List<T>();
-            using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
-
-
-            while (await reader.ReadAsync(ct).ConfigureAwait(false))
-            {
-                var entity = new T();
-                for (int i = 0; i < mapping.Columns.Length; i++)
-                {
-                    if (reader.IsDBNull(i)) continue;
-                    var column = mapping.Columns[i];
-                    var t = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
-                    object? v;
-                    if (t == typeof(int)) v = reader.GetInt32(i);
-                    else if (t == typeof(long)) v = reader.GetInt64(i);
-                    else if (t == typeof(double)) v = reader.GetDouble(i);
-                    else if (t == typeof(float)) v = (float)reader.GetDouble(i);
-                    else if (t == typeof(bool)) v = reader.GetInt32(i) != 0;
-                    else if (t == typeof(string)) v = reader.GetString(i);
-                    else if (t == typeof(DateTime)) v = DateTime.Parse(reader.GetString(i), null, System.Globalization.DateTimeStyles.RoundtripKind);
-                    else v = reader.GetValue(i);
-
-                    column.Setter(entity, v);
-                }
-                results.Add(entity);
-            }
-
-
-            return results;
-        }
     }
 }
