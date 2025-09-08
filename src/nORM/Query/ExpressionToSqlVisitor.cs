@@ -6,6 +6,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Globalization;
+using System.Collections.Frozen;
 using nORM.Core;
 using nORM.Mapping;
 using nORM.Providers;
@@ -36,12 +37,13 @@ namespace nORM.Query
         private readonly Dictionary<ConstKey, string> _constParamMap = new();
         private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
 
-        private readonly Dictionary<string, IMethodTranslator> _translators = new()
-        {
-            ["Contains"] = new ContainsTranslator(),
-            ["StartsWith"] = new StartsWithTranslator(),
-            ["EndsWith"] = new EndsWithTranslator()
-        };
+        private static readonly FrozenDictionary<string, IMethodTranslator> _translators =
+            new Dictionary<string, IMethodTranslator>
+            {
+                ["Contains"] = new ContainsTranslator(),
+                ["StartsWith"] = new StartsWithTranslator(),
+                ["EndsWith"] = new EndsWithTranslator()
+            }.ToFrozenDictionary(StringComparer.Ordinal);
 
         private static readonly Dictionary<MethodInfo, Action<ExpressionToSqlVisitor, MethodCallExpression>> _fastMethodHandlers =
             new()
