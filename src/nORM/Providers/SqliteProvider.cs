@@ -26,8 +26,22 @@ namespace nORM.Providers
         public override int MaxSqlLength => 1_000_000;
         public override int MaxParameters => 999;
         public override string Escape(string id) => $"\"{id}\"";
+        public override char ParameterPrefixChar => '@';
 
         public override CommandType StoredProcedureCommandType => CommandType.Text;
+
+        public override void BuildSimpleSelect(Span<char> buffer, ReadOnlySpan<char> table,
+            ReadOnlySpan<char> columns, out int length)
+        {
+            "SELECT ".CopyTo(buffer);
+            var pos = 7;
+            columns.CopyTo(buffer.Slice(pos));
+            pos += columns.Length;
+            " FROM ".CopyTo(buffer.Slice(pos));
+            pos += 6;
+            table.CopyTo(buffer.Slice(pos));
+            length = pos + table.Length;
+        }
 
         public override async Task InitializeConnectionAsync(DbConnection connection, CancellationToken ct)
         {
