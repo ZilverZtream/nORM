@@ -138,6 +138,9 @@ namespace nORM.Query
         {
             lock (_syncRoot)
             {
+                SqlBuilder? oldClauses = Interlocked.Exchange(ref _clauses, null!);
+                oldClauses?.Dispose();
+
                 _ctx = ctx;
                 _provider = ctx.Provider;
                 _mapping = null!;
@@ -155,7 +158,6 @@ namespace nORM.Query
                 _noTracking = false;
                 _splitQuery = false;
                 _tables = new HashSet<string>();
-                _clauses?.Dispose();
                 _clauses = new SqlBuilder();
                 _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
                 _isCacheable = false;
@@ -168,26 +170,28 @@ namespace nORM.Query
         {
             lock (_syncRoot)
             {
-                _clauses?.Dispose();
+                SqlBuilder? oldClauses = Interlocked.Exchange(ref _clauses, null!);
+                oldClauses?.Dispose();
                 _clauses = new SqlBuilder();
+
+                _includes?.Clear();
+                _correlatedParams?.Clear();
+                _tables?.Clear();
 
                 _ctx = null!;
                 _provider = null!;
                 _mapping = null!;
                 _rootType = null;
                 _parameterManager.Reset();
-                _includes = new List<IncludePlan>();
                 _projection = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
-                _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
                 _groupJoinInfo = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
                 _singleResult = false;
                 _noTracking = false;
                 _splitQuery = false;
-                _tables = new HashSet<string>();
                 _estimatedTimeout = default;
                 _isCacheable = false;
                 _cacheExpiration = null;
@@ -530,7 +534,11 @@ namespace nORM.Query
         {
             lock (_syncRoot)
             {
-                _translatorPool.Return(this);
+                SqlBuilder? oldClauses = Interlocked.Exchange(ref _clauses, null!);
+                oldClauses?.Dispose();
+
+                // Don't return to pool if disposal was called directly
+                // _translatorPool.Return(this); // Remove this line
             }
         }
 
