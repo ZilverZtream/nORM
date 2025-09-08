@@ -64,6 +64,14 @@ namespace nORM.Query
                 return false;
 
             var body = lambda.Body;
+
+            // Support boolean member access: u => u.IsActive
+            if (body is MemberExpression meBoolean && meBoolean.Type == typeof(bool))
+            {
+                info = new WhereInfo(meBoolean.Member.Name, true);
+                return true;
+            }
+
             if (body is BinaryExpression be && be.NodeType == ExpressionType.Equal && be.Left is MemberExpression me)
             {
                 try
