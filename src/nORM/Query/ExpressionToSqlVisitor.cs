@@ -34,6 +34,7 @@ namespace nORM.Query
         private bool _suppressNullCheck = false;
         private const int _constParamMapLimit = 1024;
         private readonly Dictionary<ConstKey, string> _constParamMap = new();
+        private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
 
         private readonly Dictionary<string, IMethodTranslator> _translators = new()
         {
@@ -84,6 +85,7 @@ namespace nORM.Query
             _constParamMap.Clear();
             _paramIndex = 0;
             _suppressNullCheck = false;
+            _memberParamMap.Clear();
         }
 
         public void Reset()
@@ -103,6 +105,7 @@ namespace nORM.Query
             _tableAlias = string.Empty;
             _suppressNullCheck = false;
             _constParamMap.Clear();
+            _memberParamMap.Clear();
         }
 
         public string Translate(Expression expression)
@@ -154,6 +157,20 @@ namespace nORM.Query
                     _sql.Append($"{info.Alias}.{column.EscCol}");
                     return node;
                 }
+            }
+
+            if (node.Expression is ParameterExpression p && !_parameterMappings.ContainsKey(p))
+            {
+                var key = (p, node.Member.Name);
+                if (!_memberParamMap.TryGetValue(key, out var paramName))
+                {
+                    paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                    _params[paramName] = DBNull.Value;
+                    _compiledParams.Add(paramName);
+                    _memberParamMap[key] = paramName;
+                }
+                _sql.Append(paramName);
+                return node;
             }
 
             if (TryGetConstantValue(node, out var value))
