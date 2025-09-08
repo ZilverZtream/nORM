@@ -78,8 +78,19 @@ namespace nORM.Internal
 
                 var parameters = cachedPlan.Parameters.ToDictionary(k => k.Key, v => v.Value);
                 if (paramNames != null)
-                    foreach (var name in paramNames)
-                        parameters[name] = value!;
+                {
+                    if (value is System.Runtime.CompilerServices.ITuple tuple)
+                    {
+                        var count = Math.Min(tuple.Length, paramNames.Count);
+                        for (int i = 0; i < count; i++)
+                            parameters[paramNames[i]] = tuple[i]!;
+                    }
+                    else
+                    {
+                        foreach (var name in paramNames)
+                            parameters[name] = value!;
+                    }
+                }
 
                 var execProvider = new NormQueryProvider(ctx);
                 return await execProvider.ExecuteCompiledAsync<List<T>>(cachedPlan, parameters, default).ConfigureAwait(false);
