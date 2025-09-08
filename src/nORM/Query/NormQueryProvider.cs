@@ -861,7 +861,8 @@ namespace nORM.Query
                 var size = after - before;
                 Interlocked.Add(ref _totalPlanSize, size);
                 Interlocked.Increment(ref _planSizeSamples);
-                return p with { Fingerprint = fingerprint };
+                var cloned = new Dictionary<string, object>(p.Parameters);
+                return p with { Fingerprint = fingerprint, Parameters = cloned };
             });
 
             _sqlCache.GetOrAdd(combinedHash, _ => plan);
