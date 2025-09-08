@@ -1,26 +1,22 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Order;
-using Microsoft.Data.Sqlite;
 using Dapper;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using nORM.Core;
 using nORM.Providers;
 using EfDbContext = Microsoft.EntityFrameworkCore.DbContext;
 using EfQueryableExtensions = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
 using NormAsyncExtensions = nORM.Core.NormAsyncExtensions;
+using static Microsoft.EntityFrameworkCore.EF;
 
 namespace nORM.Benchmarks
 {
-
     // EF Core Context
     public class EfCoreContext : EfDbContext
     {
@@ -31,8 +27,8 @@ namespace nORM.Benchmarks
             _connectionString = connectionString;
         }
 
-        public Microsoft.EntityFrameworkCore.DbSet<BenchmarkUser> Users { get; set; }
-        public Microsoft.EntityFrameworkCore.DbSet<BenchmarkOrder> Orders { get; set; }
+        public DbSet<BenchmarkUser> Users { get; set; }
+        public DbSet<BenchmarkOrder> Orders { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -46,6 +42,9 @@ namespace nORM.Benchmarks
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id).ValueGeneratedOnAdd();
                 entity.ToTable("BenchmarkUser");
+                entity.HasIndex(e => e.IsActive);
+                entity.HasIndex(e => e.Age);
+                entity.HasIndex(e => e.City);
             });
 
             modelBuilder.Entity<BenchmarkOrder>(entity =>
@@ -53,6 +52,7 @@ namespace nORM.Benchmarks
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id).ValueGeneratedOnAdd();
                 entity.ToTable("BenchmarkOrder");
+                entity.HasIndex(e => e.UserId);
             });
         }
     }
@@ -76,12 +76,81 @@ namespace nORM.Benchmarks
         private nORM.Core.DbContext? _nOrmContext;
         private SqliteConnection? _dapperConnection;
 
+        // Prepared commands (for prepared/compiled-equivalent benchmarks)
+        private SqliteCommand? _dapperSimplePrepared;
+        private SqliteParameter? _dapperSimpleTakeParam;
+
+        private SqliteCommand? _dapperComplexPrepared;
+        private SqliteParameter? _dapperComplexAgeParam;
+        private SqliteParameter? _dapperComplexCityParam;
+
+        private SqliteCommand? _adoSimplePrepared;
+        private SqliteParameter? _adoSimpleTakeParam;
+
+        private SqliteCommand? _adoComplexPrepared;
+        private SqliteParameter? _adoComplexAgeParam;
+        private SqliteParameter? _adoComplexCityParam;
+
+        // EF Core compiled queries
+        private static readonly Func<EfCoreContext, int, IAsyncEnumerable<BenchmarkUser>> _efSimpleCompiled
+            = CompileAsyncQuery((EfCoreContext ctx, int take)
+                => ctx.Users.AsNoTracking().Where(u => u.IsActive).Take(take));
+
+        private static readonly Func<EfCoreContext, int, string, IAsyncEnumerable<BenchmarkUser>> _efComplexCompiled
+            = CompileAsyncQuery((EfCoreContext ctx, int age, string city)
+                => ctx.Users.AsNoTracking()
+                    .Where(u => u.IsActive && u.Age > age && u.City == city)
+                    .OrderBy(u => u.Name)
+                    .Skip(5)
+                    .Take(20));
+
+        // nORM compiled queries (via Norm.CompileQuery)
+        private static readonly Func<nORM.Core.DbContext, int, Task<List<BenchmarkUser>>> _normSimpleCompiled
+            = Norm.CompileQuery<nORM.Core.DbContext, int, BenchmarkUser>(
+                (c, take) => c.Query<BenchmarkUser>().Where(u => u.IsActive == true).AsNoTracking().Take(take));
+
+        private static readonly Func<nORM.Core.DbContext, (int, string), Task<List<BenchmarkUser>>> _normComplexCompiled
+            = Norm.CompileQuery<nORM.Core.DbContext, (int, string), BenchmarkUser>(
+                (c, p) => c.Query<BenchmarkUser>()
+                    .Where(u => u.IsActive && u.Age > p.Item1 && u.City == p.Item2)
+                    .AsNoTracking()
+                    .OrderBy(u => u.Name)
+                    .Skip(5)
+                    .Take(20));
+
+        // ---------- SQLite PRAGMA helpers (applied uniformly once per connection) ----------
+        private static void ApplySqlitePragmas(SqliteConnection conn)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = NORMAL;
+                PRAGMA foreign_keys = ON;
+                PRAGMA temp_store = MEMORY;
+                PRAGMA cache_size = -20000;
+            ";
+            cmd.ExecuteNonQuery();
+        }
+
+        private static async Task ApplySqlitePragmasAsync(SqliteConnection conn)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = NORMAL;
+                PRAGMA foreign_keys = ON;
+                PRAGMA temp_store = MEMORY;
+                PRAGMA cache_size = -20000;
+            ";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         [GlobalSetup]
         public async Task Setup()
         {
             Console.WriteLine("🔧 Setting up benchmark databases...");
 
-            // Generate test data
+            // Generate test data (deterministic)
             var random = new Random(42);
             _testUsers = Enumerable.Range(1, UserCount)
                 .Select(i => new BenchmarkUser
@@ -105,7 +174,6 @@ namespace nORM.Benchmarks
                     ProductName = $"Product {random.Next(1, 100)}"
                 }).ToList();
 
-            // Setup all databases
             await SetupDatabase();
 
             Console.WriteLine("✅ Benchmark setup complete!");
@@ -125,48 +193,90 @@ namespace nORM.Benchmarks
 
         private async Task SetupDatabase()
         {
-            // Delete existing database
             if (System.IO.File.Exists("benchmark.db"))
                 System.IO.File.Delete("benchmark.db");
 
-            // Use EF Core to create the database and initial data
+            // EF create + seed (so schema/indexes are shared)
             _efContext = new EfCoreContext(_efConnectionString);
             await _efContext.Database.OpenConnectionAsync();
+            var efConn = (SqliteConnection)_efContext.Database.GetDbConnection();
+            ApplySqlitePragmas(efConn);
             await _efContext.Database.EnsureCreatedAsync();
-            
-            // 1. Add and save the users FIRST. This generates their IDs.
+
             _efContext.Users.AddRange(_testUsers);
             await _efContext.SaveChangesAsync();
 
-            // 2. Now that users exist, add and save the orders.
             _efContext.Orders.AddRange(_testOrders);
             await _efContext.SaveChangesAsync();
-
             _efContext.ChangeTracker.Clear();
 
-            // Setup nORM connection
+            // nORM setup
             var options = new nORM.Configuration.DbContextOptions
             {
-                BulkBatchSize = 50, // Optimized for SQLite parameter limits
+                BulkBatchSize = 50,
                 TimeoutConfiguration = { BaseTimeout = TimeSpan.FromSeconds(30) }
             };
-
             _nOrmConnection = new SqliteConnection(_nOrmConnectionString);
             await _nOrmConnection.OpenAsync();
+            await ApplySqlitePragmasAsync(_nOrmConnection);
             _nOrmContext = new nORM.Core.DbContext(_nOrmConnection, new SqliteProvider(), options);
 
-            // Setup Dapper connection
+            // Dapper/ADO shared connection
             _dapperConnection = new SqliteConnection(_dapperConnectionString);
             await _dapperConnection.OpenAsync();
+            await ApplySqlitePragmasAsync(_dapperConnection);
+
+            // Prepared statements (once)
+            // Simple
+            _dapperSimplePrepared = _dapperConnection.CreateCommand();
+            _dapperSimplePrepared.CommandText = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT @Take";
+            _dapperSimpleTakeParam = _dapperSimplePrepared.CreateParameter();
+            _dapperSimpleTakeParam.ParameterName = "@Take";
+            _dapperSimplePrepared.Parameters.Add(_dapperSimpleTakeParam);
+            _dapperSimplePrepared.Prepare();
+
+            _adoSimplePrepared = _dapperConnection.CreateCommand();
+            _adoSimplePrepared.CommandText = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT @Take";
+            _adoSimpleTakeParam = _adoSimplePrepared.CreateParameter();
+            _adoSimpleTakeParam.ParameterName = "@Take";
+            _adoSimplePrepared.Parameters.Add(_adoSimpleTakeParam);
+            _adoSimplePrepared.Prepare();
+
+            // Complex
+            _dapperComplexPrepared = _dapperConnection.CreateCommand();
+            _dapperComplexPrepared.CommandText = @"
+                SELECT * FROM BenchmarkUser
+                WHERE IsActive = 1 AND Age > @Age AND City = @City
+                ORDER BY Name
+                LIMIT 20 OFFSET 5";
+            _dapperComplexAgeParam = _dapperComplexPrepared.CreateParameter();
+            _dapperComplexAgeParam.ParameterName = "@Age";
+            _dapperComplexCityParam = _dapperComplexPrepared.CreateParameter();
+            _dapperComplexCityParam.ParameterName = "@City";
+            _dapperComplexPrepared.Parameters.Add(_dapperComplexAgeParam);
+            _dapperComplexPrepared.Parameters.Add(_dapperComplexCityParam);
+            _dapperComplexPrepared.Prepare();
+
+            _adoComplexPrepared = _dapperConnection.CreateCommand();
+            _adoComplexPrepared.CommandText = @"
+                SELECT * FROM BenchmarkUser
+                WHERE IsActive = 1 AND Age > @Age AND City = @City
+                ORDER BY Name
+                LIMIT 20 OFFSET 5";
+            _adoComplexAgeParam = _adoComplexPrepared.CreateParameter();
+            _adoComplexAgeParam.ParameterName = "@Age";
+            _adoComplexCityParam = _adoComplexPrepared.CreateParameter();
+            _adoComplexCityParam.ParameterName = "@City";
+            _adoComplexPrepared.Parameters.Add(_adoComplexAgeParam);
+            _adoComplexPrepared.Parameters.Add(_adoComplexCityParam);
+            _adoComplexPrepared.Prepare();
         }
 
-        // ========== SINGLE INSERT BENCHMARKS ==========
+        // ========== SINGLE INSERT (reuse contexts/connections; no per-op PRAGMAs) ==========
 
         [Benchmark]
         public async Task Insert_Single_EfCore()
         {
-            await using var context = new EfCoreContext(_efConnectionString);
-
             var user = new BenchmarkUser
             {
                 Name = "Test User EF",
@@ -179,16 +289,14 @@ namespace nORM.Benchmarks
                 Salary = 50_000
             };
 
-            context.Users.Add(user);
-            await context.SaveChangesAsync();
+            _efContext!.Users.Add(user);
+            await _efContext.SaveChangesAsync();
+            _efContext.ChangeTracker.Clear();
         }
 
         [Benchmark]
         public async Task Insert_Single_nORM()
         {
-            var options = new nORM.Configuration.DbContextOptions();
-            await using var context = new nORM.Core.DbContext(_nOrmConnectionString, new SqliteProvider(), options);
-
             var user = new BenchmarkUser
             {
                 Name = "Test User nORM",
@@ -201,14 +309,15 @@ namespace nORM.Benchmarks
                 Salary = 50_000
             };
 
-            await context.InsertAsync(user);
+            await _nOrmContext!.InsertAsync(user);
         }
 
         [Benchmark]
         public async Task Insert_Single_Dapper()
         {
-            await using var connection = new SqliteConnection(_dapperConnectionString);
-            await connection.OpenAsync();
+            const string sql = @"
+                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
+                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
 
             var user = new BenchmarkUser
             {
@@ -222,17 +331,13 @@ namespace nORM.Benchmarks
                 Salary = 50_000
             };
 
-            var sql = @"
-                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
-                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
-
-            await connection.ExecuteAsync(sql, user);
+            await _dapperConnection!.ExecuteAsync(sql, user);
         }
 
         [Benchmark]
         public async Task Insert_Single_RawAdo()
         {
-            var sql = @"
+            const string sql = @"
                 INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
                 VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
             using var command = _dapperConnection!.CreateCommand();
@@ -245,16 +350,16 @@ namespace nORM.Benchmarks
             command.Parameters.AddWithValue("@City", "TestCity");
             command.Parameters.AddWithValue("@Department", "TestDept");
             command.Parameters.AddWithValue("@Salary", 50_000);
-
             await command.ExecuteNonQueryAsync();
         }
 
-        // ========== QUERY BENCHMARKS ==========
+        // ========== SIMPLE QUERY (standard) ==========
 
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Simple_EfCore()
         {
             return await EfQueryableExtensions.ToListAsync(_efContext!.Users
+                .AsNoTracking()
                 .Where(u => u.IsActive)
                 .Take(10));
         }
@@ -271,7 +376,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Simple_Dapper()
         {
-            var sql = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
+            const string sql = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
             var result = await _dapperConnection!.QueryAsync<BenchmarkUser>(sql);
             return result.ToList();
         }
@@ -279,7 +384,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Simple_RawAdo()
         {
-            var sql = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
+            const string sql = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
             using var command = _dapperConnection!.CreateCommand();
             command.CommandText = sql;
 
@@ -290,27 +395,91 @@ namespace nORM.Benchmarks
             {
                 users.Add(new BenchmarkUser
                 {
-                    Id = reader.GetInt32("Id"),
-                    Name = reader.GetString("Name"),
-                    Email = reader.GetString("Email"),
-                    CreatedAt = DateTime.Parse(reader.GetString("CreatedAt")),
-                    IsActive = reader.GetInt32("IsActive") == 1,
-                    Age = reader.GetInt32("Age"),
-                    City = reader.GetString("City"),
-                    Department = reader.GetString("Department"),
-                    Salary = reader.GetDouble("Salary")
+                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                    Email = reader.GetString(reader.GetOrdinal("Email")),
+                    CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                    IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
+                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
+                    City = reader.GetString(reader.GetOrdinal("City")),
+                    Department = reader.GetString(reader.GetOrdinal("Department")),
+                    Salary = reader.GetDouble(reader.GetOrdinal("Salary"))
                 });
             }
 
             return users;
         }
 
-        // ========== COMPLEX QUERY BENCHMARKS ==========
+        // ========== SIMPLE QUERY (compiled/prepared) ==========
+
+        [Benchmark(Description = "Query Simple EF Core (Compiled)")]
+        public async Task<List<BenchmarkUser>> Query_Simple_EfCore_Compiled()
+        {
+            var list = new List<BenchmarkUser>();
+            await foreach (var u in _efSimpleCompiled(_efContext!, 10))
+                list.Add(u);
+            return list;
+        }
+
+        [Benchmark(Description = "Query Simple nORM (Compiled)")]
+        public Task<List<BenchmarkUser>> Query_Simple_nORM_Compiled()
+            => _normSimpleCompiled(_nOrmContext!, 10);
+
+        [Benchmark(Description = "Query Simple Dapper (Prepared)")]
+        public async Task<List<BenchmarkUser>> Query_Simple_Dapper_Prepared()
+        {
+            _dapperSimpleTakeParam!.Value = 10;
+            using var reader = await _dapperSimplePrepared!.ExecuteReaderAsync();
+            var users = new List<BenchmarkUser>();
+            while (await reader.ReadAsync())
+            {
+                users.Add(new BenchmarkUser
+                {
+                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                    Email = reader.GetString(reader.GetOrdinal("Email")),
+                    CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                    IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
+                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
+                    City = reader.GetString(reader.GetOrdinal("City")),
+                    Department = reader.GetString(reader.GetOrdinal("Department")),
+                    Salary = reader.GetDouble(reader.GetOrdinal("Salary"))
+                });
+            }
+            return users;
+        }
+
+        [Benchmark(Description = "Query Simple Raw ADO (Prepared)")]
+        public async Task<List<BenchmarkUser>> Query_Simple_RawAdo_Prepared()
+        {
+            _adoSimpleTakeParam!.Value = 10;
+            using var reader = await _adoSimplePrepared!.ExecuteReaderAsync();
+            var users = new List<BenchmarkUser>();
+            while (await reader.ReadAsync())
+            {
+                users.Add(new BenchmarkUser
+                {
+                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                    Email = reader.GetString(reader.GetOrdinal("Email")),
+                    CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                    IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
+                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
+                    City = reader.GetString(reader.GetOrdinal("City")),
+                    Department = reader.GetString(reader.GetOrdinal("Department")),
+                    Salary = reader.GetDouble(reader.GetOrdinal("Salary"))
+                });
+            }
+            return users;
+        }
+
+        // ========== COMPLEX QUERY (standard) ==========
 
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Complex_EfCore()
         {
             return await EfQueryableExtensions.ToListAsync(_efContext!.Users
+                .AsNoTracking()
                 .Where(u => u.IsActive && u.Age > 25 && u.City == "New York")
                 .OrderBy(u => u.Name)
                 .Skip(5)
@@ -331,7 +500,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Complex_Dapper()
         {
-            var sql = @"
+            const string sql = @"
                 SELECT * FROM BenchmarkUser
                 WHERE IsActive = 1 AND Age > @Age AND City = @City
                 ORDER BY Name
@@ -341,7 +510,72 @@ namespace nORM.Benchmarks
             return result.ToList();
         }
 
-        // ========== JOIN BENCHMARKS ==========
+        // ========== COMPLEX QUERY (compiled/prepared) ==========
+
+        [Benchmark(Description = "Query Complex EF Core (Compiled)")]
+        public async Task<List<BenchmarkUser>> Query_Complex_EfCore_Compiled()
+        {
+            var list = new List<BenchmarkUser>();
+            await foreach (var u in _efComplexCompiled(_efContext!, 25, "New York"))
+                list.Add(u);
+            return list;
+        }
+
+        [Benchmark(Description = "Query Complex nORM (Compiled)")]
+        public Task<List<BenchmarkUser>> Query_Complex_nORM_Compiled()
+            => _normComplexCompiled(_nOrmContext!, (25, "New York"));
+
+        [Benchmark(Description = "Query Complex Dapper (Prepared)")]
+        public async Task<List<BenchmarkUser>> Query_Complex_Dapper_Prepared()
+        {
+            _dapperComplexAgeParam!.Value = 25;
+            _dapperComplexCityParam!.Value = "New York";
+            using var reader = await _dapperComplexPrepared!.ExecuteReaderAsync();
+            var users = new List<BenchmarkUser>();
+            while (await reader.ReadAsync())
+            {
+                users.Add(new BenchmarkUser
+                {
+                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                    Email = reader.GetString(reader.GetOrdinal("Email")),
+                    CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                    IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
+                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
+                    City = reader.GetString(reader.GetOrdinal("City")),
+                    Department = reader.GetString(reader.GetOrdinal("Department")),
+                    Salary = reader.GetDouble(reader.GetOrdinal("Salary"))
+                });
+            }
+            return users;
+        }
+
+        [Benchmark(Description = "Query Complex Raw ADO (Prepared)")]
+        public async Task<List<BenchmarkUser>> Query_Complex_RawAdo_Prepared()
+        {
+            _adoComplexAgeParam!.Value = 25;
+            _adoComplexCityParam!.Value = "New York";
+            using var reader = await _adoComplexPrepared!.ExecuteReaderAsync();
+            var users = new List<BenchmarkUser>();
+            while (await reader.ReadAsync())
+            {
+                users.Add(new BenchmarkUser
+                {
+                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                    Email = reader.GetString(reader.GetOrdinal("Email")),
+                    CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                    IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
+                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
+                    City = reader.GetString(reader.GetOrdinal("City")),
+                    Department = reader.GetString(reader.GetOrdinal("Department")),
+                    Salary = reader.GetDouble(reader.GetOrdinal("Salary"))
+                });
+            }
+            return users;
+        }
+
+        // ========== JOIN ==========
 
         [Benchmark]
         public async Task<List<object>> Query_Join_EfCore()
@@ -372,7 +606,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<object>> Query_Join_Dapper()
         {
-            var sql = @"
+            const string sql = @"
                 SELECT u.Name, o.Amount, o.ProductName
                 FROM BenchmarkUser u
                 INNER JOIN BenchmarkOrder o ON u.Id = o.UserId
@@ -383,32 +617,173 @@ namespace nORM.Benchmarks
             return result.Cast<object>().ToList();
         }
 
-        // ========== COUNT BENCHMARKS ==========
+        // ========== COUNT ==========
 
         [Benchmark]
-        public async Task<int> Count_EfCore()
+        public Task<int> Count_EfCore()
+            => EfQueryableExtensions.CountAsync(_efContext!.Users, u => u.IsActive);
+
+        [Benchmark]
+        public Task<int> Count_nORM()
+            => NormAsyncExtensions.CountAsync(_nOrmContext!.Query<BenchmarkUser>().Where(u => u.IsActive));
+
+        [Benchmark]
+        public Task<int> Count_Dapper()
+            => _dapperConnection!.QuerySingleAsync<int>("SELECT COUNT(*) FROM BenchmarkUser WHERE IsActive = 1");
+
+        // ========== BULK INSERTS: Naive / Batched / Idiomatic ==========
+
+        [Benchmark(Description = "BulkInsert Naive - EF per row")]
+        public async Task BulkInsert_Naive_EfCore()
         {
-            return await EfQueryableExtensions.CountAsync(_efContext!.Users, u => u.IsActive);
+            for (int i = 1; i <= 100; i++)
+            {
+                var u = new BenchmarkUser
+                {
+                    Name = $"Naive EF {i}",
+                    Email = $"naive{i}@ef.com",
+                    CreatedAt = DateTime.Now,
+                    IsActive = true,
+                    Age = 30,
+                    City = "BulkCity",
+                    Department = "BulkDept",
+                    Salary = 60_000
+                };
+                _efContext!.Users.Add(u);
+                await _efContext.SaveChangesAsync();
+            }
+            _efContext!.ChangeTracker.Clear();
         }
 
-        [Benchmark]
-        public async Task<int> Count_nORM()
+        [Benchmark(Description = "BulkInsert Naive - nORM per row")]
+        public async Task BulkInsert_Naive_nORM()
         {
-            return await NormAsyncExtensions.CountAsync(_nOrmContext!.Query<BenchmarkUser>()
-                .Where(u => u.IsActive));
+            for (int i = 1; i <= 100; i++)
+            {
+                var u = new BenchmarkUser
+                {
+                    Name = $"Naive nORM {i}",
+                    Email = $"naive{i}@norm.com",
+                    CreatedAt = DateTime.Now,
+                    IsActive = true,
+                    Age = 30,
+                    City = "BulkCity",
+                    Department = "BulkDept",
+                    Salary = 60_000
+                };
+                await _nOrmContext!.InsertAsync(u);
+            }
         }
 
-        [Benchmark]
-        public async Task<int> Count_Dapper()
+        [Benchmark(Description = "BulkInsert Naive - Dapper per row")]
+        public async Task BulkInsert_Naive_Dapper()
         {
-            var sql = "SELECT COUNT(*) FROM BenchmarkUser WHERE IsActive = 1";
-            return await _dapperConnection!.QuerySingleAsync<int>(sql);
+            const string sql = @"
+                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
+                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
+
+            for (int i = 1; i <= 100; i++)
+            {
+                var u = new BenchmarkUser
+                {
+                    Name = $"Naive Dapper {i}",
+                    Email = $"naive{i}@dapper.com",
+                    CreatedAt = DateTime.Now,
+                    IsActive = true,
+                    Age = 30,
+                    City = "BulkCity",
+                    Department = "BulkDept",
+                    Salary = 60_000
+                };
+                await _dapperConnection!.ExecuteAsync(sql, u);
+            }
         }
 
-        // ========== BULK OPERATIONS BENCHMARKS ==========
+        [Benchmark(Description = "BulkInsert Batched - EF SaveChanges in Tx")]
+        public async Task BulkInsert_Batched_EfCore()
+        {
+            var users = Enumerable.Range(1, 100).Select(i => new BenchmarkUser
+            {
+                Name = $"Batch EF {i}",
+                Email = $"batch{i}@ef.com",
+                CreatedAt = DateTime.Now,
+                IsActive = true,
+                Age = 30,
+                City = "BulkCity",
+                Department = "BulkDept",
+                Salary = 60_000
+            }).ToList();
 
-        [Benchmark]
-        public async Task BulkInsert_EfCore()
+            await using var tx = await _efContext!.Database.BeginTransactionAsync();
+            _efContext!.Users.AddRange(users);
+            await _efContext.SaveChangesAsync();
+            await tx.CommitAsync();
+            _efContext.ChangeTracker.Clear();
+        }
+
+        [Benchmark(Description = "BulkInsert Batched - nORM Tx + per row")]
+        public async Task BulkInsert_Batched_nORM()
+        {
+            await using var tx = await _nOrmConnection!.BeginTransactionAsync();
+            for (int i = 1; i <= 100; i++)
+            {
+                var u = new BenchmarkUser
+                {
+                    Name = $"Batch nORM {i}",
+                    Email = $"batch{i}@norm.com",
+                    CreatedAt = DateTime.Now,
+                    IsActive = true,
+                    Age = 30,
+                    City = "BulkCity",
+                    Department = "BulkDept",
+                    Salary = 60_000
+                };
+                await _nOrmContext!.InsertAsync(u, tx);
+            }
+            await tx.CommitAsync();
+        }
+
+        [Benchmark(Description = "BulkInsert Batched - Dapper prepared")]
+        public async Task BulkInsert_Batched_Dapper()
+        {
+            const string sql = @"
+                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
+                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
+
+            await using var tx = await _dapperConnection!.BeginTransactionAsync();
+
+            using var cmd = _dapperConnection.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Transaction = (SqliteTransaction)tx;
+
+            var pName = cmd.CreateParameter(); pName.ParameterName = "@Name"; cmd.Parameters.Add(pName);
+            var pEmail = cmd.CreateParameter(); pEmail.ParameterName = "@Email"; cmd.Parameters.Add(pEmail);
+            var pCreated = cmd.CreateParameter(); pCreated.ParameterName = "@CreatedAt"; cmd.Parameters.Add(pCreated);
+            var pActive = cmd.CreateParameter(); pActive.ParameterName = "@IsActive"; cmd.Parameters.Add(pActive);
+            var pAge = cmd.CreateParameter(); pAge.ParameterName = "@Age"; cmd.Parameters.Add(pAge);
+            var pCity = cmd.CreateParameter(); pCity.ParameterName = "@City"; cmd.Parameters.Add(pCity);
+            var pDept = cmd.CreateParameter(); pDept.ParameterName = "@Department"; cmd.Parameters.Add(pDept);
+            var pSalary = cmd.CreateParameter(); pSalary.ParameterName = "@Salary"; cmd.Parameters.Add(pSalary);
+
+            for (int i = 1; i <= 100; i++)
+            {
+                pName.Value = $"Batch Dapper {i}";
+                pEmail.Value = $"batch{i}@dapper.com";
+                pCreated.Value = DateTime.Now.ToString("O");
+                pActive.Value = 1;
+                pAge.Value = 30;
+                pCity.Value = "BulkCity";
+                pDept.Value = "BulkDept";
+                pSalary.Value = 60_000;
+
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            await tx.CommitAsync();
+        }
+
+        [Benchmark(Description = "BulkInsert Idiomatic - EF AddRange")]
+        public async Task BulkInsert_Idiomatic_EfCore()
         {
             var users = Enumerable.Range(1, 100).Select(i => new BenchmarkUser
             {
@@ -427,8 +802,8 @@ namespace nORM.Benchmarks
             _efContext.ChangeTracker.Clear();
         }
 
-        [Benchmark]
-        public async Task BulkInsert_nORM()
+        [Benchmark(Description = "BulkInsert Idiomatic - nORM BulkInsert")]
+        public Task BulkInsert_Idiomatic_nORM()
         {
             var users = Enumerable.Range(1, 100).Select(i => new BenchmarkUser
             {
@@ -442,11 +817,11 @@ namespace nORM.Benchmarks
                 Salary = 60_000
             }).ToList();
 
-            await _nOrmContext!.BulkInsertAsync(users);
+            return _nOrmContext!.BulkInsertAsync(users);
         }
 
-        [Benchmark]
-        public async Task BulkInsert_Dapper()
+        [Benchmark(Description = "BulkInsert Idiomatic - Dapper list in Tx")]
+        public async Task BulkInsert_Idiomatic_Dapper()
         {
             var users = Enumerable.Range(1, 100).Select(i => new BenchmarkUser
             {
@@ -460,12 +835,12 @@ namespace nORM.Benchmarks
                 Salary = 60_000
             }).ToList();
 
-            var sql = @"
+            const string sql = @"
                 INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
                 VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
 
             await using var transaction = await _dapperConnection!.BeginTransactionAsync();
-            await _dapperConnection!.ExecuteAsync(sql, users, transaction);
+            await _dapperConnection.ExecuteAsync(sql, users, transaction);
             await transaction.CommitAsync();
         }
 
@@ -477,14 +852,12 @@ namespace nORM.Benchmarks
             _nOrmConnection?.Dispose();
             _dapperConnection?.Dispose();
 
-            // Clean up database file
             try
             {
                 if (System.IO.File.Exists("benchmark.db"))
                     System.IO.File.Delete("benchmark.db");
             }
-            catch { /* Ignore cleanup errors */ }
+            catch { /* ignore */ }
         }
     }
 }
-
