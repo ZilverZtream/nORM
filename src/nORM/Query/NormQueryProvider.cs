@@ -15,6 +15,7 @@ using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using System.Globalization;
 using System.Buffers.Binary;
+using System.Buffers;
 using nORM.Core;
 using nORM.Execution;
 using nORM.Internal;
@@ -645,45 +646,85 @@ namespace nORM.Query
 
         private string BuildCacheKeyFromPlan<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
         {
-            var sb = new StringBuilder();
-            sb.Append(plan.Sql);
-            sb.Append('|').Append(typeof(TResult).FullName);
+            var hasher = new XxHash128();
+            AppendUtf8(hasher, plan.Sql.AsSpan());
+            AppendByte(hasher, (byte)'|');
+            AppendUtf8(hasher, typeof(TResult).FullName!.AsSpan());
 
             var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             if (_ctx.Options.TenantProvider != null)
             {
                 if (tenant == null)
                     throw new InvalidOperationException("Tenant context required but not available");
-                sb.Append("|TENANT:").Append(tenant);
+                AppendUtf8(hasher, "|TENANT:".AsSpan());
+                AppendUtf8(hasher, tenant.ToString()!.AsSpan());
             }
 
             foreach (var kvp in parameters.OrderBy(k => k.Key))
             {
-                sb.Append('|').Append(kvp.Key).Append('=');
+                AppendByte(hasher, (byte)'|');
+                AppendUtf8(hasher, kvp.Key.AsSpan());
+                AppendByte(hasher, (byte)'=');
                 if (kvp.Value is null)
                 {
-                    sb.Append("null");
+                    AppendUtf8(hasher, "null".AsSpan());
                     continue;
                 }
 
-                sb.Append(kvp.Value.GetType().FullName).Append(':');
+                AppendUtf8(hasher, kvp.Value.GetType().FullName!.AsSpan());
+                AppendByte(hasher, (byte)':');
                 if (kvp.Value is byte[] bytesValue)
                 {
-                    sb.Append(Convert.ToHexString(bytesValue));
+                    hasher.Append(bytesValue);
                 }
                 else if (kvp.Value is IFormattable formattable)
                 {
-                    sb.Append(formattable.ToString(null, CultureInfo.InvariantCulture));
+                    AppendUtf8(hasher, formattable.ToString(null, CultureInfo.InvariantCulture)!.AsSpan());
                 }
                 else
                 {
-                    sb.Append(kvp.Value.ToString());
+                    AppendUtf8(hasher, kvp.Value.ToString()!.AsSpan());
                 }
             }
 
-            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-            var hash = XxHash128.Hash(bytes);
+            Span<byte> hash = stackalloc byte[16];
+            hasher.GetCurrentHash(hash);
             return Convert.ToHexString(hash);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void AppendUtf8(XxHash128 hasher, ReadOnlySpan<char> value)
+        {
+            if (value.IsEmpty)
+                return;
+            var byteCount = Encoding.UTF8.GetByteCount(value);
+            if (byteCount <= 256)
+            {
+                Span<byte> buffer = stackalloc byte[byteCount];
+                Encoding.UTF8.GetBytes(value, buffer);
+                hasher.Append(buffer);
+            }
+            else
+            {
+                var rented = ArrayPool<byte>.Shared.Rent(byteCount);
+                try
+                {
+                    Encoding.UTF8.GetBytes(value, rented);
+                    hasher.Append(rented.AsSpan(0, byteCount));
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(rented);
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void AppendByte(XxHash128 hasher, byte value)
+        {
+            Span<byte> b = stackalloc byte[1];
+            b[0] = value;
+            hasher.Append(b);
         }
 
         private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
