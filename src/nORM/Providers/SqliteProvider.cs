@@ -4,7 +4,7 @@ using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
+using nORM.Query;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -55,7 +55,7 @@ namespace nORM.Providers
             pragmaCmd.ExecuteNonQuery();
         }
         
-        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
+        public override void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
         {
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
             EnsureValidParameterName(offsetParameterName, nameof(offsetParameterName));

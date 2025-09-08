@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using nORM.Providers;
 using nORM.Core;
+using nORM.Query;
 using Xunit;
 
 namespace nORM.Tests;
@@ -109,10 +109,11 @@ public class QueryTranslatorCrossProviderTests : TestBase
         using var connection = setup.Connection;
         var provider = setup.Provider;
         var (sql, parameters, _) = TranslateQuery<Product, Product>(q => q.Take(5), connection, provider);
-        var sb = new StringBuilder(BaseSelect(provider));
+        var sb = new OptimizedSqlBuilder();
+        sb.Append(BaseSelect(provider));
         var paramName = provider.ParamPrefix + "p0";
         provider.ApplyPaging(sb, 5, null, paramName, null);
-        var expected = sb.ToString();
+        var expected = sb.ToSqlString();
         Assert.Equal(expected, sql);
         var param = Assert.Single(parameters);
         Assert.Equal(paramName, param.Key);
@@ -127,10 +128,11 @@ public class QueryTranslatorCrossProviderTests : TestBase
         using var connection = setup.Connection;
         var provider = setup.Provider;
         var (sql, parameters, _) = TranslateQuery<Product, Product>(q => q.Skip(10), connection, provider);
-        var sb = new StringBuilder(BaseSelect(provider));
+        var sb = new OptimizedSqlBuilder();
+        sb.Append(BaseSelect(provider));
         var paramName = provider.ParamPrefix + "p0";
         provider.ApplyPaging(sb, null, 10, null, paramName);
-        var expected = sb.ToString();
+        var expected = sb.ToSqlString();
         Assert.Equal(expected, sql);
         var param = Assert.Single(parameters);
         Assert.Equal(paramName, param.Key);
@@ -146,11 +148,12 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var provider = setup.Provider;
         var (sql, parameters, _) = TranslateQuery<Product, Product>(q => q.OrderBy(p => p.Id).Skip(20).Take(10), connection, provider);
         var t0 = provider.Escape("T0");
-        var sb = new StringBuilder($"{BaseSelect(provider, true)} ORDER BY {t0}.{provider.Escape("Id")} ASC");
+        var sb = new OptimizedSqlBuilder();
+        sb.Append(BaseSelect(provider, true)).Append(" ORDER BY ").Append(t0).Append('.').Append(provider.Escape("Id")).Append(" ASC");
         var offsetParam = provider.ParamPrefix + "p0";
         var limitParam = provider.ParamPrefix + "p1";
         provider.ApplyPaging(sb, 10, 20, limitParam, offsetParam);
-        var expected = sb.ToString();
+        var expected = sb.ToSqlString();
         Assert.Equal(expected, sql);
         Assert.Equal(2, parameters.Count);
         Assert.Equal(20, parameters[offsetParam]);
@@ -164,7 +167,8 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var setup = CreateProvider(providerKind);
         using var connection = setup.Connection;
         var provider = setup.Provider;
-        var sb = new StringBuilder(BaseSelect(provider));
+        var sb = new OptimizedSqlBuilder();
+        sb.Append(BaseSelect(provider));
         Assert.Throws<ArgumentException>(() => provider.ApplyPaging(sb, 5, null, "p0", null));
     }
 
