@@ -148,7 +148,7 @@ namespace nORM.Query
             {
                 var param = parameters[i];
                 var pType = param.ParameterType;
-                var underlying = Nullable.GetUnderlyingType(pType);
+                var underlying = Nullable.GetUnderlyingType(pType) ?? pType;
                 var skip = il.DefineLabel();
                 var end = il.DefineLabel();
 
@@ -159,35 +159,31 @@ namespace nORM.Query
 
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldloc, ordinals[i]);
-                var readerMethod = Methods.GetReaderMethod(underlying ?? pType);
+                var readerMethod = Methods.GetReaderMethod(underlying);
                 il.Emit(OpCodes.Callvirt, readerMethod);
 
-                if (readerMethod == Methods.GetValue)
+                if (readerMethod.ReturnType == typeof(object))
                 {
-                    var target = underlying ?? pType;
-                    il.Emit(OpCodes.Ldtoken, target);
+                    il.Emit(OpCodes.Ldtoken, underlying);
                     il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
                     il.Emit(OpCodes.Call, typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) })!);
-                    if (target.IsValueType)
-                        il.Emit(OpCodes.Unbox_Any, target);
+                    if (underlying.IsValueType)
+                        il.Emit(OpCodes.Unbox_Any, underlying);
                     else
-                        il.Emit(OpCodes.Castclass, target);
+                        il.Emit(OpCodes.Castclass, underlying);
+                }
+                else if (readerMethod.ReturnType != underlying)
+                {
+                    if (underlying.IsValueType)
+                        il.Emit(OpCodes.Unbox_Any, underlying);
+                    else
+                        il.Emit(OpCodes.Castclass, underlying);
                 }
 
-                if (underlying != null)
+                if (Nullable.GetUnderlyingType(pType) != null)
                 {
-                    var ctorNullable = pType.GetConstructor(new[] { underlying })!;
-                    if (readerMethod.ReturnType != underlying)
-                        il.Emit(OpCodes.Unbox_Any, underlying);
-                    il.Emit(OpCodes.Newobj, ctorNullable);
-                }
-                else if (pType.IsValueType && readerMethod.ReturnType == typeof(object))
-                {
-                    il.Emit(OpCodes.Unbox_Any, pType);
-                }
-                else if (!pType.IsValueType && readerMethod.ReturnType != pType)
-                {
-                    il.Emit(OpCodes.Castclass, pType);
+                    var nullableCtor = pType.GetConstructor(new[] { underlying })!;
+                    il.Emit(OpCodes.Newobj, nullableCtor);
                 }
 
                 il.Emit(OpCodes.Br_S, end);
