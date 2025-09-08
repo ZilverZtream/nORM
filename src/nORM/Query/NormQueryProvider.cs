@@ -189,34 +189,47 @@ namespace nORM.Query
             result = default!;
 
             var resultType = typeof(TResult);
+            Type? elementType = null;
+
             if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(List<>))
             {
-                var elementType = resultType.GetGenericArguments()[0];
-                if (elementType.IsClass && elementType.GetConstructor(Type.EmptyTypes) != null)
+                elementType = resultType.GetGenericArguments()[0];
+            }
+            else if (resultType == typeof(int) || resultType == typeof(long))
+            {
+                if (expression is MethodCallExpression mc && mc.Arguments.Count > 0)
                 {
-                    try
-                    {
-                        var method = typeof(FastPathQueryExecutor)
-                            .GetMethod(nameof(FastPathQueryExecutor.TryExecute), BindingFlags.Public | BindingFlags.Static)!
-                            .MakeGenericMethod(elementType);
+                    var sourceType = mc.Arguments[0].Type;
+                    if (sourceType.IsGenericType)
+                        elementType = sourceType.GetGenericArguments()[0];
+                }
+            }
 
-                        object?[] args = { expression, _ctx, null };
-                        var success = (bool)method.Invoke(null, args)!;
-                        if (success)
-                        {
-                            var task = (Task)args[2]!;
-                            result = task.ContinueWith(t =>
-                            {
-                                var resProp = t.GetType().GetProperty("Result");
-                                return (TResult)resProp!.GetValue(t)!;
-                            }, TaskContinuationOptions.ExecuteSynchronously);
-                            return true;
-                        }
-                    }
-                    catch
+            if (elementType != null && elementType.IsClass && elementType.GetConstructor(Type.EmptyTypes) != null)
+            {
+                try
+                {
+                    var method = typeof(FastPathQueryExecutor)
+                        .GetMethod(nameof(FastPathQueryExecutor.TryExecute), BindingFlags.Public | BindingFlags.Static)!
+                        .MakeGenericMethod(elementType);
+
+                    object?[] args = { expression, _ctx, null };
+                    var success = (bool)method.Invoke(null, args)!;
+                    if (success)
                     {
-                        // ignore and fall back to full translation path
+                        var task = (Task)args[2]!;
+                        result = task.ContinueWith(t =>
+                        {
+                            var resProp = t.GetType().GetProperty("Result");
+                            var value = resProp!.GetValue(t)!;
+                            return (TResult)Convert.ChangeType(value, typeof(TResult))!;
+                        }, TaskContinuationOptions.ExecuteSynchronously);
+                        return true;
                     }
+                }
+                catch
+                {
+                    // ignore and fall back to full translation path
                 }
             }
 
