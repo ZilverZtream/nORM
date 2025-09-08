@@ -15,10 +15,10 @@ namespace nORM.Core
     {
         private readonly Func<DbConnection> _connectionFactory;
         private readonly ConcurrentQueue<PooledItem> _pool = new();
-        private readonly object _poolLock = new();
         private readonly SemaphoreSlim _semaphore;
         private readonly Timer _cleanupTimer;
         private readonly int _minSize;
+        private readonly int _maxSize;
         private readonly TimeSpan _idleLifetime;
         private int _created;
         private int _returning;
@@ -49,7 +49,8 @@ namespace nORM.Core
             if (opts.MinPoolSize < 0 || opts.MinPoolSize > opts.MaxPoolSize)
                 throw new ArgumentOutOfRangeException(nameof(options.MinPoolSize));
 
-            _semaphore = new SemaphoreSlim(opts.MaxPoolSize, opts.MaxPoolSize);
+            _maxSize = opts.MaxPoolSize;
+            _semaphore = new SemaphoreSlim(0, _maxSize);
             _minSize = opts.MinPoolSize;
             _idleLifetime = opts.ConnectionIdleLifetime;
 
@@ -94,18 +95,11 @@ namespace nORM.Core
         public async Task<DbConnection> RentAsync(CancellationToken ct = default)
         {
             ThrowIfDisposed();
-            await _semaphore.WaitAsync(ct).ConfigureAwait(false);
-            try
-            {
-                while (true)
-                {
-                    PooledItem? item = null;
-                    lock (_poolLock)
-                    {
-                        if (!_pool.TryDequeue(out item))
-                            break;
-                    }
 
+            while (true)
+            {
+                if (_pool.TryDequeue(out var item))
+                {
                     try
                     {
                         if (item.Connection.State == ConnectionState.Open)
@@ -119,46 +113,61 @@ namespace nORM.Core
                         item.Connection.Dispose();
                         Interlocked.Decrement(ref _created);
                     }
+
+                    continue;
                 }
 
-                var cn = _connectionFactory();
-                await cn.OpenAsync(ct).ConfigureAwait(false);
-                Interlocked.Increment(ref _created);
-                return new PooledDbConnection(this, cn);
-            }
-            catch
-            {
-                _semaphore.Release();
-                throw;
+                if (Volatile.Read(ref _created) < _maxSize && HasSufficientMemory())
+                {
+                    if (Interlocked.Increment(ref _created) <= _maxSize)
+                    {
+                        try
+                        {
+                            var cn = _connectionFactory();
+                            await cn.OpenAsync(ct).ConfigureAwait(false);
+                            return new PooledDbConnection(this, cn);
+                        }
+                        catch
+                        {
+                            Interlocked.Decrement(ref _created);
+                            throw;
+                        }
+                    }
+                    else
+                    {
+                        Interlocked.Decrement(ref _created);
+                    }
+                }
+
+                await _semaphore.WaitAsync(ct).ConfigureAwait(false);
             }
         }
 
         private void Return(DbConnection connection)
         {
-            lock (_poolLock)
+            Interlocked.Increment(ref _returning);
+            try
             {
-                _returning++;
-                try
+                if (_disposed)
                 {
-                    if (_disposed)
-                    {
-                        connection.Dispose();
-                    }
-                    else if (connection.State == ConnectionState.Open)
-                    {
-                        _pool.Enqueue(new PooledItem(connection));
-                    }
-                    else
-                    {
-                        connection.Dispose();
-                        Interlocked.Decrement(ref _created);
-                    }
+                    connection.Dispose();
+                    Interlocked.Decrement(ref _created);
                 }
-                finally
+                else if (connection.State == ConnectionState.Open)
                 {
-                    _returning--;
+                    _pool.Enqueue(new PooledItem(connection));
+                }
+                else
+                {
+                    connection.Dispose();
+                    Interlocked.Decrement(ref _created);
                 }
             }
+            finally
+            {
+                Interlocked.Decrement(ref _returning);
+            }
+
             _semaphore.Release();
         }
 
@@ -168,24 +177,22 @@ namespace nORM.Core
             var threshold = DateTime.UtcNow - _idleLifetime;
 
             var itemsToRequeue = new List<PooledItem>();
-            lock (_poolLock)
+            while (Volatile.Read(ref _created) - Volatile.Read(ref _returning) > _minSize &&
+                   _pool.TryDequeue(out var item))
             {
-                while (_created - _returning > _minSize && _pool.TryDequeue(out var item))
+                if (item.LastUsed < threshold)
                 {
-                    if (item.LastUsed < threshold)
-                    {
-                        item.Connection.Dispose();
-                        Interlocked.Decrement(ref _created);
-                    }
-                    else
-                    {
-                        itemsToRequeue.Add(item);
-                    }
+                    item.Connection.Dispose();
+                    Interlocked.Decrement(ref _created);
                 }
-
-                foreach (var item in itemsToRequeue)
-                    _pool.Enqueue(item);
+                else
+                {
+                    itemsToRequeue.Add(item);
+                }
             }
+
+            foreach (var item in itemsToRequeue)
+                _pool.Enqueue(item);
         }
 
         private static bool HasSufficientMemory()
