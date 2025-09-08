@@ -113,7 +113,7 @@ namespace nORM.Query
                         t._correlatedParams[param] = info;
                     }
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
-                    var visitor = ExpressionVisitorPool.Get(in vctx);
+                    var visitor = FastExpressionVisitorPool.Get(in vctx);
                     var sql = visitor.Translate(lambda.Body);
                     var isGrouping = node.Arguments[0] is MethodCallExpression mc && mc.Method.Name == "GroupBy";
                     var target = isGrouping ? t._having : t._where;
@@ -121,7 +121,7 @@ namespace nORM.Query
                     target.Append($"({sql})");
                     foreach (var kvp in visitor.GetParameters())
                         t._params[kvp.Key] = kvp.Value;
-                    ExpressionVisitorPool.Return(visitor);
+                    FastExpressionVisitorPool.Return(visitor);
                 }
                 return source;
             }
@@ -151,10 +151,10 @@ namespace nORM.Query
                         t._correlatedParams[param] = info;
                     }
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
-                    var visitor = ExpressionVisitorPool.Get(in vctx);
+                    var visitor = FastExpressionVisitorPool.Get(in vctx);
                     var sql = visitor.Translate(keySelector.Body);
                     t._orderBy.Add((sql, !t._methodName.Contains("Descending")));
-                    ExpressionVisitorPool.Return(visitor);
+                    FastExpressionVisitorPool.Return(visitor);
                 }
                 return source;
             }
@@ -349,13 +349,13 @@ namespace nORM.Query
                     if (!t._correlatedParams.ContainsKey(param))
                         t._correlatedParams[param] = (t._mapping, alias);
                     var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap);
-                    var visitor = ExpressionVisitorPool.Get(in vctxFS);
+                    var visitor = FastExpressionVisitorPool.Get(in vctxFS);
                     var sql = visitor.Translate(predicate.Body);
                     if (t._where.Length > 0) t._where.Append(" AND ");
                     t._where.Append($"({sql})");
                     foreach (var kvp in visitor.GetParameters())
                         t._params[kvp.Key] = kvp.Value;
-                    ExpressionVisitorPool.Return(visitor);
+                    FastExpressionVisitorPool.Return(visitor);
                 }
                 t._take = 1;
                 var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
@@ -377,13 +377,13 @@ namespace nORM.Query
                     if (!t._correlatedParams.ContainsKey(param))
                         t._correlatedParams[param] = (t._mapping, alias);
                     var vctxLast = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap);
-                    var visitor = ExpressionVisitorPool.Get(in vctxLast);
+                    var visitor = FastExpressionVisitorPool.Get(in vctxLast);
                     var sql = visitor.Translate(lastPredicate.Body);
                     if (t._where.Length > 0) t._where.Append(" AND ");
                     t._where.Append($"({sql})");
                     foreach (var kvp in visitor.GetParameters())
                         t._params[kvp.Key] = kvp.Value;
-                    ExpressionVisitorPool.Return(visitor);
+                    FastExpressionVisitorPool.Return(visitor);
                 }
                 var lastSrc = t.Visit(node.Arguments[0]);
                 if (t._orderBy.Count > 0)
@@ -427,13 +427,13 @@ namespace nORM.Query
                         t._correlatedParams[param] = info;
                     }
                     var vctxCount = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
-                    var visitor = ExpressionVisitorPool.Get(in vctxCount);
+                    var visitor = FastExpressionVisitorPool.Get(in vctxCount);
                     var sql = visitor.Translate(countPredicate.Body);
                     if (t._where.Length > 0) t._where.Append(" AND ");
                     t._where.Append($"({sql})");
                     foreach (var kvp in visitor.GetParameters())
                         t._params[kvp.Key] = kvp.Value;
-                    ExpressionVisitorPool.Return(visitor);
+                    FastExpressionVisitorPool.Return(visitor);
                 }
                 var newArgs = new[] { source }.Concat(node.Arguments.Skip(1));
                 return node.Update(node.Object, newArgs);
