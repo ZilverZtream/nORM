@@ -323,8 +323,17 @@ namespace nORM.Query
 
                     if (_t._isAggregate && _t._groupBy.Count == 0)
                     {
-                        _t._sql.AppendFragment("SELECT COUNT(*) FROM ").Append(fromClause);
-                        if (alias != null) _t._sql.Append(' ').Append(alias);
+                        var prefix = PooledStringBuilder.Rent();
+                        try
+                        {
+                            prefix.Append("SELECT COUNT(*) FROM ").Append(fromClause);
+                            if (alias != null) prefix.Append(' ').Append(alias);
+                            _t._sql.Insert(0, prefix.ToString());
+                        }
+                        finally
+                        {
+                            PooledStringBuilder.Return(prefix);
+                        }
                     }
                     else
                     {
@@ -351,10 +360,17 @@ namespace nORM.Query
                         }
 
                         var distinct = _t._isDistinct ? "DISTINCT " : string.Empty;
-                        using var prefix = new OptimizedSqlBuilder(select.Length + _t._mapping.EscTable.Length + 32);
-                        prefix.AppendFragment("SELECT ").Append(distinct).Append(select).AppendFragment(" FROM ").Append(fromClause);
-                        if (alias != null) prefix.Append(' ').Append(alias);
-                        _t._sql.Insert(0, prefix.ToSqlString());
+                        var prefix = PooledStringBuilder.Rent();
+                        try
+                        {
+                            prefix.Append("SELECT ").Append(distinct).Append(select).Append(" FROM ").Append(fromClause);
+                            if (alias != null) prefix.Append(' ').Append(alias);
+                            _t._sql.Insert(0, prefix.ToString());
+                        }
+                        finally
+                        {
+                            PooledStringBuilder.Return(prefix);
+                        }
                     }
                 }
 
