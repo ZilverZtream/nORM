@@ -32,9 +32,9 @@ namespace nORM.Query
 
         public void Reset()
         {
-            Parameters = new Dictionary<string, object>();
-            CompiledParameters = new List<string>();
-            ParameterMap = new Dictionary<ParameterExpression, string>();
+            Parameters.Clear();
+            CompiledParameters.Clear();
+            ParameterMap.Clear();
             Volatile.Write(ref _index, 0);
         }
     }
