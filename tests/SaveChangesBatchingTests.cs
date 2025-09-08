@@ -2,10 +2,10 @@ using System;
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Text;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
 using nORM.Providers;
+using nORM.Query;
 using nORM.Enterprise;
 using nORM.Mapping;
 using nORM.Configuration;
@@ -21,7 +21,7 @@ public class SaveChangesBatchingTests
         public override int MaxParameters => 5;
         public override string Escape(string id) => $"\"{id}\"";
 
-        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
+        public override void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
         {
             if (limitParameterName != null) sb.Append(" LIMIT ").Append(limitParameterName);
             if (offsetParameterName != null) sb.Append(" OFFSET ").Append(offsetParameterName);

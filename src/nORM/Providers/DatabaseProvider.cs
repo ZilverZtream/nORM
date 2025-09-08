@@ -5,6 +5,7 @@ using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using nORM.Query;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Core;
@@ -30,7 +31,7 @@ namespace nORM.Providers
         public virtual int MaxSqlLength => int.MaxValue;
         public virtual int MaxParameters => int.MaxValue;
         public abstract string Escape(string id);
-        public abstract void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName);
+        public abstract void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName);
         public abstract string GetIdentityRetrievalString(TableMapping m);
         public abstract DbParameter CreateParameter(string name, object? value);
         public abstract string? TranslateFunction(string name, Type declaringType, params string[] args);

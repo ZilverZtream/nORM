@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
 using nORM.Providers;
+using nORM.Query;
 using nORM.Mapping;
 using Xunit;
 
@@ -26,7 +26,7 @@ public class BulkInsertTests
         public override int MaxParameters => 999;
         public override string Escape(string id) => $"\"{id}\"";
 
-        public override void ApplyPaging(StringBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
+        public override void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
         {
             if (limitParameterName != null) sb.Append(" LIMIT ").Append(limitParameterName);
             if (offsetParameterName != null) sb.Append(" OFFSET ").Append(offsetParameterName);

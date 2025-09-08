@@ -9,8 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Data;
-using System.Text;
-using Microsoft.Extensions.ObjectPool;
+using nORM.Query;
 using nORM.Core;
 using nORM.Mapping;
 using nORM.Internal;
@@ -30,8 +29,6 @@ namespace nORM.Navigation
         private static readonly ConcurrentLruCache<Type, List<NavigationPropertyInfo>> _navigationPropertyCache = new(maxSize: 1000);
         private static readonly ConditionalWeakTable<DbContext, BatchedNavigationLoader> _navigationLoaders = new();
         private static readonly ConcurrentDictionary<BatchedNavigationLoader, byte> _activeLoaders = new();
-        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
-            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
         internal static void RegisterLoader(BatchedNavigationLoader loader) => _activeLoaders[loader] = 0;
         internal static void UnregisterLoader(BatchedNavigationLoader loader) => _activeLoaders.TryRemove(loader, out _);
@@ -396,19 +393,13 @@ namespace nORM.Navigation
             cmd.AddParam(paramName, keyValue);
 
             // Apply LIMIT 1 for single result
-            var sb = _stringBuilderPool.Get();
-            try
+            using (var sb = new OptimizedSqlBuilder(cmd.CommandText.Length + 20))
             {
                 sb.Append(cmd.CommandText);
                 var limitParam = context.Provider.ParamPrefix + "p_limit";
                 context.Provider.ApplyPaging(sb, 1, null, limitParam, null);
-                cmd.CommandText = sb.ToString();
+                cmd.CommandText = sb.ToSqlString();
                 cmd.AddParam(limitParam, 1);
-            }
-            finally
-            {
-                sb.Clear();
-                _stringBuilderPool.Return(sb);
             }
 
             using var translator = Query.QueryTranslator.Rent(context);
