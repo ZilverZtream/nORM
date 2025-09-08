@@ -8,8 +8,6 @@ namespace nORM.Internal
     {
         public static void AddParamsStackAlloc(this DbCommand cmd, ReadOnlySpan<(string name, object value)> parameters)
         {
-            Span<DbParameter> paramSpan = stackalloc DbParameter[parameters.Length];
-
             for (int i = 0; i < parameters.Length; i++)
             {
                 var param = cmd.CreateParameter();
