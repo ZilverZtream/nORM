@@ -6,10 +6,10 @@ using Xunit;
 
 namespace nORM.Tests;
 
-public class QueryTranslatorObjectPoolTests
+public class QueryTranslatorDisposeTests
 {
     [Fact]
-    public void Dispose_returns_translator_to_pool()
+    public void Dispose_does_not_return_translator_to_pool()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -23,7 +23,7 @@ public class QueryTranslatorObjectPoolTests
 
         var translator2 = rentMethod.Invoke(null, new object[] { ctx });
 
-        Assert.Same(translator1, translator2);
+        Assert.NotSame(translator1, translator2);
     }
 }
 
