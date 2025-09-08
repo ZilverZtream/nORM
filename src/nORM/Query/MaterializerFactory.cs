@@ -569,11 +569,14 @@ namespace nORM.Query
 
             Expression call = underlyingType.Name switch
             {
-                nameof(Int32) => Expression.Call(reader, Methods.GetInt32, Expression.Constant(index)),
-                nameof(String) => Expression.Call(reader, Methods.GetString, Expression.Constant(index)),
+                nameof(Int32)    => Expression.Call(reader, Methods.GetInt32, Expression.Constant(index)),
+                nameof(String)   => Expression.Call(reader, Methods.GetString, Expression.Constant(index)),
                 nameof(DateTime) => Expression.Call(reader, Methods.GetDateTime, Expression.Constant(index)),
-                nameof(Boolean) => Expression.Call(reader, Methods.GetBoolean, Expression.Constant(index)),
-                _ => Expression.Call(reader, Methods.GetValue, Expression.Constant(index))
+                nameof(Boolean)  => Expression.Call(reader, Methods.GetBoolean, Expression.Constant(index)),
+                nameof(Decimal)  => Expression.Call(reader, Methods.GetDecimal, Expression.Constant(index)),
+                _ => Expression.Convert(
+                        Expression.Call(reader, Methods.GetValue, Expression.Constant(index)),
+                        underlyingType)
             };
 
             if (call.Type != propertyType)
