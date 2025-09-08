@@ -17,15 +17,16 @@ using Microsoft.Extensions.ObjectPool;
 
 namespace nORM.Providers
 {
-    public abstract class DatabaseProvider
+    public abstract class DatabaseProvider : IFastProvider
     {
         private readonly ConcurrentLruCache<(Type Type, string Operation), string> _sqlCache = new(maxSize: 1000);
         protected static readonly DynamicBatchSizer BatchSizer = new();
 
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
-        
-        public string ParamPrefix { get; protected init; } = "@";
+
+        public virtual char ParameterPrefixChar => '@';
+        public virtual string ParamPrefix => ParameterPrefixChar.ToString();
         public virtual int MaxSqlLength => int.MaxValue;
         public virtual int MaxParameters => int.MaxValue;
         public abstract string Escape(string id);
@@ -84,6 +85,20 @@ namespace nORM.Providers
         public virtual void InitializeConnection(DbConnection connection) { }
 
         public virtual CommandType StoredProcedureCommandType => CommandType.StoredProcedure;
+
+        public virtual void BuildSimpleSelect(Span<char> buffer, ReadOnlySpan<char> table,
+            ReadOnlySpan<char> columns, out int length)
+        {
+            length = BuildSimpleSelectSlow(buffer, table, columns);
+        }
+
+        protected virtual int BuildSimpleSelectSlow(Span<char> buffer, ReadOnlySpan<char> table,
+            ReadOnlySpan<char> columns)
+        {
+            var sql = string.Concat("SELECT ", columns.ToString(), " FROM ", table.ToString());
+            sql.AsSpan().CopyTo(buffer);
+            return sql.Length;
+        }
 
         public virtual string BuildContainsClause(DbCommand cmd, string columnName, IReadOnlyList<object?> values)
         {
