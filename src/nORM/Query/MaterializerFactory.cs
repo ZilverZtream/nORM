@@ -22,11 +22,8 @@ namespace nORM.Query
     internal sealed class MaterializerFactory
     {
         private const int DefaultCacheSize = 1000;
-        private static int _currentCacheSize = DefaultCacheSize;
         private static readonly ConcurrentLruCache<(int MappingTypeHash, int TargetTypeHash, int ProjectionHash, string TableName), Func<DbDataReader, CancellationToken, Task<object>>> _cache
             = new(maxSize: DefaultCacheSize, timeToLive: TimeSpan.FromMinutes(10));
-        private static readonly IMemoryMonitor _memoryMonitor = new SystemMemoryMonitor();
-        private const long LowMemoryThresholdBytes = 200L * 1024L * 1024L;
 
         // Cache constructor info and delegates to avoid repeated reflection in hot paths
         private static readonly ConcurrentDictionary<Type, ConstructorInfo> _constructorCache = new();
@@ -112,38 +109,29 @@ namespace nORM.Query
 
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
         {
-            var available = _memoryMonitor.GetAvailableMemory();
-            if (available < LowMemoryThresholdBytes)
+            // CHECK FOR COMPILED MATERIALIZER FIRST
+            if (projection == null && CompiledMaterializerStore.TryGet(targetType, out var compiled))
             {
-                var scale = (double)available / LowMemoryThresholdBytes;
-                var newSize = Math.Max(10, (int)(_currentCacheSize * scale));
-                if (newSize < _currentCacheSize)
-                {
-                    _currentCacheSize = newSize;
-                    _cache.SetMaxSize(newSize);
-                }
+                return compiled;
             }
 
+            // Also check the cache with the new key structure
             var projectionHash = projection != null ? ExpressionFingerprint.Compute(projection) : 0;
             var cacheKey = (mapping.Type.GetHashCode(), targetType.GetHashCode(), projectionHash, mapping.TableName);
 
-            if (projection == null && CompiledMaterializerStore.TryGet(targetType, out var precompiled))
-            {
-                _cache.GetOrAdd(cacheKey, _ => precompiled);
-                return precompiled;
-            }
-
-            if (projection == null && _fastMaterializers.TryGetValue(targetType, out var fast))
-            {
-                return _cache.GetOrAdd(cacheKey, _ => (reader, ct) =>
-                {
-                    ct.ThrowIfCancellationRequested();
-                    return Task.FromResult(fast(reader));
-                });
-            }
-
             return _cache.GetOrAdd(cacheKey, _ =>
             {
+                // For simple entity materialization without projection, prefer fast materializers
+                if (projection == null && _fastMaterializers.TryGetValue(targetType, out var fast))
+                {
+                    return (reader, ct) =>
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        return Task.FromResult(fast(reader));
+                    };
+                }
+
+                // Fall back to existing reflection-based approach
                 var sync = CreateMaterializerInternal(mapping, targetType, projection);
                 ValidateMaterializer(sync, mapping, targetType);
                 return (reader, ct) =>
