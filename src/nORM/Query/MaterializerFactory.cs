@@ -49,6 +49,23 @@ namespace nORM.Query
             }
         }
 
+        private static object? ConvertDbValue(object dbValue, Type targetType)
+        {
+            if (dbValue == null || dbValue is DBNull)
+            {
+                return null;
+            }
+
+            var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+
+            if (dbValue.GetType() == underlyingType)
+            {
+                return dbValue;
+            }
+
+            return Convert.ChangeType(dbValue, underlyingType);
+        }
+
         private static Func<DbDataReader, object> CreateILMaterializer<T>() where T : class
         {
             var type = typeof(T);
@@ -144,11 +161,12 @@ namespace nORM.Query
                 il.Emit(OpCodes.Stloc, ordinals[i]);
             }
 
+            var convertMethod = typeof(MaterializerFactory).GetMethod(nameof(ConvertDbValue), BindingFlags.NonPublic | BindingFlags.Static)!;
+
             for (int i = 0; i < parameters.Length; i++)
             {
                 var param = parameters[i];
                 var pType = param.ParameterType;
-                var underlying = Nullable.GetUnderlyingType(pType) ?? pType;
                 var skip = il.DefineLabel();
                 var end = il.DefineLabel();
 
@@ -159,31 +177,18 @@ namespace nORM.Query
 
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldloc, ordinals[i]);
-                var readerMethod = Methods.GetReaderMethod(underlying);
-                il.Emit(OpCodes.Callvirt, readerMethod);
+                il.Emit(OpCodes.Callvirt, Methods.GetValue);
+                il.Emit(OpCodes.Ldtoken, pType);
+                il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
+                il.Emit(OpCodes.Call, convertMethod);
 
-                if (readerMethod.ReturnType == typeof(object))
+                if (pType.IsValueType)
                 {
-                    il.Emit(OpCodes.Ldtoken, underlying);
-                    il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
-                    il.Emit(OpCodes.Call, typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) })!);
-                    if (underlying.IsValueType)
-                        il.Emit(OpCodes.Unbox_Any, underlying);
-                    else
-                        il.Emit(OpCodes.Castclass, underlying);
+                    il.Emit(OpCodes.Unbox_Any, pType);
                 }
-                else if (readerMethod.ReturnType != underlying)
+                else
                 {
-                    if (underlying.IsValueType)
-                        il.Emit(OpCodes.Unbox_Any, underlying);
-                    else
-                        il.Emit(OpCodes.Castclass, underlying);
-                }
-
-                if (Nullable.GetUnderlyingType(pType) != null)
-                {
-                    var nullableCtor = pType.GetConstructor(new[] { underlying })!;
-                    il.Emit(OpCodes.Newobj, nullableCtor);
+                    il.Emit(OpCodes.Castclass, pType);
                 }
 
                 il.Emit(OpCodes.Br_S, end);
