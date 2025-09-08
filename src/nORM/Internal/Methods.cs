@@ -18,7 +18,7 @@ namespace nORM.Internal
         public static readonly MethodInfo GetInt64 = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetInt64))!;
         public static readonly MethodInfo GetFloat = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetFloat))!;
         public static readonly MethodInfo GetDouble = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetDouble))!;
-        public static readonly MethodInfo GetDecimal = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetDecimal))!;
+        public static readonly MethodInfo GetDecimal = typeof(DbDataReader).GetMethod(nameof(DbDataReader.GetDecimal))!;
         public static readonly MethodInfo GetDateTime = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetDateTime))!;
         public static readonly MethodInfo GetGuid = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetGuid))!;
         public static readonly MethodInfo GetString = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetString))!;
