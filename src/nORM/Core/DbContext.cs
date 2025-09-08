@@ -178,7 +178,7 @@ namespace nORM.Core
             return joinCount * 1000 + subQueryCount * 500;
         }
 
-        public DbConnection Connection => EnsureConnection();
+        public DbConnection Connection => _cn;
         public DatabaseProvider Provider => _p;
 
         internal DbTransaction? CurrentTransaction
@@ -200,8 +200,7 @@ namespace nORM.Core
                 return await _executionStrategy.ExecuteAsync(async (ctx, token) =>
                 {
                     await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
-                    await using var cmd = ctx.Connection.CreateCommand();
-                    cmd.CommandText = "SELECT 1";
+                    var cmd = CommandPool.Get(ctx.Connection, "SELECT 1");
                     cmd.CommandTimeout = (int)TimeSpan.FromSeconds(5).TotalSeconds;
                     var result = await cmd.ExecuteScalarWithInterceptionAsync(ctx, token).ConfigureAwait(false);
                     return result is 1 or 1L;
@@ -742,6 +741,22 @@ namespace nORM.Core
             }
             return index;
         }
+
+        private Dictionary<string, object> AddParametersFast(DbCommand cmd, object[] parameters)
+        {
+            var dict = new Dictionary<string, object>(parameters.Length);
+            var span = new (string name, object value)[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                var name = $"{_p.ParamPrefix}p{i}";
+                var value = parameters[i] ?? DBNull.Value;
+                span[i] = (name, value);
+                dict[name] = value;
+            }
+
+            cmd.SetParametersFast(span);
+            return dict;
+        }
         #endregion
 
         #region Bulk Operations
@@ -818,10 +833,9 @@ namespace nORM.Core
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                await using var cmd = ctx.Connection.CreateCommand();
-                cmd.CommandText = sql;
+                var cmd = CommandPool.Get(ctx.Connection, sql);
                 cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
-                var paramDict = ParameterHelper.AddParameters(_p, cmd, parameters);
+                var paramDict = ctx.AddParametersFast(cmd, parameters);
 
                 if (!NormValidator.IsSafeRawSql(sql))
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
@@ -861,6 +875,7 @@ namespace nORM.Core
                 }
 
                 ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
+                cmd.Parameters.Clear();
                 return list;
             }, ct);
 
@@ -869,10 +884,9 @@ namespace nORM.Core
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                await using var cmd = ctx.Connection.CreateCommand();
-                cmd.CommandText = sql;
+                var cmd = CommandPool.Get(ctx.Connection, sql);
                 cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
-                var paramDict = ParameterHelper.AddParameters(_p, cmd, parameters);
+                var paramDict = ctx.AddParametersFast(cmd, parameters);
 
                 if (!NormValidator.IsSafeRawSql(sql))
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
@@ -886,6 +900,7 @@ namespace nORM.Core
                 while (await reader.ReadAsync(token).ConfigureAwait(false)) list.Add((T)await materializer(reader, token).ConfigureAwait(false));
 
                 ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
+                cmd.Parameters.Clear();
                 return list;
             }, ct);
 
@@ -894,20 +909,22 @@ namespace nORM.Core
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                await using var cmd = ctx.Connection.CreateCommand();
-                cmd.CommandText = procedureName;
+                var cmd = CommandPool.Get(ctx.Connection, procedureName);
                 cmd.CommandType = CommandType.StoredProcedure;
                 cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText).TotalSeconds;
                 var paramDict = new Dictionary<string, object>();
                 if (parameters != null)
                 {
-                    foreach (var prop in parameters.GetType().GetProperties())
+                    var props = parameters.GetType().GetProperties();
+                    var span = new (string name, object value)[props.Length];
+                    for (int i = 0; i < props.Length; i++)
                     {
-                        var pName = _p.ParamPrefix + prop.Name;
-                        var pValue = prop.GetValue(parameters);
-                        cmd.AddParam(pName, pValue);
-                        paramDict[pName] = pValue ?? DBNull.Value;
+                        var pName = _p.ParamPrefix + props[i].Name;
+                        var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
+                        span[i] = (pName, pValue);
+                        paramDict[pName] = pValue;
                     }
+                    cmd.SetParametersFast(span);
                 }
 
                 if (!NormValidator.IsSafeRawSql(procedureName))
@@ -922,6 +939,7 @@ namespace nORM.Core
                 while (await reader.ReadAsync(token).ConfigureAwait(false)) list.Add((T)await materializer(reader, token).ConfigureAwait(false));
 
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
+                cmd.Parameters.Clear();
                 return list;
             }, ct);
 
@@ -929,20 +947,22 @@ namespace nORM.Core
         {
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             var sw = Stopwatch.StartNew();
-            await using var cmd = Connection.CreateCommand();
-            cmd.CommandText = procedureName;
+            var cmd = CommandPool.Get(Connection, procedureName);
             cmd.CommandType = _p.StoredProcedureCommandType;
             cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText).TotalSeconds;
             var paramDict = new Dictionary<string, object>();
             if (parameters != null)
             {
-                foreach (var prop in parameters.GetType().GetProperties())
+                var props = parameters.GetType().GetProperties();
+                var span = new (string name, object value)[props.Length];
+                for (int i = 0; i < props.Length; i++)
                 {
-                    var pName = _p.ParamPrefix + prop.Name;
-                    var pValue = prop.GetValue(parameters);
-                    cmd.AddParam(pName, pValue);
-                    paramDict[pName] = pValue ?? DBNull.Value;
+                    var pName = _p.ParamPrefix + props[i].Name;
+                    var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
+                    span[i] = (pName, pValue);
+                    paramDict[pName] = pValue;
                 }
+                cmd.SetParametersFast(span);
             }
 
             if (!NormValidator.IsSafeRawSql(procedureName))
@@ -962,6 +982,7 @@ namespace nORM.Core
             }
 
             Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, count);
+            cmd.Parameters.Clear();
         }
 
         public Task<StoredProcedureResult<T>> ExecuteStoredProcedureWithOutputAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()
@@ -969,20 +990,22 @@ namespace nORM.Core
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                await using var cmd = ctx.Connection.CreateCommand();
-                cmd.CommandText = procedureName;
+                var cmd = CommandPool.Get(ctx.Connection, procedureName);
                 cmd.CommandType = CommandType.StoredProcedure;
                 cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText).TotalSeconds;
                 var paramDict = new Dictionary<string, object>();
                 if (parameters != null)
                 {
-                    foreach (var prop in parameters.GetType().GetProperties())
+                    var props = parameters.GetType().GetProperties();
+                    var span = new (string name, object value)[props.Length];
+                    for (int i = 0; i < props.Length; i++)
                     {
-                        var pName = _p.ParamPrefix + prop.Name;
-                        var pValue = prop.GetValue(parameters);
-                        cmd.AddParam(pName, pValue);
-                        paramDict[pName] = pValue ?? DBNull.Value;
+                        var pName = _p.ParamPrefix + props[i].Name;
+                        var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
+                        span[i] = (pName, pValue);
+                        paramDict[pName] = pValue;
                     }
+                    cmd.SetParametersFast(span);
                 }
 
                 var outputParamMap = new Dictionary<string, DbParameter>();
@@ -1017,6 +1040,7 @@ namespace nORM.Core
                 }
 
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
+                cmd.Parameters.Clear();
                 return new StoredProcedureResult<T>(list, outputs);
             }, ct);
         #endregion
@@ -1060,13 +1084,15 @@ namespace nORM.Core
             await _executionStrategy.ExecuteAsync(async (ctx, ct) =>
             {
                 await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                await using var cmd = ctx.Connection.CreateCommand();
                 var p0 = _p.ParamPrefix + "p0";
                 var p1 = _p.ParamPrefix + "p1";
-                cmd.CommandText = $"INSERT INTO __NormTemporalTags (TagName, Timestamp) VALUES ({p0}, {p1})";
-                cmd.AddParam(p0, tagName);
-                cmd.AddParam(p1, DateTime.UtcNow);
+                var cmd = CommandPool.Get(ctx.Connection, $"INSERT INTO __NormTemporalTags (TagName, Timestamp) VALUES ({p0}, {p1})");
+                var span = new (string name, object value)[2];
+                span[0] = (p0, tagName);
+                span[1] = (p1, DateTime.UtcNow);
+                cmd.SetParametersFast(span);
                 await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                cmd.Parameters.Clear();
                 return 0;
             }, default).ConfigureAwait(false);
         }
