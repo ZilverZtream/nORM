@@ -122,7 +122,14 @@ namespace nORM.Query
 
         private object ProcessEntity(object entity, bool trackable, TableMapping? entityMap)
         {
-            if (!trackable) return entity;
+            if (!trackable)
+                return entity;
+
+            // ADD FAST PATH FOR READ-ONLY SCENARIOS
+            if (IsReadOnlyQuery())
+            {
+                return entity; // Skip all tracking setup
+            }
 
             var actualMap = entityMap != null && entity.GetType() == entityMap.Type
                 ? entityMap
@@ -131,6 +138,12 @@ namespace nORM.Query
             entity = entry.Entity!;
             NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
             return entity;
+        }
+
+        private bool IsReadOnlyQuery()
+        {
+            // Determine if this is a read-only context
+            return _ctx.Options.DefaultTrackingBehavior == QueryTrackingBehavior.NoTracking;
         }
 
         private static int EstimateCapacity(string sql, IReadOnlyDictionary<string, object> parameters)

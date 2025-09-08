@@ -35,6 +35,24 @@ namespace nORM.Core
                 return existing;
             }
 
+            // ADD LAZY TRACKING CHECK
+            if (state == EntityState.Unchanged && !_options.EagerChangeTracking)
+            {
+                var lazy = CreateLazyEntry(entity, mapping);
+                _entriesByReference[entity] = lazy;
+                if (entity is not INotifyPropertyChanged)
+                    _nonNotifyingEntries[lazy] = 0;
+                if (pk != null)
+                {
+                    var typeEntries = _entriesByKey.GetOrAdd(
+                        mapping.Type,
+                        _ => new ConcurrentDictionary<object, EntityEntry>());
+                    typeEntries[pk] = lazy;
+                }
+
+                return lazy;
+            }
+
             var entry = new EntityEntry(entity, state, mapping, _options, MarkDirty);
             _entriesByReference[entity] = entry;
             if (entity is not INotifyPropertyChanged)
@@ -48,6 +66,12 @@ namespace nORM.Core
             }
 
             return entry;
+        }
+
+        private EntityEntry CreateLazyEntry(object entity, TableMapping mapping)
+        {
+            // Minimal entry that defers property change setup
+            return new EntityEntry(entity, EntityState.Unchanged, mapping, _options, MarkDirty, lazy: true);
         }
 
         private const int MaxCascadeDepth = 100;
@@ -143,6 +167,7 @@ namespace nORM.Core
 
         internal void MarkDirty(EntityEntry entry)
         {
+            entry.UpgradeToFullTracking();
             if (_nonNotifyingEntries.ContainsKey(entry))
             {
                 _nonNotifyingEntries[entry] = 1;
