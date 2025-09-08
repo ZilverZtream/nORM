@@ -869,10 +869,16 @@ namespace nORM.Query
                 var size = after - before;
                 Interlocked.Add(ref _totalPlanSize, size);
                 Interlocked.Increment(ref _planSizeSamples);
-                // Cache the plan with a clone of the parameters to avoid sharing state
-                // across different executions.
+                // Cache the plan with clones of the parameter collections so the plan is
+                // self-contained and not affected when the translator clears its data.
                 var clonedParams = new Dictionary<string, object>(p.Parameters);
-                return p with { Fingerprint = fingerprint, Parameters = clonedParams };
+                var clonedCompiledParams = new List<string>(p.CompiledParameters);
+                return p with
+                {
+                    Fingerprint = fingerprint,
+                    Parameters = clonedParams,
+                    CompiledParameters = clonedCompiledParams
+                };
             });
 
             _sqlCache.GetOrAdd(combinedHash, _ => plan);
