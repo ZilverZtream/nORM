@@ -311,19 +311,26 @@ namespace nORM.Query
         {
             var sw = Stopwatch.StartNew();
 
+            // Merge template parameters from the plan with the live execution values
+            var finalParameters = new Dictionary<string, object>(plan.Parameters);
+            foreach (var p in parameters)
+            {
+                finalParameters[p.Key] = p.Value;
+            }
+
             Func<Task<TResult>> queryExecutorFactory = async () =>
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 await using var cmd = _ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
-                foreach (var p in parameters) cmd.AddOptimizedParam(p.Key, p.Value);
+                foreach (var p in finalParameters) cmd.AddOptimizedParam(p.Key, p.Value);
 
                 object result;
                 if (plan.IsScalar)
                 {
                     var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                     if (scalarResult == null || scalarResult is DBNull) return default!;
                     var resultType = typeof(TResult);
                     result = Convert.ChangeType(scalarResult, Nullable.GetUnderlyingType(resultType) ?? resultType)!;
@@ -331,7 +338,7 @@ namespace nORM.Query
                 else
                 {
                     var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, list.Count);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw.Elapsed, list.Count);
                     if (plan.SingleResult)
                     {
                         result = plan.MethodName switch
@@ -358,7 +365,7 @@ namespace nORM.Query
 
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
-                var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, parameters);
+                var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, finalParameters);
                 var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
                 return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
             }
