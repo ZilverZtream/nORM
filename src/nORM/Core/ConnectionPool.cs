@@ -53,32 +53,35 @@ namespace nORM.Core
             _minSize = opts.MinPoolSize;
             _idleLifetime = opts.ConnectionIdleLifetime;
 
-            // Pre-warm pool with minimum number of connections gradually
+            // Pre-warm pool with minimum number of connections in parallel
             if (_minSize > 0)
             {
                 Task.Run(async () =>
                 {
+                    var tasks = new List<Task>(_minSize);
                     for (int i = 0; i < _minSize && !_disposed; i++)
                     {
                         if (!HasSufficientMemory())
                             break;
 
-                        DbConnection? cn = null;
-                        try
+                        tasks.Add(Task.Run(async () =>
                         {
-                            cn = connectionFactory();
-                            await cn.OpenAsync().ConfigureAwait(false);
-                            _pool.Enqueue(new PooledItem(cn));
-                            Interlocked.Increment(ref _created);
-                        }
-                        catch
-                        {
-                            cn?.Dispose();
-                            break;
-                        }
-
-                        await Task.Delay(50).ConfigureAwait(false);
+                            DbConnection? cn = null;
+                            try
+                            {
+                                cn = connectionFactory();
+                                await cn.OpenAsync().ConfigureAwait(false);
+                                _pool.Enqueue(new PooledItem(cn));
+                                Interlocked.Increment(ref _created);
+                            }
+                            catch
+                            {
+                                cn?.Dispose();
+                            }
+                        }));
                     }
+
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
                 });
             }
 
