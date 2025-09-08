@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
+using Microsoft.Extensions.ObjectPool;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
@@ -44,29 +45,30 @@ internal readonly struct VisitorContext
 
 internal static class FastExpressionVisitorPool
 {
-    [ThreadStatic]
-    private static ExpressionToSqlVisitor? _threadLocalVisitor;
+    private sealed class VisitorPolicy : PooledObjectPolicy<ExpressionToSqlVisitor>
+    {
+        public override ExpressionToSqlVisitor Create() => new();
+
+        public override bool Return(ExpressionToSqlVisitor obj)
+        {
+            obj.Reset();
+            return true;
+        }
+    }
+
+    private static readonly ObjectPool<ExpressionToSqlVisitor> _pool =
+        new DefaultObjectPool<ExpressionToSqlVisitor>(new VisitorPolicy(), Environment.ProcessorCount * 2);
 
     private static readonly ConcurrentDictionary<MemberInfo, Delegate> _memberAccessorCache = new();
 
     public static ExpressionToSqlVisitor Get(in VisitorContext context)
     {
-        var visitor = _threadLocalVisitor;
-        if (visitor == null)
-        {
-            visitor = new ExpressionToSqlVisitor();
-            _threadLocalVisitor = visitor;
-        }
-
+        var visitor = _pool.Get();
         visitor.Initialize(in context);
         return visitor;
     }
 
-    public static void Return(ExpressionToSqlVisitor visitor)
-    {
-        visitor.Reset();
-        // Keep in thread-local storage, no actual return needed
-    }
+    public static void Return(ExpressionToSqlVisitor visitor) => _pool.Return(visitor);
 
     public static object? GetMemberValue(MemberInfo member, object? instance)
     {
