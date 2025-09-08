@@ -1,7 +1,11 @@
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Reflection;
 using Microsoft.Extensions.ObjectPool;
 using nORM.Core;
+using nORM.Internal;
 using nORM.Mapping;
 using nORM.Providers;
 
@@ -44,6 +48,8 @@ internal static class ExpressionVisitorPool
     private static readonly ObjectPool<ExpressionToSqlVisitor> _pool =
         new DefaultObjectPool<ExpressionToSqlVisitor>(new VisitorPooledObjectPolicy());
 
+    private static readonly ConcurrentDictionary<MemberInfo, Delegate> _memberAccessorCache = new();
+
     public static ExpressionToSqlVisitor Get(in VisitorContext context)
     {
         var visitor = _pool.Get();
@@ -55,6 +61,28 @@ internal static class ExpressionVisitorPool
     {
         visitor.Reset();
         _pool.Return(visitor);
+    }
+
+    public static object? GetMemberValue(MemberInfo member, object? instance)
+    {
+        if (!_memberAccessorCache.TryGetValue(member, out var del))
+        {
+            var objParam = Expression.Parameter(typeof(object), "obj");
+            var typedParam = Expression.Convert(objParam, member.DeclaringType!);
+            Expression body = member switch
+            {
+                PropertyInfo pi => Expression.Property(typedParam, pi),
+                FieldInfo fi => Expression.Field(typedParam, fi),
+                _ => throw new NotSupportedException("Member must be a field or property.")
+            };
+            body = Expression.Convert(body, typeof(object));
+            var lambda = Expression.Lambda<Func<object?, object?>>(body, objParam);
+            var compiled = ExpressionCompiler.CompileExpression(lambda);
+            _memberAccessorCache.TryAdd(member, compiled);
+            del = compiled;
+        }
+
+        return ((Func<object?, object?>)del)(instance);
     }
 }
 
