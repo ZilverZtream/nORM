@@ -385,7 +385,7 @@ namespace nORM.Query
                     _t._sql.AppendFragment(" HAVING ").Append(_t._having.ToSqlString());
                 if (_t._orderBy.Count > 0)
                     _t._sql.AppendFragment(" ORDER BY ").Append(PooledStringBuilder.JoinOrderBy(_t._orderBy));
-                _t._ctx.Provider.ApplyPaging(_t._sql.InnerBuilder, _t._take, _t._skip, _t._takeParam, _t._skipParam);
+                _t._ctx.Provider.ApplyPaging(_t._sql, _t._take, _t._skip, _t._takeParam, _t._skipParam);
 
                 var singleResult = _t._singleResult || _t._methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
                     or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
@@ -740,13 +740,13 @@ namespace nORM.Query
                         var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                         var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
                         joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                        joinSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                        joinSql.AppendJoin(", ", outerCols.Concat(innerCols));
                         joinSql.Append(' ');
                     }
                     else
                     {
                         joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                        joinSql.InnerBuilder.AppendJoin(", ", neededColumns);
+                        joinSql.AppendJoin(", ", neededColumns);
                         joinSql.Append(' ');
                     }
                 }
@@ -754,7 +754,7 @@ namespace nORM.Query
                 {
                     var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
                     joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                    joinSql.InnerBuilder.AppendJoin(", ", innerCols);
+                    joinSql.AppendJoin(", ", innerCols);
                     joinSql.Append(' ');
                 }
                 else
@@ -762,7 +762,7 @@ namespace nORM.Query
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                     var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
                     joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                    joinSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                    joinSql.AppendJoin(", ", outerCols.Concat(innerCols));
                     joinSql.Append(' ');
                 }
 
@@ -806,13 +806,13 @@ namespace nORM.Query
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                     var innerCols = crossMapping.Columns.Select(c => $"{crossAlias}.{c.EscCol}");
                     crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                    crossSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                    crossSql.AppendJoin(", ", outerCols.Concat(innerCols));
                     crossSql.Append(' ');
                 }
                 else
                 {
                     crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                    crossSql.InnerBuilder.AppendJoin(", ", neededColumns);
+                    crossSql.AppendJoin(", ", neededColumns);
                     crossSql.Append(' ');
                 }
             }
@@ -820,7 +820,7 @@ namespace nORM.Query
             {
                 var innerCols = crossMapping.Columns.Select(c => $"{crossAlias}.{c.EscCol}");
                 crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                crossSql.InnerBuilder.AppendJoin(", ", innerCols);
+                crossSql.AppendJoin(", ", innerCols);
                 crossSql.Append(' ');
             }
             else
@@ -828,7 +828,7 @@ namespace nORM.Query
                 var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                 var innerCols = crossMapping.Columns.Select(c => $"{crossAlias}.{c.EscCol}");
                 crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                crossSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                crossSql.AppendJoin(", ", outerCols.Concat(innerCols));
                 crossSql.Append(' ');
             }
 
@@ -896,7 +896,7 @@ namespace nORM.Query
             }
             var limitParam = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
             _params[limitParam] = 1;
-            _ctx.Provider.ApplyPaging(subSqlBuilder.InnerBuilder, 1, null, limitParam, null);
+            _ctx.Provider.ApplyPaging(subSqlBuilder, 1, null, limitParam, null);
 
             switch (node.Method.Name)
             {
@@ -1243,7 +1243,7 @@ namespace nORM.Query
                 }
 
                 _sql.AppendSelect(ReadOnlySpan<char>.Empty);
-                _sql.InnerBuilder.AppendJoin(", ", selectItems);
+                _sql.AppendJoin(", ", selectItems);
             }
             finally
             {

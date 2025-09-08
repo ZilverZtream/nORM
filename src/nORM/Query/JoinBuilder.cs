@@ -32,13 +32,13 @@ namespace nORM.Query
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                     var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
                     joinSql.AppendSelect(System.ReadOnlySpan<char>.Empty);
-                    joinSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                    joinSql.AppendJoin(", ", outerCols.Concat(innerCols));
                     joinSql.Append(' ');
                 }
                 else
                 {
                     joinSql.AppendSelect(System.ReadOnlySpan<char>.Empty);
-                    joinSql.InnerBuilder.AppendJoin(", ", neededColumns);
+                    joinSql.AppendJoin(", ", neededColumns);
                     joinSql.Append(' ');
                 }
             }
@@ -47,7 +47,7 @@ namespace nORM.Query
                 var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
                 var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
                 joinSql.AppendSelect(System.ReadOnlySpan<char>.Empty);
-                joinSql.InnerBuilder.AppendJoin(", ", outerCols.Concat(innerCols));
+                joinSql.AppendJoin(", ", outerCols.Concat(innerCols));
                 joinSql.Append(' ');
             }
 

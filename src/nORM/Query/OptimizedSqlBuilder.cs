@@ -1,62 +1,50 @@
 using System;
-using System.Text;
-using Microsoft.Extensions.ObjectPool;
+using System.Buffers;
+using System.Collections.Generic;
 
 namespace nORM.Query
 {
     /// <summary>
-    /// Simplified SQL builder that wraps a <see cref="StringBuilder"/> and
-    /// exposes convenience methods used throughout the query translation
-    /// pipeline.
+    /// SQL builder that minimizes allocations by working directly with
+    /// span-based operations over pooled character buffers.
     /// </summary>
-    internal sealed class OptimizedSqlBuilder : IDisposable
+    public sealed class OptimizedSqlBuilder : IDisposable
     {
-        private static readonly ObjectPool<StringBuilder> _pool =
-            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
-        private readonly StringBuilder _builder;
-        private readonly bool _pooled;
+        private char[] _buffer;
+        private int _position;
 
         public OptimizedSqlBuilder()
+            : this(256)
         {
-            _builder = _pool.Get();
-            _builder.Clear();
-            _pooled = true;
         }
 
         public OptimizedSqlBuilder(int capacity)
         {
-            _builder = _pool.Get();
-            _builder.Clear();
-            if (_builder.Capacity < capacity)
-                _builder.EnsureCapacity(capacity);
-            _pooled = true;
+            _buffer = ArrayPool<char>.Shared.Rent(capacity);
+            _position = 0;
         }
 
-        public OptimizedSqlBuilder(StringBuilder builder)
-        {
-            _builder = builder ?? _pool.Get();
-            _pooled = builder == null;
-        }
-
-        public StringBuilder InnerBuilder => _builder;
-
-        public int Length => _builder.Length;
+        public int Length => _position;
 
         public OptimizedSqlBuilder Append(string? value)
         {
-            _builder.Append(value);
+            if (value != null)
+                Append(value.AsSpan());
             return this;
         }
 
         public OptimizedSqlBuilder Append(ReadOnlySpan<char> value)
         {
-            _builder.Append(value);
+            EnsureCapacity(value.Length);
+            value.CopyTo(_buffer.AsSpan(_position));
+            _position += value.Length;
             return this;
         }
 
         public OptimizedSqlBuilder Append(char value)
         {
-            _builder.Append(value);
+            EnsureCapacity(1);
+            _buffer[_position++] = value;
             return this;
         }
 
@@ -64,53 +52,87 @@ namespace nORM.Query
 
         public OptimizedSqlBuilder AppendSelect(ReadOnlySpan<char> columns)
         {
-            _builder.Append("SELECT ");
+            Append("SELECT ");
             if (!columns.IsEmpty)
-                _builder.Append(columns);
+                Append(columns);
             return this;
         }
 
-        public OptimizedSqlBuilder AppendAggregateFunction(string function, string column)
+        public OptimizedSqlBuilder AppendAggregateFunction(ReadOnlySpan<char> function, ReadOnlySpan<char> column)
         {
-            _builder.Append(function).Append('(').Append(column).Append(')');
+            Append(function);
+            Append('(');
+            Append(column);
+            Append(')');
             return this;
         }
 
-        public OptimizedSqlBuilder AppendParameterizedValue(string paramName, object? value, System.Collections.Generic.IDictionary<string, object> parameters)
+        public OptimizedSqlBuilder AppendParameterizedValue(string paramName, object? value, IDictionary<string, object> parameters)
         {
-            _builder.Append(paramName);
+            Append(paramName.AsSpan());
             parameters[paramName] = value!;
+            return this;
+        }
+
+        public OptimizedSqlBuilder AppendJoin(string separator, IEnumerable<string> values)
+        {
+            using var e = values.GetEnumerator();
+            if (!e.MoveNext())
+                return this;
+
+            Append(e.Current);
+            while (e.MoveNext())
+            {
+                Append(separator);
+                Append(e.Current);
+            }
             return this;
         }
 
         public OptimizedSqlBuilder Remove(int startIndex, int length)
         {
-            _builder.Remove(startIndex, length);
+            _buffer.AsSpan(startIndex + length, _position - (startIndex + length))
+                .CopyTo(_buffer.AsSpan(startIndex));
+            _position -= length;
             return this;
         }
 
         public OptimizedSqlBuilder Insert(int index, string value)
         {
-            _builder.Insert(index, value);
+            var span = value.AsSpan();
+            EnsureCapacity(span.Length);
+            _buffer.AsSpan(index, _position - index).CopyTo(_buffer.AsSpan(index + span.Length));
+            span.CopyTo(_buffer.AsSpan(index));
+            _position += span.Length;
             return this;
         }
 
-        public void Clear() => _builder.Clear();
+        public void Clear() => _position = 0;
 
-        public string ToSqlString() => _builder.ToString();
+        public string ToSqlString() => new string(_buffer, 0, _position);
 
-        public string ToString(int startIndex, int length) => _builder.ToString(startIndex, length);
+        public string ToString(int startIndex, int length) => new string(_buffer, startIndex, length);
 
-        public override string ToString() => _builder.ToString();
+        public override string ToString() => ToSqlString();
 
         public void Dispose()
         {
-            if (_pooled)
-            {
-                _builder.Clear();
-                _pool.Return(_builder);
-            }
+            var buffer = _buffer;
+            _buffer = Array.Empty<char>();
+            ArrayPool<char>.Shared.Return(buffer);
+        }
+
+        private void EnsureCapacity(int additional)
+        {
+            var required = _position + additional;
+            if (required <= _buffer.Length)
+                return;
+
+            var newSize = Math.Max(_buffer.Length * 2, required);
+            var newBuffer = ArrayPool<char>.Shared.Rent(newSize);
+            _buffer.AsSpan(0, _position).CopyTo(newBuffer);
+            ArrayPool<char>.Shared.Return(_buffer);
+            _buffer = newBuffer;
         }
     }
 }
-
