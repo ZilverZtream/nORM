@@ -789,7 +789,7 @@ namespace nORM.Query
 
         public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
         {
-            // Streaming queries bypass the cache to avoid materializing entire result sets in memory.
+            // Execute in true streaming mode so only one row is materialized at a time.
             var plan = GetPlan(expression, out _);
 
             var sw = Stopwatch.StartNew();
@@ -810,8 +810,13 @@ namespace nORM.Query
                 _ctx.GetMapping(plan.ElementType);
 
             var count = 0;
-            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct)
+            await using var reader = await cmd
+                .ExecuteReaderWithInterceptionAsync(
+                    _ctx,
+                    CommandBehavior.SequentialAccess | CommandBehavior.SingleResult,
+                    ct)
                 .ConfigureAwait(false);
+
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
                 var entity = (T)await plan.Materializer(reader, ct).ConfigureAwait(false);
@@ -822,6 +827,7 @@ namespace nORM.Query
                     entity = (T)entry.Entity!;
                     NavigationPropertyExtensions.EnableLazyLoading((object)entity!, _ctx);
                 }
+
                 count++;
                 yield return entity;
             }
