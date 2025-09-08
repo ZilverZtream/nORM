@@ -11,16 +11,16 @@ using nORM.Navigation;
 
 namespace nORM.Core
 {
-    public sealed class EntityEntry
+    public class EntityEntry
     {
         private readonly TableMapping _mapping;
-        private readonly Column[] _nonKeyColumns;
-        private readonly int[] _originalHashes;
-        private readonly object?[] _originalValues;
-        private readonly BitArray _changedProperties;
-        private readonly Func<object, int>[] _getHashCodes;
-        private readonly Func<object, object?>[] _getValues;
-        private readonly Dictionary<string, int> _propertyIndex;
+        private Column[] _nonKeyColumns;
+        private int[] _originalHashes;
+        private object?[] _originalValues;
+        private BitArray _changedProperties;
+        private Func<object, int>[] _getHashCodes;
+        private Func<object, object?>[] _getValues;
+        private Dictionary<string, int> _propertyIndex;
         private readonly DbContextOptions _options;
         private readonly Action<EntityEntry>? _markDirty;
         private bool _hasNotifiedChange;
@@ -29,14 +29,33 @@ namespace nORM.Core
         public EntityState State { get; internal set; }
         internal TableMapping Mapping => _mapping;
 
-        internal EntityEntry(object entity, EntityState state, TableMapping mapping, DbContextOptions options, Action<EntityEntry>? markDirty = null)
+        internal EntityEntry(object entity, EntityState state, TableMapping mapping, DbContextOptions options, Action<EntityEntry>? markDirty = null, bool lazy = false)
         {
             Entity = entity;
             State = state;
             _mapping = mapping;
             _options = options;
             _markDirty = markDirty;
-            _nonKeyColumns = mapping.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
+
+            if (!lazy)
+            {
+                InitializeTracking();
+            }
+            else
+            {
+                _nonKeyColumns = Array.Empty<Column>();
+                _getHashCodes = Array.Empty<Func<object, int>>();
+                _getValues = Array.Empty<Func<object, object?>>();
+                _propertyIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+                _originalHashes = Array.Empty<int>();
+                _originalValues = Array.Empty<object?>();
+                _changedProperties = new BitArray(0);
+            }
+        }
+
+        private void InitializeTracking()
+        {
+            _nonKeyColumns = _mapping.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
             _getHashCodes = new Func<object, int>[_nonKeyColumns.Length];
             _getValues = new Func<object, object?>[_nonKeyColumns.Length];
             _propertyIndex = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -52,46 +71,55 @@ namespace nORM.Core
             _changedProperties = new BitArray(_nonKeyColumns.Length);
             CaptureOriginalValues();
 
-            if (entity is INotifyPropertyChanged notify)
+            if (Entity is INotifyPropertyChanged notify)
             {
-                notify.PropertyChanged += (_, e) =>
-                {
-                    if (State is EntityState.Added or EntityState.Deleted) return;
-
-                    var currentEntity = Entity;
-                    if (currentEntity is null) return;
-
-                    if (e.PropertyName != null && _propertyIndex.TryGetValue(e.PropertyName, out var idx))
-                    {
-                        var currentValue = _getValues[idx](currentEntity);
-                        var changed = !Equals(currentValue, _originalValues[idx]);
-                        _changedProperties[idx] = changed;
-                    }
-                    else
-                    {
-                        for (int i = 0; i < _nonKeyColumns.Length; i++)
-                        {
-                            var currentValue = _getValues[i](currentEntity);
-                            var changed = !Equals(currentValue, _originalValues[i]);
-                            _changedProperties[i] = changed;
-                        }
-                    }
-
-                    var hasAnyChanges = false;
-                    for (int i = 0; i < _nonKeyColumns.Length; i++)
-                    {
-                        if (_changedProperties[i])
-                        {
-                            hasAnyChanges = true;
-                            break;
-                        }
-                    }
-
-                    _hasNotifiedChange = true;
-                    State = hasAnyChanges ? EntityState.Modified : EntityState.Unchanged;
-                    _markDirty?.Invoke(this);
-                };
+                notify.PropertyChanged += PropertyChangedHandler;
             }
+        }
+
+        private void PropertyChangedHandler(object? _, PropertyChangedEventArgs e)
+        {
+            if (State is EntityState.Added or EntityState.Deleted) return;
+
+            var currentEntity = Entity;
+            if (currentEntity is null) return;
+
+            if (e.PropertyName != null && _propertyIndex.TryGetValue(e.PropertyName, out var idx))
+            {
+                var currentValue = _getValues[idx](currentEntity);
+                var changed = !Equals(currentValue, _originalValues[idx]);
+                _changedProperties[idx] = changed;
+            }
+            else
+            {
+                for (int i = 0; i < _nonKeyColumns.Length; i++)
+                {
+                    var currentValue = _getValues[i](currentEntity);
+                    var changed = !Equals(currentValue, _originalValues[i]);
+                    _changedProperties[i] = changed;
+                }
+            }
+
+            var hasAnyChanges = false;
+            for (int i = 0; i < _nonKeyColumns.Length; i++)
+            {
+                if (_changedProperties[i])
+                {
+                    hasAnyChanges = true;
+                    break;
+                }
+            }
+
+            _hasNotifiedChange = true;
+            State = hasAnyChanges ? EntityState.Modified : EntityState.Unchanged;
+            _markDirty?.Invoke(this);
+        }
+
+        internal void UpgradeToFullTracking()
+        {
+            if (_nonKeyColumns.Length != 0)
+                return;
+            InitializeTracking();
         }
 
         private void CaptureOriginalValues()
@@ -112,6 +140,7 @@ namespace nORM.Core
 
         internal void DetectChanges()
         {
+            UpgradeToFullTracking();
             if (State is EntityState.Added or EntityState.Deleted or EntityState.Detached) return;
             if (_hasNotifiedChange) return;
 
@@ -157,6 +186,7 @@ namespace nORM.Core
 
         internal void AcceptChanges()
         {
+            UpgradeToFullTracking();
             CaptureOriginalValues();
             State = EntityState.Unchanged;
             _hasNotifiedChange = false;

@@ -42,6 +42,8 @@ namespace nORM.Configuration
         public Action<ModelBuilder>? OnModelCreating { get; set; }
         public bool UseBatchedBulkOps { get; set; } = false;
         public bool UsePreciseChangeTracking { get; set; } = false;
+        public bool EagerChangeTracking { get; set; } = true;
+        public QueryTrackingBehavior DefaultTrackingBehavior { get; set; } = QueryTrackingBehavior.TrackAll;
         public IList<IDbCommandInterceptor> CommandInterceptors { get; } = new List<IDbCommandInterceptor>();
         public IList<ISaveChangesInterceptor> SaveChangesInterceptors { get; } = new List<ISaveChangesInterceptor>();
         // Caching is opt-in and disabled by default
