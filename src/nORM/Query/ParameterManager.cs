@@ -55,7 +55,7 @@ namespace nORM.Query
                 case long l: p.DbType = System.Data.DbType.Int64; p.Value = l; return;
                 case short s: p.DbType = System.Data.DbType.Int16; p.Value = s; return;
                 case byte b: p.DbType = System.Data.DbType.Byte; p.Value = b; return;
-                case bool bo: p.DbType = System.Data.DbType.Int32; p.Value = bo ? 1 : 0; return; // SQLite
+                case bool bo: p.DbType = System.Data.DbType.Boolean; p.Value = bo; return; // Use Boolean type
                 case double d: p.DbType = System.Data.DbType.Double; p.Value = d; return;
                 case float f: p.DbType = System.Data.DbType.Double; p.Value = (double)f; return;
                 case decimal m: p.DbType = System.Data.DbType.Decimal; p.Value = m; return;
