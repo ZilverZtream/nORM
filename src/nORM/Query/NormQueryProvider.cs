@@ -852,8 +852,9 @@ namespace nORM.Query
 
             if (_sqlCache.TryGet(combinedHash, out var cached))
             {
-                var clonedParams = new Dictionary<string, object>(cached.Parameters);
-                return cached with { Parameters = clonedParams };
+                // When a plan is retrieved from the SQL cache, ensure the caller gets
+                // its own parameter dictionary so modifications won't affect the cached plan.
+                return cached with { Parameters = new Dictionary<string, object>(cached.Parameters) };
             }
 
             var cacheKey = BuildPlanCacheKey(fingerprint, tenantHash, elementType, filtered.Type);
@@ -868,11 +869,16 @@ namespace nORM.Query
                 var size = after - before;
                 Interlocked.Add(ref _totalPlanSize, size);
                 Interlocked.Increment(ref _planSizeSamples);
-                var cloned = new Dictionary<string, object>(p.Parameters);
-                return p with { Fingerprint = fingerprint, Parameters = cloned };
+                // Cache the plan with a clone of the parameters to avoid sharing state
+                // across different executions.
+                var clonedParams = new Dictionary<string, object>(p.Parameters);
+                return p with { Fingerprint = fingerprint, Parameters = clonedParams };
             });
 
             _sqlCache.GetOrAdd(combinedHash, _ => plan);
+
+            // Each execution should receive a fresh copy of the parameters dictionary
+            // from the plan cache.
             return plan with { Parameters = new Dictionary<string, object>(plan.Parameters) };
         }
 
