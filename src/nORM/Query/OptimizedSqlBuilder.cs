@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using nORM.Internal;
 
 namespace nORM.Query
 {
@@ -10,21 +11,30 @@ namespace nORM.Query
     /// </summary>
     internal sealed class OptimizedSqlBuilder : IDisposable
     {
+        private static readonly LockFreeObjectPool<StringBuilder> _pool = new();
         private readonly StringBuilder _builder;
+        private readonly bool _pooled;
 
         public OptimizedSqlBuilder()
         {
-            _builder = new StringBuilder();
+            _builder = _pool.Get();
+            _builder.Clear();
+            _pooled = true;
         }
 
         public OptimizedSqlBuilder(int capacity)
         {
-            _builder = new StringBuilder(capacity);
+            _builder = _pool.Get();
+            _builder.Clear();
+            if (_builder.Capacity < capacity)
+                _builder.EnsureCapacity(capacity);
+            _pooled = true;
         }
 
         public OptimizedSqlBuilder(StringBuilder builder)
         {
-            _builder = builder ?? new StringBuilder();
+            _builder = builder ?? _pool.Get();
+            _pooled = builder == null;
         }
 
         public StringBuilder InnerBuilder => _builder;
@@ -94,7 +104,11 @@ namespace nORM.Query
 
         public void Dispose()
         {
-            // No resources to release; method included for usage compatibility
+            if (_pooled)
+            {
+                _builder.Clear();
+                _pool.Return(_builder);
+            }
         }
     }
 }
