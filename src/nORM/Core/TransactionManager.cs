@@ -7,20 +7,18 @@ namespace nORM.Core
 {
     internal sealed class TransactionManager : IAsyncDisposable, IDisposable
     {
-        private readonly CancellationTokenSource? _timeoutCts;
-        private readonly CancellationTokenSource? _linkedCts;
+        private readonly CancellationTokenSource? _cts;
 
         public DbTransaction? Transaction { get; }
         public CancellationToken Token { get; }
         public bool OwnsTransaction { get; }
 
         private TransactionManager(DbTransaction? transaction, bool ownsTransaction,
-            CancellationTokenSource? timeoutCts, CancellationTokenSource? linkedCts, CancellationToken token)
+            CancellationTokenSource? cts, CancellationToken token)
         {
             Transaction = transaction;
             OwnsTransaction = ownsTransaction;
-            _timeoutCts = timeoutCts;
-            _linkedCts = linkedCts;
+            _cts = cts;
             Token = token;
         }
 
@@ -31,8 +29,7 @@ namespace nORM.Core
             var ownsTransaction = existingTransaction == null && ambientTransaction == null;
 
             DbTransaction? transaction = null;
-            CancellationTokenSource? timeoutCts = null;
-            CancellationTokenSource? linkedCts = null;
+            CancellationTokenSource? cts = null;
             var token = ct;
 
             if (ambientTransaction != null && existingTransaction == null)
@@ -46,16 +43,16 @@ namespace nORM.Core
                 var isolationLevel = System.Data.IsolationLevel.ReadCommitted;
                 transaction = await context.Connection.BeginTransactionAsync(isolationLevel, ct).ConfigureAwait(false);
 
-                timeoutCts = new CancellationTokenSource(context.Options.TimeoutConfiguration.BaseTimeout);
-                linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
-                token = linkedCts.Token;
+                cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(context.Options.TimeoutConfiguration.BaseTimeout);
+                token = cts.Token;
             }
             else
             {
                 transaction = existingTransaction!;
             }
 
-            return new TransactionManager(transaction, ownsTransaction, timeoutCts, linkedCts, token);
+            return new TransactionManager(transaction, ownsTransaction, cts, token);
         }
 
         public async ValueTask CommitAsync()
@@ -80,8 +77,8 @@ namespace nORM.Core
             {
                 await Transaction.DisposeAsync().ConfigureAwait(false);
             }
-            _linkedCts?.Dispose();
-            _timeoutCts?.Dispose();
+            _cts?.Dispose();
+            GC.SuppressFinalize(this);
         }
 
         public void Dispose()
@@ -90,8 +87,17 @@ namespace nORM.Core
             {
                 Transaction.Dispose();
             }
-            _linkedCts?.Dispose();
-            _timeoutCts?.Dispose();
+            _cts?.Dispose();
+            GC.SuppressFinalize(this);
+        }
+
+        ~TransactionManager()
+        {
+            if (OwnsTransaction && Transaction != null)
+            {
+                Transaction.Dispose();
+            }
+            _cts?.Dispose();
         }
     }
 }
