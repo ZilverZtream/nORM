@@ -34,6 +34,7 @@ namespace nORM.Query
         private const int _constParamMapLimit = 1024;
         private readonly Dictionary<ConstKey, string> _constParamMap = new();
         private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
+        private static readonly Expression _emptyExpression = Expression.Empty();
 
         private static readonly FrozenDictionary<string, IMethodTranslator> _translators =
             new Dictionary<string, IMethodTranslator>
@@ -592,7 +593,13 @@ namespace nORM.Query
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Binary parameter exceeds maximum length"));
 
             AppendConstant(value, value?.GetType() ?? typeof(object));
-            return Expression.Constant(value);
+
+            // Returning a cached empty expression avoids allocating a new
+            // Expression instance for each constant value translated. The
+            // actual value has already been written directly to the
+            // parameter collection in AppendConstant, so no further
+            // expression tree representation is required here.
+            return _emptyExpression;
         }
 
         private enum LikeOperation
