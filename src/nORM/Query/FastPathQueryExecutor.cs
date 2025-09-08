@@ -18,22 +18,60 @@ namespace nORM.Query
 
         private readonly record struct WhereInfo(string Property, object Value);
 
-        public static bool TryExecute<T>(Expression expr, DbContext ctx, out Task<List<T>> result) where T : class, new()
+        public static bool TryExecute<T>(Expression expr, DbContext ctx, out Task<object> result) where T : class, new()
         {
             result = default!;
 
             if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null)
                 return false;
 
+            if (IsSimpleCountPattern(expr, out var hasPredicate))
+            {
+                if (hasPredicate)
+                {
+                    return false;
+                }
+
+                result = ExecuteSimpleCount<T>(ctx);
+                return true;
+            }
+
             if (IsSimpleWherePattern(expr, out var whereInfo, out var takeCount))
             {
-                result = ExecuteSimpleWhere<T>(ctx, whereInfo, takeCount);
+                result = ExecuteSimpleWhere<T>(ctx, whereInfo, takeCount).ContinueWith(t => (object)t.Result);
                 return true;
             }
 
             if (IsSimpleTakePattern(expr, out takeCount))
             {
-                result = ExecuteSimpleTake<T>(ctx, takeCount);
+                result = ExecuteSimpleTake<T>(ctx, takeCount).ContinueWith(t => (object)t.Result);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsSimpleCountPattern(Expression expr, out bool hasPredicate)
+        {
+            hasPredicate = false;
+            if (expr is not MethodCallExpression countCall ||
+                (countCall.Method.Name != nameof(Queryable.Count) && countCall.Method.Name != nameof(Queryable.LongCount)))
+            {
+                return false;
+            }
+
+            if (countCall.Arguments.Count == 2)
+            {
+                if (Unwrap(countCall.Arguments[0]) is not ConstantExpression) return false;
+                if (countCall.Arguments[1] is not LambdaExpression) return false;
+                hasPredicate = true;
+                return true;
+            }
+
+            if (countCall.Arguments.Count == 1)
+            {
+                if (Unwrap(countCall.Arguments[0]) is not ConstantExpression) return false;
+                hasPredicate = false;
                 return true;
             }
 
@@ -64,6 +102,14 @@ namespace nORM.Query
                 return false;
 
             var body = lambda.Body;
+
+            // Support boolean member access: u => u.IsActive
+            if (body is MemberExpression meBoolean && meBoolean.Type == typeof(bool))
+            {
+                info = new WhereInfo(meBoolean.Member.Name, true);
+                return true;
+            }
+
             if (body is BinaryExpression be && be.NodeType == ExpressionType.Equal && be.Left is MemberExpression me)
             {
                 try
@@ -202,6 +248,19 @@ namespace nORM.Query
                 results.Add(entity);
             }
             return results;
+        }
+
+        private static async Task<object> ExecuteSimpleCount<T>(DbContext ctx) where T : class
+        {
+            var map = ctx.GetMapping(typeof(T));
+            var sql = $"SELECT COUNT(*) FROM {map.EscTable}";
+
+            await ctx.EnsureConnectionAsync(default).ConfigureAwait(false);
+            await using var cmd = ctx.Connection.CreateCommand();
+            cmd.CommandText = sql;
+
+            var result = await cmd.ExecuteScalarAsync(default).ConfigureAwait(false);
+            return Convert.ToInt32(result);
         }
     }
 }
