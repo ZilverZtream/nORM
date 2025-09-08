@@ -40,7 +40,7 @@ namespace nORM.Query
         internal static (long Hits, long Misses, double HitRate) CacheStats
             => (_cache.Hits, _cache.Misses, _cache.HitRate);
 
-        public static void PrecompileCommonPatterns<T>() where T : class, new()
+        public static void PrecompileCommonPatterns<T>() where T : class
         {
             var key = typeof(T);
             if (!_fastMaterializers.ContainsKey(key))
@@ -49,59 +49,165 @@ namespace nORM.Query
             }
         }
 
-        private static Func<DbDataReader, object> CreateILMaterializer<T>() where T : class, new()
+        private static Func<DbDataReader, object> CreateILMaterializer<T>() where T : class
         {
+            var type = typeof(T);
             var method = new DynamicMethod("Materialize", typeof(object), new[] { typeof(DbDataReader) }, typeof(MaterializerFactory), true);
             var il = method.GetILGenerator();
 
-            var ctor = typeof(T).GetConstructor(Type.EmptyTypes)!;
-            var props = typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public);
-
-            il.DeclareLocal(typeof(T)); // local 0: entity
-            il.Emit(OpCodes.Newobj, ctor);
-            il.Emit(OpCodes.Stloc_0);
-
-            for (int i = 0; i < props.Length; i++)
+            var parameterlessCtor = type.GetConstructor(Type.EmptyTypes);
+            if (parameterlessCtor != null)
             {
-                var prop = props[i];
-                if (!prop.CanWrite) continue;
+                var props = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
 
-                var skip = il.DefineLabel();
+                il.DeclareLocal(type); // local 0: entity
+                il.Emit(OpCodes.Newobj, parameterlessCtor);
+                il.Emit(OpCodes.Stloc_0);
+
+                for (int i = 0; i < props.Length; i++)
+                {
+                    var prop = props[i];
+                    if (!prop.CanWrite) continue;
+
+                    var skip = il.DefineLabel();
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, i);
+                    il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
+                    il.Emit(OpCodes.Brtrue_S, skip);
+
+                    il.Emit(OpCodes.Ldloc_0);
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, i);
+                    var readerMethod = Methods.GetReaderMethod(prop.PropertyType);
+                    il.Emit(OpCodes.Callvirt, readerMethod);
+
+                    var pType = prop.PropertyType;
+                    var underlying = Nullable.GetUnderlyingType(pType);
+                    if (underlying != null)
+                    {
+                        if (readerMethod == Methods.GetValue)
+                        {
+                            il.Emit(OpCodes.Ldtoken, underlying);
+                            il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
+                            il.Emit(OpCodes.Call, typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) })!);
+                            il.Emit(OpCodes.Unbox_Any, underlying);
+                        }
+                        else if (readerMethod.ReturnType != underlying)
+                        {
+                            il.Emit(OpCodes.Unbox_Any, underlying);
+                        }
+                        var ctorNullable = pType.GetConstructor(new[] { underlying })!;
+                        il.Emit(OpCodes.Newobj, ctorNullable);
+                    }
+                    else if (pType.IsValueType)
+                    {
+                        if (readerMethod.ReturnType == typeof(object))
+                        {
+                            il.Emit(OpCodes.Ldtoken, pType);
+                            il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
+                            il.Emit(OpCodes.Call, typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) })!);
+                        }
+                        il.Emit(OpCodes.Unbox_Any, pType);
+                    }
+                    else if (readerMethod.ReturnType != pType)
+                    {
+                        if (readerMethod == Methods.GetValue)
+                        {
+                            il.Emit(OpCodes.Ldtoken, pType);
+                            il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
+                            il.Emit(OpCodes.Call, typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) })!);
+                        }
+                        il.Emit(OpCodes.Castclass, pType);
+                    }
+
+                    il.Emit(OpCodes.Callvirt, prop.GetSetMethod()!);
+                    il.MarkLabel(skip);
+                }
+
+                il.Emit(OpCodes.Ldloc_0);
+                il.Emit(OpCodes.Ret);
+                return (Func<DbDataReader, object>)method.CreateDelegate(typeof(Func<DbDataReader, object>));
+            }
+
+            // Parameterized constructor path
+            var ctor = type.GetConstructors().OrderByDescending(c => c.GetParameters().Length).First();
+            var parameters = ctor.GetParameters();
+            var getOrdinal = typeof(DbDataReader).GetMethod(nameof(DbDataReader.GetOrdinal))!;
+            var ordinals = new LocalBuilder[parameters.Length];
+
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                ordinals[i] = il.DeclareLocal(typeof(int));
                 il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldc_I4, i);
+                il.Emit(OpCodes.Ldstr, parameters[i].Name!);
+                il.Emit(OpCodes.Callvirt, getOrdinal);
+                il.Emit(OpCodes.Stloc, ordinals[i]);
+            }
+
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                var param = parameters[i];
+                var pType = param.ParameterType;
+                var underlying = Nullable.GetUnderlyingType(pType);
+                var skip = il.DefineLabel();
+                var end = il.DefineLabel();
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldloc, ordinals[i]);
                 il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
                 il.Emit(OpCodes.Brtrue_S, skip);
 
-                il.Emit(OpCodes.Ldloc_0);
                 il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldc_I4, i);
-                il.Emit(OpCodes.Callvirt, Methods.GetValue);
+                il.Emit(OpCodes.Ldloc, ordinals[i]);
+                var readerMethod = Methods.GetReaderMethod(underlying ?? pType);
+                il.Emit(OpCodes.Callvirt, readerMethod);
 
-                var pType = prop.PropertyType;
-                var underlying = Nullable.GetUnderlyingType(pType);
-                if (underlying != null)
+                if (readerMethod == Methods.GetValue)
                 {
-                    il.Emit(OpCodes.Ldtoken, underlying);
+                    var target = underlying ?? pType;
+                    il.Emit(OpCodes.Ldtoken, target);
                     il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
                     il.Emit(OpCodes.Call, typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) })!);
-                    il.Emit(OpCodes.Unbox_Any, underlying);
+                    if (target.IsValueType)
+                        il.Emit(OpCodes.Unbox_Any, target);
+                    else
+                        il.Emit(OpCodes.Castclass, target);
+                }
+
+                if (underlying != null)
+                {
                     var ctorNullable = pType.GetConstructor(new[] { underlying })!;
+                    if (readerMethod.ReturnType != underlying)
+                        il.Emit(OpCodes.Unbox_Any, underlying);
                     il.Emit(OpCodes.Newobj, ctorNullable);
                 }
-                else if (pType.IsValueType)
+                else if (pType.IsValueType && readerMethod.ReturnType == typeof(object))
                 {
                     il.Emit(OpCodes.Unbox_Any, pType);
                 }
-                else
+                else if (!pType.IsValueType && readerMethod.ReturnType != pType)
                 {
                     il.Emit(OpCodes.Castclass, pType);
                 }
 
-                il.Emit(OpCodes.Callvirt, prop.GetSetMethod()!);
+                il.Emit(OpCodes.Br_S, end);
+
                 il.MarkLabel(skip);
+                if (pType.IsValueType)
+                {
+                    var loc = il.DeclareLocal(pType);
+                    il.Emit(OpCodes.Ldloca_S, loc);
+                    il.Emit(OpCodes.Initobj, pType);
+                    il.Emit(OpCodes.Ldloc, loc);
+                }
+                else
+                {
+                    il.Emit(OpCodes.Ldnull);
+                }
+                il.MarkLabel(end);
             }
 
-            il.Emit(OpCodes.Ldloc_0);
+            il.Emit(OpCodes.Newobj, ctor);
             il.Emit(OpCodes.Ret);
 
             return (Func<DbDataReader, object>)method.CreateDelegate(typeof(Func<DbDataReader, object>));
@@ -154,19 +260,16 @@ namespace nORM.Query
                     {
                         var dmap = kvp.Value;
                         var indices = dmap.Columns.Select(c => Array.IndexOf(mapping.Columns, mapping.ColumnsByName[c.Prop.Name])).ToArray();
+                        var getters = dmap.Columns.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, indices[i])).ToArray();
                         return (Func<DbDataReader, object>)(reader =>
                         {
                             var entity = Activator.CreateInstance(dmap.Type)!;
                             for (int i = 0; i < dmap.Columns.Length; i++)
                             {
-                                var col = dmap.Columns[i];
                                 var idx = indices[i];
                                 if (reader.IsDBNull(idx)) continue;
-                                var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
-                                var value = readerMethod.Invoke(reader, new object[] { idx });
-                                if (readerMethod == Methods.GetValue)
-                                    value = Convert.ChangeType(value!, col.Prop.PropertyType);
-                                col.Setter(entity, value);
+                                var value = getters[i](reader);
+                                dmap.Columns[i].Setter(entity, value);
                             }
                             return entity;
                         });
@@ -183,15 +286,12 @@ namespace nORM.Query
             // Handle simple scalar types directly
             if (IsSimpleType(targetType))
             {
+                var getter = CreateReaderGetter(targetType, 0);
                 return reader =>
                 {
                     if (reader.IsDBNull(0))
                         return targetType.IsValueType ? Activator.CreateInstance(targetType)! : null!;
-                    var read = Methods.GetReaderMethod(targetType);
-                    var value = read.Invoke(reader, new object[] { 0 });
-                    if (read == Methods.GetValue)
-                        value = Convert.ChangeType(value!, targetType);
-                    return value!;
+                    return getter(reader)!;
                 };
             }
 
@@ -239,6 +339,7 @@ namespace nORM.Query
                     };
                 }
 
+                var getters = columns.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, i)).ToArray();
                 return reader =>
                 {
                     var entity = parameterlessCtorDelegate();
@@ -246,10 +347,7 @@ namespace nORM.Query
                     {
                         if (reader.IsDBNull(i)) continue;
                         var col = columns[i];
-                        var readerMethod = Methods.GetReaderMethod(col.Prop.PropertyType);
-                        var value = readerMethod.Invoke(reader, new object[] { i });
-                        if (readerMethod == Methods.GetValue)
-                            value = Convert.ChangeType(value!, col.Prop.PropertyType);
+                        var value = getters[i](reader);
                         col.Setter(entity, value);
                     }
                     return entity!;
@@ -260,6 +358,7 @@ namespace nORM.Query
             var ctor = GetCachedConstructor(targetType, columns);
             var ctorParams = ctor.GetParameters();
             var ctorDelegate = _constructorDelegates.GetOrAdd(targetType, _ => CreateConstructorDelegate(ctor));
+            var paramGetters = ctorParams.Select((p, i) => CreateReaderGetter(p.ParameterType, i)).ToArray();
 
             return reader =>
             {
@@ -271,12 +370,7 @@ namespace nORM.Query
                         args[i] = ctorParams[i].ParameterType.IsValueType ? Activator.CreateInstance(ctorParams[i].ParameterType) : null;
                         continue;
                     }
-                    var paramType = ctorParams[i].ParameterType;
-                    var readerMethod = Methods.GetReaderMethod(paramType);
-                    var value = readerMethod.Invoke(reader, new object[] { i });
-                    if (readerMethod == Methods.GetValue)
-                        value = Convert.ChangeType(value!, paramType);
-                    args[i] = value;
+                    args[i] = paramGetters[i](reader);
                 }
                 return ctorDelegate(args)!;
             };
@@ -350,6 +444,14 @@ namespace nORM.Query
                 return cols.ToArray();
             }
             return mapping.Columns;
+        }
+
+        private static Func<DbDataReader, object> CreateReaderGetter(Type type, int index)
+        {
+            var readerParam = Expression.Parameter(typeof(DbDataReader), "reader");
+            var valueExpr = GetOptimizedReaderCall(readerParam, type, index);
+            var body = Expression.Convert(valueExpr, typeof(object));
+            return Expression.Lambda<Func<DbDataReader, object>>(body, readerParam).Compile();
         }
 
         private static Func<DbDataReader, object> CreateOptimizedMaterializer(Column[] columns, Type targetType)
