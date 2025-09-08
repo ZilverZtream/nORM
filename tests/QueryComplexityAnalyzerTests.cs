@@ -59,6 +59,19 @@ public class QueryComplexityAnalyzerTests : TestBase
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
+    private class TrackingEnumerable : IEnumerable<int>
+    {
+        public int EnumerationCount { get; private set; }
+
+        public IEnumerator<int> GetEnumerator()
+        {
+            EnumerationCount++;
+            return Enumerable.Range(0, 10).GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
     private class TestMemoryMonitor : IMemoryMonitor
     {
         public long Available { get; set; } = 512L * 1024 * 1024;
@@ -105,5 +118,19 @@ public class QueryComplexityAnalyzerTests : TestBase
 
         Assert.Equal(5, paramCount);
         Assert.Equal(0, ids.EnumerationCount);
+    }
+
+    [Fact]
+    public void Repeated_analysis_uses_cache()
+    {
+        var ids = new TrackingEnumerable();
+        var query = new List<Product>().AsQueryable().Where(p => ids.Contains(p.Id));
+        var analyzer = new AdaptiveQueryComplexityAnalyzer(new TestMemoryMonitor());
+
+        analyzer.AnalyzeQuery(query.Expression, new DbContextOptions());
+        Assert.Equal(1, ids.EnumerationCount);
+
+        analyzer.AnalyzeQuery(query.Expression, new DbContextOptions());
+        Assert.Equal(1, ids.EnumerationCount);
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
@@ -15,6 +16,7 @@ namespace nORM.Query
     {
         private readonly IMemoryMonitor _memoryMonitor;
         private readonly SemaphoreSlim _complexQuerySemaphore;
+        private static readonly ConcurrentDictionary<int, QueryComplexityInfo> _analysisCache = new();
 
         private const int DefaultEnumerationLimit = 2000;
 
@@ -48,6 +50,18 @@ namespace nORM.Query
             if (query is null) throw new ArgumentNullException(nameof(query));
             if (options is null) throw new ArgumentNullException(nameof(options));
 
+            var fingerprint = ExpressionFingerprint.Compute(query);
+
+            if (_analysisCache.TryGetValue(fingerprint, out var cached))
+                return cached;
+
+            if (IsSimpleQuery(query))
+            {
+                var simpleInfo = new QueryComplexityInfo();
+                _analysisCache[fingerprint] = simpleInfo;
+                return simpleInfo;
+            }
+
             var baseAnalysis = AnalyzeQueryStructure(query);
 
             var availableMemory = _memoryMonitor.GetAvailableMemory();
@@ -65,6 +79,8 @@ namespace nORM.Query
                     $"Query complexity too high (cost: {baseAnalysis.EstimatedCost}, threshold: {adaptedLimits.HighCostThreshold})."));
             }
 
+            _analysisCache[fingerprint] = baseAnalysis;
+
             return baseAnalysis;
         }
 
@@ -73,6 +89,55 @@ namespace nORM.Query
             var visitor = new ComplexityVisitor();
             visitor.Visit(query);
             return visitor.GetComplexityInfo();
+        }
+
+        private static bool IsSimpleQuery(Expression expr)
+        {
+            if (expr is not MethodCallExpression)
+                return false;
+
+            MethodCallExpression? whereCall = null;
+            Expression current = expr;
+
+            while (current is MethodCallExpression mc && mc.Method.DeclaringType == typeof(Queryable))
+            {
+                if (mc.Method.Name == nameof(Queryable.Where))
+                {
+                    if (whereCall != null) return false;
+                    whereCall = mc;
+                    current = mc.Arguments[0];
+                }
+                else if (mc.Method.Name is nameof(Queryable.First) or nameof(Queryable.FirstOrDefault)
+                    or nameof(Queryable.Single) or nameof(Queryable.SingleOrDefault))
+                {
+                    current = mc.Arguments[0];
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            if (current is not ConstantExpression)
+                return false;
+
+            if (whereCall == null)
+                return true;
+
+            var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
+            return lambda.Body switch
+            {
+                MemberExpression me when me.Type == typeof(bool) => true,
+                BinaryExpression be when be.NodeType == ExpressionType.Equal => true,
+                _ => false
+            };
+        }
+
+        private static Expression StripQuotes(Expression e)
+        {
+            while (e.NodeType == ExpressionType.Quote)
+                e = ((UnaryExpression)e).Operand;
+            return e;
         }
 
         private static AdaptiveLimits CalculateAdaptiveLimits(long availableMemory, DbContextOptions options)
