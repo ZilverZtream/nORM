@@ -2,9 +2,6 @@ using System;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Loggers;
-using BenchmarkDotNet.Columns;
-using BenchmarkDotNet.Reports;
 
 namespace nORM.Benchmarks
 {
@@ -44,11 +41,11 @@ namespace nORM.Benchmarks
             Console.WriteLine();
             Console.WriteLine("Test scenarios:");
             Console.WriteLine("• Single inserts");
-            Console.WriteLine("• Simple queries");
-            Console.WriteLine("• Complex queries with filtering");
+            Console.WriteLine("• Simple queries (standard & compiled/prepared)");
+            Console.WriteLine("• Complex queries with filtering (standard & compiled/prepared)");
             Console.WriteLine("• Joins");
             Console.WriteLine("• Count operations");
-            Console.WriteLine("• Bulk operations");
+            Console.WriteLine("• Bulk operations (naive, batched, idiomatic)");
             Console.WriteLine();
             Console.WriteLine("⚠️  This will take several minutes to complete.");
             Console.WriteLine("Press any key to start, or Ctrl+C to cancel...");
@@ -145,7 +142,7 @@ namespace nORM.Benchmarks
             {
                 Console.WriteLine($"❌ Error running fast benchmarks: {ex.Message}");
                 Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                
+
                 if (ex.InnerException != null)
                 {
                     Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
@@ -163,7 +160,7 @@ namespace nORM.Benchmarks
                 // First run join verification tests
                 await JoinVerificationTest.RunJoinTests();
                 Console.WriteLine();
-                
+
                 var benchmarks = new OrmBenchmarks();
                 await benchmarks.Setup();
 
@@ -171,7 +168,7 @@ namespace nORM.Benchmarks
 
                 // Test nORM basic operations
                 await TestNormOperations(benchmarks);
-                
+
                 benchmarks.Cleanup();
                 Console.WriteLine("✅ All quick tests passed!");
                 Console.WriteLine();
@@ -203,7 +200,7 @@ namespace nORM.Benchmarks
                 var complexUsers = await benchmarks.Query_Complex_nORM();
                 Console.WriteLine($"  ✅ Complex query returned {complexUsers.Count} users");
 
-                // Test join query (if implemented)
+                // Test join query
                 try
                 {
                     var joinResults = await benchmarks.Query_Join_nORM();
@@ -222,8 +219,8 @@ namespace nORM.Benchmarks
                 var count = await benchmarks.Count_nORM();
                 Console.WriteLine($"  ✅ Count query returned {count}");
 
-                // Test bulk insert
-                await benchmarks.BulkInsert_nORM();
+                // Test bulk insert (idiomatic nORM)
+                await benchmarks.BulkInsert_Idiomatic_nORM();
                 Console.WriteLine("  ✅ Bulk insert completed");
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains("not initialized"))

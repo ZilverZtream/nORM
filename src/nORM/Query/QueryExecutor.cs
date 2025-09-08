@@ -58,7 +58,7 @@ namespace nORM.Query
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
-                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct)
+                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
                     .ConfigureAwait(false);
 
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -99,7 +99,7 @@ namespace nORM.Query
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
-                using var reader = command.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess);
+                using var reader = command.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
 
                 while (reader.Read())
                 {
@@ -177,7 +177,7 @@ namespace nORM.Query
                     var outerColumnCount = outerMap.Columns.Length;
                     var innerKeyIndex = outerColumnCount + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
 
-                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess, ct)
+                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
                         .ConfigureAwait(false);
 
                     object? currentOuter = null;
@@ -202,9 +202,9 @@ namespace nORM.Query
                             if (trackOuter)
                             {
                                 var actualMap = _ctx.GetMapping(outer.GetType());
-                                  var entry = _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
-                                  outer = entry.Entity!;
-                                  NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
+                                var entry = _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
+                                outer = entry.Entity!;
+                                NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
                             }
 
                             currentOuter = outer;
@@ -217,9 +217,9 @@ namespace nORM.Query
                             if (trackInner)
                             {
                                 var actualMap = _ctx.GetMapping(inner.GetType());
-                                  var entry = _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualMap);
-                                  inner = entry.Entity!;
-                                  NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
+                                var entry = _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualMap);
+                                inner = entry.Entity!;
+                                NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
                             }
                             currentChildren.Add(inner);
                         }
@@ -311,7 +311,7 @@ namespace nORM.Query
                     var outerColumnCount = outerMap.Columns.Length;
                     var innerKeyIndex = outerColumnCount + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
 
-                    using var reader = cmd.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess);
+                    using var reader = cmd.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
 
                     object? currentOuter = null;
                     object? currentKey = null;

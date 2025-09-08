@@ -147,7 +147,7 @@ namespace nORM.Query
 
             return Execute<TResult>(expression);
         }
-            
+
         public object? Execute(Expression expression) => Execute<object>(expression);
 
         public Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken ct)
@@ -164,12 +164,12 @@ namespace nORM.Query
                         // Check if this is a simple query pattern we can optimize
                         if (IsSimpleQueryPattern(expression))
                         {
-                            var method = typeof(NormQueryProvider).GetMethod(nameof(ExecuteFastListAsync), 
+                            var method = typeof(NormQueryProvider).GetMethod(nameof(ExecuteFastListAsync),
                                 BindingFlags.NonPublic | BindingFlags.Instance)!
                                 .MakeGenericMethod(entityType);
-                            
+
                             var task = (Task)method.Invoke(this, new object[] { expression, ct })!;
-                            return task.ContinueWith(t => 
+                            return task.ContinueWith(t =>
                             {
                                 var result = t.GetType().GetProperty("Result")!.GetValue(t);
                                 return (TResult)result!;
@@ -387,24 +387,36 @@ namespace nORM.Query
                 sb.Append(string.Join(", ", map.Columns.Select(c => c.EscCol)));
                 sb.Append(" FROM ").Append(map.EscTable);
 
+
                 if (whereCall != null)
                 {
                     var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
-                    if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
-                        return false;
+                    // Support boolean member: u => u.IsActive
+                    if (lambda.Body is MemberExpression boolMember && boolMember.Type == typeof(bool))
+                    {
+                        if (!map.ColumnsByName.TryGetValue(boolMember.Member.Name, out var boolCol))
+                            return false;
+                        sb.Append(" WHERE ").Append(boolCol.EscCol).Append(" = 1");
+                    }
+                    else
+                    {
+                        if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
+                            return false;
 
-                    if (be.Left is not MemberExpression me)
-                        return false;
+                        if (be.Left is not MemberExpression me)
+                            return false;
 
-                    if (!map.ColumnsByName.TryGetValue(me.Member.Name, out var column))
-                        return false;
+                        if (!map.ColumnsByName.TryGetValue(me.Member.Name, out var column))
+                            return false;
 
-                    var paramName = _ctx.Provider.ParamPrefix + "p0";
-                    sb.Append(" WHERE ").Append(column.EscCol).Append(" = ").Append(paramName);
+                        var paramName = _ctx.Provider.ParamPrefix + "p0";
+                        sb.Append(" WHERE ").Append(column.EscCol).Append(" = ").Append(paramName);
 
-                    var value = Expression.Lambda(be.Right, lambda.Parameters).Compile().DynamicInvoke(new object?[] { null });
-                    parameters[paramName] = value!;
+                        var value = Expression.Lambda(be.Right, lambda.Parameters).Compile().DynamicInvoke(new object?[] { null });
+                        parameters[paramName] = value!;
+                    }
                 }
+
 
                 sql = sb.ToString();
                 _simpleSqlCache[cacheKey] = sql;
@@ -413,17 +425,26 @@ namespace nORM.Query
 
             sql = cachedSql!;
 
+
             // SQL cached; still need parameter value if where present
             if (whereCall != null)
             {
                 var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
-                if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
-                    return false;
+                if (lambda.Body is MemberExpression boolMember && boolMember.Type == typeof(bool))
+                {
+                    // no parameter to bind for boolean predicate
+                }
+                else
+                {
+                    if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
+                        return false;
 
-                var paramName = _ctx.Provider.ParamPrefix + "p0";
-                var value = Expression.Lambda(be.Right, lambda.Parameters).Compile().DynamicInvoke(new object?[] { null });
-                parameters[paramName] = value!;
+                    var paramName = _ctx.Provider.ParamPrefix + "p0";
+                    var value = Expression.Lambda(be.Right, lambda.Parameters).Compile().DynamicInvoke(new object?[] { null });
+                    parameters[paramName] = value!;
+                }
             }
+
 
             return true;
         }
@@ -890,21 +911,19 @@ namespace nORM.Query
             {
                 while (expr is MethodCallExpression m)
                 {
-                    if (m.Method.Name == "AsNoTracking" && m.Arguments.Count == 1)
+                    if (m.Method.Name == "AsNoTracking")
                     {
-                        expr = m.Arguments[0];
+                        if (m.Arguments.Count == 1) expr = m.Arguments[0];
+                        else break;
                         continue;
                     }
-
                     if (m.Method.Name == "Take" && m.Arguments.Count == 2 && m.Arguments[1] is ConstantExpression)
                     {
                         expr = m.Arguments[0];
                         continue;
                     }
-
                     break;
                 }
-
                 return expr;
             }
 
@@ -915,7 +934,25 @@ namespace nORM.Query
             if (core is MethodCallExpression { Method.Name: "Where", Arguments: { Count: 2 } } whereCall)
             {
                 var source = Unwrap(whereCall.Arguments[0]);
-                return source is ConstantExpression;
+                if (source is not ConstantExpression) return false;
+
+                // Accept: u => u.BoolProp   OR   u => u.BoolProp == true   OR simple equality on scalar
+                var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
+                var body = lambda.Body;
+
+                if (body is MemberExpression me && me.Type == typeof(bool))
+                    return true;
+
+                if (body is UnaryExpression { Operand: MemberExpression me2 } uex && me2.Type == typeof(bool))
+                    return true;
+
+                if (body is BinaryExpression be)
+                {
+                    if (be.NodeType == ExpressionType.Equal) return true;
+                    if ((be.NodeType == ExpressionType.GreaterThan || be.NodeType == ExpressionType.GreaterThanOrEqual) &&
+                        be.Left is MemberExpression && (be.Right is ConstantExpression || be.Right is MemberExpression { Expression: ConstantExpression }))
+                        return true;
+                }
             }
 
             return false;
@@ -1009,38 +1046,30 @@ namespace nORM.Query
             var results = new List<T>();
             using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
 
+
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
                 var entity = new T();
                 for (int i = 0; i < mapping.Columns.Length; i++)
                 {
-                    if (!reader.IsDBNull(i))
-                    {
-                        var column = mapping.Columns[i];
-                        var value = reader.GetValue(i);
+                    if (reader.IsDBNull(i)) continue;
+                    var column = mapping.Columns[i];
+                    var t = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
+                    object? v;
+                    if (t == typeof(int)) v = reader.GetInt32(i);
+                    else if (t == typeof(long)) v = reader.GetInt64(i);
+                    else if (t == typeof(double)) v = reader.GetDouble(i);
+                    else if (t == typeof(float)) v = (float)reader.GetDouble(i);
+                    else if (t == typeof(bool)) v = reader.GetInt32(i) != 0;
+                    else if (t == typeof(string)) v = reader.GetString(i);
+                    else if (t == typeof(DateTime)) v = DateTime.Parse(reader.GetString(i), null, System.Globalization.DateTimeStyles.RoundtripKind);
+                    else v = reader.GetValue(i);
 
-                        // Handle type conversion
-                        if (value != null)
-                        {
-                            var targetType = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
-                            if (value.GetType() != targetType && targetType != typeof(object))
-                            {
-                                try
-                                {
-                                    value = Convert.ChangeType(value, targetType);
-                                }
-                                catch
-                                {
-                                    // If conversion fails, use the original value
-                                }
-                            }
-                        }
-
-                        column.Setter(entity, value);
-                    }
+                    column.Setter(entity, v);
                 }
                 results.Add(entity);
             }
+
 
             return results;
         }
