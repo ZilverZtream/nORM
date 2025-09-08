@@ -28,41 +28,40 @@ namespace nORM.Core
         internal EntityEntry Track(object entity, EntityState state, TableMapping mapping)
         {
             var pk = GetPrimaryKeyValue(entity, mapping);
-            if (pk != null && _entriesByKey.TryGetValue(mapping.Type, out var existingTypeEntries) &&
-                existingTypeEntries.TryGetValue(pk, out var existing))
-            {
-                existing.State = state;
-                return existing;
-            }
 
-            // ADD LAZY TRACKING CHECK
-            if (state == EntityState.Unchanged && !_options.EagerChangeTracking)
+            var entry = _entriesByReference.GetOrAdd(entity, _ =>
             {
-                var lazy = CreateLazyEntry(entity, mapping);
-                _entriesByReference[entity] = lazy;
-                if (entity is not INotifyPropertyChanged)
-                    _nonNotifyingEntries[lazy] = 0;
+                var newEntry = state == EntityState.Unchanged && !_options.EagerChangeTracking
+                    ? CreateLazyEntry(entity, mapping)
+                    : new EntityEntry(entity, state, mapping, _options, MarkDirty);
+
                 if (pk != null)
                 {
                     var typeEntries = _entriesByKey.GetOrAdd(
                         mapping.Type,
                         _ => new ConcurrentDictionary<object, EntityEntry>());
-                    typeEntries[pk] = lazy;
+
+                    if (!typeEntries.TryAdd(pk, newEntry))
+                    {
+                        if (typeEntries.TryGetValue(pk, out var existingEntry))
+                        {
+                            existingEntry.State = state;
+                            return existingEntry;
+                        }
+                    }
                 }
 
-                return lazy;
-            }
+                if (entity is not INotifyPropertyChanged)
+                {
+                    _nonNotifyingEntries.TryAdd(newEntry, 0);
+                }
 
-            var entry = new EntityEntry(entity, state, mapping, _options, MarkDirty);
-            _entriesByReference[entity] = entry;
-            if (entity is not INotifyPropertyChanged)
-                _nonNotifyingEntries[entry] = 0;
-            if (pk != null)
+                return newEntry;
+            });
+
+            if (entry.Entity == entity)
             {
-                var typeEntries = _entriesByKey.GetOrAdd(
-                    mapping.Type,
-                    _ => new ConcurrentDictionary<object, EntityEntry>());
-                typeEntries[pk] = entry;
+                entry.State = state;
             }
 
             return entry;
