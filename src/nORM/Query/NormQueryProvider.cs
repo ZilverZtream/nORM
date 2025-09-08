@@ -14,6 +14,7 @@ using System.Text;
 using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using System.Globalization;
+using System.Buffers.Binary;
 using nORM.Core;
 using nORM.Execution;
 using nORM.Internal;
@@ -28,7 +29,7 @@ namespace nORM.Query
     internal sealed class NormQueryProvider : IQueryProvider
     {
         internal readonly DbContext _ctx;
-        private static readonly ConcurrentLruCache<string, QueryPlan> _planCache =
+        private static readonly ConcurrentLruCache<PlanCacheKey, QueryPlan> _planCache =
             new(maxSize: CalculateInitialPlanCacheSize(), timeToLive: TimeSpan.FromHours(1));
         private static readonly Timer _planCacheMonitor = new(AdjustPlanCacheSize, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
@@ -820,18 +821,33 @@ namespace nORM.Query
             return plan with { Parameters = new Dictionary<string, object>(plan.Parameters) };
         }
 
-        private string BuildPlanCacheKey(int fingerprint, int tenantHash, Type elementType, Type expressionType)
-        {
-            var sb = new StringBuilder();
-            sb.Append(fingerprint)
-              .Append(':').Append(tenantHash)
-              .Append(':').Append(GetTypeHash(elementType))
-              .Append(':').Append(GetTypeHash(expressionType));
-            return sb.ToString();
-        }
+        private static PlanCacheKey BuildPlanCacheKey(int fingerprint, int tenantHash, Type elementType, Type expressionType)
+            => new PlanCacheKey(fingerprint, tenantHash, GetTypeHash(elementType), GetTypeHash(expressionType));
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int GetTypeHash(Type type) => _typeHashCodes.GetOrAdd(type, static t => t.GetHashCode());
+
+        private readonly struct PlanCacheKey : IEquatable<PlanCacheKey>
+        {
+            private readonly ulong _high;
+            private readonly ulong _low;
+
+            public PlanCacheKey(int fingerprint, int tenantHash, int elementHash, int expressionHash)
+            {
+                Span<byte> data = stackalloc byte[16];
+                BinaryPrimitives.WriteInt32LittleEndian(data[0..4], fingerprint);
+                BinaryPrimitives.WriteInt32LittleEndian(data[4..8], tenantHash);
+                BinaryPrimitives.WriteInt32LittleEndian(data[8..12], elementHash);
+                BinaryPrimitives.WriteInt32LittleEndian(data[12..16], expressionHash);
+                var hash = XxHash128.Hash(data);
+                _low = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(0, 8));
+                _high = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(8, 8));
+            }
+
+            public bool Equals(PlanCacheKey other) => _high == other._high && _low == other._low;
+            public override bool Equals(object? obj) => obj is PlanCacheKey other && Equals(other);
+            public override int GetHashCode() => HashCode.Combine(_high, _low);
+        }
 
         private string BuildCacheKeyWithValues<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
         {
