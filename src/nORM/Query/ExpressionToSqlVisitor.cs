@@ -43,6 +43,14 @@ namespace nORM.Query
             ["EndsWith"] = new EndsWithTranslator()
         };
 
+        private static readonly Dictionary<MethodInfo, Action<ExpressionToSqlVisitor, MethodCallExpression>> _fastMethodHandlers =
+            new()
+            {
+                { typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!, HandleStringContains },
+                { typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string) })!, HandleStringStartsWith },
+                { typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(string) })!, HandleStringEndsWith }
+            };
+
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
@@ -233,6 +241,13 @@ namespace nORM.Query
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
+            // ADD FAST PATH FOR COMMON METHODS
+            if (_fastMethodHandlers.TryGetValue(node.Method, out var handler))
+            {
+                handler(this, node);
+                return node;
+            }
+
             if (!IsTranslatableMethod(node.Method))
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Method '{node.Method.Name}' cannot be translated to SQL"));
 
@@ -669,12 +684,7 @@ namespace nORM.Query
                 case MemberExpression me:
                     if (me.Expression != null && TryGetConstantValue(me.Expression, out var obj, visited))
                     {
-                        value = me.Member switch
-                        {
-                            FieldInfo fi => fi.GetValue(obj),
-                            PropertyInfo pi => pi.GetValue(obj),
-                            _ => null
-                        };
+                        value = ExpressionVisitorPool.GetMemberValue(me.Member, obj);
                         return true;
                     }
                     break;
@@ -722,6 +732,54 @@ namespace nORM.Query
             if (iface != null) return iface.GetGenericArguments()[0];
 
             throw new ArgumentException($"Cannot determine element type from expression of type {type}");
+        }
+
+        private static void HandleStringContains(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+        {
+            visitor.Visit(node.Object!);
+            visitor._sql.Append(" LIKE ");
+            if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
+            {
+                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
+                visitor.AppendConstant(visitor.CreateSafeLikePattern(cs, LikeOperation.Contains), typeof(string));
+                visitor._sql.Append($" ESCAPE '{escChar}'");
+            }
+            else
+            {
+                throw new NotSupportedException("Only constant values are supported in Contains().");
+            }
+        }
+
+        private static void HandleStringStartsWith(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+        {
+            visitor.Visit(node.Object!);
+            visitor._sql.Append(" LIKE ");
+            if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
+            {
+                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
+                visitor.AppendConstant(visitor.CreateSafeLikePattern(ss, LikeOperation.StartsWith), typeof(string));
+                visitor._sql.Append($" ESCAPE '{escChar}'");
+            }
+            else
+            {
+                throw new NotSupportedException("Only constant values are supported in StartsWith().");
+            }
+        }
+
+        private static void HandleStringEndsWith(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+        {
+            visitor.Visit(node.Object!);
+            visitor._sql.Append(" LIKE ");
+            if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
+            {
+                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
+                visitor.AppendConstant(visitor.CreateSafeLikePattern(es, LikeOperation.EndsWith), typeof(string));
+                visitor._sql.Append($" ESCAPE '{escChar}'");
+            }
+            else
+            {
+                throw new NotSupportedException("Only constant values are supported in EndsWith().");
+            }
         }
 
         private interface IMethodTranslator

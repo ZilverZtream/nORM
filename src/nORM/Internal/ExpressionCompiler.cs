@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -13,6 +14,20 @@ namespace nORM.Internal
 {
     internal static class ExpressionCompiler
     {
+        private static readonly ConcurrentDictionary<int, Delegate> _compiledDelegateCache = new();
+
+        public static Func<T, TResult> CompileExpression<T, TResult>(Expression<Func<T, TResult>> expr)
+        {
+            var key = ExpressionFingerprint.Compute(expr);
+
+            if (_compiledDelegateCache.TryGetValue(key, out var cached))
+                return (Func<T, TResult>)cached;
+
+            var compiled = expr.Compile();
+            _compiledDelegateCache.TryAdd(key, compiled);
+            return compiled;
+        }
+
         public static Func<TContext, TParam, Task<List<T>>> CompileQuery<TContext, TParam, T>(Expression<Func<TContext, TParam, IQueryable<T>>> queryExpression)
             where TContext : DbContext
             where T : class
