@@ -187,28 +187,12 @@ namespace nORM.Query
             cmd.Parameters.Add(param);
 
             var results = new List<T>();
+            var materializer = new MaterializerFactory().CreateMaterializer(map, typeof(T));
             await using var reader = await cmd.ExecuteReaderAsync(System.Threading.CancellationToken.None).ConfigureAwait(false);
 
             while (await reader.ReadAsync(default).ConfigureAwait(false))
             {
-                var entity = new T();
-                for (int i = 0; i < map.Columns.Length; i++)
-                {
-                    if (reader.IsDBNull(i)) continue;
-                    var col = map.Columns[i];
-                    var t = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
-                    object? v;
-                    if (t == typeof(int)) v = reader.GetInt32(i);
-                    else if (t == typeof(long)) v = reader.GetInt64(i);
-                    else if (t == typeof(double)) v = reader.GetDouble(i);
-                    else if (t == typeof(float)) v = (float)reader.GetDouble(i);
-                    else if (t == typeof(bool)) v = reader.GetInt32(i) != 0;
-                    else if (t == typeof(string)) v = reader.GetString(i);
-                    else if (t == typeof(DateTime)) v = DateTime.Parse(reader.GetString(i), null, DateTimeStyles.RoundtripKind);
-                    else v = reader.GetValue(i);
-                    col.Setter(entity, v);
-                }
-                results.Add(entity);
+                results.Add((T)await materializer(reader, default).ConfigureAwait(false));
             }
             return results;
         }
@@ -225,27 +209,11 @@ namespace nORM.Query
             cmd.CommandText = sql;
 
             var results = new List<T>();
+            var materializer = new MaterializerFactory().CreateMaterializer(map, typeof(T));
             await using var reader = await cmd.ExecuteReaderAsync(System.Threading.CancellationToken.None).ConfigureAwait(false);
             while (await reader.ReadAsync(default).ConfigureAwait(false))
             {
-                var entity = new T();
-                for (int i = 0; i < map.Columns.Length; i++)
-                {
-                    if (reader.IsDBNull(i)) continue;
-                    var col = map.Columns[i];
-                    var t = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
-                    object? v;
-                    if (t == typeof(int)) v = reader.GetInt32(i);
-                    else if (t == typeof(long)) v = reader.GetInt64(i);
-                    else if (t == typeof(double)) v = reader.GetDouble(i);
-                    else if (t == typeof(float)) v = (float)reader.GetDouble(i);
-                    else if (t == typeof(bool)) v = reader.GetInt32(i) != 0;
-                    else if (t == typeof(string)) v = reader.GetString(i);
-                    else if (t == typeof(DateTime)) v = DateTime.Parse(reader.GetString(i), null, DateTimeStyles.RoundtripKind);
-                    else v = reader.GetValue(i);
-                    col.Setter(entity, v);
-                }
-                results.Add(entity);
+                results.Add((T)await materializer(reader, default).ConfigureAwait(false));
             }
             return results;
         }
