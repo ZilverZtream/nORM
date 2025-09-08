@@ -33,6 +33,7 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<Type, bool> _simpleTypeCache = new();
         private static readonly ConcurrentDictionary<Type, Func<DbDataReader, object>> _fastMaterializers = new();
         private static readonly ConcurrentDictionary<Type, Action<object, DbDataReader>[]> _setterCache = new();
+        private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _propertiesCache = new();
 
         private static bool IsSimpleType(Type type)
             => _simpleTypeCache.GetOrAdd(type, static t => t.IsPrimitive || t == typeof(decimal) || t == typeof(string));
@@ -75,7 +76,7 @@ namespace nORM.Query
             var parameterlessCtor = type.GetConstructor(Type.EmptyTypes);
             if (parameterlessCtor != null)
             {
-                var props = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
+                var props = _propertiesCache.GetOrAdd(type, t => t.GetProperties(BindingFlags.Instance | BindingFlags.Public));
 
                 il.DeclareLocal(type); // local 0: entity
                 il.Emit(OpCodes.Newobj, parameterlessCtor);
@@ -262,9 +263,15 @@ namespace nORM.Query
                         var dmap = kvp.Value;
                         var indices = dmap.Columns.Select(c => Array.IndexOf(mapping.Columns, mapping.ColumnsByName[c.Prop.Name])).ToArray();
                         var getters = dmap.Columns.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, indices[i])).ToArray();
+                        var ctor = _parameterlessCtorDelegates.GetOrAdd(dmap.Type, t =>
+                        {
+                            var newExpr = Expression.New(t);
+                            var body = Expression.Convert(newExpr, typeof(object));
+                            return Expression.Lambda<Func<object>>(body).Compile();
+                        });
                         return (Func<DbDataReader, object>)(reader =>
                         {
-                            var entity = Activator.CreateInstance(dmap.Type)!;
+                            var entity = ctor();
                             for (int i = 0; i < dmap.Columns.Length; i++)
                             {
                                 var idx = indices[i];
@@ -287,13 +294,18 @@ namespace nORM.Query
             // Handle simple scalar types directly
             if (IsSimpleType(targetType))
             {
-                var getter = CreateReaderGetter(targetType, 0);
-                return reader =>
-                {
-                    if (reader.IsDBNull(0))
-                        return targetType.IsValueType ? Activator.CreateInstance(targetType)! : null!;
-                    return getter(reader)!;
-                };
+                    var getter = CreateReaderGetter(targetType, 0);
+                    var defaultFactory = _parameterlessCtorDelegates.GetOrAdd(targetType, t =>
+                    {
+                        var body = Expression.Convert(Expression.New(t), typeof(object));
+                        return Expression.Lambda<Func<object>>(body).Compile();
+                    });
+                    return reader =>
+                    {
+                        if (reader.IsDBNull(0))
+                            return targetType.IsValueType ? defaultFactory() : null!;
+                        return getter(reader)!;
+                    };
             }
 
             var columns = projection == null
@@ -315,7 +327,7 @@ namespace nORM.Query
                     return Expression.Lambda<Func<object>>(body).Compile();
                 });
 
-                var properties = targetType.GetProperties();
+                var properties = _propertiesCache.GetOrAdd(targetType, t => t.GetProperties(BindingFlags.Instance | BindingFlags.Public));
                 var canOptimize = columns.Length <= properties.Length;
                 for (int i = 0; i < columns.Length && i < properties.Length; i++)
                 {
@@ -360,6 +372,11 @@ namespace nORM.Query
             var ctorParams = ctor.GetParameters();
             var ctorDelegate = _constructorDelegates.GetOrAdd(targetType, _ => CreateConstructorDelegate(ctor));
             var paramGetters = ctorParams.Select((p, i) => CreateReaderGetter(p.ParameterType, i)).ToArray();
+            var defaultFactories = ctorParams.Select(p => _parameterlessCtorDelegates.GetOrAdd(p.ParameterType, t =>
+            {
+                var body = Expression.Convert(Expression.New(t), typeof(object));
+                return Expression.Lambda<Func<object>>(body).Compile();
+            })).ToArray();
 
             return reader =>
             {
@@ -368,7 +385,7 @@ namespace nORM.Query
                 {
                     if (reader.IsDBNull(i))
                     {
-                        args[i] = ctorParams[i].ParameterType.IsValueType ? Activator.CreateInstance(ctorParams[i].ParameterType) : null;
+                        args[i] = ctorParams[i].ParameterType.IsValueType ? defaultFactories[i]() : null;
                         continue;
                     }
                     args[i] = paramGetters[i](reader);
@@ -592,7 +609,7 @@ namespace nORM.Query
         {
             return _setterCache.GetOrAdd(type, t =>
             {
-                var properties = t.GetProperties();
+                var properties = _propertiesCache.GetOrAdd(t, tt => tt.GetProperties(BindingFlags.Instance | BindingFlags.Public));
                 var setters = new Action<object, DbDataReader>[properties.Length];
 
                 for (int i = 0; i < properties.Length; i++)
