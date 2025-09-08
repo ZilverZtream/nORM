@@ -19,7 +19,8 @@ namespace nORM.Core
         private readonly DatabaseTopology _topology;
         private readonly DatabaseProvider _provider;
         private readonly ILogger _logger;
-        private readonly Timer _healthCheckTimer;
+        private readonly PeriodicTimer _healthCheckTimer;
+        private readonly Task _healthCheckTask;
         private readonly SemaphoreSlim _failoverSemaphore = new(1, 1);
         private readonly SemaphoreSlim _poolInitSemaphore = new(1, 1);
         private readonly SemaphoreSlim _healthCheckSemaphore = new(1, 1);
@@ -37,7 +38,7 @@ namespace nORM.Core
         private readonly TimeSpan _baseDelay = TimeSpan.FromSeconds(1);
         private readonly TimeSpan _maxDelay = TimeSpan.FromSeconds(30);
 
-        public ConnectionManager(DatabaseTopology topology, DatabaseProvider provider, ILogger logger)
+        public ConnectionManager(DatabaseTopology topology, DatabaseProvider provider, ILogger logger, TimeSpan? healthCheckInterval = null)
         {
             _topology = topology ?? throw new ArgumentNullException(nameof(topology));
             _provider = provider ?? throw new ArgumentNullException(nameof(provider));
@@ -47,11 +48,9 @@ namespace nORM.Core
             DeterminePrimaryNode();
             UpdateAvailableReadReplicas();
 
-            _healthCheckTimer = new Timer(static state =>
-            {
-                var manager = (ConnectionManager)state!;
-                _ = manager.PerformHealthChecksAsync(manager._disposeCts.Token);
-            }, this, TimeSpan.Zero, TimeSpan.FromSeconds(30));
+            var interval = healthCheckInterval ?? TimeSpan.FromSeconds(30);
+            _healthCheckTimer = new PeriodicTimer(interval);
+            _healthCheckTask = Task.Run(() => HealthCheckLoopAsync(_disposeCts.Token));
         }
 
         private void InitializeConnectionPools()
@@ -183,6 +182,23 @@ namespace nORM.Core
             }
         }
 
+        private async Task HealthCheckLoopAsync(CancellationToken token)
+        {
+            try
+            {
+                await PerformHealthChecksAsync(token).ConfigureAwait(false);
+
+                while (await _healthCheckTimer.WaitForNextTickAsync(token).ConfigureAwait(false))
+                {
+                    await PerformHealthChecksAsync(token).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during shutdown
+            }
+        }
+
         private async Task PerformHealthChecksAsync(CancellationToken token)
         {
             if (_disposed || token.IsCancellationRequested)
@@ -294,6 +310,14 @@ namespace nORM.Core
             _disposed = true;
             _disposeCts.Cancel();
             _healthCheckTimer.Dispose();
+            try
+            {
+                _healthCheckTask.Wait();
+            }
+            catch
+            {
+                // Ignore exceptions during shutdown
+            }
             _disposeCts.Dispose();
 
             foreach (var pool in _connectionPools.Values)
