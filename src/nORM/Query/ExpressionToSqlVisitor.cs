@@ -10,8 +10,6 @@ using System.Collections.Frozen;
 using nORM.Core;
 using nORM.Mapping;
 using nORM.Providers;
-using System.Text;
-using Microsoft.Extensions.ObjectPool;
 
 #nullable enable
 
@@ -53,8 +51,6 @@ namespace nORM.Query
                 { typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(string) })!, HandleStringEndsWith }
             };
 
-        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
-            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
         internal ExpressionToSqlVisitor() { }
 
@@ -120,19 +116,10 @@ namespace nORM.Query
 
         public string Translate(Expression expression)
         {
-            var sb = _stringBuilderPool.Get();
-            try
-            {
-                using var builder = new OptimizedSqlBuilder(sb);
-                _sql = builder;
-                Visit(expression);
-                return sb.ToString();
-            }
-            finally
-            {
-                sb.Clear();
-                _stringBuilderPool.Return(sb);
-            }
+            using var builder = new OptimizedSqlBuilder();
+            _sql = builder;
+            Visit(expression);
+            return builder.ToSqlString();
         }
 
         protected override Expression VisitBinary(BinaryExpression node)
