@@ -66,10 +66,12 @@ namespace nORM.Core
                 if (entity is not INotifyPropertyChanged)
                     _nonNotifyingEntries.TryAdd(entry, 0);
 
+
                 if (pk != null)
                 {
                     var typeEntries = _entriesByKey.GetOrAdd(
                         mapping.Type,
+
                         static _ => new ConcurrentDictionary<object, EntityEntry>());
                     typeEntries.TryAdd(pk, entry);
                 }
