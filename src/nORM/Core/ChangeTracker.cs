@@ -27,7 +27,27 @@ namespace nORM.Core
 
         internal EntityEntry Track(object entity, EntityState state, TableMapping mapping)
         {
+            // Fast path: entity already tracked by reference
+            if (_entriesByReference.TryGetValue(entity, out var existingEntry))
+            {
+                existingEntry.State = state;
+
+                // If the entity now has a primary key that wasn't tracked, add it
+                var pk = GetPrimaryKeyValue(entity, existingEntry.Mapping);
+                if (pk != null)
+                {
+                    var typeEntries = _entriesByKey.GetOrAdd(
+                        existingEntry.Mapping.Type,
+                        _ => new ConcurrentDictionary<object, EntityEntry>());
+                    typeEntries.TryAdd(pk, existingEntry);
+                }
+
+                return existingEntry;
+            }
+
             var pk = GetPrimaryKeyValue(entity, mapping);
+
+            // If not found by reference, check by primary key
             if (pk != null && _entriesByKey.TryGetValue(mapping.Type, out var existingTypeEntries) &&
                 existingTypeEntries.TryGetValue(pk, out var existing))
             {
@@ -35,36 +55,36 @@ namespace nORM.Core
                 return existing;
             }
 
-            // ADD LAZY TRACKING CHECK
-            if (state == EntityState.Unchanged && !_options.EagerChangeTracking)
+            // Create new entry only when needed
+            var entry = state == EntityState.Unchanged && !_options.EagerChangeTracking
+                ? CreateLazyEntry(entity, mapping)
+                : new EntityEntry(entity, state, mapping, _options, MarkDirty);
+
+            if (_entriesByReference.TryAdd(entity, entry))
             {
-                var lazy = CreateLazyEntry(entity, mapping);
-                _entriesByReference[entity] = lazy;
+                // Successfully added - set up additional tracking
                 if (entity is not INotifyPropertyChanged)
-                    _nonNotifyingEntries[lazy] = 0;
+                    _nonNotifyingEntries.TryAdd(entry, 0);
+
                 if (pk != null)
                 {
                     var typeEntries = _entriesByKey.GetOrAdd(
                         mapping.Type,
-                        _ => new ConcurrentDictionary<object, EntityEntry>());
-                    typeEntries[pk] = lazy;
+                        static _ => new ConcurrentDictionary<object, EntityEntry>());
+                    typeEntries.TryAdd(pk, entry);
                 }
 
-                return lazy;
+                return entry;
             }
 
-            var entry = new EntityEntry(entity, state, mapping, _options, MarkDirty);
-            _entriesByReference[entity] = entry;
-            if (entity is not INotifyPropertyChanged)
-                _nonNotifyingEntries[entry] = 0;
-            if (pk != null)
+            // Another thread added it between check and add
+            if (_entriesByReference.TryGetValue(entity, out var raceEntry))
             {
-                var typeEntries = _entriesByKey.GetOrAdd(
-                    mapping.Type,
-                    _ => new ConcurrentDictionary<object, EntityEntry>());
-                typeEntries[pk] = entry;
+                raceEntry.State = state;
+                return raceEntry;
             }
 
+            // Fallback: return the one we created
             return entry;
         }
 
