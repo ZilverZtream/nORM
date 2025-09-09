@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using nORM.Mapping;
@@ -113,6 +113,81 @@ namespace nORM.Query
             }
 
             return neededColumns;
+        }
+
+
+        /// <summary>
+        /// Zero-copy variant: appends SELECT/FROM/JOIN directly into the provided builder
+        /// to avoid allocating an intermediate SQL string.
+        /// </summary>
+        public static void BuildJoinClauseInto(
+            OptimizedSqlBuilder joinSql,
+            System.Linq.Expressions.LambdaExpression? projection,
+            nORM.Mapping.TableMapping outerMapping,
+            string outerAlias,
+            nORM.Mapping.TableMapping innerMapping,
+            string innerAlias,
+            string joinType,
+            string outerKeySql,
+            string innerKeySql,
+            string? orderBy = null)
+        {
+            // SELECT
+            if (projection?.Body is System.Linq.Expressions.NewExpression newExpr)
+            {
+                var neededColumns = ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
+                joinSql.AppendSelect(System.ReadOnlySpan<char>.Empty);
+                if (neededColumns.Count == 0)
+                {
+                    bool first = true;
+                    for (int i = 0; i < outerMapping.Columns.Length; i++)
+                    {
+                        if (!first) joinSql.Append(", ");
+                        joinSql.Append(outerAlias).Append('.').Append(outerMapping.Columns[i].EscCol);
+                        first = false;
+                    }
+                    for (int i = 0; i < innerMapping.Columns.Length; i++)
+                    {
+                        if (!first) joinSql.Append(", ");
+                        joinSql.Append(innerAlias).Append('.').Append(innerMapping.Columns[i].EscCol);
+                        first = false;
+                    }
+                    joinSql.Append(' ');
+                }
+                else
+                {
+                    for (int i = 0; i < neededColumns.Count; i++)
+                    {
+                        if (i > 0) joinSql.Append(", ");
+                        joinSql.Append(neededColumns[i]);
+                    }
+                    joinSql.Append(' ');
+                }
+            }
+            else
+            {
+                joinSql.AppendSelect(System.ReadOnlySpan<char>.Empty);
+                bool first = true;
+                for (int i = 0; i < outerMapping.Columns.Length; i++)
+                {
+                    if (!first) joinSql.Append(", ");
+                    joinSql.Append(outerAlias).Append('.').Append(outerMapping.Columns[i].EscCol);
+                    first = false;
+                }
+                for (int i = 0; i < innerMapping.Columns.Length; i++)
+                {
+                    if (!first) joinSql.Append(", ");
+                    joinSql.Append(innerAlias).Append('.').Append(innerMapping.Columns[i].EscCol);
+                }
+                joinSql.Append(' ');
+            }
+
+            // FROM + JOIN + ON
+            joinSql.Append("FROM ").Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
+            joinSql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
+            joinSql.Append("ON ").Append(outerKeySql).Append(" = ").Append(innerKeySql);
+            if (!string.IsNullOrEmpty(orderBy))
+                joinSql.Append(" ORDER BY ").Append(orderBy!);
         }
     }
 }

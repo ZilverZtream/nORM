@@ -10,12 +10,10 @@ using System.Collections.Frozen;
 using nORM.Core;
 using nORM.Mapping;
 using nORM.Providers;
-
 #nullable enable
-
 namespace nORM.Query
 {
-    internal sealed class ExpressionToSqlVisitor : ExpressionVisitor, nORM.Internal.IResettable
+    internal sealed class ExpressionToSqlVisitor : ExpressionVisitor, nORM.Internal.IResettable, IDisposable
     {
         private DbContext _ctx = null!;
         private TableMapping _mapping = null!;
@@ -35,7 +33,6 @@ namespace nORM.Query
         private readonly Dictionary<ConstKey, string> _constParamMap = new();
         private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
         private static readonly Expression _emptyExpression = Expression.Empty();
-
         private static readonly FrozenDictionary<string, IMethodTranslator> _translators =
             new Dictionary<string, IMethodTranslator>
             {
@@ -43,7 +40,6 @@ namespace nORM.Query
                 ["StartsWith"] = new StartsWithTranslator(),
                 ["EndsWith"] = new EndsWithTranslator()
             }.ToFrozenDictionary(StringComparer.Ordinal);
-
         private static readonly Dictionary<MethodInfo, Action<ExpressionToSqlVisitor, MethodCallExpression>> _fastMethodHandlers =
             new()
             {
@@ -51,20 +47,16 @@ namespace nORM.Query
                 { typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string) })!, HandleStringStartsWith },
                 { typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(string) })!, HandleStringEndsWith }
             };
-
-
         internal ExpressionToSqlVisitor() { }
-
         public ExpressionToSqlVisitor(DbContext ctx, TableMapping mapping, DatabaseProvider provider,
                                       ParameterExpression parameter, string tableAlias,
                                       Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated = null,
                                       List<string>? compiledParams = null,
                                       Dictionary<ParameterExpression, string>? paramMap = null)
         {
-            var context = new VisitorContext(ctx, mapping, provider, parameter, tableAlias, correlated, compiledParams, paramMap);
+            var context = new VisitorContext(ctx ?? throw new ArgumentNullException(nameof(ctx)), mapping ?? throw new ArgumentNullException(nameof(mapping)), provider ?? throw new ArgumentNullException(nameof(provider)), parameter ?? throw new ArgumentNullException(nameof(parameter)), tableAlias ?? throw new ArgumentNullException(nameof(tableAlias)), correlated, compiledParams, paramMap);
             Initialize(in context);
         }
-
         public void Initialize(in VisitorContext context)
         {
             _ctx = context.Context;
@@ -72,7 +64,6 @@ namespace nORM.Query
             _provider = context.Provider;
             _parameter = context.Parameter;
             _tableAlias = context.TableAlias;
-
             _parameterMappings.Clear();
             if (context.Correlated != null)
             {
@@ -80,21 +71,17 @@ namespace nORM.Query
                     _parameterMappings[kvp.Key] = kvp.Value;
             }
             _parameterMappings[context.Parameter] = (context.Mapping, context.TableAlias);
-
             _compiledParams = context.CompiledParams ?? _ownedCompiledParams;
             if (context.CompiledParams == null)
                 _ownedCompiledParams.Clear();
-
             _paramMap = context.ParamMap ?? _ownedParamMap;
             if (context.ParamMap == null)
                 _ownedParamMap.Clear();
-
             _constParamMap.Clear();
             _paramIndex = 0;
             _suppressNullCheck = false;
             _memberParamMap.Clear();
         }
-
         public void Reset()
         {
             _sql = null!;
@@ -114,7 +101,10 @@ namespace nORM.Query
             _constParamMap.Clear();
             _memberParamMap.Clear();
         }
-
+        public void Dispose()
+        {
+            Reset();
+        }
         public string Translate(Expression expression)
         {
             using var builder = new OptimizedSqlBuilder();
@@ -122,7 +112,6 @@ namespace nORM.Query
             Visit(expression);
             return builder.ToSqlString();
         }
-
         protected override Expression VisitBinary(BinaryExpression node)
         {
             _sql.Append("(");
@@ -143,7 +132,6 @@ namespace nORM.Query
             _sql.Append(")");
             return node;
         }
-
         protected override Expression VisitMember(MemberExpression node)
         {
             if (node.Expression is ParameterExpression pe && _parameterMappings.TryGetValue(pe, out var info))
@@ -156,7 +144,6 @@ namespace nORM.Query
                     return node;
                 }
             }
-
             if (node.Expression is ParameterExpression p && !_parameterMappings.ContainsKey(p))
             {
                 var key = (p, node.Member.Name);
@@ -170,13 +157,11 @@ namespace nORM.Query
                 _sql.Append(paramName);
                 return node;
             }
-
             if (TryGetConstantValue(node, out var value))
             {
                 AppendConstant(value, node.Type);
                 return node;
             }
-
             if (node.Expression != null)
             {
                 var exprSql = GetSql(node.Expression);
@@ -187,27 +172,22 @@ namespace nORM.Query
                     return node;
                 }
             }
-
             throw new NotSupportedException($"Member '{node.Member.Name}' is not supported in this context.");
         }
-
         protected override Expression VisitConstant(ConstantExpression node)
         {
             AppendConstant(node.Value, node.Type);
             return node;
         }
-
         protected override Expression VisitParameter(ParameterExpression node)
         {
             if (_parameterMappings.ContainsKey(node))
                 return base.VisitParameter(node);
-
             if (_paramMap.TryGetValue(node, out var existing))
             {
                 _sql.Append(existing);
                 return node;
             }
-
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
             _params[paramName] = DBNull.Value;
             _compiledParams.Add(paramName);
@@ -215,7 +195,6 @@ namespace nORM.Query
             _sql.Append(paramName);
             return node;
         }
-
         protected override Expression VisitUnary(UnaryExpression node)
         {
             if (node.NodeType == ExpressionType.Not)
@@ -225,10 +204,8 @@ namespace nORM.Query
                 _sql.Append("))");
                 return node;
             }
-
             return base.VisitUnary(node);
         }
-
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             // ADD FAST PATH FOR COMMON METHODS
@@ -237,20 +214,16 @@ namespace nORM.Query
                 handler(this, node);
                 return node;
             }
-
             if (!IsTranslatableMethod(node.Method))
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Method '{node.Method.Name}' cannot be translated to SQL"));
-
             if (!_suppressNullCheck && RequiresNullCheck(node))
             {
                 return TranslateWithNullCheck(node);
             }
-
             if (TryGetConstantValueSafe(node, out var constVal))
             {
                 return CreateSafeParameter(constVal);
             }
-
             if (node.Method.DeclaringType == typeof(Json) && node.Method.Name == nameof(Json.Value))
             {
                 var columnSql = GetSql(node.Arguments[0]);
@@ -270,7 +243,6 @@ namespace nORM.Query
                 translator.Translate(this, node);
                 return node;
             }
-
             if (node.Method.DeclaringType == typeof(string))
             {
                 var strArgs = new List<string>();
@@ -284,7 +256,6 @@ namespace nORM.Query
                     _sql.Append(fn);
                     return node;
                 }
-
                 throw new NotSupportedException($"String method '{node.Method.Name}' not supported.");
             }
             if (node.Method.DeclaringType == typeof(Enumerable) || node.Method.DeclaringType == typeof(Queryable))
@@ -348,7 +319,6 @@ namespace nORM.Query
             {
                 Expression? collectionExpr = null;
                 Expression? valueExpr = null;
-
                 if (node.Method.DeclaringType == typeof(Enumerable))
                 {
                     if (node.Arguments.Count == 2)
@@ -362,24 +332,20 @@ namespace nORM.Query
                     collectionExpr = node.Object;
                     valueExpr = node.Arguments[0];
                 }
-
                 if (collectionExpr != null && valueExpr != null && TryGetConstantValue(collectionExpr, out var colVal) && colVal is IEnumerable en && colVal is not string)
                 {
                     var items = new List<object?>();
                     foreach (var item in en)
                         items.Add(item);
-
                     if (items.Count == 0)
                     {
                         _sql.Append("(1=0)");
                         return node;
                     }
-
                     var remainingParams = _provider.MaxParameters - _paramIndex - 10;
                     if (remainingParams <= 0 || items.Count > remainingParams)
                         throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
                             $"IN clause exceeds maximum parameter count of {remainingParams}"));
-
                     var maxBatchSize = Math.Max(1, Math.Min(1000, remainingParams));
                     if (items.Count > maxBatchSize)
                     {
@@ -417,7 +383,6 @@ namespace nORM.Query
                     return node;
                 }
             }
-
             if (node.Method.DeclaringType == typeof(Queryable))
             {
                 switch (node.Method.Name)
@@ -440,7 +405,6 @@ namespace nORM.Query
                         throw new NotSupportedException($"Queryable method '{node.Method.Name}' not supported.");
                 }
             }
-
             var args = new List<string>();
             if (node.Object != null)
                 args.Add(GetSql(node.Object));
@@ -452,7 +416,6 @@ namespace nORM.Query
                 _sql.Append(fnSql);
                 return node;
             }
-
             var custom = node.Method.GetCustomAttribute<SqlFunctionAttribute>();
             if (custom != null)
             {
@@ -460,10 +423,8 @@ namespace nORM.Query
                 _sql.Append(formatted);
                 return node;
             }
-
             throw new NotSupportedException($"Method '{node.Method.Name}' not supported.");
         }
-
         private void BuildExists(Expression source, LambdaExpression? predicate, bool negate)
         {
             if (predicate != null)
@@ -471,82 +432,63 @@ namespace nORM.Query
                 var et = GetElementType(source);
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { et }, source, Expression.Quote(predicate));
             }
-
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
-
             using var subTranslator = QueryTranslator.Create(_ctx, mapping, _params, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
-
             _sql.Append(negate ? "NOT EXISTS(" : "EXISTS(");
             _sql.Append(subPlan.Sql);
             _sql.Append(")");
         }
-
         private void BuildIn(Expression source, Expression value)
         {
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
-
             using var subTranslator = QueryTranslator.Create(_ctx, mapping, _params, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
-
             Visit(value);
             _sql.Append(" IN (");
             _sql.Append(subPlan.Sql);
             _sql.Append(")");
         }
-
         private bool IsTranslatableMethod(MethodInfo method)
         {
             if (method.GetCustomAttribute<SqlFunctionAttribute>() != null)
                 return true;
-
             var safeDeclaringTypes = new HashSet<Type>
             {
                 typeof(string), typeof(Math), typeof(DateTime), typeof(Convert), typeof(Enumerable), typeof(Queryable), typeof(Json)
             };
-
             if (method.DeclaringType == null || !safeDeclaringTypes.Contains(method.DeclaringType))
                 return false;
-
             var dangerousMethods = new HashSet<string>
             {
                 "GetType", "ToString", "GetHashCode"
             };
-
             return !dangerousMethods.Contains(method.Name);
         }
-
         private Expression TranslateWithNullCheck(MethodCallExpression node)
         {
             if (node.Object == null) return base.VisitMethodCall(node);
-
             _sql.Append("(CASE WHEN ");
             Visit(node.Object);
             _sql.Append(" IS NULL THEN NULL ELSE ");
-
             _suppressNullCheck = true;
             var result = VisitMethodCall(node);
             _suppressNullCheck = false;
-
             _sql.Append(" END)");
             return result;
         }
-
         private bool RequiresNullCheck(MethodCallExpression node)
         {
             if (node.Object == null)
                 return false;
-
             if (node.Method.DeclaringType == typeof(string))
                 return false;
-
             return !node.Object.Type.IsValueType || Nullable.GetUnderlyingType(node.Object.Type) != null;
         }
-
         private bool TryGetConstantValueSafe(Expression expr, out object? value, int maxDepth = 5)
         {
             if (maxDepth <= 0)
@@ -554,7 +496,6 @@ namespace nORM.Query
                 value = null;
                 return false;
             }
-
             try
             {
                 return TryGetConstantValue(expr, out value);
@@ -565,7 +506,6 @@ namespace nORM.Query
                 return false;
             }
         }
-
         private void AppendConstant(object? value, Type type)
         {
             var key = new ConstKey(value, type);
@@ -574,26 +514,19 @@ namespace nORM.Query
                 _sql.Append(existing);
                 return;
             }
-
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
             _sql.AppendParameterizedValue(paramName, value, _params);
-
             if (_constParamMap.Count >= _constParamMapLimit)
                 _constParamMap.Clear();
-
             _constParamMap[key] = paramName;
         }
-
         private Expression CreateSafeParameter(object? value)
         {
             if (value is string str && str.Length > 8000)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "String parameter exceeds maximum length"));
-
             if (value is byte[] bytes && bytes.Length > 8000)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Binary parameter exceeds maximum length"));
-
             AppendConstant(value, value?.GetType() ?? typeof(object));
-
             // Returning a cached empty expression avoids allocating a new
             // Expression instance for each constant value translated. The
             // actual value has already been written directly to the
@@ -601,36 +534,29 @@ namespace nORM.Query
             // expression tree representation is required here.
             return _emptyExpression;
         }
-
         private enum LikeOperation
         {
             Contains,
             StartsWith,
             EndsWith
         }
-
         private readonly struct ConstKey : IEquatable<ConstKey>
         {
             public readonly object? Value;
             public readonly Type? Type;
-
             public ConstKey(object? value, Type? type)
             {
                 Value = value;
                 Type = type;
             }
-
             public bool Equals(ConstKey other) => Equals(Value, other.Value) && Type == other.Type;
             public override bool Equals(object? obj) => obj is ConstKey other && Equals(other);
             public override int GetHashCode() => HashCode.Combine(Value, Type);
         }
-
         private string CreateSafeLikePattern(string value, LikeOperation operation)
         {
             if (string.IsNullOrEmpty(value)) return string.Empty;
-
             var escaped = _provider.EscapeLikePattern(value);
-
             return operation switch
             {
                 LikeOperation.Contains => $"%{escaped}%",
@@ -639,7 +565,6 @@ namespace nORM.Query
                 _ => escaped
             };
         }
-
         private static Type GetRootElementType(Expression source)
         {
             while (source is MethodCallExpression mce)
@@ -650,10 +575,7 @@ namespace nORM.Query
             }
             return GetElementType(source);
         }
-
-
         public Dictionary<string, object> GetParameters() => _params;
-
         private string GetSql(Expression expression)
         {
             var start = _sql.Length;
@@ -662,7 +584,6 @@ namespace nORM.Query
             _sql.Remove(start, _sql.Length - start);
             return segment;
         }
-
         private static bool TryGetConstantValue(Expression e, out object? value, HashSet<Expression>? visited = null)
         {
             visited ??= new HashSet<Expression>(ReferenceEqualityComparer.Instance);
@@ -671,7 +592,6 @@ namespace nORM.Query
                 value = null;
                 return false;
             }
-
             switch (e)
             {
                 case ConstantExpression ce:
@@ -691,7 +611,6 @@ namespace nORM.Query
                         value = null;
                         return false;
                     }
-
                     var args = new object?[mce.Arguments.Count];
                     for (int i = 0; i < mce.Arguments.Count; i++)
                     {
@@ -702,18 +621,14 @@ namespace nORM.Query
                         }
                         args[i] = argVal;
                     }
-
                     value = mce.Method.Invoke(instance, args);
                     return true;
             }
-
             value = null;
             return false;
         }
-
         private static Expression StripQuotes(Expression e)
             => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
-
         private static Type GetElementType(Expression queryExpression)
         {
             var type = queryExpression.Type;
@@ -722,14 +637,11 @@ namespace nORM.Query
                 var args = type.GetGenericArguments();
                 if (args.Length > 0) return args[0];
             }
-
             var iface = type.GetInterfaces()
                 .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
             if (iface != null) return iface.GetGenericArguments()[0];
-
             throw new ArgumentException($"Cannot determine element type from expression of type {type}");
         }
-
         private static void HandleStringContains(ExpressionToSqlVisitor visitor, MethodCallExpression node)
         {
             visitor.Visit(node.Object!);
@@ -745,7 +657,6 @@ namespace nORM.Query
                 throw new NotSupportedException("Only constant values are supported in Contains().");
             }
         }
-
         private static void HandleStringStartsWith(ExpressionToSqlVisitor visitor, MethodCallExpression node)
         {
             visitor.Visit(node.Object!);
@@ -761,7 +672,6 @@ namespace nORM.Query
                 throw new NotSupportedException("Only constant values are supported in StartsWith().");
             }
         }
-
         private static void HandleStringEndsWith(ExpressionToSqlVisitor visitor, MethodCallExpression node)
         {
             visitor.Visit(node.Object!);
@@ -777,18 +687,15 @@ namespace nORM.Query
                 throw new NotSupportedException("Only constant values are supported in EndsWith().");
             }
         }
-
         private interface IMethodTranslator
         {
             bool CanTranslate(MethodCallExpression node);
             void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node);
         }
-
         private sealed class ContainsTranslator : IMethodTranslator
         {
             public bool CanTranslate(MethodCallExpression node)
                 => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
-
             public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
             {
                 visitor.Visit(node.Object!);
@@ -805,12 +712,10 @@ namespace nORM.Query
                 }
             }
         }
-
         private sealed class StartsWithTranslator : IMethodTranslator
         {
             public bool CanTranslate(MethodCallExpression node)
                 => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
-
             public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
             {
                 visitor.Visit(node.Object!);
@@ -827,12 +732,10 @@ namespace nORM.Query
                 }
             }
         }
-
         private sealed class EndsWithTranslator : IMethodTranslator
         {
             public bool CanTranslate(MethodCallExpression node)
                 => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
-
             public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
             {
                 visitor.Visit(node.Object!);
@@ -849,6 +752,5 @@ namespace nORM.Query
                 }
             }
         }
-
     }
 }

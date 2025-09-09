@@ -22,12 +22,10 @@ using nORM.Internal;
 using nORM.Navigation;
 using nORM.Mapping;
 using Microsoft.Extensions.Logging;
-
 #nullable enable
-
 namespace nORM.Query
 {
-    internal sealed class NormQueryProvider : IQueryProvider
+    internal sealed class NormQueryProvider : IQueryProvider, IDisposable
     {
         internal readonly DbContext _ctx;
         private static readonly ConcurrentLruCache<PlanCacheKey, QueryPlan> _planCache =
@@ -43,21 +41,22 @@ namespace nORM.Query
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
         private readonly ConcurrentDictionary<string, string> _simpleSqlCache = new();
-
         public NormQueryProvider(DbContext ctx)
         {
-            _ctx = ctx;
+            _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
             _includeProcessor = new IncludeProcessor(ctx);
             _executor = new QueryExecutor(ctx, _includeProcessor);
             _cudBuilder = new BulkCudBuilder(ctx);
         }
-
+        public void Dispose()
+        {
+            // Instance-level disposables if any
+        }
         public IQueryable CreateQuery(Expression expression)
         {
             var elementType = expression.Type.GetGenericArguments()[0];
             return CreateQueryInternal(elementType, expression);
         }
-
         public IQueryable<TElement> CreateQuery<TElement>(Expression expression)
         {
             var query = CreateQueryInternal(typeof(TElement), expression);
@@ -65,10 +64,8 @@ namespace nORM.Query
             {
                 return typedQuery;
             }
-
             throw new InvalidOperationException($"Unable to create IQueryable for type '{typeof(TElement)}'.");
         }
-
         private IQueryable CreateQueryInternal(Type elementType, Expression expression)
         {
             // Check if the type can satisfy the 'new()' constraint
@@ -85,36 +82,35 @@ namespace nORM.Query
                 return (IQueryable)Activator.CreateInstance(unconstrainedQueryableType, new object[] { this, expression })!;
             }
         }
-
         private static bool CanUseConstrainedQueryable(Type elementType)
         {
             // Check if type is a class and has a public parameterless constructor
             if (!elementType.IsClass)
                 return false;
-
             // Anonymous types start with '<>' and don't have public parameterless constructors
             if (elementType.Name.StartsWith("<>"))
                 return false;
-
             // Check for public parameterless constructor
             var defaultConstructor = elementType.GetConstructor(Type.EmptyTypes);
             return defaultConstructor != null && defaultConstructor.IsPublic;
         }
-
         private static void CleanupCacheLocks(object? state)
         {
+            var keysToRemove = new List<string>();
             foreach (var kvp in _cacheLocks)
             {
                 if (kvp.Value.CurrentCount == 1)
                 {
-                    _cacheLocks.TryRemove(kvp.Key, out _);
+                    keysToRemove.Add(kvp.Key);
                 }
             }
+            foreach (var key in keysToRemove)
+            {
+                _cacheLocks.TryRemove(key, out _);
+            }
         }
-
         private static int CalculateInitialPlanCacheSize()
             => CalculatePlanCacheSize(GC.GetGCMemoryInfo());
-
         private static void AdjustPlanCacheSize(object? state)
         {
             var info = GC.GetGCMemoryInfo();
@@ -124,7 +120,6 @@ namespace nORM.Query
             }
             _planCache.SetMaxSize(CalculatePlanCacheSize(info));
         }
-
         private static int CalculatePlanCacheSize(GCMemoryInfo info)
         {
             var samples = Volatile.Read(ref _planSizeSamples);
@@ -136,28 +131,22 @@ namespace nORM.Query
             var size = (int)(cacheBytes / avgPlanSize);
             return Math.Clamp(size, 100, 10000);
         }
-
         public TResult Execute<TResult>(Expression expression)
             => ExecuteAsync<TResult>(expression, CancellationToken.None).GetAwaiter().GetResult();
-
         public TResult ExecuteSync<TResult>(Expression expression)
         {
             if (TryGetSimpleQuery(expression, out var sql, out var parameters))
             {
                 return ExecuteSimpleSync<TResult>(sql, parameters);
             }
-
             return Execute<TResult>(expression);
         }
-
         public object? Execute(Expression expression) => Execute<object>(expression);
-
         public Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken ct)
         {
             // Fast path – bypass translator for recognized simple patterns
             if (TryExecuteFastPath<TResult>(expression, out var fastResult))
                 return fastResult;
-
             // Original execution path
             if (TryGetSimpleQuery(expression, out var sql, out var parameters))
             {
@@ -166,33 +155,27 @@ namespace nORM.Query
                     ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => factory(token), ct)
                     : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => factory(token), ct);
             }
-
             return _ctx.Options.RetryPolicy != null
                ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteInternalAsync<TResult>(expression, token), ct)
                : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteInternalAsync<TResult>(expression, token), ct);
         }
-
         public Task<int> ExecuteDeleteAsync(Expression expression, CancellationToken ct)
         {
             return _ctx.Options.RetryPolicy != null
                 ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteDeleteInternalAsync(expression, token), ct)
                 : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteDeleteInternalAsync(expression, token), ct);
         }
-
         public Task<int> ExecuteUpdateAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
         {
             return _ctx.Options.RetryPolicy != null
                 ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteUpdateInternalAsync(expression, set, token), ct)
                 : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteUpdateInternalAsync(expression, set, token), ct);
         }
-
         private bool TryExecuteFastPath<TResult>(Expression expression, out Task<TResult> result)
         {
             result = default!;
-
             var resultType = typeof(TResult);
             Type? elementType = null;
-
             if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(List<>))
             {
                 elementType = resultType.GetGenericArguments()[0];
@@ -206,7 +189,6 @@ namespace nORM.Query
                         elementType = sourceType.GetGenericArguments()[0];
                 }
             }
-
             if (elementType != null && elementType.IsClass && elementType.GetConstructor(Type.EmptyTypes) != null)
             {
                 try
@@ -214,7 +196,6 @@ namespace nORM.Query
                     var method = typeof(FastPathQueryExecutor)
                         .GetMethod(nameof(FastPathQueryExecutor.TryExecute), BindingFlags.Public | BindingFlags.Static)!
                         .MakeGenericMethod(elementType);
-
                     object?[] args = { expression, _ctx, null };
                     var success = (bool)method.Invoke(null, args)!;
                     if (success)
@@ -222,6 +203,7 @@ namespace nORM.Query
                         var task = (Task)args[2]!;
                         result = task.ContinueWith(t =>
                         {
+                            if (t.IsFaulted) throw t.Exception!;
                             var resProp = t.GetType().GetProperty("Result");
                             var value = resProp!.GetValue(t)!;
                             return (TResult)Convert.ChangeType(value, typeof(TResult))!;
@@ -234,15 +216,12 @@ namespace nORM.Query
                     // ignore and fall back to full translation path
                 }
             }
-
             return false;
         }
-
         private async Task<TResult> ExecuteInternalAsync<TResult>(Expression expression, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
             var plan = GetPlan(expression, out var filtered);
-
             Func<Task<TResult>> queryExecutorFactory = async () =>
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
@@ -250,7 +229,6 @@ namespace nORM.Query
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
                 foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
-
                 object result;
                 if (plan.IsScalar)
                 {
@@ -284,10 +262,8 @@ namespace nORM.Query
                         result = list;
                     }
                 }
-
                 return (TResult)result!;
             };
-
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
                 var cacheKey = BuildCacheKeyWithValues<TResult>(plan, plan.Parameters);
@@ -299,25 +275,21 @@ namespace nORM.Query
                 return await queryExecutorFactory().ConfigureAwait(false);
             }
         }
-
         internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
         {
             return _ctx.Options.RetryPolicy != null
                 ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteCompiledInternalAsync<TResult>(plan, parameters, token), ct)
                 : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteCompiledInternalAsync<TResult>(plan, parameters, token), ct);
         }
-
         private async Task<TResult> ExecuteCompiledInternalAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
-
             // Merge template parameters from the plan with the live execution values
             var finalParameters = new Dictionary<string, object>(plan.Parameters);
             foreach (var p in parameters)
             {
                 finalParameters[p.Key] = p.Value;
             }
-
             Func<Task<TResult>> queryExecutorFactory = async () =>
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
@@ -325,7 +297,6 @@ namespace nORM.Query
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
                 foreach (var p in finalParameters) cmd.AddOptimizedParam(p.Key, p.Value);
-
                 object result;
                 if (plan.IsScalar)
                 {
@@ -359,10 +330,8 @@ namespace nORM.Query
                         result = list;
                     }
                 }
-
                 return (TResult)result!;
             };
-
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
                 var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, finalParameters);
@@ -374,19 +343,15 @@ namespace nORM.Query
                 return await queryExecutorFactory().ConfigureAwait(false);
             }
         }
-
         private bool TryGetSimpleQuery(Expression expr, out string sql, out Dictionary<string, object> parameters)
         {
             sql = string.Empty;
             parameters = new Dictionary<string, object>();
-
             if (_ctx.Options.GlobalFilters.Count > 0 || _ctx.Options.TenantProvider != null)
                 return false;
-
             // Traverse to find root query and optional Where predicate
             MethodCallExpression? whereCall = null;
             Expression current = expr;
-
             // Unwrap result operators like First/Single
             while (current is MethodCallExpression mc && mc.Method.DeclaringType == typeof(Queryable))
             {
@@ -405,23 +370,17 @@ namespace nORM.Query
                     return false;
                 }
             }
-
             if (current is not ConstantExpression constant)
                 return false;
-
             var elementType = GetElementType(constant);
             var map = _ctx.GetMapping(elementType);
-
             var cacheKey = ExpressionFingerprint.Compute(expr) + ":" + elementType.FullName;
-
             if (!_simpleSqlCache.TryGetValue(cacheKey, out var cachedSql))
             {
                 var sb = new StringBuilder();
                 sb.Append("SELECT ");
                 sb.Append(string.Join(", ", map.Columns.Select(c => c.EscCol)));
                 sb.Append(" FROM ").Append(map.EscTable);
-
-
                 if (whereCall != null)
                 {
                     var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
@@ -436,30 +395,21 @@ namespace nORM.Query
                     {
                         if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
                             return false;
-
                         if (be.Left is not MemberExpression me)
                             return false;
-
                         if (!map.ColumnsByName.TryGetValue(me.Member.Name, out var column))
                             return false;
-
                         var paramName = _ctx.Provider.ParamPrefix + "p0";
                         sb.Append(" WHERE ").Append(column.EscCol).Append(" = ").Append(paramName);
-
                         var value = Expression.Lambda(be.Right, lambda.Parameters).Compile().DynamicInvoke(new object?[] { null });
                         parameters[paramName] = value!;
                     }
                 }
-
-
                 sql = sb.ToString();
                 _simpleSqlCache[cacheKey] = sql;
                 return true;
             }
-
             sql = cachedSql!;
-
-
             // SQL cached; still need parameter value if where present
             if (whereCall != null)
             {
@@ -472,25 +422,19 @@ namespace nORM.Query
                 {
                     if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
                         return false;
-
                     var paramName = _ctx.Provider.ParamPrefix + "p0";
                     var value = Expression.Lambda(be.Right, lambda.Parameters).Compile().DynamicInvoke(new object?[] { null });
                     parameters[paramName] = value!;
                 }
             }
-
-
             return true;
         }
-
         private async Task<TResult> ExecuteSimpleAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
-
             Type resultType = typeof(TResult);
             bool returnsList = false;
             Type elementType;
-
             if (resultType.IsGenericType)
             {
                 var genDef = resultType.GetGenericTypeDefinition();
@@ -508,10 +452,8 @@ namespace nORM.Query
             {
                 elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
             }
-
             var mapping = _ctx.GetMapping(elementType);
             var materializer = new MaterializerFactory().CreateMaterializer(mapping, elementType);
-
             var plan = new QueryPlan(
                 sql,
                 parameters,
@@ -530,33 +472,26 @@ namespace nORM.Query
                 IsCacheable: false,
                 CacheExpiration: null
             );
-
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = sql;
             foreach (var p in parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
-
             var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
             _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, list.Count);
-
             if (returnsList)
             {
                 return (TResult)list;
             }
-
             return list.Count > 0 ? (TResult)list.Cast<object>().First()! : default!;
         }
-
         private TResult ExecuteSimpleSync<TResult>(string sql, Dictionary<string, object> parameters)
         {
             var sw = Stopwatch.StartNew();
-
             Type resultType = typeof(TResult);
             bool returnsList = false;
             Type elementType;
-
             if (resultType.IsGenericType)
             {
                 var genDef = resultType.GetGenericTypeDefinition();
@@ -574,10 +509,8 @@ namespace nORM.Query
             {
                 elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
             }
-
             var mapping = _ctx.GetMapping(elementType);
             var materializer = new MaterializerFactory().CreateMaterializer(mapping, elementType);
-
             var plan = new QueryPlan(
                 sql,
                 parameters,
@@ -596,41 +529,33 @@ namespace nORM.Query
                 IsCacheable: false,
                 CacheExpiration: null
             );
-
             _ctx.EnsureConnection();
             using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = sql;
             foreach (var p in parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
-
             var list = _executor.Materialize(plan, cmd);
             _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, list.Count);
-
             if (returnsList)
             {
                 return (TResult)list;
             }
-
             return list.Count > 0 ? (TResult)list.Cast<object>().First()! : default!;
         }
-
         private static Expression StripQuotes(Expression e)
         {
             while (e.NodeType == ExpressionType.Quote)
                 e = ((UnaryExpression)e).Operand;
             return e;
         }
-
         private async Task<TResult> ExecuteWithCacheAsync<TResult>(string cacheKey, IReadOnlyCollection<string> tables, TimeSpan expiration, Func<Task<TResult>> factory, CancellationToken ct)
         {
             var cache = _ctx.Options.CacheProvider;
             if (cache == null)
                 return await factory().ConfigureAwait(false);
-
             if (cache.TryGet(cacheKey, out TResult? cached))
                 return cached!;
-
             var semaphore = _cacheLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
             await semaphore.WaitAsync(ct).ConfigureAwait(false);
             try
@@ -640,7 +565,6 @@ namespace nORM.Query
                     cached = await factory().ConfigureAwait(false);
                     cache.Set(cacheKey, cached!, expiration, tables);
                 }
-
                 return cached!;
             }
             finally
@@ -650,14 +574,12 @@ namespace nORM.Query
                     _cacheLocks.TryRemove(cacheKey, out _);
             }
         }
-
         private string BuildCacheKeyFromPlan<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
         {
             var hasher = new XxHash128();
             AppendUtf8(hasher, plan.Sql.AsSpan());
             AppendByte(hasher, (byte)'|');
             AppendUtf8(hasher, typeof(TResult).FullName!.AsSpan());
-
             var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             if (_ctx.Options.TenantProvider != null)
             {
@@ -666,7 +588,6 @@ namespace nORM.Query
                 AppendUtf8(hasher, "|TENANT:".AsSpan());
                 AppendUtf8(hasher, tenant.ToString()!.AsSpan());
             }
-
             foreach (var kvp in parameters.OrderBy(k => k.Key))
             {
                 AppendByte(hasher, (byte)'|');
@@ -677,7 +598,6 @@ namespace nORM.Query
                     AppendUtf8(hasher, "null".AsSpan());
                     continue;
                 }
-
                 AppendUtf8(hasher, kvp.Value.GetType().FullName!.AsSpan());
                 AppendByte(hasher, (byte)':');
                 if (kvp.Value is byte[] bytesValue)
@@ -693,12 +613,10 @@ namespace nORM.Query
                     AppendUtf8(hasher, kvp.Value.ToString()!.AsSpan());
                 }
             }
-
             Span<byte> hash = stackalloc byte[16];
             hasher.GetCurrentHash(hash);
             return Convert.ToHexString(hash);
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void AppendUtf8(XxHash128 hasher, ReadOnlySpan<char> value)
         {
@@ -721,11 +639,10 @@ namespace nORM.Query
                 }
                 finally
                 {
-                    ArrayPool<byte>.Shared.Return(rented);
+                    ArrayPool<byte>.Shared.Return(rented, clearArray: true);
                 }
             }
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void AppendByte(XxHash128 hasher, byte value)
         {
@@ -733,20 +650,16 @@ namespace nORM.Query
             b[0] = value;
             hasher.Append(b);
         }
-
         private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
             var plan = GetPlan(expression, out var filtered);
             if (plan.Tables.Count != 1)
                 throw new NotSupportedException("ExecuteDeleteAsync only supports single table queries.");
-
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
-
             _cudBuilder.ValidateCudPlan(plan.Sql);
             var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
-
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
@@ -754,26 +667,21 @@ namespace nORM.Query
             cmd.CommandText = finalSql;
             foreach (var p in plan.Parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
-
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
             _ctx.Options.Logger?.LogQuery(finalSql, plan.Parameters, sw.Elapsed, affected);
             return affected;
         }
-
         private async Task<int> ExecuteUpdateInternalAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
             var plan = GetPlan(expression, out var filtered);
             if (plan.Tables.Count != 1)
                 throw new NotSupportedException("ExecuteUpdateAsync only supports single table queries.");
-
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
-
             _cudBuilder.ValidateCudPlan(plan.Sql);
             var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
             var (setClause, setParams) = _cudBuilder.BuildSetClause(mapping, set);
-
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
@@ -783,39 +691,31 @@ namespace nORM.Query
                 cmd.AddOptimizedParam(p.Key, p.Value);
             foreach (var p in setParams)
                 cmd.AddOptimizedParam(p.Key, p.Value);
-
             var allParams = plan.Parameters.ToDictionary(k => k.Key, v => v.Value);
             foreach (var p in setParams)
                 allParams[p.Key] = p.Value;
-
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
             _ctx.Options.Logger?.LogQuery(finalSql, allParams, sw.Elapsed, affected);
             return affected;
         }
-
-
         public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
         {
             // Execute in true streaming mode so only one row is materialized at a time.
             var plan = GetPlan(expression, out _);
-
             var sw = Stopwatch.StartNew();
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
             foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
-
             if (plan.Includes.Count > 0 || plan.GroupJoinInfo != null)
                 throw new NotSupportedException("AsAsyncEnumerable does not support Include or GroupJoin operations.");
-
             var trackable = !plan.NoTracking &&
                              plan.ElementType.IsClass &&
                              !plan.ElementType.Name.StartsWith("<>") &&
                              plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
             if (trackable)
                 _ctx.GetMapping(plan.ElementType);
-
             var count = 0;
             await using var reader = await cmd
                 .ExecuteReaderWithInterceptionAsync(
@@ -823,7 +723,6 @@ namespace nORM.Query
                     CommandBehavior.SequentialAccess | CommandBehavior.SingleResult,
                     ct)
                 .ConfigureAwait(false);
-
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
                 var entity = (T)await plan.Materializer(reader, ct).ConfigureAwait(false);
@@ -834,14 +733,11 @@ namespace nORM.Query
                     entity = (T)entry.Entity!;
                     NavigationPropertyExtensions.EnableLazyLoading((object)entity!, _ctx);
                 }
-
                 count++;
                 yield return entity;
             }
-
             _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, count);
         }
-
         internal QueryPlan GetPlan(Expression expression, out Expression filtered)
         {
             filtered = ApplyGlobalFilters(expression);
@@ -849,16 +745,13 @@ namespace nORM.Query
             var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
             var fingerprint = ExpressionFingerprint.Compute(filtered);
             var combinedHash = HashCode.Combine(fingerprint, tenantHash, GetTypeHash(elementType), GetTypeHash(filtered.Type));
-
             if (_sqlCache.TryGet(combinedHash, out var cached))
             {
                 // When a plan is retrieved from the SQL cache, ensure the caller gets
                 // its own parameter dictionary so modifications won't affect the cached plan.
                 return cached with { Parameters = new Dictionary<string, object>(cached.Parameters) };
             }
-
             var cacheKey = BuildPlanCacheKey(fingerprint, tenantHash, elementType, filtered.Type);
-
             var localFiltered = filtered;
             var plan = _planCache.GetOrAdd(cacheKey, _ =>
             {
@@ -880,25 +773,19 @@ namespace nORM.Query
                     CompiledParameters = clonedCompiledParams
                 };
             });
-
             _sqlCache.GetOrAdd(combinedHash, _ => plan);
-
             // Each execution should receive a fresh copy of the parameters dictionary
             // from the plan cache.
             return plan with { Parameters = new Dictionary<string, object>(plan.Parameters) };
         }
-
         private static PlanCacheKey BuildPlanCacheKey(int fingerprint, int tenantHash, Type elementType, Type expressionType)
             => new PlanCacheKey(fingerprint, tenantHash, GetTypeHash(elementType), GetTypeHash(expressionType));
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int GetTypeHash(Type type) => _typeHashCodes.GetOrAdd(type, static t => t.GetHashCode());
-
         private readonly struct PlanCacheKey : IEquatable<PlanCacheKey>
         {
             private readonly ulong _high;
             private readonly ulong _low;
-
             public PlanCacheKey(int fingerprint, int tenantHash, int elementHash, int expressionHash)
             {
                 Span<byte> data = stackalloc byte[16];
@@ -910,17 +797,14 @@ namespace nORM.Query
                 _low = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(0, 8));
                 _high = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(8, 8));
             }
-
             public bool Equals(PlanCacheKey other) => _high == other._high && _low == other._low;
             public override bool Equals(object? obj) => obj is PlanCacheKey other && Equals(other);
             public override int GetHashCode() => HashCode.Combine(_high, _low);
         }
-
         private string BuildCacheKeyWithValues<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
         {
             return BuildCacheKeyFromPlan<TResult>(plan, parameters);
         }
-
         private static Expression UnwrapQueryExpression(Expression expression)
         {
             return expression is MethodCallExpression mc &&
@@ -929,7 +813,6 @@ namespace nORM.Query
                 ? mc.Arguments[0]
                 : expression;
         }
-
         private Expression ApplyGlobalFilters(Expression expression)
         {
             if (expression is MethodCallExpression mc &&
@@ -941,9 +824,7 @@ namespace nORM.Query
                 args[0] = filteredSource;
                 return mc.Update(mc.Object, args);
             }
-
             var entityType = GetElementType(expression);
-
             if (_ctx.Options.GlobalFilters.Count > 0)
             {
                 foreach (var kvp in _ctx.Options.GlobalFilters)
@@ -962,7 +843,6 @@ namespace nORM.Query
                         {
                             lambda = filter;
                         }
-
                         expression = Expression.Call(
                             typeof(Queryable),
                             nameof(Queryable.Where),
@@ -972,7 +852,6 @@ namespace nORM.Query
                     }
                 }
             }
-
             if (_ctx.Options.TenantProvider != null)
             {
                 var map = _ctx.GetMapping(entityType);
@@ -993,10 +872,8 @@ namespace nORM.Query
                         Expression.Quote(lambda));
                 }
             }
-
             return expression;
         }
-
         private static Type GetElementType(Expression queryExpression)
         {
             var type = queryExpression.Type;
@@ -1005,13 +882,10 @@ namespace nORM.Query
                 var args = type.GetGenericArguments();
                 if (args.Length > 0) return args[0];
             }
-
             var iface = type.GetInterfaces()
                 .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
             if (iface != null) return iface.GetGenericArguments()[0];
-
             throw new ArgumentException($"Cannot determine element type from expression of type {type}");
         }
-
     }
 }

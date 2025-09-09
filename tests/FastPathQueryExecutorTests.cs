@@ -37,7 +37,7 @@ public class FastPathQueryExecutorTests
         var success = FastPathQueryExecutor.TryExecute<User>(query.Expression, ctx, out var task);
         Assert.True(success);
 
-        var results = (List<User>)await task.ConfigureAwait(false);
+        var results = (List<User>)await task.ConfigureAwait(true);
         Assert.Single(results);
         Assert.True(results[0].IsActive);
     }
@@ -67,7 +67,7 @@ public class FastPathQueryExecutorTests
         var success = FastPathQueryExecutor.TryExecute<User>(expr, ctx, out var task);
         Assert.True(success);
 
-        var count = (int)await task.ConfigureAwait(false);
+        var count = (int)await task.ConfigureAwait(true);
         Assert.Equal(2, count);
     }
 }

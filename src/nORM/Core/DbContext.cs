@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
@@ -23,9 +23,7 @@ using nORM.Enterprise;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Reflection;
-
 #nullable enable
-
 namespace nORM.Core
 {
     public class DbContext : IDisposable, IAsyncDisposable
@@ -43,63 +41,47 @@ namespace nORM.Core
         private readonly Timer _cleanupTimer;
         private bool _providerInitialized;
         private readonly SemaphoreSlim _providerInitLock = new(1, 1);
-        private DbTransaction? _currentTransaction;
+        private DbTransaction? _currentTransaction; // Access via Interlocked.* only
         private bool _disposed;
-
         public DbContextOptions Options { get; }
         public ChangeTracker ChangeTracker { get; }
         public DatabaseFacade Database { get; }
-
         public DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options = null)
         {
             _cn = cn ?? throw new ArgumentNullException(nameof(cn));
             _p = p ?? throw new ArgumentNullException(nameof(p));
             Options = options ?? new DbContextOptions();
-
             Options.Validate();
-
             if (string.IsNullOrWhiteSpace(Options.TenantColumnName))
                 throw new ArgumentException("TenantColumnName cannot be null or empty");
-
             if (Options.CacheExpiration <= TimeSpan.Zero)
                 throw new ArgumentException("CacheExpiration must be positive");
-
             if (Options.CommandInterceptors.Any(i => i == null))
                 throw new ArgumentException("CommandInterceptors cannot contain null entries");
-
             if (Options.SaveChangesInterceptors.Any(i => i == null))
                 throw new ArgumentException("SaveChangesInterceptors cannot contain null entries");
-
             ChangeTracker = new ChangeTracker(Options);
             _modelBuilder = new ModelBuilder();
             Options.OnModelCreating?.Invoke(_modelBuilder);
-
             Database = new DatabaseFacade(this);
-
             _executionStrategy = Options.RetryPolicy != null
                 ? new RetryingExecutionStrategy(this, Options.RetryPolicy)
                 : new DefaultExecutionStrategy(this);
-
             _timeoutManager = new AdaptiveTimeoutManager(Options.TimeoutConfiguration,
                 Options.Logger ?? NullLogger.Instance);
-
             if (Options.IsTemporalVersioningEnabled)
             {
                 TemporalManager.InitializeAsync(this).GetAwaiter().GetResult();
             }
-
             _cleanupTimer = new Timer(_ => CleanupDisposables(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
-
         public DbContext(string connectionString, DatabaseProvider p, DbContextOptions? options = null)
             : this(CreateConnectionSafe(connectionString, p), p, options)
         {
         }
-
         private static DbConnection CreateConnectionSafe(string connectionString, DatabaseProvider provider)
         {
             DbConnection? connection = null;
-
             try
             {
                 connection = DbConnectionFactory.Create(connectionString, provider);
@@ -108,17 +90,14 @@ namespace nORM.Core
             catch (Exception ex)
             {
                 connection?.Dispose();
-
                 var safeConnStr = NormValidator.MaskSensitiveConnectionStringData(connectionString);
                 throw new ArgumentException($"Invalid connection string format: {safeConnStr}", nameof(connectionString), ex);
             }
         }
-
         internal async Task<DbConnection> EnsureConnectionAsync(CancellationToken ct = default)
         {
             if (_cn.State != ConnectionState.Open)
                 await _cn.OpenAsync(ct).ConfigureAwait(false);
-
             if (!_providerInitialized)
             {
                 await _providerInitLock.WaitAsync(ct).ConfigureAwait(false);
@@ -135,15 +114,12 @@ namespace nORM.Core
                     _providerInitLock.Release();
                 }
             }
-
             return _cn;
         }
-
         internal DbConnection EnsureConnection()
         {
             if (_cn.State != ConnectionState.Open)
                 _cn.Open();
-
             if (!_providerInitialized)
             {
                 _providerInitLock.Wait();
@@ -160,37 +136,37 @@ namespace nORM.Core
                     _providerInitLock.Release();
                 }
             }
-
             return _cn;
         }
-
         internal TimeSpan GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType operationType, string? sql = null, int recordCount = 1)
         {
             var complexity = EstimateQueryComplexity(sql);
             return _timeoutManager.GetTimeoutForOperation(operationType, recordCount, complexity);
         }
 
+        private static readonly Regex JoinRegex = new(@"\bJOIN\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex SelectRegex = new(@"\bSELECT\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static int EstimateQueryComplexity(string? sql)
         {
             if (string.IsNullOrWhiteSpace(sql)) return 1;
-            var joinCount = Regex.Matches(sql, "\\bJOIN\\b", RegexOptions.IgnoreCase).Count;
-            var subQueryCount = Math.Max(0, Regex.Matches(sql, "\\bSELECT\\b", RegexOptions.IgnoreCase).Count - 1);
+            var joinCount = JoinRegex.Matches(sql).Count;
+            var subQueryCount = Math.Max(0, SelectRegex.Matches(sql).Count - 1);
             return joinCount * 1000 + subQueryCount * 500;
         }
 
         public DbConnection Connection => _cn;
         public DatabaseProvider Provider => _p;
 
+        // Safe atomic accessors using Interlocked (avoids CS0420 warnings)
         internal DbTransaction? CurrentTransaction
         {
-            get => _currentTransaction;
-            set => _currentTransaction = value;
+            get => Interlocked.CompareExchange(ref _currentTransaction, null, null);
+            set => Interlocked.Exchange(ref _currentTransaction, value);
         }
-
         internal void ClearTransaction(DbTransaction transaction)
         {
-            if (ReferenceEquals(_currentTransaction, transaction))
-                _currentTransaction = null;
+            if (ReferenceEquals(Interlocked.CompareExchange(ref _currentTransaction, null, null), transaction))
+                Interlocked.Exchange(ref _currentTransaction, null);
         }
 
         public async Task<bool> IsHealthyAsync(CancellationToken ct = default)
@@ -200,8 +176,8 @@ namespace nORM.Core
                 return await _executionStrategy.ExecuteAsync(async (ctx, token) =>
                 {
                     await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
-                    var cmd = CommandPool.Get(ctx.Connection, "SELECT 1");
-                    cmd.CommandTimeout = (int)TimeSpan.FromSeconds(5).TotalSeconds;
+                    await using var cmd = CommandPool.Get(ctx.Connection, "SELECT 1");
+                    cmd.CommandTimeout = ToSecondsClamped(TimeSpan.FromSeconds(5));
                     var result = await cmd.ExecuteScalarWithInterceptionAsync(ctx, token).ConfigureAwait(false);
                     return result is 1 or 1L;
                 }, ct).ConfigureAwait(false);
@@ -218,13 +194,18 @@ namespace nORM.Core
                 yield return GetMapping(type);
         }
 
+        private static bool IsSafeIdentifier(string name)
+            => !string.IsNullOrWhiteSpace(name) && Regex.IsMatch(name, @"^[A-Za-z0-9_\.]+$");
+
         public IQueryable Query(string tableName)
         {
             if (string.IsNullOrWhiteSpace(tableName))
                 throw new ArgumentException("Table name cannot be null or empty.", nameof(tableName));
-
-            var entityType = _dynamicTypeCache.GetOrAdd(tableName, t => _typeGenerator.GenerateEntityType(this.Connection, t));
-
+            if (!IsSafeIdentifier(tableName))
+                throw new NormUsageException("Invalid table name.");
+            var logical = tableName;
+            var entityType = _dynamicTypeCache.GetOrAdd(logical,
+                _ => _typeGenerator.GenerateEntityType(this.Connection, logical));
             var method = typeof(NormQueryable).GetMethods()
                 .Single(m => m.Name == nameof(NormQueryable.Query) && m.IsGenericMethodDefinition);
             var generic = method.MakeGenericMethod(entityType);
@@ -238,26 +219,22 @@ namespace nORM.Core
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
             return ChangeTracker.Track(entity, EntityState.Added, GetMapping(typeof(T)));
         }
-
         public EntityEntry Attach<T>(T entity) where T : class
         {
             NormValidator.ValidateEntity(entity);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
             return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(typeof(T)));
         }
-
         public EntityEntry Update<T>(T entity) where T : class
         {
             NormValidator.ValidateEntity(entity);
             return ChangeTracker.Track(entity, EntityState.Modified, GetMapping(typeof(T)));
         }
-
         public EntityEntry Remove<T>(T entity) where T : class
         {
             NormValidator.ValidateEntity(entity);
             return ChangeTracker.Track(entity, EntityState.Deleted, GetMapping(typeof(T)));
         }
-
         public EntityEntry Entry(object entity)
         {
             NormValidator.ValidateEntity(entity, nameof(entity));
@@ -265,7 +242,6 @@ namespace nORM.Core
             method.MakeGenericMethod(entity.GetType()).Invoke(null, new object[] { entity, this });
             return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(entity.GetType()));
         }
-
         public DbContextOptions UseDeadlockResilientSaveChanges()
         {
             Options.RetryPolicy = new RetryPolicy
@@ -277,7 +253,6 @@ namespace nORM.Core
             };
             return Options;
         }
-
         public Task<int> SaveChangesAsync(CancellationToken ct = default)
             => SaveChangesWithRetryAsync(ct);
 
@@ -286,7 +261,7 @@ namespace nORM.Core
             var policy = Options.RetryPolicy;
             var maxRetries = policy?.MaxRetries ?? 1;
             var baseDelay = policy?.BaseDelay ?? TimeSpan.Zero;
-
+            var rand = Random.Shared;
             for (var attempt = 0; ; attempt++)
             {
                 try
@@ -295,7 +270,9 @@ namespace nORM.Core
                 }
                 catch (Exception ex) when (attempt < maxRetries - 1 && IsRetryableException(ex))
                 {
-                    var delay = TimeSpan.FromMilliseconds(baseDelay.TotalMilliseconds * Math.Pow(2, attempt));
+                    var backoffMs = baseDelay.TotalMilliseconds * Math.Pow(2, attempt);
+                    var jitter = 1 + (rand.NextDouble() * 0.4 - 0.2); // ±20%
+                    var delay = TimeSpan.FromMilliseconds(backoffMs * jitter);
                     await Task.Delay(delay, ct).ConfigureAwait(false);
                 }
             }
@@ -320,6 +297,8 @@ namespace nORM.Core
             await using var transactionManager = await TransactionManager.CreateAsync(this, ct).ConfigureAwait(false);
             ct = transactionManager.Token;
             var transaction = transactionManager.Transaction;
+            if (transaction is null)
+                throw new InvalidOperationException("Transaction cannot be null when creating a CommandScope.");
 
             var totalAffected = 0;
             try
@@ -329,10 +308,8 @@ namespace nORM.Core
                     var entries = group.ToList();
                     if (entries.Count == 0)
                         continue;
-
                     var map = group.Key.Mapping;
                     var state = group.Key.State;
-
                     await using var commandScope = new CommandScope(Connection, transaction);
 
                     var paramsPerEntity = state switch
@@ -342,17 +319,14 @@ namespace nORM.Core
                         EntityState.Deleted => map.KeyColumns.Length + (map.TimestampColumn != null ? 1 : 0),
                         _ => 0
                     };
-
                     var batchSize = CalculateBatchSize(entries.Count, paramsPerEntity);
                     var templateLength = EstimateTemplateLength(state, map);
 
                     for (int start = 0; start < entries.Count; start += batchSize)
                     {
                         var batch = entries.Skip(start).Take(Math.Min(batchSize, entries.Count - start)).ToList();
-
                         await using var cmd = commandScope.CreateCommand();
                         var sql = new StringBuilder(templateLength * batch.Count);
-
                         switch (state)
                         {
                             case EntityState.Added:
@@ -367,13 +341,11 @@ namespace nORM.Core
                         }
                     }
                 }
-
                 if (saveInterceptors.Count > 0)
                 {
                     foreach (var interceptor in saveInterceptors)
                         await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, ct).ConfigureAwait(false);
                 }
-
                 await transactionManager.CommitAsync().ConfigureAwait(false);
             }
             catch
@@ -397,7 +369,7 @@ namespace nORM.Core
                 foreach (var tag in tags)
                     cache.InvalidateTag(tag);
             }
-
+            ChangeTracker.Clear();
             return totalAffected;
         }
 
@@ -430,10 +402,10 @@ namespace nORM.Core
                     entry.Entity ?? throw new InvalidOperationException("Entity is null"),
                     WriteOperation.Insert, paramIndex);
             }
-
             cmd.CommandText = sql.ToString();
-            cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText).TotalSeconds;
-            await cmd.PrepareAsync(ct).ConfigureAwait(false);
+            cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText));
+            if (batch.Count > 1)
+                await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             if (map.KeyColumns.Any(k => k.IsDbGenerated))
             {
@@ -470,18 +442,16 @@ namespace nORM.Core
                     entry.Entity ?? throw new InvalidOperationException("Entity is null"),
                     WriteOperation.Update, paramIndex);
             }
-
             cmd.CommandText = sql.ToString();
-            cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Update, cmd.CommandText).TotalSeconds;
-            await cmd.PrepareAsync(ct).ConfigureAwait(false);
+            cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Update, cmd.CommandText));
+            if (batch.Count > 1)
+                await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
             if (map.TimestampColumn != null && updated != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
-
             foreach (var entry in batch)
                 entry.AcceptChanges();
-
             return updated;
         }
 
@@ -494,21 +464,19 @@ namespace nORM.Core
                     entry.Entity ?? throw new InvalidOperationException("Entity is null"),
                     WriteOperation.Delete, paramIndex);
             }
-
             cmd.CommandText = sql.ToString();
-            cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Delete, cmd.CommandText).TotalSeconds;
-            await cmd.PrepareAsync(ct).ConfigureAwait(false);
+            cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Delete, cmd.CommandText));
+            if (batch.Count > 1)
+                await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
             if (map.TimestampColumn != null && deleted != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
-
             foreach (var entry in batch)
             {
                 if (entry.Entity is { } entityToRemove)
                     ChangeTracker.Remove(entityToRemove, true);
             }
-
             return deleted;
         }
 
@@ -519,35 +487,26 @@ namespace nORM.Core
                 if (Options.RetryPolicy.ShouldRetry(dbEx))
                     return true;
             }
-
             return ex is TimeoutException;
         }
-
+        private static int ToSecondsClamped(TimeSpan t) => Math.Max(1, (int)Math.Ceiling(t.TotalSeconds));
         #endregion
 
         #region Standard CRUD
         public Task<int> InsertAsync<T>(T entity, CancellationToken ct = default) where T : class
             => InsertAsync(entity, null, ct);
-
         public Task<int> InsertAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
         {
             var result = WriteOptimizedAsync(entity, WriteOperation.Insert, ct, transaction);
-
-            // Enable lazy loading for the inserted entity
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
-
             return result;
         }
-
         public Task<int> UpdateAsync<T>(T entity, CancellationToken ct = default) where T : class
             => UpdateAsync(entity, null, ct);
-
         public Task<int> UpdateAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
             => WriteOptimizedAsync(entity, WriteOperation.Update, ct, transaction);
-
         public Task<int> DeleteAsync<T>(T entity, CancellationToken ct = default) where T : class
             => DeleteAsync(entity, null, ct);
-
         public Task<int> DeleteAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
             => WriteOptimizedAsync(entity, WriteOperation.Delete, ct, transaction);
 
@@ -555,23 +514,19 @@ namespace nORM.Core
 
         private async Task<int> WriteOptimizedAsync<T>(T entity, WriteOperation operation, CancellationToken ct, DbTransaction? transaction = null) where T : class
         {
-            if (entity is null) throw new ArgumentNullException(nameof(entity));
-
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
             var map = GetMapping(typeof(T));
             ValidateTenantContext(entity, map, operation);
-
             var tx = transaction ?? Database.CurrentTransaction;
 
             if (operation == WriteOperation.Insert && Options.RetryPolicy == null && tx == null)
             {
                 return await ExecuteFastInsert(entity, map, ct, null).ConfigureAwait(false);
             }
-
             if (tx != null)
             {
                 return await WriteWithTransactionAsync(entity, map, operation, tx, ct, ownsTransaction: false).ConfigureAwait(false);
             }
-
             return await _executionStrategy.ExecuteAsync((ctx, token) =>
                 WriteWithTransactionAsync(entity, map, operation, null, token, ownsTransaction: true), ct).ConfigureAwait(false);
         }
@@ -584,7 +539,6 @@ namespace nORM.Core
             try
             {
                 await using var cmd = commandScope.CreateCommand();
-
                 cmd.CommandText = operation switch
                 {
                     WriteOperation.Insert => _p.BuildInsert(map),
@@ -592,7 +546,6 @@ namespace nORM.Core
                     WriteOperation.Delete => _p.BuildDelete(map),
                     _ => throw new ArgumentOutOfRangeException(nameof(operation))
                 };
-
                 var opType = operation switch
                 {
                     WriteOperation.Insert => AdaptiveTimeoutManager.OperationType.Insert,
@@ -600,11 +553,10 @@ namespace nORM.Core
                     WriteOperation.Delete => AdaptiveTimeoutManager.OperationType.Delete,
                     _ => AdaptiveTimeoutManager.OperationType.Insert
                 };
-                cmd.CommandTimeout = (int)GetAdaptiveTimeout(opType, cmd.CommandText).TotalSeconds;
-
+                cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(opType, cmd.CommandText));
                 AddParametersOptimized(cmd, map, entity, operation);
 
-                await cmd.PrepareAsync(ct).ConfigureAwait(false);
+                // No unconditional Prepare() here  reduces overhead for single-row ops.
 
                 if (operation == WriteOperation.Insert && map.KeyColumns.Any(k => k.IsDbGenerated))
                 {
@@ -613,7 +565,6 @@ namespace nORM.Core
                     if (ownsTransaction) await currentTransaction.CommitAsync(ct).ConfigureAwait(false);
                     return 1;
                 }
-
                 var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
                 if ((operation is WriteOperation.Update or WriteOperation.Delete) &&
                     map.TimestampColumn != null && recordsAffected == 0)
@@ -636,7 +587,6 @@ namespace nORM.Core
             {
                 return await WriteWithTransactionAsync(entity, map, WriteOperation.Insert, transaction, ct, ownsTransaction: false).ConfigureAwait(false);
             }
-
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var ownTransaction = await _cn.BeginTransactionAsync(ct).ConfigureAwait(false);
             await using var commandScope = new CommandScope(_cn, ownTransaction);
@@ -644,8 +594,7 @@ namespace nORM.Core
             {
                 await using var cmd = commandScope.CreateCommand();
                 cmd.CommandText = _p.BuildInsert(map);
-                cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText).TotalSeconds;
-
+                cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText));
                 foreach (var col in map.Columns)
                 {
                     if (!col.IsDbGenerated)
@@ -655,7 +604,7 @@ namespace nORM.Core
                     }
                 }
 
-                await cmd.PrepareAsync(ct).ConfigureAwait(false);
+                // No unconditional Prepare() here either.
 
                 if (map.KeyColumns.Any(k => k.IsDbGenerated))
                 {
@@ -664,7 +613,6 @@ namespace nORM.Core
                     await ownTransaction.CommitAsync(ct).ConfigureAwait(false);
                     return 1;
                 }
-
                 var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
                 await ownTransaction.CommitAsync(ct).ConfigureAwait(false);
                 return recordsAffected;
@@ -684,7 +632,6 @@ namespace nORM.Core
                     foreach (var col in map.InsertColumns)
                         cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
                     break;
-
                 case WriteOperation.Update:
                     foreach (var col in map.UpdateColumns)
                         cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
@@ -693,7 +640,7 @@ namespace nORM.Core
                     if (map.TimestampColumn != null)
                         cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, map.TimestampColumn.Getter(entity));
                     break;
-                    
+
                 case WriteOperation.Delete:
                     foreach (var col in map.KeyColumns)
                         cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
@@ -772,40 +719,45 @@ namespace nORM.Core
             return index;
         }
 
-        private Dictionary<string, object> AddParametersFast(DbCommand cmd, object[] parameters)
+        private IReadOnlyDictionary<string, object> AddParametersFast(DbCommand cmd, object[] parameters)
         {
-            var dict = new Dictionary<string, object>(parameters.Length);
             var span = new (string name, object value)[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
             {
                 var name = $"{_p.ParamPrefix}p{i}";
                 var value = parameters[i] ?? DBNull.Value;
                 span[i] = (name, value);
-                dict[name] = value;
             }
-
             cmd.SetParametersFast(span);
+
+            if (Options.Logger?.IsEnabled(LogLevel.Debug) != true)
+                return EmptyDictionary<string, object>.Instance;
+
+            var dict = new Dictionary<string, object>(parameters.Length);
+            foreach (var (name, value) in span) dict[name] = value;
             return dict;
+        }
+
+        internal static class EmptyDictionary<TKey, TValue> where TKey : notnull
+        {
+            public static readonly IReadOnlyDictionary<TKey, TValue> Instance = new Dictionary<TKey, TValue>(0);
         }
 
         private readonly struct CommandScope : IAsyncDisposable
         {
             private readonly DbConnection _connection;
             private readonly DbTransaction _transaction;
-
             public CommandScope(DbConnection connection, DbTransaction transaction)
             {
                 _connection = connection;
                 _transaction = transaction;
             }
-
             public DbCommand CreateCommand()
             {
                 var cmd = _connection.CreateCommand();
                 cmd.Transaction = _transaction;
                 return cmd;
             }
-
             public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
         #endregion
@@ -859,21 +811,16 @@ namespace nORM.Core
         {
             if (transaction == null)
                 throw new InvalidOperationException("No active transaction.");
-
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
-
             return _p.CreateSavepointAsync(transaction, name, ct);
         }
-
         public Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             if (transaction == null)
                 throw new InvalidOperationException("No active transaction.");
-
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
-
             return _p.RollbackToSavepointAsync(transaction, name, ct);
         }
         #endregion
@@ -884,13 +831,11 @@ namespace nORM.Core
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                var cmd = CommandPool.Get(ctx.Connection, sql);
-                cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
+                await using var cmd = CommandPool.Get(ctx.Connection, sql);
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
                 var paramDict = ctx.AddParametersFast(cmd, parameters);
-
                 if (!NormValidator.IsSafeRawSql(sql))
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
-
                 NormValidator.ValidateRawSql(sql, paramDict);
 
                 var props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -900,15 +845,15 @@ namespace nORM.Core
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
                 var fieldCount = reader.FieldCount;
-                var columns = new string[fieldCount];
-                for (int i = 0; i < fieldCount; i++) columns[i] = reader.GetName(i);
+                var fieldNames = new string[fieldCount];
+                for (int i = 0; i < fieldCount; i++) fieldNames[i] = reader.GetName(i);
 
                 while (await reader.ReadAsync(token).ConfigureAwait(false))
                 {
                     var item = new T();
                     for (int i = 0; i < fieldCount; i++)
                     {
-                        if (!props.TryGetValue(columns[i], out var prop)) continue;
+                        if (!props.TryGetValue(fieldNames[i], out var prop)) continue;
                         var value = reader.GetValue(i);
                         if (value == DBNull.Value) continue;
                         var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
@@ -935,20 +880,20 @@ namespace nORM.Core
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                var cmd = CommandPool.Get(ctx.Connection, sql);
-                cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
+                await using var cmd = CommandPool.Get(ctx.Connection, sql);
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
                 var paramDict = ctx.AddParametersFast(cmd, parameters);
-
                 if (!NormValidator.IsSafeRawSql(sql))
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
-
                 NormValidator.ValidateRawSql(sql, paramDict);
 
                 using var translator = global::nORM.Query.QueryTranslator.Rent(this);
                 var materializer = translator.CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
+
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
-                while (await reader.ReadAsync(token).ConfigureAwait(false)) list.Add((T)await materializer(reader, token).ConfigureAwait(false));
+                while (await reader.ReadAsync(token).ConfigureAwait(false))
+                    list.Add((T)await materializer(reader, token).ConfigureAwait(false));
 
                 ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
                 cmd.Parameters.Clear();
@@ -960,9 +905,10 @@ namespace nORM.Core
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                var cmd = CommandPool.Get(ctx.Connection, procedureName);
+                await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
                 cmd.CommandType = CommandType.StoredProcedure;
-                cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText).TotalSeconds;
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
+
                 var paramDict = new Dictionary<string, object>();
                 if (parameters != null)
                 {
@@ -978,16 +924,18 @@ namespace nORM.Core
                     cmd.SetParametersFast(span);
                 }
 
-                if (!NormValidator.IsSafeRawSql(procedureName))
-                    throw new NormUsageException("Potential SQL injection detected in raw query.");
+                if (!IsSafeIdentifier(procedureName))
+                    throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
 
                 NormValidator.ValidateRawSql(procedureName, paramDict);
 
                 using var translator = global::nORM.Query.QueryTranslator.Rent(this);
                 var materializer = translator.CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
+
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
-                while (await reader.ReadAsync(token).ConfigureAwait(false)) list.Add((T)await materializer(reader, token).ConfigureAwait(false));
+                while (await reader.ReadAsync(token).ConfigureAwait(false))
+                    list.Add((T)await materializer(reader, token).ConfigureAwait(false));
 
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
                 cmd.Parameters.Clear();
@@ -998,9 +946,10 @@ namespace nORM.Core
         {
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             var sw = Stopwatch.StartNew();
-            var cmd = CommandPool.Get(Connection, procedureName);
+            await using var cmd = CommandPool.Get(Connection, procedureName);
             cmd.CommandType = _p.StoredProcedureCommandType;
-            cmd.CommandTimeout = (int)GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText).TotalSeconds;
+            cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
+
             var paramDict = new Dictionary<string, object>();
             if (parameters != null)
             {
@@ -1016,14 +965,15 @@ namespace nORM.Core
                 cmd.SetParametersFast(span);
             }
 
-            if (!NormValidator.IsSafeRawSql(procedureName))
-                throw new NormUsageException("Potential SQL injection detected in raw query.");
+            if (!IsSafeIdentifier(procedureName))
+                throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
 
             NormValidator.ValidateRawSql(procedureName, paramDict);
 
             using var translator = global::nORM.Query.QueryTranslator.Rent(this);
             var materializer = translator.CreateMaterializer(GetMapping(typeof(T)), typeof(T));
             var count = 0;
+
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.SequentialAccess, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
@@ -1041,9 +991,10 @@ namespace nORM.Core
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                var cmd = CommandPool.Get(ctx.Connection, procedureName);
+                await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
                 cmd.CommandType = CommandType.StoredProcedure;
-                cmd.CommandTimeout = (int)ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText).TotalSeconds;
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
+
                 var paramDict = new Dictionary<string, object>();
                 if (parameters != null)
                 {
@@ -1072,23 +1023,23 @@ namespace nORM.Core
                     outputParamMap[op.Name] = p;
                 }
 
-                if (!NormValidator.IsSafeRawSql(procedureName))
-                    throw new NormUsageException("Potential SQL injection detected in raw query.");
+                if (!IsSafeIdentifier(procedureName))
+                    throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
 
                 NormValidator.ValidateRawSql(procedureName, paramDict);
 
                 using var translator = global::nORM.Query.QueryTranslator.Rent(this);
                 var materializer = translator.CreateMaterializer(GetMapping(typeof(T)), typeof(T));
                 var list = new List<T>();
+
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
-                while (await reader.ReadAsync(token).ConfigureAwait(false)) list.Add((T)await materializer(reader, token).ConfigureAwait(false));
+                while (await reader.ReadAsync(token).ConfigureAwait(false))
+                    list.Add((T)await materializer(reader, token).ConfigureAwait(false));
                 await reader.DisposeAsync().ConfigureAwait(false);
 
                 var outputs = new Dictionary<string, object?>();
                 foreach (var kv in outputParamMap)
-                {
                     outputs[kv.Key] = kv.Value.Value == DBNull.Value ? null : kv.Value.Value;
-                }
 
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
                 cmd.Parameters.Clear();
@@ -1101,11 +1052,9 @@ namespace nORM.Core
             if (Options.TenantProvider == null) return;
             var tenantCol = map.TenantColumn;
             if (tenantCol == null) return;
-
             var tenantId = Options.TenantProvider.GetCurrentTenantId();
             if (tenantId == null)
                 throw new InvalidOperationException("Tenant context required but not available");
-
             var entityTenant = tenantCol.Getter(entity);
             if (entityTenant == null)
             {
@@ -1126,7 +1075,6 @@ namespace nORM.Core
 
         public void SetShadowProperty(object entity, string name, object? value)
             => Internal.ShadowPropertyStore.Set(entity, name, value);
-
         public object? GetShadowProperty(object entity, string name)
             => Internal.ShadowPropertyStore.Get(entity, name);
 
@@ -1137,7 +1085,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 var p0 = _p.ParamPrefix + "p0";
                 var p1 = _p.ParamPrefix + "p1";
-                var cmd = CommandPool.Get(ctx.Connection, $"INSERT INTO __NormTemporalTags (TagName, Timestamp) VALUES ({p0}, {p1})");
+                await using var cmd = CommandPool.Get(ctx.Connection, $"INSERT INTO __NormTemporalTags (TagName, Timestamp) VALUES ({p0}, {p1})");
                 var span = new (string name, object value)[2];
                 span[0] = (p0, tagName);
                 span[1] = (p1, DateTime.UtcNow);
@@ -1153,6 +1101,7 @@ namespace nORM.Core
             if (!_disposed && disposing)
             {
                 _cleanupTimer?.Dispose();
+                _providerInitLock?.Dispose();
                 lock (_disposablesLock)
                 {
                     CleanupDisposablesInternal();
@@ -1163,12 +1112,10 @@ namespace nORM.Core
                         {
                             d.Dispose();
                         }
-
                         _disposables.Remove(node);
                         node = next;
                     }
                 }
-
                 _cn?.Dispose();
                 _disposed = true;
             }
@@ -1183,7 +1130,6 @@ namespace nORM.Core
                 {
                     _disposables.Remove(node);
                 }
-
                 node = next;
             }
         }
@@ -1193,6 +1139,27 @@ namespace nORM.Core
             lock (_disposablesLock)
             {
                 CleanupDisposablesInternal();
+            }
+        }
+
+        private async Task CleanupDisposablesAsync()
+        {
+            List<IDisposable> toDispose = new();
+            lock (_disposablesLock)
+            {
+                for (var n = _disposables.First; n != null;)
+                {
+                    var next = n.Next;
+                    if (n.Value.TryGetTarget(out var d))
+                        toDispose.Add(d);
+                    _disposables.Remove(n);
+                    n = next;
+                }
+            }
+            foreach (var d in toDispose)
+            {
+                if (d is IAsyncDisposable ad) await ad.DisposeAsync().ConfigureAwait(false);
+                else d.Dispose();
             }
         }
 
@@ -1213,41 +1180,21 @@ namespace nORM.Core
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-
         public async ValueTask DisposeAsync()
         {
             if (!_disposed)
             {
                 _cleanupTimer?.Dispose();
-                lock (_disposablesLock)
-                {
-                    CleanupDisposablesInternal();
-                    for (var node = _disposables.First; node != null;)
-                    {
-                        var next = node.Next;
-                        if (node.Value.TryGetTarget(out var d))
-                        {
-                            d.Dispose();
-                        }
-
-                        _disposables.Remove(node);
-                        node = next;
-                    }
-                }
-
+                _providerInitLock?.Dispose();
+                await CleanupDisposablesAsync();
                 if (_cn != null)
-                {
                     await _cn.DisposeAsync().ConfigureAwait(false);
-                }
-
                 _disposed = true;
             }
-
             GC.SuppressFinalize(this);
         }
     }
 
     public sealed record OutputParameter(string Name, DbType DbType, int? Size = null);
-
     public sealed record StoredProcedureResult<T>(List<T> Results, IReadOnlyDictionary<string, object?> OutputParameters);
 }

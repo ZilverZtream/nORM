@@ -112,7 +112,7 @@ namespace nORM.Benchmarks
         private static readonly Func<nORM.Core.DbContext, (int, string), Task<List<BenchmarkUser>>> _normComplexCompiled
             = Norm.CompileQuery<nORM.Core.DbContext, (int, string), BenchmarkUser>(
                 (c, p) => c.Query<BenchmarkUser>()
-                    .Where(u => u.IsActive && u.Age > p.Item1 && u.City == p.Item2)
+                    .Where(u => u.IsActive == true && u.Age > p.Item1 && u.City == p.Item2)
                     .AsNoTracking()
                     .OrderBy(u => u.Name)
                     .Skip(5)

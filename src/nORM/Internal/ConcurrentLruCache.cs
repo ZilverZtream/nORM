@@ -7,104 +7,75 @@ using System.Threading;
 
 namespace nORM.Internal
 {
+    /// <summary>
+    /// Concurrent LRU cache with optional TTL. Expired entries are removed on access.
+    /// Eviction on insert is size-based only (no TTL prune on insert) to minimize churn in hot paths.
+    /// </summary>
     public class ConcurrentLruCache<TKey, TValue> where TKey : notnull
     {
         private readonly ConcurrentDictionary<TKey, LinkedListNode<CacheItem>> _cache = new();
         private readonly LinkedList<CacheItem> _lruList = new();
-        // Protects access to _lruList, which is not thread-safe.
         private readonly object _lock = new();
+
         private int _maxSize;
         private readonly TimeSpan? _timeToLive;
         private long _hits;
         private long _misses;
 
-        public ConcurrentLruCache(int maxSize, TimeSpan? timeToLive = null)
+        public ConcurrentLruCache(int maxSize = 1000, TimeSpan? timeToLive = null)
         {
+            if (maxSize <= 0) throw new ArgumentOutOfRangeException(nameof(maxSize));
             _maxSize = maxSize;
             _timeToLive = timeToLive;
         }
 
-        public TValue GetOrAdd(TKey key, Func<TKey, TValue> factory)
+        public void SetMaxSize(int maxSize)
         {
-            // First, try a lock-free read for the common case.
-            if (_cache.TryGetValue(key, out var existingNode))
-            {
-                lock (_lock)
-                {
-                    // The node might have been removed by another thread between TryGetValue and the lock.
-                    // A simple check is to see if it still has a list.
-                    if (existingNode.List != null)
-                    {
-                        if (!IsExpired(existingNode.Value))
-                        {
-                            _lruList.Remove(existingNode);
-                            _lruList.AddFirst(existingNode);
-                            Interlocked.Increment(ref _hits);
-                            return existingNode.Value.Value;
-                        }
-
-                        _lruList.Remove(existingNode);
-                        _cache.TryRemove(existingNode.Value.Key, out _);
-                    }
-                }
-            }
-
-            // Key doesn't exist or was just evicted, we need to add it.
+            if (maxSize <= 0) throw new ArgumentOutOfRangeException(nameof(maxSize));
             lock (_lock)
             {
-                // Double-check if another thread added it while we were waiting for the lock.
-                if (_cache.TryGetValue(key, out existingNode))
+                _maxSize = maxSize;
+                while (_lruList.Count > _maxSize)
                 {
-                    if (!IsExpired(existingNode.Value))
-                    {
-                        _lruList.Remove(existingNode);
-                        _lruList.AddFirst(existingNode);
-                        Interlocked.Increment(ref _hits);
-                        return existingNode.Value.Value;
-                    }
-
-                    _lruList.Remove(existingNode);
-                    _cache.TryRemove(existingNode.Value.Key, out _);
-                }
-
-                // We are the first, create and add the new item.
-                var value = factory(key);
-                var newNode = new LinkedListNode<CacheItem>(new CacheItem(key, value, DateTimeOffset.UtcNow));
-
-                _cache[key] = newNode; // Use indexer now that we are in a lock.
-                _lruList.AddFirst(newNode);
-
-                if (_lruList.Count > _maxSize)
-                {
-                    var lastNode = _lruList.Last!;
+                    var last = _lruList.Last!;
                     _lruList.RemoveLast();
-                    _cache.TryRemove(lastNode.Value.Key, out _);
+                    _cache.TryRemove(last.Value.Key, out _);
                 }
+            }
+        }
 
-                Interlocked.Increment(ref _misses);
-                return value;
+        public void Clear()
+        {
+            lock (_lock)
+            {
+                _cache.Clear();
+                _lruList.Clear();
+                Interlocked.Exchange(ref _hits, 0);
+                Interlocked.Exchange(ref _misses, 0);
             }
         }
 
         public bool TryGet(TKey key, out TValue value)
         {
-            if (_cache.TryGetValue(key, out var existingNode))
+            // Lock-free lookup, then guarded promotion & TTL check
+            if (_cache.TryGetValue(key, out var node))
             {
                 lock (_lock)
                 {
-                    if (existingNode.List != null)
+                    if (node.List != null)
                     {
-                        if (!IsExpired(existingNode.Value))
+                        if (!IsExpired(node.Value))
                         {
-                            _lruList.Remove(existingNode);
-                            _lruList.AddFirst(existingNode);
-                            value = existingNode.Value.Value;
+                            _lruList.Remove(node);
+                            _lruList.AddFirst(node);
                             Interlocked.Increment(ref _hits);
+                            value = node.Value.Value;
                             return true;
                         }
 
-                        _lruList.Remove(existingNode);
-                        _cache.TryRemove(existingNode.Value.Key, out _);
+                        // Expired: remove
+                        _lruList.Remove(node);
+                        _cache.TryRemove(node.Value.Key, out _);
                     }
                 }
             }
@@ -114,25 +85,50 @@ namespace nORM.Internal
             return false;
         }
 
-        public void Clear()
+        /// <summary>
+        /// Adds or returns existing value. The factory runs only if missing/expired.
+        /// </summary>
+        public TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
         {
-            lock (_lock)
-            {
-                _cache.Clear();
-                _lruList.Clear();
-            }
+            if (valueFactory is null) throw new ArgumentNullException(nameof(valueFactory));
+            if (TryGet(key, out var existing))
+                return existing;
+
+            var created = valueFactory(key); // compute outside lock
+            Set(key, created);
+            return created;
         }
 
-        public void SetMaxSize(int maxSize)
+        /// <summary>
+        /// Sets/replaces a value. TTL override and dependencies are accepted for call-site compatibility.
+        /// </summary>
+        public void Set(TKey key, TValue value, TimeSpan? ttlOverride = null, IReadOnlyList<string>? dependencies = null)
         {
+            var item = new CacheItem(key, value, DateTimeOffset.UtcNow, ttlOverride);
+
             lock (_lock)
             {
-                _maxSize = maxSize;
-                while (_lruList.Count > _maxSize)
+                if (_cache.TryGetValue(key, out var existing))
                 {
-                    var lastNode = _lruList.Last!;
+                    if (existing.List != null)
+                        _lruList.Remove(existing);
+                    var newNode = new LinkedListNode<CacheItem>(item);
+                    _cache[key] = newNode;
+                    _lruList.AddFirst(newNode);
+                }
+                else
+                {
+                    var newNode = new LinkedListNode<CacheItem>(item);
+                    _cache[key] = newNode;
+                    _lruList.AddFirst(newNode);
+                }
+
+                // Size-based eviction only (no TTL prune here to avoid extra churn)
+                if (_lruList.Count > _maxSize)
+                {
+                    var last = _lruList.Last!;
                     _lruList.RemoveLast();
-                    _cache.TryRemove(lastNode.Value.Key, out _);
+                    _cache.TryRemove(last.Value.Key, out _);
                 }
             }
         }
@@ -142,9 +138,11 @@ namespace nORM.Internal
         public double HitRate => Hits + Misses == 0 ? 0 : (double)Hits / (Hits + Misses);
 
         private bool IsExpired(CacheItem item)
-            => _timeToLive.HasValue && DateTimeOffset.UtcNow - item.Created > _timeToLive.Value;
+        {
+            var ttl = item.TtlOverride ?? _timeToLive;
+            return ttl.HasValue && DateTimeOffset.UtcNow - item.Created > ttl.Value;
+        }
 
-        private record CacheItem(TKey Key, TValue Value, DateTimeOffset Created);
+        private readonly record struct CacheItem(TKey Key, TValue Value, DateTimeOffset Created, TimeSpan? TtlOverride);
     }
 }
-

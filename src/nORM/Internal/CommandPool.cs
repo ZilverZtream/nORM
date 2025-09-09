@@ -6,19 +6,13 @@ namespace nORM.Internal
 {
     internal sealed class CommandPool
     {
-        [ThreadStatic]
-        private static DbCommand? _cachedCommand;
-
+        // Removed thread-static caching. Commands are cheap to create and callers typically dispose them.
         public static DbCommand Get(DbConnection connection, string sql)
         {
-            var cmd = _cachedCommand;
-            if (cmd == null || cmd.Connection != connection)
-            {
-                cmd?.Dispose();
-                cmd = connection.CreateCommand();
-                _cachedCommand = cmd;
-            }
+            if (connection is null) throw new ArgumentNullException(nameof(connection));
+            if (sql is null) throw new ArgumentNullException(nameof(sql));
 
+            var cmd = connection.CreateCommand();
             cmd.Parameters.Clear();
             cmd.CommandText = sql;
             cmd.CommandType = CommandType.Text;

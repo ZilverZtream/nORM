@@ -25,6 +25,7 @@ namespace nORM.Core
         private readonly SemaphoreSlim _poolInitSemaphore = new(1, 1);
         private readonly SemaphoreSlim _healthCheckSemaphore = new(1, 1);
         private readonly CancellationTokenSource _disposeCts = new();
+
         private bool _disposed;
 
         private readonly ConcurrentDictionary<string, ConnectionPool> _connectionPools = new();
@@ -76,10 +77,10 @@ namespace nORM.Core
 
         private void DeterminePrimaryNode()
         {
-            _currentPrimary = _topology.Nodes
-                .Where(n => n.Role == DatabaseTopology.DatabaseRole.Primary || n.Role == DatabaseTopology.DatabaseRole.SecondaryMaster)
-                .OrderBy(n => n.Priority)
-                .FirstOrDefault(n => n.IsHealthy);
+            // Choose the first node marked as Primary role; fallback to first node
+            var primary = _topology.Nodes.FirstOrDefault(n => n.Role == DatabaseTopology.DatabaseRole.Primary)
+                          ?? _topology.Nodes.FirstOrDefault();
+            _currentPrimary = primary;
         }
 
         private void UpdateAvailableReadReplicas()
@@ -95,19 +96,16 @@ namespace nORM.Core
             lock (_circuitBreakerLock)
             {
                 if (DateTime.UtcNow < _nextRetry)
-                    throw new NormConnectionException("Circuit breaker is open; skipping connection attempt");
+                    throw new InvalidOperationException("Circuit breaker open: delaying write connection attempts.");
             }
 
             var primary = _currentPrimary;
-            if (primary == null || !primary.IsHealthy)
+            if (primary == null)
             {
-                await FailoverToPrimaryAsync(ct).ConfigureAwait(false);
+                await TriggerFailoverAsync(ct).ConfigureAwait(false);
                 primary = _currentPrimary;
                 if (primary == null)
-                {
-                    RegisterFailure();
-                    throw new NormConnectionException("No healthy primary database available");
-                }
+                    throw new InvalidOperationException("No primary node available.");
             }
 
             var pool = _connectionPools[primary.ConnectionString];
@@ -132,9 +130,9 @@ namespace nORM.Core
         public async Task<DbConnection> GetReadConnectionAsync(CancellationToken ct = default)
         {
             var replicas = _availableReadReplicas;
-            if (!replicas.Any())
+            if (replicas.Count == 0)
             {
-                _logger.LogWarning("No healthy read replicas available, using primary for read operation");
+                _logger.LogWarning("No healthy read replicas available; using primary for read");
                 return await GetWriteConnectionAsync(ct).ConfigureAwait(false);
             }
 
@@ -144,9 +142,13 @@ namespace nORM.Core
             {
                 return await pool.RentAsync(ct).ConfigureAwait(false);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to connect to read replica {ConnectionString}, falling back to primary", replica.ConnectionString);
+                _logger.LogWarning(ex, "Failed to acquire connection from read replica {Replica}", replica.ConnectionString);
                 replica.IsHealthy = false;
                 UpdateAvailableReadReplicas();
                 return await GetWriteConnectionAsync(ct).ConfigureAwait(false);
@@ -164,12 +166,8 @@ namespace nORM.Core
             lock (_circuitBreakerLock)
             {
                 _consecutiveFailures++;
-                var delayTicks = (long)(_baseDelay.Ticks * Math.Pow(2, _consecutiveFailures - 1));
-                if (delayTicks > _maxDelay.Ticks)
-                    delayTicks = _maxDelay.Ticks;
-                var delay = TimeSpan.FromTicks(delayTicks);
+                var delay = TimeSpan.FromMilliseconds(Math.Min(_baseDelay.TotalMilliseconds * Math.Pow(2, _consecutiveFailures), _maxDelay.TotalMilliseconds));
                 _nextRetry = DateTime.UtcNow + delay;
-                _logger.LogWarning("Write connection failure. Circuit breaker open for {Delay}", delay);
             }
         }
 
@@ -201,57 +199,22 @@ namespace nORM.Core
 
         private async Task PerformHealthChecksAsync(CancellationToken token)
         {
-            if (_disposed || token.IsCancellationRequested)
-                return;
-
-            if (!await _healthCheckSemaphore.WaitAsync(0, token).ConfigureAwait(false))
-                return;
-
-            try
-            {
-                await MonitorNodeHealthAsync(token).ConfigureAwait(false);
-
-                if (_disposed || token.IsCancellationRequested)
-                    return;
-
-                await _failoverSemaphore.WaitAsync(token).ConfigureAwait(false);
-                try
-                {
-                    RefreshTopologyState();
-                }
-                finally
-                {
-                    _failoverSemaphore.Release();
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                // Cancellation requested; exit gracefully
-            }
-            finally
-            {
-                _healthCheckSemaphore.Release();
-            }
-        }
-
-        private async Task MonitorNodeHealthAsync(CancellationToken token)
-        {
-            if (_disposed || token.IsCancellationRequested)
-                return;
-
+            await _healthCheckSemaphore.WaitAsync(token).ConfigureAwait(false);
             try
             {
                 foreach (var node in _topology.Nodes)
                 {
-                    if (_disposed || token.IsCancellationRequested)
-                        break;
-
                     var pool = _connectionPools[node.ConnectionString];
                     DbConnection? cn = null;
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
                     try
                     {
-                        var sw = System.Diagnostics.Stopwatch.StartNew();
                         cn = await pool.RentAsync(token).ConfigureAwait(false);
+                        using var pingCmd = cn.CreateCommand();
+                        pingCmd.CommandText = "SELECT 1";
+                        pingCmd.CommandType = CommandType.Text;
+                        using var reader = await pingCmd.ExecuteReaderAsync(token).ConfigureAwait(false);
+                        while (await reader.ReadAsync(token).ConfigureAwait(false)) { }
                         sw.Stop();
                         node.IsHealthy = true;
                         node.LastHealthCheck = DateTime.UtcNow;
@@ -259,42 +222,56 @@ namespace nORM.Core
                     }
                     catch (OperationCanceledException)
                     {
-                        // Cancellation requested; exit iteration after cleanup
-                        break;
+                        throw;
                     }
                     catch
                     {
+                        sw.Stop();
                         node.IsHealthy = false;
                         node.LastHealthCheck = DateTime.UtcNow;
                     }
                     finally
                     {
                         if (cn != null)
-                            await cn.DisposeAsync().ConfigureAwait(false);
+                        {
+                            try { pool.Return(cn); } catch { /* ignore */ }
+                        }
                     }
                 }
+
+                // If current primary went unhealthy, attempt failover
+                var primary = _currentPrimary;
+                if (primary is not null && !primary.IsHealthy)
+                {
+                    await TriggerFailoverAsync(token).ConfigureAwait(false);
+                }
+
+                UpdateAvailableReadReplicas();
             }
-            catch (OperationCanceledException)
+            finally
             {
-                // Cancellation requested; exit gracefully
+                _healthCheckSemaphore.Release();
             }
         }
 
-        private void RefreshTopologyState()
-        {
-            DeterminePrimaryNode();
-            UpdateAvailableReadReplicas();
-        }
-
-        private async Task FailoverToPrimaryAsync(CancellationToken ct)
+        private async Task TriggerFailoverAsync(CancellationToken ct)
         {
             await _failoverSemaphore.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                RefreshTopologyState();
-                if (_currentPrimary == null)
+                // Prefer a healthy node with Primary role; otherwise any healthy node
+                var healthy = _topology.Nodes.Where(n => n.IsHealthy).ToList();
+                var newPrimary = healthy.FirstOrDefault(n => n.Role == DatabaseTopology.DatabaseRole.Primary)
+                                 ?? healthy.FirstOrDefault();
+
+                if (newPrimary != null)
                 {
-                    _logger.LogError("Failover attempted but no healthy primary nodes found");
+                    _logger.LogWarning("Failing over to {ConnectionString}", newPrimary.ConnectionString);
+                    _currentPrimary = newPrimary;
+                }
+                else
+                {
+                    _logger.LogError("Failover attempted but no healthy nodes found");
                 }
             }
             finally
@@ -312,7 +289,8 @@ namespace nORM.Core
             _healthCheckTimer.Dispose();
             try
             {
-                _healthCheckTask.Wait();
+                // Avoid indefinite blocking on shutdown
+                Task.WhenAny(_healthCheckTask, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
             }
             catch
             {

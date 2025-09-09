@@ -32,24 +32,14 @@ namespace nORM.Core
             CancellationTokenSource? cts = null;
             var token = ct;
 
-            if (ambientTransaction != null && existingTransaction == null)
+            if (ownsTransaction)
             {
                 await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                context.Connection.EnlistTransaction(ambientTransaction);
-            }
-            else if (ownsTransaction)
-            {
-                await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                var isolationLevel = System.Data.IsolationLevel.ReadCommitted;
-                transaction = await context.Connection.BeginTransactionAsync(isolationLevel, ct).ConfigureAwait(false);
+                transaction = await context.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
 
+                // Create a CTS that cancels if the ambient token cancels.
                 cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                cts.CancelAfter(context.Options.TimeoutConfiguration.BaseTimeout);
                 token = cts.Token;
-            }
-            else
-            {
-                transaction = existingTransaction!;
             }
 
             return new TransactionManager(transaction, ownsTransaction, cts, token);
@@ -58,24 +48,20 @@ namespace nORM.Core
         public async ValueTask CommitAsync()
         {
             if (OwnsTransaction && Transaction != null)
-            {
                 await Transaction.CommitAsync(Token).ConfigureAwait(false);
-            }
         }
 
         public async ValueTask RollbackAsync()
         {
             if (OwnsTransaction && Transaction != null)
-            {
                 await Transaction.RollbackAsync(Token).ConfigureAwait(false);
-            }
         }
 
         public async ValueTask DisposeAsync()
         {
             if (OwnsTransaction && Transaction != null)
             {
-                await Transaction.DisposeAsync().ConfigureAwait(false);
+                try { await Transaction.DisposeAsync().ConfigureAwait(false); } catch { }
             }
             _cts?.Dispose();
             GC.SuppressFinalize(this);
@@ -85,19 +71,10 @@ namespace nORM.Core
         {
             if (OwnsTransaction && Transaction != null)
             {
-                Transaction.Dispose();
+                try { Transaction.Dispose(); } catch { }
             }
             _cts?.Dispose();
             GC.SuppressFinalize(this);
-        }
-
-        ~TransactionManager()
-        {
-            if (OwnsTransaction && Transaction != null)
-            {
-                Transaction.Dispose();
-            }
-            _cts?.Dispose();
         }
     }
 }
