@@ -37,3 +37,27 @@ bld/
 # OS
 .DS_Store
 Thumbs.db
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.FastNormBenchmarks-20250909-072827.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-071352.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-080539.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-082739.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-085903.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-094708.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-105937.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-113610.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-122420.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-124643.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-140936.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-144401.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-150624.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-154115.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-162849.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-172638.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-180323.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-190322.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-192435.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-210356.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-213948.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-221905.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-224016.log
+/benchmarks/BenchmarkDotNet.Artifacts/nORM.Benchmarks.OrmBenchmarks-20250908-230023.log
