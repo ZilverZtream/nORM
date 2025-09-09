@@ -235,6 +235,7 @@ namespace nORM.Core
         {
             private readonly ConnectionPool _pool;
             private DbConnection? _inner;
+            private volatile bool _disposed;
 
             public PooledDbConnection(ConnectionPool pool, DbConnection inner)
             {
@@ -266,15 +267,34 @@ namespace nORM.Core
             public override ConnectionState State => Inner.State;
             protected override DbCommand CreateDbCommand() => Inner.CreateCommand();
 
-            private DbConnection Inner => _inner ?? throw new ObjectDisposedException(nameof(PooledDbConnection));
+            private DbConnection Inner => _disposed
+                ? throw new ObjectDisposedException(nameof(PooledDbConnection))
+                : _inner ?? throw new ObjectDisposedException(nameof(PooledDbConnection));
 
             protected override void Dispose(bool disposing)
             {
-                if (disposing)
+                if (disposing && !_disposed)
                 {
-                    var cn = Interlocked.Exchange(ref _inner, null);
-                    if (cn != null)
-                        _pool.Return(cn);
+                    lock (this)
+                    {
+                        if (!_disposed)
+                        {
+                            var cn = Interlocked.Exchange(ref _inner, null);
+                            if (cn != null)
+                            {
+                                try
+                                {
+                                    _pool.Return(cn);
+                                }
+                                catch
+                                {
+                                    try { cn.Dispose(); } catch { }
+                                }
+                            }
+
+                            _disposed = true;
+                        }
+                    }
                 }
             }
 
