@@ -64,11 +64,11 @@ namespace nORM.Internal
 
             foreach (var interceptor in interceptors)
             {
-                var interception = interceptor.NonQueryExecutingAsync(command, ctx, CancellationToken.None).GetAwaiter().GetResult();
+                var interception = interceptor.NonQueryExecutingAsync(command, ctx, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                 if (interception.IsSuppressed)
                 {
                     foreach (var i in interceptors)
-                        i.NonQueryExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, CancellationToken.None).GetAwaiter().GetResult();
+                        i.NonQueryExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                     return interception.Result;
                 }
             }
@@ -80,7 +80,7 @@ namespace nORM.Internal
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    interceptor.NonQueryExecutedAsync(command, ctx, result, sw.Elapsed, CancellationToken.None).GetAwaiter().GetResult();
+                    interceptor.NonQueryExecutedAsync(command, ctx, result, sw.Elapsed, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                 }
                 return result;
             }
@@ -89,7 +89,7 @@ namespace nORM.Internal
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).GetAwaiter().GetResult();
+                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                 }
                 throw;
             }
@@ -146,11 +146,11 @@ namespace nORM.Internal
 
             foreach (var interceptor in interceptors)
             {
-                var interception = interceptor.ScalarExecutingAsync(command, ctx, CancellationToken.None).GetAwaiter().GetResult();
+                var interception = interceptor.ScalarExecutingAsync(command, ctx, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                 if (interception.IsSuppressed)
                 {
                     foreach (var i in interceptors)
-                        i.ScalarExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, CancellationToken.None).GetAwaiter().GetResult();
+                        i.ScalarExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                     return interception.Result;
                 }
             }
@@ -162,7 +162,7 @@ namespace nORM.Internal
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    interceptor.ScalarExecutedAsync(command, ctx, result, sw.Elapsed, CancellationToken.None).GetAwaiter().GetResult();
+                    interceptor.ScalarExecutedAsync(command, ctx, result, sw.Elapsed, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                 }
                 return result;
             }
@@ -171,7 +171,7 @@ namespace nORM.Internal
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).GetAwaiter().GetResult();
+                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                 }
                 throw;
             }
@@ -228,11 +228,11 @@ namespace nORM.Internal
 
             foreach (var interceptor in interceptors)
             {
-                var interception = interceptor.ReaderExecutingAsync(command, ctx, CancellationToken.None).GetAwaiter().GetResult();
+                var interception = interceptor.ReaderExecutingAsync(command, ctx, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                 if (interception.IsSuppressed)
                 {
                     foreach (var i in interceptors)
-                        i.ReaderExecutedAsync(command, ctx, interception.Result!, TimeSpan.Zero, CancellationToken.None).GetAwaiter().GetResult();
+                        i.ReaderExecutedAsync(command, ctx, interception.Result!, TimeSpan.Zero, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                     return interception.Result!;
                 }
             }
@@ -244,7 +244,7 @@ namespace nORM.Internal
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    interceptor.ReaderExecutedAsync(command, ctx, reader, sw.Elapsed, CancellationToken.None).GetAwaiter().GetResult();
+                    interceptor.ReaderExecutedAsync(command, ctx, reader, sw.Elapsed, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                 }
                 return reader;
             }
@@ -253,7 +253,7 @@ namespace nORM.Internal
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
-                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).GetAwaiter().GetResult();
+                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                 }
                 throw;
             }

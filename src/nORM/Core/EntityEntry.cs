@@ -14,13 +14,14 @@ namespace nORM.Core
     public class EntityEntry
     {
         private readonly TableMapping _mapping;
-        private Column[] _nonKeyColumns;
-        private int[] _originalHashes;
-        private object?[] _originalValues;
-        private BitArray _changedProperties;
-        private Func<object, int>[] _getHashCodes;
-        private Func<object, object?>[] _getValues;
-        private Dictionary<string, int> _propertyIndex;
+        // Initialize non-nullable fields with default values to satisfy CS8618
+        private Column[] _nonKeyColumns = Array.Empty<Column>();
+        private int[] _originalHashes = Array.Empty<int>();
+        private object?[] _originalValues = Array.Empty<object?>();
+        private BitArray _changedProperties = new BitArray(0);
+        private Func<object, int>[] _getHashCodes = Array.Empty<Func<object, int>>();
+        private Func<object, object?>[] _getValues = Array.Empty<Func<object, object?>>();
+        private Dictionary<string, int> _propertyIndex = new Dictionary<string, int>(StringComparer.Ordinal);
         private readonly DbContextOptions _options;
         private readonly Action<EntityEntry>? _markDirty;
         private bool _hasNotifiedChange;

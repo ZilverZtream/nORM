@@ -15,9 +15,7 @@ using nORM.Mapping;
 using nORM.Providers;
 using nORM.SourceGeneration;
 using Microsoft.Extensions.Logging;
-
 #nullable enable
-
 namespace nORM.Query
 {
     internal sealed partial class QueryTranslator : ExpressionVisitor, IDisposable
@@ -38,9 +36,7 @@ namespace nORM.Query
         private bool _isAggregate;
         private string _methodName = "";
         private Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams = new();
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value - used in complex join scenarios
         private GroupJoinInfo? _groupJoinInfo;
-#pragma warning restore CS0649
         private int _joinCounter;
         private DatabaseProvider _provider = null!;
         private bool _singleResult;
@@ -51,10 +47,8 @@ namespace nORM.Query
         private bool _isCacheable;
         private TimeSpan? _cacheExpiration;
         private DateTime? _asOfTimestamp;
-
         private const int MaxRecursionDepth = 100;
         private int _recursionDepth;
-
         private OptimizedSqlBuilder _sql => _clauses.Sql;
         private OptimizedSqlBuilder _where => _clauses.Where;
         private OptimizedSqlBuilder _having => _clauses.Having;
@@ -65,28 +59,21 @@ namespace nORM.Query
         private string? _takeParam { get => _clauses.TakeParam; set => _clauses.TakeParam = value; }
         private string? _skipParam { get => _clauses.SkipParam; set => _clauses.SkipParam = value; }
         private bool _isDistinct { get => _clauses.IsDistinct; set => _clauses.IsDistinct = value; }
-
-        // Initialize _groupJoinInfo in constructor to suppress warning
-        // This field is used in complex join scenarios
-
+        private bool _isPooled;
         private static readonly ObjectPool<QueryTranslator> _translatorPool =
             new DefaultObjectPool<QueryTranslator>(new QueryTranslatorPooledObjectPolicy());
-
         private static readonly ObjectPool<List<string>> _selectItemsPool =
             new DefaultObjectPool<List<string>>(new ListPooledObjectPolicy<string>());
-
         private static readonly AdaptiveQueryComplexityAnalyzer _complexityAnalyzer =
             new AdaptiveQueryComplexityAnalyzer(new SystemMemoryMonitor());
-
         private QueryTranslator()
         {
         }
-
         public QueryTranslator(DbContext ctx)
         {
+            _isPooled = false;
             Reset(ctx);
         }
-
         private QueryTranslator(
             DbContext ctx,
             TableMapping mapping,
@@ -99,6 +86,7 @@ namespace nORM.Query
             int joinStart = 0,
             int recursionDepth = 0)
         {
+            _isPooled = false;
             _ctx = ctx;
             _provider = ctx.Provider;
             _mapping = mapping;
@@ -113,7 +101,6 @@ namespace nORM.Query
             _joinCounter = joinStart;
             _recursionDepth = recursionDepth;
         }
-
         internal static QueryTranslator Create(
             DbContext ctx,
             TableMapping mapping,
@@ -126,21 +113,19 @@ namespace nORM.Query
             int joinStart = 0,
             int recursionDepth = 0)
             => new QueryTranslator(ctx, mapping, parameters, pIndex, correlated, tables, compiledParams, paramMap, joinStart, recursionDepth);
-
         internal static QueryTranslator Rent(DbContext ctx)
         {
             var t = _translatorPool.Get();
+            t._isPooled = true;
             t.Reset(ctx);
             return t;
         }
-
         private void Reset(DbContext ctx)
         {
             lock (_syncRoot)
             {
                 SqlBuilder? oldClauses = Interlocked.Exchange(ref _clauses, null!);
                 oldClauses?.Dispose();
-
                 _ctx = ctx;
                 _provider = ctx.Provider;
                 _mapping = null!;
@@ -165,7 +150,6 @@ namespace nORM.Query
                 _asOfTimestamp = null;
             }
         }
-
         private void Clear()
         {
             lock (_syncRoot)
@@ -173,11 +157,9 @@ namespace nORM.Query
                 SqlBuilder? oldClauses = Interlocked.Exchange(ref _clauses, null!);
                 oldClauses?.Dispose();
                 _clauses = new SqlBuilder();
-
                 _includes?.Clear();
                 _correlatedParams?.Clear();
                 _tables?.Clear();
-
                 _ctx = null!;
                 _provider = null!;
                 _mapping = null!;
@@ -198,10 +180,8 @@ namespace nORM.Query
                 _asOfTimestamp = null;
             }
         }
-
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
             => _materializerFactory.CreateMaterializer(mapping, targetType, projection);
-
         private static Type GetElementType(Expression queryExpression)
         {
             var type = queryExpression.Type;
@@ -210,14 +190,11 @@ namespace nORM.Query
                 var args = type.GetGenericArguments();
                 if (args.Length > 0) return args[0];
             }
-
             var iface = type.GetInterfaces()
                 .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
             if (iface != null) return iface.GetGenericArguments()[0];
-
             throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Cannot determine element type from expression of type {type}"));
         }
-
         public QueryPlan Translate(Expression e)
         {
             lock (_syncRoot)
@@ -228,44 +205,36 @@ namespace nORM.Query
                     .Generate();
             }
         }
-
         private sealed class TranslationBuilder
         {
             private readonly QueryTranslator _t;
             private readonly Expression _expression;
-
             public TranslationBuilder(QueryTranslator translator, Expression expression)
             {
                 _t = translator;
                 _expression = expression;
             }
-
             public TranslationBuilder Validate()
             {
                 if (_expression == null) throw new ArgumentNullException(nameof(_expression));
                 if (_t._ctx == null) throw new InvalidOperationException("QueryTranslator not properly initialized");
                 if (_t._provider == null) throw new InvalidOperationException("Provider not set");
-
                 var complexityInfo = _complexityAnalyzer.AnalyzeQuery(_expression, _t._ctx.Options);
                 if (complexityInfo.WarningMessages.Any())
                 {
                     var warnings = string.Join("; ", complexityInfo.WarningMessages);
                     _t._ctx.Options.Logger?.LogQuery($"-- WARN: {warnings}", new Dictionary<string, object>(), TimeSpan.Zero, 0);
                 }
-
                 var timeoutMultiplier = Math.Max(1.0, complexityInfo.EstimatedCost / 1000.0);
                 var adjustedTimeout = TimeSpan.FromMilliseconds(_t._ctx.Options.TimeoutConfiguration.BaseTimeout.TotalMilliseconds * timeoutMultiplier);
                 _t._estimatedTimeout = adjustedTimeout;
-
                 return this;
             }
-
             public TranslationBuilder Setup()
             {
                 var rootExpr = UnwrapQueryExpression(_expression);
                 _t._rootType = GetElementType(rootExpr);
                 _t._mapping = _t.TrackMapping(_t._rootType);
-
                 var baseType = _t._rootType.BaseType;
                 while (baseType != null && baseType != typeof(object))
                 {
@@ -284,27 +253,22 @@ namespace nORM.Query
                     }
                     baseType = baseType.BaseType;
                 }
-
                 return this;
             }
-
             public QueryPlan Generate()
             {
                 _t.Visit(_expression);
-
                 var materializerType = _t._projection?.Body.Type ?? _t._rootType ?? _t._mapping.Type;
                 if (_t._isAggregate && _t._groupBy.Count == 0 && (_expression as MethodCallExpression)?.Method.Name is "Count" or "LongCount")
                 {
                     materializerType = typeof(int);
                 }
-
                 var materializer = _t._materializerFactory.CreateMaterializer(_t._mapping, materializerType, _t._projection);
                 var isScalar = _t._isAggregate && _t._groupBy.Count == 0;
-
                 if (_t._sql.Length == 0)
                 {
                     var fromClause = _t._mapping.EscTable;
-                    var alias = _t._correlatedParams.Count > 0 ? _t._correlatedParams.Values.First().Alias : null;
+                    var alias = _t._correlatedParams.Count > 0 ? _t._correlatedParams.Values.FirstOrDefault().Alias : null;
                     if (_t._asOfTimestamp.HasValue)
                     {
                         alias ??= _t.EscapeAlias("T0");
@@ -324,7 +288,6 @@ namespace nORM.Query
 )";
                         fromClause = temporalQuery;
                     }
-
                     if (_t._isAggregate && _t._groupBy.Count == 0)
                     {
                         var prefix = PooledStringBuilder.Rent();
@@ -344,7 +307,6 @@ namespace nORM.Query
                         var windowFuncs = _t._clauses.WindowFunctions;
                         if (windowFuncs.Count > 0 && _t._projection == null)
                             _t._projection = windowFuncs[^1].ResultSelector;
-
                         string select;
                         if (windowFuncs.Count > 0 && _t._projection != null)
                         {
@@ -362,7 +324,6 @@ namespace nORM.Query
                         {
                             select = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
                         }
-
                         var distinct = _t._isDistinct ? "DISTINCT " : string.Empty;
                         var prefix = PooledStringBuilder.Rent();
                         try
@@ -377,12 +338,10 @@ namespace nORM.Query
                         }
                     }
                 }
-
                 if (_t._where.Length > 0)
                 {
                     _t._sql.AppendFragment(" WHERE ").Append(_t._where.ToSqlString());
                 }
-
                 if (_t._groupBy.Count > 0)
                     _t._sql.AppendFragment(" GROUP BY ").Append(PooledStringBuilder.Join(_t._groupBy));
                 if (_t._having.Length > 0)
@@ -390,31 +349,25 @@ namespace nORM.Query
                 if (_t._orderBy.Count > 0)
                     _t._sql.AppendFragment(" ORDER BY ").Append(PooledStringBuilder.JoinOrderBy(_t._orderBy));
                 _t._ctx.Provider.ApplyPaging(_t._sql, _t._take, _t._skip, _t._takeParam, _t._skipParam);
-
                 var singleResult = _t._singleResult || _t._methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
                     or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
-
                 var elementType = _t._groupJoinInfo?.ResultType ?? materializerType;
-
                 var plan = new QueryPlan(_t._sql.ToString(), (IReadOnlyDictionary<string, object>)_t._params, _t._compiledParams, materializer, elementType, isScalar, singleResult, _t._noTracking, _t._methodName, _t._includes, _t._groupJoinInfo, _t._tables.ToArray(), _t._splitQuery, _t._estimatedTimeout, _t._isCacheable, _t._cacheExpiration);
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
             }
         }
-
         private TableMapping TrackMapping(Type type)
         {
-            if (type == null) throw new ArgumentNullException(nameof(type));
+            ArgumentNullException.ThrowIfNull(type);
             var map = _ctx?.GetMapping(type) ?? throw new InvalidOperationException("Context not available");
             _tables.Add(map.TableName);
             return map;
         }
-
         private string BuildSelectWithWindowFunctions(LambdaExpression projection, List<WindowFunctionInfo> windowFuncs, string overClause)
         {
             if (projection.Body is not NewExpression ne)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Window function projection must be an anonymous object initializer."));
-
             var paramMap = windowFuncs.ToDictionary(w => w.ResultParameter, w => w);
             var sb = PooledStringBuilder.Rent();
             try
@@ -458,7 +411,6 @@ namespace nORM.Query
                 PooledStringBuilder.Return(sb);
             }
         }
-
         private string BuildWindowFunctionSql(WindowFunctionInfo wf, string overClause)
         {
             if (wf.ValueSelector != null)
@@ -475,7 +427,6 @@ namespace nORM.Query
                 foreach (var kvp in visitor.GetParameters())
                     _params[kvp.Key] = kvp.Value;
                 FastExpressionVisitorPool.Return(visitor);
-
                 string defaultSql = string.Empty;
                 if (wf.DefaultValueSelector != null)
                 {
@@ -493,7 +444,6 @@ namespace nORM.Query
                     FastExpressionVisitorPool.Return(visitor2);
                     defaultSql = $", {defSql}";
                 }
-
                 string offsetParam;
                 do
                 {
@@ -505,18 +455,15 @@ namespace nORM.Query
             }
             return $"{wf.FunctionName}() OVER ({overClause})";
         }
-
         private string TranslateSubExpression(Expression e)
         {
             if (_recursionDepth >= MaxRecursionDepth)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum translation depth of {MaxRecursionDepth}"));
-
             using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
             var subPlan = subTranslator.Translate(e);
             _parameterManager.Index = subTranslator.ParameterIndex;
             return subPlan.Sql;
         }
-
         private async Task<DateTime> GetTimestampForTagAsync(string tagName, CancellationToken ct = default)
         {
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
@@ -529,44 +476,41 @@ namespace nORM.Query
                 throw new NormQueryException($"Tag '{tagName}' not found.");
             return Convert.ToDateTime(result);
         }
-
         public void Dispose()
         {
             lock (_syncRoot)
             {
                 SqlBuilder? oldClauses = Interlocked.Exchange(ref _clauses, null!);
                 oldClauses?.Dispose();
-
-                // Don't return to pool if disposal was called directly
-                // _translatorPool.Return(this); // Remove this line
+                if (_isPooled)
+                {
+                    Clear();
+                    _translatorPool.Return(this);
+                }
+                else
+                {
+                    Clear();
+                }
             }
         }
-
         private sealed class QueryTranslatorPooledObjectPolicy : PooledObjectPolicy<QueryTranslator>
         {
             public override QueryTranslator Create() => new QueryTranslator();
-
             public override bool Return(QueryTranslator obj)
             {
                 obj.Clear();
                 return true;
             }
         }
-
         private sealed class ListPooledObjectPolicy<T> : PooledObjectPolicy<List<T>>
         {
             public override List<T> Create() => new List<T>();
-
             public override bool Return(List<T> obj)
             {
                 obj.Clear();
                 return true;
             }
         }
-
-
-
-
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             _methodName = node.Method.Name;
@@ -576,108 +520,81 @@ namespace nORM.Query
             }
             return base.VisitMethodCall(node);
         }
-
         private Expression HandleInnerJoin(MethodCallExpression node)
         {
             if (node.Arguments.Count < 5)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join operation requires 5 arguments"));
-
             var outerQuery = node.Arguments[0];
             var innerQuery = node.Arguments[1];
             var outerKeySelector = StripQuotes(node.Arguments[2]) as LambdaExpression;
             var innerKeySelector = StripQuotes(node.Arguments[3]) as LambdaExpression;
             var resultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
-
             if (outerKeySelector == null || innerKeySelector == null || resultSelector == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join selectors must be lambda expressions"));
-
             Visit(outerQuery);
-
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
-
             var outerAlias = EscapeAlias("T0");
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
-
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
             var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
             var outerKeyVisitor = FastExpressionVisitorPool.Get(in vctxOuter);
             var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
-
             if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
                 _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
             var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap);
             var innerKeyVisitor = FastExpressionVisitorPool.Get(in vctxInner);
             var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
-
             foreach (var kvp in outerKeyVisitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
             FastExpressionVisitorPool.Return(outerKeyVisitor);
             foreach (var kvp in innerKeyVisitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
             FastExpressionVisitorPool.Return(innerKeyVisitor);
-
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
-
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
             _sql.Clear();
-            _sql.Append(sql);
-
+            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
             return node;
         }
-
         private Expression HandleGroupJoin(MethodCallExpression node)
         {
             if (node.Arguments.Count < 5)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join operation requires 5 arguments"));
-
             var outerQuery = node.Arguments[0];
             var innerQuery = node.Arguments[1];
             var outerKeySelector = StripQuotes(node.Arguments[2]) as LambdaExpression;
             var innerKeySelector = StripQuotes(node.Arguments[3]) as LambdaExpression;
             var resultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
-
             if (outerKeySelector == null || innerKeySelector == null || resultSelector == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join selectors must be lambda expressions"));
-
             Visit(outerQuery);
-
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
-
             var outerAlias = EscapeAlias("T0");
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
-
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
             var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
             var outerKeyVisitor = FastExpressionVisitorPool.Get(in vctxOuter);
             var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
-
             if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
                 _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
             var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap);
             var innerKeyVisitor = FastExpressionVisitorPool.Get(in vctxInner);
             var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
-
             foreach (var kvp in outerKeyVisitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
             FastExpressionVisitorPool.Return(outerKeyVisitor);
             foreach (var kvp in innerKeyVisitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
             FastExpressionVisitorPool.Return(innerKeyVisitor);
-
             JoinBuilder.SetupJoinProjection(null, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
-
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
             _sql.Clear();
-            _sql.Append(sql);
-
+            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
             var outerType = outerKeySelector.Parameters[0].Type;
             var innerType = innerKeySelector.Parameters[0].Type;
             var resultType = resultSelector.Body.Type;
-
             var innerKeyColumn = innerMapping.Columns.FirstOrDefault(c =>
                 ExtractPropertyName(innerKeySelector.Body) == c.PropName);
             if (innerKeyColumn != null)
@@ -693,53 +610,41 @@ namespace nORM.Query
                     resultSelectorFunc
                 );
             }
-
             return node;
         }
-
         private Expression HandleSelectMany(MethodCallExpression node)
         {
             // SelectMany can be used in different ways:
             // 1. SelectMany(collectionSelector) - flattens collections
             // 2. SelectMany(collectionSelector, resultSelector) - joins and projects
-
             if (node.Arguments.Count < 2)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "SelectMany requires at least 2 arguments"));
-
             var sourceQuery = node.Arguments[0];
             var collectionSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
                                    ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Collection selector must be a lambda expression"));
-
             // Visit the source query first to establish base mapping
             Visit(sourceQuery);
-
             var outerMapping = _mapping;
             var outerAlias = EscapeAlias("T0");
-
             // Track the outer parameter for correlated references
             if (!_correlatedParams.ContainsKey(collectionSelector.Parameters[0]))
                 _correlatedParams[collectionSelector.Parameters[0]] = (outerMapping, outerAlias);
-
             // Determine if a result selector is provided
             var resultSelector = node.Arguments.Count > 2
                 ? StripQuotes(node.Arguments[2]) as LambdaExpression
                 : null;
-
             // Navigation property: treat as INNER JOIN
             if (collectionSelector.Body is MemberExpression memberExpr &&
                 outerMapping.Relations.TryGetValue(memberExpr.Member.Name, out var relation))
             {
                 var innerMapping = TrackMapping(relation.DependentType);
                 var innerAlias = EscapeAlias("T" + (++_joinCounter));
-
                 if (resultSelector != null && resultSelector.Parameters.Count > 1 &&
                     !_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
                 {
                     _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
                 }
-
                 using var joinSql = new OptimizedSqlBuilder(256);
-
                 if (_projection?.Body is NewExpression newExpr)
                 {
                     var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
@@ -773,14 +678,11 @@ namespace nORM.Query
                     joinSql.AppendJoin(", ", outerCols.Concat(innerCols));
                     joinSql.Append(' ');
                 }
-
                 joinSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
                 joinSql.Append($"INNER JOIN {innerMapping.EscTable} {innerAlias} ");
                 joinSql.Append($"ON {outerAlias}.{relation.PrincipalKey.EscCol} = {innerAlias}.{relation.ForeignKey.EscCol}");
-
                 _sql.Clear();
                 _sql.Append(joinSql.ToSqlString());
-
                 if (resultSelector != null)
                 {
                     _projection = resultSelector;
@@ -789,23 +691,18 @@ namespace nORM.Query
                 {
                     _mapping = innerMapping;
                 }
-
                 return node;
             }
-
             // Otherwise treat as CROSS JOIN
             var innerType = GetElementType(collectionSelector.Body);
             var crossMapping = TrackMapping(innerType);
             var crossAlias = EscapeAlias("T" + (++_joinCounter));
-
             if (resultSelector != null && resultSelector.Parameters.Count > 1 &&
                 !_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
             {
                 _correlatedParams[resultSelector.Parameters[1]] = (crossMapping, crossAlias);
             }
-
             using var crossSql = new OptimizedSqlBuilder(256);
-
             if (_projection?.Body is NewExpression crossNew)
             {
                 var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, outerMapping, crossMapping, outerAlias, crossAlias);
@@ -839,13 +736,10 @@ namespace nORM.Query
                 crossSql.AppendJoin(", ", outerCols.Concat(innerCols));
                 crossSql.Append(' ');
             }
-
             crossSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
             crossSql.Append($"CROSS JOIN {crossMapping.EscTable} {crossAlias}");
-
             _sql.Clear();
             _sql.Append(crossSql.ToSqlString());
-
             if (resultSelector != null)
             {
                 _projection = resultSelector;
@@ -854,18 +748,14 @@ namespace nORM.Query
             {
                 _mapping = crossMapping;
             }
-
             return node;
         }
-
         private Expression HandleSetOperation(MethodCallExpression node)
         {
             _isAggregate = true;
             _singleResult = true;
-
             var source = node.Arguments[0];
             var elementType = source.Type.GetGenericArguments().First();
-
             if (node.Method.Name == nameof(Queryable.Any) && node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression anyPred)
             {
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(anyPred));
@@ -885,12 +775,10 @@ namespace nORM.Query
                 var lambda = Expression.Lambda(eq, param);
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
             }
-
             using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _parameterManager.Index = subTranslator.ParameterIndex;
             _mapping = subTranslator._mapping;
-
             using var subSqlBuilder = new OptimizedSqlBuilder();
             var fromIndex = subPlan.Sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
             if (fromIndex >= 0)
@@ -905,7 +793,6 @@ namespace nORM.Query
             var limitParam = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
             _params[limitParam] = 1;
             _ctx.Provider.ApplyPaging(subSqlBuilder, 1, null, limitParam, null);
-
             switch (node.Method.Name)
             {
                 case nameof(Queryable.Any):
@@ -920,10 +807,8 @@ namespace nORM.Query
                     _sql.Append(")");
                     break;
             }
-
             return node;
         }
-
         private static bool TryGetConstantValue(Expression e, out object? value)
         {
             switch (e)
@@ -950,7 +835,6 @@ namespace nORM.Query
                         value = null;
                         return false;
                     }
-
                     var args = new object?[mce.Arguments.Count];
                     for (int i = 0; i < mce.Arguments.Count; i++)
                     {
@@ -961,15 +845,12 @@ namespace nORM.Query
                         }
                         args[i] = argVal;
                     }
-
                     value = mce.Method.Invoke(instance, args);
                     return true;
             }
-
             value = null;
             return false;
         }
-
         private static bool TryGetIntValue(Expression expr, out int value)
         {
             value = 0;
@@ -980,7 +861,6 @@ namespace nORM.Query
             }
             return false;
         }
-
         protected override Expression VisitConstant(ConstantExpression node)
         {
             if (node.Value is IQueryable q && q.ElementType != null)
@@ -988,11 +868,10 @@ namespace nORM.Query
                 if (_rootType == null || q.ElementType != _rootType)
                 {
                     _rootType = q.ElementType;
-            _mapping = TrackMapping(q.ElementType);
+                    _mapping = TrackMapping(q.ElementType);
                 }
                 return node;
             }
-
             if (node.Value != null)
             {
                 var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
@@ -1001,18 +880,15 @@ namespace nORM.Query
             }
             return node;
         }
-
         protected override Expression VisitParameter(ParameterExpression node)
         {
             if (_correlatedParams.ContainsKey(node))
                 return base.VisitParameter(node);
-
             if (_paramMap.TryGetValue(node, out var existing))
             {
                 _sql.Append(existing);
                 return node;
             }
-
             var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
             _params[paramName] = DBNull.Value;
             _compiledParams.Add(paramName);
@@ -1020,7 +896,6 @@ namespace nORM.Query
             _sql.Append(paramName);
             return node;
         }
-
         protected override Expression VisitBinary(BinaryExpression node)
         {
             _sql.Append("(");
@@ -1041,7 +916,6 @@ namespace nORM.Query
             _sql.Append(")");
             return node;
         }
-
         protected override Expression VisitMember(MemberExpression node)
         {
             if (node.Expression is ParameterExpression pe)
@@ -1058,7 +932,6 @@ namespace nORM.Query
                 }
                 return node;
             }
-
             if (TryGetConstantValue(node, out var value))
             {
                 var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
@@ -1066,19 +939,15 @@ namespace nORM.Query
                 _sql.Append(paramName);
                 return node;
             }
-
             throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, $"Member '{node.Member.Name}'"));
         }
-
         private string EscapeAlias(string alias)
         {
             if (string.IsNullOrWhiteSpace(alias))
                 throw new NormQueryException($"Invalid table alias: {alias}");
             return _provider.Escape(alias);
         }
-
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
-
         private LambdaExpression ExpandProjection(LambdaExpression lambda)
         {
             if (_projection != null &&
@@ -1091,17 +960,14 @@ namespace nORM.Query
             }
             return lambda;
         }
-
         private static Expression UnwrapQueryExpression(Expression expression) =>
             expression is MethodCallExpression mc &&
             !typeof(IQueryable).IsAssignableFrom(expression.Type) &&
             mc.Arguments.Count > 0
                 ? mc.Arguments[0]
                 : expression;
-
         private static bool IsRecordType(Type type) =>
             type.GetMethod("<Clone>$", BindingFlags.Instance | BindingFlags.NonPublic) != null;
-
         private static string? ExtractPropertyName(Expression expression)
         {
             return expression switch
@@ -1111,22 +977,20 @@ namespace nORM.Query
                 _ => null
             };
         }
-
         private Expression HandleAggregateExpression(MethodCallExpression node)
         {
             // node.Arguments[0] = source query
             // node.Arguments[1] = selector lambda
             // node.Arguments[2] = function name
-            
+
             var sourceQuery = node.Arguments[0];
             var selectorLambda = StripQuotes(node.Arguments[1]) as LambdaExpression;
             var functionConstant = node.Arguments[2] as ConstantExpression;
-            
+
             if (selectorLambda == null || functionConstant?.Value is not string functionName)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Invalid aggregate expression structure"));
-
             Visit(sourceQuery);
-            
+
             var param = selectorLambda.Parameters[0];
             var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
@@ -1134,34 +998,30 @@ namespace nORM.Query
             var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
             var visitor = FastExpressionVisitorPool.Get(in vctx);
             var columnSql = visitor.Translate(selectorLambda.Body);
-
             foreach (var kvp in visitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
             FastExpressionVisitorPool.Return(visitor);
-
             _isAggregate = true;
             _sql.Clear();
-            
+
             var sqlFunction = functionName.ToUpperInvariant();
             if (sqlFunction == "AVERAGE") sqlFunction = "AVG";
-            
+
             _sql.AppendSelect(ReadOnlySpan<char>.Empty);
             _sql.AppendAggregateFunction(sqlFunction, columnSql);
-            
+
             return node;
         }
-
         private Expression HandleGroupBy(MethodCallExpression node)
         {
             // GroupBy(source, keySelector) or GroupBy(source, keySelector, resultSelector)
             var sourceQuery = node.Arguments[0];
             var keySelectorLambda = StripQuotes(node.Arguments[1]) as LambdaExpression;
-            
+
             if (keySelectorLambda == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "GroupBy key selector must be a lambda expression"));
-
             Visit(sourceQuery);
-            
+
             var param = keySelectorLambda.Parameters[0];
             var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
@@ -1169,13 +1029,11 @@ namespace nORM.Query
             var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
             var visitor = FastExpressionVisitorPool.Get(in vctx2);
             var groupBySql = visitor.Translate(keySelectorLambda.Body);
-
             foreach (var kvp in visitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
             FastExpressionVisitorPool.Return(visitor);
-
             _groupBy.Add(groupBySql);
-            
+
             // If there's a result selector, handle the projection
             if (node.Arguments.Count > 2)
             {
@@ -1183,18 +1041,17 @@ namespace nORM.Query
                 if (resultSelector != null)
                 {
                     _projection = resultSelector;
-                    
+
                     // Clear the default select and let the projection handling rebuild it
                     _sql.Clear();
-                    
+
                     // Analyze the result selector to build appropriate SELECT clause
                     BuildGroupBySelectClause(resultSelector, groupBySql, alias);
                 }
             }
-            
+
             return node;
         }
-
         private void BuildGroupBySelectClause(LambdaExpression resultSelector, string groupBySql, string alias)
         {
             var selectItems = _selectItemsPool.Get();
@@ -1204,7 +1061,6 @@ namespace nORM.Query
                 builder.Append(groupBySql).Append(" AS GroupKey");
                 selectItems.Add(builder.ToString());
                 PooledStringBuilder.Return(builder);
-
                 // Analyze the result selector body to find aggregates
                 if (resultSelector.Body is NewExpression newExpr)
                 {
@@ -1212,7 +1068,6 @@ namespace nORM.Query
                     {
                         var arg = newExpr.Arguments[i];
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
-
                         if (arg is MethodCallExpression methodCall)
                         {
                             var aggregateSql = TranslateGroupAggregateMethod(methodCall, alias);
@@ -1237,19 +1092,16 @@ namespace nORM.Query
                             var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
                             var visitor = FastExpressionVisitorPool.Get(in vctx);
                             var sql = visitor.Translate(arg);
-
                             builder = PooledStringBuilder.Rent();
                             builder.Append(sql).Append(" AS ").Append(memberName);
                             selectItems.Add(builder.ToString());
                             PooledStringBuilder.Return(builder);
-
                             foreach (var kvp in visitor.GetParameters())
                                 _params[kvp.Key] = kvp.Value;
                             FastExpressionVisitorPool.Return(visitor);
                         }
                     }
                 }
-
                 _sql.AppendSelect(ReadOnlySpan<char>.Empty);
                 _sql.AppendJoin(", ", selectItems);
             }
@@ -1258,11 +1110,10 @@ namespace nORM.Query
                 _selectItemsPool.Return(selectItems);
             }
         }
-
         private string? TranslateGroupAggregateMethod(MethodCallExpression methodCall, string alias)
         {
             var methodName = methodCall.Method.Name;
-            
+
             // Handle IGrouping<TKey, TElement> methods
             switch (methodName)
             {
@@ -1346,14 +1197,13 @@ namespace nORM.Query
                     return null;
             }
         }
-
         private Expression HandleDirectAggregate(MethodCallExpression node)
         {
             // Handle direct aggregate calls like query.Sum(x => x.Amount)
             var sourceQuery = node.Arguments[0];
-            
+
             Visit(sourceQuery);
-            
+
             if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression selector)
             {
                 var param = selector.Parameters[0];
@@ -1363,35 +1213,31 @@ namespace nORM.Query
                 var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                 var columnSql = visitor.Translate(selector.Body);
-
                 foreach (var kvp in visitor.GetParameters())
                     _params[kvp.Key] = kvp.Value;
                 FastExpressionVisitorPool.Return(visitor);
-
                 _isAggregate = true;
                 _sql.Clear();
-                
+
                 var sqlFunction = node.Method.Name.ToUpperInvariant();
                 if (sqlFunction == "AVERAGE") sqlFunction = "AVG";
-                
+
                 _sql.AppendSelect(ReadOnlySpan<char>.Empty);
                 _sql.AppendAggregateFunction(sqlFunction, columnSql);
             }
-            
+
             return node;
         }
-
         private Expression HandleAllOperation(MethodCallExpression node)
         {
             // ALL is translated as NOT EXISTS with negated predicate
             var sourceQuery = node.Arguments[0];
             var predicate = node.Arguments[1] as LambdaExpression;
-            
+
             if (predicate == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "All operation requires a predicate"));
-
             Visit(sourceQuery);
-            
+
             // Create negated predicate: NOT (predicate)
             var param = predicate.Parameters[0];
             var alias = EscapeAlias("T" + _joinCounter);
@@ -1400,11 +1246,9 @@ namespace nORM.Query
             var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
             var visitor = FastExpressionVisitorPool.Get(in vctx2);
             var predicateSql = visitor.Translate(predicate.Body);
-
             foreach (var kvp in visitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
             FastExpressionVisitorPool.Return(visitor);
-
             // Wrap in NOT EXISTS
             _sql.Insert(0, "SELECT CASE WHEN NOT EXISTS(");
             if (_where.Length > 0)
@@ -1412,27 +1256,22 @@ namespace nORM.Query
             else
                 _where.Append($"NOT ({predicateSql})");
             _sql.Append(") THEN 1 ELSE 0 END");
-            
+
             return node;
         }
-
-
         private static Func<object, object> CreateObjectKeySelector(LambdaExpression keySelector)
         {
             var parameterType = keySelector.Parameters[0].Type;
             var returnType = keySelector.ReturnType;
-
             var objParam = Expression.Parameter(typeof(object), "obj");
             var castParam = Expression.Convert(objParam, parameterType);
             var body = new ParameterReplacer(keySelector.Parameters[0], castParam).Visit(keySelector.Body)!;
             var convertBody = Expression.Convert(body, typeof(object));
             var lambda = Expression.Lambda<Func<object, object>>(convertBody, objParam);
-
             ExpressionUtils.ValidateExpression(lambda);
             var timeout = ExpressionUtils.GetCompilationTimeout(lambda);
             using var cts = new CancellationTokenSource(timeout);
             var invoker = ExpressionUtils.CompileWithFallback(lambda, cts.Token);
-
             return obj =>
             {
                 try
@@ -1451,44 +1290,36 @@ namespace nORM.Query
                 }
             };
         }
-
         private static Func<object, IEnumerable<object>, object> CompileGroupJoinResultSelector(LambdaExpression resultSelector)
         {
             var outerParam = Expression.Parameter(typeof(object), "outer");
             var innerParam = Expression.Parameter(typeof(IEnumerable<object>), "inners");
-
             var castOuter = Expression.Convert(outerParam, resultSelector.Parameters[0].Type);
             var innerElementType = resultSelector.Parameters[1].Type.GetGenericArguments()[0];
             var castMethod = typeof(Enumerable).GetMethod("Cast")!.MakeGenericMethod(innerElementType);
             var castInner = Expression.Call(castMethod, innerParam);
-
             Expression body = resultSelector.Body;
             body = new ParameterReplacer(resultSelector.Parameters[0], castOuter).Visit(body)!;
             body = new ParameterReplacer(resultSelector.Parameters[1], castInner).Visit(body)!;
             body = Expression.Convert(body, typeof(object));
-
             var lambda = Expression.Lambda<Func<object, IEnumerable<object>, object>>(body, outerParam, innerParam);
             ExpressionUtils.ValidateExpression(lambda);
             var timeout = ExpressionUtils.GetCompilationTimeout(lambda);
             using var cts = new CancellationTokenSource(timeout);
             return ExpressionUtils.CompileWithFallback(lambda, cts.Token);
         }
-
         private sealed class ParameterReplacer : ExpressionVisitor
         {
             private readonly ParameterExpression _from;
             private readonly Expression _to;
-
             public ParameterReplacer(ParameterExpression from, Expression to)
             {
                 _from = from;
                 _to = to;
             }
-
             protected override Expression VisitParameter(ParameterExpression node) =>
                 node == _from ? _to : base.VisitParameter(node);
         }
-
         private sealed class ProjectionMemberReplacer : ExpressionVisitor
         {
             protected override Expression VisitMember(MemberExpression node)

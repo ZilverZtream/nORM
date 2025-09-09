@@ -17,12 +17,13 @@ namespace nORM.Navigation
         private readonly DbContext _context;
         private readonly Dictionary<(Type EntityType, string PropertyName), List<(object Entity, TaskCompletionSource<object> Tcs)>> _pendingLoads = new();
         private readonly Timer _batchTimer;
+        private int _processing;
         private readonly SemaphoreSlim _batchSemaphore = new(1, 1);
 
         public BatchedNavigationLoader(DbContext context)
         {
             _context = context;
-            _batchTimer = new Timer(ProcessBatch, null, TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(10));
+            _batchTimer = new Timer(TimerTick, null, TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(10));
             NavigationPropertyExtensions.RegisterLoader(this);
             _context.RegisterForDisposal(this);
         }
@@ -51,10 +52,15 @@ namespace nORM.Navigation
             return (List<object>)await tcs.Task.ConfigureAwait(false);
         }
 
-        private async void ProcessBatch(object? state)
+        private void TimerTick(object? state)
         {
-            if (!await _batchSemaphore.WaitAsync(1).ConfigureAwait(false))
-                return;
+            if (Interlocked.Exchange(ref _processing, 1) == 1) return;
+            _ = Task.Run(async () => { try { await ProcessBatchAsync().ConfigureAwait(false); } finally { Volatile.Write(ref _processing, 0); } });
+        }
+
+        private async Task ProcessBatchAsync()
+        {
+            await _batchSemaphore.WaitAsync().ConfigureAwait(false);
 
             try
             {
