@@ -27,43 +27,53 @@ namespace nORM.Core
 
         internal EntityEntry Track(object entity, EntityState state, TableMapping mapping)
         {
+            // Fast path: entity already tracked by reference
+            if (_entriesByReference.TryGetValue(entity, out var existingEntry))
+            {
+                existingEntry.State = state;
+                return existingEntry;
+            }
+
             var pk = GetPrimaryKeyValue(entity, mapping);
 
-            var entry = _entriesByReference.GetOrAdd(entity, _ =>
+            // If not found by reference, check by primary key
+            if (pk != null && _entriesByKey.TryGetValue(mapping.Type, out var existingTypeEntries) &&
+                existingTypeEntries.TryGetValue(pk, out var existing))
             {
-                var newEntry = state == EntityState.Unchanged && !_options.EagerChangeTracking
-                    ? CreateLazyEntry(entity, mapping)
-                    : new EntityEntry(entity, state, mapping, _options, MarkDirty);
+                existing.State = state;
+                return existing;
+            }
+
+            // Create new entry only when needed
+            var entry = state == EntityState.Unchanged && !_options.EagerChangeTracking
+                ? CreateLazyEntry(entity, mapping)
+                : new EntityEntry(entity, state, mapping, _options, MarkDirty);
+
+            if (_entriesByReference.TryAdd(entity, entry))
+            {
+                // Successfully added - set up additional tracking
+                if (entity is not INotifyPropertyChanged)
+                    _nonNotifyingEntries.TryAdd(entry, 0);
 
                 if (pk != null)
                 {
                     var typeEntries = _entriesByKey.GetOrAdd(
                         mapping.Type,
-                        _ => new ConcurrentDictionary<object, EntityEntry>());
-
-                    if (!typeEntries.TryAdd(pk, newEntry))
-                    {
-                        if (typeEntries.TryGetValue(pk, out var existingEntry))
-                        {
-                            existingEntry.State = state;
-                            return existingEntry;
-                        }
-                    }
+                        static _ => new ConcurrentDictionary<object, EntityEntry>());
+                    typeEntries.TryAdd(pk, entry);
                 }
 
-                if (entity is not INotifyPropertyChanged)
-                {
-                    _nonNotifyingEntries.TryAdd(newEntry, 0);
-                }
-
-                return newEntry;
-            });
-
-            if (entry.Entity == entity)
-            {
-                entry.State = state;
+                return entry;
             }
 
+            // Another thread added it between check and add
+            if (_entriesByReference.TryGetValue(entity, out var raceEntry))
+            {
+                raceEntry.State = state;
+                return raceEntry;
+            }
+
+            // Fallback: return the one we created
             return entry;
         }
 
