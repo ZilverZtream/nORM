@@ -96,6 +96,12 @@ namespace nORM.Mapping
             DiscoverRelations(ctx);
         }
 
+        /// <summary>
+        /// Inspects the entity type and associated configuration to build the collection of
+        /// relationships that describe how this entity links to dependents. Both explicitly
+        /// configured relationships and convention-based matches are considered.
+        /// </summary>
+        /// <param name="ctx">The <see cref="DbContext"/> used to resolve related entity mappings.</param>
         private void DiscoverRelations(DbContext ctx)
         {
             if (_fluentConfig?.Relationships.Count > 0)

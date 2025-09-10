@@ -57,6 +57,13 @@ namespace nORM.Migration
             return new MigrationSqlStatements(up, down);
         }
 
+        /// <summary>
+        /// Maps a <see cref="ColumnSchema"/> instance to the appropriate PostgreSQL column
+        /// type. When a CLR type is not explicitly mapped, <c>TEXT</c> is used as a safe
+        /// default.
+        /// </summary>
+        /// <param name="column">The column metadata describing the desired CLR type.</param>
+        /// <returns>The PostgreSQL data type name.</returns>
         private static string GetSqlType(ColumnSchema column)
             => TypeMap.TryGetValue(column.ClrType, out var sql) ? sql : "TEXT";
     }

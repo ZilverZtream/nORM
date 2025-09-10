@@ -225,6 +225,10 @@ namespace nORM.Scaffolding
             return name;
         }
 
+        /// <summary>
+        /// Converts a database object name to PascalCase by removing separators and capitalizing
+        /// the first letter of each segment.
+        /// </summary>
         private static string ToPascalCase(string name)
         {
             if (string.IsNullOrWhiteSpace(name)) return name;
@@ -248,14 +252,28 @@ namespace nORM.Scaffolding
             }
         }
 
+        /// <summary>
+        /// Combines schema and table names into a single unescaped string.
+        /// </summary>
         private static string EscapeQualified(string schema, string table) => $"{schema}.{table}";
 
+        /// <summary>
+        /// Returns a schema-qualified table name if a schema is provided; otherwise returns the
+        /// table name without modification.
+        /// </summary>
         private static string EscapeQualifiedIfNeeded(string? schema, string table) =>
             string.IsNullOrEmpty(schema) ? table : $"{schema}.{table}";
 
+        /// <summary>
+        /// Escapes schema and table identifiers using the given provider's rules.
+        /// </summary>
         private static string EscapeQualified(DatabaseProvider provider, string? schema, string table)
             => string.IsNullOrEmpty(schema) ? provider.Escape(table) : $"{provider.Escape(schema!)}.{provider.Escape(table)}";
 
+        /// <summary>
+        /// Escapes a potentially schema-qualified identifier by quoting each part according to
+        /// the database connection type.
+        /// </summary>
         private static string EscapeIdentifier(DbConnection connection, string identifier)
         {
             // Support schema-qualified names by escaping each part separately.
@@ -272,6 +290,10 @@ namespace nORM.Scaffolding
             return string.Join(".", parts.Select(Quote));
         }
 
+        /// <summary>
+        /// Escapes an identifier so it is valid in generated C# code, prefixing with '@' if it is
+        /// a keyword or otherwise invalid.
+        /// </summary>
         private static string EscapeCSharpIdentifier(string identifier)
         {
             if (string.IsNullOrEmpty(identifier)) return identifier;
@@ -282,12 +304,18 @@ namespace nORM.Scaffolding
             return needsAt ? "@" + identifier : identifier;
         }
 
+        /// <summary>
+        /// Extracts the unqualified name component from a schema-qualified identifier.
+        /// </summary>
         private static string GetUnqualifiedName(string identifier)
         {
             var idx = identifier.LastIndexOf('.');
             return idx >= 0 ? identifier[(idx + 1)..] : identifier;
         }
 
+        /// <summary>
+        /// Retrieves the schema portion of a qualified identifier, or <c>null</c> if none exists.
+        /// </summary>
         private static string? GetSchemaNameOrNull(string identifier)
         {
             var idx = identifier.LastIndexOf('.');

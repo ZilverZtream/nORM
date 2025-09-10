@@ -656,6 +656,14 @@ namespace nORM.Query
             b[0] = value;
             hasher.Append(b);
         }
+        /// <summary>
+        /// Executes a DELETE statement represented by the provided LINQ expression. The method
+        /// validates the generated plan, constructs the final SQL and executes it, returning the
+        /// number of affected rows.
+        /// </summary>
+        /// <param name="expression">The LINQ expression describing the entities to delete.</param>
+        /// <param name="ct">A token used to cancel the asynchronous operation.</param>
+        /// <returns>The count of rows removed from the database.</returns>
         private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
