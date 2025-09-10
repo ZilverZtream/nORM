@@ -58,6 +58,15 @@ namespace nORM.Execution
             _logger = logger;
         }
 
+        /// <summary>
+        /// Calculates an adaptive timeout value for a given database operation based on
+        /// its type, expected complexity and past execution statistics.
+        /// </summary>
+        /// <param name="operationType">The type of operation to be executed.</param>
+        /// <param name="recordCount">Number of records involved, used to scale timeouts for bulk operations.</param>
+        /// <param name="complexityScore">A relative complexity score used to adjust the timeout.</param>
+        /// <param name="operationKey">Optional key for tracking historical execution statistics.</param>
+        /// <returns>The timeout <see cref="TimeSpan"/> to apply for the operation.</returns>
         public TimeSpan GetTimeoutForOperation(
             OperationType operationType,
             int recordCount = 1,
@@ -190,6 +199,10 @@ namespace nORM.Execution
                 });
         }
 
+        /// <summary>
+        /// Retrieves a snapshot of the recorded timeout statistics for all operations.
+        /// </summary>
+        /// <returns>A dictionary keyed by operation identifier containing statistical data.</returns>
         public Dictionary<string, TimeoutStatistics> GetOperationStatistics()
         {
             return new Dictionary<string, TimeoutStatistics>(_operationStats);

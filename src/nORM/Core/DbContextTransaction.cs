@@ -19,6 +19,9 @@ namespace nORM.Core
 
         public DbTransaction? Transaction => _transaction;
 
+        /// <summary>
+        /// Commits the underlying database transaction and disposes the wrapper.
+        /// </summary>
         public void Commit()
         {
             _transaction?.Commit();
@@ -36,6 +39,9 @@ namespace nORM.Core
             await DisposeAsync().ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Rolls back the underlying database transaction and disposes the wrapper.
+        /// </summary>
         public void Rollback()
         {
             _transaction?.Rollback();
@@ -53,6 +59,9 @@ namespace nORM.Core
             await DisposeAsync().ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Disposes the transaction and clears it from the owning <see cref="DbContext"/>.
+        /// </summary>
         public void Dispose()
         {
             if (!_completed)

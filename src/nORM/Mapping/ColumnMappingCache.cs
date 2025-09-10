@@ -20,6 +20,14 @@ namespace nORM.Mapping
         private static readonly ConcurrentDictionary<Type, CachedTypeInfo> _typeCache = new();
         private static readonly ConcurrentDictionary<(Type EntityType, Type ProviderType, IEntityTypeConfiguration? Config), Column[]> _columnCache = new();
 
+        /// <summary>
+        /// Retrieves column metadata for the specified entity type from a cache,
+        /// generating the mapping if it has not been cached previously.
+        /// </summary>
+        /// <param name="entityType">The CLR type of the entity.</param>
+        /// <param name="provider">Database provider used for escaping identifiers.</param>
+        /// <param name="config">Optional entity type configuration.</param>
+        /// <returns>An array of <see cref="Column"/> objects describing the entity's columns.</returns>
         public static Column[] GetCachedColumns(Type entityType, DatabaseProvider provider, IEntityTypeConfiguration? config)
         {
             var key = (entityType, provider.GetType(), config);

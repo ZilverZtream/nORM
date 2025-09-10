@@ -126,6 +126,12 @@ namespace nORM.Mapping
             IsShadow = true;
         }
 
+        /// <summary>
+        /// Creates a compiled delegate that efficiently retrieves the value of the specified property
+        /// on a given object instance, boxing value types as necessary.
+        /// </summary>
+        /// <param name="property">The property for which to generate a getter.</param>
+        /// <returns>A delegate that returns the property's value for a supplied object.</returns>
         public static Func<object, object?> CreateGetterDelegate(PropertyInfo property)
         {
             var dm = new DynamicMethod("get_" + property.Name, typeof(object), new[] { typeof(object) }, property.DeclaringType!.Module, true);
