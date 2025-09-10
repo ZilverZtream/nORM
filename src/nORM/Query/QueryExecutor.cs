@@ -643,8 +643,22 @@ namespace nORM.Query
             public override Task<T> GetFieldValueAsync<T>(int ordinal, CancellationToken cancellationToken)
                 => _inner.GetFieldValueAsync<T>(ordinal + _offset, cancellationToken);
 
+            /// <summary>
+            /// Returns an enumerator that iterates through the current result set, applying the column offset.
+            /// </summary>
+            /// <returns>An enumerator over the underlying data reader.</returns>
             public override IEnumerator GetEnumerator() => _inner.GetEnumerator();
+
+            /// <summary>
+            /// Advances the reader to the next result set while preserving the column offset.
+            /// </summary>
+            /// <returns><c>true</c> if there is another result set; otherwise, <c>false</c>.</returns>
             public override bool NextResult() => _inner.NextResult();
+
+            /// <summary>
+            /// Reads the next row from the current result set.
+            /// </summary>
+            /// <returns><c>true</c> if there are more rows; otherwise, <c>false</c>.</returns>
             public override bool Read() => _inner.Read();
             /// <summary>
             /// Advances to the next result set asynchronously.
@@ -659,6 +673,10 @@ namespace nORM.Query
             /// <param name="cancellationToken">Token used to cancel the read operation.</param>
             /// <returns>A task returning <c>true</c> if a row was read.</returns>
             public override Task<bool> ReadAsync(CancellationToken cancellationToken) => _inner.ReadAsync(cancellationToken);
+            /// <summary>
+            /// Retrieves a <see cref="System.Data.DataTable"/> that describes the column metadata for the current result set.
+            /// </summary>
+            /// <returns>A schema table describing the current result set.</returns>
             public override System.Data.DataTable GetSchemaTable() => _inner.GetSchemaTable()!;
         }
     }
