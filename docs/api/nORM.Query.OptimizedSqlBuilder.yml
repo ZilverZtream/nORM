@@ -1,0 +1,2107 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Query.OptimizedSqlBuilder
+  commentId: T:nORM.Query.OptimizedSqlBuilder
+  id: OptimizedSqlBuilder
+  parent: nORM.Query
+  children:
+  - nORM.Query.OptimizedSqlBuilder.#ctor
+  - nORM.Query.OptimizedSqlBuilder.#ctor(System.Int32)
+  - nORM.Query.OptimizedSqlBuilder.Append(System.Char)
+  - nORM.Query.OptimizedSqlBuilder.Append(System.ReadOnlySpan{System.Char})
+  - nORM.Query.OptimizedSqlBuilder.Append(System.String)
+  - nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction(System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char})
+  - nORM.Query.OptimizedSqlBuilder.AppendFragment(System.String)
+  - nORM.Query.OptimizedSqlBuilder.AppendJoin(System.String,System.Collections.Generic.IEnumerable{System.String})
+  - nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue(System.String,System.Object,System.Collections.Generic.IDictionary{System.String,System.Object})
+  - nORM.Query.OptimizedSqlBuilder.AppendSelect(System.ReadOnlySpan{System.Char})
+  - nORM.Query.OptimizedSqlBuilder.Clear
+  - nORM.Query.OptimizedSqlBuilder.Dispose
+  - nORM.Query.OptimizedSqlBuilder.Insert(System.Int32,System.String)
+  - nORM.Query.OptimizedSqlBuilder.Length
+  - nORM.Query.OptimizedSqlBuilder.Remove(System.Int32,System.Int32)
+  - nORM.Query.OptimizedSqlBuilder.Reserve(System.Int32)
+  - nORM.Query.OptimizedSqlBuilder.ToSqlString
+  - nORM.Query.OptimizedSqlBuilder.ToString
+  - nORM.Query.OptimizedSqlBuilder.ToString(System.Int32,System.Int32)
+  langs:
+  - csharp
+  - vb
+  name: OptimizedSqlBuilder
+  nameWithType: OptimizedSqlBuilder
+  fullName: nORM.Query.OptimizedSqlBuilder
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OptimizedSqlBuilder
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 10
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: >-
+    SQL builder that minimizes allocations by working directly with
+
+    span-based operations over pooled character buffers.
+  example: []
+  syntax:
+    content: 'public sealed class OptimizedSqlBuilder : IDisposable'
+    content.vb: Public NotInheritable Class OptimizedSqlBuilder Implements IDisposable
+  inheritance:
+  - System.Object
+  implements:
+  - System.IDisposable
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  extensionMethods:
+  - nORM.Query.OptimizedSqlBuilder.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  - nORM.Query.OptimizedSqlBuilder.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,{TProperty}}})
+  - nORM.Query.OptimizedSqlBuilder.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  - nORM.Query.OptimizedSqlBuilder.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Query.OptimizedSqlBuilder.#ctor
+  commentId: M:nORM.Query.OptimizedSqlBuilder.#ctor
+  id: '#ctor'
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: OptimizedSqlBuilder()
+  nameWithType: OptimizedSqlBuilder.OptimizedSqlBuilder()
+  fullName: nORM.Query.OptimizedSqlBuilder.OptimizedSqlBuilder()
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 15
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  syntax:
+    content: public OptimizedSqlBuilder()
+    content.vb: Public Sub New()
+  overload: nORM.Query.OptimizedSqlBuilder.#ctor*
+  nameWithType.vb: OptimizedSqlBuilder.New()
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.New()
+  name.vb: New()
+- uid: nORM.Query.OptimizedSqlBuilder.#ctor(System.Int32)
+  commentId: M:nORM.Query.OptimizedSqlBuilder.#ctor(System.Int32)
+  id: '#ctor(System.Int32)'
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: OptimizedSqlBuilder(int)
+  nameWithType: OptimizedSqlBuilder.OptimizedSqlBuilder(int)
+  fullName: nORM.Query.OptimizedSqlBuilder.OptimizedSqlBuilder(int)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 20
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  syntax:
+    content: public OptimizedSqlBuilder(int capacity)
+    parameters:
+    - id: capacity
+      type: System.Int32
+    content.vb: Public Sub New(capacity As Integer)
+  overload: nORM.Query.OptimizedSqlBuilder.#ctor*
+  nameWithType.vb: OptimizedSqlBuilder.New(Integer)
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.New(Integer)
+  name.vb: New(Integer)
+- uid: nORM.Query.OptimizedSqlBuilder.Length
+  commentId: P:nORM.Query.OptimizedSqlBuilder.Length
+  id: Length
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: Length
+  nameWithType: OptimizedSqlBuilder.Length
+  fullName: nORM.Query.OptimizedSqlBuilder.Length
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Length
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 26
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  syntax:
+    content: public int Length { get; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public ReadOnly Property Length As Integer
+  overload: nORM.Query.OptimizedSqlBuilder.Length*
+- uid: nORM.Query.OptimizedSqlBuilder.Append(System.String)
+  commentId: M:nORM.Query.OptimizedSqlBuilder.Append(System.String)
+  id: Append(System.String)
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: Append(string?)
+  nameWithType: OptimizedSqlBuilder.Append(string?)
+  fullName: nORM.Query.OptimizedSqlBuilder.Append(string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Append
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 33
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Appends a string to the builder if the value is not <code>null</code>.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder Append(string? value)
+    parameters:
+    - id: value
+      type: System.String
+      description: The string to append.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function Append(value As String) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.Append*
+  nameWithType.vb: OptimizedSqlBuilder.Append(String)
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.Append(String)
+  name.vb: Append(String)
+- uid: nORM.Query.OptimizedSqlBuilder.Append(System.ReadOnlySpan{System.Char})
+  commentId: M:nORM.Query.OptimizedSqlBuilder.Append(System.ReadOnlySpan{System.Char})
+  id: Append(System.ReadOnlySpan{System.Char})
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: Append(ReadOnlySpan<char>)
+  nameWithType: OptimizedSqlBuilder.Append(ReadOnlySpan<char>)
+  fullName: nORM.Query.OptimizedSqlBuilder.Append(System.ReadOnlySpan<char>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Append
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 45
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Appends the specified span of characters to the builder.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder Append(ReadOnlySpan<char> value)
+    parameters:
+    - id: value
+      type: System.ReadOnlySpan{System.Char}
+      description: The characters to append.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function Append(value As ReadOnlySpan(Of Char)) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.Append*
+  nameWithType.vb: OptimizedSqlBuilder.Append(ReadOnlySpan(Of Char))
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.Append(System.ReadOnlySpan(Of Char))
+  name.vb: Append(ReadOnlySpan(Of Char))
+- uid: nORM.Query.OptimizedSqlBuilder.Append(System.Char)
+  commentId: M:nORM.Query.OptimizedSqlBuilder.Append(System.Char)
+  id: Append(System.Char)
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: Append(char)
+  nameWithType: OptimizedSqlBuilder.Append(char)
+  fullName: nORM.Query.OptimizedSqlBuilder.Append(char)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Append
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 58
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Appends a single character to the builder.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder Append(char value)
+    parameters:
+    - id: value
+      type: System.Char
+      description: The character to append.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function Append(value As Char) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.Append*
+  nameWithType.vb: OptimizedSqlBuilder.Append(Char)
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.Append(Char)
+  name.vb: Append(Char)
+- uid: nORM.Query.OptimizedSqlBuilder.AppendFragment(System.String)
+  commentId: M:nORM.Query.OptimizedSqlBuilder.AppendFragment(System.String)
+  id: AppendFragment(System.String)
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: AppendFragment(string)
+  nameWithType: OptimizedSqlBuilder.AppendFragment(string)
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendFragment(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AppendFragment
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 70
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Appends a pre-constructed SQL fragment to the builder.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder AppendFragment(string value)
+    parameters:
+    - id: value
+      type: System.String
+      description: The fragment to append.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function AppendFragment(value As String) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.AppendFragment*
+  nameWithType.vb: OptimizedSqlBuilder.AppendFragment(String)
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.AppendFragment(String)
+  name.vb: AppendFragment(String)
+- uid: nORM.Query.OptimizedSqlBuilder.AppendSelect(System.ReadOnlySpan{System.Char})
+  commentId: M:nORM.Query.OptimizedSqlBuilder.AppendSelect(System.ReadOnlySpan{System.Char})
+  id: AppendSelect(System.ReadOnlySpan{System.Char})
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: AppendSelect(ReadOnlySpan<char>)
+  nameWithType: OptimizedSqlBuilder.AppendSelect(ReadOnlySpan<char>)
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendSelect(System.ReadOnlySpan<char>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AppendSelect
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 77
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Appends a <code>SELECT</code> keyword and the provided column list.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder AppendSelect(ReadOnlySpan<char> columns)
+    parameters:
+    - id: columns
+      type: System.ReadOnlySpan{System.Char}
+      description: Columns to include in the <code>SELECT</code> clause.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function AppendSelect(columns As ReadOnlySpan(Of Char)) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.AppendSelect*
+  nameWithType.vb: OptimizedSqlBuilder.AppendSelect(ReadOnlySpan(Of Char))
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.AppendSelect(System.ReadOnlySpan(Of Char))
+  name.vb: AppendSelect(ReadOnlySpan(Of Char))
+- uid: nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction(System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char})
+  commentId: M:nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction(System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char})
+  id: AppendAggregateFunction(System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char})
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: AppendAggregateFunction(ReadOnlySpan<char>, ReadOnlySpan<char>)
+  nameWithType: OptimizedSqlBuilder.AppendAggregateFunction(ReadOnlySpan<char>, ReadOnlySpan<char>)
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction(System.ReadOnlySpan<char>, System.ReadOnlySpan<char>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AppendAggregateFunction
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 91
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Appends a SQL aggregate function invocation such as <code>COUNT(column)</code>.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder AppendAggregateFunction(ReadOnlySpan<char> function, ReadOnlySpan<char> column)
+    parameters:
+    - id: function
+      type: System.ReadOnlySpan{System.Char}
+      description: Name of the aggregate function.
+    - id: column
+      type: System.ReadOnlySpan{System.Char}
+      description: Column to aggregate.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function AppendAggregateFunction([function] As ReadOnlySpan(Of Char), column As ReadOnlySpan(Of Char)) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction*
+  nameWithType.vb: OptimizedSqlBuilder.AppendAggregateFunction(ReadOnlySpan(Of Char), ReadOnlySpan(Of Char))
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction(System.ReadOnlySpan(Of Char), System.ReadOnlySpan(Of Char))
+  name.vb: AppendAggregateFunction(ReadOnlySpan(Of Char), ReadOnlySpan(Of Char))
+- uid: nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue(System.String,System.Object,System.Collections.Generic.IDictionary{System.String,System.Object})
+  commentId: M:nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue(System.String,System.Object,System.Collections.Generic.IDictionary{System.String,System.Object})
+  id: AppendParameterizedValue(System.String,System.Object,System.Collections.Generic.IDictionary{System.String,System.Object})
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: AppendParameterizedValue(string, object?, IDictionary<string, object>)
+  nameWithType: OptimizedSqlBuilder.AppendParameterizedValue(string, object?, IDictionary<string, object>)
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue(string, object?, System.Collections.Generic.IDictionary<string, object>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AppendParameterizedValue
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 108
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: >-
+    Appends a parameter placeholder and stores its value in the supplied
+
+    dictionary for later use when executing a command.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder AppendParameterizedValue(string paramName, object? value, IDictionary<string, object> parameters)
+    parameters:
+    - id: paramName
+      type: System.String
+      description: The name of the parameter including prefix.
+    - id: value
+      type: System.Object
+      description: The value to associate with the parameter.
+    - id: parameters
+      type: System.Collections.Generic.IDictionary{System.String,System.Object}
+      description: Dictionary that collects parameter values.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function AppendParameterizedValue(paramName As String, value As Object, parameters As IDictionary(Of String, Object)) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue*
+  nameWithType.vb: OptimizedSqlBuilder.AppendParameterizedValue(String, Object, IDictionary(Of String, Object))
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue(String, Object, System.Collections.Generic.IDictionary(Of String, Object))
+  name.vb: AppendParameterizedValue(String, Object, IDictionary(Of String, Object))
+- uid: nORM.Query.OptimizedSqlBuilder.AppendJoin(System.String,System.Collections.Generic.IEnumerable{System.String})
+  commentId: M:nORM.Query.OptimizedSqlBuilder.AppendJoin(System.String,System.Collections.Generic.IEnumerable{System.String})
+  id: AppendJoin(System.String,System.Collections.Generic.IEnumerable{System.String})
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: AppendJoin(string, IEnumerable<string>)
+  nameWithType: OptimizedSqlBuilder.AppendJoin(string, IEnumerable<string>)
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendJoin(string, System.Collections.Generic.IEnumerable<string>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AppendJoin
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 121
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Appends a collection of values separated by the specified separator string.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder AppendJoin(string separator, IEnumerable<string> values)
+    parameters:
+    - id: separator
+      type: System.String
+      description: Separator to insert between values.
+    - id: values
+      type: System.Collections.Generic.IEnumerable{System.String}
+      description: Values to append.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function AppendJoin(separator As String, values As IEnumerable(Of String)) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.AppendJoin*
+  nameWithType.vb: OptimizedSqlBuilder.AppendJoin(String, IEnumerable(Of String))
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.AppendJoin(String, System.Collections.Generic.IEnumerable(Of String))
+  name.vb: AppendJoin(String, IEnumerable(Of String))
+- uid: nORM.Query.OptimizedSqlBuilder.Remove(System.Int32,System.Int32)
+  commentId: M:nORM.Query.OptimizedSqlBuilder.Remove(System.Int32,System.Int32)
+  id: Remove(System.Int32,System.Int32)
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: Remove(int, int)
+  nameWithType: OptimizedSqlBuilder.Remove(int, int)
+  fullName: nORM.Query.OptimizedSqlBuilder.Remove(int, int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Remove
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 142
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Removes a range of characters from the builder.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder Remove(int startIndex, int length)
+    parameters:
+    - id: startIndex
+      type: System.Int32
+      description: The starting index of the range to remove.
+    - id: length
+      type: System.Int32
+      description: The number of characters to remove.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function Remove(startIndex As Integer, length As Integer) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.Remove*
+  nameWithType.vb: OptimizedSqlBuilder.Remove(Integer, Integer)
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.Remove(Integer, Integer)
+  name.vb: Remove(Integer, Integer)
+- uid: nORM.Query.OptimizedSqlBuilder.Insert(System.Int32,System.String)
+  commentId: M:nORM.Query.OptimizedSqlBuilder.Insert(System.Int32,System.String)
+  id: Insert(System.Int32,System.String)
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: Insert(int, string)
+  nameWithType: OptimizedSqlBuilder.Insert(int, string)
+  fullName: nORM.Query.OptimizedSqlBuilder.Insert(int, string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Insert
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 156
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Inserts the specified string at the given index within the builder.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder Insert(int index, string value)
+    parameters:
+    - id: index
+      type: System.Int32
+      description: Position at which to insert the string.
+    - id: value
+      type: System.String
+      description: String to insert.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function Insert(index As Integer, value As String) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.Insert*
+  nameWithType.vb: OptimizedSqlBuilder.Insert(Integer, String)
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.Insert(Integer, String)
+  name.vb: Insert(Integer, String)
+- uid: nORM.Query.OptimizedSqlBuilder.Clear
+  commentId: M:nORM.Query.OptimizedSqlBuilder.Clear
+  id: Clear
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: Clear()
+  nameWithType: OptimizedSqlBuilder.Clear()
+  fullName: nORM.Query.OptimizedSqlBuilder.Clear()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Clear
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 169
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Resets the builder, discarding all accumulated characters.
+  example: []
+  syntax:
+    content: public void Clear()
+    content.vb: Public Sub Clear()
+  overload: nORM.Query.OptimizedSqlBuilder.Clear*
+- uid: nORM.Query.OptimizedSqlBuilder.ToSqlString
+  commentId: M:nORM.Query.OptimizedSqlBuilder.ToSqlString
+  id: ToSqlString
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: ToSqlString()
+  nameWithType: OptimizedSqlBuilder.ToSqlString()
+  fullName: nORM.Query.OptimizedSqlBuilder.ToSqlString()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ToSqlString
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 175
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Creates a <xref href="System.String" data-throw-if-not-resolved="false"></xref> from the current contents of the buffer.
+  example: []
+  syntax:
+    content: public string ToSqlString()
+    return:
+      type: System.String
+      description: The SQL text represented by this builder.
+    content.vb: Public Function ToSqlString() As String
+  overload: nORM.Query.OptimizedSqlBuilder.ToSqlString*
+- uid: nORM.Query.OptimizedSqlBuilder.ToString(System.Int32,System.Int32)
+  commentId: M:nORM.Query.OptimizedSqlBuilder.ToString(System.Int32,System.Int32)
+  id: ToString(System.Int32,System.Int32)
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: ToString(int, int)
+  nameWithType: OptimizedSqlBuilder.ToString(int, int)
+  fullName: nORM.Query.OptimizedSqlBuilder.ToString(int, int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ToString
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 183
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Converts a subset of the internal buffer to a <xref href="System.String" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public string ToString(int startIndex, int length)
+    parameters:
+    - id: startIndex
+      type: System.Int32
+      description: Index in the buffer at which to start.
+    - id: length
+      type: System.Int32
+      description: Number of characters to include.
+    return:
+      type: System.String
+      description: The specified substring.
+    content.vb: Public Function ToString(startIndex As Integer, length As Integer) As String
+  overload: nORM.Query.OptimizedSqlBuilder.ToString*
+  nameWithType.vb: OptimizedSqlBuilder.ToString(Integer, Integer)
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.ToString(Integer, Integer)
+  name.vb: ToString(Integer, Integer)
+- uid: nORM.Query.OptimizedSqlBuilder.ToString
+  commentId: M:nORM.Query.OptimizedSqlBuilder.ToString
+  id: ToString
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: ToString()
+  nameWithType: OptimizedSqlBuilder.ToString()
+  fullName: nORM.Query.OptimizedSqlBuilder.ToString()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ToString
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 188
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Returns the complete SQL string represented by the builder.
+  example: []
+  syntax:
+    content: public override string ToString()
+    return:
+      type: System.String
+    content.vb: Public Overrides Function ToString() As String
+  overridden: System.Object.ToString
+  overload: nORM.Query.OptimizedSqlBuilder.ToString*
+- uid: nORM.Query.OptimizedSqlBuilder.Dispose
+  commentId: M:nORM.Query.OptimizedSqlBuilder.Dispose
+  id: Dispose
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: Dispose()
+  nameWithType: OptimizedSqlBuilder.Dispose()
+  fullName: nORM.Query.OptimizedSqlBuilder.Dispose()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Dispose
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 193
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Returns the rented buffer to the pool.
+  example: []
+  syntax:
+    content: public void Dispose()
+    content.vb: Public Sub Dispose()
+  overload: nORM.Query.OptimizedSqlBuilder.Dispose*
+  implements:
+  - System.IDisposable.Dispose
+- uid: nORM.Query.OptimizedSqlBuilder.Reserve(System.Int32)
+  commentId: M:nORM.Query.OptimizedSqlBuilder.Reserve(System.Int32)
+  id: Reserve(System.Int32)
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: Reserve(int)
+  nameWithType: OptimizedSqlBuilder.Reserve(int)
+  fullName: nORM.Query.OptimizedSqlBuilder.Reserve(int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Reserve
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 225
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: >-
+    Reserves additional capacity in the underlying buffer to reduce future
+
+    reallocations when appending large amounts of data.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder Reserve(int additionalCapacity)
+    parameters:
+    - id: additionalCapacity
+      type: System.Int32
+      description: The number of extra characters to reserve space for.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function Reserve(additionalCapacity As Integer) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.Reserve*
+  nameWithType.vb: OptimizedSqlBuilder.Reserve(Integer)
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.Reserve(Integer)
+  name.vb: Reserve(Integer)
+references:
+- uid: nORM.Query
+  commentId: N:nORM.Query
+  href: nORM.html
+  name: nORM.Query
+  nameWithType: nORM.Query
+  fullName: nORM.Query
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Query
+    name: Query
+    href: nORM.Query.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Query
+    name: Query
+    href: nORM.Query.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.IDisposable
+  commentId: T:System.IDisposable
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.idisposable
+  name: IDisposable
+  nameWithType: IDisposable
+  fullName: System.IDisposable
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: nORM.Query.OptimizedSqlBuilder.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<OptimizedSqlBuilder>(OptimizedSqlBuilder, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<OptimizedSqlBuilder>(OptimizedSqlBuilder, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<nORM.Query.OptimizedSqlBuilder>(nORM.Query.OptimizedSqlBuilder, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of OptimizedSqlBuilder)(OptimizedSqlBuilder, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of nORM.Query.OptimizedSqlBuilder)(nORM.Query.OptimizedSqlBuilder, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of OptimizedSqlBuilder)(OptimizedSqlBuilder, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Query.OptimizedSqlBuilder,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: '>'
+  - name: (
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Query.OptimizedSqlBuilder,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: )
+  - name: (
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Query.OptimizedSqlBuilder.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,{TProperty}}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<OptimizedSqlBuilder, TProperty>(OptimizedSqlBuilder, Expression<Func<OptimizedSqlBuilder, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<OptimizedSqlBuilder, TProperty>(OptimizedSqlBuilder, Expression<Func<OptimizedSqlBuilder, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<nORM.Query.OptimizedSqlBuilder, TProperty>(nORM.Query.OptimizedSqlBuilder, System.Linq.Expressions.Expression<System.Func<nORM.Query.OptimizedSqlBuilder, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of OptimizedSqlBuilder, TProperty)(OptimizedSqlBuilder, Expression(Of Func(Of OptimizedSqlBuilder, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of nORM.Query.OptimizedSqlBuilder, TProperty)(nORM.Query.OptimizedSqlBuilder, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Query.OptimizedSqlBuilder, TProperty)))
+  name.vb: IsLoaded(Of OptimizedSqlBuilder, TProperty)(OptimizedSqlBuilder, Expression(Of Func(Of OptimizedSqlBuilder, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Query.OptimizedSqlBuilder,System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Query.OptimizedSqlBuilder,System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Query.OptimizedSqlBuilder.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<OptimizedSqlBuilder, TProperty>(OptimizedSqlBuilder, Expression<Func<OptimizedSqlBuilder, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<OptimizedSqlBuilder, TProperty>(OptimizedSqlBuilder, Expression<Func<OptimizedSqlBuilder, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Query.OptimizedSqlBuilder, TProperty>(nORM.Query.OptimizedSqlBuilder, System.Linq.Expressions.Expression<System.Func<nORM.Query.OptimizedSqlBuilder, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of OptimizedSqlBuilder, TProperty)(OptimizedSqlBuilder, Expression(Of Func(Of OptimizedSqlBuilder, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Query.OptimizedSqlBuilder, TProperty)(nORM.Query.OptimizedSqlBuilder, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Query.OptimizedSqlBuilder, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of OptimizedSqlBuilder, TProperty)(OptimizedSqlBuilder, Expression(Of Func(Of OptimizedSqlBuilder, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Query.OptimizedSqlBuilder,System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Query.OptimizedSqlBuilder,System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Query.OptimizedSqlBuilder.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,{TProperty}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<OptimizedSqlBuilder, TProperty>(OptimizedSqlBuilder, Expression<Func<OptimizedSqlBuilder, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<OptimizedSqlBuilder, TProperty>(OptimizedSqlBuilder, Expression<Func<OptimizedSqlBuilder, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Query.OptimizedSqlBuilder, TProperty>(nORM.Query.OptimizedSqlBuilder, System.Linq.Expressions.Expression<System.Func<nORM.Query.OptimizedSqlBuilder, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of OptimizedSqlBuilder, TProperty)(OptimizedSqlBuilder, Expression(Of Func(Of OptimizedSqlBuilder, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Query.OptimizedSqlBuilder, TProperty)(nORM.Query.OptimizedSqlBuilder, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Query.OptimizedSqlBuilder, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of OptimizedSqlBuilder, TProperty)(OptimizedSqlBuilder, Expression(Of Func(Of OptimizedSqlBuilder, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Query.OptimizedSqlBuilder,System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Query.OptimizedSqlBuilder,System.Linq.Expressions.Expression{System.Func{nORM.Query.OptimizedSqlBuilder,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<T>(T, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<T>(T, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<T>(T, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of T)(T, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+- uid: nORM.Query.OptimizedSqlBuilder.#ctor*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.#ctor
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder__ctor
+  name: OptimizedSqlBuilder
+  nameWithType: OptimizedSqlBuilder.OptimizedSqlBuilder
+  fullName: nORM.Query.OptimizedSqlBuilder.OptimizedSqlBuilder
+  nameWithType.vb: OptimizedSqlBuilder.New
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.New
+  name.vb: New
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: nORM.Query.OptimizedSqlBuilder.Length*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.Length
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_Length
+  name: Length
+  nameWithType: OptimizedSqlBuilder.Length
+  fullName: nORM.Query.OptimizedSqlBuilder.Length
+- uid: nORM.Query.OptimizedSqlBuilder.Append*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.Append
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_Append_System_String_
+  name: Append
+  nameWithType: OptimizedSqlBuilder.Append
+  fullName: nORM.Query.OptimizedSqlBuilder.Append
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: nORM.Query.OptimizedSqlBuilder
+  commentId: T:nORM.Query.OptimizedSqlBuilder
+  parent: nORM.Query
+  href: nORM.Query.OptimizedSqlBuilder.html
+  name: OptimizedSqlBuilder
+  nameWithType: OptimizedSqlBuilder
+  fullName: nORM.Query.OptimizedSqlBuilder
+- uid: System.ReadOnlySpan{System.Char}
+  commentId: T:System.ReadOnlySpan{System.Char}
+  parent: System
+  definition: System.ReadOnlySpan`1
+  href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  name: ReadOnlySpan<char>
+  nameWithType: ReadOnlySpan<char>
+  fullName: System.ReadOnlySpan<char>
+  nameWithType.vb: ReadOnlySpan(Of Char)
+  fullName.vb: System.ReadOnlySpan(Of Char)
+  name.vb: ReadOnlySpan(Of Char)
+  spec.csharp:
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: <
+  - uid: System.Char
+    name: char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: '>'
+  spec.vb:
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Char
+    name: Char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: )
+- uid: System.ReadOnlySpan`1
+  commentId: T:System.ReadOnlySpan`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  name: ReadOnlySpan<T>
+  nameWithType: ReadOnlySpan<T>
+  fullName: System.ReadOnlySpan<T>
+  nameWithType.vb: ReadOnlySpan(Of T)
+  fullName.vb: System.ReadOnlySpan(Of T)
+  name.vb: ReadOnlySpan(Of T)
+  spec.csharp:
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Char
+  commentId: T:System.Char
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.char
+  name: char
+  nameWithType: char
+  fullName: char
+  nameWithType.vb: Char
+  fullName.vb: Char
+  name.vb: Char
+- uid: nORM.Query.OptimizedSqlBuilder.AppendFragment*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.AppendFragment
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_AppendFragment_System_String_
+  name: AppendFragment
+  nameWithType: OptimizedSqlBuilder.AppendFragment
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendFragment
+- uid: nORM.Query.OptimizedSqlBuilder.AppendSelect*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.AppendSelect
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_AppendSelect_System_ReadOnlySpan_System_Char__
+  name: AppendSelect
+  nameWithType: OptimizedSqlBuilder.AppendSelect
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendSelect
+- uid: nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_AppendAggregateFunction_System_ReadOnlySpan_System_Char__System_ReadOnlySpan_System_Char__
+  name: AppendAggregateFunction
+  nameWithType: OptimizedSqlBuilder.AppendAggregateFunction
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction
+- uid: nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_AppendParameterizedValue_System_String_System_Object_System_Collections_Generic_IDictionary_System_String_System_Object__
+  name: AppendParameterizedValue
+  nameWithType: OptimizedSqlBuilder.AppendParameterizedValue
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue
+- uid: System.Collections.Generic.IDictionary{System.String,System.Object}
+  commentId: T:System.Collections.Generic.IDictionary{System.String,System.Object}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  name: IDictionary<string, object>
+  nameWithType: IDictionary<string, object>
+  fullName: System.Collections.Generic.IDictionary<string, object>
+  nameWithType.vb: IDictionary(Of String, Object)
+  fullName.vb: System.Collections.Generic.IDictionary(Of String, Object)
+  name.vb: IDictionary(Of String, Object)
+  spec.csharp:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Collections.Generic.IDictionary`2
+  commentId: T:System.Collections.Generic.IDictionary`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  name: IDictionary<TKey, TValue>
+  nameWithType: IDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IDictionary<TKey, TValue>
+  nameWithType.vb: IDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IDictionary(Of TKey, TValue)
+  name.vb: IDictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  - name: <
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Query.OptimizedSqlBuilder.AppendJoin*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.AppendJoin
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_AppendJoin_System_String_System_Collections_Generic_IEnumerable_System_String__
+  name: AppendJoin
+  nameWithType: OptimizedSqlBuilder.AppendJoin
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendJoin
+- uid: System.Collections.Generic.IEnumerable{System.String}
+  commentId: T:System.Collections.Generic.IEnumerable{System.String}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IEnumerable`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  name: IEnumerable<string>
+  nameWithType: IEnumerable<string>
+  fullName: System.Collections.Generic.IEnumerable<string>
+  nameWithType.vb: IEnumerable(Of String)
+  fullName.vb: System.Collections.Generic.IEnumerable(Of String)
+  name.vb: IEnumerable(Of String)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: System.Collections.Generic.IEnumerable`1
+  commentId: T:System.Collections.Generic.IEnumerable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  name: IEnumerable<T>
+  nameWithType: IEnumerable<T>
+  fullName: System.Collections.Generic.IEnumerable<T>
+  nameWithType.vb: IEnumerable(Of T)
+  fullName.vb: System.Collections.Generic.IEnumerable(Of T)
+  name.vb: IEnumerable(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Query.OptimizedSqlBuilder.Remove*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.Remove
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_Remove_System_Int32_System_Int32_
+  name: Remove
+  nameWithType: OptimizedSqlBuilder.Remove
+  fullName: nORM.Query.OptimizedSqlBuilder.Remove
+- uid: nORM.Query.OptimizedSqlBuilder.Insert*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.Insert
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_Insert_System_Int32_System_String_
+  name: Insert
+  nameWithType: OptimizedSqlBuilder.Insert
+  fullName: nORM.Query.OptimizedSqlBuilder.Insert
+- uid: nORM.Query.OptimizedSqlBuilder.Clear*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.Clear
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_Clear
+  name: Clear
+  nameWithType: OptimizedSqlBuilder.Clear
+  fullName: nORM.Query.OptimizedSqlBuilder.Clear
+- uid: nORM.Query.OptimizedSqlBuilder.ToSqlString*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.ToSqlString
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_ToSqlString
+  name: ToSqlString
+  nameWithType: OptimizedSqlBuilder.ToSqlString
+  fullName: nORM.Query.OptimizedSqlBuilder.ToSqlString
+- uid: nORM.Query.OptimizedSqlBuilder.ToString*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.ToString
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_ToString_System_Int32_System_Int32_
+  name: ToString
+  nameWithType: OptimizedSqlBuilder.ToString
+  fullName: nORM.Query.OptimizedSqlBuilder.ToString
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: nORM.Query.OptimizedSqlBuilder.Dispose*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.Dispose
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_Dispose
+  name: Dispose
+  nameWithType: OptimizedSqlBuilder.Dispose
+  fullName: nORM.Query.OptimizedSqlBuilder.Dispose
+- uid: System.IDisposable.Dispose
+  commentId: M:System.IDisposable.Dispose
+  parent: System.IDisposable
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  name: Dispose()
+  nameWithType: IDisposable.Dispose()
+  fullName: System.IDisposable.Dispose()
+  spec.csharp:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
+  - name: )
+- uid: nORM.Query.OptimizedSqlBuilder.Reserve*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.Reserve
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_Reserve_System_Int32_
+  name: Reserve
+  nameWithType: OptimizedSqlBuilder.Reserve
+  fullName: nORM.Query.OptimizedSqlBuilder.Reserve

@@ -1,0 +1,53 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Query
+  commentId: N:nORM.Query
+  id: nORM.Query
+  children:
+  - nORM.Query.OptimizedSqlBuilder
+  - nORM.Query.SqlFunctionAttribute
+  langs:
+  - csharp
+  - vb
+  name: nORM.Query
+  nameWithType: nORM.Query
+  fullName: nORM.Query
+  type: Namespace
+  assemblies:
+  - nORM
+references:
+- uid: nORM.Query.OptimizedSqlBuilder
+  commentId: T:nORM.Query.OptimizedSqlBuilder
+  parent: nORM.Query
+  href: nORM.Query.OptimizedSqlBuilder.html
+  name: OptimizedSqlBuilder
+  nameWithType: OptimizedSqlBuilder
+  fullName: nORM.Query.OptimizedSqlBuilder
+- uid: nORM.Query.SqlFunctionAttribute
+  commentId: T:nORM.Query.SqlFunctionAttribute
+  href: nORM.Query.SqlFunctionAttribute.html
+  name: SqlFunctionAttribute
+  nameWithType: SqlFunctionAttribute
+  fullName: nORM.Query.SqlFunctionAttribute
+- uid: nORM.Query
+  commentId: N:nORM.Query
+  href: nORM.html
+  name: nORM.Query
+  nameWithType: nORM.Query
+  fullName: nORM.Query
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Query
+    name: Query
+    href: nORM.Query.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Query
+    name: Query
+    href: nORM.Query.html

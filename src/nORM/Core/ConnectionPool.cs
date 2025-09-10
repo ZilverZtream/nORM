@@ -300,7 +300,7 @@ namespace nORM.Core
             /// Asynchronously disposes the pooled database connection and
             /// returns the underlying connection back to the pool.
             /// The method simply delegates to the synchronous
-            /// <see cref="Dispose()"/> implementation and returns a
+            /// Dispose implementation and returns a
             /// completed <see cref="ValueTask"/> for convenience.
             /// </summary>
             /// <returns>A completed task representing the asynchronous dispose operation.</returns>
@@ -345,12 +345,6 @@ namespace nORM.Core
             /// <returns>A task that completes when the connection has been opened.</returns>
             public override Task OpenAsync(CancellationToken cancellationToken) => _inner!.OpenAsync(cancellationToken);
 
-            /// <summary>
-            /// Begins a database transaction on the underlying connection using the
-            /// provider's default isolation level.
-            /// </summary>
-            /// <returns>A <see cref="DbTransaction"/> representing the started transaction.</returns>
-            public override DbTransaction BeginTransaction() => _inner!.BeginTransaction();
 
             /// <summary>
             /// Begins a database transaction on the underlying connection with the

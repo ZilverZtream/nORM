@@ -1,0 +1,489 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Scaffolding.DatabaseScaffolder
+  commentId: T:nORM.Scaffolding.DatabaseScaffolder
+  id: DatabaseScaffolder
+  parent: nORM.Scaffolding
+  children:
+  - nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String)
+  langs:
+  - csharp
+  - vb
+  name: DatabaseScaffolder
+  nameWithType: DatabaseScaffolder
+  fullName: nORM.Scaffolding.DatabaseScaffolder
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Scaffolding/DatabaseScaffolder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DatabaseScaffolder
+    path: src/nORM/Scaffolding/DatabaseScaffolder.cs
+    startLine: 22
+  assemblies:
+  - nORM
+  namespace: nORM.Scaffolding
+  summary: >-
+    Provides reverse-engineering utilities that can scaffold entity classes and a DbContext
+
+    from an existing database schema.
+  example: []
+  syntax:
+    content: public static class DatabaseScaffolder
+    content.vb: Public Module DatabaseScaffolder
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+- uid: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String)
+  commentId: M:nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String)
+  id: ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String)
+  parent: nORM.Scaffolding.DatabaseScaffolder
+  langs:
+  - csharp
+  - vb
+  name: ScaffoldAsync(DbConnection, DatabaseProvider, string, string, string)
+  nameWithType: DatabaseScaffolder.ScaffoldAsync(DbConnection, DatabaseProvider, string, string, string)
+  fullName: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection, nORM.Providers.DatabaseProvider, string, string, string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Scaffolding/DatabaseScaffolder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ScaffoldAsync
+    path: src/nORM/Scaffolding/DatabaseScaffolder.cs
+    startLine: 35
+  assemblies:
+  - nORM
+  namespace: nORM.Scaffolding
+  summary: Generates entity classes and a DbContext based on the current database schema.
+  example: []
+  syntax:
+    content: public static Task ScaffoldAsync(DbConnection connection, DatabaseProvider provider, string outputDirectory, string namespaceName, string contextName = "AppDbContext")
+    parameters:
+    - id: connection
+      type: System.Data.Common.DbConnection
+      description: Open database connection.
+    - id: provider
+      type: nORM.Providers.DatabaseProvider
+      description: Database provider implementation.
+    - id: outputDirectory
+      type: System.String
+      description: Directory to write generated files into.
+    - id: namespaceName
+      type: System.String
+      description: Namespace for the generated classes.
+    - id: contextName
+      type: System.String
+      description: Name of the generated DbContext.
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Public Shared Function ScaffoldAsync(connection As DbConnection, provider As DatabaseProvider, outputDirectory As String, namespaceName As String, contextName As String = "AppDbContext") As Task
+  overload: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync*
+  nameWithType.vb: DatabaseScaffolder.ScaffoldAsync(DbConnection, DatabaseProvider, String, String, String)
+  fullName.vb: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection, nORM.Providers.DatabaseProvider, String, String, String)
+  name.vb: ScaffoldAsync(DbConnection, DatabaseProvider, String, String, String)
+references:
+- uid: nORM.Scaffolding
+  commentId: N:nORM.Scaffolding
+  href: nORM.html
+  name: nORM.Scaffolding
+  nameWithType: nORM.Scaffolding
+  fullName: nORM.Scaffolding
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Scaffolding
+    name: Scaffolding
+    href: nORM.Scaffolding.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Scaffolding
+    name: Scaffolding
+    href: nORM.Scaffolding.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync*
+  commentId: Overload:nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync
+  href: nORM.Scaffolding.DatabaseScaffolder.html#nORM_Scaffolding_DatabaseScaffolder_ScaffoldAsync_System_Data_Common_DbConnection_nORM_Providers_DatabaseProvider_System_String_System_String_System_String_
+  name: ScaffoldAsync
+  nameWithType: DatabaseScaffolder.ScaffoldAsync
+  fullName: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync
+- uid: System.Data.Common.DbConnection
+  commentId: T:System.Data.Common.DbConnection
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection
+  name: DbConnection
+  nameWithType: DbConnection
+  fullName: System.Data.Common.DbConnection
+- uid: nORM.Providers.DatabaseProvider
+  commentId: T:nORM.Providers.DatabaseProvider
+  parent: nORM.Providers
+  href: nORM.Providers.DatabaseProvider.html
+  name: DatabaseProvider
+  nameWithType: DatabaseProvider
+  fullName: nORM.Providers.DatabaseProvider
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: System.Threading.Tasks.Task
+  commentId: T:System.Threading.Tasks.Task
+  parent: System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task
+  name: Task
+  nameWithType: Task
+  fullName: System.Threading.Tasks.Task
+- uid: System.Data.Common
+  commentId: N:System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Data.Common
+  nameWithType: System.Data.Common
+  fullName: System.Data.Common
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+- uid: nORM.Providers
+  commentId: N:nORM.Providers
+  href: nORM.html
+  name: nORM.Providers
+  nameWithType: nORM.Providers
+  fullName: nORM.Providers
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+- uid: System.Threading.Tasks
+  commentId: N:System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading.Tasks
+  nameWithType: System.Threading.Tasks
+  fullName: System.Threading.Tasks
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks

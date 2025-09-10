@@ -1,0 +1,1566 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.NormException
+  commentId: T:nORM.Core.NormException
+  id: NormException
+  parent: nORM.Core
+  children:
+  - nORM.Core.NormException.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.Exception)
+  - nORM.Core.NormException.Parameters
+  - nORM.Core.NormException.SqlStatement
+  langs:
+  - csharp
+  - vb
+  name: NormException
+  nameWithType: NormException
+  fullName: nORM.Core.NormException
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Core/NormException.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NormException
+    path: src/nORM/Core/NormException.cs
+    startLine: 8
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: 'public class NormException : DbException, ISerializable'
+    content.vb: Public Class NormException Inherits DbException Implements ISerializable
+  inheritance:
+  - System.Object
+  - System.Exception
+  - System.SystemException
+  - System.Runtime.InteropServices.ExternalException
+  - System.Data.Common.DbException
+  derivedClasses:
+  - nORM.Core.NormConfigurationException
+  - nORM.Core.NormConnectionException
+  - nORM.Core.NormDatabaseException
+  - nORM.Core.NormQueryException
+  - nORM.Core.NormTimeoutException
+  - nORM.Core.NormUnsupportedFeatureException
+  - nORM.Core.NormUsageException
+  implements:
+  - System.Runtime.Serialization.ISerializable
+  inheritedMembers:
+  - System.Data.Common.DbException.IsTransient
+  - System.Data.Common.DbException.SqlState
+  - System.Data.Common.DbException.BatchCommand
+  - System.Data.Common.DbException.DbBatchCommand
+  - System.Runtime.InteropServices.ExternalException.ToString
+  - System.Runtime.InteropServices.ExternalException.ErrorCode
+  - System.Exception.GetBaseException
+  - System.Exception.GetType
+  - System.Exception.Data
+  - System.Exception.HelpLink
+  - System.Exception.HResult
+  - System.Exception.InnerException
+  - System.Exception.Message
+  - System.Exception.Source
+  - System.Exception.StackTrace
+  - System.Exception.TargetSite
+  - System.Exception.SerializeObjectState
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  extensionMethods:
+  - nORM.Core.NormException.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  - nORM.Core.NormException.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,{TProperty}}})
+  - nORM.Core.NormException.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  - nORM.Core.NormException.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Core.NormException.SqlStatement
+  commentId: P:nORM.Core.NormException.SqlStatement
+  id: SqlStatement
+  parent: nORM.Core.NormException
+  langs:
+  - csharp
+  - vb
+  name: SqlStatement
+  nameWithType: NormException.SqlStatement
+  fullName: nORM.Core.NormException.SqlStatement
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/NormException.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SqlStatement
+    path: src/nORM/Core/NormException.cs
+    startLine: 10
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: public string? SqlStatement { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property SqlStatement As String
+  overload: nORM.Core.NormException.SqlStatement*
+- uid: nORM.Core.NormException.Parameters
+  commentId: P:nORM.Core.NormException.Parameters
+  id: Parameters
+  parent: nORM.Core.NormException
+  langs:
+  - csharp
+  - vb
+  name: Parameters
+  nameWithType: NormException.Parameters
+  fullName: nORM.Core.NormException.Parameters
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/NormException.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Parameters
+    path: src/nORM/Core/NormException.cs
+    startLine: 11
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: public IReadOnlyDictionary<string, object>? Parameters { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+    content.vb: Public ReadOnly Property Parameters As IReadOnlyDictionary(Of String, Object)
+  overload: nORM.Core.NormException.Parameters*
+- uid: nORM.Core.NormException.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.Exception)
+  commentId: M:nORM.Core.NormException.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.Exception)
+  id: '#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.Exception)'
+  parent: nORM.Core.NormException
+  langs:
+  - csharp
+  - vb
+  name: NormException(string, string?, IReadOnlyDictionary<string, object>?, Exception?)
+  nameWithType: NormException.NormException(string, string?, IReadOnlyDictionary<string, object>?, Exception?)
+  fullName: nORM.Core.NormException.NormException(string, string?, System.Collections.Generic.IReadOnlyDictionary<string, object>?, System.Exception?)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Core/NormException.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Core/NormException.cs
+    startLine: 13
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: public NormException(string message, string? sql, IReadOnlyDictionary<string, object>? parameters, Exception? inner = null)
+    parameters:
+    - id: message
+      type: System.String
+    - id: sql
+      type: System.String
+    - id: parameters
+      type: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+    - id: inner
+      type: System.Exception
+    content.vb: Public Sub New(message As String, sql As String, parameters As IReadOnlyDictionary(Of String, Object), inner As Exception = Nothing)
+  overload: nORM.Core.NormException.#ctor*
+  nameWithType.vb: NormException.New(String, String, IReadOnlyDictionary(Of String, Object), Exception)
+  fullName.vb: nORM.Core.NormException.New(String, String, System.Collections.Generic.IReadOnlyDictionary(Of String, Object), System.Exception)
+  name.vb: New(String, String, IReadOnlyDictionary(Of String, Object), Exception)
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Exception
+  commentId: T:System.Exception
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception
+  name: Exception
+  nameWithType: Exception
+  fullName: System.Exception
+- uid: System.SystemException
+  commentId: T:System.SystemException
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.systemexception
+  name: SystemException
+  nameWithType: SystemException
+  fullName: System.SystemException
+- uid: System.Runtime.InteropServices.ExternalException
+  commentId: T:System.Runtime.InteropServices.ExternalException
+  parent: System.Runtime.InteropServices
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.runtime.interopservices.externalexception
+  name: ExternalException
+  nameWithType: ExternalException
+  fullName: System.Runtime.InteropServices.ExternalException
+- uid: System.Data.Common.DbException
+  commentId: T:System.Data.Common.DbException
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbexception
+  name: DbException
+  nameWithType: DbException
+  fullName: System.Data.Common.DbException
+- uid: System.Runtime.Serialization.ISerializable
+  commentId: T:System.Runtime.Serialization.ISerializable
+  parent: System.Runtime.Serialization
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.runtime.serialization.iserializable
+  name: ISerializable
+  nameWithType: ISerializable
+  fullName: System.Runtime.Serialization.ISerializable
+- uid: System.Data.Common.DbException.IsTransient
+  commentId: P:System.Data.Common.DbException.IsTransient
+  parent: System.Data.Common.DbException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbexception.istransient
+  name: IsTransient
+  nameWithType: DbException.IsTransient
+  fullName: System.Data.Common.DbException.IsTransient
+- uid: System.Data.Common.DbException.SqlState
+  commentId: P:System.Data.Common.DbException.SqlState
+  parent: System.Data.Common.DbException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbexception.sqlstate
+  name: SqlState
+  nameWithType: DbException.SqlState
+  fullName: System.Data.Common.DbException.SqlState
+- uid: System.Data.Common.DbException.BatchCommand
+  commentId: P:System.Data.Common.DbException.BatchCommand
+  parent: System.Data.Common.DbException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbexception.batchcommand
+  name: BatchCommand
+  nameWithType: DbException.BatchCommand
+  fullName: System.Data.Common.DbException.BatchCommand
+- uid: System.Data.Common.DbException.DbBatchCommand
+  commentId: P:System.Data.Common.DbException.DbBatchCommand
+  parent: System.Data.Common.DbException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbexception.dbbatchcommand
+  name: DbBatchCommand
+  nameWithType: DbException.DbBatchCommand
+  fullName: System.Data.Common.DbException.DbBatchCommand
+- uid: System.Runtime.InteropServices.ExternalException.ToString
+  commentId: M:System.Runtime.InteropServices.ExternalException.ToString
+  parent: System.Runtime.InteropServices.ExternalException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.runtime.interopservices.externalexception.tostring
+  name: ToString()
+  nameWithType: ExternalException.ToString()
+  fullName: System.Runtime.InteropServices.ExternalException.ToString()
+  spec.csharp:
+  - uid: System.Runtime.InteropServices.ExternalException.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.runtime.interopservices.externalexception.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Runtime.InteropServices.ExternalException.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.runtime.interopservices.externalexception.tostring
+  - name: (
+  - name: )
+- uid: System.Runtime.InteropServices.ExternalException.ErrorCode
+  commentId: P:System.Runtime.InteropServices.ExternalException.ErrorCode
+  parent: System.Runtime.InteropServices.ExternalException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.runtime.interopservices.externalexception.errorcode
+  name: ErrorCode
+  nameWithType: ExternalException.ErrorCode
+  fullName: System.Runtime.InteropServices.ExternalException.ErrorCode
+- uid: System.Exception.GetBaseException
+  commentId: M:System.Exception.GetBaseException
+  parent: System.Exception
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception.getbaseexception
+  name: GetBaseException()
+  nameWithType: Exception.GetBaseException()
+  fullName: System.Exception.GetBaseException()
+  spec.csharp:
+  - uid: System.Exception.GetBaseException
+    name: GetBaseException
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.exception.getbaseexception
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Exception.GetBaseException
+    name: GetBaseException
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.exception.getbaseexception
+  - name: (
+  - name: )
+- uid: System.Exception.GetType
+  commentId: M:System.Exception.GetType
+  parent: System.Exception
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception.gettype
+  name: GetType()
+  nameWithType: Exception.GetType()
+  fullName: System.Exception.GetType()
+  spec.csharp:
+  - uid: System.Exception.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.exception.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Exception.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.exception.gettype
+  - name: (
+  - name: )
+- uid: System.Exception.Data
+  commentId: P:System.Exception.Data
+  parent: System.Exception
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception.data
+  name: Data
+  nameWithType: Exception.Data
+  fullName: System.Exception.Data
+- uid: System.Exception.HelpLink
+  commentId: P:System.Exception.HelpLink
+  parent: System.Exception
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception.helplink
+  name: HelpLink
+  nameWithType: Exception.HelpLink
+  fullName: System.Exception.HelpLink
+- uid: System.Exception.HResult
+  commentId: P:System.Exception.HResult
+  parent: System.Exception
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception.hresult
+  name: HResult
+  nameWithType: Exception.HResult
+  fullName: System.Exception.HResult
+- uid: System.Exception.InnerException
+  commentId: P:System.Exception.InnerException
+  parent: System.Exception
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception.innerexception
+  name: InnerException
+  nameWithType: Exception.InnerException
+  fullName: System.Exception.InnerException
+- uid: System.Exception.Message
+  commentId: P:System.Exception.Message
+  parent: System.Exception
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception.message
+  name: Message
+  nameWithType: Exception.Message
+  fullName: System.Exception.Message
+- uid: System.Exception.Source
+  commentId: P:System.Exception.Source
+  parent: System.Exception
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception.source
+  name: Source
+  nameWithType: Exception.Source
+  fullName: System.Exception.Source
+- uid: System.Exception.StackTrace
+  commentId: P:System.Exception.StackTrace
+  parent: System.Exception
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception.stacktrace
+  name: StackTrace
+  nameWithType: Exception.StackTrace
+  fullName: System.Exception.StackTrace
+- uid: System.Exception.TargetSite
+  commentId: P:System.Exception.TargetSite
+  parent: System.Exception
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception.targetsite
+  name: TargetSite
+  nameWithType: Exception.TargetSite
+  fullName: System.Exception.TargetSite
+- uid: System.Exception.SerializeObjectState
+  commentId: E:System.Exception.SerializeObjectState
+  parent: System.Exception
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception.serializeobjectstate
+  name: SerializeObjectState
+  nameWithType: Exception.SerializeObjectState
+  fullName: System.Exception.SerializeObjectState
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: nORM.Core.NormException.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<NormException>(NormException, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<NormException>(NormException, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<nORM.Core.NormException>(nORM.Core.NormException, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of NormException)(NormException, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of nORM.Core.NormException)(nORM.Core.NormException, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of NormException)(NormException, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.NormException,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.NormException,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: )
+  - name: (
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Core.NormException.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,{TProperty}}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<NormException, TProperty>(NormException, Expression<Func<NormException, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<NormException, TProperty>(NormException, Expression<Func<NormException, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<nORM.Core.NormException, TProperty>(nORM.Core.NormException, System.Linq.Expressions.Expression<System.Func<nORM.Core.NormException, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of NormException, TProperty)(NormException, Expression(Of Func(Of NormException, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of nORM.Core.NormException, TProperty)(nORM.Core.NormException, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.NormException, TProperty)))
+  name.vb: IsLoaded(Of NormException, TProperty)(NormException, Expression(Of Func(Of NormException, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Core.NormException,System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Core.NormException,System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Core.NormException.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<NormException, TProperty>(NormException, Expression<Func<NormException, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<NormException, TProperty>(NormException, Expression<Func<NormException, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Core.NormException, TProperty>(nORM.Core.NormException, System.Linq.Expressions.Expression<System.Func<nORM.Core.NormException, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of NormException, TProperty)(NormException, Expression(Of Func(Of NormException, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Core.NormException, TProperty)(nORM.Core.NormException, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.NormException, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of NormException, TProperty)(NormException, Expression(Of Func(Of NormException, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Core.NormException,System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Core.NormException,System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.NormException.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,{TProperty}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<NormException, TProperty>(NormException, Expression<Func<NormException, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<NormException, TProperty>(NormException, Expression<Func<NormException, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Core.NormException, TProperty>(nORM.Core.NormException, System.Linq.Expressions.Expression<System.Func<nORM.Core.NormException, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of NormException, TProperty)(NormException, Expression(Of Func(Of NormException, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Core.NormException, TProperty)(nORM.Core.NormException, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.NormException, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of NormException, TProperty)(NormException, Expression(Of Func(Of NormException, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Core.NormException,System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Core.NormException,System.Linq.Expressions.Expression{System.Func{nORM.Core.NormException,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.NormException
+    name: NormException
+    href: nORM.Core.NormException.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Runtime.InteropServices
+  commentId: N:System.Runtime.InteropServices
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Runtime.InteropServices
+  nameWithType: System.Runtime.InteropServices
+  fullName: System.Runtime.InteropServices
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Runtime
+    name: Runtime
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.runtime
+  - name: .
+  - uid: System.Runtime.InteropServices
+    name: InteropServices
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.runtime.interopservices
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Runtime
+    name: Runtime
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.runtime
+  - name: .
+  - uid: System.Runtime.InteropServices
+    name: InteropServices
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.runtime.interopservices
+- uid: System.Data.Common
+  commentId: N:System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Data.Common
+  nameWithType: System.Data.Common
+  fullName: System.Data.Common
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+- uid: System.Runtime.Serialization
+  commentId: N:System.Runtime.Serialization
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Runtime.Serialization
+  nameWithType: System.Runtime.Serialization
+  fullName: System.Runtime.Serialization
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Runtime
+    name: Runtime
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.runtime
+  - name: .
+  - uid: System.Runtime.Serialization
+    name: Serialization
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.runtime.serialization
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Runtime
+    name: Runtime
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.runtime
+  - name: .
+  - uid: System.Runtime.Serialization
+    name: Serialization
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.runtime.serialization
+- uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<T>(T, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<T>(T, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<T>(T, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of T)(T, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+- uid: nORM.Core.NormException.SqlStatement*
+  commentId: Overload:nORM.Core.NormException.SqlStatement
+  href: nORM.Core.NormException.html#nORM_Core_NormException_SqlStatement
+  name: SqlStatement
+  nameWithType: NormException.SqlStatement
+  fullName: nORM.Core.NormException.SqlStatement
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: nORM.Core.NormException.Parameters*
+  commentId: Overload:nORM.Core.NormException.Parameters
+  href: nORM.Core.NormException.html#nORM_Core_NormException_Parameters
+  name: Parameters
+  nameWithType: NormException.Parameters
+  fullName: nORM.Core.NormException.Parameters
+- uid: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<string, object>
+  nameWithType: IReadOnlyDictionary<string, object>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<string, object>
+  nameWithType.vb: IReadOnlyDictionary(Of String, Object)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of String, Object)
+  name.vb: IReadOnlyDictionary(Of String, Object)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Collections.Generic.IReadOnlyDictionary`2
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<TKey, TValue>
+  nameWithType: IReadOnlyDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>
+  nameWithType.vb: IReadOnlyDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of TKey, TValue)
+  name.vb: IReadOnlyDictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: <
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Core.NormException.#ctor*
+  commentId: Overload:nORM.Core.NormException.#ctor
+  href: nORM.Core.NormException.html#nORM_Core_NormException__ctor_System_String_System_String_System_Collections_Generic_IReadOnlyDictionary_System_String_System_Object__System_Exception_
+  name: NormException
+  nameWithType: NormException.NormException
+  fullName: nORM.Core.NormException.NormException
+  nameWithType.vb: NormException.New
+  fullName.vb: nORM.Core.NormException.New
+  name.vb: New

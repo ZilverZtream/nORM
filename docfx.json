@@ -1,0 +1,22 @@
+{
+  "metadata": [
+    {
+      "src": [
+        { "files": [ "src/nORM.csproj" ] }
+      ],
+      "dest": "docs/api",
+      "properties": {
+        "TargetFramework": "net8.0",
+        "Configuration": "Release",
+        "RunAnalyzersDuringBuild": "false"
+      }
+    }
+  ],
+  "build": {
+    "content": [
+      { "files": [ "docs/api/**.yml", "docs/api/toc.yml", "docs/api/index.md" ] },
+      { "files": [ "docs/**/*.md" ], "exclude": [ "**/obj/**" ] }
+    ],
+    "dest": "docs/_site"
+  }
+}

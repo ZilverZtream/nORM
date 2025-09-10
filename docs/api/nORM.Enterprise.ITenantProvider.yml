@@ -1,0 +1,813 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Enterprise.ITenantProvider
+  commentId: T:nORM.Enterprise.ITenantProvider
+  id: ITenantProvider
+  parent: nORM.Enterprise
+  children:
+  - nORM.Enterprise.ITenantProvider.GetCurrentTenantId
+  langs:
+  - csharp
+  - vb
+  name: ITenantProvider
+  nameWithType: ITenantProvider
+  fullName: nORM.Enterprise.ITenantProvider
+  type: Interface
+  source:
+    remote:
+      path: src/nORM/Enterprise/ITenantProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ITenantProvider
+    path: src/nORM/Enterprise/ITenantProvider.cs
+    startLine: 4
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  syntax:
+    content: public interface ITenantProvider
+    content.vb: Public Interface ITenantProvider
+  extensionMethods:
+  - nORM.Enterprise.ITenantProvider.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  - nORM.Enterprise.ITenantProvider.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,{TProperty}}})
+  - nORM.Enterprise.ITenantProvider.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  - nORM.Enterprise.ITenantProvider.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Enterprise.ITenantProvider.GetCurrentTenantId
+  commentId: M:nORM.Enterprise.ITenantProvider.GetCurrentTenantId
+  id: GetCurrentTenantId
+  parent: nORM.Enterprise.ITenantProvider
+  langs:
+  - csharp
+  - vb
+  name: GetCurrentTenantId()
+  nameWithType: ITenantProvider.GetCurrentTenantId()
+  fullName: nORM.Enterprise.ITenantProvider.GetCurrentTenantId()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/ITenantProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GetCurrentTenantId
+    path: src/nORM/Enterprise/ITenantProvider.cs
+    startLine: 6
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  syntax:
+    content: object GetCurrentTenantId()
+    return:
+      type: System.Object
+    content.vb: Function GetCurrentTenantId() As Object
+  overload: nORM.Enterprise.ITenantProvider.GetCurrentTenantId*
+references:
+- uid: nORM.Enterprise
+  commentId: N:nORM.Enterprise
+  href: nORM.html
+  name: nORM.Enterprise
+  nameWithType: nORM.Enterprise
+  fullName: nORM.Enterprise
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Enterprise
+    name: Enterprise
+    href: nORM.Enterprise.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Enterprise
+    name: Enterprise
+    href: nORM.Enterprise.html
+- uid: nORM.Enterprise.ITenantProvider.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<ITenantProvider>(ITenantProvider, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<ITenantProvider>(ITenantProvider, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<nORM.Enterprise.ITenantProvider>(nORM.Enterprise.ITenantProvider, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of ITenantProvider)(ITenantProvider, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of nORM.Enterprise.ITenantProvider)(nORM.Enterprise.ITenantProvider, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of ITenantProvider)(ITenantProvider, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Enterprise.ITenantProvider,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: '>'
+  - name: (
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Enterprise.ITenantProvider,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: )
+  - name: (
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Enterprise.ITenantProvider.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,{TProperty}}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<ITenantProvider, TProperty>(ITenantProvider, Expression<Func<ITenantProvider, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<ITenantProvider, TProperty>(ITenantProvider, Expression<Func<ITenantProvider, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<nORM.Enterprise.ITenantProvider, TProperty>(nORM.Enterprise.ITenantProvider, System.Linq.Expressions.Expression<System.Func<nORM.Enterprise.ITenantProvider, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of ITenantProvider, TProperty)(ITenantProvider, Expression(Of Func(Of ITenantProvider, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of nORM.Enterprise.ITenantProvider, TProperty)(nORM.Enterprise.ITenantProvider, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Enterprise.ITenantProvider, TProperty)))
+  name.vb: IsLoaded(Of ITenantProvider, TProperty)(ITenantProvider, Expression(Of Func(Of ITenantProvider, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Enterprise.ITenantProvider,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Enterprise.ITenantProvider,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Enterprise.ITenantProvider.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<ITenantProvider, TProperty>(ITenantProvider, Expression<Func<ITenantProvider, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<ITenantProvider, TProperty>(ITenantProvider, Expression<Func<ITenantProvider, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Enterprise.ITenantProvider, TProperty>(nORM.Enterprise.ITenantProvider, System.Linq.Expressions.Expression<System.Func<nORM.Enterprise.ITenantProvider, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of ITenantProvider, TProperty)(ITenantProvider, Expression(Of Func(Of ITenantProvider, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Enterprise.ITenantProvider, TProperty)(nORM.Enterprise.ITenantProvider, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Enterprise.ITenantProvider, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of ITenantProvider, TProperty)(ITenantProvider, Expression(Of Func(Of ITenantProvider, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Enterprise.ITenantProvider,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Enterprise.ITenantProvider,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Enterprise.ITenantProvider.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,{TProperty}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<ITenantProvider, TProperty>(ITenantProvider, Expression<Func<ITenantProvider, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<ITenantProvider, TProperty>(ITenantProvider, Expression<Func<ITenantProvider, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Enterprise.ITenantProvider, TProperty>(nORM.Enterprise.ITenantProvider, System.Linq.Expressions.Expression<System.Func<nORM.Enterprise.ITenantProvider, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of ITenantProvider, TProperty)(ITenantProvider, Expression(Of Func(Of ITenantProvider, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Enterprise.ITenantProvider, TProperty)(nORM.Enterprise.ITenantProvider, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Enterprise.ITenantProvider, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of ITenantProvider, TProperty)(ITenantProvider, Expression(Of Func(Of ITenantProvider, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Enterprise.ITenantProvider,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Enterprise.ITenantProvider,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ITenantProvider,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    href: nORM.Enterprise.ITenantProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<T>(T, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<T>(T, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<T>(T, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of T)(T, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+- uid: nORM.Enterprise.ITenantProvider.GetCurrentTenantId*
+  commentId: Overload:nORM.Enterprise.ITenantProvider.GetCurrentTenantId
+  href: nORM.Enterprise.ITenantProvider.html#nORM_Enterprise_ITenantProvider_GetCurrentTenantId
+  name: GetCurrentTenantId
+  nameWithType: ITenantProvider.GetCurrentTenantId
+  fullName: nORM.Enterprise.ITenantProvider.GetCurrentTenantId
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System

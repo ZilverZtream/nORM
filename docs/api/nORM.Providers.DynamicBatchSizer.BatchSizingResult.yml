@@ -1,0 +1,1181 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+  commentId: T:nORM.Providers.DynamicBatchSizer.BatchSizingResult
+  id: DynamicBatchSizer.BatchSizingResult
+  parent: nORM.Providers
+  children:
+  - nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime
+  - nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage
+  - nORM.Providers.DynamicBatchSizer.BatchSizingResult.OptimalBatchSize
+  - nORM.Providers.DynamicBatchSizer.BatchSizingResult.Strategy
+  langs:
+  - csharp
+  - vb
+  name: DynamicBatchSizer.BatchSizingResult
+  nameWithType: DynamicBatchSizer.BatchSizingResult
+  fullName: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Providers/DynamicBatchSizer.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BatchSizingResult
+    path: src/nORM/Providers/DynamicBatchSizer.cs
+    startLine: 16
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  syntax:
+    content: public class DynamicBatchSizer.BatchSizingResult
+    content.vb: Public Class DynamicBatchSizer.BatchSizingResult
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+  extensionMethods:
+  - nORM.Providers.DynamicBatchSizer.BatchSizingResult.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  - nORM.Providers.DynamicBatchSizer.BatchSizingResult.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,{TProperty}}})
+  - nORM.Providers.DynamicBatchSizer.BatchSizingResult.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  - nORM.Providers.DynamicBatchSizer.BatchSizingResult.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.OptimalBatchSize
+  commentId: P:nORM.Providers.DynamicBatchSizer.BatchSizingResult.OptimalBatchSize
+  id: OptimalBatchSize
+  parent: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+  langs:
+  - csharp
+  - vb
+  name: OptimalBatchSize
+  nameWithType: DynamicBatchSizer.BatchSizingResult.OptimalBatchSize
+  fullName: nORM.Providers.DynamicBatchSizer.BatchSizingResult.OptimalBatchSize
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Providers/DynamicBatchSizer.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OptimalBatchSize
+    path: src/nORM/Providers/DynamicBatchSizer.cs
+    startLine: 18
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  syntax:
+    content: public int OptimalBatchSize { get; set; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public Property OptimalBatchSize As Integer
+  overload: nORM.Providers.DynamicBatchSizer.BatchSizingResult.OptimalBatchSize*
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage
+  commentId: P:nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage
+  id: EstimatedMemoryUsage
+  parent: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+  langs:
+  - csharp
+  - vb
+  name: EstimatedMemoryUsage
+  nameWithType: DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage
+  fullName: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Providers/DynamicBatchSizer.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EstimatedMemoryUsage
+    path: src/nORM/Providers/DynamicBatchSizer.cs
+    startLine: 19
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  syntax:
+    content: public int EstimatedMemoryUsage { get; set; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public Property EstimatedMemoryUsage As Integer
+  overload: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage*
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime
+  commentId: P:nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime
+  id: EstimatedBatchTime
+  parent: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+  langs:
+  - csharp
+  - vb
+  name: EstimatedBatchTime
+  nameWithType: DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime
+  fullName: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Providers/DynamicBatchSizer.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EstimatedBatchTime
+    path: src/nORM/Providers/DynamicBatchSizer.cs
+    startLine: 20
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  syntax:
+    content: public TimeSpan EstimatedBatchTime { get; set; }
+    parameters: []
+    return:
+      type: System.TimeSpan
+    content.vb: Public Property EstimatedBatchTime As TimeSpan
+  overload: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime*
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.Strategy
+  commentId: P:nORM.Providers.DynamicBatchSizer.BatchSizingResult.Strategy
+  id: Strategy
+  parent: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+  langs:
+  - csharp
+  - vb
+  name: Strategy
+  nameWithType: DynamicBatchSizer.BatchSizingResult.Strategy
+  fullName: nORM.Providers.DynamicBatchSizer.BatchSizingResult.Strategy
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Providers/DynamicBatchSizer.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Strategy
+    path: src/nORM/Providers/DynamicBatchSizer.cs
+    startLine: 21
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  syntax:
+    content: public string Strategy { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property Strategy As String
+  overload: nORM.Providers.DynamicBatchSizer.BatchSizingResult.Strategy*
+references:
+- uid: nORM.Providers
+  commentId: N:nORM.Providers
+  href: nORM.html
+  name: nORM.Providers
+  nameWithType: nORM.Providers
+  fullName: nORM.Providers
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<BatchSizingResult>(BatchSizingResult, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<DynamicBatchSizer.BatchSizingResult>(DynamicBatchSizer.BatchSizingResult, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<nORM.Providers.DynamicBatchSizer.BatchSizingResult>(nORM.Providers.DynamicBatchSizer.BatchSizingResult, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of DynamicBatchSizer.BatchSizingResult)(DynamicBatchSizer.BatchSizingResult, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of nORM.Providers.DynamicBatchSizer.BatchSizingResult)(nORM.Providers.DynamicBatchSizer.BatchSizingResult, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of BatchSizingResult)(BatchSizingResult, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Providers.DynamicBatchSizer.BatchSizingResult,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: '>'
+  - name: (
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Providers.DynamicBatchSizer.BatchSizingResult,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: )
+  - name: (
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,{TProperty}}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<BatchSizingResult, TProperty>(BatchSizingResult, Expression<Func<BatchSizingResult, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<DynamicBatchSizer.BatchSizingResult, TProperty>(DynamicBatchSizer.BatchSizingResult, Expression<Func<DynamicBatchSizer.BatchSizingResult, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<nORM.Providers.DynamicBatchSizer.BatchSizingResult, TProperty>(nORM.Providers.DynamicBatchSizer.BatchSizingResult, System.Linq.Expressions.Expression<System.Func<nORM.Providers.DynamicBatchSizer.BatchSizingResult, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of DynamicBatchSizer.BatchSizingResult, TProperty)(DynamicBatchSizer.BatchSizingResult, Expression(Of Func(Of DynamicBatchSizer.BatchSizingResult, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of nORM.Providers.DynamicBatchSizer.BatchSizingResult, TProperty)(nORM.Providers.DynamicBatchSizer.BatchSizingResult, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Providers.DynamicBatchSizer.BatchSizingResult, TProperty)))
+  name.vb: IsLoaded(Of BatchSizingResult, TProperty)(BatchSizingResult, Expression(Of Func(Of BatchSizingResult, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Providers.DynamicBatchSizer.BatchSizingResult,System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Providers.DynamicBatchSizer.BatchSizingResult,System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<BatchSizingResult, TProperty>(BatchSizingResult, Expression<Func<BatchSizingResult, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<DynamicBatchSizer.BatchSizingResult, TProperty>(DynamicBatchSizer.BatchSizingResult, Expression<Func<DynamicBatchSizer.BatchSizingResult, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Providers.DynamicBatchSizer.BatchSizingResult, TProperty>(nORM.Providers.DynamicBatchSizer.BatchSizingResult, System.Linq.Expressions.Expression<System.Func<nORM.Providers.DynamicBatchSizer.BatchSizingResult, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of DynamicBatchSizer.BatchSizingResult, TProperty)(DynamicBatchSizer.BatchSizingResult, Expression(Of Func(Of DynamicBatchSizer.BatchSizingResult, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Providers.DynamicBatchSizer.BatchSizingResult, TProperty)(nORM.Providers.DynamicBatchSizer.BatchSizingResult, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Providers.DynamicBatchSizer.BatchSizingResult, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of BatchSizingResult, TProperty)(BatchSizingResult, Expression(Of Func(Of BatchSizingResult, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Providers.DynamicBatchSizer.BatchSizingResult,System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Providers.DynamicBatchSizer.BatchSizingResult,System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,{TProperty}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<BatchSizingResult, TProperty>(BatchSizingResult, Expression<Func<BatchSizingResult, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<DynamicBatchSizer.BatchSizingResult, TProperty>(DynamicBatchSizer.BatchSizingResult, Expression<Func<DynamicBatchSizer.BatchSizingResult, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Providers.DynamicBatchSizer.BatchSizingResult, TProperty>(nORM.Providers.DynamicBatchSizer.BatchSizingResult, System.Linq.Expressions.Expression<System.Func<nORM.Providers.DynamicBatchSizer.BatchSizingResult, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of DynamicBatchSizer.BatchSizingResult, TProperty)(DynamicBatchSizer.BatchSizingResult, Expression(Of Func(Of DynamicBatchSizer.BatchSizingResult, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Providers.DynamicBatchSizer.BatchSizingResult, TProperty)(nORM.Providers.DynamicBatchSizer.BatchSizingResult, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Providers.DynamicBatchSizer.BatchSizingResult, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of BatchSizingResult, TProperty)(BatchSizingResult, Expression(Of Func(Of BatchSizingResult, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Providers.DynamicBatchSizer.BatchSizingResult,System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Providers.DynamicBatchSizer.BatchSizingResult,System.Linq.Expressions.Expression{System.Func{nORM.Providers.DynamicBatchSizer.BatchSizingResult,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<T>(T, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<T>(T, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<T>(T, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of T)(T, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.OptimalBatchSize*
+  commentId: Overload:nORM.Providers.DynamicBatchSizer.BatchSizingResult.OptimalBatchSize
+  href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html#nORM_Providers_DynamicBatchSizer_BatchSizingResult_OptimalBatchSize
+  name: OptimalBatchSize
+  nameWithType: DynamicBatchSizer.BatchSizingResult.OptimalBatchSize
+  fullName: nORM.Providers.DynamicBatchSizer.BatchSizingResult.OptimalBatchSize
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage*
+  commentId: Overload:nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage
+  href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html#nORM_Providers_DynamicBatchSizer_BatchSizingResult_EstimatedMemoryUsage
+  name: EstimatedMemoryUsage
+  nameWithType: DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage
+  fullName: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime*
+  commentId: Overload:nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime
+  href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html#nORM_Providers_DynamicBatchSizer_BatchSizingResult_EstimatedBatchTime
+  name: EstimatedBatchTime
+  nameWithType: DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime
+  fullName: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.timespan
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.Strategy*
+  commentId: Overload:nORM.Providers.DynamicBatchSizer.BatchSizingResult.Strategy
+  href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html#nORM_Providers_DynamicBatchSizer_BatchSizingResult_Strategy
+  name: Strategy
+  nameWithType: DynamicBatchSizer.BatchSizingResult.Strategy
+  fullName: nORM.Providers.DynamicBatchSizer.BatchSizingResult.Strategy
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String

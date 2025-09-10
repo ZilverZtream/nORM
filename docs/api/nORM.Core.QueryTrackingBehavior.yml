@@ -1,0 +1,112 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.QueryTrackingBehavior
+  commentId: T:nORM.Core.QueryTrackingBehavior
+  id: QueryTrackingBehavior
+  parent: nORM.Core
+  children:
+  - nORM.Core.QueryTrackingBehavior.NoTracking
+  - nORM.Core.QueryTrackingBehavior.TrackAll
+  langs:
+  - csharp
+  - vb
+  name: QueryTrackingBehavior
+  nameWithType: QueryTrackingBehavior
+  fullName: nORM.Core.QueryTrackingBehavior
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Core/QueryTrackingBehavior.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: QueryTrackingBehavior
+    path: src/nORM/Core/QueryTrackingBehavior.cs
+    startLine: 2
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: public enum QueryTrackingBehavior
+    content.vb: Public Enum QueryTrackingBehavior
+- uid: nORM.Core.QueryTrackingBehavior.TrackAll
+  commentId: F:nORM.Core.QueryTrackingBehavior.TrackAll
+  id: TrackAll
+  parent: nORM.Core.QueryTrackingBehavior
+  langs:
+  - csharp
+  - vb
+  name: TrackAll
+  nameWithType: QueryTrackingBehavior.TrackAll
+  fullName: nORM.Core.QueryTrackingBehavior.TrackAll
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Core/QueryTrackingBehavior.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TrackAll
+    path: src/nORM/Core/QueryTrackingBehavior.cs
+    startLine: 4
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: TrackAll = 0
+    return:
+      type: nORM.Core.QueryTrackingBehavior
+- uid: nORM.Core.QueryTrackingBehavior.NoTracking
+  commentId: F:nORM.Core.QueryTrackingBehavior.NoTracking
+  id: NoTracking
+  parent: nORM.Core.QueryTrackingBehavior
+  langs:
+  - csharp
+  - vb
+  name: NoTracking
+  nameWithType: QueryTrackingBehavior.NoTracking
+  fullName: nORM.Core.QueryTrackingBehavior.NoTracking
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Core/QueryTrackingBehavior.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NoTracking
+    path: src/nORM/Core/QueryTrackingBehavior.cs
+    startLine: 5
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: NoTracking = 1
+    return:
+      type: nORM.Core.QueryTrackingBehavior
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: nORM.Core.QueryTrackingBehavior
+  commentId: T:nORM.Core.QueryTrackingBehavior
+  parent: nORM.Core
+  href: nORM.Core.QueryTrackingBehavior.html
+  name: QueryTrackingBehavior
+  nameWithType: QueryTrackingBehavior
+  fullName: nORM.Core.QueryTrackingBehavior

@@ -1,0 +1,112 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Mapping
+  commentId: N:nORM.Mapping
+  id: nORM.Mapping
+  children:
+  - nORM.Mapping.Column
+  - nORM.Mapping.ColumnMappingCache
+  - nORM.Mapping.DiscriminatorColumnAttribute
+  - nORM.Mapping.DiscriminatorValueAttribute
+  - nORM.Mapping.OwnedAttribute
+  - nORM.Mapping.TableMapping
+  - nORM.Mapping.TableMapping.Relation
+  - nORM.Mapping.TableSplitAttribute
+  langs:
+  - csharp
+  - vb
+  name: nORM.Mapping
+  nameWithType: nORM.Mapping
+  fullName: nORM.Mapping
+  type: Namespace
+  assemblies:
+  - nORM
+references:
+- uid: nORM.Mapping.Column
+  commentId: T:nORM.Mapping.Column
+  parent: nORM.Mapping
+  href: nORM.Mapping.Column.html
+  name: Column
+  nameWithType: Column
+  fullName: nORM.Mapping.Column
+- uid: nORM.Mapping.ColumnMappingCache
+  commentId: T:nORM.Mapping.ColumnMappingCache
+  href: nORM.Mapping.ColumnMappingCache.html
+  name: ColumnMappingCache
+  nameWithType: ColumnMappingCache
+  fullName: nORM.Mapping.ColumnMappingCache
+- uid: nORM.Mapping.DiscriminatorColumnAttribute
+  commentId: T:nORM.Mapping.DiscriminatorColumnAttribute
+  href: nORM.Mapping.DiscriminatorColumnAttribute.html
+  name: DiscriminatorColumnAttribute
+  nameWithType: DiscriminatorColumnAttribute
+  fullName: nORM.Mapping.DiscriminatorColumnAttribute
+- uid: nORM.Mapping.DiscriminatorValueAttribute
+  commentId: T:nORM.Mapping.DiscriminatorValueAttribute
+  href: nORM.Mapping.DiscriminatorValueAttribute.html
+  name: DiscriminatorValueAttribute
+  nameWithType: DiscriminatorValueAttribute
+  fullName: nORM.Mapping.DiscriminatorValueAttribute
+- uid: nORM.Mapping.OwnedAttribute
+  commentId: T:nORM.Mapping.OwnedAttribute
+  href: nORM.Mapping.OwnedAttribute.html
+  name: OwnedAttribute
+  nameWithType: OwnedAttribute
+  fullName: nORM.Mapping.OwnedAttribute
+- uid: nORM.Mapping.TableMapping
+  commentId: T:nORM.Mapping.TableMapping
+  parent: nORM.Mapping
+  href: nORM.Mapping.TableMapping.html
+  name: TableMapping
+  nameWithType: TableMapping
+  fullName: nORM.Mapping.TableMapping
+- uid: nORM.Mapping.TableMapping.Relation
+  commentId: T:nORM.Mapping.TableMapping.Relation
+  href: nORM.Mapping.TableMapping.html
+  name: TableMapping.Relation
+  nameWithType: TableMapping.Relation
+  fullName: nORM.Mapping.TableMapping.Relation
+  spec.csharp:
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: .
+  - uid: nORM.Mapping.TableMapping.Relation
+    name: Relation
+    href: nORM.Mapping.TableMapping.Relation.html
+  spec.vb:
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: .
+  - uid: nORM.Mapping.TableMapping.Relation
+    name: Relation
+    href: nORM.Mapping.TableMapping.Relation.html
+- uid: nORM.Mapping.TableSplitAttribute
+  commentId: T:nORM.Mapping.TableSplitAttribute
+  href: nORM.Mapping.TableSplitAttribute.html
+  name: TableSplitAttribute
+  nameWithType: TableSplitAttribute
+  fullName: nORM.Mapping.TableSplitAttribute
+- uid: nORM.Mapping
+  commentId: N:nORM.Mapping
+  href: nORM.html
+  name: nORM.Mapping
+  nameWithType: nORM.Mapping
+  fullName: nORM.Mapping
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html

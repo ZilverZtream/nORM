@@ -1,0 +1,2523 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.DbContextOptions
+  commentId: T:nORM.Configuration.DbContextOptions
+  id: DbContextOptions
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}})
+  - nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,``0,System.Boolean}})
+  - nORM.Configuration.DbContextOptions.BulkBatchSize
+  - nORM.Configuration.DbContextOptions.CacheExpiration
+  - nORM.Configuration.DbContextOptions.CacheProvider
+  - nORM.Configuration.DbContextOptions.CommandInterceptors
+  - nORM.Configuration.DbContextOptions.CommandTimeout
+  - nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
+  - nORM.Configuration.DbContextOptions.EagerChangeTracking
+  - nORM.Configuration.DbContextOptions.EnableTemporalVersioning
+  - nORM.Configuration.DbContextOptions.GlobalFilters
+  - nORM.Configuration.DbContextOptions.Logger
+  - nORM.Configuration.DbContextOptions.OnModelCreating
+  - nORM.Configuration.DbContextOptions.RetryPolicy
+  - nORM.Configuration.DbContextOptions.SaveChangesInterceptors
+  - nORM.Configuration.DbContextOptions.TenantColumnName
+  - nORM.Configuration.DbContextOptions.TenantProvider
+  - nORM.Configuration.DbContextOptions.TimeoutConfiguration
+  - nORM.Configuration.DbContextOptions.UseBatchedBulkOps
+  - nORM.Configuration.DbContextOptions.UseInMemoryCache
+  - nORM.Configuration.DbContextOptions.UsePreciseChangeTracking
+  - nORM.Configuration.DbContextOptions.Validate
+  langs:
+  - csharp
+  - vb
+  name: DbContextOptions
+  nameWithType: DbContextOptions
+  fullName: nORM.Configuration.DbContextOptions
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DbContextOptions
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 13
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public class DbContextOptions
+    content.vb: Public Class DbContextOptions
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+  extensionMethods:
+  - nORM.Configuration.DbContextOptions.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  - nORM.Configuration.DbContextOptions.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,{TProperty}}})
+  - nORM.Configuration.DbContextOptions.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  - nORM.Configuration.DbContextOptions.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Configuration.DbContextOptions.TimeoutConfiguration
+  commentId: P:nORM.Configuration.DbContextOptions.TimeoutConfiguration
+  id: TimeoutConfiguration
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: TimeoutConfiguration
+  nameWithType: DbContextOptions.TimeoutConfiguration
+  fullName: nORM.Configuration.DbContextOptions.TimeoutConfiguration
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TimeoutConfiguration
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 18
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public AdaptiveTimeoutManager.TimeoutConfiguration TimeoutConfiguration { get; set; }
+    parameters: []
+    return:
+      type: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+    content.vb: Public Property TimeoutConfiguration As AdaptiveTimeoutManager.TimeoutConfiguration
+  overload: nORM.Configuration.DbContextOptions.TimeoutConfiguration*
+- uid: nORM.Configuration.DbContextOptions.CommandTimeout
+  commentId: P:nORM.Configuration.DbContextOptions.CommandTimeout
+  id: CommandTimeout
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: CommandTimeout
+  nameWithType: DbContextOptions.CommandTimeout
+  fullName: nORM.Configuration.DbContextOptions.CommandTimeout
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CommandTimeout
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 20
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: >-
+      [Obsolete("Use TimeoutConfiguration.BaseTimeout instead")]
+
+      public TimeSpan CommandTimeout { get; set; }
+    parameters: []
+    return:
+      type: System.TimeSpan
+    content.vb: >-
+      <Obsolete("Use TimeoutConfiguration.BaseTimeout instead")>
+
+      Public Property CommandTimeout As TimeSpan
+  overload: nORM.Configuration.DbContextOptions.CommandTimeout*
+  attributes:
+  - type: System.ObsoleteAttribute
+    ctor: System.ObsoleteAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Use TimeoutConfiguration.BaseTimeout instead
+- uid: nORM.Configuration.DbContextOptions.BulkBatchSize
+  commentId: P:nORM.Configuration.DbContextOptions.BulkBatchSize
+  id: BulkBatchSize
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: BulkBatchSize
+  nameWithType: DbContextOptions.BulkBatchSize
+  fullName: nORM.Configuration.DbContextOptions.BulkBatchSize
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BulkBatchSize
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 27
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public int BulkBatchSize { get; set; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public Property BulkBatchSize As Integer
+  overload: nORM.Configuration.DbContextOptions.BulkBatchSize*
+- uid: nORM.Configuration.DbContextOptions.Logger
+  commentId: P:nORM.Configuration.DbContextOptions.Logger
+  id: Logger
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: DbContextOptions.Logger
+  fullName: nORM.Configuration.DbContextOptions.Logger
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Logger
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 37
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public ILogger? Logger { get; set; }
+    parameters: []
+    return:
+      type: Microsoft.Extensions.Logging.ILogger
+    content.vb: Public Property Logger As ILogger
+  overload: nORM.Configuration.DbContextOptions.Logger*
+- uid: nORM.Configuration.DbContextOptions.RetryPolicy
+  commentId: P:nORM.Configuration.DbContextOptions.RetryPolicy
+  id: RetryPolicy
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: RetryPolicy
+  nameWithType: DbContextOptions.RetryPolicy
+  fullName: nORM.Configuration.DbContextOptions.RetryPolicy
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RetryPolicy
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 38
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public RetryPolicy? RetryPolicy { get; set; }
+    parameters: []
+    return:
+      type: nORM.Enterprise.RetryPolicy
+    content.vb: Public Property RetryPolicy As RetryPolicy
+  overload: nORM.Configuration.DbContextOptions.RetryPolicy*
+- uid: nORM.Configuration.DbContextOptions.TenantProvider
+  commentId: P:nORM.Configuration.DbContextOptions.TenantProvider
+  id: TenantProvider
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: TenantProvider
+  nameWithType: DbContextOptions.TenantProvider
+  fullName: nORM.Configuration.DbContextOptions.TenantProvider
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TenantProvider
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 39
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public ITenantProvider? TenantProvider { get; set; }
+    parameters: []
+    return:
+      type: nORM.Enterprise.ITenantProvider
+    content.vb: Public Property TenantProvider As ITenantProvider
+  overload: nORM.Configuration.DbContextOptions.TenantProvider*
+- uid: nORM.Configuration.DbContextOptions.TenantColumnName
+  commentId: P:nORM.Configuration.DbContextOptions.TenantColumnName
+  id: TenantColumnName
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: TenantColumnName
+  nameWithType: DbContextOptions.TenantColumnName
+  fullName: nORM.Configuration.DbContextOptions.TenantColumnName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TenantColumnName
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 40
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public string TenantColumnName { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property TenantColumnName As String
+  overload: nORM.Configuration.DbContextOptions.TenantColumnName*
+- uid: nORM.Configuration.DbContextOptions.OnModelCreating
+  commentId: P:nORM.Configuration.DbContextOptions.OnModelCreating
+  id: OnModelCreating
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: OnModelCreating
+  nameWithType: DbContextOptions.OnModelCreating
+  fullName: nORM.Configuration.DbContextOptions.OnModelCreating
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OnModelCreating
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 41
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public Action<ModelBuilder>? OnModelCreating { get; set; }
+    parameters: []
+    return:
+      type: System.Action{nORM.Configuration.ModelBuilder}
+    content.vb: Public Property OnModelCreating As Action(Of ModelBuilder)
+  overload: nORM.Configuration.DbContextOptions.OnModelCreating*
+- uid: nORM.Configuration.DbContextOptions.UseBatchedBulkOps
+  commentId: P:nORM.Configuration.DbContextOptions.UseBatchedBulkOps
+  id: UseBatchedBulkOps
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: UseBatchedBulkOps
+  nameWithType: DbContextOptions.UseBatchedBulkOps
+  fullName: nORM.Configuration.DbContextOptions.UseBatchedBulkOps
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UseBatchedBulkOps
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 42
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public bool UseBatchedBulkOps { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property UseBatchedBulkOps As Boolean
+  overload: nORM.Configuration.DbContextOptions.UseBatchedBulkOps*
+- uid: nORM.Configuration.DbContextOptions.UsePreciseChangeTracking
+  commentId: P:nORM.Configuration.DbContextOptions.UsePreciseChangeTracking
+  id: UsePreciseChangeTracking
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: UsePreciseChangeTracking
+  nameWithType: DbContextOptions.UsePreciseChangeTracking
+  fullName: nORM.Configuration.DbContextOptions.UsePreciseChangeTracking
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UsePreciseChangeTracking
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 43
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public bool UsePreciseChangeTracking { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property UsePreciseChangeTracking As Boolean
+  overload: nORM.Configuration.DbContextOptions.UsePreciseChangeTracking*
+- uid: nORM.Configuration.DbContextOptions.EagerChangeTracking
+  commentId: P:nORM.Configuration.DbContextOptions.EagerChangeTracking
+  id: EagerChangeTracking
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: EagerChangeTracking
+  nameWithType: DbContextOptions.EagerChangeTracking
+  fullName: nORM.Configuration.DbContextOptions.EagerChangeTracking
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EagerChangeTracking
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 44
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public bool EagerChangeTracking { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property EagerChangeTracking As Boolean
+  overload: nORM.Configuration.DbContextOptions.EagerChangeTracking*
+- uid: nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
+  commentId: P:nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
+  id: DefaultTrackingBehavior
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: DefaultTrackingBehavior
+  nameWithType: DbContextOptions.DefaultTrackingBehavior
+  fullName: nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DefaultTrackingBehavior
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 45
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public QueryTrackingBehavior DefaultTrackingBehavior { get; set; }
+    parameters: []
+    return:
+      type: nORM.Core.QueryTrackingBehavior
+    content.vb: Public Property DefaultTrackingBehavior As QueryTrackingBehavior
+  overload: nORM.Configuration.DbContextOptions.DefaultTrackingBehavior*
+- uid: nORM.Configuration.DbContextOptions.CommandInterceptors
+  commentId: P:nORM.Configuration.DbContextOptions.CommandInterceptors
+  id: CommandInterceptors
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: CommandInterceptors
+  nameWithType: DbContextOptions.CommandInterceptors
+  fullName: nORM.Configuration.DbContextOptions.CommandInterceptors
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CommandInterceptors
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 46
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public IList<IDbCommandInterceptor> CommandInterceptors { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IList{nORM.Enterprise.IDbCommandInterceptor}
+    content.vb: Public ReadOnly Property CommandInterceptors As IList(Of IDbCommandInterceptor)
+  overload: nORM.Configuration.DbContextOptions.CommandInterceptors*
+- uid: nORM.Configuration.DbContextOptions.SaveChangesInterceptors
+  commentId: P:nORM.Configuration.DbContextOptions.SaveChangesInterceptors
+  id: SaveChangesInterceptors
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: SaveChangesInterceptors
+  nameWithType: DbContextOptions.SaveChangesInterceptors
+  fullName: nORM.Configuration.DbContextOptions.SaveChangesInterceptors
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SaveChangesInterceptors
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 47
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public IList<ISaveChangesInterceptor> SaveChangesInterceptors { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IList{nORM.Enterprise.ISaveChangesInterceptor}
+    content.vb: Public ReadOnly Property SaveChangesInterceptors As IList(Of ISaveChangesInterceptor)
+  overload: nORM.Configuration.DbContextOptions.SaveChangesInterceptors*
+- uid: nORM.Configuration.DbContextOptions.CacheProvider
+  commentId: P:nORM.Configuration.DbContextOptions.CacheProvider
+  id: CacheProvider
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: CacheProvider
+  nameWithType: DbContextOptions.CacheProvider
+  fullName: nORM.Configuration.DbContextOptions.CacheProvider
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CacheProvider
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 49
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public IDbCacheProvider? CacheProvider { get; set; }
+    parameters: []
+    return:
+      type: nORM.Enterprise.IDbCacheProvider
+    content.vb: Public Property CacheProvider As IDbCacheProvider
+  overload: nORM.Configuration.DbContextOptions.CacheProvider*
+- uid: nORM.Configuration.DbContextOptions.CacheExpiration
+  commentId: P:nORM.Configuration.DbContextOptions.CacheExpiration
+  id: CacheExpiration
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: CacheExpiration
+  nameWithType: DbContextOptions.CacheExpiration
+  fullName: nORM.Configuration.DbContextOptions.CacheExpiration
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CacheExpiration
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 50
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public TimeSpan CacheExpiration { get; set; }
+    parameters: []
+    return:
+      type: System.TimeSpan
+    content.vb: Public Property CacheExpiration As TimeSpan
+  overload: nORM.Configuration.DbContextOptions.CacheExpiration*
+- uid: nORM.Configuration.DbContextOptions.UseInMemoryCache
+  commentId: M:nORM.Configuration.DbContextOptions.UseInMemoryCache
+  id: UseInMemoryCache
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: UseInMemoryCache()
+  nameWithType: DbContextOptions.UseInMemoryCache()
+  fullName: nORM.Configuration.DbContextOptions.UseInMemoryCache()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UseInMemoryCache
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 58
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Enables the built-in in-memory cache for query results using
+
+    <xref href="nORM.Core.NormMemoryCacheProvider" data-throw-if-not-resolved="false"></xref>. The cache is scoped by tenant when a
+
+    <xref href="nORM.Enterprise.ITenantProvider" data-throw-if-not-resolved="false"></xref> is available.
+  example: []
+  syntax:
+    content: public DbContextOptions UseInMemoryCache()
+    return:
+      type: nORM.Configuration.DbContextOptions
+      description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for chaining.
+    content.vb: Public Function UseInMemoryCache() As DbContextOptions
+  overload: nORM.Configuration.DbContextOptions.UseInMemoryCache*
+- uid: nORM.Configuration.DbContextOptions.EnableTemporalVersioning
+  commentId: M:nORM.Configuration.DbContextOptions.EnableTemporalVersioning
+  id: EnableTemporalVersioning
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: EnableTemporalVersioning()
+  nameWithType: DbContextOptions.EnableTemporalVersioning()
+  fullName: nORM.Configuration.DbContextOptions.EnableTemporalVersioning()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EnableTemporalVersioning
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 69
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Enables temporal versioning for all entities in the context. When enabled the
+
+    provider generates history tables and triggers to track changes over time.
+  example: []
+  syntax:
+    content: public DbContextOptions EnableTemporalVersioning()
+    return:
+      type: nORM.Configuration.DbContextOptions
+      description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for chaining.
+    content.vb: Public Function EnableTemporalVersioning() As DbContextOptions
+  overload: nORM.Configuration.DbContextOptions.EnableTemporalVersioning*
+- uid: nORM.Configuration.DbContextOptions.GlobalFilters
+  commentId: P:nORM.Configuration.DbContextOptions.GlobalFilters
+  id: GlobalFilters
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: GlobalFilters
+  nameWithType: DbContextOptions.GlobalFilters
+  fullName: nORM.Configuration.DbContextOptions.GlobalFilters
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GlobalFilters
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 77
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public IDictionary<Type, List<LambdaExpression>> GlobalFilters { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IDictionary{System.Type,System.Collections.Generic.List{System.Linq.Expressions.LambdaExpression}}
+    content.vb: Public ReadOnly Property GlobalFilters As IDictionary(Of Type, List(Of LambdaExpression))
+  overload: nORM.Configuration.DbContextOptions.GlobalFilters*
+- uid: nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,``0,System.Boolean}})
+  commentId: M:nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,``0,System.Boolean}})
+  id: AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,``0,System.Boolean}})
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: AddGlobalFilter<TEntity>(Expression<Func<DbContext, TEntity, bool>>)
+  nameWithType: DbContextOptions.AddGlobalFilter<TEntity>(Expression<Func<DbContext, TEntity, bool>>)
+  fullName: nORM.Configuration.DbContextOptions.AddGlobalFilter<TEntity>(System.Linq.Expressions.Expression<System.Func<nORM.Core.DbContext, TEntity, bool>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AddGlobalFilter
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 79
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public DbContextOptions AddGlobalFilter<TEntity>(Expression<Func<DbContext, TEntity, bool>> filter)
+    parameters:
+    - id: filter
+      type: System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,{TEntity},System.Boolean}}
+    typeParameters:
+    - id: TEntity
+    return:
+      type: nORM.Configuration.DbContextOptions
+    content.vb: Public Function AddGlobalFilter(Of TEntity)(filter As Expression(Of Func(Of DbContext, TEntity, Boolean))) As DbContextOptions
+  overload: nORM.Configuration.DbContextOptions.AddGlobalFilter*
+  nameWithType.vb: DbContextOptions.AddGlobalFilter(Of TEntity)(Expression(Of Func(Of DbContext, TEntity, Boolean)))
+  fullName.vb: nORM.Configuration.DbContextOptions.AddGlobalFilter(Of TEntity)(System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.DbContext, TEntity, Boolean)))
+  name.vb: AddGlobalFilter(Of TEntity)(Expression(Of Func(Of DbContext, TEntity, Boolean)))
+- uid: nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}})
+  commentId: M:nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}})
+  id: AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}})
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: AddGlobalFilter<TEntity>(Expression<Func<TEntity, bool>>)
+  nameWithType: DbContextOptions.AddGlobalFilter<TEntity>(Expression<Func<TEntity, bool>>)
+  fullName: nORM.Configuration.DbContextOptions.AddGlobalFilter<TEntity>(System.Linq.Expressions.Expression<System.Func<TEntity, bool>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AddGlobalFilter
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 90
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public DbContextOptions AddGlobalFilter<TEntity>(Expression<Func<TEntity, bool>> filter)
+    parameters:
+    - id: filter
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Boolean}}
+    typeParameters:
+    - id: TEntity
+    return:
+      type: nORM.Configuration.DbContextOptions
+    content.vb: Public Function AddGlobalFilter(Of TEntity)(filter As Expression(Of Func(Of TEntity, Boolean))) As DbContextOptions
+  overload: nORM.Configuration.DbContextOptions.AddGlobalFilter*
+  nameWithType.vb: DbContextOptions.AddGlobalFilter(Of TEntity)(Expression(Of Func(Of TEntity, Boolean)))
+  fullName.vb: nORM.Configuration.DbContextOptions.AddGlobalFilter(Of TEntity)(System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Boolean)))
+  name.vb: AddGlobalFilter(Of TEntity)(Expression(Of Func(Of TEntity, Boolean)))
+- uid: nORM.Configuration.DbContextOptions.Validate
+  commentId: M:nORM.Configuration.DbContextOptions.Validate
+  id: Validate
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: Validate()
+  nameWithType: DbContextOptions.Validate()
+  fullName: nORM.Configuration.DbContextOptions.Validate()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Validate
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 102
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Validates the configured options ensuring all values fall within allowed ranges
+
+    and required settings are provided. Throws <xref href="System.InvalidOperationException" data-throw-if-not-resolved="false"></xref>
+
+    if any configuration is invalid.
+  example: []
+  syntax:
+    content: public void Validate()
+    content.vb: Public Sub Validate()
+  overload: nORM.Configuration.DbContextOptions.Validate*
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: nORM.Configuration.DbContextOptions.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<DbContextOptions>(DbContextOptions, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<DbContextOptions>(DbContextOptions, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<nORM.Configuration.DbContextOptions>(nORM.Configuration.DbContextOptions, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of DbContextOptions)(DbContextOptions, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of nORM.Configuration.DbContextOptions)(nORM.Configuration.DbContextOptions, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of DbContextOptions)(DbContextOptions, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Configuration.DbContextOptions,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: '>'
+  - name: (
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Configuration.DbContextOptions,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: )
+  - name: (
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Configuration.DbContextOptions.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,{TProperty}}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<DbContextOptions, TProperty>(DbContextOptions, Expression<Func<DbContextOptions, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<DbContextOptions, TProperty>(DbContextOptions, Expression<Func<DbContextOptions, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<nORM.Configuration.DbContextOptions, TProperty>(nORM.Configuration.DbContextOptions, System.Linq.Expressions.Expression<System.Func<nORM.Configuration.DbContextOptions, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of DbContextOptions, TProperty)(DbContextOptions, Expression(Of Func(Of DbContextOptions, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of nORM.Configuration.DbContextOptions, TProperty)(nORM.Configuration.DbContextOptions, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Configuration.DbContextOptions, TProperty)))
+  name.vb: IsLoaded(Of DbContextOptions, TProperty)(DbContextOptions, Expression(Of Func(Of DbContextOptions, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Configuration.DbContextOptions,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Configuration.DbContextOptions,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Configuration.DbContextOptions.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<DbContextOptions, TProperty>(DbContextOptions, Expression<Func<DbContextOptions, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<DbContextOptions, TProperty>(DbContextOptions, Expression<Func<DbContextOptions, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Configuration.DbContextOptions, TProperty>(nORM.Configuration.DbContextOptions, System.Linq.Expressions.Expression<System.Func<nORM.Configuration.DbContextOptions, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of DbContextOptions, TProperty)(DbContextOptions, Expression(Of Func(Of DbContextOptions, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Configuration.DbContextOptions, TProperty)(nORM.Configuration.DbContextOptions, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Configuration.DbContextOptions, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of DbContextOptions, TProperty)(DbContextOptions, Expression(Of Func(Of DbContextOptions, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Configuration.DbContextOptions,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Configuration.DbContextOptions,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Configuration.DbContextOptions.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,{TProperty}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<DbContextOptions, TProperty>(DbContextOptions, Expression<Func<DbContextOptions, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<DbContextOptions, TProperty>(DbContextOptions, Expression<Func<DbContextOptions, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Configuration.DbContextOptions, TProperty>(nORM.Configuration.DbContextOptions, System.Linq.Expressions.Expression<System.Func<nORM.Configuration.DbContextOptions, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of DbContextOptions, TProperty)(DbContextOptions, Expression(Of Func(Of DbContextOptions, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Configuration.DbContextOptions, TProperty)(nORM.Configuration.DbContextOptions, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Configuration.DbContextOptions, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of DbContextOptions, TProperty)(DbContextOptions, Expression(Of Func(Of DbContextOptions, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Configuration.DbContextOptions,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Configuration.DbContextOptions,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<T>(T, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<T>(T, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<T>(T, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of T)(T, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+- uid: nORM.Configuration.DbContextOptions.TimeoutConfiguration*
+  commentId: Overload:nORM.Configuration.DbContextOptions.TimeoutConfiguration
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_TimeoutConfiguration
+  name: TimeoutConfiguration
+  nameWithType: DbContextOptions.TimeoutConfiguration
+  fullName: nORM.Configuration.DbContextOptions.TimeoutConfiguration
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+  commentId: T:nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+  parent: nORM.Execution
+  href: nORM.Execution.AdaptiveTimeoutManager.html
+  name: AdaptiveTimeoutManager.TimeoutConfiguration
+  nameWithType: AdaptiveTimeoutManager.TimeoutConfiguration
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+  spec.csharp:
+  - uid: nORM.Execution.AdaptiveTimeoutManager
+    name: AdaptiveTimeoutManager
+    href: nORM.Execution.AdaptiveTimeoutManager.html
+  - name: .
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+    name: TimeoutConfiguration
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration.html
+  spec.vb:
+  - uid: nORM.Execution.AdaptiveTimeoutManager
+    name: AdaptiveTimeoutManager
+    href: nORM.Execution.AdaptiveTimeoutManager.html
+  - name: .
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+    name: TimeoutConfiguration
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration.html
+- uid: nORM.Execution
+  commentId: N:nORM.Execution
+  href: nORM.html
+  name: nORM.Execution
+  nameWithType: nORM.Execution
+  fullName: nORM.Execution
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Execution
+    name: Execution
+    href: nORM.Execution.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Execution
+    name: Execution
+    href: nORM.Execution.html
+- uid: nORM.Configuration.DbContextOptions.CommandTimeout*
+  commentId: Overload:nORM.Configuration.DbContextOptions.CommandTimeout
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_CommandTimeout
+  name: CommandTimeout
+  nameWithType: DbContextOptions.CommandTimeout
+  fullName: nORM.Configuration.DbContextOptions.CommandTimeout
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.timespan
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan
+- uid: nORM.Configuration.DbContextOptions.BulkBatchSize*
+  commentId: Overload:nORM.Configuration.DbContextOptions.BulkBatchSize
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_BulkBatchSize
+  name: BulkBatchSize
+  nameWithType: DbContextOptions.BulkBatchSize
+  fullName: nORM.Configuration.DbContextOptions.BulkBatchSize
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: nORM.Configuration.DbContextOptions.Logger*
+  commentId: Overload:nORM.Configuration.DbContextOptions.Logger
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_Logger
+  name: Logger
+  nameWithType: DbContextOptions.Logger
+  fullName: nORM.Configuration.DbContextOptions.Logger
+- uid: Microsoft.Extensions.Logging.ILogger
+  commentId: T:Microsoft.Extensions.Logging.ILogger
+  parent: Microsoft.Extensions.Logging
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger
+  name: ILogger
+  nameWithType: ILogger
+  fullName: Microsoft.Extensions.Logging.ILogger
+- uid: Microsoft.Extensions.Logging
+  commentId: N:Microsoft.Extensions.Logging
+  href: https://learn.microsoft.com/dotnet/api/microsoft
+  name: Microsoft.Extensions.Logging
+  nameWithType: Microsoft.Extensions.Logging
+  fullName: Microsoft.Extensions.Logging
+  spec.csharp:
+  - uid: Microsoft
+    name: Microsoft
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Logging
+    name: Logging
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging
+  spec.vb:
+  - uid: Microsoft
+    name: Microsoft
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Logging
+    name: Logging
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging
+- uid: nORM.Configuration.DbContextOptions.RetryPolicy*
+  commentId: Overload:nORM.Configuration.DbContextOptions.RetryPolicy
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_RetryPolicy
+  name: RetryPolicy
+  nameWithType: DbContextOptions.RetryPolicy
+  fullName: nORM.Configuration.DbContextOptions.RetryPolicy
+- uid: nORM.Enterprise.RetryPolicy
+  commentId: T:nORM.Enterprise.RetryPolicy
+  parent: nORM.Enterprise
+  href: nORM.Enterprise.RetryPolicy.html
+  name: RetryPolicy
+  nameWithType: RetryPolicy
+  fullName: nORM.Enterprise.RetryPolicy
+- uid: nORM.Enterprise
+  commentId: N:nORM.Enterprise
+  href: nORM.html
+  name: nORM.Enterprise
+  nameWithType: nORM.Enterprise
+  fullName: nORM.Enterprise
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Enterprise
+    name: Enterprise
+    href: nORM.Enterprise.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Enterprise
+    name: Enterprise
+    href: nORM.Enterprise.html
+- uid: nORM.Configuration.DbContextOptions.TenantProvider*
+  commentId: Overload:nORM.Configuration.DbContextOptions.TenantProvider
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_TenantProvider
+  name: TenantProvider
+  nameWithType: DbContextOptions.TenantProvider
+  fullName: nORM.Configuration.DbContextOptions.TenantProvider
+- uid: nORM.Enterprise.ITenantProvider
+  commentId: T:nORM.Enterprise.ITenantProvider
+  parent: nORM.Enterprise
+  href: nORM.Enterprise.ITenantProvider.html
+  name: ITenantProvider
+  nameWithType: ITenantProvider
+  fullName: nORM.Enterprise.ITenantProvider
+- uid: nORM.Configuration.DbContextOptions.TenantColumnName*
+  commentId: Overload:nORM.Configuration.DbContextOptions.TenantColumnName
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_TenantColumnName
+  name: TenantColumnName
+  nameWithType: DbContextOptions.TenantColumnName
+  fullName: nORM.Configuration.DbContextOptions.TenantColumnName
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: nORM.Configuration.DbContextOptions.OnModelCreating*
+  commentId: Overload:nORM.Configuration.DbContextOptions.OnModelCreating
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_OnModelCreating
+  name: OnModelCreating
+  nameWithType: DbContextOptions.OnModelCreating
+  fullName: nORM.Configuration.DbContextOptions.OnModelCreating
+- uid: System.Action{nORM.Configuration.ModelBuilder}
+  commentId: T:System.Action{nORM.Configuration.ModelBuilder}
+  parent: System
+  definition: System.Action`1
+  href: https://learn.microsoft.com/dotnet/api/system.action-1
+  name: Action<ModelBuilder>
+  nameWithType: Action<ModelBuilder>
+  fullName: System.Action<nORM.Configuration.ModelBuilder>
+  nameWithType.vb: Action(Of ModelBuilder)
+  fullName.vb: System.Action(Of nORM.Configuration.ModelBuilder)
+  name.vb: Action(Of ModelBuilder)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: <
+  - uid: nORM.Configuration.ModelBuilder
+    name: ModelBuilder
+    href: nORM.Configuration.ModelBuilder.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.ModelBuilder
+    name: ModelBuilder
+    href: nORM.Configuration.ModelBuilder.html
+  - name: )
+- uid: System.Action`1
+  commentId: T:System.Action`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.action-1
+  name: Action<T>
+  nameWithType: Action<T>
+  fullName: System.Action<T>
+  nameWithType.vb: Action(Of T)
+  fullName.vb: System.Action(Of T)
+  name.vb: Action(Of T)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Configuration.DbContextOptions.UseBatchedBulkOps*
+  commentId: Overload:nORM.Configuration.DbContextOptions.UseBatchedBulkOps
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_UseBatchedBulkOps
+  name: UseBatchedBulkOps
+  nameWithType: DbContextOptions.UseBatchedBulkOps
+  fullName: nORM.Configuration.DbContextOptions.UseBatchedBulkOps
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
+- uid: nORM.Configuration.DbContextOptions.UsePreciseChangeTracking*
+  commentId: Overload:nORM.Configuration.DbContextOptions.UsePreciseChangeTracking
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_UsePreciseChangeTracking
+  name: UsePreciseChangeTracking
+  nameWithType: DbContextOptions.UsePreciseChangeTracking
+  fullName: nORM.Configuration.DbContextOptions.UsePreciseChangeTracking
+- uid: nORM.Configuration.DbContextOptions.EagerChangeTracking*
+  commentId: Overload:nORM.Configuration.DbContextOptions.EagerChangeTracking
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_EagerChangeTracking
+  name: EagerChangeTracking
+  nameWithType: DbContextOptions.EagerChangeTracking
+  fullName: nORM.Configuration.DbContextOptions.EagerChangeTracking
+- uid: nORM.Configuration.DbContextOptions.DefaultTrackingBehavior*
+  commentId: Overload:nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_DefaultTrackingBehavior
+  name: DefaultTrackingBehavior
+  nameWithType: DbContextOptions.DefaultTrackingBehavior
+  fullName: nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
+- uid: nORM.Core.QueryTrackingBehavior
+  commentId: T:nORM.Core.QueryTrackingBehavior
+  parent: nORM.Core
+  href: nORM.Core.QueryTrackingBehavior.html
+  name: QueryTrackingBehavior
+  nameWithType: QueryTrackingBehavior
+  fullName: nORM.Core.QueryTrackingBehavior
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: nORM.Configuration.DbContextOptions.CommandInterceptors*
+  commentId: Overload:nORM.Configuration.DbContextOptions.CommandInterceptors
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_CommandInterceptors
+  name: CommandInterceptors
+  nameWithType: DbContextOptions.CommandInterceptors
+  fullName: nORM.Configuration.DbContextOptions.CommandInterceptors
+- uid: System.Collections.Generic.IList{nORM.Enterprise.IDbCommandInterceptor}
+  commentId: T:System.Collections.Generic.IList{nORM.Enterprise.IDbCommandInterceptor}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ilist-1
+  name: IList<IDbCommandInterceptor>
+  nameWithType: IList<IDbCommandInterceptor>
+  fullName: System.Collections.Generic.IList<nORM.Enterprise.IDbCommandInterceptor>
+  nameWithType.vb: IList(Of IDbCommandInterceptor)
+  fullName.vb: System.Collections.Generic.IList(Of nORM.Enterprise.IDbCommandInterceptor)
+  name.vb: IList(Of IDbCommandInterceptor)
+  spec.csharp:
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ilist-1
+  - name: <
+  - uid: nORM.Enterprise.IDbCommandInterceptor
+    name: IDbCommandInterceptor
+    href: nORM.Enterprise.IDbCommandInterceptor.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ilist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.IDbCommandInterceptor
+    name: IDbCommandInterceptor
+    href: nORM.Enterprise.IDbCommandInterceptor.html
+  - name: )
+- uid: System.Collections.Generic.IList`1
+  commentId: T:System.Collections.Generic.IList`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ilist-1
+  name: IList<T>
+  nameWithType: IList<T>
+  fullName: System.Collections.Generic.IList<T>
+  nameWithType.vb: IList(Of T)
+  fullName.vb: System.Collections.Generic.IList(Of T)
+  name.vb: IList(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ilist-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ilist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Configuration.DbContextOptions.SaveChangesInterceptors*
+  commentId: Overload:nORM.Configuration.DbContextOptions.SaveChangesInterceptors
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_SaveChangesInterceptors
+  name: SaveChangesInterceptors
+  nameWithType: DbContextOptions.SaveChangesInterceptors
+  fullName: nORM.Configuration.DbContextOptions.SaveChangesInterceptors
+- uid: System.Collections.Generic.IList{nORM.Enterprise.ISaveChangesInterceptor}
+  commentId: T:System.Collections.Generic.IList{nORM.Enterprise.ISaveChangesInterceptor}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ilist-1
+  name: IList<ISaveChangesInterceptor>
+  nameWithType: IList<ISaveChangesInterceptor>
+  fullName: System.Collections.Generic.IList<nORM.Enterprise.ISaveChangesInterceptor>
+  nameWithType.vb: IList(Of ISaveChangesInterceptor)
+  fullName.vb: System.Collections.Generic.IList(Of nORM.Enterprise.ISaveChangesInterceptor)
+  name.vb: IList(Of ISaveChangesInterceptor)
+  spec.csharp:
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ilist-1
+  - name: <
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ilist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: )
+- uid: nORM.Configuration.DbContextOptions.CacheProvider*
+  commentId: Overload:nORM.Configuration.DbContextOptions.CacheProvider
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_CacheProvider
+  name: CacheProvider
+  nameWithType: DbContextOptions.CacheProvider
+  fullName: nORM.Configuration.DbContextOptions.CacheProvider
+- uid: nORM.Enterprise.IDbCacheProvider
+  commentId: T:nORM.Enterprise.IDbCacheProvider
+  parent: nORM.Enterprise
+  href: nORM.Enterprise.IDbCacheProvider.html
+  name: IDbCacheProvider
+  nameWithType: IDbCacheProvider
+  fullName: nORM.Enterprise.IDbCacheProvider
+- uid: nORM.Configuration.DbContextOptions.CacheExpiration*
+  commentId: Overload:nORM.Configuration.DbContextOptions.CacheExpiration
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_CacheExpiration
+  name: CacheExpiration
+  nameWithType: DbContextOptions.CacheExpiration
+  fullName: nORM.Configuration.DbContextOptions.CacheExpiration
+- uid: nORM.Core.NormMemoryCacheProvider
+  commentId: T:nORM.Core.NormMemoryCacheProvider
+  href: nORM.Core.NormMemoryCacheProvider.html
+  name: NormMemoryCacheProvider
+  nameWithType: NormMemoryCacheProvider
+  fullName: nORM.Core.NormMemoryCacheProvider
+- uid: nORM.Configuration.DbContextOptions
+  commentId: T:nORM.Configuration.DbContextOptions
+  parent: nORM.Configuration
+  href: nORM.Configuration.DbContextOptions.html
+  name: DbContextOptions
+  nameWithType: DbContextOptions
+  fullName: nORM.Configuration.DbContextOptions
+- uid: nORM.Configuration.DbContextOptions.UseInMemoryCache*
+  commentId: Overload:nORM.Configuration.DbContextOptions.UseInMemoryCache
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_UseInMemoryCache
+  name: UseInMemoryCache
+  nameWithType: DbContextOptions.UseInMemoryCache
+  fullName: nORM.Configuration.DbContextOptions.UseInMemoryCache
+- uid: nORM.Configuration.DbContextOptions.EnableTemporalVersioning*
+  commentId: Overload:nORM.Configuration.DbContextOptions.EnableTemporalVersioning
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_EnableTemporalVersioning
+  name: EnableTemporalVersioning
+  nameWithType: DbContextOptions.EnableTemporalVersioning
+  fullName: nORM.Configuration.DbContextOptions.EnableTemporalVersioning
+- uid: nORM.Configuration.DbContextOptions.GlobalFilters*
+  commentId: Overload:nORM.Configuration.DbContextOptions.GlobalFilters
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_GlobalFilters
+  name: GlobalFilters
+  nameWithType: DbContextOptions.GlobalFilters
+  fullName: nORM.Configuration.DbContextOptions.GlobalFilters
+- uid: System.Collections.Generic.IDictionary{System.Type,System.Collections.Generic.List{System.Linq.Expressions.LambdaExpression}}
+  commentId: T:System.Collections.Generic.IDictionary{System.Type,System.Collections.Generic.List{System.Linq.Expressions.LambdaExpression}}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  name: IDictionary<Type, List<LambdaExpression>>
+  nameWithType: IDictionary<Type, List<LambdaExpression>>
+  fullName: System.Collections.Generic.IDictionary<System.Type, System.Collections.Generic.List<System.Linq.Expressions.LambdaExpression>>
+  nameWithType.vb: IDictionary(Of Type, List(Of LambdaExpression))
+  fullName.vb: System.Collections.Generic.IDictionary(Of System.Type, System.Collections.Generic.List(Of System.Linq.Expressions.LambdaExpression))
+  name.vb: IDictionary(Of Type, List(Of LambdaExpression))
+  spec.csharp:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  - name: <
+  - uid: System.Type
+    name: Type
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.type
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - uid: System.Linq.Expressions.LambdaExpression
+    name: LambdaExpression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.lambdaexpression
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Type
+    name: Type
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.type
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Linq.Expressions.LambdaExpression
+    name: LambdaExpression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.lambdaexpression
+  - name: )
+  - name: )
+- uid: System.Collections.Generic.IDictionary`2
+  commentId: T:System.Collections.Generic.IDictionary`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  name: IDictionary<TKey, TValue>
+  nameWithType: IDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IDictionary<TKey, TValue>
+  nameWithType.vb: IDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IDictionary(Of TKey, TValue)
+  name.vb: IDictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  - name: <
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: )
+- uid: nORM.Configuration.DbContextOptions.AddGlobalFilter*
+  commentId: Overload:nORM.Configuration.DbContextOptions.AddGlobalFilter
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_AddGlobalFilter__1_System_Linq_Expressions_Expression_System_Func_nORM_Core_DbContext___0_System_Boolean___
+  name: AddGlobalFilter
+  nameWithType: DbContextOptions.AddGlobalFilter
+  fullName: nORM.Configuration.DbContextOptions.AddGlobalFilter
+- uid: System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,{TEntity},System.Boolean}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,``0,System.Boolean}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<DbContext, TEntity, bool>>
+  nameWithType: Expression<Func<DbContext, TEntity, bool>>
+  fullName: System.Linq.Expressions.Expression<System.Func<nORM.Core.DbContext, TEntity, bool>>
+  nameWithType.vb: Expression(Of Func(Of DbContext, TEntity, Boolean))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.DbContext, TEntity, Boolean))
+  name.vb: Expression(Of Func(Of DbContext, TEntity, Boolean))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: <
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+  - name: )
+- uid: System.Linq.Expressions.Expression`1
+  commentId: T:System.Linq.Expressions.Expression`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<TDelegate>
+  nameWithType: Expression<TDelegate>
+  fullName: System.Linq.Expressions.Expression<TDelegate>
+  nameWithType.vb: Expression(Of TDelegate)
+  fullName.vb: System.Linq.Expressions.Expression(Of TDelegate)
+  name.vb: Expression(Of TDelegate)
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - name: TDelegate
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDelegate
+  - name: )
+- uid: System.Linq.Expressions
+  commentId: N:System.Linq.Expressions
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Linq.Expressions
+  nameWithType: System.Linq.Expressions
+  fullName: System.Linq.Expressions
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+- uid: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Boolean}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<TEntity, bool>>
+  nameWithType: Expression<Func<TEntity, bool>>
+  fullName: System.Linq.Expressions.Expression<System.Func<TEntity, bool>>
+  nameWithType.vb: Expression(Of Func(Of TEntity, Boolean))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Boolean))
+  name.vb: Expression(Of Func(Of TEntity, Boolean))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+  - name: )
+- uid: System.InvalidOperationException
+  commentId: T:System.InvalidOperationException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.invalidoperationexception
+  name: InvalidOperationException
+  nameWithType: InvalidOperationException
+  fullName: System.InvalidOperationException
+- uid: nORM.Configuration.DbContextOptions.Validate*
+  commentId: Overload:nORM.Configuration.DbContextOptions.Validate
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_Validate
+  name: Validate
+  nameWithType: DbContextOptions.Validate
+  fullName: nORM.Configuration.DbContextOptions.Validate

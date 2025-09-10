@@ -1,0 +1,272 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  id: nORM.Configuration
+  children:
+  - nORM.Configuration.DbContextOptions
+  - nORM.Configuration.EntityTypeBuilder`1
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  - nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
+  - nORM.Configuration.IEntityTypeConfiguration
+  - nORM.Configuration.ModelBuilder
+  - nORM.Configuration.OwnedNavigation
+  - nORM.Configuration.RelationshipConfiguration
+  - nORM.Configuration.ShadowPropertyConfiguration
+  langs:
+  - csharp
+  - vb
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  type: Namespace
+  assemblies:
+  - nORM
+references:
+- uid: nORM.Configuration.DbContextOptions
+  commentId: T:nORM.Configuration.DbContextOptions
+  parent: nORM.Configuration
+  href: nORM.Configuration.DbContextOptions.html
+  name: DbContextOptions
+  nameWithType: DbContextOptions
+  fullName: nORM.Configuration.DbContextOptions
+- uid: nORM.Configuration.EntityTypeBuilder`1
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1
+  parent: nORM.Configuration
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>
+  nameWithType: EntityTypeBuilder<TEntity>
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>
+  nameWithType.vb: EntityTypeBuilder(Of TEntity)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity)
+  name.vb: EntityTypeBuilder(Of TEntity)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  parent: nORM.Configuration
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.PropertyBuilder
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder
+  name.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+    name: PropertyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+    name: PropertyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html
+- uid: nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
+  parent: nORM.Configuration
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.ShadowPropertyBuilder
+  nameWithType: EntityTypeBuilder<TEntity>.ShadowPropertyBuilder
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.ShadowPropertyBuilder
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).ShadowPropertyBuilder
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).ShadowPropertyBuilder
+  name.vb: EntityTypeBuilder(Of TEntity).ShadowPropertyBuilder
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
+    name: ShadowPropertyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ShadowPropertyBuilder.html
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
+    name: ShadowPropertyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ShadowPropertyBuilder.html
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent)
+  name.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+    name: CollectionNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.html
+  - name: <
+  - name: TDependent
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+    name: CollectionNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDependent
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
+  parent: nORM.Configuration
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ReferenceCollectionBuilder
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ReferenceCollectionBuilder
+  name.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ReferenceCollectionBuilder
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+    name: CollectionNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.html
+  - name: <
+  - name: TDependent
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
+    name: ReferenceCollectionBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.ReferenceCollectionBuilder.html
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+    name: CollectionNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDependent
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
+    name: ReferenceCollectionBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.ReferenceCollectionBuilder.html
+- uid: nORM.Configuration.IEntityTypeConfiguration
+  commentId: T:nORM.Configuration.IEntityTypeConfiguration
+  parent: nORM.Configuration
+  href: nORM.Configuration.IEntityTypeConfiguration.html
+  name: IEntityTypeConfiguration
+  nameWithType: IEntityTypeConfiguration
+  fullName: nORM.Configuration.IEntityTypeConfiguration
+- uid: nORM.Configuration.OwnedNavigation
+  commentId: T:nORM.Configuration.OwnedNavigation
+  href: nORM.Configuration.OwnedNavigation.html
+  name: OwnedNavigation
+  nameWithType: OwnedNavigation
+  fullName: nORM.Configuration.OwnedNavigation
+- uid: nORM.Configuration.ShadowPropertyConfiguration
+  commentId: T:nORM.Configuration.ShadowPropertyConfiguration
+  href: nORM.Configuration.ShadowPropertyConfiguration.html
+  name: ShadowPropertyConfiguration
+  nameWithType: ShadowPropertyConfiguration
+  fullName: nORM.Configuration.ShadowPropertyConfiguration
+- uid: nORM.Configuration.RelationshipConfiguration
+  commentId: T:nORM.Configuration.RelationshipConfiguration
+  href: nORM.Configuration.RelationshipConfiguration.html
+  name: RelationshipConfiguration
+  nameWithType: RelationshipConfiguration
+  fullName: nORM.Configuration.RelationshipConfiguration
+- uid: nORM.Configuration.ModelBuilder
+  commentId: T:nORM.Configuration.ModelBuilder
+  href: nORM.Configuration.ModelBuilder.html
+  name: ModelBuilder
+  nameWithType: ModelBuilder
+  fullName: nORM.Configuration.ModelBuilder
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html

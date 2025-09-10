@@ -1,0 +1,639 @@
+### YamlMime:ManagedReference
+items:
+- uid: Microsoft.Extensions.Logging.DbContextLoggingExtensions
+  commentId: T:Microsoft.Extensions.Logging.DbContextLoggingExtensions
+  id: DbContextLoggingExtensions
+  parent: Microsoft.Extensions.Logging
+  children:
+  - Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogBulkOperation(Microsoft.Extensions.Logging.ILogger,System.String,System.String,System.Int32,System.TimeSpan)
+  - Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogError(Microsoft.Extensions.Logging.ILogger,nORM.Core.NormException,System.Int32)
+  - Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogQuery(Microsoft.Extensions.Logging.ILogger,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.TimeSpan,System.Int32)
+  langs:
+  - csharp
+  - vb
+  name: DbContextLoggingExtensions
+  nameWithType: DbContextLoggingExtensions
+  fullName: Microsoft.Extensions.Logging.DbContextLoggingExtensions
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DbContextLoggingExtensions
+    path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
+    startLine: 9
+  assemblies:
+  - nORM
+  namespace: Microsoft.Extensions.Logging
+  summary: Extension methods for logging nORM specific database operations.
+  example: []
+  syntax:
+    content: public static class DbContextLoggingExtensions
+    content.vb: Public Module DbContextLoggingExtensions
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+- uid: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogQuery(Microsoft.Extensions.Logging.ILogger,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.TimeSpan,System.Int32)
+  commentId: M:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogQuery(Microsoft.Extensions.Logging.ILogger,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.TimeSpan,System.Int32)
+  id: LogQuery(Microsoft.Extensions.Logging.ILogger,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.TimeSpan,System.Int32)
+  isExtensionMethod: true
+  parent: Microsoft.Extensions.Logging.DbContextLoggingExtensions
+  langs:
+  - csharp
+  - vb
+  name: LogQuery(ILogger, string, IReadOnlyDictionary<string, object>, TimeSpan, int)
+  nameWithType: DbContextLoggingExtensions.LogQuery(ILogger, string, IReadOnlyDictionary<string, object>, TimeSpan, int)
+  fullName: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogQuery(Microsoft.Extensions.Logging.ILogger, string, System.Collections.Generic.IReadOnlyDictionary<string, object>, System.TimeSpan, int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LogQuery
+    path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
+    startLine: 14
+  assemblies:
+  - nORM
+  namespace: Microsoft.Extensions.Logging
+  summary: Logs a database query with parameter and timing information.
+  example: []
+  syntax:
+    content: public static void LogQuery(this ILogger logger, string sql, IReadOnlyDictionary<string, object> parameters, TimeSpan duration, int recordCount)
+    parameters:
+    - id: logger
+      type: Microsoft.Extensions.Logging.ILogger
+    - id: sql
+      type: System.String
+    - id: parameters
+      type: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+    - id: duration
+      type: System.TimeSpan
+    - id: recordCount
+      type: System.Int32
+    content.vb: Public Shared Sub LogQuery(logger As ILogger, sql As String, parameters As IReadOnlyDictionary(Of String, Object), duration As TimeSpan, recordCount As Integer)
+  overload: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogQuery*
+  nameWithType.vb: DbContextLoggingExtensions.LogQuery(ILogger, String, IReadOnlyDictionary(Of String, Object), TimeSpan, Integer)
+  fullName.vb: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogQuery(Microsoft.Extensions.Logging.ILogger, String, System.Collections.Generic.IReadOnlyDictionary(Of String, Object), System.TimeSpan, Integer)
+  name.vb: LogQuery(ILogger, String, IReadOnlyDictionary(Of String, Object), TimeSpan, Integer)
+- uid: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogBulkOperation(Microsoft.Extensions.Logging.ILogger,System.String,System.String,System.Int32,System.TimeSpan)
+  commentId: M:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogBulkOperation(Microsoft.Extensions.Logging.ILogger,System.String,System.String,System.Int32,System.TimeSpan)
+  id: LogBulkOperation(Microsoft.Extensions.Logging.ILogger,System.String,System.String,System.Int32,System.TimeSpan)
+  isExtensionMethod: true
+  parent: Microsoft.Extensions.Logging.DbContextLoggingExtensions
+  langs:
+  - csharp
+  - vb
+  name: LogBulkOperation(ILogger, string, string, int, TimeSpan)
+  nameWithType: DbContextLoggingExtensions.LogBulkOperation(ILogger, string, string, int, TimeSpan)
+  fullName: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogBulkOperation(Microsoft.Extensions.Logging.ILogger, string, string, int, System.TimeSpan)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LogBulkOperation
+    path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
+    startLine: 23
+  assemblies:
+  - nORM
+  namespace: Microsoft.Extensions.Logging
+  summary: Logs a bulk database operation.
+  example: []
+  syntax:
+    content: public static void LogBulkOperation(this ILogger logger, string operation, string tableName, int recordCount, TimeSpan duration)
+    parameters:
+    - id: logger
+      type: Microsoft.Extensions.Logging.ILogger
+    - id: operation
+      type: System.String
+    - id: tableName
+      type: System.String
+    - id: recordCount
+      type: System.Int32
+    - id: duration
+      type: System.TimeSpan
+    content.vb: Public Shared Sub LogBulkOperation(logger As ILogger, operation As String, tableName As String, recordCount As Integer, duration As TimeSpan)
+  overload: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogBulkOperation*
+  nameWithType.vb: DbContextLoggingExtensions.LogBulkOperation(ILogger, String, String, Integer, TimeSpan)
+  fullName.vb: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogBulkOperation(Microsoft.Extensions.Logging.ILogger, String, String, Integer, System.TimeSpan)
+  name.vb: LogBulkOperation(ILogger, String, String, Integer, TimeSpan)
+- uid: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogError(Microsoft.Extensions.Logging.ILogger,nORM.Core.NormException,System.Int32)
+  commentId: M:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogError(Microsoft.Extensions.Logging.ILogger,nORM.Core.NormException,System.Int32)
+  id: LogError(Microsoft.Extensions.Logging.ILogger,nORM.Core.NormException,System.Int32)
+  isExtensionMethod: true
+  parent: Microsoft.Extensions.Logging.DbContextLoggingExtensions
+  langs:
+  - csharp
+  - vb
+  name: LogError(ILogger, NormException, int)
+  nameWithType: DbContextLoggingExtensions.LogError(ILogger, NormException, int)
+  fullName: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogError(Microsoft.Extensions.Logging.ILogger, nORM.Core.NormException, int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LogError
+    path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
+    startLine: 32
+  assemblies:
+  - nORM
+  namespace: Microsoft.Extensions.Logging
+  summary: Logs a nORM specific error with retry attempt information.
+  example: []
+  syntax:
+    content: public static void LogError(this ILogger logger, NormException exception, int retryAttempt)
+    parameters:
+    - id: logger
+      type: Microsoft.Extensions.Logging.ILogger
+    - id: exception
+      type: nORM.Core.NormException
+    - id: retryAttempt
+      type: System.Int32
+    content.vb: Public Shared Sub LogError(logger As ILogger, exception As NormException, retryAttempt As Integer)
+  overload: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogError*
+  nameWithType.vb: DbContextLoggingExtensions.LogError(ILogger, NormException, Integer)
+  fullName.vb: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogError(Microsoft.Extensions.Logging.ILogger, nORM.Core.NormException, Integer)
+  name.vb: LogError(ILogger, NormException, Integer)
+references:
+- uid: Microsoft.Extensions.Logging
+  commentId: N:Microsoft.Extensions.Logging
+  href: https://learn.microsoft.com/dotnet/api/microsoft
+  name: Microsoft.Extensions.Logging
+  nameWithType: Microsoft.Extensions.Logging
+  fullName: Microsoft.Extensions.Logging
+  spec.csharp:
+  - uid: Microsoft
+    name: Microsoft
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Logging
+    name: Logging
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging
+  spec.vb:
+  - uid: Microsoft
+    name: Microsoft
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Logging
+    name: Logging
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogQuery*
+  commentId: Overload:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogQuery
+  href: Microsoft.Extensions.Logging.DbContextLoggingExtensions.html#Microsoft_Extensions_Logging_DbContextLoggingExtensions_LogQuery_Microsoft_Extensions_Logging_ILogger_System_String_System_Collections_Generic_IReadOnlyDictionary_System_String_System_Object__System_TimeSpan_System_Int32_
+  name: LogQuery
+  nameWithType: DbContextLoggingExtensions.LogQuery
+  fullName: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogQuery
+- uid: Microsoft.Extensions.Logging.ILogger
+  commentId: T:Microsoft.Extensions.Logging.ILogger
+  parent: Microsoft.Extensions.Logging
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger
+  name: ILogger
+  nameWithType: ILogger
+  fullName: Microsoft.Extensions.Logging.ILogger
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<string, object>
+  nameWithType: IReadOnlyDictionary<string, object>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<string, object>
+  nameWithType.vb: IReadOnlyDictionary(Of String, Object)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of String, Object)
+  name.vb: IReadOnlyDictionary(Of String, Object)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.timespan
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: System.Collections.Generic.IReadOnlyDictionary`2
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<TKey, TValue>
+  nameWithType: IReadOnlyDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>
+  nameWithType.vb: IReadOnlyDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of TKey, TValue)
+  name.vb: IReadOnlyDictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: <
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogBulkOperation*
+  commentId: Overload:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogBulkOperation
+  href: Microsoft.Extensions.Logging.DbContextLoggingExtensions.html#Microsoft_Extensions_Logging_DbContextLoggingExtensions_LogBulkOperation_Microsoft_Extensions_Logging_ILogger_System_String_System_String_System_Int32_System_TimeSpan_
+  name: LogBulkOperation
+  nameWithType: DbContextLoggingExtensions.LogBulkOperation
+  fullName: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogBulkOperation
+- uid: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogError*
+  commentId: Overload:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogError
+  href: Microsoft.Extensions.Logging.DbContextLoggingExtensions.html#Microsoft_Extensions_Logging_DbContextLoggingExtensions_LogError_Microsoft_Extensions_Logging_ILogger_nORM_Core_NormException_System_Int32_
+  name: LogError
+  nameWithType: DbContextLoggingExtensions.LogError
+  fullName: Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogError
+- uid: nORM.Core.NormException
+  commentId: T:nORM.Core.NormException
+  parent: nORM.Core
+  href: nORM.Core.NormException.html
+  name: NormException
+  nameWithType: NormException
+  fullName: nORM.Core.NormException
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html

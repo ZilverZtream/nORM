@@ -1,0 +1,913 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.WindowFunctionsExtensions
+  commentId: T:nORM.Core.WindowFunctionsExtensions
+  id: WindowFunctionsExtensions
+  parent: nORM.Core
+  children:
+  - nORM.Core.WindowFunctionsExtensions.WithDenseRank``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  - nORM.Core.WindowFunctionsExtensions.WithLag``3(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Int32,System.Linq.Expressions.Expression{System.Func{``0,``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  - nORM.Core.WindowFunctionsExtensions.WithLead``3(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Int32,System.Linq.Expressions.Expression{System.Func{``0,``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  - nORM.Core.WindowFunctionsExtensions.WithRank``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  - nORM.Core.WindowFunctionsExtensions.WithRowNumber``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  langs:
+  - csharp
+  - vb
+  name: WindowFunctionsExtensions
+  nameWithType: WindowFunctionsExtensions
+  fullName: nORM.Core.WindowFunctionsExtensions
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Core/WindowFunctionsExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: WindowFunctionsExtensions
+    path: src/nORM/Core/WindowFunctionsExtensions.cs
+    startLine: 10
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Provides LINQ extension methods for SQL window functions.
+  example: []
+  syntax:
+    content: public static class WindowFunctionsExtensions
+    content.vb: Public Module WindowFunctionsExtensions
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+- uid: nORM.Core.WindowFunctionsExtensions.WithRowNumber``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  commentId: M:nORM.Core.WindowFunctionsExtensions.WithRowNumber``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  id: WithRowNumber``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  isExtensionMethod: true
+  parent: nORM.Core.WindowFunctionsExtensions
+  langs:
+  - csharp
+  - vb
+  name: WithRowNumber<TSource, TResult>(IQueryable<TSource>, Expression<Func<TSource, int, TResult>>)
+  nameWithType: WindowFunctionsExtensions.WithRowNumber<TSource, TResult>(IQueryable<TSource>, Expression<Func<TSource, int, TResult>>)
+  fullName: nORM.Core.WindowFunctionsExtensions.WithRowNumber<TSource, TResult>(System.Linq.IQueryable<TSource>, System.Linq.Expressions.Expression<System.Func<TSource, int, TResult>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/WindowFunctionsExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: WithRowNumber
+    path: src/nORM/Core/WindowFunctionsExtensions.cs
+    startLine: 15
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Adds a ROW_NUMBER() column to the query projection.
+  example: []
+  syntax:
+    content: 'public static IQueryable<TResult> WithRowNumber<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, int, TResult>> resultSelector) where TSource : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{TSource}}
+    - id: resultSelector
+      type: System.Linq.Expressions.Expression{System.Func{{TSource},System.Int32,{TResult}}}
+    typeParameters:
+    - id: TSource
+    - id: TResult
+    return:
+      type: System.Linq.IQueryable{{TResult}}
+    content.vb: Public Shared Function WithRowNumber(Of TSource As Class, TResult)(source As IQueryable(Of TSource), resultSelector As Expression(Of Func(Of TSource, Integer, TResult))) As IQueryable(Of TResult)
+  overload: nORM.Core.WindowFunctionsExtensions.WithRowNumber*
+  nameWithType.vb: WindowFunctionsExtensions.WithRowNumber(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, Integer, TResult)))
+  fullName.vb: nORM.Core.WindowFunctionsExtensions.WithRowNumber(Of TSource, TResult)(System.Linq.IQueryable(Of TSource), System.Linq.Expressions.Expression(Of System.Func(Of TSource, Integer, TResult)))
+  name.vb: WithRowNumber(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, Integer, TResult)))
+- uid: nORM.Core.WindowFunctionsExtensions.WithRank``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  commentId: M:nORM.Core.WindowFunctionsExtensions.WithRank``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  id: WithRank``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  isExtensionMethod: true
+  parent: nORM.Core.WindowFunctionsExtensions
+  langs:
+  - csharp
+  - vb
+  name: WithRank<TSource, TResult>(IQueryable<TSource>, Expression<Func<TSource, int, TResult>>)
+  nameWithType: WindowFunctionsExtensions.WithRank<TSource, TResult>(IQueryable<TSource>, Expression<Func<TSource, int, TResult>>)
+  fullName: nORM.Core.WindowFunctionsExtensions.WithRank<TSource, TResult>(System.Linq.IQueryable<TSource>, System.Linq.Expressions.Expression<System.Func<TSource, int, TResult>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/WindowFunctionsExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: WithRank
+    path: src/nORM/Core/WindowFunctionsExtensions.cs
+    startLine: 31
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Adds a RANK() column to the query projection.
+  example: []
+  syntax:
+    content: 'public static IQueryable<TResult> WithRank<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, int, TResult>> resultSelector) where TSource : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{TSource}}
+    - id: resultSelector
+      type: System.Linq.Expressions.Expression{System.Func{{TSource},System.Int32,{TResult}}}
+    typeParameters:
+    - id: TSource
+    - id: TResult
+    return:
+      type: System.Linq.IQueryable{{TResult}}
+    content.vb: Public Shared Function WithRank(Of TSource As Class, TResult)(source As IQueryable(Of TSource), resultSelector As Expression(Of Func(Of TSource, Integer, TResult))) As IQueryable(Of TResult)
+  overload: nORM.Core.WindowFunctionsExtensions.WithRank*
+  nameWithType.vb: WindowFunctionsExtensions.WithRank(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, Integer, TResult)))
+  fullName.vb: nORM.Core.WindowFunctionsExtensions.WithRank(Of TSource, TResult)(System.Linq.IQueryable(Of TSource), System.Linq.Expressions.Expression(Of System.Func(Of TSource, Integer, TResult)))
+  name.vb: WithRank(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, Integer, TResult)))
+- uid: nORM.Core.WindowFunctionsExtensions.WithDenseRank``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  commentId: M:nORM.Core.WindowFunctionsExtensions.WithDenseRank``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  id: WithDenseRank``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
+  isExtensionMethod: true
+  parent: nORM.Core.WindowFunctionsExtensions
+  langs:
+  - csharp
+  - vb
+  name: WithDenseRank<TSource, TResult>(IQueryable<TSource>, Expression<Func<TSource, int, TResult>>)
+  nameWithType: WindowFunctionsExtensions.WithDenseRank<TSource, TResult>(IQueryable<TSource>, Expression<Func<TSource, int, TResult>>)
+  fullName: nORM.Core.WindowFunctionsExtensions.WithDenseRank<TSource, TResult>(System.Linq.IQueryable<TSource>, System.Linq.Expressions.Expression<System.Func<TSource, int, TResult>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/WindowFunctionsExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: WithDenseRank
+    path: src/nORM/Core/WindowFunctionsExtensions.cs
+    startLine: 47
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Adds a DENSE_RANK() column to the query projection.
+  example: []
+  syntax:
+    content: 'public static IQueryable<TResult> WithDenseRank<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, int, TResult>> resultSelector) where TSource : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{TSource}}
+    - id: resultSelector
+      type: System.Linq.Expressions.Expression{System.Func{{TSource},System.Int32,{TResult}}}
+    typeParameters:
+    - id: TSource
+    - id: TResult
+    return:
+      type: System.Linq.IQueryable{{TResult}}
+    content.vb: Public Shared Function WithDenseRank(Of TSource As Class, TResult)(source As IQueryable(Of TSource), resultSelector As Expression(Of Func(Of TSource, Integer, TResult))) As IQueryable(Of TResult)
+  overload: nORM.Core.WindowFunctionsExtensions.WithDenseRank*
+  nameWithType.vb: WindowFunctionsExtensions.WithDenseRank(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, Integer, TResult)))
+  fullName.vb: nORM.Core.WindowFunctionsExtensions.WithDenseRank(Of TSource, TResult)(System.Linq.IQueryable(Of TSource), System.Linq.Expressions.Expression(Of System.Func(Of TSource, Integer, TResult)))
+  name.vb: WithDenseRank(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, Integer, TResult)))
+- uid: nORM.Core.WindowFunctionsExtensions.WithLag``3(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Int32,System.Linq.Expressions.Expression{System.Func{``0,``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Core.WindowFunctionsExtensions.WithLag``3(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Int32,System.Linq.Expressions.Expression{System.Func{``0,``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  id: WithLag``3(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Int32,System.Linq.Expressions.Expression{System.Func{``0,``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExtensionMethod: true
+  parent: nORM.Core.WindowFunctionsExtensions
+  langs:
+  - csharp
+  - vb
+  name: WithLag<TSource, TValue, TResult>(IQueryable<TSource>, Expression<Func<TSource, TValue>>, int, Expression<Func<TSource, TValue?, TResult>>, Expression<Func<TSource, TValue>>?)
+  nameWithType: WindowFunctionsExtensions.WithLag<TSource, TValue, TResult>(IQueryable<TSource>, Expression<Func<TSource, TValue>>, int, Expression<Func<TSource, TValue?, TResult>>, Expression<Func<TSource, TValue>>?)
+  fullName: nORM.Core.WindowFunctionsExtensions.WithLag<TSource, TValue, TResult>(System.Linq.IQueryable<TSource>, System.Linq.Expressions.Expression<System.Func<TSource, TValue>>, int, System.Linq.Expressions.Expression<System.Func<TSource, TValue?, TResult>>, System.Linq.Expressions.Expression<System.Func<TSource, TValue>>?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/WindowFunctionsExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: WithLag
+    path: src/nORM/Core/WindowFunctionsExtensions.cs
+    startLine: 63
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Adds a LAG() column to the query projection.
+  example: []
+  syntax:
+    content: 'public static IQueryable<TResult> WithLag<TSource, TValue, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TValue>> valueSelector, int offset, Expression<Func<TSource, TValue?, TResult>> resultSelector, Expression<Func<TSource, TValue>>? defaultValue = null) where TSource : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{TSource}}
+    - id: valueSelector
+      type: System.Linq.Expressions.Expression{System.Func{{TSource},{TValue}}}
+    - id: offset
+      type: System.Int32
+    - id: resultSelector
+      type: System.Linq.Expressions.Expression{System.Func{{TSource},{TValue},{TResult}}}
+    - id: defaultValue
+      type: System.Linq.Expressions.Expression{System.Func{{TSource},{TValue}}}
+    typeParameters:
+    - id: TSource
+    - id: TValue
+    - id: TResult
+    return:
+      type: System.Linq.IQueryable{{TResult}}
+    content.vb: Public Shared Function WithLag(Of TSource As Class, TValue, TResult)(source As IQueryable(Of TSource), valueSelector As Expression(Of Func(Of TSource, TValue)), offset As Integer, resultSelector As Expression(Of Func(Of TSource, TValue, TResult)), defaultValue As Expression(Of Func(Of TSource, TValue)) = Nothing) As IQueryable(Of TResult)
+  overload: nORM.Core.WindowFunctionsExtensions.WithLag*
+  nameWithType.vb: WindowFunctionsExtensions.WithLag(Of TSource, TValue, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TValue)), Integer, Expression(Of Func(Of TSource, TValue, TResult)), Expression(Of Func(Of TSource, TValue)))
+  fullName.vb: nORM.Core.WindowFunctionsExtensions.WithLag(Of TSource, TValue, TResult)(System.Linq.IQueryable(Of TSource), System.Linq.Expressions.Expression(Of System.Func(Of TSource, TValue)), Integer, System.Linq.Expressions.Expression(Of System.Func(Of TSource, TValue, TResult)), System.Linq.Expressions.Expression(Of System.Func(Of TSource, TValue)))
+  name.vb: WithLag(Of TSource, TValue, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TValue)), Integer, Expression(Of Func(Of TSource, TValue, TResult)), Expression(Of Func(Of TSource, TValue)))
+- uid: nORM.Core.WindowFunctionsExtensions.WithLead``3(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Int32,System.Linq.Expressions.Expression{System.Func{``0,``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Core.WindowFunctionsExtensions.WithLead``3(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Int32,System.Linq.Expressions.Expression{System.Func{``0,``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  id: WithLead``3(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Int32,System.Linq.Expressions.Expression{System.Func{``0,``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExtensionMethod: true
+  parent: nORM.Core.WindowFunctionsExtensions
+  langs:
+  - csharp
+  - vb
+  name: WithLead<TSource, TValue, TResult>(IQueryable<TSource>, Expression<Func<TSource, TValue>>, int, Expression<Func<TSource, TValue?, TResult>>, Expression<Func<TSource, TValue>>?)
+  nameWithType: WindowFunctionsExtensions.WithLead<TSource, TValue, TResult>(IQueryable<TSource>, Expression<Func<TSource, TValue>>, int, Expression<Func<TSource, TValue?, TResult>>, Expression<Func<TSource, TValue>>?)
+  fullName: nORM.Core.WindowFunctionsExtensions.WithLead<TSource, TValue, TResult>(System.Linq.IQueryable<TSource>, System.Linq.Expressions.Expression<System.Func<TSource, TValue>>, int, System.Linq.Expressions.Expression<System.Func<TSource, TValue?, TResult>>, System.Linq.Expressions.Expression<System.Func<TSource, TValue>>?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/WindowFunctionsExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: WithLead
+    path: src/nORM/Core/WindowFunctionsExtensions.cs
+    startLine: 92
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Adds a LEAD() column to the query projection.
+  example: []
+  syntax:
+    content: 'public static IQueryable<TResult> WithLead<TSource, TValue, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TValue>> valueSelector, int offset, Expression<Func<TSource, TValue?, TResult>> resultSelector, Expression<Func<TSource, TValue>>? defaultValue = null) where TSource : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{TSource}}
+    - id: valueSelector
+      type: System.Linq.Expressions.Expression{System.Func{{TSource},{TValue}}}
+    - id: offset
+      type: System.Int32
+    - id: resultSelector
+      type: System.Linq.Expressions.Expression{System.Func{{TSource},{TValue},{TResult}}}
+    - id: defaultValue
+      type: System.Linq.Expressions.Expression{System.Func{{TSource},{TValue}}}
+    typeParameters:
+    - id: TSource
+    - id: TValue
+    - id: TResult
+    return:
+      type: System.Linq.IQueryable{{TResult}}
+    content.vb: Public Shared Function WithLead(Of TSource As Class, TValue, TResult)(source As IQueryable(Of TSource), valueSelector As Expression(Of Func(Of TSource, TValue)), offset As Integer, resultSelector As Expression(Of Func(Of TSource, TValue, TResult)), defaultValue As Expression(Of Func(Of TSource, TValue)) = Nothing) As IQueryable(Of TResult)
+  overload: nORM.Core.WindowFunctionsExtensions.WithLead*
+  nameWithType.vb: WindowFunctionsExtensions.WithLead(Of TSource, TValue, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TValue)), Integer, Expression(Of Func(Of TSource, TValue, TResult)), Expression(Of Func(Of TSource, TValue)))
+  fullName.vb: nORM.Core.WindowFunctionsExtensions.WithLead(Of TSource, TValue, TResult)(System.Linq.IQueryable(Of TSource), System.Linq.Expressions.Expression(Of System.Func(Of TSource, TValue)), Integer, System.Linq.Expressions.Expression(Of System.Func(Of TSource, TValue, TResult)), System.Linq.Expressions.Expression(Of System.Func(Of TSource, TValue)))
+  name.vb: WithLead(Of TSource, TValue, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TValue)), Integer, Expression(Of Func(Of TSource, TValue, TResult)), Expression(Of Func(Of TSource, TValue)))
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Core.WindowFunctionsExtensions.WithRowNumber*
+  commentId: Overload:nORM.Core.WindowFunctionsExtensions.WithRowNumber
+  href: nORM.Core.WindowFunctionsExtensions.html#nORM_Core_WindowFunctionsExtensions_WithRowNumber__2_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0_System_Int32___1___
+  name: WithRowNumber
+  nameWithType: WindowFunctionsExtensions.WithRowNumber
+  fullName: nORM.Core.WindowFunctionsExtensions.WithRowNumber
+- uid: System.Linq.IQueryable{{TSource}}
+  commentId: T:System.Linq.IQueryable{``0}
+  parent: System.Linq
+  definition: System.Linq.IQueryable`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  name: IQueryable<TSource>
+  nameWithType: IQueryable<TSource>
+  fullName: System.Linq.IQueryable<TSource>
+  nameWithType.vb: IQueryable(Of TSource)
+  fullName.vb: System.Linq.IQueryable(Of TSource)
+  name.vb: IQueryable(Of TSource)
+  spec.csharp:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: TSource
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TSource
+  - name: )
+- uid: System.Linq.Expressions.Expression{System.Func{{TSource},System.Int32,{TResult}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<TSource, int, TResult>>
+  nameWithType: Expression<Func<TSource, int, TResult>>
+  fullName: System.Linq.Expressions.Expression<System.Func<TSource, int, TResult>>
+  nameWithType.vb: Expression(Of Func(Of TSource, Integer, TResult))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of TSource, Integer, TResult))
+  name.vb: Expression(Of Func(Of TSource, Integer, TResult))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: <
+  - name: TSource
+  - name: ','
+  - name: " "
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TSource
+  - name: ','
+  - name: " "
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: )
+  - name: )
+- uid: System.Linq.IQueryable{{TResult}}
+  commentId: T:System.Linq.IQueryable{``3}
+  parent: System.Linq
+  definition: System.Linq.IQueryable`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  name: IQueryable<TResult>
+  nameWithType: IQueryable<TResult>
+  fullName: System.Linq.IQueryable<TResult>
+  nameWithType.vb: IQueryable(Of TResult)
+  fullName.vb: System.Linq.IQueryable(Of TResult)
+  name.vb: IQueryable(Of TResult)
+  spec.csharp:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TResult
+  - name: )
+- uid: System.Linq.IQueryable`1
+  commentId: T:System.Linq.IQueryable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  name: IQueryable<T>
+  nameWithType: IQueryable<T>
+  fullName: System.Linq.IQueryable<T>
+  nameWithType.vb: IQueryable(Of T)
+  fullName.vb: System.Linq.IQueryable(Of T)
+  name.vb: IQueryable(Of T)
+  spec.csharp:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Linq
+  commentId: N:System.Linq
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Linq
+  nameWithType: System.Linq
+  fullName: System.Linq
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+- uid: System.Linq.Expressions.Expression`1
+  commentId: T:System.Linq.Expressions.Expression`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<TDelegate>
+  nameWithType: Expression<TDelegate>
+  fullName: System.Linq.Expressions.Expression<TDelegate>
+  nameWithType.vb: Expression(Of TDelegate)
+  fullName.vb: System.Linq.Expressions.Expression(Of TDelegate)
+  name.vb: Expression(Of TDelegate)
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - name: TDelegate
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDelegate
+  - name: )
+- uid: System.Linq.Expressions
+  commentId: N:System.Linq.Expressions
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Linq.Expressions
+  nameWithType: System.Linq.Expressions
+  fullName: System.Linq.Expressions
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+- uid: nORM.Core.WindowFunctionsExtensions.WithRank*
+  commentId: Overload:nORM.Core.WindowFunctionsExtensions.WithRank
+  href: nORM.Core.WindowFunctionsExtensions.html#nORM_Core_WindowFunctionsExtensions_WithRank__2_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0_System_Int32___1___
+  name: WithRank
+  nameWithType: WindowFunctionsExtensions.WithRank
+  fullName: nORM.Core.WindowFunctionsExtensions.WithRank
+- uid: nORM.Core.WindowFunctionsExtensions.WithDenseRank*
+  commentId: Overload:nORM.Core.WindowFunctionsExtensions.WithDenseRank
+  href: nORM.Core.WindowFunctionsExtensions.html#nORM_Core_WindowFunctionsExtensions_WithDenseRank__2_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0_System_Int32___1___
+  name: WithDenseRank
+  nameWithType: WindowFunctionsExtensions.WithDenseRank
+  fullName: nORM.Core.WindowFunctionsExtensions.WithDenseRank
+- uid: nORM.Core.WindowFunctionsExtensions.WithLag*
+  commentId: Overload:nORM.Core.WindowFunctionsExtensions.WithLag
+  href: nORM.Core.WindowFunctionsExtensions.html#nORM_Core_WindowFunctionsExtensions_WithLag__3_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0___1___System_Int32_System_Linq_Expressions_Expression_System_Func___0___1___2___System_Linq_Expressions_Expression_System_Func___0___1___
+  name: WithLag
+  nameWithType: WindowFunctionsExtensions.WithLag
+  fullName: nORM.Core.WindowFunctionsExtensions.WithLag
+- uid: System.Linq.Expressions.Expression{System.Func{{TSource},{TValue}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{``0,``1}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<TSource, TValue>>
+  nameWithType: Expression<Func<TSource, TValue>>
+  fullName: System.Linq.Expressions.Expression<System.Func<TSource, TValue>>
+  nameWithType.vb: Expression(Of Func(Of TSource, TValue))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of TSource, TValue))
+  name.vb: Expression(Of Func(Of TSource, TValue))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: TSource
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TSource
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: )
+  - name: )
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: System.Linq.Expressions.Expression{System.Func{{TSource},{TValue},{TResult}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{``0,``1,``2}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<TSource, TValue, TResult>>
+  nameWithType: Expression<Func<TSource, TValue, TResult>>
+  fullName: System.Linq.Expressions.Expression<System.Func<TSource, TValue, TResult>>
+  nameWithType.vb: Expression(Of Func(Of TSource, TValue, TResult))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of TSource, TValue, TResult))
+  name.vb: Expression(Of Func(Of TSource, TValue, TResult))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: <
+  - name: TSource
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TSource
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: )
+  - name: )
+- uid: nORM.Core.WindowFunctionsExtensions.WithLead*
+  commentId: Overload:nORM.Core.WindowFunctionsExtensions.WithLead
+  href: nORM.Core.WindowFunctionsExtensions.html#nORM_Core_WindowFunctionsExtensions_WithLead__3_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0___1___System_Int32_System_Linq_Expressions_Expression_System_Func___0___1___2___System_Linq_Expressions_Expression_System_Func___0___1___
+  name: WithLead
+  nameWithType: WindowFunctionsExtensions.WithLead
+  fullName: nORM.Core.WindowFunctionsExtensions.WithLead

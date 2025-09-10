@@ -1,0 +1,111 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Enterprise
+  commentId: N:nORM.Enterprise
+  id: nORM.Enterprise
+  children:
+  - nORM.Enterprise.BaseDbCommandInterceptor
+  - nORM.Enterprise.IDbCacheProvider
+  - nORM.Enterprise.IDbCommandInterceptor
+  - nORM.Enterprise.ISaveChangesInterceptor
+  - nORM.Enterprise.ITenantProvider
+  - nORM.Enterprise.InterceptionResult`1
+  - nORM.Enterprise.RetryPolicy
+  langs:
+  - csharp
+  - vb
+  name: nORM.Enterprise
+  nameWithType: nORM.Enterprise
+  fullName: nORM.Enterprise
+  type: Namespace
+  assemblies:
+  - nORM
+references:
+- uid: nORM.Enterprise.IDbCacheProvider
+  commentId: T:nORM.Enterprise.IDbCacheProvider
+  parent: nORM.Enterprise
+  href: nORM.Enterprise.IDbCacheProvider.html
+  name: IDbCacheProvider
+  nameWithType: IDbCacheProvider
+  fullName: nORM.Enterprise.IDbCacheProvider
+- uid: nORM.Enterprise.IDbCommandInterceptor
+  commentId: T:nORM.Enterprise.IDbCommandInterceptor
+  parent: nORM.Enterprise
+  href: nORM.Enterprise.IDbCommandInterceptor.html
+  name: IDbCommandInterceptor
+  nameWithType: IDbCommandInterceptor
+  fullName: nORM.Enterprise.IDbCommandInterceptor
+- uid: nORM.Enterprise.BaseDbCommandInterceptor
+  commentId: T:nORM.Enterprise.BaseDbCommandInterceptor
+  href: nORM.Enterprise.BaseDbCommandInterceptor.html
+  name: BaseDbCommandInterceptor
+  nameWithType: BaseDbCommandInterceptor
+  fullName: nORM.Enterprise.BaseDbCommandInterceptor
+- uid: nORM.Enterprise.InterceptionResult`1
+  commentId: T:nORM.Enterprise.InterceptionResult`1
+  parent: nORM.Enterprise
+  href: nORM.Enterprise.InterceptionResult-1.html
+  name: InterceptionResult<T>
+  nameWithType: InterceptionResult<T>
+  fullName: nORM.Enterprise.InterceptionResult<T>
+  nameWithType.vb: InterceptionResult(Of T)
+  fullName.vb: nORM.Enterprise.InterceptionResult(Of T)
+  name.vb: InterceptionResult(Of T)
+  spec.csharp:
+  - uid: nORM.Enterprise.InterceptionResult`1
+    name: InterceptionResult
+    href: nORM.Enterprise.InterceptionResult-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Enterprise.InterceptionResult`1
+    name: InterceptionResult
+    href: nORM.Enterprise.InterceptionResult-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Enterprise.ISaveChangesInterceptor
+  commentId: T:nORM.Enterprise.ISaveChangesInterceptor
+  href: nORM.Enterprise.ISaveChangesInterceptor.html
+  name: ISaveChangesInterceptor
+  nameWithType: ISaveChangesInterceptor
+  fullName: nORM.Enterprise.ISaveChangesInterceptor
+- uid: nORM.Enterprise.ITenantProvider
+  commentId: T:nORM.Enterprise.ITenantProvider
+  parent: nORM.Enterprise
+  href: nORM.Enterprise.ITenantProvider.html
+  name: ITenantProvider
+  nameWithType: ITenantProvider
+  fullName: nORM.Enterprise.ITenantProvider
+- uid: nORM.Enterprise.RetryPolicy
+  commentId: T:nORM.Enterprise.RetryPolicy
+  parent: nORM.Enterprise
+  href: nORM.Enterprise.RetryPolicy.html
+  name: RetryPolicy
+  nameWithType: RetryPolicy
+  fullName: nORM.Enterprise.RetryPolicy
+- uid: nORM.Enterprise
+  commentId: N:nORM.Enterprise
+  href: nORM.html
+  name: nORM.Enterprise
+  nameWithType: nORM.Enterprise
+  fullName: nORM.Enterprise
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Enterprise
+    name: Enterprise
+    href: nORM.Enterprise.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Enterprise
+    name: Enterprise
+    href: nORM.Enterprise.html

@@ -1,0 +1,1217 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  commentId: T:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  id: AdaptiveTimeoutManager.TimeoutStatistics
+  parent: nORM.Execution
+  children:
+  - nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.AverageExecutionTime
+  - nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.ExecutionCount
+  - nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime
+  - nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate
+  - nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount
+  langs:
+  - csharp
+  - vb
+  name: AdaptiveTimeoutManager.TimeoutStatistics
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TimeoutStatistics
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 29
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: public class AdaptiveTimeoutManager.TimeoutStatistics
+    content.vb: Public Class AdaptiveTimeoutManager.TimeoutStatistics
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+  extensionMethods:
+  - nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  - nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,{TProperty}}})
+  - nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  - nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.AverageExecutionTime
+  commentId: P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.AverageExecutionTime
+  id: AverageExecutionTime
+  parent: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  langs:
+  - csharp
+  - vb
+  name: AverageExecutionTime
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics.AverageExecutionTime
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.AverageExecutionTime
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AverageExecutionTime
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 31
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: public TimeSpan AverageExecutionTime { get; set; }
+    parameters: []
+    return:
+      type: System.TimeSpan
+    content.vb: Public Property AverageExecutionTime As TimeSpan
+  overload: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.AverageExecutionTime*
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime
+  commentId: P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime
+  id: MaxExecutionTime
+  parent: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  langs:
+  - csharp
+  - vb
+  name: MaxExecutionTime
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: MaxExecutionTime
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 32
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: public TimeSpan MaxExecutionTime { get; set; }
+    parameters: []
+    return:
+      type: System.TimeSpan
+    content.vb: Public Property MaxExecutionTime As TimeSpan
+  overload: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime*
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.ExecutionCount
+  commentId: P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.ExecutionCount
+  id: ExecutionCount
+  parent: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  langs:
+  - csharp
+  - vb
+  name: ExecutionCount
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics.ExecutionCount
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.ExecutionCount
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecutionCount
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 33
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: public int ExecutionCount { get; set; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public Property ExecutionCount As Integer
+  overload: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.ExecutionCount*
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount
+  commentId: P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount
+  id: TimeoutCount
+  parent: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  langs:
+  - csharp
+  - vb
+  name: TimeoutCount
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TimeoutCount
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 34
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: public int TimeoutCount { get; set; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public Property TimeoutCount As Integer
+  overload: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount*
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate
+  commentId: P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate
+  id: SuccessRate
+  parent: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  langs:
+  - csharp
+  - vb
+  name: SuccessRate
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SuccessRate
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 35
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: public double SuccessRate { get; }
+    parameters: []
+    return:
+      type: System.Double
+    content.vb: Public ReadOnly Property SuccessRate As Double
+  overload: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate*
+references:
+- uid: nORM.Execution
+  commentId: N:nORM.Execution
+  href: nORM.html
+  name: nORM.Execution
+  nameWithType: nORM.Execution
+  fullName: nORM.Execution
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Execution
+    name: Execution
+    href: nORM.Execution.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Execution
+    name: Execution
+    href: nORM.Execution.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<TimeoutStatistics>(TimeoutStatistics, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<AdaptiveTimeoutManager.TimeoutStatistics>(AdaptiveTimeoutManager.TimeoutStatistics, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics>(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of AdaptiveTimeoutManager.TimeoutStatistics)(AdaptiveTimeoutManager.TimeoutStatistics, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics)(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of TimeoutStatistics)(TimeoutStatistics, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: '>'
+  - name: (
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: )
+  - name: (
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,{TProperty}}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<TimeoutStatistics, TProperty>(TimeoutStatistics, Expression<Func<TimeoutStatistics, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<AdaptiveTimeoutManager.TimeoutStatistics, TProperty>(AdaptiveTimeoutManager.TimeoutStatistics, Expression<Func<AdaptiveTimeoutManager.TimeoutStatistics, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, TProperty>(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, System.Linq.Expressions.Expression<System.Func<nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of AdaptiveTimeoutManager.TimeoutStatistics, TProperty)(AdaptiveTimeoutManager.TimeoutStatistics, Expression(Of Func(Of AdaptiveTimeoutManager.TimeoutStatistics, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, TProperty)(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, TProperty)))
+  name.vb: IsLoaded(Of TimeoutStatistics, TProperty)(TimeoutStatistics, Expression(Of Func(Of TimeoutStatistics, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<TimeoutStatistics, TProperty>(TimeoutStatistics, Expression<Func<TimeoutStatistics, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<AdaptiveTimeoutManager.TimeoutStatistics, TProperty>(AdaptiveTimeoutManager.TimeoutStatistics, Expression<Func<AdaptiveTimeoutManager.TimeoutStatistics, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, TProperty>(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, System.Linq.Expressions.Expression<System.Func<nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of AdaptiveTimeoutManager.TimeoutStatistics, TProperty)(AdaptiveTimeoutManager.TimeoutStatistics, Expression(Of Func(Of AdaptiveTimeoutManager.TimeoutStatistics, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, TProperty)(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of TimeoutStatistics, TProperty)(TimeoutStatistics, Expression(Of Func(Of TimeoutStatistics, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,{TProperty}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<TimeoutStatistics, TProperty>(TimeoutStatistics, Expression<Func<TimeoutStatistics, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<AdaptiveTimeoutManager.TimeoutStatistics, TProperty>(AdaptiveTimeoutManager.TimeoutStatistics, Expression<Func<AdaptiveTimeoutManager.TimeoutStatistics, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, TProperty>(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, System.Linq.Expressions.Expression<System.Func<nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of AdaptiveTimeoutManager.TimeoutStatistics, TProperty)(AdaptiveTimeoutManager.TimeoutStatistics, Expression(Of Func(Of AdaptiveTimeoutManager.TimeoutStatistics, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, TProperty)(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of TimeoutStatistics, TProperty)(TimeoutStatistics, Expression(Of Func(Of TimeoutStatistics, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,System.Linq.Expressions.Expression{System.Func{nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<T>(T, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<T>(T, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<T>(T, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of T)(T, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.AverageExecutionTime*
+  commentId: Overload:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.AverageExecutionTime
+  href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html#nORM_Execution_AdaptiveTimeoutManager_TimeoutStatistics_AverageExecutionTime
+  name: AverageExecutionTime
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics.AverageExecutionTime
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.AverageExecutionTime
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.timespan
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime*
+  commentId: Overload:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime
+  href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html#nORM_Execution_AdaptiveTimeoutManager_TimeoutStatistics_MaxExecutionTime
+  name: MaxExecutionTime
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.ExecutionCount*
+  commentId: Overload:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.ExecutionCount
+  href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html#nORM_Execution_AdaptiveTimeoutManager_TimeoutStatistics_ExecutionCount
+  name: ExecutionCount
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics.ExecutionCount
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.ExecutionCount
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount*
+  commentId: Overload:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount
+  href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html#nORM_Execution_AdaptiveTimeoutManager_TimeoutStatistics_TimeoutCount
+  name: TimeoutCount
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate*
+  commentId: Overload:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate
+  href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html#nORM_Execution_AdaptiveTimeoutManager_TimeoutStatistics_SuccessRate
+  name: SuccessRate
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate
+- uid: System.Double
+  commentId: T:System.Double
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.double
+  name: double
+  nameWithType: double
+  fullName: double
+  nameWithType.vb: Double
+  fullName.vb: Double
+  name.vb: Double

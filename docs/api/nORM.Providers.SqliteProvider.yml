@@ -1,0 +1,4109 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Providers.SqliteProvider
+  commentId: T:nORM.Providers.SqliteProvider
+  id: SqliteProvider
+  parent: nORM.Providers
+  children:
+  - nORM.Providers.SqliteProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String)
+  - nORM.Providers.SqliteProvider.BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32@)
+  - nORM.Providers.SqliteProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  - nORM.Providers.SqliteProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  - nORM.Providers.SqliteProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  - nORM.Providers.SqliteProvider.CreateParameter(System.String,System.Object)
+  - nORM.Providers.SqliteProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  - nORM.Providers.SqliteProvider.Escape(System.String)
+  - nORM.Providers.SqliteProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping)
+  - nORM.Providers.SqliteProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping)
+  - nORM.Providers.SqliteProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping)
+  - nORM.Providers.SqliteProvider.InitializeConnection(System.Data.Common.DbConnection)
+  - nORM.Providers.SqliteProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken)
+  - nORM.Providers.SqliteProvider.IsAvailableAsync
+  - nORM.Providers.SqliteProvider.MaxParameters
+  - nORM.Providers.SqliteProvider.MaxSqlLength
+  - nORM.Providers.SqliteProvider.ParameterPrefixChar
+  - nORM.Providers.SqliteProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  - nORM.Providers.SqliteProvider.StoredProcedureCommandType
+  - nORM.Providers.SqliteProvider.TranslateFunction(System.String,System.Type,System.String[])
+  - nORM.Providers.SqliteProvider.TranslateJsonPathAccess(System.String,System.String)
+  - nORM.Providers.SqliteProvider.ValidateConnection(System.Data.Common.DbConnection)
+  langs:
+  - csharp
+  - vb
+  name: SqliteProvider
+  nameWithType: SqliteProvider
+  fullName: nORM.Providers.SqliteProvider
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SqliteProvider
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 23
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: >-
+    Lightweight provider implementation targeting SQLite databases.
+
+    Provides SQL generation and initialization routines specific to SQLite's feature set.
+  example: []
+  syntax:
+    content: 'public sealed class SqliteProvider : DatabaseProvider, IFastProvider'
+    content.vb: Public NotInheritable Class SqliteProvider Inherits DatabaseProvider Implements IFastProvider
+  inheritance:
+  - System.Object
+  - nORM.Providers.DatabaseProvider
+  implements:
+  - nORM.Providers.IFastProvider
+  inheritedMembers:
+  - nORM.Providers.DatabaseProvider.ParamPrefix
+  - nORM.Providers.DatabaseProvider.LikeEscapeChar
+  - nORM.Providers.DatabaseProvider.EscapeLikePattern(System.String)
+  - nORM.Providers.DatabaseProvider.BuildContainsClause(System.Data.Common.DbCommand,System.String,System.Collections.Generic.IReadOnlyList{System.Object})
+  - nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping)
+  - nORM.Providers.DatabaseProvider.BuildUpdate(nORM.Mapping.TableMapping)
+  - nORM.Providers.DatabaseProvider.BuildDelete(nORM.Mapping.TableMapping)
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+  extensionMethods:
+  - nORM.Providers.SqliteProvider.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  - nORM.Providers.SqliteProvider.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,{TProperty}}})
+  - nORM.Providers.SqliteProvider.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  - nORM.Providers.SqliteProvider.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Providers.SqliteProvider.MaxSqlLength
+  commentId: P:nORM.Providers.SqliteProvider.MaxSqlLength
+  id: MaxSqlLength
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: MaxSqlLength
+  nameWithType: SqliteProvider.MaxSqlLength
+  fullName: nORM.Providers.SqliteProvider.MaxSqlLength
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: MaxSqlLength
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 25
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  example: []
+  syntax:
+    content: public override int MaxSqlLength { get; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public Overrides ReadOnly Property MaxSqlLength As Integer
+  overridden: nORM.Providers.DatabaseProvider.MaxSqlLength
+  overload: nORM.Providers.SqliteProvider.MaxSqlLength*
+- uid: nORM.Providers.SqliteProvider.MaxParameters
+  commentId: P:nORM.Providers.SqliteProvider.MaxParameters
+  id: MaxParameters
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: MaxParameters
+  nameWithType: SqliteProvider.MaxParameters
+  fullName: nORM.Providers.SqliteProvider.MaxParameters
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: MaxParameters
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 26
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  example: []
+  syntax:
+    content: public override int MaxParameters { get; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public Overrides ReadOnly Property MaxParameters As Integer
+  overridden: nORM.Providers.DatabaseProvider.MaxParameters
+  overload: nORM.Providers.SqliteProvider.MaxParameters*
+- uid: nORM.Providers.SqliteProvider.Escape(System.String)
+  commentId: M:nORM.Providers.SqliteProvider.Escape(System.String)
+  id: Escape(System.String)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: Escape(string)
+  nameWithType: SqliteProvider.Escape(string)
+  fullName: nORM.Providers.SqliteProvider.Escape(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Escape
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 33
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Escapes an identifier by wrapping it in double quotes, per SQLite requirements.
+  example: []
+  syntax:
+    content: public override string Escape(string id)
+    parameters:
+    - id: id
+      type: System.String
+      description: Identifier to escape.
+    return:
+      type: System.String
+      description: The escaped identifier.
+    content.vb: Public Overrides Function Escape(id As String) As String
+  overridden: nORM.Providers.DatabaseProvider.Escape(System.String)
+  overload: nORM.Providers.SqliteProvider.Escape*
+  nameWithType.vb: SqliteProvider.Escape(String)
+  fullName.vb: nORM.Providers.SqliteProvider.Escape(String)
+  name.vb: Escape(String)
+- uid: nORM.Providers.SqliteProvider.ParameterPrefixChar
+  commentId: P:nORM.Providers.SqliteProvider.ParameterPrefixChar
+  id: ParameterPrefixChar
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: ParameterPrefixChar
+  nameWithType: SqliteProvider.ParameterPrefixChar
+  fullName: nORM.Providers.SqliteProvider.ParameterPrefixChar
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ParameterPrefixChar
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 34
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  example: []
+  syntax:
+    content: public override char ParameterPrefixChar { get; }
+    parameters: []
+    return:
+      type: System.Char
+    content.vb: Public Overrides ReadOnly Property ParameterPrefixChar As Char
+  overridden: nORM.Providers.DatabaseProvider.ParameterPrefixChar
+  overload: nORM.Providers.SqliteProvider.ParameterPrefixChar*
+- uid: nORM.Providers.SqliteProvider.StoredProcedureCommandType
+  commentId: P:nORM.Providers.SqliteProvider.StoredProcedureCommandType
+  id: StoredProcedureCommandType
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: StoredProcedureCommandType
+  nameWithType: SqliteProvider.StoredProcedureCommandType
+  fullName: nORM.Providers.SqliteProvider.StoredProcedureCommandType
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: StoredProcedureCommandType
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 36
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  example: []
+  syntax:
+    content: public override CommandType StoredProcedureCommandType { get; }
+    parameters: []
+    return:
+      type: System.Data.CommandType
+    content.vb: Public Overrides ReadOnly Property StoredProcedureCommandType As CommandType
+  overridden: nORM.Providers.DatabaseProvider.StoredProcedureCommandType
+  overload: nORM.Providers.SqliteProvider.StoredProcedureCommandType*
+- uid: nORM.Providers.SqliteProvider.BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32@)
+  commentId: M:nORM.Providers.SqliteProvider.BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32@)
+  id: BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32@)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: BuildSimpleSelect(Span<char>, ReadOnlySpan<char>, ReadOnlySpan<char>, out int)
+  nameWithType: SqliteProvider.BuildSimpleSelect(Span<char>, ReadOnlySpan<char>, ReadOnlySpan<char>, out int)
+  fullName: nORM.Providers.SqliteProvider.BuildSimpleSelect(System.Span<char>, System.ReadOnlySpan<char>, System.ReadOnlySpan<char>, out int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BuildSimpleSelect
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 45
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Builds a minimal <code>SELECT</code> statement directly into a character buffer.
+  example: []
+  syntax:
+    content: public override void BuildSimpleSelect(Span<char> buffer, ReadOnlySpan<char> table, ReadOnlySpan<char> columns, out int length)
+    parameters:
+    - id: buffer
+      type: System.Span{System.Char}
+      description: Buffer receiving the SQL.
+    - id: table
+      type: System.ReadOnlySpan{System.Char}
+      description: Table name to query.
+    - id: columns
+      type: System.ReadOnlySpan{System.Char}
+      description: Comma-separated column list.
+    - id: length
+      type: System.Int32
+      description: Receives the length of the generated SQL.
+    content.vb: Public Overrides Sub BuildSimpleSelect(buffer As Span(Of Char), table As ReadOnlySpan(Of Char), columns As ReadOnlySpan(Of Char), length As Integer)
+  overridden: nORM.Providers.DatabaseProvider.BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32@)
+  overload: nORM.Providers.SqliteProvider.BuildSimpleSelect*
+  nameWithType.vb: SqliteProvider.BuildSimpleSelect(Span(Of Char), ReadOnlySpan(Of Char), ReadOnlySpan(Of Char), Integer)
+  fullName.vb: nORM.Providers.SqliteProvider.BuildSimpleSelect(System.Span(Of Char), System.ReadOnlySpan(Of Char), System.ReadOnlySpan(Of Char), Integer)
+  name.vb: BuildSimpleSelect(Span(Of Char), ReadOnlySpan(Of Char), ReadOnlySpan(Of Char), Integer)
+- uid: nORM.Providers.SqliteProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.SqliteProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken)
+  id: InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: InitializeConnectionAsync(DbConnection, CancellationToken)
+  nameWithType: SqliteProvider.InitializeConnectionAsync(DbConnection, CancellationToken)
+  fullName: nORM.Providers.SqliteProvider.InitializeConnectionAsync(System.Data.Common.DbConnection, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: InitializeConnectionAsync
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 58
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Performs provider-specific initialization when a connection is opened.
+  example: []
+  syntax:
+    content: public override Task InitializeConnectionAsync(DbConnection connection, CancellationToken ct)
+    parameters:
+    - id: connection
+      type: System.Data.Common.DbConnection
+      description: The open connection to initialize.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Public Overrides Function InitializeConnectionAsync(connection As DbConnection, ct As CancellationToken) As Task
+  overridden: nORM.Providers.DatabaseProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken)
+  overload: nORM.Providers.SqliteProvider.InitializeConnectionAsync*
+- uid: nORM.Providers.SqliteProvider.InitializeConnection(System.Data.Common.DbConnection)
+  commentId: M:nORM.Providers.SqliteProvider.InitializeConnection(System.Data.Common.DbConnection)
+  id: InitializeConnection(System.Data.Common.DbConnection)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: InitializeConnection(DbConnection)
+  nameWithType: SqliteProvider.InitializeConnection(DbConnection)
+  fullName: nORM.Providers.SqliteProvider.InitializeConnection(System.Data.Common.DbConnection)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: InitializeConnection
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 70
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Applies performance-related <code>PRAGMA</code> settings to the SQLite connection.
+  example: []
+  syntax:
+    content: public override void InitializeConnection(DbConnection connection)
+    parameters:
+    - id: connection
+      type: System.Data.Common.DbConnection
+      description: The connection to configure.
+    content.vb: Public Overrides Sub InitializeConnection(connection As DbConnection)
+  overridden: nORM.Providers.DatabaseProvider.InitializeConnection(System.Data.Common.DbConnection)
+  overload: nORM.Providers.SqliteProvider.InitializeConnection*
+- uid: nORM.Providers.SqliteProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String)
+  commentId: M:nORM.Providers.SqliteProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String)
+  id: ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: ApplyPaging(OptimizedSqlBuilder, int?, int?, string?, string?)
+  nameWithType: SqliteProvider.ApplyPaging(OptimizedSqlBuilder, int?, int?, string?, string?)
+  fullName: nORM.Providers.SqliteProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder, int?, int?, string?, string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ApplyPaging
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 86
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Appends SQLite <code>LIMIT</code> and <code>OFFSET</code> clauses to the SQL builder.
+  example: []
+  syntax:
+    content: public override void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
+    parameters:
+    - id: sb
+      type: nORM.Query.OptimizedSqlBuilder
+      description: Builder receiving the clauses.
+    - id: limit
+      type: System.Nullable{System.Int32}
+      description: Maximum number of rows to return.
+    - id: offset
+      type: System.Nullable{System.Int32}
+      description: Number of rows to skip.
+    - id: limitParameterName
+      type: System.String
+      description: Name of the parameter supplying the limit.
+    - id: offsetParameterName
+      type: System.String
+      description: Name of the parameter supplying the offset.
+    content.vb: Public Overrides Sub ApplyPaging(sb As OptimizedSqlBuilder, limit As Integer?, offset As Integer?, limitParameterName As String, offsetParameterName As String)
+  overridden: nORM.Providers.DatabaseProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String)
+  overload: nORM.Providers.SqliteProvider.ApplyPaging*
+  nameWithType.vb: SqliteProvider.ApplyPaging(OptimizedSqlBuilder, Integer?, Integer?, String, String)
+  fullName.vb: nORM.Providers.SqliteProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder, Integer?, Integer?, String, String)
+  name.vb: ApplyPaging(OptimizedSqlBuilder, Integer?, Integer?, String, String)
+- uid: nORM.Providers.SqliteProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping)
+  commentId: M:nORM.Providers.SqliteProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping)
+  id: GetIdentityRetrievalString(nORM.Mapping.TableMapping)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: GetIdentityRetrievalString(TableMapping)
+  nameWithType: SqliteProvider.GetIdentityRetrievalString(TableMapping)
+  fullName: nORM.Providers.SqliteProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GetIdentityRetrievalString
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 103
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Returns SQL that retrieves the last rowid generated by an <code>INSERT</code>.
+  example: []
+  syntax:
+    content: public override string GetIdentityRetrievalString(TableMapping m)
+    parameters:
+    - id: m
+      type: nORM.Mapping.TableMapping
+      description: The mapping for which the identity is retrieved.
+    return:
+      type: System.String
+      description: SQL fragment to append to the insert command.
+    content.vb: Public Overrides Function GetIdentityRetrievalString(m As TableMapping) As String
+  overridden: nORM.Providers.DatabaseProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping)
+  overload: nORM.Providers.SqliteProvider.GetIdentityRetrievalString*
+- uid: nORM.Providers.SqliteProvider.CreateParameter(System.String,System.Object)
+  commentId: M:nORM.Providers.SqliteProvider.CreateParameter(System.String,System.Object)
+  id: CreateParameter(System.String,System.Object)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: CreateParameter(string, object?)
+  nameWithType: SqliteProvider.CreateParameter(string, object?)
+  fullName: nORM.Providers.SqliteProvider.CreateParameter(string, object?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CreateParameter
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 111
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Creates a SQLite parameter with the given name and value.
+  example: []
+  syntax:
+    content: public override DbParameter CreateParameter(string name, object? value)
+    parameters:
+    - id: name
+      type: System.String
+      description: Parameter name including prefix.
+    - id: value
+      type: System.Object
+      description: Parameter value; <code>null</code> becomes <xref href="System.DBNull.Value" data-throw-if-not-resolved="false"></xref>.
+    return:
+      type: System.Data.Common.DbParameter
+      description: A configured <xref href="Microsoft.Data.Sqlite.SqliteParameter" data-throw-if-not-resolved="false"></xref>.
+    content.vb: Public Overrides Function CreateParameter(name As String, value As Object) As DbParameter
+  overridden: nORM.Providers.DatabaseProvider.CreateParameter(System.String,System.Object)
+  overload: nORM.Providers.SqliteProvider.CreateParameter*
+  nameWithType.vb: SqliteProvider.CreateParameter(String, Object)
+  fullName.vb: nORM.Providers.SqliteProvider.CreateParameter(String, Object)
+  name.vb: CreateParameter(String, Object)
+- uid: nORM.Providers.SqliteProvider.TranslateFunction(System.String,System.Type,System.String[])
+  commentId: M:nORM.Providers.SqliteProvider.TranslateFunction(System.String,System.Type,System.String[])
+  id: TranslateFunction(System.String,System.Type,System.String[])
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: TranslateFunction(string, Type, params string[])
+  nameWithType: SqliteProvider.TranslateFunction(string, Type, params string[])
+  fullName: nORM.Providers.SqliteProvider.TranslateFunction(string, System.Type, params string[])
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TranslateFunction
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 123
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Attempts to translate a .NET method into its SQLite SQL equivalent.
+  example: []
+  syntax:
+    content: public override string? TranslateFunction(string name, Type declaringType, params string[] args)
+    parameters:
+    - id: name
+      type: System.String
+      description: Name of the method being translated.
+    - id: declaringType
+      type: System.Type
+      description: Type that declares the method.
+    - id: args
+      type: System.String[]
+      description: SQL fragments representing the arguments.
+    return:
+      type: System.String
+      description: The translated SQL or <code>null</code> if unsupported.
+    content.vb: Public Overrides Function TranslateFunction(name As String, declaringType As Type, ParamArray args As String()) As String
+  overridden: nORM.Providers.DatabaseProvider.TranslateFunction(System.String,System.Type,System.String[])
+  overload: nORM.Providers.SqliteProvider.TranslateFunction*
+  nameWithType.vb: SqliteProvider.TranslateFunction(String, Type, ParamArray String())
+  fullName.vb: nORM.Providers.SqliteProvider.TranslateFunction(String, System.Type, ParamArray String())
+  name.vb: TranslateFunction(String, Type, ParamArray String())
+- uid: nORM.Providers.SqliteProvider.TranslateJsonPathAccess(System.String,System.String)
+  commentId: M:nORM.Providers.SqliteProvider.TranslateJsonPathAccess(System.String,System.String)
+  id: TranslateJsonPathAccess(System.String,System.String)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: TranslateJsonPathAccess(string, string)
+  nameWithType: SqliteProvider.TranslateJsonPathAccess(string, string)
+  fullName: nORM.Providers.SqliteProvider.TranslateJsonPathAccess(string, string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TranslateJsonPathAccess
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 172
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Translates JSON value access using SQLite's <code>json_extract</code> function.
+  example: []
+  syntax:
+    content: public override string TranslateJsonPathAccess(string columnName, string jsonPath)
+    parameters:
+    - id: columnName
+      type: System.String
+      description: JSON column to access.
+    - id: jsonPath
+      type: System.String
+      description: JSON path expression.
+    return:
+      type: System.String
+      description: SQL fragment retrieving the requested JSON value.
+    content.vb: Public Overrides Function TranslateJsonPathAccess(columnName As String, jsonPath As String) As String
+  overridden: nORM.Providers.DatabaseProvider.TranslateJsonPathAccess(System.String,System.String)
+  overload: nORM.Providers.SqliteProvider.TranslateJsonPathAccess*
+  nameWithType.vb: SqliteProvider.TranslateJsonPathAccess(String, String)
+  fullName.vb: nORM.Providers.SqliteProvider.TranslateJsonPathAccess(String, String)
+  name.vb: TranslateJsonPathAccess(String, String)
+- uid: nORM.Providers.SqliteProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping)
+  commentId: M:nORM.Providers.SqliteProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping)
+  id: GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: GenerateCreateHistoryTableSql(TableMapping)
+  nameWithType: SqliteProvider.GenerateCreateHistoryTableSql(TableMapping)
+  fullName: nORM.Providers.SqliteProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GenerateCreateHistoryTableSql
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 180
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Generates SQL to create a simple temporal history table for SQLite.
+  example: []
+  syntax:
+    content: public override string GenerateCreateHistoryTableSql(TableMapping mapping)
+    parameters:
+    - id: mapping
+      type: nORM.Mapping.TableMapping
+      description: The entity mapping being tracked.
+    return:
+      type: System.String
+      description: DDL statement that creates the history table.
+    content.vb: Public Overrides Function GenerateCreateHistoryTableSql(mapping As TableMapping) As String
+  overridden: nORM.Providers.DatabaseProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping)
+  overload: nORM.Providers.SqliteProvider.GenerateCreateHistoryTableSql*
+- uid: nORM.Providers.SqliteProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping)
+  commentId: M:nORM.Providers.SqliteProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping)
+  id: GenerateTemporalTriggersSql(nORM.Mapping.TableMapping)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: GenerateTemporalTriggersSql(TableMapping)
+  nameWithType: SqliteProvider.GenerateTemporalTriggersSql(TableMapping)
+  fullName: nORM.Providers.SqliteProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GenerateTemporalTriggersSql
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 197
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Generates trigger definitions that maintain the temporal history table.
+  example: []
+  syntax:
+    content: public override string GenerateTemporalTriggersSql(TableMapping mapping)
+    parameters:
+    - id: mapping
+      type: nORM.Mapping.TableMapping
+      description: The mapping describing the source table.
+    return:
+      type: System.String
+      description: DDL statements creating the triggers.
+    content.vb: Public Overrides Function GenerateTemporalTriggersSql(mapping As TableMapping) As String
+  overridden: nORM.Providers.DatabaseProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping)
+  overload: nORM.Providers.SqliteProvider.GenerateTemporalTriggersSql*
+- uid: nORM.Providers.SqliteProvider.ValidateConnection(System.Data.Common.DbConnection)
+  commentId: M:nORM.Providers.SqliteProvider.ValidateConnection(System.Data.Common.DbConnection)
+  id: ValidateConnection(System.Data.Common.DbConnection)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: ValidateConnection(DbConnection)
+  nameWithType: SqliteProvider.ValidateConnection(DbConnection)
+  fullName: nORM.Providers.SqliteProvider.ValidateConnection(System.Data.Common.DbConnection)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ValidateConnection
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 236
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: >-
+    Verifies that the provided connection is a <xref href="Microsoft.Data.Sqlite.SqliteConnection" data-throw-if-not-resolved="false"></xref>, as required
+
+    by this provider.
+  example: []
+  syntax:
+    content: protected override void ValidateConnection(DbConnection connection)
+    parameters:
+    - id: connection
+      type: System.Data.Common.DbConnection
+      description: The connection to validate.
+    content.vb: Protected Overrides Sub ValidateConnection(connection As DbConnection)
+  overridden: nORM.Providers.DatabaseProvider.ValidateConnection(System.Data.Common.DbConnection)
+  overload: nORM.Providers.SqliteProvider.ValidateConnection*
+  exceptions:
+  - type: System.InvalidOperationException
+    commentId: T:System.InvalidOperationException
+    description: Thrown if the connection is not compatible.
+- uid: nORM.Providers.SqliteProvider.IsAvailableAsync
+  commentId: M:nORM.Providers.SqliteProvider.IsAvailableAsync
+  id: IsAvailableAsync
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: IsAvailableAsync()
+  nameWithType: SqliteProvider.IsAvailableAsync()
+  fullName: nORM.Providers.SqliteProvider.IsAvailableAsync()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsAvailableAsync
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 248
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: >-
+    Determines if the SQLite provider can be used in the current environment by
+
+    verifying that the required <code>Microsoft.Data.Sqlite</code> assembly is available
+
+    and that the SQLite engine meets the minimum version requirement.
+  example: []
+  syntax:
+    content: public override Task<bool> IsAvailableAsync()
+    return:
+      type: System.Threading.Tasks.Task{System.Boolean}
+    content.vb: Public Overrides Function IsAvailableAsync() As Task(Of Boolean)
+  overridden: nORM.Providers.DatabaseProvider.IsAvailableAsync
+  overload: nORM.Providers.SqliteProvider.IsAvailableAsync*
+- uid: nORM.Providers.SqliteProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.SqliteProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  id: CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: CreateSavepointAsync(DbTransaction, string, CancellationToken)
+  nameWithType: SqliteProvider.CreateSavepointAsync(DbTransaction, string, CancellationToken)
+  fullName: nORM.Providers.SqliteProvider.CreateSavepointAsync(System.Data.Common.DbTransaction, string, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CreateSavepointAsync
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 278
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Creates a savepoint within a SQLite transaction allowing partial rollbacks.
+  example: []
+  syntax:
+    content: public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+    parameters:
+    - id: transaction
+      type: System.Data.Common.DbTransaction
+      description: The active SQLite transaction.
+    - id: name
+      type: System.String
+      description: Name of the savepoint to create.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Public Overrides Function CreateSavepointAsync(transaction As DbTransaction, name As String, ct As CancellationToken = Nothing) As Task
+  overridden: nORM.Providers.DatabaseProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  overload: nORM.Providers.SqliteProvider.CreateSavepointAsync*
+  nameWithType.vb: SqliteProvider.CreateSavepointAsync(DbTransaction, String, CancellationToken)
+  fullName.vb: nORM.Providers.SqliteProvider.CreateSavepointAsync(System.Data.Common.DbTransaction, String, System.Threading.CancellationToken)
+  name.vb: CreateSavepointAsync(DbTransaction, String, CancellationToken)
+- uid: nORM.Providers.SqliteProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.SqliteProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  id: RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: RollbackToSavepointAsync(DbTransaction, string, CancellationToken)
+  nameWithType: SqliteProvider.RollbackToSavepointAsync(DbTransaction, string, CancellationToken)
+  fullName: nORM.Providers.SqliteProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction, string, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RollbackToSavepointAsync
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 294
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: Rolls back a SQLite transaction to the specified savepoint.
+  example: []
+  syntax:
+    content: public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+    parameters:
+    - id: transaction
+      type: System.Data.Common.DbTransaction
+      description: The active SQLite transaction.
+    - id: name
+      type: System.String
+      description: Name of the savepoint to roll back to.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Public Overrides Function RollbackToSavepointAsync(transaction As DbTransaction, name As String, ct As CancellationToken = Nothing) As Task
+  overridden: nORM.Providers.DatabaseProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  overload: nORM.Providers.SqliteProvider.RollbackToSavepointAsync*
+  nameWithType.vb: SqliteProvider.RollbackToSavepointAsync(DbTransaction, String, CancellationToken)
+  fullName.vb: nORM.Providers.SqliteProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction, String, System.Threading.CancellationToken)
+  name.vb: RollbackToSavepointAsync(DbTransaction, String, CancellationToken)
+- uid: nORM.Providers.SqliteProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.SqliteProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  id: BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: BulkInsertAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  nameWithType: SqliteProvider.BulkInsertAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  fullName: nORM.Providers.SqliteProvider.BulkInsertAsync<T>(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BulkInsertAsync
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 305
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  example: []
+  syntax:
+    content: 'public override Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class'
+    parameters:
+    - id: ctx
+      type: nORM.Core.DbContext
+    - id: m
+      type: nORM.Mapping.TableMapping
+    - id: entities
+      type: System.Collections.Generic.IEnumerable{{T}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+    content.vb: Public Overrides Function BulkInsertAsync(Of T As Class)(ctx As DbContext, m As TableMapping, entities As IEnumerable(Of T), ct As CancellationToken) As Task(Of Integer)
+  overridden: nORM.Providers.DatabaseProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{{T}},System.Threading.CancellationToken)
+  overload: nORM.Providers.SqliteProvider.BulkInsertAsync*
+  nameWithType.vb: SqliteProvider.BulkInsertAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Providers.SqliteProvider.BulkInsertAsync(Of T)(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkInsertAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+- uid: nORM.Providers.SqliteProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.SqliteProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  id: BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: BulkUpdateAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  nameWithType: SqliteProvider.BulkUpdateAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  fullName: nORM.Providers.SqliteProvider.BulkUpdateAsync<T>(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BulkUpdateAsync
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 364
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  example: []
+  syntax:
+    content: 'public override Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class'
+    parameters:
+    - id: ctx
+      type: nORM.Core.DbContext
+    - id: m
+      type: nORM.Mapping.TableMapping
+    - id: entities
+      type: System.Collections.Generic.IEnumerable{{T}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+    content.vb: Public Overrides Function BulkUpdateAsync(Of T As Class)(ctx As DbContext, m As TableMapping, entities As IEnumerable(Of T), ct As CancellationToken) As Task(Of Integer)
+  overridden: nORM.Providers.DatabaseProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{{T}},System.Threading.CancellationToken)
+  overload: nORM.Providers.SqliteProvider.BulkUpdateAsync*
+  nameWithType.vb: SqliteProvider.BulkUpdateAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Providers.SqliteProvider.BulkUpdateAsync(Of T)(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkUpdateAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+- uid: nORM.Providers.SqliteProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.SqliteProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  id: BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: BulkDeleteAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  nameWithType: SqliteProvider.BulkDeleteAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  fullName: nORM.Providers.SqliteProvider.BulkDeleteAsync<T>(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BulkDeleteAsync
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 418
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  example: []
+  syntax:
+    content: 'public override Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class'
+    parameters:
+    - id: ctx
+      type: nORM.Core.DbContext
+    - id: m
+      type: nORM.Mapping.TableMapping
+    - id: entities
+      type: System.Collections.Generic.IEnumerable{{T}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+    content.vb: Public Overrides Function BulkDeleteAsync(Of T As Class)(ctx As DbContext, m As TableMapping, entities As IEnumerable(Of T), ct As CancellationToken) As Task(Of Integer)
+  overridden: nORM.Providers.DatabaseProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{{T}},System.Threading.CancellationToken)
+  overload: nORM.Providers.SqliteProvider.BulkDeleteAsync*
+  nameWithType.vb: SqliteProvider.BulkDeleteAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Providers.SqliteProvider.BulkDeleteAsync(Of T)(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkDeleteAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+references:
+- uid: nORM.Providers
+  commentId: N:nORM.Providers
+  href: nORM.html
+  name: nORM.Providers
+  nameWithType: nORM.Providers
+  fullName: nORM.Providers
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: nORM.Providers.DatabaseProvider
+  commentId: T:nORM.Providers.DatabaseProvider
+  parent: nORM.Providers
+  href: nORM.Providers.DatabaseProvider.html
+  name: DatabaseProvider
+  nameWithType: DatabaseProvider
+  fullName: nORM.Providers.DatabaseProvider
+- uid: nORM.Providers.IFastProvider
+  commentId: T:nORM.Providers.IFastProvider
+  parent: nORM.Providers
+  href: nORM.Providers.IFastProvider.html
+  name: IFastProvider
+  nameWithType: IFastProvider
+  fullName: nORM.Providers.IFastProvider
+- uid: nORM.Providers.DatabaseProvider.ParamPrefix
+  commentId: P:nORM.Providers.DatabaseProvider.ParamPrefix
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_ParamPrefix
+  name: ParamPrefix
+  nameWithType: DatabaseProvider.ParamPrefix
+  fullName: nORM.Providers.DatabaseProvider.ParamPrefix
+- uid: nORM.Providers.DatabaseProvider.LikeEscapeChar
+  commentId: P:nORM.Providers.DatabaseProvider.LikeEscapeChar
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_LikeEscapeChar
+  name: LikeEscapeChar
+  nameWithType: DatabaseProvider.LikeEscapeChar
+  fullName: nORM.Providers.DatabaseProvider.LikeEscapeChar
+- uid: nORM.Providers.DatabaseProvider.EscapeLikePattern(System.String)
+  commentId: M:nORM.Providers.DatabaseProvider.EscapeLikePattern(System.String)
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_EscapeLikePattern_System_String_
+  name: EscapeLikePattern(string)
+  nameWithType: DatabaseProvider.EscapeLikePattern(string)
+  fullName: nORM.Providers.DatabaseProvider.EscapeLikePattern(string)
+  nameWithType.vb: DatabaseProvider.EscapeLikePattern(String)
+  fullName.vb: nORM.Providers.DatabaseProvider.EscapeLikePattern(String)
+  name.vb: EscapeLikePattern(String)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.EscapeLikePattern(System.String)
+    name: EscapeLikePattern
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_EscapeLikePattern_System_String_
+  - name: (
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.EscapeLikePattern(System.String)
+    name: EscapeLikePattern
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_EscapeLikePattern_System_String_
+  - name: (
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: nORM.Providers.DatabaseProvider.BuildContainsClause(System.Data.Common.DbCommand,System.String,System.Collections.Generic.IReadOnlyList{System.Object})
+  commentId: M:nORM.Providers.DatabaseProvider.BuildContainsClause(System.Data.Common.DbCommand,System.String,System.Collections.Generic.IReadOnlyList{System.Object})
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildContainsClause_System_Data_Common_DbCommand_System_String_System_Collections_Generic_IReadOnlyList_System_Object__
+  name: BuildContainsClause(DbCommand, string, IReadOnlyList<object>)
+  nameWithType: DatabaseProvider.BuildContainsClause(DbCommand, string, IReadOnlyList<object>)
+  fullName: nORM.Providers.DatabaseProvider.BuildContainsClause(System.Data.Common.DbCommand, string, System.Collections.Generic.IReadOnlyList<object>)
+  nameWithType.vb: DatabaseProvider.BuildContainsClause(DbCommand, String, IReadOnlyList(Of Object))
+  fullName.vb: nORM.Providers.DatabaseProvider.BuildContainsClause(System.Data.Common.DbCommand, String, System.Collections.Generic.IReadOnlyList(Of Object))
+  name.vb: BuildContainsClause(DbCommand, String, IReadOnlyList(Of Object))
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.BuildContainsClause(System.Data.Common.DbCommand,System.String,System.Collections.Generic.IReadOnlyList{System.Object})
+    name: BuildContainsClause
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildContainsClause_System_Data_Common_DbCommand_System_String_System_Collections_Generic_IReadOnlyList_System_Object__
+  - name: (
+  - uid: System.Data.Common.DbCommand
+    name: DbCommand
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbcommand
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.BuildContainsClause(System.Data.Common.DbCommand,System.String,System.Collections.Generic.IReadOnlyList{System.Object})
+    name: BuildContainsClause
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildContainsClause_System_Data_Common_DbCommand_System_String_System_Collections_Generic_IReadOnlyList_System_Object__
+  - name: (
+  - uid: System.Data.Common.DbCommand
+    name: DbCommand
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbcommand
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  - name: )
+- uid: nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping)
+  commentId: M:nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping)
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildInsert_nORM_Mapping_TableMapping_
+  name: BuildInsert(TableMapping)
+  nameWithType: DatabaseProvider.BuildInsert(TableMapping)
+  fullName: nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping)
+    name: BuildInsert
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildInsert_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping)
+    name: BuildInsert
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildInsert_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+- uid: nORM.Providers.DatabaseProvider.BuildUpdate(nORM.Mapping.TableMapping)
+  commentId: M:nORM.Providers.DatabaseProvider.BuildUpdate(nORM.Mapping.TableMapping)
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildUpdate_nORM_Mapping_TableMapping_
+  name: BuildUpdate(TableMapping)
+  nameWithType: DatabaseProvider.BuildUpdate(TableMapping)
+  fullName: nORM.Providers.DatabaseProvider.BuildUpdate(nORM.Mapping.TableMapping)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.BuildUpdate(nORM.Mapping.TableMapping)
+    name: BuildUpdate
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildUpdate_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.BuildUpdate(nORM.Mapping.TableMapping)
+    name: BuildUpdate
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildUpdate_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+- uid: nORM.Providers.DatabaseProvider.BuildDelete(nORM.Mapping.TableMapping)
+  commentId: M:nORM.Providers.DatabaseProvider.BuildDelete(nORM.Mapping.TableMapping)
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildDelete_nORM_Mapping_TableMapping_
+  name: BuildDelete(TableMapping)
+  nameWithType: DatabaseProvider.BuildDelete(TableMapping)
+  fullName: nORM.Providers.DatabaseProvider.BuildDelete(nORM.Mapping.TableMapping)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.BuildDelete(nORM.Mapping.TableMapping)
+    name: BuildDelete
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildDelete_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.BuildDelete(nORM.Mapping.TableMapping)
+    name: BuildDelete
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildDelete_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: nORM.Providers.SqliteProvider.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<SqliteProvider>(SqliteProvider, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<SqliteProvider>(SqliteProvider, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<nORM.Providers.SqliteProvider>(nORM.Providers.SqliteProvider, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of SqliteProvider)(SqliteProvider, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of nORM.Providers.SqliteProvider)(nORM.Providers.SqliteProvider, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of SqliteProvider)(SqliteProvider, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Providers.SqliteProvider,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: '>'
+  - name: (
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Providers.SqliteProvider,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: )
+  - name: (
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Providers.SqliteProvider.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,{TProperty}}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<SqliteProvider, TProperty>(SqliteProvider, Expression<Func<SqliteProvider, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<SqliteProvider, TProperty>(SqliteProvider, Expression<Func<SqliteProvider, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<nORM.Providers.SqliteProvider, TProperty>(nORM.Providers.SqliteProvider, System.Linq.Expressions.Expression<System.Func<nORM.Providers.SqliteProvider, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of SqliteProvider, TProperty)(SqliteProvider, Expression(Of Func(Of SqliteProvider, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of nORM.Providers.SqliteProvider, TProperty)(nORM.Providers.SqliteProvider, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Providers.SqliteProvider, TProperty)))
+  name.vb: IsLoaded(Of SqliteProvider, TProperty)(SqliteProvider, Expression(Of Func(Of SqliteProvider, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Providers.SqliteProvider,System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Providers.SqliteProvider,System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Providers.SqliteProvider.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<SqliteProvider, TProperty>(SqliteProvider, Expression<Func<SqliteProvider, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<SqliteProvider, TProperty>(SqliteProvider, Expression<Func<SqliteProvider, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Providers.SqliteProvider, TProperty>(nORM.Providers.SqliteProvider, System.Linq.Expressions.Expression<System.Func<nORM.Providers.SqliteProvider, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of SqliteProvider, TProperty)(SqliteProvider, Expression(Of Func(Of SqliteProvider, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Providers.SqliteProvider, TProperty)(nORM.Providers.SqliteProvider, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Providers.SqliteProvider, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of SqliteProvider, TProperty)(SqliteProvider, Expression(Of Func(Of SqliteProvider, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Providers.SqliteProvider,System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Providers.SqliteProvider,System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Providers.SqliteProvider.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,{TProperty}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<SqliteProvider, TProperty>(SqliteProvider, Expression<Func<SqliteProvider, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<SqliteProvider, TProperty>(SqliteProvider, Expression<Func<SqliteProvider, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Providers.SqliteProvider, TProperty>(nORM.Providers.SqliteProvider, System.Linq.Expressions.Expression<System.Func<nORM.Providers.SqliteProvider, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of SqliteProvider, TProperty)(SqliteProvider, Expression(Of Func(Of SqliteProvider, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Providers.SqliteProvider, TProperty)(nORM.Providers.SqliteProvider, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Providers.SqliteProvider, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of SqliteProvider, TProperty)(SqliteProvider, Expression(Of Func(Of SqliteProvider, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Providers.SqliteProvider,System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Providers.SqliteProvider,System.Linq.Expressions.Expression{System.Func{nORM.Providers.SqliteProvider,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    href: nORM.Providers.SqliteProvider.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<T>(T, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<T>(T, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<T>(T, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of T)(T, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+- uid: nORM.Providers.DatabaseProvider.MaxSqlLength
+  commentId: P:nORM.Providers.DatabaseProvider.MaxSqlLength
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_MaxSqlLength
+  name: MaxSqlLength
+  nameWithType: DatabaseProvider.MaxSqlLength
+  fullName: nORM.Providers.DatabaseProvider.MaxSqlLength
+- uid: nORM.Providers.SqliteProvider.MaxSqlLength*
+  commentId: Overload:nORM.Providers.SqliteProvider.MaxSqlLength
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_MaxSqlLength
+  name: MaxSqlLength
+  nameWithType: SqliteProvider.MaxSqlLength
+  fullName: nORM.Providers.SqliteProvider.MaxSqlLength
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: nORM.Providers.DatabaseProvider.MaxParameters
+  commentId: P:nORM.Providers.DatabaseProvider.MaxParameters
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_MaxParameters
+  name: MaxParameters
+  nameWithType: DatabaseProvider.MaxParameters
+  fullName: nORM.Providers.DatabaseProvider.MaxParameters
+- uid: nORM.Providers.SqliteProvider.MaxParameters*
+  commentId: Overload:nORM.Providers.SqliteProvider.MaxParameters
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_MaxParameters
+  name: MaxParameters
+  nameWithType: SqliteProvider.MaxParameters
+  fullName: nORM.Providers.SqliteProvider.MaxParameters
+- uid: nORM.Providers.DatabaseProvider.Escape(System.String)
+  commentId: M:nORM.Providers.DatabaseProvider.Escape(System.String)
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_Escape_System_String_
+  name: Escape(string)
+  nameWithType: DatabaseProvider.Escape(string)
+  fullName: nORM.Providers.DatabaseProvider.Escape(string)
+  nameWithType.vb: DatabaseProvider.Escape(String)
+  fullName.vb: nORM.Providers.DatabaseProvider.Escape(String)
+  name.vb: Escape(String)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.Escape(System.String)
+    name: Escape
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_Escape_System_String_
+  - name: (
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.Escape(System.String)
+    name: Escape
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_Escape_System_String_
+  - name: (
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: nORM.Providers.SqliteProvider.Escape*
+  commentId: Overload:nORM.Providers.SqliteProvider.Escape
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_Escape_System_String_
+  name: Escape
+  nameWithType: SqliteProvider.Escape
+  fullName: nORM.Providers.SqliteProvider.Escape
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: nORM.Providers.DatabaseProvider.ParameterPrefixChar
+  commentId: P:nORM.Providers.DatabaseProvider.ParameterPrefixChar
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_ParameterPrefixChar
+  name: ParameterPrefixChar
+  nameWithType: DatabaseProvider.ParameterPrefixChar
+  fullName: nORM.Providers.DatabaseProvider.ParameterPrefixChar
+- uid: nORM.Providers.SqliteProvider.ParameterPrefixChar*
+  commentId: Overload:nORM.Providers.SqliteProvider.ParameterPrefixChar
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_ParameterPrefixChar
+  name: ParameterPrefixChar
+  nameWithType: SqliteProvider.ParameterPrefixChar
+  fullName: nORM.Providers.SqliteProvider.ParameterPrefixChar
+- uid: System.Char
+  commentId: T:System.Char
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.char
+  name: char
+  nameWithType: char
+  fullName: char
+  nameWithType.vb: Char
+  fullName.vb: Char
+  name.vb: Char
+- uid: nORM.Providers.DatabaseProvider.StoredProcedureCommandType
+  commentId: P:nORM.Providers.DatabaseProvider.StoredProcedureCommandType
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_StoredProcedureCommandType
+  name: StoredProcedureCommandType
+  nameWithType: DatabaseProvider.StoredProcedureCommandType
+  fullName: nORM.Providers.DatabaseProvider.StoredProcedureCommandType
+- uid: nORM.Providers.SqliteProvider.StoredProcedureCommandType*
+  commentId: Overload:nORM.Providers.SqliteProvider.StoredProcedureCommandType
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_StoredProcedureCommandType
+  name: StoredProcedureCommandType
+  nameWithType: SqliteProvider.StoredProcedureCommandType
+  fullName: nORM.Providers.SqliteProvider.StoredProcedureCommandType
+- uid: System.Data.CommandType
+  commentId: T:System.Data.CommandType
+  parent: System.Data
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.commandtype
+  name: CommandType
+  nameWithType: CommandType
+  fullName: System.Data.CommandType
+- uid: System.Data
+  commentId: N:System.Data
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Data
+  nameWithType: System.Data
+  fullName: System.Data
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+- uid: nORM.Providers.DatabaseProvider.BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32@)
+  commentId: M:nORM.Providers.DatabaseProvider.BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32@)
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildSimpleSelect_System_Span_System_Char__System_ReadOnlySpan_System_Char__System_ReadOnlySpan_System_Char__System_Int32__
+  name: BuildSimpleSelect(Span<char>, ReadOnlySpan<char>, ReadOnlySpan<char>, out int)
+  nameWithType: DatabaseProvider.BuildSimpleSelect(Span<char>, ReadOnlySpan<char>, ReadOnlySpan<char>, out int)
+  fullName: nORM.Providers.DatabaseProvider.BuildSimpleSelect(System.Span<char>, System.ReadOnlySpan<char>, System.ReadOnlySpan<char>, out int)
+  nameWithType.vb: DatabaseProvider.BuildSimpleSelect(Span(Of Char), ReadOnlySpan(Of Char), ReadOnlySpan(Of Char), Integer)
+  fullName.vb: nORM.Providers.DatabaseProvider.BuildSimpleSelect(System.Span(Of Char), System.ReadOnlySpan(Of Char), System.ReadOnlySpan(Of Char), Integer)
+  name.vb: BuildSimpleSelect(Span(Of Char), ReadOnlySpan(Of Char), ReadOnlySpan(Of Char), Integer)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32@)
+    name: BuildSimpleSelect
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildSimpleSelect_System_Span_System_Char__System_ReadOnlySpan_System_Char__System_ReadOnlySpan_System_Char__System_Int32__
+  - name: (
+  - uid: System.Span`1
+    name: Span
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.span-1
+  - name: <
+  - uid: System.Char
+    name: char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: <
+  - uid: System.Char
+    name: char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: <
+  - uid: System.Char
+    name: char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: out
+  - name: " "
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32@)
+    name: BuildSimpleSelect
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BuildSimpleSelect_System_Span_System_Char__System_ReadOnlySpan_System_Char__System_ReadOnlySpan_System_Char__System_Int32__
+  - name: (
+  - uid: System.Span`1
+    name: Span
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.span-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Char
+    name: Char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Char
+    name: Char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Char
+    name: Char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+- uid: nORM.Providers.SqliteProvider.BuildSimpleSelect*
+  commentId: Overload:nORM.Providers.SqliteProvider.BuildSimpleSelect
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_BuildSimpleSelect_System_Span_System_Char__System_ReadOnlySpan_System_Char__System_ReadOnlySpan_System_Char__System_Int32__
+  name: BuildSimpleSelect
+  nameWithType: SqliteProvider.BuildSimpleSelect
+  fullName: nORM.Providers.SqliteProvider.BuildSimpleSelect
+- uid: System.Span{System.Char}
+  commentId: T:System.Span{System.Char}
+  parent: System
+  definition: System.Span`1
+  href: https://learn.microsoft.com/dotnet/api/system.span-1
+  name: Span<char>
+  nameWithType: Span<char>
+  fullName: System.Span<char>
+  nameWithType.vb: Span(Of Char)
+  fullName.vb: System.Span(Of Char)
+  name.vb: Span(Of Char)
+  spec.csharp:
+  - uid: System.Span`1
+    name: Span
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.span-1
+  - name: <
+  - uid: System.Char
+    name: char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: '>'
+  spec.vb:
+  - uid: System.Span`1
+    name: Span
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.span-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Char
+    name: Char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: )
+- uid: System.ReadOnlySpan{System.Char}
+  commentId: T:System.ReadOnlySpan{System.Char}
+  parent: System
+  definition: System.ReadOnlySpan`1
+  href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  name: ReadOnlySpan<char>
+  nameWithType: ReadOnlySpan<char>
+  fullName: System.ReadOnlySpan<char>
+  nameWithType.vb: ReadOnlySpan(Of Char)
+  fullName.vb: System.ReadOnlySpan(Of Char)
+  name.vb: ReadOnlySpan(Of Char)
+  spec.csharp:
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: <
+  - uid: System.Char
+    name: char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: '>'
+  spec.vb:
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Char
+    name: Char
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.char
+  - name: )
+- uid: System.Span`1
+  commentId: T:System.Span`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.span-1
+  name: Span<T>
+  nameWithType: Span<T>
+  fullName: System.Span<T>
+  nameWithType.vb: Span(Of T)
+  fullName.vb: System.Span(Of T)
+  name.vb: Span(Of T)
+  spec.csharp:
+  - uid: System.Span`1
+    name: Span
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.span-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Span`1
+    name: Span
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.span-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.ReadOnlySpan`1
+  commentId: T:System.ReadOnlySpan`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  name: ReadOnlySpan<T>
+  nameWithType: ReadOnlySpan<T>
+  fullName: System.ReadOnlySpan<T>
+  nameWithType.vb: ReadOnlySpan(Of T)
+  fullName.vb: System.ReadOnlySpan(Of T)
+  name.vb: ReadOnlySpan(Of T)
+  spec.csharp:
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.ReadOnlySpan`1
+    name: ReadOnlySpan
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.readonlyspan-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Providers.DatabaseProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.DatabaseProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken)
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_InitializeConnectionAsync_System_Data_Common_DbConnection_System_Threading_CancellationToken_
+  name: InitializeConnectionAsync(DbConnection, CancellationToken)
+  nameWithType: DatabaseProvider.InitializeConnectionAsync(DbConnection, CancellationToken)
+  fullName: nORM.Providers.DatabaseProvider.InitializeConnectionAsync(System.Data.Common.DbConnection, System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken)
+    name: InitializeConnectionAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_InitializeConnectionAsync_System_Data_Common_DbConnection_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Data.Common.DbConnection
+    name: DbConnection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken)
+    name: InitializeConnectionAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_InitializeConnectionAsync_System_Data_Common_DbConnection_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Data.Common.DbConnection
+    name: DbConnection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Providers.SqliteProvider.InitializeConnectionAsync*
+  commentId: Overload:nORM.Providers.SqliteProvider.InitializeConnectionAsync
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_InitializeConnectionAsync_System_Data_Common_DbConnection_System_Threading_CancellationToken_
+  name: InitializeConnectionAsync
+  nameWithType: SqliteProvider.InitializeConnectionAsync
+  fullName: nORM.Providers.SqliteProvider.InitializeConnectionAsync
+- uid: System.Data.Common.DbConnection
+  commentId: T:System.Data.Common.DbConnection
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection
+  name: DbConnection
+  nameWithType: DbConnection
+  fullName: System.Data.Common.DbConnection
+- uid: System.Threading.CancellationToken
+  commentId: T:System.Threading.CancellationToken
+  parent: System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  name: CancellationToken
+  nameWithType: CancellationToken
+  fullName: System.Threading.CancellationToken
+- uid: System.Threading.Tasks.Task
+  commentId: T:System.Threading.Tasks.Task
+  parent: System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task
+  name: Task
+  nameWithType: Task
+  fullName: System.Threading.Tasks.Task
+- uid: System.Data.Common
+  commentId: N:System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Data.Common
+  nameWithType: System.Data.Common
+  fullName: System.Data.Common
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+- uid: System.Threading
+  commentId: N:System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading
+  nameWithType: System.Threading
+  fullName: System.Threading
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+- uid: System.Threading.Tasks
+  commentId: N:System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading.Tasks
+  nameWithType: System.Threading.Tasks
+  fullName: System.Threading.Tasks
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: nORM.Providers.DatabaseProvider.InitializeConnection(System.Data.Common.DbConnection)
+  commentId: M:nORM.Providers.DatabaseProvider.InitializeConnection(System.Data.Common.DbConnection)
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_InitializeConnection_System_Data_Common_DbConnection_
+  name: InitializeConnection(DbConnection)
+  nameWithType: DatabaseProvider.InitializeConnection(DbConnection)
+  fullName: nORM.Providers.DatabaseProvider.InitializeConnection(System.Data.Common.DbConnection)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.InitializeConnection(System.Data.Common.DbConnection)
+    name: InitializeConnection
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_InitializeConnection_System_Data_Common_DbConnection_
+  - name: (
+  - uid: System.Data.Common.DbConnection
+    name: DbConnection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.InitializeConnection(System.Data.Common.DbConnection)
+    name: InitializeConnection
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_InitializeConnection_System_Data_Common_DbConnection_
+  - name: (
+  - uid: System.Data.Common.DbConnection
+    name: DbConnection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection
+  - name: )
+- uid: nORM.Providers.SqliteProvider.InitializeConnection*
+  commentId: Overload:nORM.Providers.SqliteProvider.InitializeConnection
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_InitializeConnection_System_Data_Common_DbConnection_
+  name: InitializeConnection
+  nameWithType: SqliteProvider.InitializeConnection
+  fullName: nORM.Providers.SqliteProvider.InitializeConnection
+- uid: nORM.Providers.DatabaseProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String)
+  commentId: M:nORM.Providers.DatabaseProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String)
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_ApplyPaging_nORM_Query_OptimizedSqlBuilder_System_Nullable_System_Int32__System_Nullable_System_Int32__System_String_System_String_
+  name: ApplyPaging(OptimizedSqlBuilder, int?, int?, string, string)
+  nameWithType: DatabaseProvider.ApplyPaging(OptimizedSqlBuilder, int?, int?, string, string)
+  fullName: nORM.Providers.DatabaseProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder, int?, int?, string, string)
+  nameWithType.vb: DatabaseProvider.ApplyPaging(OptimizedSqlBuilder, Integer?, Integer?, String, String)
+  fullName.vb: nORM.Providers.DatabaseProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder, Integer?, Integer?, String, String)
+  name.vb: ApplyPaging(OptimizedSqlBuilder, Integer?, Integer?, String, String)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String)
+    name: ApplyPaging
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_ApplyPaging_nORM_Query_OptimizedSqlBuilder_System_Nullable_System_Int32__System_Nullable_System_Int32__System_String_System_String_
+  - name: (
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '?'
+  - name: ','
+  - name: " "
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '?'
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String)
+    name: ApplyPaging
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_ApplyPaging_nORM_Query_OptimizedSqlBuilder_System_Nullable_System_Int32__System_Nullable_System_Int32__System_String_System_String_
+  - name: (
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    href: nORM.Query.OptimizedSqlBuilder.html
+  - name: ','
+  - name: " "
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '?'
+  - name: ','
+  - name: " "
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '?'
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: nORM.Providers.SqliteProvider.ApplyPaging*
+  commentId: Overload:nORM.Providers.SqliteProvider.ApplyPaging
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_ApplyPaging_nORM_Query_OptimizedSqlBuilder_System_Nullable_System_Int32__System_Nullable_System_Int32__System_String_System_String_
+  name: ApplyPaging
+  nameWithType: SqliteProvider.ApplyPaging
+  fullName: nORM.Providers.SqliteProvider.ApplyPaging
+- uid: nORM.Query.OptimizedSqlBuilder
+  commentId: T:nORM.Query.OptimizedSqlBuilder
+  parent: nORM.Query
+  href: nORM.Query.OptimizedSqlBuilder.html
+  name: OptimizedSqlBuilder
+  nameWithType: OptimizedSqlBuilder
+  fullName: nORM.Query.OptimizedSqlBuilder
+- uid: System.Nullable{System.Int32}
+  commentId: T:System.Nullable{System.Int32}
+  parent: System
+  definition: System.Nullable`1
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int?
+  nameWithType: int?
+  fullName: int?
+  nameWithType.vb: Integer?
+  fullName.vb: Integer?
+  name.vb: Integer?
+  spec.csharp:
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '?'
+  spec.vb:
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '?'
+- uid: nORM.Query
+  commentId: N:nORM.Query
+  href: nORM.html
+  name: nORM.Query
+  nameWithType: nORM.Query
+  fullName: nORM.Query
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Query
+    name: Query
+    href: nORM.Query.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Query
+    name: Query
+    href: nORM.Query.html
+- uid: System.Nullable`1
+  commentId: T:System.Nullable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  name: Nullable<T>
+  nameWithType: Nullable<T>
+  fullName: System.Nullable<T>
+  nameWithType.vb: Nullable(Of T)
+  fullName.vb: System.Nullable(Of T)
+  name.vb: Nullable(Of T)
+  spec.csharp:
+  - uid: System.Nullable`1
+    name: Nullable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Nullable`1
+    name: Nullable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Providers.DatabaseProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping)
+  commentId: M:nORM.Providers.DatabaseProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping)
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_GetIdentityRetrievalString_nORM_Mapping_TableMapping_
+  name: GetIdentityRetrievalString(TableMapping)
+  nameWithType: DatabaseProvider.GetIdentityRetrievalString(TableMapping)
+  fullName: nORM.Providers.DatabaseProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping)
+    name: GetIdentityRetrievalString
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_GetIdentityRetrievalString_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping)
+    name: GetIdentityRetrievalString
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_GetIdentityRetrievalString_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+- uid: nORM.Providers.SqliteProvider.GetIdentityRetrievalString*
+  commentId: Overload:nORM.Providers.SqliteProvider.GetIdentityRetrievalString
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_GetIdentityRetrievalString_nORM_Mapping_TableMapping_
+  name: GetIdentityRetrievalString
+  nameWithType: SqliteProvider.GetIdentityRetrievalString
+  fullName: nORM.Providers.SqliteProvider.GetIdentityRetrievalString
+- uid: nORM.Mapping.TableMapping
+  commentId: T:nORM.Mapping.TableMapping
+  parent: nORM.Mapping
+  href: nORM.Mapping.TableMapping.html
+  name: TableMapping
+  nameWithType: TableMapping
+  fullName: nORM.Mapping.TableMapping
+- uid: nORM.Mapping
+  commentId: N:nORM.Mapping
+  href: nORM.html
+  name: nORM.Mapping
+  nameWithType: nORM.Mapping
+  fullName: nORM.Mapping
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html
+- uid: System.DBNull.Value
+  commentId: F:System.DBNull.Value
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.dbnull.value
+  name: Value
+  nameWithType: DBNull.Value
+  fullName: System.DBNull.Value
+- uid: Microsoft.Data.Sqlite.SqliteParameter
+  commentId: T:Microsoft.Data.Sqlite.SqliteParameter
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.data.sqlite.sqliteparameter
+  name: SqliteParameter
+  nameWithType: SqliteParameter
+  fullName: Microsoft.Data.Sqlite.SqliteParameter
+- uid: nORM.Providers.DatabaseProvider.CreateParameter(System.String,System.Object)
+  commentId: M:nORM.Providers.DatabaseProvider.CreateParameter(System.String,System.Object)
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_CreateParameter_System_String_System_Object_
+  name: CreateParameter(string, object)
+  nameWithType: DatabaseProvider.CreateParameter(string, object)
+  fullName: nORM.Providers.DatabaseProvider.CreateParameter(string, object)
+  nameWithType.vb: DatabaseProvider.CreateParameter(String, Object)
+  fullName.vb: nORM.Providers.DatabaseProvider.CreateParameter(String, Object)
+  name.vb: CreateParameter(String, Object)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.CreateParameter(System.String,System.Object)
+    name: CreateParameter
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_CreateParameter_System_String_System_Object_
+  - name: (
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.CreateParameter(System.String,System.Object)
+    name: CreateParameter
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_CreateParameter_System_String_System_Object_
+  - name: (
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: nORM.Providers.SqliteProvider.CreateParameter*
+  commentId: Overload:nORM.Providers.SqliteProvider.CreateParameter
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_CreateParameter_System_String_System_Object_
+  name: CreateParameter
+  nameWithType: SqliteProvider.CreateParameter
+  fullName: nORM.Providers.SqliteProvider.CreateParameter
+- uid: System.Data.Common.DbParameter
+  commentId: T:System.Data.Common.DbParameter
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbparameter
+  name: DbParameter
+  nameWithType: DbParameter
+  fullName: System.Data.Common.DbParameter
+- uid: nORM.Providers.DatabaseProvider.TranslateFunction(System.String,System.Type,System.String[])
+  commentId: M:nORM.Providers.DatabaseProvider.TranslateFunction(System.String,System.Type,System.String[])
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_TranslateFunction_System_String_System_Type_System_String___
+  name: TranslateFunction(string, Type, params string[])
+  nameWithType: DatabaseProvider.TranslateFunction(string, Type, params string[])
+  fullName: nORM.Providers.DatabaseProvider.TranslateFunction(string, System.Type, params string[])
+  nameWithType.vb: DatabaseProvider.TranslateFunction(String, Type, ParamArray String())
+  fullName.vb: nORM.Providers.DatabaseProvider.TranslateFunction(String, System.Type, ParamArray String())
+  name.vb: TranslateFunction(String, Type, ParamArray String())
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.TranslateFunction(System.String,System.Type,System.String[])
+    name: TranslateFunction
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_TranslateFunction_System_String_System_Type_System_String___
+  - name: (
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Type
+    name: Type
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.type
+  - name: ','
+  - name: " "
+  - name: params
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '['
+  - name: ']'
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.TranslateFunction(System.String,System.Type,System.String[])
+    name: TranslateFunction
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_TranslateFunction_System_String_System_Type_System_String___
+  - name: (
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Type
+    name: Type
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.type
+  - name: ','
+  - name: " "
+  - name: ParamArray
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: (
+  - name: )
+  - name: )
+- uid: nORM.Providers.SqliteProvider.TranslateFunction*
+  commentId: Overload:nORM.Providers.SqliteProvider.TranslateFunction
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_TranslateFunction_System_String_System_Type_System_String___
+  name: TranslateFunction
+  nameWithType: SqliteProvider.TranslateFunction
+  fullName: nORM.Providers.SqliteProvider.TranslateFunction
+- uid: System.Type
+  commentId: T:System.Type
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.type
+  name: Type
+  nameWithType: Type
+  fullName: System.Type
+- uid: System.String[]
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string[]
+  nameWithType: string[]
+  fullName: string[]
+  nameWithType.vb: String()
+  fullName.vb: String()
+  name.vb: String()
+  spec.csharp:
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '['
+  - name: ']'
+  spec.vb:
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: (
+  - name: )
+- uid: nORM.Providers.DatabaseProvider.TranslateJsonPathAccess(System.String,System.String)
+  commentId: M:nORM.Providers.DatabaseProvider.TranslateJsonPathAccess(System.String,System.String)
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_TranslateJsonPathAccess_System_String_System_String_
+  name: TranslateJsonPathAccess(string, string)
+  nameWithType: DatabaseProvider.TranslateJsonPathAccess(string, string)
+  fullName: nORM.Providers.DatabaseProvider.TranslateJsonPathAccess(string, string)
+  nameWithType.vb: DatabaseProvider.TranslateJsonPathAccess(String, String)
+  fullName.vb: nORM.Providers.DatabaseProvider.TranslateJsonPathAccess(String, String)
+  name.vb: TranslateJsonPathAccess(String, String)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.TranslateJsonPathAccess(System.String,System.String)
+    name: TranslateJsonPathAccess
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_TranslateJsonPathAccess_System_String_System_String_
+  - name: (
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.TranslateJsonPathAccess(System.String,System.String)
+    name: TranslateJsonPathAccess
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_TranslateJsonPathAccess_System_String_System_String_
+  - name: (
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: nORM.Providers.SqliteProvider.TranslateJsonPathAccess*
+  commentId: Overload:nORM.Providers.SqliteProvider.TranslateJsonPathAccess
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_TranslateJsonPathAccess_System_String_System_String_
+  name: TranslateJsonPathAccess
+  nameWithType: SqliteProvider.TranslateJsonPathAccess
+  fullName: nORM.Providers.SqliteProvider.TranslateJsonPathAccess
+- uid: nORM.Providers.DatabaseProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping)
+  commentId: M:nORM.Providers.DatabaseProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping)
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_GenerateCreateHistoryTableSql_nORM_Mapping_TableMapping_
+  name: GenerateCreateHistoryTableSql(TableMapping)
+  nameWithType: DatabaseProvider.GenerateCreateHistoryTableSql(TableMapping)
+  fullName: nORM.Providers.DatabaseProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping)
+    name: GenerateCreateHistoryTableSql
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_GenerateCreateHistoryTableSql_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping)
+    name: GenerateCreateHistoryTableSql
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_GenerateCreateHistoryTableSql_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+- uid: nORM.Providers.SqliteProvider.GenerateCreateHistoryTableSql*
+  commentId: Overload:nORM.Providers.SqliteProvider.GenerateCreateHistoryTableSql
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_GenerateCreateHistoryTableSql_nORM_Mapping_TableMapping_
+  name: GenerateCreateHistoryTableSql
+  nameWithType: SqliteProvider.GenerateCreateHistoryTableSql
+  fullName: nORM.Providers.SqliteProvider.GenerateCreateHistoryTableSql
+- uid: nORM.Providers.DatabaseProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping)
+  commentId: M:nORM.Providers.DatabaseProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping)
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_GenerateTemporalTriggersSql_nORM_Mapping_TableMapping_
+  name: GenerateTemporalTriggersSql(TableMapping)
+  nameWithType: DatabaseProvider.GenerateTemporalTriggersSql(TableMapping)
+  fullName: nORM.Providers.DatabaseProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping)
+    name: GenerateTemporalTriggersSql
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_GenerateTemporalTriggersSql_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping)
+    name: GenerateTemporalTriggersSql
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_GenerateTemporalTriggersSql_nORM_Mapping_TableMapping_
+  - name: (
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+- uid: nORM.Providers.SqliteProvider.GenerateTemporalTriggersSql*
+  commentId: Overload:nORM.Providers.SqliteProvider.GenerateTemporalTriggersSql
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_GenerateTemporalTriggersSql_nORM_Mapping_TableMapping_
+  name: GenerateTemporalTriggersSql
+  nameWithType: SqliteProvider.GenerateTemporalTriggersSql
+  fullName: nORM.Providers.SqliteProvider.GenerateTemporalTriggersSql
+- uid: Microsoft.Data.Sqlite.SqliteConnection
+  commentId: T:Microsoft.Data.Sqlite.SqliteConnection
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.data.sqlite.sqliteconnection
+  name: SqliteConnection
+  nameWithType: SqliteConnection
+  fullName: Microsoft.Data.Sqlite.SqliteConnection
+- uid: System.InvalidOperationException
+  commentId: T:System.InvalidOperationException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.invalidoperationexception
+  name: InvalidOperationException
+  nameWithType: InvalidOperationException
+  fullName: System.InvalidOperationException
+- uid: nORM.Providers.DatabaseProvider.ValidateConnection(System.Data.Common.DbConnection)
+  commentId: M:nORM.Providers.DatabaseProvider.ValidateConnection(System.Data.Common.DbConnection)
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_ValidateConnection_System_Data_Common_DbConnection_
+  name: ValidateConnection(DbConnection)
+  nameWithType: DatabaseProvider.ValidateConnection(DbConnection)
+  fullName: nORM.Providers.DatabaseProvider.ValidateConnection(System.Data.Common.DbConnection)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.ValidateConnection(System.Data.Common.DbConnection)
+    name: ValidateConnection
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_ValidateConnection_System_Data_Common_DbConnection_
+  - name: (
+  - uid: System.Data.Common.DbConnection
+    name: DbConnection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.ValidateConnection(System.Data.Common.DbConnection)
+    name: ValidateConnection
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_ValidateConnection_System_Data_Common_DbConnection_
+  - name: (
+  - uid: System.Data.Common.DbConnection
+    name: DbConnection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection
+  - name: )
+- uid: nORM.Providers.SqliteProvider.ValidateConnection*
+  commentId: Overload:nORM.Providers.SqliteProvider.ValidateConnection
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_ValidateConnection_System_Data_Common_DbConnection_
+  name: ValidateConnection
+  nameWithType: SqliteProvider.ValidateConnection
+  fullName: nORM.Providers.SqliteProvider.ValidateConnection
+- uid: nORM.Providers.DatabaseProvider.IsAvailableAsync
+  commentId: M:nORM.Providers.DatabaseProvider.IsAvailableAsync
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_IsAvailableAsync
+  name: IsAvailableAsync()
+  nameWithType: DatabaseProvider.IsAvailableAsync()
+  fullName: nORM.Providers.DatabaseProvider.IsAvailableAsync()
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.IsAvailableAsync
+    name: IsAvailableAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_IsAvailableAsync
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.IsAvailableAsync
+    name: IsAvailableAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_IsAvailableAsync
+  - name: (
+  - name: )
+- uid: nORM.Providers.SqliteProvider.IsAvailableAsync*
+  commentId: Overload:nORM.Providers.SqliteProvider.IsAvailableAsync
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_IsAvailableAsync
+  name: IsAvailableAsync
+  nameWithType: SqliteProvider.IsAvailableAsync
+  fullName: nORM.Providers.SqliteProvider.IsAvailableAsync
+- uid: System.Threading.Tasks.Task{System.Boolean}
+  commentId: T:System.Threading.Tasks.Task{System.Boolean}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<bool>
+  nameWithType: Task<bool>
+  fullName: System.Threading.Tasks.Task<bool>
+  nameWithType.vb: Task(Of Boolean)
+  fullName.vb: System.Threading.Tasks.Task(Of Boolean)
+  name.vb: Task(Of Boolean)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+- uid: System.Threading.Tasks.Task`1
+  commentId: T:System.Threading.Tasks.Task`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<TResult>
+  nameWithType: Task<TResult>
+  fullName: System.Threading.Tasks.Task<TResult>
+  nameWithType.vb: Task(Of TResult)
+  fullName.vb: System.Threading.Tasks.Task(Of TResult)
+  name.vb: Task(Of TResult)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TResult
+  - name: )
+- uid: nORM.Providers.DatabaseProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.DatabaseProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_CreateSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
+  name: CreateSavepointAsync(DbTransaction, string, CancellationToken)
+  nameWithType: DatabaseProvider.CreateSavepointAsync(DbTransaction, string, CancellationToken)
+  fullName: nORM.Providers.DatabaseProvider.CreateSavepointAsync(System.Data.Common.DbTransaction, string, System.Threading.CancellationToken)
+  nameWithType.vb: DatabaseProvider.CreateSavepointAsync(DbTransaction, String, CancellationToken)
+  fullName.vb: nORM.Providers.DatabaseProvider.CreateSavepointAsync(System.Data.Common.DbTransaction, String, System.Threading.CancellationToken)
+  name.vb: CreateSavepointAsync(DbTransaction, String, CancellationToken)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+    name: CreateSavepointAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_CreateSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Data.Common.DbTransaction
+    name: DbTransaction
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+    name: CreateSavepointAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_CreateSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Data.Common.DbTransaction
+    name: DbTransaction
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Providers.SqliteProvider.CreateSavepointAsync*
+  commentId: Overload:nORM.Providers.SqliteProvider.CreateSavepointAsync
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_CreateSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
+  name: CreateSavepointAsync
+  nameWithType: SqliteProvider.CreateSavepointAsync
+  fullName: nORM.Providers.SqliteProvider.CreateSavepointAsync
+- uid: System.Data.Common.DbTransaction
+  commentId: T:System.Data.Common.DbTransaction
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction
+  name: DbTransaction
+  nameWithType: DbTransaction
+  fullName: System.Data.Common.DbTransaction
+- uid: nORM.Providers.DatabaseProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.DatabaseProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  parent: nORM.Providers.DatabaseProvider
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_RollbackToSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
+  name: RollbackToSavepointAsync(DbTransaction, string, CancellationToken)
+  nameWithType: DatabaseProvider.RollbackToSavepointAsync(DbTransaction, string, CancellationToken)
+  fullName: nORM.Providers.DatabaseProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction, string, System.Threading.CancellationToken)
+  nameWithType.vb: DatabaseProvider.RollbackToSavepointAsync(DbTransaction, String, CancellationToken)
+  fullName.vb: nORM.Providers.DatabaseProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction, String, System.Threading.CancellationToken)
+  name.vb: RollbackToSavepointAsync(DbTransaction, String, CancellationToken)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+    name: RollbackToSavepointAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_RollbackToSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Data.Common.DbTransaction
+    name: DbTransaction
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+    name: RollbackToSavepointAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_RollbackToSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Data.Common.DbTransaction
+    name: DbTransaction
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Providers.SqliteProvider.RollbackToSavepointAsync*
+  commentId: Overload:nORM.Providers.SqliteProvider.RollbackToSavepointAsync
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_RollbackToSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
+  name: RollbackToSavepointAsync
+  nameWithType: SqliteProvider.RollbackToSavepointAsync
+  fullName: nORM.Providers.SqliteProvider.RollbackToSavepointAsync
+- uid: nORM.Providers.DatabaseProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{{T}},System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.DatabaseProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  parent: nORM.Providers.DatabaseProvider
+  definition: nORM.Providers.DatabaseProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkInsertAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  name: BulkInsertAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  nameWithType: DatabaseProvider.BulkInsertAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  fullName: nORM.Providers.DatabaseProvider.BulkInsertAsync<T>(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: DatabaseProvider.BulkInsertAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Providers.DatabaseProvider.BulkInsertAsync(Of T)(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkInsertAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkInsertAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkInsertAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkInsertAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkInsertAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Providers.SqliteProvider.BulkInsertAsync*
+  commentId: Overload:nORM.Providers.SqliteProvider.BulkInsertAsync
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_BulkInsertAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  name: BulkInsertAsync
+  nameWithType: SqliteProvider.BulkInsertAsync
+  fullName: nORM.Providers.SqliteProvider.BulkInsertAsync
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: System.Collections.Generic.IEnumerable{{T}}
+  commentId: T:System.Collections.Generic.IEnumerable{``0}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IEnumerable`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  name: IEnumerable<T>
+  nameWithType: IEnumerable<T>
+  fullName: System.Collections.Generic.IEnumerable<T>
+  nameWithType.vb: IEnumerable(Of T)
+  fullName.vb: System.Collections.Generic.IEnumerable(Of T)
+  name.vb: IEnumerable(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Threading.Tasks.Task{System.Int32}
+  commentId: T:System.Threading.Tasks.Task{System.Int32}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<int>
+  nameWithType: Task<int>
+  fullName: System.Threading.Tasks.Task<int>
+  nameWithType.vb: Task(Of Integer)
+  fullName.vb: System.Threading.Tasks.Task(Of Integer)
+  name.vb: Task(Of Integer)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+- uid: nORM.Providers.DatabaseProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.DatabaseProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkInsertAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  name: BulkInsertAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  nameWithType: DatabaseProvider.BulkInsertAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  fullName: nORM.Providers.DatabaseProvider.BulkInsertAsync<T>(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: DatabaseProvider.BulkInsertAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Providers.DatabaseProvider.BulkInsertAsync(Of T)(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkInsertAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkInsertAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkInsertAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkInsertAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkInsertAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: System.Collections.Generic.IEnumerable`1
+  commentId: T:System.Collections.Generic.IEnumerable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  name: IEnumerable<T>
+  nameWithType: IEnumerable<T>
+  fullName: System.Collections.Generic.IEnumerable<T>
+  nameWithType.vb: IEnumerable(Of T)
+  fullName.vb: System.Collections.Generic.IEnumerable(Of T)
+  name.vb: IEnumerable(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Providers.DatabaseProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{{T}},System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.DatabaseProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  parent: nORM.Providers.DatabaseProvider
+  definition: nORM.Providers.DatabaseProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkUpdateAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  name: BulkUpdateAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  nameWithType: DatabaseProvider.BulkUpdateAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  fullName: nORM.Providers.DatabaseProvider.BulkUpdateAsync<T>(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: DatabaseProvider.BulkUpdateAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Providers.DatabaseProvider.BulkUpdateAsync(Of T)(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkUpdateAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkUpdateAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkUpdateAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkUpdateAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkUpdateAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Providers.SqliteProvider.BulkUpdateAsync*
+  commentId: Overload:nORM.Providers.SqliteProvider.BulkUpdateAsync
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_BulkUpdateAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  name: BulkUpdateAsync
+  nameWithType: SqliteProvider.BulkUpdateAsync
+  fullName: nORM.Providers.SqliteProvider.BulkUpdateAsync
+- uid: nORM.Providers.DatabaseProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.DatabaseProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkUpdateAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  name: BulkUpdateAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  nameWithType: DatabaseProvider.BulkUpdateAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  fullName: nORM.Providers.DatabaseProvider.BulkUpdateAsync<T>(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: DatabaseProvider.BulkUpdateAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Providers.DatabaseProvider.BulkUpdateAsync(Of T)(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkUpdateAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkUpdateAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkUpdateAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkUpdateAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkUpdateAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Providers.DatabaseProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{{T}},System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.DatabaseProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  parent: nORM.Providers.DatabaseProvider
+  definition: nORM.Providers.DatabaseProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkDeleteAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  name: BulkDeleteAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  nameWithType: DatabaseProvider.BulkDeleteAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  fullName: nORM.Providers.DatabaseProvider.BulkDeleteAsync<T>(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: DatabaseProvider.BulkDeleteAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Providers.DatabaseProvider.BulkDeleteAsync(Of T)(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkDeleteAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkDeleteAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkDeleteAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkDeleteAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkDeleteAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Providers.SqliteProvider.BulkDeleteAsync*
+  commentId: Overload:nORM.Providers.SqliteProvider.BulkDeleteAsync
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_BulkDeleteAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  name: BulkDeleteAsync
+  nameWithType: SqliteProvider.BulkDeleteAsync
+  fullName: nORM.Providers.SqliteProvider.BulkDeleteAsync
+- uid: nORM.Providers.DatabaseProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Providers.DatabaseProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkDeleteAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  name: BulkDeleteAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  nameWithType: DatabaseProvider.BulkDeleteAsync<T>(DbContext, TableMapping, IEnumerable<T>, CancellationToken)
+  fullName: nORM.Providers.DatabaseProvider.BulkDeleteAsync<T>(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: DatabaseProvider.BulkDeleteAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Providers.DatabaseProvider.BulkDeleteAsync(Of T)(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkDeleteAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkDeleteAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkDeleteAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+    name: BulkDeleteAsync
+    href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_BulkDeleteAsync__1_nORM_Core_DbContext_nORM_Mapping_TableMapping_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )

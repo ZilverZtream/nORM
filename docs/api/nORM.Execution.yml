@@ -1,0 +1,116 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Execution
+  commentId: N:nORM.Execution
+  id: nORM.Execution
+  children:
+  - nORM.Execution.AdaptiveTimeoutManager
+  - nORM.Execution.AdaptiveTimeoutManager.OperationType
+  - nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+  - nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  langs:
+  - csharp
+  - vb
+  name: nORM.Execution
+  nameWithType: nORM.Execution
+  fullName: nORM.Execution
+  type: Namespace
+  assemblies:
+  - nORM
+references:
+- uid: nORM.Execution.AdaptiveTimeoutManager
+  commentId: T:nORM.Execution.AdaptiveTimeoutManager
+  href: nORM.Execution.AdaptiveTimeoutManager.html
+  name: AdaptiveTimeoutManager
+  nameWithType: AdaptiveTimeoutManager
+  fullName: nORM.Execution.AdaptiveTimeoutManager
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+  commentId: T:nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+  parent: nORM.Execution
+  href: nORM.Execution.AdaptiveTimeoutManager.html
+  name: AdaptiveTimeoutManager.TimeoutConfiguration
+  nameWithType: AdaptiveTimeoutManager.TimeoutConfiguration
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+  spec.csharp:
+  - uid: nORM.Execution.AdaptiveTimeoutManager
+    name: AdaptiveTimeoutManager
+    href: nORM.Execution.AdaptiveTimeoutManager.html
+  - name: .
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+    name: TimeoutConfiguration
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration.html
+  spec.vb:
+  - uid: nORM.Execution.AdaptiveTimeoutManager
+    name: AdaptiveTimeoutManager
+    href: nORM.Execution.AdaptiveTimeoutManager.html
+  - name: .
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+    name: TimeoutConfiguration
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration.html
+- uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  commentId: T:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  href: nORM.Execution.AdaptiveTimeoutManager.html
+  name: AdaptiveTimeoutManager.TimeoutStatistics
+  nameWithType: AdaptiveTimeoutManager.TimeoutStatistics
+  fullName: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+  spec.csharp:
+  - uid: nORM.Execution.AdaptiveTimeoutManager
+    name: AdaptiveTimeoutManager
+    href: nORM.Execution.AdaptiveTimeoutManager.html
+  - name: .
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+  spec.vb:
+  - uid: nORM.Execution.AdaptiveTimeoutManager
+    name: AdaptiveTimeoutManager
+    href: nORM.Execution.AdaptiveTimeoutManager.html
+  - name: .
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: TimeoutStatistics
+    href: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  commentId: T:nORM.Execution.AdaptiveTimeoutManager.OperationType
+  parent: nORM.Execution
+  href: nORM.Execution.AdaptiveTimeoutManager.html
+  name: AdaptiveTimeoutManager.OperationType
+  nameWithType: AdaptiveTimeoutManager.OperationType
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  spec.csharp:
+  - uid: nORM.Execution.AdaptiveTimeoutManager
+    name: AdaptiveTimeoutManager
+    href: nORM.Execution.AdaptiveTimeoutManager.html
+  - name: .
+  - uid: nORM.Execution.AdaptiveTimeoutManager.OperationType
+    name: OperationType
+    href: nORM.Execution.AdaptiveTimeoutManager.OperationType.html
+  spec.vb:
+  - uid: nORM.Execution.AdaptiveTimeoutManager
+    name: AdaptiveTimeoutManager
+    href: nORM.Execution.AdaptiveTimeoutManager.html
+  - name: .
+  - uid: nORM.Execution.AdaptiveTimeoutManager.OperationType
+    name: OperationType
+    href: nORM.Execution.AdaptiveTimeoutManager.OperationType.html
+- uid: nORM.Execution
+  commentId: N:nORM.Execution
+  href: nORM.html
+  name: nORM.Execution
+  nameWithType: nORM.Execution
+  fullName: nORM.Execution
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Execution
+    name: Execution
+    href: nORM.Execution.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Execution
+    name: Execution
+    href: nORM.Execution.html

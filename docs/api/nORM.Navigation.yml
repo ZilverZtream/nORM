@@ -1,0 +1,121 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  id: nORM.Navigation
+  children:
+  - nORM.Navigation.BatchedNavigationLoader
+  - nORM.Navigation.LazyNavigationCollection`1
+  - nORM.Navigation.LazyNavigationReference`1
+  - nORM.Navigation.NavigationContext
+  - nORM.Navigation.NavigationPropertyExtensions
+  - nORM.Navigation.NavigationPropertyInfo
+  langs:
+  - csharp
+  - vb
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  type: Namespace
+  assemblies:
+  - nORM
+references:
+- uid: nORM.Navigation.BatchedNavigationLoader
+  commentId: T:nORM.Navigation.BatchedNavigationLoader
+  href: nORM.Navigation.BatchedNavigationLoader.html
+  name: BatchedNavigationLoader
+  nameWithType: BatchedNavigationLoader
+  fullName: nORM.Navigation.BatchedNavigationLoader
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationContext
+  commentId: T:nORM.Navigation.NavigationContext
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationContext.html
+  name: NavigationContext
+  nameWithType: NavigationContext
+  fullName: nORM.Navigation.NavigationContext
+- uid: nORM.Navigation.NavigationPropertyInfo
+  commentId: T:nORM.Navigation.NavigationPropertyInfo
+  href: nORM.Navigation.NavigationPropertyInfo.html
+  name: NavigationPropertyInfo
+  nameWithType: NavigationPropertyInfo
+  fullName: nORM.Navigation.NavigationPropertyInfo
+- uid: nORM.Navigation.LazyNavigationCollection`1
+  commentId: T:nORM.Navigation.LazyNavigationCollection`1
+  href: nORM.Navigation.LazyNavigationCollection-1.html
+  name: LazyNavigationCollection<T>
+  nameWithType: LazyNavigationCollection<T>
+  fullName: nORM.Navigation.LazyNavigationCollection<T>
+  nameWithType.vb: LazyNavigationCollection(Of T)
+  fullName.vb: nORM.Navigation.LazyNavigationCollection(Of T)
+  name.vb: LazyNavigationCollection(Of T)
+  spec.csharp:
+  - uid: nORM.Navigation.LazyNavigationCollection`1
+    name: LazyNavigationCollection
+    href: nORM.Navigation.LazyNavigationCollection-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Navigation.LazyNavigationCollection`1
+    name: LazyNavigationCollection
+    href: nORM.Navigation.LazyNavigationCollection-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Navigation.LazyNavigationReference`1
+  commentId: T:nORM.Navigation.LazyNavigationReference`1
+  parent: nORM.Navigation
+  href: nORM.Navigation.LazyNavigationReference-1.html
+  name: LazyNavigationReference<T>
+  nameWithType: LazyNavigationReference<T>
+  fullName: nORM.Navigation.LazyNavigationReference<T>
+  nameWithType.vb: LazyNavigationReference(Of T)
+  fullName.vb: nORM.Navigation.LazyNavigationReference(Of T)
+  name.vb: LazyNavigationReference(Of T)
+  spec.csharp:
+  - uid: nORM.Navigation.LazyNavigationReference`1
+    name: LazyNavigationReference
+    href: nORM.Navigation.LazyNavigationReference-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Navigation.LazyNavigationReference`1
+    name: LazyNavigationReference
+    href: nORM.Navigation.LazyNavigationReference-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html

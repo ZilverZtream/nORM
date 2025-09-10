@@ -1,0 +1,30 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Scaffolding
+  commentId: N:nORM.Scaffolding
+  id: nORM.Scaffolding
+  children:
+  - nORM.Scaffolding.DatabaseScaffolder
+  - nORM.Scaffolding.DynamicEntityTypeGenerator
+  langs:
+  - csharp
+  - vb
+  name: nORM.Scaffolding
+  nameWithType: nORM.Scaffolding
+  fullName: nORM.Scaffolding
+  type: Namespace
+  assemblies:
+  - nORM
+references:
+- uid: nORM.Scaffolding.DatabaseScaffolder
+  commentId: T:nORM.Scaffolding.DatabaseScaffolder
+  href: nORM.Scaffolding.DatabaseScaffolder.html
+  name: DatabaseScaffolder
+  nameWithType: DatabaseScaffolder
+  fullName: nORM.Scaffolding.DatabaseScaffolder
+- uid: nORM.Scaffolding.DynamicEntityTypeGenerator
+  commentId: T:nORM.Scaffolding.DynamicEntityTypeGenerator
+  href: nORM.Scaffolding.DynamicEntityTypeGenerator.html
+  name: DynamicEntityTypeGenerator
+  nameWithType: DynamicEntityTypeGenerator
+  fullName: nORM.Scaffolding.DynamicEntityTypeGenerator

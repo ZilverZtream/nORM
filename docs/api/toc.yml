@@ -1,0 +1,400 @@
+### YamlMime:TableOfContent
+items:
+- uid: Microsoft.Extensions.Logging
+  name: Microsoft.Extensions.Logging
+  type: Namespace
+  items:
+  - uid: Microsoft.Extensions.Logging.DbContextLoggingExtensions
+    name: DbContextLoggingExtensions
+    type: Class
+- uid: nORM.Configuration
+  name: nORM.Configuration
+  type: Namespace
+  items:
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    type: Class
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder<TEntity>
+    type: Class
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+    name: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>
+    type: Class
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
+    name: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder
+    type: Class
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+    name: EntityTypeBuilder<TEntity>.PropertyBuilder
+    type: Class
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
+    name: EntityTypeBuilder<TEntity>.ShadowPropertyBuilder
+    type: Class
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    type: Interface
+  - uid: nORM.Configuration.ModelBuilder
+    name: ModelBuilder
+    type: Class
+  - uid: nORM.Configuration.OwnedNavigation
+    name: OwnedNavigation
+    type: Class
+  - uid: nORM.Configuration.RelationshipConfiguration
+    name: RelationshipConfiguration
+    type: Class
+  - uid: nORM.Configuration.ShadowPropertyConfiguration
+    name: ShadowPropertyConfiguration
+    type: Class
+- uid: nORM.Core
+  name: nORM.Core
+  type: Namespace
+  items:
+  - uid: nORM.Core.AdvancedLinqExtensions
+    name: AdvancedLinqExtensions
+    type: Class
+  - uid: nORM.Core.AsyncConnectionManager
+    name: AsyncConnectionManager
+    type: Class
+  - uid: nORM.Core.CacheableExtensions
+    name: CacheableExtensions
+    type: Class
+  - uid: nORM.Core.ChangeTracker
+    name: ChangeTracker
+    type: Class
+  - uid: nORM.Core.ConnectionManager
+    name: ConnectionManager
+    type: Class
+  - uid: nORM.Core.ConnectionPool
+    name: ConnectionPool
+    type: Class
+  - uid: nORM.Core.ConnectionPoolOptions
+    name: ConnectionPoolOptions
+    type: Class
+  - uid: nORM.Core.DatabaseFacade
+    name: DatabaseFacade
+    type: Class
+  - uid: nORM.Core.DatabaseTopology
+    name: DatabaseTopology
+    type: Class
+  - uid: nORM.Core.DatabaseTopology.DatabaseNode
+    name: DatabaseTopology.DatabaseNode
+    type: Class
+  - uid: nORM.Core.DatabaseTopology.DatabaseRole
+    name: DatabaseTopology.DatabaseRole
+    type: Enum
+  - uid: nORM.Core.DbConcurrencyException
+    name: DbConcurrencyException
+    type: Class
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    type: Class
+  - uid: nORM.Core.DbContextTransaction
+    name: DbContextTransaction
+    type: Class
+  - uid: nORM.Core.EntityEntry
+    name: EntityEntry
+    type: Class
+  - uid: nORM.Core.EntityState
+    name: EntityState
+    type: Enum
+  - uid: nORM.Core.IMemoryMonitor
+    name: IMemoryMonitor
+    type: Interface
+  - uid: nORM.Core.INormIncludableQueryable`2
+    name: INormIncludableQueryable<TEntity, TProperty>
+    type: Interface
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable<T>
+    type: Interface
+  - uid: nORM.Core.Json
+    name: Json
+    type: Class
+  - uid: nORM.Core.Norm
+    name: Norm
+    type: Class
+  - uid: nORM.Core.NormAsyncExtensions
+    name: NormAsyncExtensions
+    type: Class
+  - uid: nORM.Core.NormAsyncPolicy
+    name: NormAsyncPolicy
+    type: Class
+  - uid: nORM.Core.NormConfigurationException
+    name: NormConfigurationException
+    type: Class
+  - uid: nORM.Core.NormConnectionException
+    name: NormConnectionException
+    type: Class
+  - uid: nORM.Core.NormDatabaseException
+    name: NormDatabaseException
+    type: Class
+  - uid: nORM.Core.NormException
+    name: NormException
+    type: Class
+  - uid: nORM.Core.NormExceptionHandler
+    name: NormExceptionHandler
+    type: Class
+  - uid: nORM.Core.NormIncludableQueryableExtensions
+    name: NormIncludableQueryableExtensions
+    type: Class
+  - uid: nORM.Core.NormMemoryCacheProvider
+    name: NormMemoryCacheProvider
+    type: Class
+  - uid: nORM.Core.NormQueryException
+    name: NormQueryException
+    type: Class
+  - uid: nORM.Core.NormQueryable
+    name: NormQueryable
+    type: Class
+  - uid: nORM.Core.NormTimeoutException
+    name: NormTimeoutException
+    type: Class
+  - uid: nORM.Core.NormUnsupportedFeatureException
+    name: NormUnsupportedFeatureException
+    type: Class
+  - uid: nORM.Core.NormUsageException
+    name: NormUsageException
+    type: Class
+  - uid: nORM.Core.NormValidator
+    name: NormValidator
+    type: Class
+  - uid: nORM.Core.OutputParameter
+    name: OutputParameter
+    type: Class
+  - uid: nORM.Core.QueryTrackingBehavior
+    name: QueryTrackingBehavior
+    type: Enum
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls<T>
+    type: Class
+  - uid: nORM.Core.StoredProcedureResult`1
+    name: StoredProcedureResult<T>
+    type: Class
+  - uid: nORM.Core.TemporalExtensions
+    name: TemporalExtensions
+    type: Class
+  - uid: nORM.Core.WindowFunctionsExtensions
+    name: WindowFunctionsExtensions
+    type: Class
+- uid: nORM.Enterprise
+  name: nORM.Enterprise
+  type: Namespace
+  items:
+  - uid: nORM.Enterprise.BaseDbCommandInterceptor
+    name: BaseDbCommandInterceptor
+    type: Class
+  - uid: nORM.Enterprise.IDbCacheProvider
+    name: IDbCacheProvider
+    type: Interface
+  - uid: nORM.Enterprise.IDbCommandInterceptor
+    name: IDbCommandInterceptor
+    type: Interface
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    type: Interface
+  - uid: nORM.Enterprise.ITenantProvider
+    name: ITenantProvider
+    type: Interface
+  - uid: nORM.Enterprise.InterceptionResult`1
+    name: InterceptionResult<T>
+    type: Struct
+  - uid: nORM.Enterprise.RetryPolicy
+    name: RetryPolicy
+    type: Class
+- uid: nORM.Execution
+  name: nORM.Execution
+  type: Namespace
+  items:
+  - uid: nORM.Execution.AdaptiveTimeoutManager
+    name: AdaptiveTimeoutManager
+    type: Class
+  - uid: nORM.Execution.AdaptiveTimeoutManager.OperationType
+    name: AdaptiveTimeoutManager.OperationType
+    type: Enum
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+    name: AdaptiveTimeoutManager.TimeoutConfiguration
+    type: Class
+  - uid: nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
+    name: AdaptiveTimeoutManager.TimeoutStatistics
+    type: Class
+- uid: nORM.Internal
+  name: nORM.Internal
+  type: Namespace
+  items:
+  - uid: nORM.Internal.ConcurrentLruCache`2
+    name: ConcurrentLruCache<TKey, TValue>
+    type: Class
+- uid: nORM.Mapping
+  name: nORM.Mapping
+  type: Namespace
+  items:
+  - uid: nORM.Mapping.Column
+    name: Column
+    type: Class
+  - uid: nORM.Mapping.ColumnMappingCache
+    name: ColumnMappingCache
+    type: Class
+  - uid: nORM.Mapping.DiscriminatorColumnAttribute
+    name: DiscriminatorColumnAttribute
+    type: Class
+  - uid: nORM.Mapping.DiscriminatorValueAttribute
+    name: DiscriminatorValueAttribute
+    type: Class
+  - uid: nORM.Mapping.OwnedAttribute
+    name: OwnedAttribute
+    type: Class
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    type: Class
+  - uid: nORM.Mapping.TableMapping.Relation
+    name: TableMapping.Relation
+    type: Class
+  - uid: nORM.Mapping.TableSplitAttribute
+    name: TableSplitAttribute
+    type: Class
+- uid: nORM.Migration
+  name: nORM.Migration
+  type: Namespace
+  items:
+  - uid: nORM.Migration.ColumnSchema
+    name: ColumnSchema
+    type: Class
+  - uid: nORM.Migration.IMigrationRunner
+    name: IMigrationRunner
+    type: Interface
+  - uid: nORM.Migration.IMigrationSqlGenerator
+    name: IMigrationSqlGenerator
+    type: Interface
+  - uid: nORM.Migration.Migration
+    name: Migration
+    type: Class
+  - uid: nORM.Migration.MigrationSqlStatements
+    name: MigrationSqlStatements
+    type: Class
+  - uid: nORM.Migration.MySqlMigrationRunner
+    name: MySqlMigrationRunner
+    type: Class
+  - uid: nORM.Migration.MySqlMigrationSqlGenerator
+    name: MySqlMigrationSqlGenerator
+    type: Class
+  - uid: nORM.Migration.PostgresMigrationRunner
+    name: PostgresMigrationRunner
+    type: Class
+  - uid: nORM.Migration.PostgresMigrationSqlGenerator
+    name: PostgresMigrationSqlGenerator
+    type: Class
+  - uid: nORM.Migration.SchemaDiff
+    name: SchemaDiff
+    type: Class
+  - uid: nORM.Migration.SchemaDiffer
+    name: SchemaDiffer
+    type: Class
+  - uid: nORM.Migration.SchemaSnapshot
+    name: SchemaSnapshot
+    type: Class
+  - uid: nORM.Migration.SchemaSnapshotBuilder
+    name: SchemaSnapshotBuilder
+    type: Class
+  - uid: nORM.Migration.SqlServerMigrationRunner
+    name: SqlServerMigrationRunner
+    type: Class
+  - uid: nORM.Migration.SqlServerMigrationSqlGenerator
+    name: SqlServerMigrationSqlGenerator
+    type: Class
+  - uid: nORM.Migration.SqliteMigrationRunner
+    name: SqliteMigrationRunner
+    type: Class
+  - uid: nORM.Migration.SqliteMigrationSqlGenerator
+    name: SqliteMigrationSqlGenerator
+    type: Class
+  - uid: nORM.Migration.TableSchema
+    name: TableSchema
+    type: Class
+- uid: nORM.Navigation
+  name: nORM.Navigation
+  type: Namespace
+  items:
+  - uid: nORM.Navigation.BatchedNavigationLoader
+    name: BatchedNavigationLoader
+    type: Class
+  - uid: nORM.Navigation.LazyNavigationCollection`1
+    name: LazyNavigationCollection<T>
+    type: Class
+  - uid: nORM.Navigation.LazyNavigationReference`1
+    name: LazyNavigationReference<T>
+    type: Class
+  - uid: nORM.Navigation.NavigationContext
+    name: NavigationContext
+    type: Class
+  - uid: nORM.Navigation.NavigationPropertyExtensions
+    name: NavigationPropertyExtensions
+    type: Class
+  - uid: nORM.Navigation.NavigationPropertyInfo
+    name: NavigationPropertyInfo
+    type: Class
+- uid: nORM.Providers
+  name: nORM.Providers
+  type: Namespace
+  items:
+  - uid: nORM.Providers.BulkOperationProvider
+    name: BulkOperationProvider
+    type: Class
+  - uid: nORM.Providers.DatabaseProvider
+    name: DatabaseProvider
+    type: Class
+  - uid: nORM.Providers.DynamicBatchSizer
+    name: DynamicBatchSizer
+    type: Class
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: DynamicBatchSizer.BatchSizingResult
+    type: Class
+  - uid: nORM.Providers.IDbParameterFactory
+    name: IDbParameterFactory
+    type: Interface
+  - uid: nORM.Providers.IFastProvider
+    name: IFastProvider
+    type: Interface
+  - uid: nORM.Providers.MySqlProvider
+    name: MySqlProvider
+    type: Class
+  - uid: nORM.Providers.PostgresProvider
+    name: PostgresProvider
+    type: Class
+  - uid: nORM.Providers.SqlServerProvider
+    name: SqlServerProvider
+    type: Class
+  - uid: nORM.Providers.SqliteProvider
+    name: SqliteProvider
+    type: Class
+- uid: nORM.Query
+  name: nORM.Query
+  type: Namespace
+  items:
+  - uid: nORM.Query.OptimizedSqlBuilder
+    name: OptimizedSqlBuilder
+    type: Class
+  - uid: nORM.Query.SqlFunctionAttribute
+    name: SqlFunctionAttribute
+    type: Class
+- uid: nORM.Scaffolding
+  name: nORM.Scaffolding
+  type: Namespace
+  items:
+  - uid: nORM.Scaffolding.DatabaseScaffolder
+    name: DatabaseScaffolder
+    type: Class
+  - uid: nORM.Scaffolding.DynamicEntityTypeGenerator
+    name: DynamicEntityTypeGenerator
+    type: Class
+- uid: nORM.SourceGeneration
+  name: nORM.SourceGeneration
+  type: Namespace
+  items:
+  - uid: nORM.SourceGeneration.CompileTimeQueryAttribute
+    name: CompileTimeQueryAttribute
+    type: Class
+  - uid: nORM.SourceGeneration.CompiledMaterializerStore
+    name: CompiledMaterializerStore
+    type: Class
+  - uid: nORM.SourceGeneration.GenerateMaterializerAttribute
+    name: GenerateMaterializerAttribute
+    type: Class
+memberLayout: SamePage

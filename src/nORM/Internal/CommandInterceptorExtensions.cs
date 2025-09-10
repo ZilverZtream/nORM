@@ -14,7 +14,7 @@ namespace nORM.Internal
     internal static class CommandInterceptorExtensions
     {
         /// <summary>
-        /// Executes <see cref="DbCommand.ExecuteNonQueryAsync"/> while invoking any registered
+        /// Executes <see cref="DbCommand.ExecuteNonQueryAsync()"/> while invoking any registered
         /// command interceptors before and after execution.
         /// </summary>
         /// <param name="command">The database command to execute.</param>
@@ -111,7 +111,7 @@ namespace nORM.Internal
         }
 
         /// <summary>
-        /// Executes <see cref="DbCommand.ExecuteScalarAsync"/> while invoking registered
+        /// Executes <see cref="DbCommand.ExecuteScalarAsync()"/> while invoking registered
         /// command interceptors surrounding the call.
         /// </summary>
         /// <param name="command">The command to execute.</param>

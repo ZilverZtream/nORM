@@ -1,0 +1,1826 @@
+{
+  "source_base_path": "C:/Users/Dennis/source/repos/nORM",
+  "xrefmap": "xrefmap.yml",
+  "files": [
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/Microsoft.Extensions.Logging.DbContextLoggingExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/Microsoft.Extensions.Logging.DbContextLoggingExtensions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "Microsoft.Extensions.Logging.DbContextLoggingExtensions",
+      "Summary": "<p sourcefile=\"docs/api/Microsoft.Extensions.Logging.DbContextLoggingExtensions.yml\" sourcestartlinenumber=\"1\">Extension methods for logging nORM specific database operations.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/Microsoft.Extensions.Logging.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/Microsoft.Extensions.Logging.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "Microsoft.Extensions.Logging",
+      "Summary": null
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "docs/api/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/index.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.DbContextOptions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.DbContextOptions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration.DbContextOptions",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.ReferenceCollectionBuilder.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.ReferenceCollectionBuilder.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.EntityTypeBuilder-1.ShadowPropertyBuilder.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.EntityTypeBuilder-1.ShadowPropertyBuilder.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration.EntityTypeBuilder<TEntity>.ShadowPropertyBuilder",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.EntityTypeBuilder-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.EntityTypeBuilder-1.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration.EntityTypeBuilder<TEntity>",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.IEntityTypeConfiguration.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.IEntityTypeConfiguration.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration.IEntityTypeConfiguration",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.ModelBuilder.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.ModelBuilder.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration.ModelBuilder",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.OwnedNavigation.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.OwnedNavigation.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration.OwnedNavigation",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Configuration.OwnedNavigation.yml\" sourcestartlinenumber=\"1\">Describes an owned navigation property and its optional configuration.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.RelationshipConfiguration.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.RelationshipConfiguration.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration.RelationshipConfiguration",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Configuration.RelationshipConfiguration.yml\" sourcestartlinenumber=\"1\">Configuration details for a relationship between entities including navigation and key information.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.ShadowPropertyConfiguration.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.ShadowPropertyConfiguration.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration.ShadowPropertyConfiguration",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Configuration.ShadowPropertyConfiguration.yml\" sourcestartlinenumber=\"1\">Represents a shadow property that does not exist on the CLR type but is mapped to a database column.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Configuration.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Configuration.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Configuration",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.AdvancedLinqExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.AdvancedLinqExtensions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.AdvancedLinqExtensions",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.AdvancedLinqExtensions.yml\" sourcestartlinenumber=\"1\">Compact aggregate extensions for nORM using numeric generics</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.AsyncConnectionManager.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.AsyncConnectionManager.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.AsyncConnectionManager",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.AsyncConnectionManager.yml\" sourcestartlinenumber=\"1\">Manages a single database connection in an asynchronous and thread-safe manner.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.CacheableExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.CacheableExtensions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.CacheableExtensions",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.CacheableExtensions.yml\" sourcestartlinenumber=\"1\">Extension methods to mark queries as cacheable.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.ChangeTracker.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.ChangeTracker.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.ChangeTracker",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.ConnectionManager.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.ConnectionManager.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.ConnectionManager",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.ConnectionManager.yml\" sourcestartlinenumber=\"1\">Provides connection management with support for read replicas and failover.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.ConnectionPool.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.ConnectionPool.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.ConnectionPool",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.ConnectionPool.yml\" sourcestartlinenumber=\"1\">Thread-safe pool managing database connections.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.ConnectionPoolOptions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.ConnectionPoolOptions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.ConnectionPoolOptions",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.ConnectionPoolOptions.yml\" sourcestartlinenumber=\"1\">Configuration settings for <xref href=\"nORM.Core.ConnectionPool\" data-throw-if-not-resolved=\"false\"></xref>.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.DatabaseFacade.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.DatabaseFacade.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.DatabaseFacade",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.DatabaseTopology.DatabaseNode.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.DatabaseTopology.DatabaseNode.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.DatabaseTopology.DatabaseNode",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.DatabaseTopology.DatabaseRole.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.DatabaseTopology.DatabaseRole.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.DatabaseTopology.DatabaseRole",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.DatabaseTopology.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.DatabaseTopology.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.DatabaseTopology",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.DatabaseTopology.yml\" sourcestartlinenumber=\"1\">Represents the topology of database nodes used for failover and read replica support.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.DbConcurrencyException.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.DbConcurrencyException.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.DbConcurrencyException",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.DbConcurrencyException.yml\" sourcestartlinenumber=\"1\">Exception thrown when an optimistic concurrency conflict is detected.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.DbContext.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.DbContext.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.DbContext",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.DbContextTransaction.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.DbContextTransaction.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.DbContextTransaction",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.EntityEntry.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.EntityEntry.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.EntityEntry",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.EntityState.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.EntityState.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.EntityState",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.IMemoryMonitor.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.IMemoryMonitor.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.IMemoryMonitor",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.IMemoryMonitor.yml\" sourcestartlinenumber=\"1\">Provides information about current system memory usage.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.INormIncludableQueryable-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.INormIncludableQueryable-2.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.INormIncludableQueryable<TEntity, TProperty>",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.INormQueryable-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.INormQueryable-1.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.INormQueryable<T>",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.INormQueryable-1.yml\" sourcestartlinenumber=\"1\">Defines a queryable data source with extended functionality like Include.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.Json.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.Json.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.Json",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.Json.yml\" sourcestartlinenumber=\"1\">Provides helper methods for working with JSON values in queries.\nThese methods act as markers for the query translator and are not intended to be executed directly.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.Norm.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.Norm.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.Norm",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormAsyncExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormAsyncExtensions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormAsyncExtensions",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.NormAsyncExtensions.yml\" sourcestartlinenumber=\"1\">High-performance extension methods for nORM async operations\nThese are specifically designed for nORM queries to avoid conflicts with other ORMs</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormAsyncPolicy.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormAsyncPolicy.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormAsyncPolicy",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.NormAsyncPolicy.yml\" sourcestartlinenumber=\"1\">Provides configuration for async context flow within nORM.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormConfigurationException.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormConfigurationException.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormConfigurationException",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.NormConfigurationException.yml\" sourcestartlinenumber=\"1\">Exception thrown when nORM configuration is invalid or incomplete.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormConnectionException.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormConnectionException.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormConnectionException",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.NormConnectionException.yml\" sourcestartlinenumber=\"1\">Represents errors that occur when establishing or managing database connections.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormDatabaseException.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormDatabaseException.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormDatabaseException",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormException.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormException.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormException",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormExceptionHandler.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormExceptionHandler.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormExceptionHandler",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormIncludableQueryableExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormIncludableQueryableExtensions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormIncludableQueryableExtensions",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormMemoryCacheProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormMemoryCacheProvider.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormMemoryCacheProvider",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.NormMemoryCacheProvider.yml\" sourcestartlinenumber=\"1\">Default in-memory cache provider for nORM using Microsoft.Extensions.Caching.Memory.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormQueryException.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormQueryException.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormQueryException",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormQueryable.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormQueryable.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormQueryable",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.NormQueryable.yml\" sourcestartlinenumber=\"1\">Provides the entry point to query the database using LINQ.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormTimeoutException.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormTimeoutException.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormTimeoutException",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormUnsupportedFeatureException.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormUnsupportedFeatureException.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormUnsupportedFeatureException",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.NormUnsupportedFeatureException.yml\" sourcestartlinenumber=\"1\">Exception thrown when a requested feature is not supported by nORM.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormUsageException.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormUsageException.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormUsageException",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.NormUsageException.yml\" sourcestartlinenumber=\"1\">Exception thrown when the nORM API is used incorrectly.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.NormValidator.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.NormValidator.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.NormValidator",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.OutputParameter.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.OutputParameter.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.OutputParameter",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.OutputParameter.yml\" sourcestartlinenumber=\"1\">Represents an output parameter for stored procedure execution.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.QueryTrackingBehavior.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.QueryTrackingBehavior.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.QueryTrackingBehavior",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.SetPropertyCalls-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.SetPropertyCalls-1.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.SetPropertyCalls<T>",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.StoredProcedureResult-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.StoredProcedureResult-1.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.StoredProcedureResult<T>",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.TemporalExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.TemporalExtensions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.TemporalExtensions",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.WindowFunctionsExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.WindowFunctionsExtensions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core.WindowFunctionsExtensions",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Core.WindowFunctionsExtensions.yml\" sourcestartlinenumber=\"1\">Provides LINQ extension methods for SQL window functions.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Core.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Core.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Core",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Enterprise.BaseDbCommandInterceptor.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Enterprise.BaseDbCommandInterceptor.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Enterprise.BaseDbCommandInterceptor",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Enterprise.BaseDbCommandInterceptor.yml\" sourcestartlinenumber=\"1\">Base implementation of <xref href=\"nORM.Enterprise.IDbCommandInterceptor\" data-throw-if-not-resolved=\"false\"></xref> that logs command execution.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Enterprise.IDbCacheProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Enterprise.IDbCacheProvider.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Enterprise.IDbCacheProvider",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Enterprise.IDbCommandInterceptor.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Enterprise.IDbCommandInterceptor.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Enterprise.IDbCommandInterceptor",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Enterprise.IDbCommandInterceptor.yml\" sourcestartlinenumber=\"1\">Defines hooks that are invoked before and after execution of <xref href=\"System.Data.Common.DbCommand\" data-throw-if-not-resolved=\"false\"></xref> instances.\nImplementations may inspect or modify the command, short-circuit execution, or react to failures.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Enterprise.ISaveChangesInterceptor.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Enterprise.ISaveChangesInterceptor.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Enterprise.ISaveChangesInterceptor",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Enterprise.ISaveChangesInterceptor.yml\" sourcestartlinenumber=\"1\">Provides hooks that run before and after <xref href=\"nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)\" data-throw-if-not-resolved=\"false\"></xref>.\nImplementations may inspect or modify tracked entities or react to persistence results.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Enterprise.ITenantProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Enterprise.ITenantProvider.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Enterprise.ITenantProvider",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Enterprise.InterceptionResult-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Enterprise.InterceptionResult-1.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Enterprise.InterceptionResult<T>",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Enterprise.InterceptionResult-1.yml\" sourcestartlinenumber=\"1\">Represents the result of an interceptor call. When <xref href=\"nORM.Enterprise.InterceptionResult%601.IsSuppressed\" data-throw-if-not-resolved=\"false\"></xref> is true,\nthe command execution is skipped and <xref href=\"nORM.Enterprise.InterceptionResult%601.Result\" data-throw-if-not-resolved=\"false\"></xref> is returned instead.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Enterprise.RetryPolicy.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Enterprise.RetryPolicy.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Enterprise.RetryPolicy",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Enterprise.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Enterprise.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Enterprise",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Execution.AdaptiveTimeoutManager.OperationType.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Execution.AdaptiveTimeoutManager.OperationType.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Execution.AdaptiveTimeoutManager.OperationType",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Execution.AdaptiveTimeoutManager.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Execution.AdaptiveTimeoutManager.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Execution.AdaptiveTimeoutManager",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Execution.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Execution.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Execution",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Internal.ConcurrentLruCache-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Internal.ConcurrentLruCache-2.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Internal.ConcurrentLruCache<TKey, TValue>",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Internal.ConcurrentLruCache-2.yml\" sourcestartlinenumber=\"1\">Concurrent LRU cache with optional TTL. Expired entries are removed on access.\nEviction on insert is size-based only (no TTL prune on insert) to minimize churn in hot paths.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Internal.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Internal.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Internal",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Mapping.Column.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Mapping.Column.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Mapping.Column",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Mapping.ColumnMappingCache.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Mapping.ColumnMappingCache.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Mapping.ColumnMappingCache",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Mapping.DiscriminatorColumnAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Mapping.DiscriminatorColumnAttribute.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Mapping.DiscriminatorColumnAttribute",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Mapping.DiscriminatorValueAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Mapping.DiscriminatorValueAttribute.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Mapping.DiscriminatorValueAttribute",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Mapping.OwnedAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Mapping.OwnedAttribute.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Mapping.OwnedAttribute",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Mapping.TableMapping.Relation.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Mapping.TableMapping.Relation.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Mapping.TableMapping.Relation",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Mapping.TableMapping.Relation.yml\" sourcestartlinenumber=\"1\">Represents the mapping of a relationship from the principal entity to a dependent entity type.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Mapping.TableMapping.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Mapping.TableMapping.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Mapping.TableMapping",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Mapping.TableSplitAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Mapping.TableSplitAttribute.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Mapping.TableSplitAttribute",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Mapping.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Mapping.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Mapping",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.ColumnSchema.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.ColumnSchema.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.ColumnSchema",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.IMigrationRunner.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.IMigrationRunner.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.IMigrationRunner",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.IMigrationSqlGenerator.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.IMigrationSqlGenerator.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.IMigrationSqlGenerator",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Migration.IMigrationSqlGenerator.yml\" sourcestartlinenumber=\"1\">Defines a service capable of translating schema differences into database-specific SQL statements.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.Migration.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.Migration.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.Migration",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.MigrationSqlStatements.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.MigrationSqlStatements.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.MigrationSqlStatements",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Migration.MigrationSqlStatements.yml\" sourcestartlinenumber=\"1\">Represents the SQL statements required to apply a migration and to roll it back.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.MySqlMigrationRunner.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.MySqlMigrationRunner.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.MySqlMigrationRunner",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.MySqlMigrationSqlGenerator.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.MySqlMigrationSqlGenerator.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.MySqlMigrationSqlGenerator",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.PostgresMigrationRunner.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.PostgresMigrationRunner.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.PostgresMigrationRunner",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.PostgresMigrationSqlGenerator.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.PostgresMigrationSqlGenerator.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.PostgresMigrationSqlGenerator",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.SchemaDiff.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.SchemaDiff.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.SchemaDiff",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.SchemaDiffer.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.SchemaDiffer.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.SchemaDiffer",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.SchemaSnapshot.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.SchemaSnapshot.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.SchemaSnapshot",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.SchemaSnapshotBuilder.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.SchemaSnapshotBuilder.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.SchemaSnapshotBuilder",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.SqlServerMigrationRunner.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.SqlServerMigrationRunner.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.SqlServerMigrationRunner",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.SqlServerMigrationSqlGenerator.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.SqlServerMigrationSqlGenerator.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.SqlServerMigrationSqlGenerator",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.SqliteMigrationRunner.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.SqliteMigrationRunner.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.SqliteMigrationRunner",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.SqliteMigrationSqlGenerator.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.SqliteMigrationSqlGenerator.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.SqliteMigrationSqlGenerator",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.TableSchema.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.TableSchema.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration.TableSchema",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Migration.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Migration.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Migration",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Navigation.BatchedNavigationLoader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Navigation.BatchedNavigationLoader.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Navigation.BatchedNavigationLoader",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Navigation.LazyNavigationCollection-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Navigation.LazyNavigationCollection-1.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Navigation.LazyNavigationCollection<T>",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Navigation.LazyNavigationCollection-1.yml\" sourcestartlinenumber=\"1\">Lazy loading collection that loads data on first enumeration</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Navigation.LazyNavigationReference-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Navigation.LazyNavigationReference-1.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Navigation.LazyNavigationReference<T>",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Navigation.LazyNavigationReference-1.yml\" sourcestartlinenumber=\"1\">Lazy loading reference that loads data on first access</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Navigation.NavigationContext.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Navigation.NavigationContext.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Navigation.NavigationContext",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Navigation.NavigationContext.yml\" sourcestartlinenumber=\"1\">Holds navigation context for an entity instance</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Navigation.NavigationPropertyExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Navigation.NavigationPropertyExtensions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Navigation.NavigationPropertyExtensions",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Navigation.NavigationPropertyExtensions.yml\" sourcestartlinenumber=\"1\">Advanced navigation property system with lazy loading, change tracking, and performance optimization\nProvides EF Core-like experience without sacrificing nORM's performance characteristics</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Navigation.NavigationPropertyInfo.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Navigation.NavigationPropertyInfo.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Navigation.NavigationPropertyInfo",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Navigation.NavigationPropertyInfo.yml\" sourcestartlinenumber=\"1\">Information about a navigation property</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Navigation.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Navigation.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Navigation",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Providers.BulkOperationProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Providers.BulkOperationProvider.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Providers.BulkOperationProvider",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Providers.BulkOperationProvider.yml\" sourcestartlinenumber=\"1\">Provides helpers for provider specific bulk operations by extracting the\ncommon batching and transactional patterns used by multiple providers.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Providers.DatabaseProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Providers.DatabaseProvider.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Providers.DatabaseProvider",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Providers.DynamicBatchSizer.BatchSizingResult.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Providers.DynamicBatchSizer.BatchSizingResult.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Providers.DynamicBatchSizer.BatchSizingResult",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Providers.DynamicBatchSizer.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Providers.DynamicBatchSizer.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Providers.DynamicBatchSizer",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Providers.IDbParameterFactory.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Providers.IDbParameterFactory.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Providers.IDbParameterFactory",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Providers.IFastProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Providers.IFastProvider.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Providers.IFastProvider",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Providers.MySqlProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Providers.MySqlProvider.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Providers.MySqlProvider",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Providers.PostgresProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Providers.PostgresProvider.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Providers.PostgresProvider",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Providers.PostgresProvider.yml\" sourcestartlinenumber=\"1\">Database provider implementation optimized for PostgreSQL.\nHandles SQL dialect translation, bulk operations and temporal table support.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Providers.SqlServerProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Providers.SqlServerProvider.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Providers.SqlServerProvider",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Providers.SqlServerProvider.yml\" sourcestartlinenumber=\"1\">Database provider implementation for Microsoft SQL Server.\nResponsible for dialect translation, bulk operations and temporal table support.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Providers.SqliteProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Providers.SqliteProvider.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Providers.SqliteProvider",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Providers.SqliteProvider.yml\" sourcestartlinenumber=\"1\">Lightweight provider implementation targeting SQLite databases.\nProvides SQL generation and initialization routines specific to SQLite's feature set.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Providers.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Providers.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Providers",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Query.OptimizedSqlBuilder.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Query.OptimizedSqlBuilder.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Query.OptimizedSqlBuilder",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Query.OptimizedSqlBuilder.yml\" sourcestartlinenumber=\"1\">SQL builder that minimizes allocations by working directly with\nspan-based operations over pooled character buffers.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Query.SqlFunctionAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Query.SqlFunctionAttribute.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Query.SqlFunctionAttribute",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Query.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Query.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Query",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Scaffolding.DatabaseScaffolder.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Scaffolding.DatabaseScaffolder.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Scaffolding.DatabaseScaffolder",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Scaffolding.DatabaseScaffolder.yml\" sourcestartlinenumber=\"1\">Provides reverse-engineering utilities that can scaffold entity classes and a DbContext\nfrom an existing database schema.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Scaffolding.DynamicEntityTypeGenerator.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Scaffolding.DynamicEntityTypeGenerator.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Scaffolding.DynamicEntityTypeGenerator",
+      "Summary": "<p sourcefile=\"docs/api/nORM.Scaffolding.DynamicEntityTypeGenerator.yml\" sourcestartlinenumber=\"1\">Generates entity types at runtime based on database schema information.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.Scaffolding.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.Scaffolding.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.Scaffolding",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.SourceGeneration.CompileTimeQueryAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.SourceGeneration.CompileTimeQueryAttribute.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.SourceGeneration.CompileTimeQueryAttribute",
+      "Summary": "<p sourcefile=\"docs/api/nORM.SourceGeneration.CompileTimeQueryAttribute.yml\" sourcestartlinenumber=\"1\">Indicates that a method should be populated by the source generator with\na pre-compiled query using the provided SQL statement.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.SourceGeneration.CompiledMaterializerStore.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.SourceGeneration.CompiledMaterializerStore.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.SourceGeneration.CompiledMaterializerStore",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.SourceGeneration.GenerateMaterializerAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.SourceGeneration.GenerateMaterializerAttribute.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.SourceGeneration.GenerateMaterializerAttribute",
+      "Summary": "<p sourcefile=\"docs/api/nORM.SourceGeneration.GenerateMaterializerAttribute.yml\" sourcestartlinenumber=\"1\">Marks an entity type for which a materializer should be generated at\ncompile time. The associated source generator will produce a method that\ncan populate an instance of the decorated type directly from a\n<xref href=\"System.Data.Common.DbDataReader\" data-throw-if-not-resolved=\"false\"></xref>.</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "docs/api/nORM.SourceGeneration.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/nORM.SourceGeneration.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "nORM.SourceGeneration",
+      "Summary": null
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "docs/api/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "docs/api/toc.html"
+        },
+        ".json": {
+          "relative_path": "docs/api/toc.json"
+        }
+      },
+      "version": ""
+    }
+  ],
+  "groups": [
+    {
+      "xrefmap": "xrefmap.yml"
+    }
+  ]
+}

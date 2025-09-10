@@ -1,0 +1,344 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  commentId: T:nORM.Execution.AdaptiveTimeoutManager.OperationType
+  id: AdaptiveTimeoutManager.OperationType
+  parent: nORM.Execution
+  children:
+  - nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkDelete
+  - nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkInsert
+  - nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkUpdate
+  - nORM.Execution.AdaptiveTimeoutManager.OperationType.ComplexSelect
+  - nORM.Execution.AdaptiveTimeoutManager.OperationType.Delete
+  - nORM.Execution.AdaptiveTimeoutManager.OperationType.Insert
+  - nORM.Execution.AdaptiveTimeoutManager.OperationType.SimpleSelect
+  - nORM.Execution.AdaptiveTimeoutManager.OperationType.StoredProcedure
+  - nORM.Execution.AdaptiveTimeoutManager.OperationType.Transaction
+  - nORM.Execution.AdaptiveTimeoutManager.OperationType.Update
+  langs:
+  - csharp
+  - vb
+  name: AdaptiveTimeoutManager.OperationType
+  nameWithType: AdaptiveTimeoutManager.OperationType
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OperationType
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 38
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: public enum AdaptiveTimeoutManager.OperationType
+    content.vb: Public Enum AdaptiveTimeoutManager.OperationType
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType.SimpleSelect
+  commentId: F:nORM.Execution.AdaptiveTimeoutManager.OperationType.SimpleSelect
+  id: SimpleSelect
+  parent: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  langs:
+  - csharp
+  - vb
+  name: SimpleSelect
+  nameWithType: AdaptiveTimeoutManager.OperationType.SimpleSelect
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType.SimpleSelect
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SimpleSelect
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 40
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: SimpleSelect = 0
+    return:
+      type: nORM.Execution.AdaptiveTimeoutManager.OperationType
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType.ComplexSelect
+  commentId: F:nORM.Execution.AdaptiveTimeoutManager.OperationType.ComplexSelect
+  id: ComplexSelect
+  parent: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  langs:
+  - csharp
+  - vb
+  name: ComplexSelect
+  nameWithType: AdaptiveTimeoutManager.OperationType.ComplexSelect
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType.ComplexSelect
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ComplexSelect
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 41
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: ComplexSelect = 1
+    return:
+      type: nORM.Execution.AdaptiveTimeoutManager.OperationType
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType.Insert
+  commentId: F:nORM.Execution.AdaptiveTimeoutManager.OperationType.Insert
+  id: Insert
+  parent: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  langs:
+  - csharp
+  - vb
+  name: Insert
+  nameWithType: AdaptiveTimeoutManager.OperationType.Insert
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType.Insert
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Insert
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 42
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: Insert = 2
+    return:
+      type: nORM.Execution.AdaptiveTimeoutManager.OperationType
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType.Update
+  commentId: F:nORM.Execution.AdaptiveTimeoutManager.OperationType.Update
+  id: Update
+  parent: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  langs:
+  - csharp
+  - vb
+  name: Update
+  nameWithType: AdaptiveTimeoutManager.OperationType.Update
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType.Update
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Update
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 43
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: Update = 3
+    return:
+      type: nORM.Execution.AdaptiveTimeoutManager.OperationType
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType.Delete
+  commentId: F:nORM.Execution.AdaptiveTimeoutManager.OperationType.Delete
+  id: Delete
+  parent: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  langs:
+  - csharp
+  - vb
+  name: Delete
+  nameWithType: AdaptiveTimeoutManager.OperationType.Delete
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType.Delete
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Delete
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 44
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: Delete = 4
+    return:
+      type: nORM.Execution.AdaptiveTimeoutManager.OperationType
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkInsert
+  commentId: F:nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkInsert
+  id: BulkInsert
+  parent: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  langs:
+  - csharp
+  - vb
+  name: BulkInsert
+  nameWithType: AdaptiveTimeoutManager.OperationType.BulkInsert
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkInsert
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BulkInsert
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 45
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: BulkInsert = 5
+    return:
+      type: nORM.Execution.AdaptiveTimeoutManager.OperationType
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkUpdate
+  commentId: F:nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkUpdate
+  id: BulkUpdate
+  parent: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  langs:
+  - csharp
+  - vb
+  name: BulkUpdate
+  nameWithType: AdaptiveTimeoutManager.OperationType.BulkUpdate
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkUpdate
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BulkUpdate
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 46
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: BulkUpdate = 6
+    return:
+      type: nORM.Execution.AdaptiveTimeoutManager.OperationType
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkDelete
+  commentId: F:nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkDelete
+  id: BulkDelete
+  parent: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  langs:
+  - csharp
+  - vb
+  name: BulkDelete
+  nameWithType: AdaptiveTimeoutManager.OperationType.BulkDelete
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType.BulkDelete
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BulkDelete
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 47
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: BulkDelete = 7
+    return:
+      type: nORM.Execution.AdaptiveTimeoutManager.OperationType
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType.Transaction
+  commentId: F:nORM.Execution.AdaptiveTimeoutManager.OperationType.Transaction
+  id: Transaction
+  parent: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  langs:
+  - csharp
+  - vb
+  name: Transaction
+  nameWithType: AdaptiveTimeoutManager.OperationType.Transaction
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType.Transaction
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Transaction
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 48
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: Transaction = 8
+    return:
+      type: nORM.Execution.AdaptiveTimeoutManager.OperationType
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType.StoredProcedure
+  commentId: F:nORM.Execution.AdaptiveTimeoutManager.OperationType.StoredProcedure
+  id: StoredProcedure
+  parent: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  langs:
+  - csharp
+  - vb
+  name: StoredProcedure
+  nameWithType: AdaptiveTimeoutManager.OperationType.StoredProcedure
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType.StoredProcedure
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: StoredProcedure
+    path: src/nORM/Execution/AdaptiveTimeoutManager.cs
+    startLine: 49
+  assemblies:
+  - nORM
+  namespace: nORM.Execution
+  syntax:
+    content: StoredProcedure = 9
+    return:
+      type: nORM.Execution.AdaptiveTimeoutManager.OperationType
+references:
+- uid: nORM.Execution
+  commentId: N:nORM.Execution
+  href: nORM.html
+  name: nORM.Execution
+  nameWithType: nORM.Execution
+  fullName: nORM.Execution
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Execution
+    name: Execution
+    href: nORM.Execution.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Execution
+    name: Execution
+    href: nORM.Execution.html
+- uid: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  commentId: T:nORM.Execution.AdaptiveTimeoutManager.OperationType
+  parent: nORM.Execution
+  href: nORM.Execution.AdaptiveTimeoutManager.html
+  name: AdaptiveTimeoutManager.OperationType
+  nameWithType: AdaptiveTimeoutManager.OperationType
+  fullName: nORM.Execution.AdaptiveTimeoutManager.OperationType
+  spec.csharp:
+  - uid: nORM.Execution.AdaptiveTimeoutManager
+    name: AdaptiveTimeoutManager
+    href: nORM.Execution.AdaptiveTimeoutManager.html
+  - name: .
+  - uid: nORM.Execution.AdaptiveTimeoutManager.OperationType
+    name: OperationType
+    href: nORM.Execution.AdaptiveTimeoutManager.OperationType.html
+  spec.vb:
+  - uid: nORM.Execution.AdaptiveTimeoutManager
+    name: AdaptiveTimeoutManager
+    href: nORM.Execution.AdaptiveTimeoutManager.html
+  - name: .
+  - uid: nORM.Execution.AdaptiveTimeoutManager.OperationType
+    name: OperationType
+    href: nORM.Execution.AdaptiveTimeoutManager.OperationType.html

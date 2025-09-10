@@ -1,0 +1,2367 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class DbContext </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class DbContext ">
+    
+    
+      <link rel="shortcut icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../styles/docfx.css">
+      <link rel="stylesheet" href="../../styles/main.css">
+      <meta property="docfx:navrel" content="">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="nORM.Core.DbContext">
+
+
+
+  <h1 id="nORM_Core_DbContext" data-uid="nORM.Core.DbContext" class="text-break">Class DbContext</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><span class="xref">DbContext</span></div>
+  </div>
+  <div class="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="nORM.html">nORM</a>.<a class="xref" href="nORM.Core.html">Core</a></h6>
+  <h6><strong>Assembly</strong>: nORM.dll</h6>
+  <h5 id="nORM_Core_DbContext_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class DbContext : IDisposable, IAsyncDisposable</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+</h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext__ctor_System_Data_Common_DbConnection_nORM_Providers_DatabaseProvider_nORM_Configuration_DbContextOptions_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.%23ctor(System.Data.Common.DbConnection%2CnORM.Providers.DatabaseProvider%2CnORM.Configuration.DbContextOptions)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L49">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext__ctor_" data-uid="nORM.Core.DbContext.#ctor*"></a>
+  <h4 id="nORM_Core_DbContext__ctor_System_Data_Common_DbConnection_nORM_Providers_DatabaseProvider_nORM_Configuration_DbContextOptions_" data-uid="nORM.Core.DbContext.#ctor(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,nORM.Configuration.DbContextOptions)">DbContext(DbConnection, DatabaseProvider, DbContextOptions?)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection">DbConnection</a></td>
+        <td><span class="parametername">cn</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="nORM.Providers.DatabaseProvider.html">DatabaseProvider</a></td>
+        <td><span class="parametername">p</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="nORM.Configuration.DbContextOptions.html">DbContextOptions</a></td>
+        <td><span class="parametername">options</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext__ctor_System_String_nORM_Providers_DatabaseProvider_nORM_Configuration_DbContextOptions_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.%23ctor(System.String%2CnORM.Providers.DatabaseProvider%2CnORM.Configuration.DbContextOptions)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L78">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext__ctor_" data-uid="nORM.Core.DbContext.#ctor*"></a>
+  <h4 id="nORM_Core_DbContext__ctor_System_String_nORM_Providers_DatabaseProvider_nORM_Configuration_DbContextOptions_" data-uid="nORM.Core.DbContext.#ctor(System.String,nORM.Providers.DatabaseProvider,nORM.Configuration.DbContextOptions)">DbContext(string, DatabaseProvider, DbContextOptions?)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DbContext(string connectionString, DatabaseProvider p, DbContextOptions? options = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">connectionString</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="nORM.Providers.DatabaseProvider.html">DatabaseProvider</a></td>
+        <td><span class="parametername">p</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="nORM.Configuration.DbContextOptions.html">DbContextOptions</a></td>
+        <td><span class="parametername">options</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_ChangeTracker.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.ChangeTracker%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L47">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_ChangeTracker_" data-uid="nORM.Core.DbContext.ChangeTracker*"></a>
+  <h4 id="nORM_Core_DbContext_ChangeTracker" data-uid="nORM.Core.DbContext.ChangeTracker">ChangeTracker</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ChangeTracker ChangeTracker { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Core.ChangeTracker.html">ChangeTracker</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Connection.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Connection%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L173">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Connection_" data-uid="nORM.Core.DbContext.Connection*"></a>
+  <h4 id="nORM_Core_DbContext_Connection" data-uid="nORM.Core.DbContext.Connection">Connection</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DbConnection Connection { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection">DbConnection</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Database.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Database%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L48">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Database_" data-uid="nORM.Core.DbContext.Database*"></a>
+  <h4 id="nORM_Core_DbContext_Database" data-uid="nORM.Core.DbContext.Database">Database</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DatabaseFacade Database { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Core.DatabaseFacade.html">DatabaseFacade</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Options.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Options%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L46">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Options_" data-uid="nORM.Core.DbContext.Options*"></a>
+  <h4 id="nORM_Core_DbContext_Options" data-uid="nORM.Core.DbContext.Options">Options</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DbContextOptions Options { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Configuration.DbContextOptions.html">DbContextOptions</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Provider.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Provider%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L174">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Provider_" data-uid="nORM.Core.DbContext.Provider*"></a>
+  <h4 id="nORM_Core_DbContext_Provider" data-uid="nORM.Core.DbContext.Provider">Provider</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DatabaseProvider Provider { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Providers.DatabaseProvider.html">DatabaseProvider</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Add__1___0_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Add%60%601(%60%600)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L259">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Add_" data-uid="nORM.Core.DbContext.Add*"></a>
+  <h4 id="nORM_Core_DbContext_Add__1___0_" data-uid="nORM.Core.DbContext.Add``1(``0)">Add&lt;T&gt;(T)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public EntityEntry Add&lt;T&gt;(T entity) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">entity</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Core.EntityEntry.html">EntityEntry</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Attach__1___0_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Attach%60%601(%60%600)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L265">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Attach_" data-uid="nORM.Core.DbContext.Attach*"></a>
+  <h4 id="nORM_Core_DbContext_Attach__1___0_" data-uid="nORM.Core.DbContext.Attach``1(``0)">Attach&lt;T&gt;(T)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public EntityEntry Attach&lt;T&gt;(T entity) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">entity</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Core.EntityEntry.html">EntityEntry</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_BulkDeleteAsync__1_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.BulkDeleteAsync%60%601(System.Collections.Generic.IEnumerable%7B%60%600%7D%2CSystem.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L911">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_BulkDeleteAsync_" data-uid="nORM.Core.DbContext.BulkDeleteAsync*"></a>
+  <h4 id="nORM_Core_DbContext_BulkDeleteAsync__1_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.BulkDeleteAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)">BulkDeleteAsync&lt;T&gt;(IEnumerable&lt;T&gt;, CancellationToken)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; BulkDeleteAsync&lt;T&gt;(IEnumerable&lt;T&gt; entities, CancellationToken ct = default) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;T&gt;</td>
+        <td><span class="parametername">entities</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_BulkInsertAsync__1_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.BulkInsertAsync%60%601(System.Collections.Generic.IEnumerable%7B%60%600%7D%2CSystem.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L883">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_BulkInsertAsync_" data-uid="nORM.Core.DbContext.BulkInsertAsync*"></a>
+  <h4 id="nORM_Core_DbContext_BulkInsertAsync__1_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.BulkInsertAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)">BulkInsertAsync&lt;T&gt;(IEnumerable&lt;T&gt;, CancellationToken)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; BulkInsertAsync&lt;T&gt;(IEnumerable&lt;T&gt; entities, CancellationToken ct = default) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;T&gt;</td>
+        <td><span class="parametername">entities</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_BulkUpdateAsync__1_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.BulkUpdateAsync%60%601(System.Collections.Generic.IEnumerable%7B%60%600%7D%2CSystem.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L897">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_BulkUpdateAsync_" data-uid="nORM.Core.DbContext.BulkUpdateAsync*"></a>
+  <h4 id="nORM_Core_DbContext_BulkUpdateAsync__1_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.BulkUpdateAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)">BulkUpdateAsync&lt;T&gt;(IEnumerable&lt;T&gt;, CancellationToken)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; BulkUpdateAsync&lt;T&gt;(IEnumerable&lt;T&gt; entities, CancellationToken ct = default) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;T&gt;</td>
+        <td><span class="parametername">entities</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_CreateSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.CreateSavepointAsync(System.Data.Common.DbTransaction%2CSystem.String%2CSystem.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L937">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_CreateSavepointAsync_" data-uid="nORM.Core.DbContext.CreateSavepointAsync*"></a>
+  <h4 id="nORM_Core_DbContext_CreateSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)">CreateSavepointAsync(DbTransaction, string, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Creates a savepoint within the provided transaction. Savepoints allow portions of a
+transaction to be rolled back without affecting the entire transaction scope.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction">DbTransaction</a></td>
+        <td><span class="parametername">transaction</span></td>
+        <td><p>The active database transaction.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">name</span></td>
+        <td><p>Name of the savepoint to create.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td><p>Token used to cancel the asynchronous operation.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
+        <td><p>A task that completes when the savepoint has been created.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
+        <td><p>Thrown when <code class="paramref">transaction</code> is <code>null</code>.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></td>
+        <td><p>Thrown when <code class="paramref">name</code> is null or empty.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_CreateTagAsync_System_String_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.CreateTagAsync(System.String)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L1237">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_CreateTagAsync_" data-uid="nORM.Core.DbContext.CreateTagAsync*"></a>
+  <h4 id="nORM_Core_DbContext_CreateTagAsync_System_String_" data-uid="nORM.Core.DbContext.CreateTagAsync(System.String)">CreateTagAsync(string)</h4>
+  <div class="markdown level1 summary"><p>Creates a temporal tag entry in the database. Temporal tags can be used to
+correlate external events with the state of the database at a given time.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task CreateTagAsync(string tagName)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">tagName</span></td>
+        <td><p>The name of the tag to create.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
+        <td><p>A task representing the asynchronous operation.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_DeleteAsync__1___0_System_Data_Common_DbTransaction_System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.DeleteAsync%60%601(%60%600%2CSystem.Data.Common.DbTransaction%2CSystem.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L617">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_DeleteAsync_" data-uid="nORM.Core.DbContext.DeleteAsync*"></a>
+  <h4 id="nORM_Core_DbContext_DeleteAsync__1___0_System_Data_Common_DbTransaction_System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.DeleteAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)">DeleteAsync&lt;T&gt;(T, DbTransaction?, CancellationToken)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; DeleteAsync&lt;T&gt;(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">entity</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction">DbTransaction</a></td>
+        <td><span class="parametername">transaction</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_DeleteAsync__1___0_System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.DeleteAsync%60%601(%60%600%2CSystem.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L615">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_DeleteAsync_" data-uid="nORM.Core.DbContext.DeleteAsync*"></a>
+  <h4 id="nORM_Core_DbContext_DeleteAsync__1___0_System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.DeleteAsync``1(``0,System.Threading.CancellationToken)">DeleteAsync&lt;T&gt;(T, CancellationToken)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; DeleteAsync&lt;T&gt;(T entity, CancellationToken ct = default) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">entity</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Dispose.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Dispose%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L1341">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Dispose_" data-uid="nORM.Core.DbContext.Dispose*"></a>
+  <h4 id="nORM_Core_DbContext_Dispose" data-uid="nORM.Core.DbContext.Dispose">Dispose()</h4>
+  <div class="markdown level1 summary"><p>Releases all resources used by the context.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Dispose_System_Boolean_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Dispose(System.Boolean)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L1255">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Dispose_" data-uid="nORM.Core.DbContext.Dispose*"></a>
+  <h4 id="nORM_Core_DbContext_Dispose_System_Boolean_" data-uid="nORM.Core.DbContext.Dispose(System.Boolean)">Dispose(bool)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual void Dispose(bool disposing)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">disposing</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_DisposeAsync.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.DisposeAsync%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L1351">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_DisposeAsync_" data-uid="nORM.Core.DbContext.DisposeAsync*"></a>
+  <h4 id="nORM_Core_DbContext_DisposeAsync" data-uid="nORM.Core.DbContext.DisposeAsync">DisposeAsync()</h4>
+  <div class="markdown level1 summary"><p>Asynchronously releases all resources used by the context, including
+active connections and registered disposables.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td><p>A task representing the asynchronous dispose operation.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Entry_System_Object_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Entry(System.Object)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L290">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Entry_" data-uid="nORM.Core.DbContext.Entry*"></a>
+  <h4 id="nORM_Core_DbContext_Entry_System_Object_" data-uid="nORM.Core.DbContext.Entry(System.Object)">Entry(object)</h4>
+  <div class="markdown level1 summary"><p>Returns the <a class="xref" href="nORM.Core.EntityEntry.html">EntityEntry</a> for the supplied entity and ensures
+that lazy-loading proxies are wired up when supported. The entity is
+automatically attached to the change tracker in the <a class="xref" href="nORM.Core.EntityState.html#nORM_Core_EntityState_Unchanged">Unchanged</a>
+state.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public EntityEntry Entry(object entity)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
+        <td><span class="parametername">entity</span></td>
+        <td><p>The entity whose tracking entry is requested.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Core.EntityEntry.html">EntityEntry</a></td>
+        <td><p>An <a class="xref" href="nORM.Core.EntityEntry.html">EntityEntry</a> representing the entity's tracking information.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></td>
+        <td><p>Thrown when <code class="paramref">entity</code> is null or invalid.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_ExecuteStoredProcedureAsAsyncEnumerable__1_System_String_System_Threading_CancellationToken_System_Object_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable%60%601(System.String%2CSystem.Threading.CancellationToken%2CSystem.Object)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L1082">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_ExecuteStoredProcedureAsAsyncEnumerable_" data-uid="nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable*"></a>
+  <h4 id="nORM_Core_DbContext_ExecuteStoredProcedureAsAsyncEnumerable__1_System_String_System_Threading_CancellationToken_System_Object_" data-uid="nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object)">ExecuteStoredProcedureAsAsyncEnumerable&lt;T&gt;(string, CancellationToken, object?)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;T&gt; ExecuteStoredProcedureAsAsyncEnumerable&lt;T&gt;(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">procedureName</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
+        <td><span class="parametername">parameters</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_ExecuteStoredProcedureAsync__1_System_String_System_Threading_CancellationToken_System_Object_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.ExecuteStoredProcedureAsync%60%601(System.String%2CSystem.Threading.CancellationToken%2CSystem.Object)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L1040">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_ExecuteStoredProcedureAsync_" data-uid="nORM.Core.DbContext.ExecuteStoredProcedureAsync*"></a>
+  <h4 id="nORM_Core_DbContext_ExecuteStoredProcedureAsync__1_System_String_System_Threading_CancellationToken_System_Object_" data-uid="nORM.Core.DbContext.ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object)">ExecuteStoredProcedureAsync&lt;T&gt;(string, CancellationToken, object?)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;T&gt;&gt; ExecuteStoredProcedureAsync&lt;T&gt;(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">procedureName</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
+        <td><span class="parametername">parameters</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;T&gt;&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_ExecuteStoredProcedureWithOutputAsync__1_System_String_System_Threading_CancellationToken_System_Object_nORM_Core_OutputParameter___.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync%60%601(System.String%2CSystem.Threading.CancellationToken%2CSystem.Object%2CnORM.Core.OutputParameter%5B%5D)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L1126">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_ExecuteStoredProcedureWithOutputAsync_" data-uid="nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync*"></a>
+  <h4 id="nORM_Core_DbContext_ExecuteStoredProcedureWithOutputAsync__1_System_String_System_Threading_CancellationToken_System_Object_nORM_Core_OutputParameter___" data-uid="nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[])">ExecuteStoredProcedureWithOutputAsync&lt;T&gt;(string, CancellationToken, object?, params OutputParameter[])</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;StoredProcedureResult&lt;T&gt;&gt; ExecuteStoredProcedureWithOutputAsync&lt;T&gt;(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">procedureName</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
+        <td><span class="parametername">parameters</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="nORM.Core.OutputParameter.html">OutputParameter</a>[]</td>
+        <td><span class="parametername">outputParameters</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="nORM.Core.StoredProcedureResult-1.html">StoredProcedureResult</a>&lt;T&gt;&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_FromSqlRawAsync__1_System_String_System_Threading_CancellationToken_System_Object___.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.FromSqlRawAsync%60%601(System.String%2CSystem.Threading.CancellationToken%2CSystem.Object%5B%5D)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L1015">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_FromSqlRawAsync_" data-uid="nORM.Core.DbContext.FromSqlRawAsync*"></a>
+  <h4 id="nORM_Core_DbContext_FromSqlRawAsync__1_System_String_System_Threading_CancellationToken_System_Object___" data-uid="nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[])">FromSqlRawAsync&lt;T&gt;(string, CancellationToken, params object[])</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;T&gt;&gt; FromSqlRawAsync&lt;T&gt;(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">sql</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>[]</td>
+        <td><span class="parametername">parameters</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;T&gt;&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_GetShadowProperty_System_Object_System_String_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.GetShadowProperty(System.Object%2CSystem.String)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L1228">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_GetShadowProperty_" data-uid="nORM.Core.DbContext.GetShadowProperty*"></a>
+  <h4 id="nORM_Core_DbContext_GetShadowProperty_System_Object_System_String_" data-uid="nORM.Core.DbContext.GetShadowProperty(System.Object,System.String)">GetShadowProperty(object, string)</h4>
+  <div class="markdown level1 summary"><p>Retrieves the value of a shadow property from the specified entity.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public object? GetShadowProperty(object entity, string name)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
+        <td><span class="parametername">entity</span></td>
+        <td><p>The entity that owns the shadow property.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">name</span></td>
+        <td><p>The name of the shadow property to retrieve.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
+        <td><p>The current value of the shadow property, or <code>null</code> if not set.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_InsertAsync__1___0_System_Data_Common_DbTransaction_System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.InsertAsync%60%601(%60%600%2CSystem.Data.Common.DbTransaction%2CSystem.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L605">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_InsertAsync_" data-uid="nORM.Core.DbContext.InsertAsync*"></a>
+  <h4 id="nORM_Core_DbContext_InsertAsync__1___0_System_Data_Common_DbTransaction_System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.InsertAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)">InsertAsync&lt;T&gt;(T, DbTransaction?, CancellationToken)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; InsertAsync&lt;T&gt;(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">entity</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction">DbTransaction</a></td>
+        <td><span class="parametername">transaction</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_InsertAsync__1___0_System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.InsertAsync%60%601(%60%600%2CSystem.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L603">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_InsertAsync_" data-uid="nORM.Core.DbContext.InsertAsync*"></a>
+  <h4 id="nORM_Core_DbContext_InsertAsync__1___0_System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.InsertAsync``1(``0,System.Threading.CancellationToken)">InsertAsync&lt;T&gt;(T, CancellationToken)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; InsertAsync&lt;T&gt;(T entity, CancellationToken ct = default) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">entity</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_IsHealthyAsync_System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.IsHealthyAsync(System.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L193">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_IsHealthyAsync_" data-uid="nORM.Core.DbContext.IsHealthyAsync*"></a>
+  <h4 id="nORM_Core_DbContext_IsHealthyAsync_System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.IsHealthyAsync(System.Threading.CancellationToken)">IsHealthyAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Checks whether the database connection is healthy by executing a lightweight query.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; IsHealthyAsync(CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td><p>Token used to cancel the asynchronous operation.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</td>
+        <td><p><code>true</code> if the connection is healthy; otherwise <code>false</code>.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Query_System_String_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Query(System.String)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L243">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Query_" data-uid="nORM.Core.DbContext.Query*"></a>
+  <h4 id="nORM_Core_DbContext_Query_System_String_" data-uid="nORM.Core.DbContext.Query(System.String)">Query(string)</h4>
+  <div class="markdown level1 summary"><p>Creates an untyped <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.iqueryable">IQueryable</a> for the specified table name.
+This API is useful when working with tables or views that do not have a
+corresponding CLR type at compile time. A dynamic entity type is generated
+on-demand and cached so subsequent calls incur minimal overhead.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IQueryable Query(string tableName)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">tableName</span></td>
+        <td><p>Name of the table to query.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.iqueryable">IQueryable</a></td>
+        <td><p>An <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.iqueryable">IQueryable</a> that can be composed with LINQ operators.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></td>
+        <td><p>Thrown when <code class="paramref">tableName</code> is null or empty.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="nORM.Core.NormUsageException.html">NormUsageException</a></td>
+        <td><p>Thrown when the provided name contains invalid characters.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_QueryUnchangedAsync__1_System_String_System_Threading_CancellationToken_System_Object___.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.QueryUnchangedAsync%60%601(System.String%2CSystem.Threading.CancellationToken%2CSystem.Object%5B%5D)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L966">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_QueryUnchangedAsync_" data-uid="nORM.Core.DbContext.QueryUnchangedAsync*"></a>
+  <h4 id="nORM_Core_DbContext_QueryUnchangedAsync__1_System_String_System_Threading_CancellationToken_System_Object___" data-uid="nORM.Core.DbContext.QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[])">QueryUnchangedAsync&lt;T&gt;(string, CancellationToken, params object[])</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;T&gt;&gt; QueryUnchangedAsync&lt;T&gt;(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">sql</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>[]</td>
+        <td><span class="parametername">parameters</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;T&gt;&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_RegisterForDisposal_System_IDisposable_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.RegisterForDisposal(System.IDisposable)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L1326">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_RegisterForDisposal_" data-uid="nORM.Core.DbContext.RegisterForDisposal*"></a>
+  <h4 id="nORM_Core_DbContext_RegisterForDisposal_System_IDisposable_" data-uid="nORM.Core.DbContext.RegisterForDisposal(System.IDisposable)">RegisterForDisposal(IDisposable)</h4>
+  <div class="markdown level1 summary"><p>Registers an <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a> resource to be disposed when the context is disposed.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterForDisposal(IDisposable disposable)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></td>
+        <td><span class="parametername">disposable</span></td>
+        <td><p>The resource to track for disposal.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Remove__1___0_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Remove%60%601(%60%600)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L276">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Remove_" data-uid="nORM.Core.DbContext.Remove*"></a>
+  <h4 id="nORM_Core_DbContext_Remove__1___0_" data-uid="nORM.Core.DbContext.Remove``1(``0)">Remove&lt;T&gt;(T)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public EntityEntry Remove&lt;T&gt;(T entity) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">entity</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Core.EntityEntry.html">EntityEntry</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_RollbackToSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.RollbackToSavepointAsync(System.Data.Common.DbTransaction%2CSystem.String%2CSystem.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L955">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_RollbackToSavepointAsync_" data-uid="nORM.Core.DbContext.RollbackToSavepointAsync*"></a>
+  <h4 id="nORM_Core_DbContext_RollbackToSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)">RollbackToSavepointAsync(DbTransaction, string, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Rolls back the specified transaction to a previously created savepoint.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction">DbTransaction</a></td>
+        <td><span class="parametername">transaction</span></td>
+        <td><p>The active database transaction.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">name</span></td>
+        <td><p>Name of the savepoint to roll back to.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td><p>Token used to cancel the asynchronous operation.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
+        <td><p>A task that completes when the transaction has been rolled back to the savepoint.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
+        <td><p>Thrown when <code class="paramref">transaction</code> is <code>null</code>.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></td>
+        <td><p>Thrown when <code class="paramref">name</code> is null or empty.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_SaveChangesAsync_System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L322">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_SaveChangesAsync_" data-uid="nORM.Core.DbContext.SaveChangesAsync*"></a>
+  <h4 id="nORM_Core_DbContext_SaveChangesAsync_System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)">SaveChangesAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Persists all tracked changes to the database. The operation is executed
+using the configured retry policy which transparently retries transient
+failures such as deadlocks.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; SaveChangesAsync(CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td><p>Token used to cancel the asynchronous operation.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
+        <td><p>The total number of state entries written to the database.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_SetShadowProperty_System_Object_System_String_System_Object_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.SetShadowProperty(System.Object%2CSystem.String%2CSystem.Object)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L1219">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_SetShadowProperty_" data-uid="nORM.Core.DbContext.SetShadowProperty*"></a>
+  <h4 id="nORM_Core_DbContext_SetShadowProperty_System_Object_System_String_System_Object_" data-uid="nORM.Core.DbContext.SetShadowProperty(System.Object,System.String,System.Object)">SetShadowProperty(object, string, object?)</h4>
+  <div class="markdown level1 summary"><p>Sets the value of a shadow property for the specified entity instance.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SetShadowProperty(object entity, string name, object? value)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
+        <td><span class="parametername">entity</span></td>
+        <td><p>The entity that owns the shadow property.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">name</span></td>
+        <td><p>The name of the shadow property to set.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
+        <td><span class="parametername">value</span></td>
+        <td><p>The value to assign.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_UpdateAsync__1___0_System_Data_Common_DbTransaction_System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.UpdateAsync%60%601(%60%600%2CSystem.Data.Common.DbTransaction%2CSystem.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L613">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_UpdateAsync_" data-uid="nORM.Core.DbContext.UpdateAsync*"></a>
+  <h4 id="nORM_Core_DbContext_UpdateAsync__1___0_System_Data_Common_DbTransaction_System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.UpdateAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)">UpdateAsync&lt;T&gt;(T, DbTransaction?, CancellationToken)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; UpdateAsync&lt;T&gt;(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">entity</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction">DbTransaction</a></td>
+        <td><span class="parametername">transaction</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_UpdateAsync__1___0_System_Threading_CancellationToken_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.UpdateAsync%60%601(%60%600%2CSystem.Threading.CancellationToken)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L611">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_UpdateAsync_" data-uid="nORM.Core.DbContext.UpdateAsync*"></a>
+  <h4 id="nORM_Core_DbContext_UpdateAsync__1___0_System_Threading_CancellationToken_" data-uid="nORM.Core.DbContext.UpdateAsync``1(``0,System.Threading.CancellationToken)">UpdateAsync&lt;T&gt;(T, CancellationToken)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; UpdateAsync&lt;T&gt;(T entity, CancellationToken ct = default) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">entity</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_Update__1___0_.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.Update%60%601(%60%600)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L271">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_Update_" data-uid="nORM.Core.DbContext.Update*"></a>
+  <h4 id="nORM_Core_DbContext_Update__1___0_" data-uid="nORM.Core.DbContext.Update``1(``0)">Update&lt;T&gt;(T)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public EntityEntry Update&lt;T&gt;(T entity) where T : class</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">entity</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Core.EntityEntry.html">EntityEntry</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext_UseDeadlockResilientSaveChanges.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext.UseDeadlockResilientSaveChanges%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L304">View Source</a>
+  </span>
+  <a id="nORM_Core_DbContext_UseDeadlockResilientSaveChanges_" data-uid="nORM.Core.DbContext.UseDeadlockResilientSaveChanges*"></a>
+  <h4 id="nORM_Core_DbContext_UseDeadlockResilientSaveChanges" data-uid="nORM.Core.DbContext.UseDeadlockResilientSaveChanges">UseDeadlockResilientSaveChanges()</h4>
+  <div class="markdown level1 summary"><p>Configures the context to automatically retry failed <code>SaveChanges</code>
+operations when the database reports a deadlock (SQL Server error 1205).
+A default retry policy with exponential backoff is applied.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DbContextOptions UseDeadlockResilientSaveChanges()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Configuration.DbContextOptions.html">DbContextOptions</a></td>
+        <td><p>The current <a class="xref" href="nORM.Configuration.DbContextOptions.html">DbContextOptions</a> instance for fluent configuration.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
+  </div>
+  <h3 id="extensionmethods">Extension Methods</h3>
+  <div>
+      <a class="xref" href="nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_">NormQueryable.Query&lt;T&gt;(DbContext)</a>
+  </div>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_">NavigationPropertyExtensions.EnableLazyLoading&lt;T&gt;(T, DbContext)</a>
+  </div>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___">NavigationPropertyExtensions.IsLoaded&lt;T, TProperty&gt;(T, Expression&lt;Func&lt;T, TProperty?&gt;&gt;)</a>
+  </div>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_">NavigationPropertyExtensions.LoadAsync&lt;T, TProperty&gt;(T, Expression&lt;Func&lt;T, ICollection&lt;TProperty&gt;?&gt;&gt;, CancellationToken)</a>
+  </div>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_">NavigationPropertyExtensions.LoadAsync&lt;T, TProperty&gt;(T, Expression&lt;Func&lt;T, TProperty?&gt;&gt;, CancellationToken)</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Core_DbContext.md&amp;value=---%0Auid%3A%20nORM.Core.DbContext%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Edit this page</a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Core/DbContext.cs/#L29" class="contribution-link">View Source</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      
+      <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

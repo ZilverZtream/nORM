@@ -1,0 +1,37 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.SourceGeneration
+  commentId: N:nORM.SourceGeneration
+  id: nORM.SourceGeneration
+  children:
+  - nORM.SourceGeneration.CompileTimeQueryAttribute
+  - nORM.SourceGeneration.CompiledMaterializerStore
+  - nORM.SourceGeneration.GenerateMaterializerAttribute
+  langs:
+  - csharp
+  - vb
+  name: nORM.SourceGeneration
+  nameWithType: nORM.SourceGeneration
+  fullName: nORM.SourceGeneration
+  type: Namespace
+  assemblies:
+  - nORM
+references:
+- uid: nORM.SourceGeneration.CompiledMaterializerStore
+  commentId: T:nORM.SourceGeneration.CompiledMaterializerStore
+  href: nORM.SourceGeneration.CompiledMaterializerStore.html
+  name: CompiledMaterializerStore
+  nameWithType: CompiledMaterializerStore
+  fullName: nORM.SourceGeneration.CompiledMaterializerStore
+- uid: nORM.SourceGeneration.CompileTimeQueryAttribute
+  commentId: T:nORM.SourceGeneration.CompileTimeQueryAttribute
+  href: nORM.SourceGeneration.CompileTimeQueryAttribute.html
+  name: CompileTimeQueryAttribute
+  nameWithType: CompileTimeQueryAttribute
+  fullName: nORM.SourceGeneration.CompileTimeQueryAttribute
+- uid: nORM.SourceGeneration.GenerateMaterializerAttribute
+  commentId: T:nORM.SourceGeneration.GenerateMaterializerAttribute
+  href: nORM.SourceGeneration.GenerateMaterializerAttribute.html
+  name: GenerateMaterializerAttribute
+  nameWithType: GenerateMaterializerAttribute
+  fullName: nORM.SourceGeneration.GenerateMaterializerAttribute

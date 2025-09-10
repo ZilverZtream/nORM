@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class OptimizedSqlBuilder </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class OptimizedSqlBuilder ">
+    
+    <meta name="description" content="SQL builder that minimizes allocations by working directly with span-based operations over pooled character buffers.">
+      <link rel="shortcut icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../styles/docfx.css">
+      <link rel="stylesheet" href="../../styles/main.css">
+      <meta property="docfx:navrel" content="">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="nORM.Query.OptimizedSqlBuilder">
+
+
+
+  <h1 id="nORM_Query_OptimizedSqlBuilder" data-uid="nORM.Query.OptimizedSqlBuilder" class="text-break">Class OptimizedSqlBuilder</h1>
+  <div class="markdown level0 summary"><p>SQL builder that minimizes allocations by working directly with
+span-based operations over pooled character buffers.</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><span class="xref">OptimizedSqlBuilder</span></div>
+  </div>
+  <div class="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="nORM.html">nORM</a>.<a class="xref" href="nORM.Query.html">Query</a></h6>
+  <h6><strong>Assembly</strong>: nORM.dll</h6>
+  <h5 id="nORM_Query_OptimizedSqlBuilder_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class OptimizedSqlBuilder : IDisposable</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+</h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder__ctor.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.%23ctor%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L16">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder__ctor_" data-uid="nORM.Query.OptimizedSqlBuilder.#ctor*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder__ctor" data-uid="nORM.Query.OptimizedSqlBuilder.#ctor">OptimizedSqlBuilder()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder()</code></pre>
+  </div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder__ctor_System_Int32_.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.%23ctor(System.Int32)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L21">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder__ctor_" data-uid="nORM.Query.OptimizedSqlBuilder.#ctor*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder__ctor_System_Int32_" data-uid="nORM.Query.OptimizedSqlBuilder.#ctor(System.Int32)">OptimizedSqlBuilder(int)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder(int capacity)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">capacity</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_Length.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.Length%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L27">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_Length_" data-uid="nORM.Query.OptimizedSqlBuilder.Length*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_Length" data-uid="nORM.Query.OptimizedSqlBuilder.Length">Length</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int Length { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_Append_System_Char_.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.Append(System.Char)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L59">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_Append_" data-uid="nORM.Query.OptimizedSqlBuilder.Append*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_Append_System_Char_" data-uid="nORM.Query.OptimizedSqlBuilder.Append(System.Char)">Append(char)</h4>
+  <div class="markdown level1 summary"><p>Appends a single character to the builder.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder Append(char value)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.char">char</a></td>
+        <td><span class="parametername">value</span></td>
+        <td><p>The character to append.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Query.OptimizedSqlBuilder.html">OptimizedSqlBuilder</a></td>
+        <td><p>The current builder instance.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_Append_System_ReadOnlySpan_System_Char__.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.Append(System.ReadOnlySpan%7BSystem.Char%7D)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L46">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_Append_" data-uid="nORM.Query.OptimizedSqlBuilder.Append*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_Append_System_ReadOnlySpan_System_Char__" data-uid="nORM.Query.OptimizedSqlBuilder.Append(System.ReadOnlySpan{System.Char})">Append(ReadOnlySpan&lt;char&gt;)</h4>
+  <div class="markdown level1 summary"><p>Appends the specified span of characters to the builder.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder Append(ReadOnlySpan&lt;char&gt; value)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.char">char</a>&gt;</td>
+        <td><span class="parametername">value</span></td>
+        <td><p>The characters to append.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Query.OptimizedSqlBuilder.html">OptimizedSqlBuilder</a></td>
+        <td><p>The current builder instance.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_Append_System_String_.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.Append(System.String)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L34">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_Append_" data-uid="nORM.Query.OptimizedSqlBuilder.Append*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_Append_System_String_" data-uid="nORM.Query.OptimizedSqlBuilder.Append(System.String)">Append(string?)</h4>
+  <div class="markdown level1 summary"><p>Appends a string to the builder if the value is not <code>null</code>.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder Append(string? value)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">value</span></td>
+        <td><p>The string to append.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Query.OptimizedSqlBuilder.html">OptimizedSqlBuilder</a></td>
+        <td><p>The current builder instance.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_AppendAggregateFunction_System_ReadOnlySpan_System_Char__System_ReadOnlySpan_System_Char__.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction(System.ReadOnlySpan%7BSystem.Char%7D%2CSystem.ReadOnlySpan%7BSystem.Char%7D)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L92">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_AppendAggregateFunction_" data-uid="nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_AppendAggregateFunction_System_ReadOnlySpan_System_Char__System_ReadOnlySpan_System_Char__" data-uid="nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction(System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char})">AppendAggregateFunction(ReadOnlySpan&lt;char&gt;, ReadOnlySpan&lt;char&gt;)</h4>
+  <div class="markdown level1 summary"><p>Appends a SQL aggregate function invocation such as <code>COUNT(column)</code>.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder AppendAggregateFunction(ReadOnlySpan&lt;char&gt; function, ReadOnlySpan&lt;char&gt; column)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.char">char</a>&gt;</td>
+        <td><span class="parametername">function</span></td>
+        <td><p>Name of the aggregate function.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.char">char</a>&gt;</td>
+        <td><span class="parametername">column</span></td>
+        <td><p>Column to aggregate.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Query.OptimizedSqlBuilder.html">OptimizedSqlBuilder</a></td>
+        <td><p>The current builder instance.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_AppendFragment_System_String_.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.AppendFragment(System.String)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L71">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_AppendFragment_" data-uid="nORM.Query.OptimizedSqlBuilder.AppendFragment*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_AppendFragment_System_String_" data-uid="nORM.Query.OptimizedSqlBuilder.AppendFragment(System.String)">AppendFragment(string)</h4>
+  <div class="markdown level1 summary"><p>Appends a pre-constructed SQL fragment to the builder.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder AppendFragment(string value)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">value</span></td>
+        <td><p>The fragment to append.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Query.OptimizedSqlBuilder.html">OptimizedSqlBuilder</a></td>
+        <td><p>The current builder instance.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_AppendJoin_System_String_System_Collections_Generic_IEnumerable_System_String__.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.AppendJoin(System.String%2CSystem.Collections.Generic.IEnumerable%7BSystem.String%7D)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L122">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_AppendJoin_" data-uid="nORM.Query.OptimizedSqlBuilder.AppendJoin*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_AppendJoin_System_String_System_Collections_Generic_IEnumerable_System_String__" data-uid="nORM.Query.OptimizedSqlBuilder.AppendJoin(System.String,System.Collections.Generic.IEnumerable{System.String})">AppendJoin(string, IEnumerable&lt;string&gt;)</h4>
+  <div class="markdown level1 summary"><p>Appends a collection of values separated by the specified separator string.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder AppendJoin(string separator, IEnumerable&lt;string&gt; values)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">separator</span></td>
+        <td><p>Separator to insert between values.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</td>
+        <td><span class="parametername">values</span></td>
+        <td><p>Values to append.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Query.OptimizedSqlBuilder.html">OptimizedSqlBuilder</a></td>
+        <td><p>The current builder instance.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_AppendParameterizedValue_System_String_System_Object_System_Collections_Generic_IDictionary_System_String_System_Object__.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue(System.String%2CSystem.Object%2CSystem.Collections.Generic.IDictionary%7BSystem.String%2CSystem.Object%7D)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L109">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_AppendParameterizedValue_" data-uid="nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_AppendParameterizedValue_System_String_System_Object_System_Collections_Generic_IDictionary_System_String_System_Object__" data-uid="nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue(System.String,System.Object,System.Collections.Generic.IDictionary{System.String,System.Object})">AppendParameterizedValue(string, object?, IDictionary&lt;string, object&gt;)</h4>
+  <div class="markdown level1 summary"><p>Appends a parameter placeholder and stores its value in the supplied
+dictionary for later use when executing a command.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder AppendParameterizedValue(string paramName, object? value, IDictionary&lt;string, object&gt; parameters)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">paramName</span></td>
+        <td><p>The name of the parameter including prefix.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
+        <td><span class="parametername">value</span></td>
+        <td><p>The value to associate with the parameter.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2">IDictionary</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>&gt;</td>
+        <td><span class="parametername">parameters</span></td>
+        <td><p>Dictionary that collects parameter values.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Query.OptimizedSqlBuilder.html">OptimizedSqlBuilder</a></td>
+        <td><p>The current builder instance.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_AppendSelect_System_ReadOnlySpan_System_Char__.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.AppendSelect(System.ReadOnlySpan%7BSystem.Char%7D)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L78">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_AppendSelect_" data-uid="nORM.Query.OptimizedSqlBuilder.AppendSelect*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_AppendSelect_System_ReadOnlySpan_System_Char__" data-uid="nORM.Query.OptimizedSqlBuilder.AppendSelect(System.ReadOnlySpan{System.Char})">AppendSelect(ReadOnlySpan&lt;char&gt;)</h4>
+  <div class="markdown level1 summary"><p>Appends a <code>SELECT</code> keyword and the provided column list.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder AppendSelect(ReadOnlySpan&lt;char&gt; columns)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.char">char</a>&gt;</td>
+        <td><span class="parametername">columns</span></td>
+        <td><p>Columns to include in the <code>SELECT</code> clause.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Query.OptimizedSqlBuilder.html">OptimizedSqlBuilder</a></td>
+        <td><p>The current builder instance.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_Clear.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.Clear%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L170">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_Clear_" data-uid="nORM.Query.OptimizedSqlBuilder.Clear*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_Clear" data-uid="nORM.Query.OptimizedSqlBuilder.Clear">Clear()</h4>
+  <div class="markdown level1 summary"><p>Resets the builder, discarding all accumulated characters.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Clear()</code></pre>
+  </div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_Dispose.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.Dispose%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L194">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_Dispose_" data-uid="nORM.Query.OptimizedSqlBuilder.Dispose*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_Dispose" data-uid="nORM.Query.OptimizedSqlBuilder.Dispose">Dispose()</h4>
+  <div class="markdown level1 summary"><p>Returns the rented buffer to the pool.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_Insert_System_Int32_System_String_.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.Insert(System.Int32%2CSystem.String)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L157">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_Insert_" data-uid="nORM.Query.OptimizedSqlBuilder.Insert*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_Insert_System_Int32_System_String_" data-uid="nORM.Query.OptimizedSqlBuilder.Insert(System.Int32,System.String)">Insert(int, string)</h4>
+  <div class="markdown level1 summary"><p>Inserts the specified string at the given index within the builder.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder Insert(int index, string value)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">index</span></td>
+        <td><p>Position at which to insert the string.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">value</span></td>
+        <td><p>String to insert.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Query.OptimizedSqlBuilder.html">OptimizedSqlBuilder</a></td>
+        <td><p>The current builder instance.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_Remove_System_Int32_System_Int32_.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.Remove(System.Int32%2CSystem.Int32)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L143">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_Remove_" data-uid="nORM.Query.OptimizedSqlBuilder.Remove*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_Remove_System_Int32_System_Int32_" data-uid="nORM.Query.OptimizedSqlBuilder.Remove(System.Int32,System.Int32)">Remove(int, int)</h4>
+  <div class="markdown level1 summary"><p>Removes a range of characters from the builder.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder Remove(int startIndex, int length)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">startIndex</span></td>
+        <td><p>The starting index of the range to remove.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">length</span></td>
+        <td><p>The number of characters to remove.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Query.OptimizedSqlBuilder.html">OptimizedSqlBuilder</a></td>
+        <td><p>The current builder instance.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_Reserve_System_Int32_.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.Reserve(System.Int32)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L226">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_Reserve_" data-uid="nORM.Query.OptimizedSqlBuilder.Reserve*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_Reserve_System_Int32_" data-uid="nORM.Query.OptimizedSqlBuilder.Reserve(System.Int32)">Reserve(int)</h4>
+  <div class="markdown level1 summary"><p>Reserves additional capacity in the underlying buffer to reduce future
+reallocations when appending large amounts of data.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public OptimizedSqlBuilder Reserve(int additionalCapacity)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">additionalCapacity</span></td>
+        <td><p>The number of extra characters to reserve space for.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="nORM.Query.OptimizedSqlBuilder.html">OptimizedSqlBuilder</a></td>
+        <td><p>The current builder instance.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_ToSqlString.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.ToSqlString%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L176">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_ToSqlString_" data-uid="nORM.Query.OptimizedSqlBuilder.ToSqlString*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_ToSqlString" data-uid="nORM.Query.OptimizedSqlBuilder.ToSqlString">ToSqlString()</h4>
+  <div class="markdown level1 summary"><p>Creates a <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a> from the current contents of the buffer.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string ToSqlString()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><p>The SQL text represented by this builder.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_ToString.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.ToString%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L189">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_ToString_" data-uid="nORM.Query.OptimizedSqlBuilder.ToString*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_ToString" data-uid="nORM.Query.OptimizedSqlBuilder.ToString">ToString()</h4>
+  <div class="markdown level1 summary"><p>Returns the complete SQL string represented by the builder.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override string ToString()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a></div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder_ToString_System_Int32_System_Int32_.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder.ToString(System.Int32%2CSystem.Int32)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L184">View Source</a>
+  </span>
+  <a id="nORM_Query_OptimizedSqlBuilder_ToString_" data-uid="nORM.Query.OptimizedSqlBuilder.ToString*"></a>
+  <h4 id="nORM_Query_OptimizedSqlBuilder_ToString_System_Int32_System_Int32_" data-uid="nORM.Query.OptimizedSqlBuilder.ToString(System.Int32,System.Int32)">ToString(int, int)</h4>
+  <div class="markdown level1 summary"><p>Converts a subset of the internal buffer to a <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string ToString(int startIndex, int length)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">startIndex</span></td>
+        <td><p>Index in the buffer at which to start.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">length</span></td>
+        <td><p>Number of characters to include.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><p>The specified substring.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
+  </div>
+  <h3 id="extensionmethods">Extension Methods</h3>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_">NavigationPropertyExtensions.EnableLazyLoading&lt;T&gt;(T, DbContext)</a>
+  </div>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___">NavigationPropertyExtensions.IsLoaded&lt;T, TProperty&gt;(T, Expression&lt;Func&lt;T, TProperty?&gt;&gt;)</a>
+  </div>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_">NavigationPropertyExtensions.LoadAsync&lt;T, TProperty&gt;(T, Expression&lt;Func&lt;T, ICollection&lt;TProperty&gt;?&gt;&gt;, CancellationToken)</a>
+  </div>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_">NavigationPropertyExtensions.LoadAsync&lt;T, TProperty&gt;(T, Expression&lt;Func&lt;T, TProperty?&gt;&gt;, CancellationToken)</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Query_OptimizedSqlBuilder.md&amp;value=---%0Auid%3A%20nORM.Query.OptimizedSqlBuilder%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Edit this page</a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Query/OptimizedSqlBuilder.cs/#L11" class="contribution-link">View Source</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      
+      <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

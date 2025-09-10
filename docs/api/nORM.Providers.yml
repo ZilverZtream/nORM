@@ -1,0 +1,130 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Providers
+  commentId: N:nORM.Providers
+  id: nORM.Providers
+  children:
+  - nORM.Providers.BulkOperationProvider
+  - nORM.Providers.DatabaseProvider
+  - nORM.Providers.DynamicBatchSizer
+  - nORM.Providers.DynamicBatchSizer.BatchSizingResult
+  - nORM.Providers.IDbParameterFactory
+  - nORM.Providers.IFastProvider
+  - nORM.Providers.MySqlProvider
+  - nORM.Providers.PostgresProvider
+  - nORM.Providers.SqlServerProvider
+  - nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: nORM.Providers
+  nameWithType: nORM.Providers
+  fullName: nORM.Providers
+  type: Namespace
+  assemblies:
+  - nORM
+references:
+- uid: nORM.Providers.BulkOperationProvider
+  commentId: T:nORM.Providers.BulkOperationProvider
+  parent: nORM.Providers
+  href: nORM.Providers.BulkOperationProvider.html
+  name: BulkOperationProvider
+  nameWithType: BulkOperationProvider
+  fullName: nORM.Providers.BulkOperationProvider
+- uid: nORM.Providers.DatabaseProvider
+  commentId: T:nORM.Providers.DatabaseProvider
+  parent: nORM.Providers
+  href: nORM.Providers.DatabaseProvider.html
+  name: DatabaseProvider
+  nameWithType: DatabaseProvider
+  fullName: nORM.Providers.DatabaseProvider
+- uid: nORM.Providers.DynamicBatchSizer
+  commentId: T:nORM.Providers.DynamicBatchSizer
+  parent: nORM.Providers
+  href: nORM.Providers.DynamicBatchSizer.html
+  name: DynamicBatchSizer
+  nameWithType: DynamicBatchSizer
+  fullName: nORM.Providers.DynamicBatchSizer
+- uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+  commentId: T:nORM.Providers.DynamicBatchSizer.BatchSizingResult
+  parent: nORM.Providers
+  href: nORM.Providers.DynamicBatchSizer.html
+  name: DynamicBatchSizer.BatchSizingResult
+  nameWithType: DynamicBatchSizer.BatchSizingResult
+  fullName: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+  spec.csharp:
+  - uid: nORM.Providers.DynamicBatchSizer
+    name: DynamicBatchSizer
+    href: nORM.Providers.DynamicBatchSizer.html
+  - name: .
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+  spec.vb:
+  - uid: nORM.Providers.DynamicBatchSizer
+    name: DynamicBatchSizer
+    href: nORM.Providers.DynamicBatchSizer.html
+  - name: .
+  - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult
+    name: BatchSizingResult
+    href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html
+- uid: nORM.Providers.IDbParameterFactory
+  commentId: T:nORM.Providers.IDbParameterFactory
+  parent: nORM.Providers
+  href: nORM.Providers.IDbParameterFactory.html
+  name: IDbParameterFactory
+  nameWithType: IDbParameterFactory
+  fullName: nORM.Providers.IDbParameterFactory
+- uid: nORM.Providers.IFastProvider
+  commentId: T:nORM.Providers.IFastProvider
+  parent: nORM.Providers
+  href: nORM.Providers.IFastProvider.html
+  name: IFastProvider
+  nameWithType: IFastProvider
+  fullName: nORM.Providers.IFastProvider
+- uid: nORM.Providers.MySqlProvider
+  commentId: T:nORM.Providers.MySqlProvider
+  href: nORM.Providers.MySqlProvider.html
+  name: MySqlProvider
+  nameWithType: MySqlProvider
+  fullName: nORM.Providers.MySqlProvider
+- uid: nORM.Providers.PostgresProvider
+  commentId: T:nORM.Providers.PostgresProvider
+  href: nORM.Providers.PostgresProvider.html
+  name: PostgresProvider
+  nameWithType: PostgresProvider
+  fullName: nORM.Providers.PostgresProvider
+- uid: nORM.Providers.SqliteProvider
+  commentId: T:nORM.Providers.SqliteProvider
+  href: nORM.Providers.SqliteProvider.html
+  name: SqliteProvider
+  nameWithType: SqliteProvider
+  fullName: nORM.Providers.SqliteProvider
+- uid: nORM.Providers.SqlServerProvider
+  commentId: T:nORM.Providers.SqlServerProvider
+  href: nORM.Providers.SqlServerProvider.html
+  name: SqlServerProvider
+  nameWithType: SqlServerProvider
+  fullName: nORM.Providers.SqlServerProvider
+- uid: nORM.Providers
+  commentId: N:nORM.Providers
+  href: nORM.html
+  name: nORM.Providers
+  nameWithType: nORM.Providers
+  fullName: nORM.Providers
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
