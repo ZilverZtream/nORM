@@ -18,18 +18,31 @@ using System.Globalization;
 
 namespace nORM.Providers
 {
+    /// <summary>
+    /// Database provider implementation for Microsoft SQL Server.
+    /// Responsible for dialect translation, bulk operations and temporal table support.
+    /// </summary>
     public sealed class SqlServerProvider : BulkOperationProvider
     {
         private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: 100);
         public override int MaxSqlLength => 8_000;
         public override int MaxParameters => 2_100;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Escapes an identifier such as a table or column name using SQL Server brackets.
+        /// </summary>
+        /// <param name="id">The identifier to escape.</param>
+        /// <returns>The escaped identifier.</returns>
         public override string Escape(string id) => $"[{id}]";
 
         /// <summary>
         /// Adds SQL Server paging clauses to the SQL builder using <c>OFFSET</c> and <c>FETCH</c>.
         /// </summary>
+        /// <param name="sb">The SQL builder to append to.</param>
+        /// <param name="limit">Maximum number of rows to return.</param>
+        /// <param name="offset">Number of rows to skip before starting to return rows.</param>
+        /// <param name="limitParameterName">Parameter name for the limit value.</param>
+        /// <param name="offsetParameterName">Parameter name for the offset value.</param>
         public override void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
         {
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
@@ -51,17 +64,27 @@ namespace nORM.Providers
         /// <summary>
         /// Returns SQL for retrieving the last identity value generated in the current scope.
         /// </summary>
+        /// <param name="m">The table mapping for which an insert occurred.</param>
+        /// <returns>SQL fragment appended after the insert to obtain the identity value.</returns>
         public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT SCOPE_IDENTITY();";
 
         /// <summary>
         /// Creates a SQL Server specific <see cref="DbParameter"/> instance.
         /// </summary>
+        /// <param name="name">Parameter name including prefix.</param>
+        /// <param name="value">Value to assign to the parameter; <c>null</c> becomes <see cref="DBNull.Value"/>.</param>
+        /// <returns>A configured <see cref="SqlParameter"/>.</returns>
         public override System.Data.Common.DbParameter CreateParameter(string name, object? value)
         {
             var param = new SqlParameter(name, value ?? DBNull.Value);
             return param;
         }
 
+        /// <summary>
+        /// Escapes special characters in a pattern used with SQL Server's <c>LIKE</c> operator.
+        /// </summary>
+        /// <param name="value">The pattern to escape.</param>
+        /// <returns>The escaped pattern.</returns>
         public override string EscapeLikePattern(string value)
         {
             var escaped = base.EscapeLikePattern(value);
@@ -75,6 +98,10 @@ namespace nORM.Providers
         /// <summary>
         /// Translates a subset of .NET methods into their SQL Server equivalents.
         /// </summary>
+        /// <param name="name">Name of the method being translated.</param>
+        /// <param name="declaringType">Type that defines the method.</param>
+        /// <param name="args">SQL representations of the method arguments.</param>
+        /// <returns>The SQL translation or <c>null</c> if unsupported.</returns>
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)
         {
             if (declaringType == typeof(string))
@@ -121,9 +148,19 @@ namespace nORM.Providers
         /// <summary>
         /// Translates a JSON value access expression using SQL Server's <c>JSON_VALUE</c> function.
         /// </summary>
+        /// <param name="columnName">The JSON column to access.</param>
+        /// <param name="jsonPath">JSON path pointing to the desired element.</param>
+        /// <returns>SQL fragment that retrieves the JSON value.</returns>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
             => $"JSON_VALUE({columnName}, '{jsonPath}')";
 
+        /// <summary>
+        /// Builds a <c>STRING_SPLIT</c> based containment clause for SQL Server.
+        /// </summary>
+        /// <param name="cmd">Command to which the parameter is added.</param>
+        /// <param name="columnName">Column to search within.</param>
+        /// <param name="values">Values to test for membership.</param>
+        /// <returns>SQL fragment implementing the containment test.</returns>
         public override string BuildContainsClause(DbCommand cmd, string columnName, IReadOnlyList<object?> values)
         {
             var pName = ParamPrefix + "p0";
@@ -135,6 +172,8 @@ namespace nORM.Providers
         /// <summary>
         /// Generates SQL to create a history table used for temporal tracking.
         /// </summary>
+        /// <param name="mapping">The mapping describing the entity table.</param>
+        /// <returns>DDL statement that creates the history table.</returns>
         public override string GenerateCreateHistoryTableSql(TableMapping mapping)
         {
             var historyTable = Escape(mapping.TableName + "_History");
@@ -153,6 +192,8 @@ CREATE TABLE {historyTable} (
         /// <summary>
         /// Generates SQL Server triggers that maintain the temporal history table.
         /// </summary>
+        /// <param name="mapping">The mapping describing the target table.</param>
+        /// <returns>DDL statements creating the temporal triggers.</returns>
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
         {
             var table = Escape(mapping.TableName);

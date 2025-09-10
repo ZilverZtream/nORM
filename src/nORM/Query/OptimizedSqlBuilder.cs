@@ -107,14 +107,33 @@ namespace nORM.Query
             return this;
         }
 
+        /// <summary>
+        /// Resets the builder, discarding all accumulated characters.
+        /// </summary>
         public void Clear() => _position = 0;
 
+        /// <summary>
+        /// Creates a <see cref="string"/> from the current contents of the buffer.
+        /// </summary>
+        /// <returns>The SQL text represented by this builder.</returns>
         public string ToSqlString() => new string(_buffer, 0, _position);
 
+        /// <summary>
+        /// Converts a subset of the internal buffer to a <see cref="string"/>.
+        /// </summary>
+        /// <param name="startIndex">Index in the buffer at which to start.</param>
+        /// <param name="length">Number of characters to include.</param>
+        /// <returns>The specified substring.</returns>
         public string ToString(int startIndex, int length) => new string(_buffer, startIndex, length);
 
+        /// <summary>
+        /// Returns the complete SQL string represented by the builder.
+        /// </summary>
         public override string ToString() => ToSqlString();
 
+        /// <summary>
+        /// Returns the rented buffer to the pool.
+        /// </summary>
         public void Dispose()
         {
             var buffer = _buffer;
