@@ -58,6 +58,13 @@ namespace nORM.Navigation
             _ = Task.Run(async () => { try { await ProcessBatchAsync().ConfigureAwait(false); } finally { Volatile.Write(ref _processing, 0); } });
         }
 
+        /// <summary>
+        /// Processes all currently queued navigation load requests as a single batch. The method
+        /// collects the pending loads, clears the queue and dispatches each group of entities and
+        /// navigation property to <see cref="LoadNavigationBatchAsync"/>. A semaphore is used to
+        /// ensure that only one batch is processed at a time, preventing concurrent access to the
+        /// internal dictionaries.
+        /// </summary>
         private async Task ProcessBatchAsync()
         {
             await _batchSemaphore.WaitAsync().ConfigureAwait(false);
@@ -116,6 +123,14 @@ namespace nORM.Navigation
             }
         }
 
+        /// <summary>
+        /// Loads all related entities for the supplied foreign key values in a single query. The
+        /// method constructs an efficient <c>WHERE IN</c> clause using the provider's facilities
+        /// and materializes each record into an entity tracked by the current <see cref="DbContext"/>.
+        /// </summary>
+        /// <param name="relation">Metadata describing the relationship being loaded.</param>
+        /// <param name="keys">The set of principal key values to retrieve related entities for.</param>
+        /// <returns>A list containing the materialized dependent entities.</returns>
         private async Task<List<object>> LoadRelatedDataBatch(TableMapping.Relation relation, List<object?> keys)
         {
             var mapping = _context.GetMapping(relation.DependentType);

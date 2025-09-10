@@ -143,12 +143,18 @@ namespace nORM.Migration
             => _context != null ? cmd.ExecuteNonQueryWithInterceptionAsync(_context, ct) : cmd.ExecuteNonQueryAsync(ct);
 
         /// <summary>
-        /// Executes a reader command, optionally routing through interceptors when a context is available.
+        /// Executes the specified command expecting a result set and returns the corresponding
+        /// <see cref="DbDataReader"/>. When the runner was created with <see cref="DbContextOptions"/>
+        /// containing command interceptors, the command is executed through the interception
+        /// pipeline so that logging, diagnostics and other cross‑cutting concerns are honored.
+        /// Otherwise the command is executed directly against the underlying connection.
         /// </summary>
-        /// <param name="cmd">The command to execute.</param>
+        /// <param name="cmd">The fully prepared <see cref="DbCommand"/> to execute.</param>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
-        /// <returns>A <see cref="DbDataReader"/> containing the results.</returns>
+        /// <returns>A task whose result is the <see cref="DbDataReader"/> produced by the command.</returns>
         private Task<DbDataReader> ExecuteReaderAsync(DbCommand cmd, CancellationToken ct)
-            => _context != null ? cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct) : cmd.ExecuteReaderAsync(ct);
+            => _context != null
+                ? cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct)
+                : cmd.ExecuteReaderAsync(ct);
     }
 }

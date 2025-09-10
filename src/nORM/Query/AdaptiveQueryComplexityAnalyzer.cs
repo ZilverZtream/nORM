@@ -38,6 +38,14 @@ namespace nORM.Query
             public int MaxEstimatedCost { get; init; }
             public int HighCostThreshold { get; init; }
         }
+        /// <summary>
+        /// Performs a complexity analysis for the specified query expression and adapts the
+        /// permissible limits based on current system resources and configured options. Results
+        /// are cached using an expression fingerprint so repeated analyses are inexpensive.
+        /// </summary>
+        /// <param name="query">The expression tree representing the query to analyze.</param>
+        /// <param name="options">Context options influencing the adaptive limits.</param>
+        /// <returns>Detailed information about the query's complexity characteristics.</returns>
         public QueryComplexityInfo AnalyzeQuery(Expression query, DbContextOptions options)
         {
             if (query is null) throw new ArgumentNullException(nameof(query));
@@ -143,6 +151,11 @@ namespace nORM.Query
             private readonly QueryComplexityInfo _complexity = new();
             private readonly HashSet<Type> _joinedTypes = new();
             private int _nestedSelectDepth;
+            /// <summary>
+            /// Finalizes the collected statistics and returns an immutable snapshot describing the
+            /// complexity of the visited expression tree.
+            /// </summary>
+            /// <returns>An instance of <see cref="QueryComplexityInfo"/> containing the metrics.</returns>
             public QueryComplexityInfo GetComplexityInfo()
             {
                 _complexity.EstimatedCost = CalculateEstimatedCost();
@@ -258,6 +271,10 @@ namespace nORM.Query
                 return queryableInterface?.GetGenericArguments()[0] ?? typeof(object);
             }
         }
+        /// <summary>
+        /// Releases resources held by the analyzer. The current implementation is stateless but
+        /// the method is provided for future extensibility and to conform to <see cref="IDisposable"/>.
+        /// </summary>
         public void Dispose()
         {
         }
