@@ -162,6 +162,9 @@ namespace nORM.Navigation
             }
         }
 
+        /// <summary>
+        /// Releases resources used by the loader and unregisters it from the navigation system.
+        /// </summary>
         public void Dispose()
         {
             NavigationPropertyExtensions.UnregisterLoader(this);
