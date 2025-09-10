@@ -97,6 +97,11 @@ namespace nORM.Core
         public IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default)
             => ((NormQueryProvider)Provider).AsAsyncEnumerable<T>(Expression, ct);
 
+        /// <summary>
+        /// Executes the query and materializes the results into a <see cref="List{T}"/> asynchronously.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A task containing the resulting list of entities.</returns>
         public Task<List<T>> ToListAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<List<T>>(Expression, ct);
         public async Task<T[]> ToArrayAsync(CancellationToken ct = default) => (await ToListAsync(ct).ConfigureAwait(false)).ToArray();
         public Task<int> CountAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<int>(Expression.Call(typeof(Queryable), nameof(Queryable.Count), new[] { typeof(T) }, Expression), ct);

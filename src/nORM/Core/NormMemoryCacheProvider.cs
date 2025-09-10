@@ -58,6 +58,10 @@ namespace nORM.Core
             _cache.Set(key, value, options);
         }
 
+        /// <summary>
+        /// Invalidates all cache entries associated with the specified tag.
+        /// </summary>
+        /// <param name="tag">Tag identifying the cached items to invalidate.</param>
         public void InvalidateTag(string tag)
         {
             var qualified = QualifyTag(tag);
@@ -68,6 +72,9 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Releases resources held by the memory cache.
+        /// </summary>
         public void Dispose() => _cache.Dispose();
     }
 }
