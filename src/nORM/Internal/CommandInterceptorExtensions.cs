@@ -13,6 +13,14 @@ namespace nORM.Internal
 {
     internal static class CommandInterceptorExtensions
     {
+        /// <summary>
+        /// Executes <see cref="DbCommand.ExecuteNonQueryAsync"/> while invoking any registered
+        /// command interceptors before and after execution.
+        /// </summary>
+        /// <param name="command">The database command to execute.</param>
+        /// <param name="ctx">The current <see cref="DbContext"/>.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The number of rows affected.</returns>
         public static async Task<int> ExecuteNonQueryWithInterceptionAsync(this DbCommand command, DbContext ctx, CancellationToken ct)
         {
             var interceptors = ctx.Options.CommandInterceptors;
@@ -95,6 +103,14 @@ namespace nORM.Internal
             }
         }
 
+        /// <summary>
+        /// Executes <see cref="DbCommand.ExecuteScalarAsync"/> while invoking registered
+        /// command interceptors surrounding the call.
+        /// </summary>
+        /// <param name="command">The command to execute.</param>
+        /// <param name="ctx">The current <see cref="DbContext"/>.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The scalar result returned by the command.</returns>
         public static async Task<object?> ExecuteScalarWithInterceptionAsync(this DbCommand command, DbContext ctx, CancellationToken ct)
         {
             var interceptors = ctx.Options.CommandInterceptors;
@@ -177,6 +193,15 @@ namespace nORM.Internal
             }
         }
 
+        /// <summary>
+        /// Executes <see cref="DbCommand.ExecuteReaderAsync(CommandBehavior, CancellationToken)"/>
+        /// while invoking registered command interceptors around the execution.
+        /// </summary>
+        /// <param name="command">The command to execute.</param>
+        /// <param name="ctx">The current <see cref="DbContext"/>.</param>
+        /// <param name="behavior">Reader behavior flags.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The resulting <see cref="DbDataReader"/>.</returns>
         public static async Task<DbDataReader> ExecuteReaderWithInterceptionAsync(this DbCommand command, DbContext ctx, CommandBehavior behavior, CancellationToken ct)
         {
             var interceptors = ctx.Options.CommandInterceptors;
