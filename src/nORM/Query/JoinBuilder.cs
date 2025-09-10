@@ -79,6 +79,16 @@ namespace nORM.Query
             }
         }
 
+        /// <summary>
+        /// Determines the minimal set of column projections required to satisfy
+        /// a specified projection expression when performing a join.
+        /// </summary>
+        /// <param name="newExpr">The <see cref="NewExpression"/> representing the projection.</param>
+        /// <param name="outerMapping">Mapping information for the outer table.</param>
+        /// <param name="innerMapping">Mapping information for the inner table.</param>
+        /// <param name="outerAlias">Alias used for the outer table in the SQL query.</param>
+        /// <param name="innerAlias">Alias used for the inner table in the SQL query.</param>
+        /// <returns>A list of fully-qualified column names that must be selected.</returns>
         public static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
         {
             var neededColumns = new List<string>();

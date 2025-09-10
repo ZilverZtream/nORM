@@ -47,8 +47,18 @@ internal static class FastExpressionVisitorPool
 {
     private sealed class VisitorPolicy : PooledObjectPolicy<ExpressionToSqlVisitor>
     {
+        /// <summary>
+        /// Creates a new <see cref="ExpressionToSqlVisitor"/> instance when the
+        /// pool requires additional objects.
+        /// </summary>
+        /// <returns>A freshly instantiated visitor ready for initialization.</returns>
         public override ExpressionToSqlVisitor Create() => new();
 
+        /// <summary>
+        /// Resets a visitor before it is returned to the pool for reuse.
+        /// </summary>
+        /// <param name="obj">The visitor being returned.</param>
+        /// <returns>Always <c>true</c> to indicate the object may be reused.</returns>
         public override bool Return(ExpressionToSqlVisitor obj)
         {
             obj.Reset();
@@ -61,6 +71,12 @@ internal static class FastExpressionVisitorPool
 
     private static readonly ConcurrentDictionary<MemberInfo, Delegate> _memberAccessorCache = new();
 
+    /// <summary>
+    /// Obtains a visitor from the pool and initializes it with the supplied
+    /// context.
+    /// </summary>
+    /// <param name="context">Configuration used to initialize the visitor.</param>
+    /// <returns>An <see cref="ExpressionToSqlVisitor"/> instance ready for use.</returns>
     public static ExpressionToSqlVisitor Get(in VisitorContext context)
     {
         var visitor = _pool.Get();
@@ -68,12 +84,25 @@ internal static class FastExpressionVisitorPool
         return visitor;
     }
 
+    /// <summary>
+    /// Returns a visitor to the pool after resetting its internal state.
+    /// </summary>
+    /// <param name="visitor">The visitor to recycle.</param>
     public static void Return(ExpressionToSqlVisitor visitor)
     {
         visitor.FastReset();
         _pool.Return(visitor);
     }
 
+    /// <summary>
+    /// Retrieves the value of a field or property using a cached delegate for
+    /// optimal performance.
+    /// </summary>
+    /// <param name="member">The member whose value should be read.</param>
+    /// <param name="instance">The object instance to read from; <c>null</c> for
+    /// static members.</param>
+    /// <returns>The boxed member value or <c>null</c> if the member cannot be
+    /// evaluated.</returns>
     public static object? GetMemberValue(MemberInfo member, object? instance)
     {
         if (!_memberAccessorCache.TryGetValue(member, out var del))

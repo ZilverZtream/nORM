@@ -612,6 +612,20 @@ namespace nORM.Query
             }
             return GetElementType(source);
         }
+        /// <summary>
+        /// Retrieves the parameter dictionary that has been populated while
+        /// translating an expression tree to its SQL representation.
+        /// </summary>
+        /// <remarks>
+        /// The returned dictionary contains parameter names and values that are
+        /// emitted during translation.  The caller can reuse this collection when
+        /// executing the generated SQL.
+        /// </remarks>
+        /// <returns>
+        /// A reference to the internal dictionary of SQL parameters.  The
+        /// contents should be treated as read-only by callers to avoid
+        /// interfering with further translations.
+        /// </returns>
         public Dictionary<string, object> GetParameters() => _params;
         private string GetSql(Expression expression)
         {
@@ -731,8 +745,28 @@ namespace nORM.Query
         }
         private sealed class ContainsTranslator : IMethodTranslator
         {
+            /// <summary>
+            /// Determines whether the supplied <see cref="MethodCallExpression"/>
+            /// represents a string <c>Contains</c> call that can be translated to
+            /// a SQL <c>LIKE</c> expression.
+            /// </summary>
+            /// <param name="node">The expression to inspect.</param>
+            /// <returns>
+            /// <c>true</c> if the method call is <c>string.Contains</c> with a
+            /// single argument; otherwise, <c>false</c>.
+            /// </returns>
             public bool CanTranslate(MethodCallExpression node)
                 => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
+
+            /// <summary>
+            /// Converts a <c>string.Contains</c> call into a SQL <c>LIKE</c>
+            /// expression and appends it to the visitor's SQL buffer.
+            /// </summary>
+            /// <param name="visitor">The visitor responsible for building the SQL.</param>
+            /// <param name="node">The method call expression to translate.</param>
+            /// <exception cref="NotSupportedException">
+            /// Thrown when the <c>Contains</c> argument is not a constant string.
+            /// </exception>
             public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
             {
                 visitor.Visit(node.Object!);
@@ -751,8 +785,27 @@ namespace nORM.Query
         }
         private sealed class StartsWithTranslator : IMethodTranslator
         {
+            /// <summary>
+            /// Determines whether the given expression is a translatable
+            /// <c>string.StartsWith</c> invocation.
+            /// </summary>
+            /// <param name="node">The method call expression to examine.</param>
+            /// <returns>
+            /// <c>true</c> when the method is <c>string.StartsWith</c> with one
+            /// argument; otherwise, <c>false</c>.
+            /// </returns>
             public bool CanTranslate(MethodCallExpression node)
                 => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
+
+            /// <summary>
+            /// Writes a SQL <c>LIKE</c> clause that emulates
+            /// <c>string.StartsWith</c> behavior.
+            /// </summary>
+            /// <param name="visitor">The visitor accumulating the SQL output.</param>
+            /// <param name="node">The <see cref="MethodCallExpression"/> to translate.</param>
+            /// <exception cref="NotSupportedException">
+            /// Thrown when the provided prefix is not a constant string value.
+            /// </exception>
             public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
             {
                 visitor.Visit(node.Object!);
@@ -771,8 +824,27 @@ namespace nORM.Query
         }
         private sealed class EndsWithTranslator : IMethodTranslator
         {
+            /// <summary>
+            /// Checks if a method call corresponds to a translatable
+            /// <c>string.EndsWith</c> invocation.
+            /// </summary>
+            /// <param name="node">The call expression to verify.</param>
+            /// <returns>
+            /// <c>true</c> when the call is <c>string.EndsWith</c> with a single
+            /// argument; otherwise, <c>false</c>.
+            /// </returns>
             public bool CanTranslate(MethodCallExpression node)
                 => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
+
+            /// <summary>
+            /// Translates a <c>string.EndsWith</c> call into the appropriate SQL
+            /// <c>LIKE</c> pattern and appends it to the visitor.
+            /// </summary>
+            /// <param name="visitor">The visitor generating SQL output.</param>
+            /// <param name="node">The <see cref="MethodCallExpression"/> to translate.</param>
+            /// <exception cref="NotSupportedException">
+            /// Thrown when the suffix argument is not a constant string.
+            /// </exception>
             public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
             {
                 visitor.Visit(node.Object!);
@@ -790,6 +862,13 @@ namespace nORM.Query
             }
         }
 
+        /// <summary>
+        /// Directs the visitor to use the provided dictionary for parameter
+        /// collection, allowing multiple visitors to share a common parameter
+        /// store.
+        /// </summary>
+        /// <param name="shared">The dictionary to populate with parameters, or
+        /// <c>null</c> to revert to the visitor's internal dictionary.</param>
         public void UseSharedParameterDictionary(Dictionary<string, object> shared)
         {
             _paramSink = shared ?? _params;
@@ -797,6 +876,14 @@ namespace nORM.Query
 
 
 
+        /// <summary>
+        /// Quickly resets the visitor to a clean state so that it can be reused
+        /// without allocating a new instance.
+        /// </summary>
+        /// <remarks>
+        /// This method clears accumulated SQL, parameters, and internal caches
+        /// while preserving preallocated buffers when possible.
+        /// </remarks>
         public void FastReset()
         {
             if (_sql != null) _sql.Clear();
