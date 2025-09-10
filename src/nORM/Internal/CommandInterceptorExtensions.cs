@@ -257,6 +257,20 @@ namespace nORM.Internal
             }
         }
 
+        /// <summary>
+        /// Executes <see cref="DbCommand.ExecuteReader(CommandBehavior)"/> while wrapping the
+        /// call with the currently registered command interceptors. This allows interceptors
+        /// to observe, modify or suppress the command execution and to be notified about
+        /// success or failure.
+        /// </summary>
+        /// <param name="command">The database command to execute.</param>
+        /// <param name="ctx">The <see cref="DbContext"/> associated with the command.</param>
+        /// <param name="behavior">Behavior flags that influence reader execution.</param>
+        /// <returns>The <see cref="DbDataReader"/> returned by the command execution.</returns>
+        /// <remarks>
+        /// The method synchronously waits for any asynchronous interceptor callbacks and
+        /// therefore should only be used in fully synchronous flows.
+        /// </remarks>
         public static DbDataReader ExecuteReaderWithInterception(this DbCommand command, DbContext ctx, CommandBehavior behavior)
         {
             var interceptors = ctx.Options.CommandInterceptors;
