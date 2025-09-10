@@ -13,6 +13,15 @@ internal static class DbConnectionFactory
 {
     private static readonly ConcurrentDictionary<Type, Func<string, DbConnection>> _factories = new();
 
+    /// <summary>
+    /// Creates a provider-specific <see cref="DbConnection"/> instance for the supplied
+    /// connection string and database provider.
+    /// </summary>
+    /// <param name="connectionString">The connection string used to create the connection.</param>
+    /// <param name="provider">The provider describing the type of database to connect to.</param>
+    /// <returns>An open <see cref="DbConnection"/> appropriate for the specified provider.</returns>
+    /// <exception cref="ArgumentException">Thrown when the connection string is not valid for the provider.</exception>
+    /// <exception cref="NotSupportedException">Thrown when the provider type is not supported.</exception>
     public static DbConnection Create(string connectionString, DatabaseProvider provider)
     {
         var providerName = provider switch

@@ -229,6 +229,9 @@ namespace nORM.Core
                 throw new ObjectDisposedException(nameof(ConnectionPool));
         }
 
+        /// <summary>
+        /// Disposes the connection pool and all connections currently tracked by the pool.
+        /// </summary>
         public void Dispose()
         {
             if (_disposed) return;
@@ -318,8 +321,21 @@ namespace nORM.Core
             public override string DataSource => _inner!.DataSource;
             public override string ServerVersion => _inner!.ServerVersion;
             public override ConnectionState State => _inner!.State;
+
+            /// <summary>
+            /// Changes the current database for the underlying connection.
+            /// </summary>
+            /// <param name="databaseName">The name of the database to switch to.</param>
             public override void ChangeDatabase(string databaseName) => _inner!.ChangeDatabase(databaseName);
+
+            /// <summary>
+            /// Closes the underlying connection and returns it to the pool.
+            /// </summary>
             public override void Close() => _inner!.Close();
+
+            /// <summary>
+            /// Opens the underlying connection.
+            /// </summary>
             public override void Open() => _inner!.Open();
 
             /// <summary>

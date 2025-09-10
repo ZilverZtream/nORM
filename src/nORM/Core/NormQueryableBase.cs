@@ -30,6 +30,10 @@ namespace nORM.Core
             Expression = expression;
         }
 
+        /// <summary>
+        /// Executes the expression tree and returns an enumerator for the resulting sequence.
+        /// </summary>
+        /// <returns>An enumerator that iterates through the query results.</returns>
         public IEnumerator<T> GetEnumerator() => Provider.Execute<IEnumerable<T>>(Expression).GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }

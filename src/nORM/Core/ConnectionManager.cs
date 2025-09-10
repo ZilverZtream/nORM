@@ -193,6 +193,11 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Continuously performs periodic health checks on all configured database nodes
+        /// until cancellation is requested.
+        /// </summary>
+        /// <param name="token">Token that cancels the loop and any in-progress checks.</param>
         private async Task HealthCheckLoopAsync(CancellationToken token)
         {
             try
@@ -210,6 +215,10 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Executes a single round of health checks against all nodes in the database topology.
+        /// </summary>
+        /// <param name="token">Token used to cancel the health check operation.</param>
         private async Task PerformHealthChecksAsync(CancellationToken token)
         {
             await _healthCheckSemaphore.WaitAsync(token).ConfigureAwait(false);
@@ -267,6 +276,10 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Elects a new primary node when the existing primary is determined to be unhealthy.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the failover process.</param>
         private async Task TriggerFailoverAsync(CancellationToken ct)
         {
             await _failoverSemaphore.WaitAsync(ct).ConfigureAwait(false);

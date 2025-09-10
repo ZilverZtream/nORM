@@ -72,6 +72,10 @@ namespace nORM.Core
             return new NormIncludableQueryable<T, TProperty>(Provider, expression);
         }
 
+        /// <summary>
+        /// Returns a new query that will not track the resulting entities in the <see cref="DbContext"/>.
+        /// </summary>
+        /// <returns>An untracked query.</returns>
         public INormQueryable<T> AsNoTracking()
         {
             var expression = Expression.Call(
@@ -83,6 +87,10 @@ namespace nORM.Core
             return new NormQueryableImpl<T>(Provider, expression);
         }
 
+        /// <summary>
+        /// Configures the query to execute related collection loads as separate database queries.
+        /// </summary>
+        /// <returns>A query configured for split query execution.</returns>
         public INormQueryable<T> AsSplitQuery()
         {
             var expression = Expression.Call(
@@ -94,6 +102,11 @@ namespace nORM.Core
             return new NormQueryableImpl<T>(Provider, expression);
         }
 
+        /// <summary>
+        /// Executes the query and exposes the results as an asynchronous stream.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous iteration.</param>
+        /// <returns>An <see cref="IAsyncEnumerable{T}"/> representing the query results.</returns>
         public IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default)
             => ((NormQueryProvider)Provider).AsAsyncEnumerable<T>(Expression, ct);
 
@@ -146,6 +159,10 @@ namespace nORM.Core
             return new NormIncludableQueryable<T, TProperty2>(Provider, expression);
         }
 
+        /// <summary>
+        /// Returns a new query that will not track the resulting entities in the <see cref="DbContext"/>.
+        /// </summary>
+        /// <returns>An untracked query.</returns>
         public INormQueryable<T> AsNoTracking()
         {
             var expression = Expression.Call(
@@ -157,6 +174,10 @@ namespace nORM.Core
             return new NormQueryableImpl<T>(Provider, expression);
         }
 
+        /// <summary>
+        /// Configures the query to execute related collection loads as separate database queries.
+        /// </summary>
+        /// <returns>A query configured for split query execution.</returns>
         public INormQueryable<T> AsSplitQuery()
         {
             var expression = Expression.Call(
@@ -168,6 +189,11 @@ namespace nORM.Core
             return new NormQueryableImpl<T>(Provider, expression);
         }
 
+        /// <summary>
+        /// Executes the query and exposes the results as an asynchronous stream.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous iteration.</param>
+        /// <returns>An <see cref="IAsyncEnumerable{T}"/> representing the query results.</returns>
         public IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default)
             => ((NormQueryProvider)Provider).AsAsyncEnumerable<T>(Expression, ct);
 
