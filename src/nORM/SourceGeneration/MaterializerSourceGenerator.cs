@@ -5,14 +5,26 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
+
+/// <summary>
+/// Roslyn source generator that produces materializer implementations for annotated entity types.
+/// </summary>
 [Generator]
 public class MaterializerSourceGenerator : ISourceGenerator
 {
+    /// <summary>
+    /// Registers the syntax receiver used to discover candidate classes.
+    /// </summary>
+    /// <param name="context">Initialization context provided by the compiler.</param>
     public void Initialize(GeneratorInitializationContext context)
     {
         context.RegisterForSyntaxNotifications(() => new MaterializerSyntaxReceiver());
     }
 
+    /// <summary>
+    /// Generates materializer code for classes marked with <c>GenerateMaterializerAttribute</c>.
+    /// </summary>
+    /// <param name="context">Execution context provided by the compiler.</param>
     public void Execute(GeneratorExecutionContext context)
     {
         if (context.SyntaxReceiver is not MaterializerSyntaxReceiver receiver)
@@ -162,13 +174,23 @@ public class MaterializerSourceGenerator : ISourceGenerator
     }
 }
 
+/// <summary>
+/// Syntax receiver that collects classes decorated with attributes.
+/// </summary>
 public class MaterializerSyntaxReceiver : ISyntaxReceiver
 {
+    /// <summary>
+    /// Gets the list of candidate classes discovered during syntax traversal.
+    /// </summary>
     public List<ClassDeclarationSyntax> CandidateClasses { get; } = new();
 
+    /// <summary>
+    /// Called for every syntax node in the compilation to identify candidates.
+    /// </summary>
+    /// <param name="syntaxNode">The node being visited.</param>
     public void OnVisitSyntaxNode(SyntaxNode syntaxNode)
     {
-        if (syntaxNode is ClassDeclarationSyntax classDeclaration && 
+        if (syntaxNode is ClassDeclarationSyntax classDeclaration &&
             classDeclaration.AttributeLists.Count > 0)
         {
             CandidateClasses.Add(classDeclaration);

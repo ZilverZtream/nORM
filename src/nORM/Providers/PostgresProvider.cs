@@ -18,6 +18,10 @@ using Microsoft.Extensions.ObjectPool;
 
 namespace nORM.Providers
 {
+    /// <summary>
+    /// Database provider implementation optimized for PostgreSQL.
+    /// Handles SQL dialect translation, bulk operations and temporal table support.
+    /// </summary>
     public sealed class PostgresProvider : BulkOperationProvider
     {
         private readonly IDbParameterFactory _parameterFactory;
@@ -66,8 +70,12 @@ namespace nORM.Providers
             _parameterFactory.CreateParameter(name, value);
 
         /// <summary>
-        /// Translates certain .NET methods to PostgreSQL function calls.
+        /// Attempts to translate a .NET method invocation into its PostgreSQL equivalent.
         /// </summary>
+        /// <param name="name">Name of the .NET method being translated.</param>
+        /// <param name="declaringType">Type that declares the method.</param>
+        /// <param name="args">SQL fragments representing the method arguments.</param>
+        /// <returns>The translated SQL expression or <c>null</c> if the method is not supported.</returns>
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)
         {
             if (declaringType == typeof(string))
@@ -112,14 +120,24 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// Translates access to JSON fields using PostgreSQL's JSON operators.
+        /// Produces a SQL fragment that accesses a JSON value using PostgreSQL's <c>jsonb_extract_path_text</c>.
         /// </summary>
+        /// <param name="columnName">The JSON column being accessed.</param>
+        /// <param name="jsonPath">The JSON path expression (dot-delimited).</param>
+        /// <returns>SQL fragment that retrieves the JSON value as text.</returns>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
         {
             var pgPath = string.Join(",", jsonPath.Split('.').Skip(1).Select(p => $"'{p}'"));
             return $"jsonb_extract_path_text({columnName}, {pgPath})";
         }
 
+        /// <summary>
+        /// Builds an optimized <c>ANY</c> expression for arrays to implement a <c>Contains</c> filter.
+        /// </summary>
+        /// <param name="cmd">Command to which parameters are added.</param>
+        /// <param name="columnName">Name of the column being filtered.</param>
+        /// <param name="values">Values to check for containment.</param>
+        /// <returns>SQL fragment implementing the containment check.</returns>
         public override string BuildContainsClause(DbCommand cmd, string columnName, IReadOnlyList<object?> values)
         {
             var pName = ParamPrefix + "p0";
@@ -131,8 +149,10 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// Generates SQL to create a temporal history table for the given mapping.
+        /// Generates the SQL definition for the temporal history table corresponding to the entity mapping.
         /// </summary>
+        /// <param name="mapping">The entity mapping to create history storage for.</param>
+        /// <returns>DDL statement that creates the history table.</returns>
         public override string GenerateCreateHistoryTableSql(TableMapping mapping)
         {
             var historyTable = Escape(mapping.TableName + "_History");
@@ -149,8 +169,10 @@ CREATE TABLE {historyTable} (
         }
 
         /// <summary>
-        /// Generates SQL for triggers that maintain the temporal history table.
+        /// Produces the trigger definitions required to track changes in the temporal history table.
         /// </summary>
+        /// <param name="mapping">The mapping describing the target table.</param>
+        /// <returns>DDL statements that create the temporal triggers.</returns>
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
         {
             var table = Escape(mapping.TableName);
