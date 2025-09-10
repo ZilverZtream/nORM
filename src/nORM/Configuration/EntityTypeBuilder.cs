@@ -120,6 +120,11 @@ namespace nORM.Configuration
                 _property = property;
             }
 
+            /// <summary>
+            /// Sets the database column name for the configured property.
+            /// </summary>
+            /// <param name="name">The column name to map the property to.</param>
+            /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
             public EntityTypeBuilder<TEntity> HasColumnName(string name)
             {
                 _parent._config.SetColumnName(_property, name);
@@ -138,6 +143,11 @@ namespace nORM.Configuration
                 _name = name;
             }
 
+            /// <summary>
+            /// Assigns a column name for the shadow property.
+            /// </summary>
+            /// <param name="columnName">The column name to use in the database.</param>
+            /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
             public EntityTypeBuilder<TEntity> HasColumnName(string columnName)
             {
                 _parent._config.SetShadowColumnName(_name, columnName);
@@ -156,6 +166,11 @@ namespace nORM.Configuration
                 PrincipalNavigation = principalNavigation;
             }
 
+            /// <summary>
+            /// Configures the relationship to have a single optional reference back to the principal entity.
+            /// </summary>
+            /// <param name="navigation">Optional expression specifying the navigation property on the dependent type.</param>
+            /// <returns>A builder for configuring the relationship further.</returns>
             public ReferenceCollectionBuilder WithOne(Expression<Func<TDependent, TEntity?>>? navigation = null)
             {
                 PropertyInfo? dependentNav = null;
@@ -177,6 +192,13 @@ namespace nORM.Configuration
                     _dependentNavigation = dependentNavigation;
                 }
 
+                /// <summary>
+                /// Configures the foreign key property used by the dependent entity in the relationship.
+                /// </summary>
+                /// <param name="foreignKeyExpression">Expression selecting the foreign key property on the dependent type.</param>
+                /// <param name="principalKeyExpression">Optional expression selecting the principal key; required when the principal has composite keys.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for further configuration.</returns>
+                /// <exception cref="NormConfigurationException">Thrown when the principal key cannot be inferred.</exception>
                 public EntityTypeBuilder<TEntity> HasForeignKey(
                     Expression<Func<TDependent, object>> foreignKeyExpression,
                     Expression<Func<TEntity, object>>? principalKeyExpression = null)

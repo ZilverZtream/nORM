@@ -32,6 +32,10 @@ namespace nORM.Migration
             }
         }
 
+        /// <summary>
+        /// Applies all pending migrations to the MySQL database.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
         {
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
@@ -47,6 +51,11 @@ namespace nORM.Migration
             await transaction.CommitAsync(ct).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Determines whether there are migrations that have not yet been applied.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns><c>true</c> if pending migrations exist; otherwise <c>false</c>.</returns>
         public async Task<bool> HasPendingMigrationsAsync(CancellationToken ct = default)
         {
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
@@ -54,6 +63,11 @@ namespace nORM.Migration
             return pending.Any();
         }
 
+        /// <summary>
+        /// Retrieves the identifiers of all pending migrations.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>An array containing the pending migration identifiers.</returns>
         public async Task<string[]> GetPendingMigrationsAsync(CancellationToken ct = default)
         {
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);

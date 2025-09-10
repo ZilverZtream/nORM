@@ -168,6 +168,9 @@ namespace nORM.Core
                 _dirtyEntries.TryAdd(entry, 0);
             }
         }
+        /// <summary>
+        /// Removes all tracked entity entries and resets the change tracker to an empty state.
+        /// </summary>
         public void Clear()
         {
             _entriesByReference.Clear();
