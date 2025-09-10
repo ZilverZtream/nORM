@@ -75,6 +75,13 @@ namespace nORM.Migration
             return new MigrationSqlStatements(up, down);
         }
 
+        /// <summary>
+        /// Converts the supplied <see cref="ColumnSchema"/> into a SQLite column type. When
+        /// an exact mapping is not found, the method defaults to <c>TEXT</c>, which can store
+        /// arbitrary data.
+        /// </summary>
+        /// <param name="column">The column definition to map.</param>
+        /// <returns>The SQLite data type as a string.</returns>
         private static string GetSqlType(ColumnSchema column)
             => TypeMap.TryGetValue(column.ClrType, out var sql) ? sql : "TEXT";
     }

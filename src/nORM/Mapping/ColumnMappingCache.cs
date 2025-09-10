@@ -62,6 +62,12 @@ namespace nORM.Mapping
             });
         }
 
+        /// <summary>
+        /// Retrieves cached metadata for the specified CLR type, analyzing the type's
+        /// properties only once and storing the results for subsequent lookups.
+        /// </summary>
+        /// <param name="type">The entity type to analyze.</param>
+        /// <returns>A <see cref="CachedTypeInfo"/> describing the type's mappable properties.</returns>
         private static CachedTypeInfo GetCachedTypeInfo(Type type)
         {
             return _typeCache.GetOrAdd(type, static t =>
@@ -138,6 +144,13 @@ namespace nORM.Mapping
             return new Column(ownedProp, provider, config, ownerProp.Property.Name, getter, setter, setterMethod);
         }
 
+        /// <summary>
+        /// Generates a compiled delegate that retrieves the value of the provided property
+        /// from a given object instance. This avoids the overhead of reflection for repeated
+        /// property access.
+        /// </summary>
+        /// <param name="property">The property to create a getter for.</param>
+        /// <returns>A delegate that returns the property's value for a supplied object.</returns>
         private static Func<object, object?> CreateOptimizedGetter(PropertyInfo property)
         {
             var instanceParam = Expression.Parameter(typeof(object), "instance");
@@ -148,6 +161,12 @@ namespace nORM.Mapping
             return Expression.Lambda<Func<object, object?>>(convertResult, instanceParam).Compile();
         }
 
+        /// <summary>
+        /// Produces a compiled delegate that assigns a value to the specified property on a
+        /// target object. The delegate performs the required casting to the property's type.
+        /// </summary>
+        /// <param name="property">The property to create a setter for.</param>
+        /// <returns>An <see cref="Action{T1,T2}"/> that sets the property's value.</returns>
         private static Action<object, object?> CreateOptimizedSetter(PropertyInfo property)
         {
             var instanceParam = Expression.Parameter(typeof(object), "instance");
@@ -160,6 +179,14 @@ namespace nORM.Mapping
             return Expression.Lambda<Action<object, object?>>(setProperty, instanceParam, valueParam).Compile();
         }
 
+        /// <summary>
+        /// Creates a getter delegate for an owned property by first accessing the owner property
+        /// and then the owned property. Null owner instances yield a null result to avoid
+        /// <see cref="NullReferenceException"/> when traversing the object graph.
+        /// </summary>
+        /// <param name="owner">The property that owns the nested property.</param>
+        /// <param name="owned">The nested property to read.</param>
+        /// <returns>A delegate that reads the nested property's value from an entity instance.</returns>
         private static Func<object, object?> CreateOwnedGetter(PropertyInfo owner, PropertyInfo owned)
         {
             var entityParam = Expression.Parameter(typeof(object), "e");
@@ -174,6 +201,15 @@ namespace nORM.Mapping
             return Expression.Lambda<Func<object, object?>>(body, entityParam).Compile();
         }
 
+        /// <summary>
+        /// Creates a setter delegate capable of assigning a value to a nested owned property. If
+        /// the owned instance is <c>null</c>, a new instance is created and attached to the owner
+        /// before the value is set.
+        /// </summary>
+        /// <param name="owner">Property representing the owning reference.</param>
+        /// <param name="owned">Property on the owned type to set.</param>
+        /// <param name="methodInfo">Receives the generated dynamic method for potential reuse.</param>
+        /// <returns>A delegate that sets the nested property's value on an entity.</returns>
         private static Action<object, object?> CreateOwnedSetter(PropertyInfo owner, PropertyInfo owned, out MethodInfo methodInfo)
         {
             var dm = new DynamicMethod($"set_{owner.Name}_{owned.Name}", typeof(void), new[] { typeof(object), typeof(object) }, owner.DeclaringType!.Module, true);

@@ -498,6 +498,15 @@ namespace nORM.Query
             _parameterManager.Index = subTranslator.ParameterIndex;
             return subPlan.Sql;
         }
+        /// <summary>
+        /// Retrieves the timestamp associated with a named temporal tag from the special
+        /// <c>__NormTemporalTags</c> table. Tags are used to reference specific points in time
+        /// for temporal queries.
+        /// </summary>
+        /// <param name="tagName">The name of the temporal tag.</param>
+        /// <param name="ct">Optional cancellation token.</param>
+        /// <returns>The timestamp stored for the specified tag.</returns>
+        /// <exception cref="NormQueryException">Thrown if the tag does not exist.</exception>
         private async Task<DateTime> GetTimestampForTagAsync(string tagName, CancellationToken ct = default)
         {
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
