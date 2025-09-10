@@ -54,6 +54,13 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Prepares the entry for change tracking by caching getters and hash-code
+        /// delegates for all non-key, non-timestamp columns and capturing the
+        /// entity's original values. If the entity implements
+        /// <see cref="INotifyPropertyChanged"/>, the entry subscribes to change
+        /// notifications to enable real-time tracking.
+        /// </summary>
         private void InitializeTracking()
         {
             _nonKeyColumns = _mapping.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
@@ -78,6 +85,12 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Handles <see cref="INotifyPropertyChanged.PropertyChanged"/> events raised
+        /// by the tracked entity and updates the internal change tracking state.
+        /// </summary>
+        /// <param name="_">Unused sender parameter.</param>
+        /// <param name="e">Event arguments describing the property change.</param>
         private void PropertyChangedHandler(object? _, PropertyChangedEventArgs e)
         {
             if (State is EntityState.Added or EntityState.Deleted) return;
@@ -116,6 +129,11 @@ namespace nORM.Core
             _markDirty?.Invoke(this);
         }
 
+        /// <summary>
+        /// Ensures the entry has been fully initialized for change tracking. When a
+        /// lazily-initialized entry first detects changes, this method populates the
+        /// required caches and subscribes to change notifications.
+        /// </summary>
         internal void UpgradeToFullTracking()
         {
             if (_nonKeyColumns.Length != 0)
@@ -123,6 +141,10 @@ namespace nORM.Core
             InitializeTracking();
         }
 
+        /// <summary>
+        /// Captures the current property values and hash codes as the baseline for
+        /// detecting future modifications.
+        /// </summary>
         private void CaptureOriginalValues()
         {
             var entity = Entity;
@@ -139,6 +161,11 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Compares the current entity values against the original snapshot to update
+        /// the <see cref="EntityState"/>. This method is used for entities that do not
+        /// notify when properties change.
+        /// </summary>
         internal void DetectChanges()
         {
             UpgradeToFullTracking();
@@ -185,6 +212,10 @@ namespace nORM.Core
                 State = EntityState.Unchanged;
         }
 
+        /// <summary>
+        /// Accepts the current property values as the new original values and resets
+        /// the change tracking state to <see cref="EntityState.Unchanged"/>.
+        /// </summary>
         internal void AcceptChanges()
         {
             UpgradeToFullTracking();
@@ -193,6 +224,10 @@ namespace nORM.Core
             _hasNotifiedChange = false;
         }
 
+        /// <summary>
+        /// Detaches the entity from the context and removes any navigation property
+        /// references that were established for change tracking or lazy loading.
+        /// </summary>
         internal void DetachEntity()
         {
             State = EntityState.Detached;

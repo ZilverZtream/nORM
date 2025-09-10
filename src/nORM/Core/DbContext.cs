@@ -79,6 +79,16 @@ namespace nORM.Core
             : this(CreateConnectionSafe(connectionString, p), p, options)
         {
         }
+        /// <summary>
+        /// Creates a new <see cref="DbConnection"/> using the provided connection
+        /// string and database provider. If creation fails, the method ensures that
+        /// any partially created connection is disposed and rethrows a sanitized
+        /// <see cref="ArgumentException"/> that masks sensitive connection details.
+        /// </summary>
+        /// <param name="connectionString">Raw database connection string.</param>
+        /// <param name="provider">The provider responsible for creating the connection.</param>
+        /// <returns>A ready-to-use <see cref="DbConnection"/> instance.</returns>
+        /// <exception cref="ArgumentException">Thrown when the connection string is invalid.</exception>
         private static DbConnection CreateConnectionSafe(string connectionString, DatabaseProvider provider)
         {
             DbConnection? connection = null;
@@ -196,9 +206,21 @@ namespace nORM.Core
             catch { return false; }
         }
 
+        /// <summary>
+        /// Retrieves or creates a <see cref="TableMapping"/> for the specified entity
+        /// type. Mappings are cached for reuse to avoid repeated reflection.
+        /// </summary>
+        /// <param name="t">The entity CLR type to map.</param>
+        /// <returns>The mapping associated with the given type.</returns>
         internal TableMapping GetMapping(Type t) => _m.GetOrAdd(t, static (k, args) =>
             new TableMapping(k, args.p, args.ctx, args.modelBuilder.GetConfiguration(k)), (p: _p, ctx: this, modelBuilder: _modelBuilder));
 
+        /// <summary>
+        /// Enumerates mappings for all entity types that were configured via the
+        /// <see cref="ModelBuilder"/>. Useful for scenarios that need to inspect
+        /// or pre-generate metadata for every known entity.
+        /// </summary>
+        /// <returns>An enumerable sequence of <see cref="TableMapping"/> objects.</returns>
         internal IEnumerable<TableMapping> GetAllMappings()
         {
             foreach (var type in _modelBuilder.GetConfiguredEntityTypes())
@@ -209,12 +231,13 @@ namespace nORM.Core
             => !string.IsNullOrWhiteSpace(name) && Regex.IsMatch(name, @"^[A-Za-z0-9_\.]+$");
 
         /// <summary>
-        /// Creates a non-typed <see cref="IQueryable"/> over the specified table name.
-        /// This is primarily used for querying tables that do not have a compile-time
-        /// entity type, such as dynamic projections or tables discovered at runtime.
+        /// Creates an untyped <see cref="IQueryable"/> for the specified table name.
+        /// This API is useful when working with tables or views that do not have a
+        /// corresponding CLR type at compile time. A dynamic entity type is generated
+        /// on-demand and cached so subsequent calls incur minimal overhead.
         /// </summary>
         /// <param name="tableName">Name of the table to query.</param>
-        /// <returns>An <see cref="IQueryable"/> representing the requested table.</returns>
+        /// <returns>An <see cref="IQueryable"/> that can be composed with LINQ operators.</returns>
         /// <exception cref="ArgumentException">Thrown when <paramref name="tableName"/> is null or empty.</exception>
         /// <exception cref="NormUsageException">Thrown when the provided name contains invalid characters.</exception>
         public IQueryable Query(string tableName)
@@ -256,8 +279,10 @@ namespace nORM.Core
             return ChangeTracker.Track(entity, EntityState.Deleted, GetMapping(typeof(T)));
         }
         /// <summary>
-        /// Returns the tracking entry for the specified entity instance and enables
-        /// lazy loading on the entity when applicable.
+        /// Returns the <see cref="EntityEntry"/> for the supplied entity and ensures
+        /// that lazy-loading proxies are wired up when supported. The entity is
+        /// automatically attached to the change tracker in the <see cref="EntityState.Unchanged"/>
+        /// state.
         /// </summary>
         /// <param name="entity">The entity whose tracking entry is requested.</param>
         /// <returns>An <see cref="EntityEntry"/> representing the entity's tracking information.</returns>
@@ -271,8 +296,9 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Configures the context to automatically retry failed save operations
-        /// when the database reports a deadlock condition.
+        /// Configures the context to automatically retry failed <c>SaveChanges</c>
+        /// operations when the database reports a deadlock (SQL Server error 1205).
+        /// A default retry policy with exponential backoff is applied.
         /// </summary>
         /// <returns>The current <see cref="DbContextOptions"/> instance for fluent configuration.</returns>
         public DbContextOptions UseDeadlockResilientSaveChanges()
@@ -287,7 +313,9 @@ namespace nORM.Core
             return Options;
         }
         /// <summary>
-        /// Persists all tracked changes to the database using the configured retry policy.
+        /// Persists all tracked changes to the database. The operation is executed
+        /// using the configured retry policy which transparently retries transient
+        /// failures such as deadlocks.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>The total number of state entries written to the database.</returns>

@@ -54,6 +54,11 @@ namespace nORM.Core
             _healthCheckTask = Task.Run(() => HealthCheckLoopAsync(_disposeCts.Token));
         }
 
+        /// <summary>
+        /// Initializes a connection pool for each node defined in the database topology.
+        /// This method is guarded by a semaphore to ensure pools are created only once
+        /// in multi-threaded scenarios.
+        /// </summary>
         private void InitializeConnectionPools()
         {
             _poolInitSemaphore.Wait();
@@ -70,11 +75,22 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Factory method used to create new <see cref="DbConnection"/> instances for
+        /// a given connection string using the configured provider.
+        /// </summary>
+        /// <param name="connectionString">The database connection string.</param>
+        /// <returns>A newly created <see cref="DbConnection"/>.</returns>
         private DbConnection CreateConnection(string connectionString)
         {
             return DbConnectionFactory.Create(connectionString, _provider);
         }
 
+        /// <summary>
+        /// Determines which database node should act as the primary (write) node. The
+        /// first node explicitly marked as <c>Primary</c> is selected, falling back to
+        /// the first node in the topology if none are marked.
+        /// </summary>
         private void DeterminePrimaryNode()
         {
             // Choose the first node marked as Primary role; fallback to first node
@@ -83,6 +99,10 @@ namespace nORM.Core
             _currentPrimary = primary;
         }
 
+        /// <summary>
+        /// Refreshes the list of healthy read-replica nodes ordered by priority. This
+        /// list is consulted when selecting a connection for read operations.
+        /// </summary>
         private void UpdateAvailableReadReplicas()
         {
             _availableReadReplicas = _topology.Nodes
@@ -168,6 +188,13 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Chooses the next read-replica to use based on a simple round-robin
+        /// algorithm. The method is thread-safe and distributes load evenly across
+        /// replicas.
+        /// </summary>
+        /// <param name="replicas">The list of currently available replicas.</param>
+        /// <returns>The selected replica node.</returns>
         private DatabaseTopology.DatabaseNode SelectOptimalReadReplica(IReadOnlyList<DatabaseTopology.DatabaseNode> replicas)
         {
             var index = Interlocked.Increment(ref _readReplicaIndex);

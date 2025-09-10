@@ -22,6 +22,16 @@ namespace nORM.Core
         {
             _options = options;
         }
+        /// <summary>
+        /// Begins tracking the specified entity instance and associates it with the
+        /// provided <paramref name="mapping"/>. If the entity is already being tracked
+        /// either by reference or by its primary key, the existing <see cref="EntityEntry"/>
+        /// is returned and its state updated.
+        /// </summary>
+        /// <param name="entity">The entity instance to track.</param>
+        /// <param name="state">The initial state to assign to the entity.</param>
+        /// <param name="mapping">Mapping information for the entity type.</param>
+        /// <returns>The <see cref="EntityEntry"/> representing the tracked entity.</returns>
         internal EntityEntry Track(object entity, EntityState state, TableMapping mapping)
         {
             // Fast path: entity already tracked by reference
@@ -74,12 +84,29 @@ namespace nORM.Core
             // Fallback: return the one we created
             return entry;
         }
+
+        /// <summary>
+        /// Creates a lightweight tracking entry that postpones expensive change
+        /// detection setup until it is explicitly required. This is used when an
+        /// entity is attached in the <see cref="EntityState.Unchanged"/> state and
+        /// eager change tracking is disabled.
+        /// </summary>
+        /// <param name="entity">The entity to create the entry for.</param>
+        /// <param name="mapping">Mapping information for the entity type.</param>
+        /// <returns>A lazily-initialized <see cref="EntityEntry"/> instance.</returns>
         private EntityEntry CreateLazyEntry(object entity, TableMapping mapping)
         {
             // Minimal entry that defers property change setup
             return new EntityEntry(entity, EntityState.Unchanged, mapping, _options, MarkDirty, lazy: true);
         }
         private const int MaxCascadeDepth = 100;
+        /// <summary>
+        /// Removes an entity from the change tracker, optionally cascading the removal
+        /// to related entities that are configured for cascade delete.
+        /// </summary>
+        /// <param name="entity">The entity instance to stop tracking.</param>
+        /// <param name="cascade">If <c>true</c>, related entities configured with cascade
+        /// delete will also be detached.</param>
         internal void Remove(object entity, bool cascade = false)
         {
             if (_entriesByReference.TryRemove(entity, out var entry))
@@ -101,6 +128,15 @@ namespace nORM.Core
                 }
             }
         }
+
+        /// <summary>
+        /// Recursively traverses the entity graph starting from
+        /// <paramref name="rootEntity"/> and detaches any dependent entities marked
+        /// for cascade deletion. This ensures that related entities do not remain
+        /// tracked when their parent is removed.
+        /// </summary>
+        /// <param name="rootEntity">The root entity being deleted.</param>
+        /// <param name="rootMapping">Mapping information for the root entity.</param>
         private void CascadeDelete(object rootEntity, TableMapping rootMapping)
         {
             var queue = new Queue<(object Entity, TableMapping Mapping, int Depth)>();
@@ -139,6 +175,10 @@ namespace nORM.Core
             }
         }
         public IEnumerable<EntityEntry> Entries => _entriesByReference.Values;
+        /// <summary>
+        /// Forces change detection for all entities that have been marked as dirty,
+        /// updating their <see cref="EntityState"/> based on current property values.
+        /// </summary>
         internal void DetectChanges()
         {
             var dirtyNonNotifyingSnapshot = _dirtyNonNotifyingEntries.Keys.ToArray();
@@ -156,6 +196,13 @@ namespace nORM.Core
             }
             _dirtyEntries.Clear();
         }
+
+        /// <summary>
+        /// Marks the specified <see cref="EntityEntry"/> as requiring change detection
+        /// on the next call to <see cref="DetectChanges"/>. Non-notifying entities are
+        /// tracked separately to ensure their changes are discovered.
+        /// </summary>
+        /// <param name="entry">The entry to mark as dirty.</param>
         internal void MarkDirty(EntityEntry entry)
         {
             entry.UpgradeToFullTracking();
@@ -179,6 +226,16 @@ namespace nORM.Core
             _dirtyNonNotifyingEntries.Clear();
             _dirtyEntries.Clear();
         }
+        /// <summary>
+        /// Extracts the primary key value for the given entity using the provided mapping.
+        /// Supports both single-column keys and composite keys.
+        /// </summary>
+        /// <param name="entity">The entity instance from which to read the key.</param>
+        /// <param name="mapping">Mapping information describing the key columns.</param>
+        /// <returns>
+        /// The key value, a composite key object when multiple key columns exist, or
+        /// <c>null</c> if the entity type does not define a primary key.
+        /// </returns>
         private static object? GetPrimaryKeyValue(object entity, TableMapping mapping)
         {
             if (mapping.KeyColumns.Length == 1)

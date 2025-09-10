@@ -344,7 +344,27 @@ namespace nORM.Core
             /// <param name="cancellationToken">Token used to cancel the asynchronous operation.</param>
             /// <returns>A task that completes when the connection has been opened.</returns>
             public override Task OpenAsync(CancellationToken cancellationToken) => _inner!.OpenAsync(cancellationToken);
+
+            /// <summary>
+            /// Begins a database transaction on the underlying connection using the
+            /// provider's default isolation level.
+            /// </summary>
+            /// <returns>A <see cref="DbTransaction"/> representing the started transaction.</returns>
+            public override DbTransaction BeginTransaction() => _inner!.BeginTransaction();
+
+            /// <summary>
+            /// Begins a database transaction on the underlying connection with the
+            /// specified isolation level. The resulting transaction is not pooled and
+            /// must be disposed by the caller.
+            /// </summary>
+            /// <param name="isolationLevel">The isolation level to apply to the transaction.</param>
+            /// <returns>A <see cref="DbTransaction"/> representing the started transaction.</returns>
             protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => _inner!.BeginTransaction(isolationLevel);
+
+            /// <summary>
+            /// Creates a command object associated with the underlying connection.
+            /// </summary>
+            /// <returns>A new <see cref="DbCommand"/> instance.</returns>
             protected override DbCommand CreateDbCommand() => _inner!.CreateCommand();
         }
     }

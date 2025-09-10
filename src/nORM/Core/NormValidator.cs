@@ -41,8 +41,18 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Retrieves a <see cref="HashSet{Object}"/> instance from the object pool
+        /// used to track visited entities during validation. The set is configured for
+        /// reference equality to correctly handle duplicate object references.
+        /// </summary>
+        /// <returns>A rented hash set instance.</returns>
         private static HashSet<object> RentHashSet() => HashSetPool.Get();
 
+        /// <summary>
+        /// Returns a previously rented hash set to the pool for reuse.
+        /// </summary>
+        /// <param name="set">The hash set to return.</param>
         private static void ReturnHashSet(HashSet<object> set) => HashSetPool.Return(set);
 
         private sealed class HashSetPolicy : PooledObjectPolicy<HashSet<object>>

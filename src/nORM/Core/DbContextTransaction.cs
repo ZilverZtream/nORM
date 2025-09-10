@@ -20,7 +20,9 @@ namespace nORM.Core
         public DbTransaction? Transaction => _transaction;
 
         /// <summary>
-        /// Commits the underlying database transaction and disposes the wrapper.
+        /// Commits the underlying database transaction and disposes this wrapper
+        /// instance. After calling this method the transaction can no longer be used
+        /// and the context's current transaction reference is cleared.
         /// </summary>
         public void Commit()
         {
@@ -40,7 +42,9 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Rolls back the underlying database transaction and disposes the wrapper.
+        /// Rolls back the underlying database transaction and disposes this wrapper
+        /// instance. Any changes made within the transaction are undone and the
+        /// context is returned to a non-transactional state.
         /// </summary>
         public void Rollback()
         {
