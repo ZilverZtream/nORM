@@ -201,6 +201,11 @@ namespace nORM.Core
             {
                 _values = values;
             }
+            /// <summary>
+            /// Determines whether this composite key is equal to another composite key instance.
+            /// </summary>
+            /// <param name="other">The other <see cref="CompositeKey"/> to compare with.</param>
+            /// <returns><c>true</c> if both keys contain equivalent values in the same order; otherwise, <c>false</c>.</returns>
             public bool Equals(CompositeKey? other)
             {
                 if (other is null || other._values.Length != _values.Length)
@@ -212,7 +217,18 @@ namespace nORM.Core
                 }
                 return true;
             }
+
+            /// <summary>
+            /// Determines whether the specified object is equal to the current composite key.
+            /// </summary>
+            /// <param name="obj">The object to compare with this key.</param>
+            /// <returns><c>true</c> if <paramref name="obj"/> is a <see cref="CompositeKey"/> with the same values; otherwise, <c>false</c>.</returns>
             public override bool Equals(object? obj) => Equals(obj as CompositeKey);
+
+            /// <summary>
+            /// Computes a hash code based on the contained key values.
+            /// </summary>
+            /// <returns>An integer hash code representing the composite key.</returns>
             public override int GetHashCode()
             {
                 unchecked

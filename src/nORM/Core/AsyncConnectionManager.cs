@@ -38,6 +38,11 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Opens the underlying <see cref="DbConnection"/> if it is not already open.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous open operation.</param>
+        /// <returns>A task that completes once the connection is confirmed open.</returns>
         private async Task EnsureConnectionOpenAsync(CancellationToken ct)
         {
             if (_connection.State != ConnectionState.Open)

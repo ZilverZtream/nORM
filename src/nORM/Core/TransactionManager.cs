@@ -86,6 +86,9 @@ namespace nORM.Core
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Releases the underlying transaction and cancellation source.
+        /// </summary>
         public void Dispose()
         {
             if (OwnsTransaction && Transaction != null)

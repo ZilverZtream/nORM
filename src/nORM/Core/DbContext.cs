@@ -94,6 +94,12 @@ namespace nORM.Core
                 throw new ArgumentException($"Invalid connection string format: {safeConnStr}", nameof(connectionString), ex);
             }
         }
+        /// <summary>
+        /// Ensures that the underlying <see cref="DbConnection"/> is open and that the
+        /// provider has performed any required initialization.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The open <see cref="DbConnection"/> instance.</returns>
         internal async Task<DbConnection> EnsureConnectionAsync(CancellationToken ct = default)
         {
             if (_cn.State != ConnectionState.Open)
@@ -288,6 +294,12 @@ namespace nORM.Core
         public Task<int> SaveChangesAsync(CancellationToken ct = default)
             => SaveChangesWithRetryAsync(ct);
 
+        /// <summary>
+        /// Invokes <see cref="SaveChangesInternalAsync"/> using the configured retry policy to
+        /// transparently retry transient failures such as deadlocks.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the save operation.</param>
+        /// <returns>The number of state entries written to the database.</returns>
         private async Task<int> SaveChangesWithRetryAsync(CancellationToken ct)
         {
             var policy = Options.RetryPolicy;
@@ -310,6 +322,11 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Persists all tracked entity changes to the database within a single transaction.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the save operation.</param>
+        /// <returns>The total number of state entries written to the database.</returns>
         private async Task<int> SaveChangesInternalAsync(CancellationToken ct)
         {
             ChangeTracker.DetectChanges();
@@ -425,6 +442,16 @@ namespace nORM.Core
                 _ => 0
             };
 
+        /// <summary>
+        /// Builds and executes a batched INSERT command for the provided entities.
+        /// </summary>
+        /// <param name="cmd">The command used to execute the batch.</param>
+        /// <param name="map">Mapping information for the target table.</param>
+        /// <param name="batch">Entities to insert.</param>
+        /// <param name="sql">Reusable <see cref="StringBuilder"/> for composing the SQL batch.</param>
+        /// <param name="paramIndex">Starting parameter index for parameter naming.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The number of rows affected.</returns>
         private async Task<int> ExecuteInsertBatch(DbCommand cmd, TableMapping map, List<EntityEntry> batch, StringBuilder sql, int paramIndex, CancellationToken ct)
         {
             foreach (var entry in batch)
@@ -465,6 +492,16 @@ namespace nORM.Core
             return affected;
         }
 
+        /// <summary>
+        /// Builds and executes a batched UPDATE statement for the provided entities.
+        /// </summary>
+        /// <param name="cmd">The command used to execute the batch.</param>
+        /// <param name="map">Mapping information for the target table.</param>
+        /// <param name="batch">Entities to update.</param>
+        /// <param name="sql">Reusable <see cref="StringBuilder"/> for composing the SQL batch.</param>
+        /// <param name="paramIndex">Starting parameter index for parameter naming.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The number of rows affected by the batch.</returns>
         private async Task<int> ExecuteUpdateBatch(DbCommand cmd, TableMapping map, List<EntityEntry> batch, StringBuilder sql, int paramIndex, CancellationToken ct)
         {
             foreach (var entry in batch)
@@ -487,6 +524,16 @@ namespace nORM.Core
             return updated;
         }
 
+        /// <summary>
+        /// Builds and executes a batched DELETE statement for the provided entities.
+        /// </summary>
+        /// <param name="cmd">The command used to execute the batch.</param>
+        /// <param name="map">Mapping information for the target table.</param>
+        /// <param name="batch">Entities to delete.</param>
+        /// <param name="sql">Reusable <see cref="StringBuilder"/> for composing the SQL batch.</param>
+        /// <param name="paramIndex">Starting parameter index for parameter naming.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The number of rows affected by the batch.</returns>
         private async Task<int> ExecuteDeleteBatch(DbCommand cmd, TableMapping map, List<EntityEntry> batch, StringBuilder sql, int paramIndex, CancellationToken ct)
         {
             foreach (var entry in batch)
@@ -784,6 +831,11 @@ namespace nORM.Core
                 _connection = connection;
                 _transaction = transaction;
             }
+
+            /// <summary>
+            /// Creates a <see cref="DbCommand"/> tied to the scoped connection and transaction.
+            /// </summary>
+            /// <returns>A configured command ready for parameter population and execution.</returns>
             public DbCommand CreateCommand()
             {
                 var cmd = _connection.CreateCommand();
@@ -1130,8 +1182,21 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Sets the value of a shadow property for the specified entity instance.
+        /// </summary>
+        /// <param name="entity">The entity that owns the shadow property.</param>
+        /// <param name="name">The name of the shadow property to set.</param>
+        /// <param name="value">The value to assign.</param>
         public void SetShadowProperty(object entity, string name, object? value)
             => Internal.ShadowPropertyStore.Set(entity, name, value);
+
+        /// <summary>
+        /// Retrieves the value of a shadow property from the specified entity.
+        /// </summary>
+        /// <param name="entity">The entity that owns the shadow property.</param>
+        /// <param name="name">The name of the shadow property to retrieve.</param>
+        /// <returns>The current value of the shadow property, or <c>null</c> if not set.</returns>
         public object? GetShadowProperty(object entity, string name)
             => Internal.ShadowPropertyStore.Get(entity, name);
 
@@ -1226,6 +1291,10 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Registers an <see cref="IDisposable"/> resource to be disposed when the context is disposed.
+        /// </summary>
+        /// <param name="disposable">The resource to track for disposal.</param>
         public void RegisterForDisposal(IDisposable disposable)
         {
             if (disposable != null)
@@ -1238,6 +1307,9 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Releases all resources used by the context.
+        /// </summary>
         public void Dispose()
         {
             Dispose(true);
@@ -1263,6 +1335,12 @@ namespace nORM.Core
         }
     }
 
+    /// <summary>
+    /// Represents an output parameter for stored procedure execution.
+    /// </summary>
+    /// <param name="Name">Name of the parameter without provider-specific prefix.</param>
+    /// <param name="DbType">Database type of the output parameter.</param>
+    /// <param name="Size">Optional size for variable-length parameters.</param>
     public sealed record OutputParameter(string Name, DbType DbType, int? Size = null);
     public sealed record StoredProcedureResult<T>(List<T> Results, IReadOnlyDictionary<string, object?> OutputParameters);
 }
