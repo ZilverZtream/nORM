@@ -16,6 +16,11 @@ namespace nORM.Query
             _count = 0;
         }
 
+        /// <summary>
+        /// Adds a new parameter to the preallocated spans, avoiding additional allocations.
+        /// </summary>
+        /// <param name="name">Parameter name.</param>
+        /// <param name="value">Parameter value.</param>
         public void Add(ReadOnlySpan<char> name, object value)
         {
             var param = _parameters[_count];
