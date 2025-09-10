@@ -6,6 +6,13 @@ namespace nORM.Query
 {
     internal static class ExpressionFingerprint
     {
+        /// <summary>
+        /// Computes a stable hash code that uniquely identifies the structural shape of the
+        /// provided expression tree. The hash is insensitive to parameter names and constant
+        /// values so that semantically equivalent queries yield the same fingerprint.
+        /// </summary>
+        /// <param name="expression">The expression tree to fingerprint.</param>
+        /// <returns>A deterministic hash representing the structure of the expression.</returns>
         public static int Compute(Expression expression)
         {
             var visitor = new FingerprintVisitor();
@@ -20,6 +27,13 @@ namespace nORM.Query
 
             public int Hash => _hash.ToHashCode();
 
+            /// <summary>
+            /// Visits each node in the expression tree, adding its type information to the running
+            /// hash used to compute the fingerprint. Constants are handled in specialized overrides
+            /// so they do not affect the fingerprint value.
+            /// </summary>
+            /// <param name="node">The current expression node.</param>
+            /// <returns>The visited expression.</returns>
             public override Expression? Visit(Expression? node)
             {
                 if (node == null)

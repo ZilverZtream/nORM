@@ -59,6 +59,13 @@ namespace nORM.Query
             var context = new VisitorContext(ctx ?? throw new ArgumentNullException(nameof(ctx)), mapping ?? throw new ArgumentNullException(nameof(mapping)), provider ?? throw new ArgumentNullException(nameof(provider)), parameter ?? throw new ArgumentNullException(nameof(parameter)), tableAlias ?? throw new ArgumentNullException(nameof(tableAlias)), correlated, compiledParams, paramMap);
             Initialize(in context);
         }
+        /// <summary>
+        /// Initializes the visitor with all context required to translate a LINQ expression into
+        /// SQL. This method can be called multiple times to reuse the same instance for different
+        /// translations.
+        /// </summary>
+        /// <param name="context">A structure containing the current <see cref="DbContext"/>,
+        /// table mapping, provider and parameter information.</param>
         public void Initialize(in VisitorContext context)
         {
             _paramSink = _params;
@@ -85,6 +92,10 @@ namespace nORM.Query
             _suppressNullCheck = false;
             _memberParamMap.Clear();
         }
+        /// <summary>
+        /// Resets the internal state so that the visitor can be returned to an object pool and
+        /// reused for subsequent translations.
+        /// </summary>
         public void Reset()
         {
             _sql = null!;
@@ -104,10 +115,20 @@ namespace nORM.Query
             _constParamMap.Clear();
             _memberParamMap.Clear();
         }
+        /// <summary>
+        /// Releases resources by resetting the visitor's state. The instance can be reused after
+        /// calling this method.
+        /// </summary>
         public void Dispose()
         {
             Reset();
         }
+        /// <summary>
+        /// Translates the supplied LINQ expression tree into an SQL string using the configured
+        /// provider and mapping information.
+        /// </summary>
+        /// <param name="expression">The expression to translate.</param>
+        /// <returns>The SQL text corresponding to the expression.</returns>
         public string Translate(Expression expression)
         {
             using var builder = new OptimizedSqlBuilder();
@@ -552,8 +573,21 @@ namespace nORM.Query
                 Value = value;
                 Type = type;
             }
+
+            /// <summary>
+            /// Determines equality with another <see cref="ConstKey"/> based on both the value and
+            /// the associated type.
+            /// </summary>
             public bool Equals(ConstKey other) => Equals(Value, other.Value) && Type == other.Type;
+
+            /// <summary>
+            /// Determines whether the specified object is equal to the current <see cref="ConstKey"/>.
+            /// </summary>
             public override bool Equals(object? obj) => obj is ConstKey other && Equals(other);
+
+            /// <summary>
+            /// Generates a hash code combining the value and type components.
+            /// </summary>
             public override int GetHashCode() => HashCode.Combine(Value, Type);
         }
         private string CreateSafeLikePattern(string value, LikeOperation operation)
