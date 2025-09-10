@@ -29,6 +29,12 @@ namespace nORM.Internal
             _timeToLive = timeToLive;
         }
 
+        /// <summary>
+        /// Sets the maximum number of entries the cache can hold. If the new size is
+        /// smaller than the current number of items, least recently used entries are evicted.
+        /// </summary>
+        /// <param name="maxSize">The new cache capacity.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="maxSize"/> is less than or equal to zero.</exception>
         public void SetMaxSize(int maxSize)
         {
             if (maxSize <= 0) throw new ArgumentOutOfRangeException(nameof(maxSize));
@@ -44,6 +50,9 @@ namespace nORM.Internal
             }
         }
 
+        /// <summary>
+        /// Clears all entries from the cache and resets hit/miss statistics.
+        /// </summary>
         public void Clear()
         {
             lock (_lock)
@@ -55,6 +64,13 @@ namespace nORM.Internal
             }
         }
 
+        /// <summary>
+        /// Attempts to retrieve a value from the cache. If found and not expired the entry is
+        /// promoted to the most recently used position.
+        /// </summary>
+        /// <param name="key">Key of the cached item.</param>
+        /// <param name="value">When this method returns, contains the cached value if found.</param>
+        /// <returns><c>true</c> if the value was found in the cache; otherwise <c>false</c>.</returns>
         public bool TryGet(TKey key, out TValue value)
         {
             // Lock-free lookup, then guarded promotion & TTL check

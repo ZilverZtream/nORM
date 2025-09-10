@@ -202,6 +202,15 @@ namespace nORM.Core
         private static bool IsSafeIdentifier(string name)
             => !string.IsNullOrWhiteSpace(name) && Regex.IsMatch(name, @"^[A-Za-z0-9_\.]+$");
 
+        /// <summary>
+        /// Creates a non-typed <see cref="IQueryable"/> over the specified table name.
+        /// This is primarily used for querying tables that do not have a compile-time
+        /// entity type, such as dynamic projections or tables discovered at runtime.
+        /// </summary>
+        /// <param name="tableName">Name of the table to query.</param>
+        /// <returns>An <see cref="IQueryable"/> representing the requested table.</returns>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="tableName"/> is null or empty.</exception>
+        /// <exception cref="NormUsageException">Thrown when the provided name contains invalid characters.</exception>
         public IQueryable Query(string tableName)
         {
             if (string.IsNullOrWhiteSpace(tableName))
@@ -240,6 +249,13 @@ namespace nORM.Core
             NormValidator.ValidateEntity(entity);
             return ChangeTracker.Track(entity, EntityState.Deleted, GetMapping(typeof(T)));
         }
+        /// <summary>
+        /// Returns the tracking entry for the specified entity instance and enables
+        /// lazy loading on the entity when applicable.
+        /// </summary>
+        /// <param name="entity">The entity whose tracking entry is requested.</param>
+        /// <returns>An <see cref="EntityEntry"/> representing the entity's tracking information.</returns>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="entity"/> is null or invalid.</exception>
         public EntityEntry Entry(object entity)
         {
             NormValidator.ValidateEntity(entity, nameof(entity));
@@ -247,6 +263,12 @@ namespace nORM.Core
             method.MakeGenericMethod(entity.GetType()).Invoke(null, new object[] { entity, this });
             return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(entity.GetType()));
         }
+
+        /// <summary>
+        /// Configures the context to automatically retry failed save operations
+        /// when the database reports a deadlock condition.
+        /// </summary>
+        /// <returns>The current <see cref="DbContextOptions"/> instance for fluent configuration.</returns>
         public DbContextOptions UseDeadlockResilientSaveChanges()
         {
             Options.RetryPolicy = new RetryPolicy
@@ -768,6 +790,11 @@ namespace nORM.Core
                 cmd.Transaction = _transaction;
                 return cmd;
             }
+            /// <summary>
+            /// Disposes the command scope. For pooled connections no additional
+            /// cleanup is required so a completed <see cref="ValueTask"/> is returned.
+            /// </summary>
+            /// <returns>A completed task representing the asynchronous dispose operation.</returns>
             public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
         #endregion
@@ -817,6 +844,16 @@ namespace nORM.Core
         #endregion
 
         #region Transaction Savepoints
+        /// <summary>
+        /// Creates a savepoint within the provided transaction. Savepoints allow portions of a
+        /// transaction to be rolled back without affecting the entire transaction scope.
+        /// </summary>
+        /// <param name="transaction">The active database transaction.</param>
+        /// <param name="name">Name of the savepoint to create.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A task that completes when the savepoint has been created.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when <paramref name="transaction"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is null or empty.</exception>
         public Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             if (transaction == null)
@@ -825,6 +862,16 @@ namespace nORM.Core
                 throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
             return _p.CreateSavepointAsync(transaction, name, ct);
         }
+
+        /// <summary>
+        /// Rolls back the specified transaction to a previously created savepoint.
+        /// </summary>
+        /// <param name="transaction">The active database transaction.</param>
+        /// <param name="name">Name of the savepoint to roll back to.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A task that completes when the transaction has been rolled back to the savepoint.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when <paramref name="transaction"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is null or empty.</exception>
         public Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             if (transaction == null)
@@ -1088,6 +1135,12 @@ namespace nORM.Core
         public object? GetShadowProperty(object entity, string name)
             => Internal.ShadowPropertyStore.Get(entity, name);
 
+        /// <summary>
+        /// Creates a temporal tag entry in the database. Temporal tags can be used to
+        /// correlate external events with the state of the database at a given time.
+        /// </summary>
+        /// <param name="tagName">The name of the tag to create.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         public async Task CreateTagAsync(string tagName)
         {
             await _executionStrategy.ExecuteAsync(async (ctx, ct) =>
@@ -1190,6 +1243,11 @@ namespace nORM.Core
             Dispose(true);
             GC.SuppressFinalize(this);
         }
+        /// <summary>
+        /// Asynchronously releases all resources used by the context, including
+        /// active connections and registered disposables.
+        /// </summary>
+        /// <returns>A task representing the asynchronous dispose operation.</returns>
         public async ValueTask DisposeAsync()
         {
             if (!_disposed)
