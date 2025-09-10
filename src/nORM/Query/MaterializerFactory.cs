@@ -796,6 +796,13 @@ namespace nORM.Query
             }
 
             public override int FieldCount => _fieldCount;
+            /// <summary>
+            /// Indicates that the value at the specified ordinal is always
+            /// <c>DBNull</c>. This allows materializer validation to proceed
+            /// without requiring actual data.
+            /// </summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <returns>Always returns <c>true</c>.</returns>
             public override bool IsDBNull(int ordinal) => true;
             /// <summary>
             /// Always reports the field as <c>DBNull</c> for validation purposes.
@@ -838,22 +845,59 @@ namespace nORM.Query
             public override Task<bool> NextResultAsync(CancellationToken cancellationToken) => Task.FromResult(false);
             public override int Depth => 0;
             public override int VisibleFieldCount => _fieldCount;
+            /// <summary>Returns the default Boolean value for validation.</summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <returns>Always <c>false</c>.</returns>
             public override bool GetBoolean(int ordinal) => default;
+
+            /// <summary>Returns the default byte value for validation.</summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <returns>Always <c>0</c>.</returns>
             public override byte GetByte(int ordinal) => default;
             public override long GetBytes(int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length) => 0;
+            /// <summary>Returns the default character value for validation.</summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <returns>The null character.</returns>
             public override char GetChar(int ordinal) => default;
             public override long GetChars(int ordinal, long dataOffset, char[]? buffer, int bufferOffset, int length) => 0;
             public override Guid GetGuid(int ordinal) => default;
             public override short GetInt16(int ordinal) => default;
             public override int GetInt32(int ordinal) => default;
             public override long GetInt64(int ordinal) => default;
+            /// <summary>Returns the default <see cref="DateTime"/> value.</summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <returns><see cref="DateTime.MinValue"/>.</returns>
             public override DateTime GetDateTime(int ordinal) => default;
+
+            /// <summary>Returns the default <see cref="decimal"/> value.</summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <returns>Always <c>0m</c>.</returns>
             public override decimal GetDecimal(int ordinal) => default;
+
+            /// <summary>Returns the default <see cref="double"/> value.</summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <returns>Always <c>0d</c>.</returns>
             public override double GetDouble(int ordinal) => default;
+
+            /// <summary>Returns the default <see cref="float"/> value.</summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <returns>Always <c>0f</c>.</returns>
             public override float GetFloat(int ordinal) => default;
+
+            /// <summary>
+            /// Returns an empty string to satisfy string retrieval during
+            /// validation.
+            /// </summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <returns>An empty string.</returns>
             public override string GetString(int ordinal) => string.Empty;
             public override T GetFieldValue<T>(int ordinal) => default!;
             public override Task<T> GetFieldValueAsync<T>(int ordinal, CancellationToken cancellationToken) => Task.FromResult(default(T)!);
+            /// <summary>
+            /// Schema information is not available for the validation reader and
+            /// attempting to access it will throw.
+            /// </summary>
+            /// <returns>Never returns; always throws <see cref="NotSupportedException"/>.</returns>
             public override System.Data.DataTable GetSchemaTable() => throw new NotSupportedException();
         }
 
@@ -929,18 +973,37 @@ namespace nORM.Query
                 return _mapping.Ordinals[ordinal];
             }
 
+            /// <summary>
+            /// Retrieves the value at the specified ordinal, applying the
+            /// precomputed ordinal mapping. Unmapped ordinals return
+            /// <see cref="DBNull.Value"/>.
+            /// </summary>
+            /// <param name="ordinal">The requested column ordinal.</param>
+            /// <returns>The value from the underlying reader or <see cref="DBNull.Value"/>.</returns>
             public override object GetValue(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.GetValue(mapped) : DBNull.Value;
             }
 
+            /// <summary>
+            /// Determines whether the value at the specified ordinal is
+            /// <c>DBNull</c>, respecting the ordinal mapping.
+            /// </summary>
+            /// <param name="ordinal">The ordinal to evaluate.</param>
+            /// <returns><c>true</c> if the column is unmapped or contains <c>DBNull</c>.</returns>
             public override bool IsDBNull(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.IsDBNull(mapped) : true;
             }
 
+            /// <summary>
+            /// Gets the name of the column at the specified ordinal, or a
+            /// synthetic name if the ordinal is unmapped.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal.</param>
+            /// <returns>The column name or a generated name for unmapped ordinals.</returns>
             public override string GetName(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
@@ -948,7 +1011,20 @@ namespace nORM.Query
             }
 
             public override int FieldCount => Math.Max(_inner.FieldCount, _mapping.Ordinals.Length);
+            /// <summary>
+            /// Retrieves the ordinal of the column with the given name directly
+            /// from the underlying reader.
+            /// </summary>
+            /// <param name="name">The column name.</param>
+            /// <returns>The ordinal of the named column.</returns>
             public override int GetOrdinal(string name) => _inner.GetOrdinal(name);
+
+            /// <summary>
+            /// Returns the data type of the column at the specified ordinal,
+            /// falling back to <see cref="object"/> for unmapped ordinals.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal.</param>
+            /// <returns>The column's <see cref="Type"/>.</returns>
             public override Type GetFieldType(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
@@ -960,6 +1036,11 @@ namespace nORM.Query
             public override bool HasRows => _inner.HasRows;
             public override bool IsClosed => _inner.IsClosed;
             public override int RecordsAffected => _inner.RecordsAffected;
+            /// <summary>
+            /// Advances the reader to the next record, delegating to the inner
+            /// reader.
+            /// </summary>
+            /// <returns><c>true</c> if the next record was read.</returns>
             public override bool Read() => _inner.Read();
             /// <summary>
             /// Asynchronously reads the next row, delegating to the inner reader while applying ordinal mapping.
@@ -967,6 +1048,11 @@ namespace nORM.Query
             /// <param name="cancellationToken">Token used to cancel the read operation.</param>
             /// <returns>A task that resolves to <c>true</c> if a row was read.</returns>
             public override Task<bool> ReadAsync(CancellationToken cancellationToken) => _inner.ReadAsync(cancellationToken);
+            /// <summary>
+            /// Advances the reader to the next result set, delegating to the
+            /// inner reader.
+            /// </summary>
+            /// <returns><c>true</c> if another result set is available.</returns>
             public override bool NextResult() => _inner.NextResult();
             /// <summary>
             /// Advances to the next result set asynchronously.
@@ -974,10 +1060,27 @@ namespace nORM.Query
             /// <param name="cancellationToken">Token used to cancel the operation.</param>
             /// <returns>A task that resolves to <c>true</c> if another result set is available.</returns>
             public override Task<bool> NextResultAsync(CancellationToken cancellationToken) => _inner.NextResultAsync(cancellationToken);
+            /// <summary>
+            /// Populates the provided array with column values from the current
+            /// row using the ordinal mapping.
+            /// </summary>
+            /// <param name="values">Destination array for the values.</param>
+            /// <returns>The number of values copied.</returns>
             public override int GetValues(object[] values) => _inner.GetValues(values);
             public override object this[int ordinal] => GetValue(ordinal);
             public override object this[string name] => _inner[name];
+            /// <summary>
+            /// Gets the data type name of the column at the specified ordinal via
+            /// the underlying reader.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal.</param>
+            /// <returns>The database-specific type name.</returns>
             public override string GetDataTypeName(int ordinal) => _inner.GetDataTypeName(MapOrdinal(ordinal));
+            /// <summary>
+            /// Returns an enumerator that iterates through the rows of the data
+            /// reader.
+            /// </summary>
+            /// <returns>An <see cref="IEnumerator"/> over the reader.</returns>
             public override IEnumerator GetEnumerator() => ((IEnumerable)_inner).GetEnumerator();
 
             // Typed getters with ordinal mapping
