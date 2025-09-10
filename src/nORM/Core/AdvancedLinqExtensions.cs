@@ -136,6 +136,15 @@ namespace nORM.Core
                 $"For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.{aggregateFunction}Async().");
         }
 
+        /// <summary>
+        /// Builds an expression tree that represents invoking the requested
+        /// aggregate function (<c>Sum</c>, <c>Average</c>, <c>Min</c>, <c>Max</c>)
+        /// over the given source with the provided selector.
+        /// </summary>
+        /// <param name="sourceExpression">The expression representing the source sequence.</param>
+        /// <param name="selector">Lambda selecting the value to aggregate.</param>
+        /// <param name="function">Name of the aggregate function to call.</param>
+        /// <returns>An <see cref="Expression"/> that can be executed by the query provider.</returns>
         private static Expression CreateAggregateExpression(Expression sourceExpression, LambdaExpression selector, string function)
         {
             var sourceType = sourceExpression.Type.GetGenericArguments()[0];
@@ -152,6 +161,14 @@ namespace nORM.Core
             return Expression.Call(null, genericMethod, sourceExpression, selector);
         }
 
+        /// <summary>
+        /// Resolves the appropriate generic <see cref="Queryable"/> method that
+        /// matches the selector's return type for the specified aggregate operation.
+        /// </summary>
+        /// <param name="cache">A lookup of selector types to aggregate methods.</param>
+        /// <param name="selectorType">The return type of the selector expression.</param>
+        /// <returns>The matching <see cref="MethodInfo"/> for the aggregate call.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when no suitable method is found.</exception>
         private static MethodInfo GetAggregateMethod(IReadOnlyDictionary<Type, MethodInfo> cache, Type selectorType)
         {
             if (!cache.TryGetValue(selectorType, out var method))

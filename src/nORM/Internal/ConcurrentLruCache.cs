@@ -153,12 +153,26 @@ namespace nORM.Internal
         public long Misses => Interlocked.Read(ref _misses);
         public double HitRate => Hits + Misses == 0 ? 0 : (double)Hits / (Hits + Misses);
 
+        /// <summary>
+        /// Determines whether the specified cache <paramref name="item"/> has
+        /// exceeded its time-to-live and should be considered expired.
+        /// </summary>
+        /// <param name="item">The cache entry to inspect.</param>
+        /// <returns><c>true</c> if the entry is expired; otherwise <c>false</c>.</returns>
         private bool IsExpired(CacheItem item)
         {
             var ttl = item.TtlOverride ?? _timeToLive;
             return ttl.HasValue && DateTimeOffset.UtcNow - item.Created > ttl.Value;
         }
 
+        /// <summary>
+        /// Represents a cache entry along with its creation time and optional
+        /// time-to-live override.
+        /// </summary>
+        /// <param name="Key">The key associated with the cached value.</param>
+        /// <param name="Value">The cached value.</param>
+        /// <param name="Created">Timestamp indicating when the entry was created.</param>
+        /// <param name="TtlOverride">Optional TTL overriding the cache's default.</param>
         private readonly record struct CacheItem(TKey Key, TValue Value, DateTimeOffset Created, TimeSpan? TtlOverride);
     }
 }
