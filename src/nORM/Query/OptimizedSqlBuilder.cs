@@ -26,6 +26,11 @@ namespace nORM.Query
 
         public int Length => _position;
 
+        /// <summary>
+        /// Appends a string to the builder if the value is not <c>null</c>.
+        /// </summary>
+        /// <param name="value">The string to append.</param>
+        /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder Append(string? value)
         {
             if (value != null)
@@ -33,6 +38,11 @@ namespace nORM.Query
             return this;
         }
 
+        /// <summary>
+        /// Appends the specified span of characters to the builder.
+        /// </summary>
+        /// <param name="value">The characters to append.</param>
+        /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder Append(ReadOnlySpan<char> value)
         {
             EnsureCapacity(value.Length);
@@ -41,6 +51,11 @@ namespace nORM.Query
             return this;
         }
 
+        /// <summary>
+        /// Appends a single character to the builder.
+        /// </summary>
+        /// <param name="value">The character to append.</param>
+        /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder Append(char value)
         {
             EnsureCapacity(1);
@@ -48,8 +63,18 @@ namespace nORM.Query
             return this;
         }
 
+        /// <summary>
+        /// Appends a pre-constructed SQL fragment to the builder.
+        /// </summary>
+        /// <param name="value">The fragment to append.</param>
+        /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder AppendFragment(string value) => Append(value);
 
+        /// <summary>
+        /// Appends a <c>SELECT</c> keyword and the provided column list.
+        /// </summary>
+        /// <param name="columns">Columns to include in the <c>SELECT</c> clause.</param>
+        /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder AppendSelect(ReadOnlySpan<char> columns)
         {
             Append("SELECT ");
@@ -58,6 +83,12 @@ namespace nORM.Query
             return this;
         }
 
+        /// <summary>
+        /// Appends a SQL aggregate function invocation such as <c>COUNT(column)</c>.
+        /// </summary>
+        /// <param name="function">Name of the aggregate function.</param>
+        /// <param name="column">Column to aggregate.</param>
+        /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder AppendAggregateFunction(ReadOnlySpan<char> function, ReadOnlySpan<char> column)
         {
             Append(function);
@@ -67,6 +98,14 @@ namespace nORM.Query
             return this;
         }
 
+        /// <summary>
+        /// Appends a parameter placeholder and stores its value in the supplied
+        /// dictionary for later use when executing a command.
+        /// </summary>
+        /// <param name="paramName">The name of the parameter including prefix.</param>
+        /// <param name="value">The value to associate with the parameter.</param>
+        /// <param name="parameters">Dictionary that collects parameter values.</param>
+        /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder AppendParameterizedValue(string paramName, object? value, IDictionary<string, object> parameters)
         {
             Append(paramName.AsSpan());
@@ -74,6 +113,12 @@ namespace nORM.Query
             return this;
         }
 
+        /// <summary>
+        /// Appends a collection of values separated by the specified separator string.
+        /// </summary>
+        /// <param name="separator">Separator to insert between values.</param>
+        /// <param name="values">Values to append.</param>
+        /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder AppendJoin(string separator, IEnumerable<string> values)
         {
             using var e = values.GetEnumerator();
@@ -89,6 +134,12 @@ namespace nORM.Query
             return this;
         }
 
+        /// <summary>
+        /// Removes a range of characters from the builder.
+        /// </summary>
+        /// <param name="startIndex">The starting index of the range to remove.</param>
+        /// <param name="length">The number of characters to remove.</param>
+        /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder Remove(int startIndex, int length)
         {
             _buffer.AsSpan(startIndex + length, _position - (startIndex + length))
@@ -97,6 +148,12 @@ namespace nORM.Query
             return this;
         }
 
+        /// <summary>
+        /// Inserts the specified string at the given index within the builder.
+        /// </summary>
+        /// <param name="index">Position at which to insert the string.</param>
+        /// <param name="value">String to insert.</param>
+        /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder Insert(int index, string value)
         {
             var span = value.AsSpan();
@@ -160,6 +217,12 @@ namespace nORM.Query
         }
 
 
+        /// <summary>
+        /// Reserves additional capacity in the underlying buffer to reduce future
+        /// reallocations when appending large amounts of data.
+        /// </summary>
+        /// <param name="additionalCapacity">The number of extra characters to reserve space for.</param>
+        /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder Reserve(int additionalCapacity)
         {
             EnsureCapacity(additionalCapacity);
