@@ -30,6 +30,11 @@ namespace nORM.Navigation
         private static readonly ConditionalWeakTable<DbContext, BatchedNavigationLoader> _navigationLoaders = new();
         private static readonly ConcurrentDictionary<BatchedNavigationLoader, byte> _activeLoaders = new();
 
+        /// <summary>
+        /// Registers a <see cref="BatchedNavigationLoader"/> so that pending navigation requests
+        /// can be tracked and cleaned up when entities are disposed.
+        /// </summary>
+        /// <param name="loader">The loader instance to register.</param>
         internal static void RegisterLoader(BatchedNavigationLoader loader) => _activeLoaders[loader] = 0;
         internal static void UnregisterLoader(BatchedNavigationLoader loader) => _activeLoaders.TryRemove(loader, out _);
 

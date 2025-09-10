@@ -57,6 +57,12 @@ namespace nORM.Migration
             return new MigrationSqlStatements(up, down);
         }
 
+        /// <summary>
+        /// Determines the SQL Server column type corresponding to the supplied column schema.
+        /// Types not present in the internal mapping fall back to <c>NVARCHAR(MAX)</c>.
+        /// </summary>
+        /// <param name="column">The column description including the CLR type.</param>
+        /// <returns>The SQL Server data type name.</returns>
         private static string GetSqlType(ColumnSchema column)
             => TypeMap.TryGetValue(column.ClrType, out var sql) ? sql : "NVARCHAR(MAX)";
     }

@@ -218,6 +218,12 @@ AFTER INSERT OR UPDATE OR DELETE ON {table}
 FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         }
 
+        /// <summary>
+        /// Ensures that the provided connection is compatible with the PostgreSQL provider
+        /// by verifying its runtime type.
+        /// </summary>
+        /// <param name="connection">The connection instance to validate.</param>
+        /// <exception cref="InvalidOperationException">Thrown when the connection is not an Npgsql connection.</exception>
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);

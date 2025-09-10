@@ -132,6 +132,20 @@ namespace nORM.Query
             }
         }
 
+        /// <summary>
+        /// Reads a single level of related entities from the <paramref name="reader"/> and
+        /// associates them with their corresponding parent objects. The method materializes
+        /// each record, optionally tracks it, and groups children by foreign key so they can
+        /// be assigned back to their principals.
+        /// </summary>
+        /// <param name="relation">The relationship metadata describing the association.</param>
+        /// <param name="childMap">Mapping information for the dependent type.</param>
+        /// <param name="materializer">Delegate that converts a data record into an entity.</param>
+        /// <param name="parents">The parent entities for which related data is being loaded.</param>
+        /// <param name="reader">Data reader positioned at the result set for this level.</param>
+        /// <param name="ct">Cancellation token for the asynchronous operation.</param>
+        /// <param name="noTracking">If <c>true</c>, entities are not tracked by the context.</param>
+        /// <returns>A list of all materialized child entities for the level.</returns>
         private async Task<IList> ProcessLevelAsync(
             TableMapping.Relation relation,
             TableMapping childMap,

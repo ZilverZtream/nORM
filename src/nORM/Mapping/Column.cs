@@ -144,6 +144,15 @@ namespace nORM.Mapping
             return (Func<object, object?>)dm.CreateDelegate(typeof(Func<object, object?>));
         }
 
+        /// <summary>
+        /// Creates a compiled delegate capable of setting the value of the specified property on a
+        /// target object instance. The delegate performs the necessary boxing or casting so that
+        /// repeated property assignments can be performed without the overhead of reflection.
+        /// </summary>
+        /// <param name="property">The property for which a setter delegate should be created.</param>
+        /// <returns>
+        /// An <see cref="Action{T1,T2}"/> that assigns a value to the provided object's property.
+        /// </returns>
         private static Action<object, object?> CreateSetterDelegate(PropertyInfo property)
         {
             var dm = new DynamicMethod("set_" + property.Name, null, new[] { typeof(object), typeof(object) }, property.DeclaringType!.Module, true);

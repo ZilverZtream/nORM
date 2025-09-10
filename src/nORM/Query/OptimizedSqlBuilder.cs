@@ -141,6 +141,11 @@ namespace nORM.Query
             ArrayPool<char>.Shared.Return(buffer);
         }
 
+        /// <summary>
+        /// Ensures that the internal buffer has enough space to accommodate the specified
+        /// number of additional characters, resizing and copying the buffer when necessary.
+        /// </summary>
+        /// <param name="additional">The number of characters that need to be appended.</param>
         private void EnsureCapacity(int additional)
         {
             var required = _position + additional;
