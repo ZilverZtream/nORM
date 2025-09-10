@@ -1,0 +1,1113 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Enterprise.ISaveChangesInterceptor
+  commentId: T:nORM.Enterprise.ISaveChangesInterceptor
+  id: ISaveChangesInterceptor
+  parent: nORM.Enterprise
+  children:
+  - nORM.Enterprise.ISaveChangesInterceptor.SavedChangesAsync(nORM.Core.DbContext,System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry},System.Int32,System.Threading.CancellationToken)
+  - nORM.Enterprise.ISaveChangesInterceptor.SavingChangesAsync(nORM.Core.DbContext,System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry},System.Threading.CancellationToken)
+  langs:
+  - csharp
+  - vb
+  name: ISaveChangesInterceptor
+  nameWithType: ISaveChangesInterceptor
+  fullName: nORM.Enterprise.ISaveChangesInterceptor
+  type: Interface
+  source:
+    remote:
+      path: src/nORM/Enterprise/ISaveChangesInterceptor.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ISaveChangesInterceptor
+    path: src/nORM/Enterprise/ISaveChangesInterceptor.cs
+    startLine: 13
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  summary: >-
+    Provides hooks that run before and after <xref href="nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref>.
+
+    Implementations may inspect or modify tracked entities or react to persistence results.
+  example: []
+  syntax:
+    content: public interface ISaveChangesInterceptor
+    content.vb: Public Interface ISaveChangesInterceptor
+  extensionMethods:
+  - nORM.Enterprise.ISaveChangesInterceptor.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  - nORM.Enterprise.ISaveChangesInterceptor.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,{TProperty}}})
+  - nORM.Enterprise.ISaveChangesInterceptor.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  - nORM.Enterprise.ISaveChangesInterceptor.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Enterprise.ISaveChangesInterceptor.SavingChangesAsync(nORM.Core.DbContext,System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry},System.Threading.CancellationToken)
+  commentId: M:nORM.Enterprise.ISaveChangesInterceptor.SavingChangesAsync(nORM.Core.DbContext,System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry},System.Threading.CancellationToken)
+  id: SavingChangesAsync(nORM.Core.DbContext,System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry},System.Threading.CancellationToken)
+  parent: nORM.Enterprise.ISaveChangesInterceptor
+  langs:
+  - csharp
+  - vb
+  name: SavingChangesAsync(DbContext, IReadOnlyList<EntityEntry>, CancellationToken)
+  nameWithType: ISaveChangesInterceptor.SavingChangesAsync(DbContext, IReadOnlyList<EntityEntry>, CancellationToken)
+  fullName: nORM.Enterprise.ISaveChangesInterceptor.SavingChangesAsync(nORM.Core.DbContext, System.Collections.Generic.IReadOnlyList<nORM.Core.EntityEntry>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/ISaveChangesInterceptor.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SavingChangesAsync
+    path: src/nORM/Enterprise/ISaveChangesInterceptor.cs
+    startLine: 18
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  summary: Called before any changes are persisted to the database.
+  example: []
+  syntax:
+    content: Task SavingChangesAsync(DbContext context, IReadOnlyList<EntityEntry> entries, CancellationToken cancellationToken)
+    parameters:
+    - id: context
+      type: nORM.Core.DbContext
+    - id: entries
+      type: System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry}
+    - id: cancellationToken
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Function SavingChangesAsync(context As DbContext, entries As IReadOnlyList(Of EntityEntry), cancellationToken As CancellationToken) As Task
+  overload: nORM.Enterprise.ISaveChangesInterceptor.SavingChangesAsync*
+  nameWithType.vb: ISaveChangesInterceptor.SavingChangesAsync(DbContext, IReadOnlyList(Of EntityEntry), CancellationToken)
+  fullName.vb: nORM.Enterprise.ISaveChangesInterceptor.SavingChangesAsync(nORM.Core.DbContext, System.Collections.Generic.IReadOnlyList(Of nORM.Core.EntityEntry), System.Threading.CancellationToken)
+  name.vb: SavingChangesAsync(DbContext, IReadOnlyList(Of EntityEntry), CancellationToken)
+- uid: nORM.Enterprise.ISaveChangesInterceptor.SavedChangesAsync(nORM.Core.DbContext,System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry},System.Int32,System.Threading.CancellationToken)
+  commentId: M:nORM.Enterprise.ISaveChangesInterceptor.SavedChangesAsync(nORM.Core.DbContext,System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry},System.Int32,System.Threading.CancellationToken)
+  id: SavedChangesAsync(nORM.Core.DbContext,System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry},System.Int32,System.Threading.CancellationToken)
+  parent: nORM.Enterprise.ISaveChangesInterceptor
+  langs:
+  - csharp
+  - vb
+  name: SavedChangesAsync(DbContext, IReadOnlyList<EntityEntry>, int, CancellationToken)
+  nameWithType: ISaveChangesInterceptor.SavedChangesAsync(DbContext, IReadOnlyList<EntityEntry>, int, CancellationToken)
+  fullName: nORM.Enterprise.ISaveChangesInterceptor.SavedChangesAsync(nORM.Core.DbContext, System.Collections.Generic.IReadOnlyList<nORM.Core.EntityEntry>, int, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/ISaveChangesInterceptor.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SavedChangesAsync
+    path: src/nORM/Enterprise/ISaveChangesInterceptor.cs
+    startLine: 23
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  summary: Called after changes have been persisted to the database.
+  example: []
+  syntax:
+    content: Task SavedChangesAsync(DbContext context, IReadOnlyList<EntityEntry> entries, int result, CancellationToken cancellationToken)
+    parameters:
+    - id: context
+      type: nORM.Core.DbContext
+    - id: entries
+      type: System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry}
+    - id: result
+      type: System.Int32
+    - id: cancellationToken
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Function SavedChangesAsync(context As DbContext, entries As IReadOnlyList(Of EntityEntry), result As Integer, cancellationToken As CancellationToken) As Task
+  overload: nORM.Enterprise.ISaveChangesInterceptor.SavedChangesAsync*
+  nameWithType.vb: ISaveChangesInterceptor.SavedChangesAsync(DbContext, IReadOnlyList(Of EntityEntry), Integer, CancellationToken)
+  fullName.vb: nORM.Enterprise.ISaveChangesInterceptor.SavedChangesAsync(nORM.Core.DbContext, System.Collections.Generic.IReadOnlyList(Of nORM.Core.EntityEntry), Integer, System.Threading.CancellationToken)
+  name.vb: SavedChangesAsync(DbContext, IReadOnlyList(Of EntityEntry), Integer, CancellationToken)
+references:
+- uid: nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_SaveChangesAsync_System_Threading_CancellationToken_
+  name: SaveChangesAsync(CancellationToken)
+  nameWithType: DbContext.SaveChangesAsync(CancellationToken)
+  fullName: nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
+    name: SaveChangesAsync
+    href: nORM.Core.DbContext.html#nORM_Core_DbContext_SaveChangesAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
+    name: SaveChangesAsync
+    href: nORM.Core.DbContext.html#nORM_Core_DbContext_SaveChangesAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Enterprise
+  commentId: N:nORM.Enterprise
+  href: nORM.html
+  name: nORM.Enterprise
+  nameWithType: nORM.Enterprise
+  fullName: nORM.Enterprise
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Enterprise
+    name: Enterprise
+    href: nORM.Enterprise.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Enterprise
+    name: Enterprise
+    href: nORM.Enterprise.html
+- uid: nORM.Enterprise.ISaveChangesInterceptor.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<ISaveChangesInterceptor>(ISaveChangesInterceptor, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<ISaveChangesInterceptor>(ISaveChangesInterceptor, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<nORM.Enterprise.ISaveChangesInterceptor>(nORM.Enterprise.ISaveChangesInterceptor, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of ISaveChangesInterceptor)(ISaveChangesInterceptor, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of nORM.Enterprise.ISaveChangesInterceptor)(nORM.Enterprise.ISaveChangesInterceptor, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of ISaveChangesInterceptor)(ISaveChangesInterceptor, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Enterprise.ISaveChangesInterceptor,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: '>'
+  - name: (
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Enterprise.ISaveChangesInterceptor,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: )
+  - name: (
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Enterprise.ISaveChangesInterceptor.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,{TProperty}}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<ISaveChangesInterceptor, TProperty>(ISaveChangesInterceptor, Expression<Func<ISaveChangesInterceptor, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<ISaveChangesInterceptor, TProperty>(ISaveChangesInterceptor, Expression<Func<ISaveChangesInterceptor, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<nORM.Enterprise.ISaveChangesInterceptor, TProperty>(nORM.Enterprise.ISaveChangesInterceptor, System.Linq.Expressions.Expression<System.Func<nORM.Enterprise.ISaveChangesInterceptor, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of ISaveChangesInterceptor, TProperty)(ISaveChangesInterceptor, Expression(Of Func(Of ISaveChangesInterceptor, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of nORM.Enterprise.ISaveChangesInterceptor, TProperty)(nORM.Enterprise.ISaveChangesInterceptor, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Enterprise.ISaveChangesInterceptor, TProperty)))
+  name.vb: IsLoaded(Of ISaveChangesInterceptor, TProperty)(ISaveChangesInterceptor, Expression(Of Func(Of ISaveChangesInterceptor, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Enterprise.ISaveChangesInterceptor,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Enterprise.ISaveChangesInterceptor,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Enterprise.ISaveChangesInterceptor.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<ISaveChangesInterceptor, TProperty>(ISaveChangesInterceptor, Expression<Func<ISaveChangesInterceptor, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<ISaveChangesInterceptor, TProperty>(ISaveChangesInterceptor, Expression<Func<ISaveChangesInterceptor, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Enterprise.ISaveChangesInterceptor, TProperty>(nORM.Enterprise.ISaveChangesInterceptor, System.Linq.Expressions.Expression<System.Func<nORM.Enterprise.ISaveChangesInterceptor, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of ISaveChangesInterceptor, TProperty)(ISaveChangesInterceptor, Expression(Of Func(Of ISaveChangesInterceptor, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Enterprise.ISaveChangesInterceptor, TProperty)(nORM.Enterprise.ISaveChangesInterceptor, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Enterprise.ISaveChangesInterceptor, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of ISaveChangesInterceptor, TProperty)(ISaveChangesInterceptor, Expression(Of Func(Of ISaveChangesInterceptor, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Enterprise.ISaveChangesInterceptor,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Enterprise.ISaveChangesInterceptor,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Enterprise.ISaveChangesInterceptor.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,{TProperty}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<ISaveChangesInterceptor, TProperty>(ISaveChangesInterceptor, Expression<Func<ISaveChangesInterceptor, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<ISaveChangesInterceptor, TProperty>(ISaveChangesInterceptor, Expression<Func<ISaveChangesInterceptor, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Enterprise.ISaveChangesInterceptor, TProperty>(nORM.Enterprise.ISaveChangesInterceptor, System.Linq.Expressions.Expression<System.Func<nORM.Enterprise.ISaveChangesInterceptor, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of ISaveChangesInterceptor, TProperty)(ISaveChangesInterceptor, Expression(Of Func(Of ISaveChangesInterceptor, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Enterprise.ISaveChangesInterceptor, TProperty)(nORM.Enterprise.ISaveChangesInterceptor, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Enterprise.ISaveChangesInterceptor, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of ISaveChangesInterceptor, TProperty)(ISaveChangesInterceptor, Expression(Of Func(Of ISaveChangesInterceptor, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Enterprise.ISaveChangesInterceptor,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Enterprise.ISaveChangesInterceptor,System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.ISaveChangesInterceptor,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Enterprise.ISaveChangesInterceptor
+    name: ISaveChangesInterceptor
+    href: nORM.Enterprise.ISaveChangesInterceptor.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<T>(T, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<T>(T, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<T>(T, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of T)(T, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+- uid: nORM.Enterprise.ISaveChangesInterceptor.SavingChangesAsync*
+  commentId: Overload:nORM.Enterprise.ISaveChangesInterceptor.SavingChangesAsync
+  href: nORM.Enterprise.ISaveChangesInterceptor.html#nORM_Enterprise_ISaveChangesInterceptor_SavingChangesAsync_nORM_Core_DbContext_System_Collections_Generic_IReadOnlyList_nORM_Core_EntityEntry__System_Threading_CancellationToken_
+  name: SavingChangesAsync
+  nameWithType: ISaveChangesInterceptor.SavingChangesAsync
+  fullName: nORM.Enterprise.ISaveChangesInterceptor.SavingChangesAsync
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry}
+  commentId: T:System.Collections.Generic.IReadOnlyList{nORM.Core.EntityEntry}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<EntityEntry>
+  nameWithType: IReadOnlyList<EntityEntry>
+  fullName: System.Collections.Generic.IReadOnlyList<nORM.Core.EntityEntry>
+  nameWithType.vb: IReadOnlyList(Of EntityEntry)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of nORM.Core.EntityEntry)
+  name.vb: IReadOnlyList(Of EntityEntry)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: nORM.Core.EntityEntry
+    name: EntityEntry
+    href: nORM.Core.EntityEntry.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.EntityEntry
+    name: EntityEntry
+    href: nORM.Core.EntityEntry.html
+  - name: )
+- uid: System.Threading.CancellationToken
+  commentId: T:System.Threading.CancellationToken
+  parent: System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  name: CancellationToken
+  nameWithType: CancellationToken
+  fullName: System.Threading.CancellationToken
+- uid: System.Threading.Tasks.Task
+  commentId: T:System.Threading.Tasks.Task
+  parent: System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task
+  name: Task
+  nameWithType: Task
+  fullName: System.Threading.Tasks.Task
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: System.Collections.Generic.IReadOnlyList`1
+  commentId: T:System.Collections.Generic.IReadOnlyList`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<T>
+  nameWithType: IReadOnlyList<T>
+  fullName: System.Collections.Generic.IReadOnlyList<T>
+  nameWithType.vb: IReadOnlyList(Of T)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of T)
+  name.vb: IReadOnlyList(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: System.Threading
+  commentId: N:System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading
+  nameWithType: System.Threading
+  fullName: System.Threading
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+- uid: System.Threading.Tasks
+  commentId: N:System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading.Tasks
+  nameWithType: System.Threading.Tasks
+  fullName: System.Threading.Tasks
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: nORM.Enterprise.ISaveChangesInterceptor.SavedChangesAsync*
+  commentId: Overload:nORM.Enterprise.ISaveChangesInterceptor.SavedChangesAsync
+  href: nORM.Enterprise.ISaveChangesInterceptor.html#nORM_Enterprise_ISaveChangesInterceptor_SavedChangesAsync_nORM_Core_DbContext_System_Collections_Generic_IReadOnlyList_nORM_Core_EntityEntry__System_Int32_System_Threading_CancellationToken_
+  name: SavedChangesAsync
+  nameWithType: ISaveChangesInterceptor.SavedChangesAsync
+  fullName: nORM.Enterprise.ISaveChangesInterceptor.SavedChangesAsync
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System

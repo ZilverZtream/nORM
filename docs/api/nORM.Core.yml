@@ -1,0 +1,462 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  id: nORM.Core
+  children:
+  - nORM.Core.AdvancedLinqExtensions
+  - nORM.Core.AsyncConnectionManager
+  - nORM.Core.CacheableExtensions
+  - nORM.Core.ChangeTracker
+  - nORM.Core.ConnectionManager
+  - nORM.Core.ConnectionPool
+  - nORM.Core.ConnectionPoolOptions
+  - nORM.Core.DatabaseFacade
+  - nORM.Core.DatabaseTopology
+  - nORM.Core.DatabaseTopology.DatabaseNode
+  - nORM.Core.DatabaseTopology.DatabaseRole
+  - nORM.Core.DbConcurrencyException
+  - nORM.Core.DbContext
+  - nORM.Core.DbContextTransaction
+  - nORM.Core.EntityEntry
+  - nORM.Core.EntityState
+  - nORM.Core.IMemoryMonitor
+  - nORM.Core.INormIncludableQueryable`2
+  - nORM.Core.INormQueryable`1
+  - nORM.Core.Json
+  - nORM.Core.Norm
+  - nORM.Core.NormAsyncExtensions
+  - nORM.Core.NormAsyncPolicy
+  - nORM.Core.NormConfigurationException
+  - nORM.Core.NormConnectionException
+  - nORM.Core.NormDatabaseException
+  - nORM.Core.NormException
+  - nORM.Core.NormExceptionHandler
+  - nORM.Core.NormIncludableQueryableExtensions
+  - nORM.Core.NormMemoryCacheProvider
+  - nORM.Core.NormQueryException
+  - nORM.Core.NormQueryable
+  - nORM.Core.NormTimeoutException
+  - nORM.Core.NormUnsupportedFeatureException
+  - nORM.Core.NormUsageException
+  - nORM.Core.NormValidator
+  - nORM.Core.OutputParameter
+  - nORM.Core.QueryTrackingBehavior
+  - nORM.Core.SetPropertyCalls`1
+  - nORM.Core.StoredProcedureResult`1
+  - nORM.Core.TemporalExtensions
+  - nORM.Core.WindowFunctionsExtensions
+  langs:
+  - csharp
+  - vb
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  type: Namespace
+  assemblies:
+  - nORM
+references:
+- uid: nORM.Core.AdvancedLinqExtensions
+  commentId: T:nORM.Core.AdvancedLinqExtensions
+  href: nORM.Core.AdvancedLinqExtensions.html
+  name: AdvancedLinqExtensions
+  nameWithType: AdvancedLinqExtensions
+  fullName: nORM.Core.AdvancedLinqExtensions
+- uid: nORM.Core.AsyncConnectionManager
+  commentId: T:nORM.Core.AsyncConnectionManager
+  href: nORM.Core.AsyncConnectionManager.html
+  name: AsyncConnectionManager
+  nameWithType: AsyncConnectionManager
+  fullName: nORM.Core.AsyncConnectionManager
+- uid: nORM.Core.CacheableExtensions
+  commentId: T:nORM.Core.CacheableExtensions
+  parent: nORM.Core
+  href: nORM.Core.CacheableExtensions.html
+  name: CacheableExtensions
+  nameWithType: CacheableExtensions
+  fullName: nORM.Core.CacheableExtensions
+- uid: nORM.Core.ChangeTracker
+  commentId: T:nORM.Core.ChangeTracker
+  parent: nORM.Core
+  href: nORM.Core.ChangeTracker.html
+  name: ChangeTracker
+  nameWithType: ChangeTracker
+  fullName: nORM.Core.ChangeTracker
+- uid: nORM.Core.ConnectionManager
+  commentId: T:nORM.Core.ConnectionManager
+  href: nORM.Core.ConnectionManager.html
+  name: ConnectionManager
+  nameWithType: ConnectionManager
+  fullName: nORM.Core.ConnectionManager
+- uid: nORM.Core.ConnectionPool
+  commentId: T:nORM.Core.ConnectionPool
+  href: nORM.Core.ConnectionPool.html
+  name: ConnectionPool
+  nameWithType: ConnectionPool
+  fullName: nORM.Core.ConnectionPool
+- uid: nORM.Core.ConnectionPoolOptions
+  commentId: T:nORM.Core.ConnectionPoolOptions
+  parent: nORM.Core
+  href: nORM.Core.ConnectionPoolOptions.html
+  name: ConnectionPoolOptions
+  nameWithType: ConnectionPoolOptions
+  fullName: nORM.Core.ConnectionPoolOptions
+- uid: nORM.Core.DatabaseFacade
+  commentId: T:nORM.Core.DatabaseFacade
+  parent: nORM.Core
+  href: nORM.Core.DatabaseFacade.html
+  name: DatabaseFacade
+  nameWithType: DatabaseFacade
+  fullName: nORM.Core.DatabaseFacade
+- uid: nORM.Core.DatabaseTopology
+  commentId: T:nORM.Core.DatabaseTopology
+  parent: nORM.Core
+  href: nORM.Core.DatabaseTopology.html
+  name: DatabaseTopology
+  nameWithType: DatabaseTopology
+  fullName: nORM.Core.DatabaseTopology
+- uid: nORM.Core.DatabaseTopology.DatabaseNode
+  commentId: T:nORM.Core.DatabaseTopology.DatabaseNode
+  href: nORM.Core.DatabaseTopology.html
+  name: DatabaseTopology.DatabaseNode
+  nameWithType: DatabaseTopology.DatabaseNode
+  fullName: nORM.Core.DatabaseTopology.DatabaseNode
+  spec.csharp:
+  - uid: nORM.Core.DatabaseTopology
+    name: DatabaseTopology
+    href: nORM.Core.DatabaseTopology.html
+  - name: .
+  - uid: nORM.Core.DatabaseTopology.DatabaseNode
+    name: DatabaseNode
+    href: nORM.Core.DatabaseTopology.DatabaseNode.html
+  spec.vb:
+  - uid: nORM.Core.DatabaseTopology
+    name: DatabaseTopology
+    href: nORM.Core.DatabaseTopology.html
+  - name: .
+  - uid: nORM.Core.DatabaseTopology.DatabaseNode
+    name: DatabaseNode
+    href: nORM.Core.DatabaseTopology.DatabaseNode.html
+- uid: nORM.Core.DatabaseTopology.DatabaseRole
+  commentId: T:nORM.Core.DatabaseTopology.DatabaseRole
+  parent: nORM.Core
+  href: nORM.Core.DatabaseTopology.html
+  name: DatabaseTopology.DatabaseRole
+  nameWithType: DatabaseTopology.DatabaseRole
+  fullName: nORM.Core.DatabaseTopology.DatabaseRole
+  spec.csharp:
+  - uid: nORM.Core.DatabaseTopology
+    name: DatabaseTopology
+    href: nORM.Core.DatabaseTopology.html
+  - name: .
+  - uid: nORM.Core.DatabaseTopology.DatabaseRole
+    name: DatabaseRole
+    href: nORM.Core.DatabaseTopology.DatabaseRole.html
+  spec.vb:
+  - uid: nORM.Core.DatabaseTopology
+    name: DatabaseTopology
+    href: nORM.Core.DatabaseTopology.html
+  - name: .
+  - uid: nORM.Core.DatabaseTopology.DatabaseRole
+    name: DatabaseRole
+    href: nORM.Core.DatabaseTopology.DatabaseRole.html
+- uid: nORM.Core.DbConcurrencyException
+  commentId: T:nORM.Core.DbConcurrencyException
+  href: nORM.Core.DbConcurrencyException.html
+  name: DbConcurrencyException
+  nameWithType: DbConcurrencyException
+  fullName: nORM.Core.DbConcurrencyException
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: nORM.Core.OutputParameter
+  commentId: T:nORM.Core.OutputParameter
+  href: nORM.Core.OutputParameter.html
+  name: OutputParameter
+  nameWithType: OutputParameter
+  fullName: nORM.Core.OutputParameter
+- uid: nORM.Core.StoredProcedureResult`1
+  commentId: T:nORM.Core.StoredProcedureResult`1
+  href: nORM.Core.StoredProcedureResult-1.html
+  name: StoredProcedureResult<T>
+  nameWithType: StoredProcedureResult<T>
+  fullName: nORM.Core.StoredProcedureResult<T>
+  nameWithType.vb: StoredProcedureResult(Of T)
+  fullName.vb: nORM.Core.StoredProcedureResult(Of T)
+  name.vb: StoredProcedureResult(Of T)
+  spec.csharp:
+  - uid: nORM.Core.StoredProcedureResult`1
+    name: StoredProcedureResult
+    href: nORM.Core.StoredProcedureResult-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.StoredProcedureResult`1
+    name: StoredProcedureResult
+    href: nORM.Core.StoredProcedureResult-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.DbContextTransaction
+  commentId: T:nORM.Core.DbContextTransaction
+  href: nORM.Core.DbContextTransaction.html
+  name: DbContextTransaction
+  nameWithType: DbContextTransaction
+  fullName: nORM.Core.DbContextTransaction
+- uid: nORM.Core.EntityEntry
+  commentId: T:nORM.Core.EntityEntry
+  parent: nORM.Core
+  href: nORM.Core.EntityEntry.html
+  name: EntityEntry
+  nameWithType: EntityEntry
+  fullName: nORM.Core.EntityEntry
+- uid: nORM.Core.EntityState
+  commentId: T:nORM.Core.EntityState
+  parent: nORM.Core
+  href: nORM.Core.EntityState.html
+  name: EntityState
+  nameWithType: EntityState
+  fullName: nORM.Core.EntityState
+- uid: nORM.Core.IMemoryMonitor
+  commentId: T:nORM.Core.IMemoryMonitor
+  href: nORM.Core.IMemoryMonitor.html
+  name: IMemoryMonitor
+  nameWithType: IMemoryMonitor
+  fullName: nORM.Core.IMemoryMonitor
+- uid: nORM.Core.Json
+  commentId: T:nORM.Core.Json
+  href: nORM.Core.Json.html
+  name: Json
+  nameWithType: Json
+  fullName: nORM.Core.Json
+- uid: nORM.Core.Norm
+  commentId: T:nORM.Core.Norm
+  href: nORM.Core.Norm.html
+  name: Norm
+  nameWithType: Norm
+  fullName: nORM.Core.Norm
+- uid: nORM.Core.NormAsyncExtensions
+  commentId: T:nORM.Core.NormAsyncExtensions
+  parent: nORM.Core
+  href: nORM.Core.NormAsyncExtensions.html
+  name: NormAsyncExtensions
+  nameWithType: NormAsyncExtensions
+  fullName: nORM.Core.NormAsyncExtensions
+- uid: nORM.Core.NormAsyncPolicy
+  commentId: T:nORM.Core.NormAsyncPolicy
+  href: nORM.Core.NormAsyncPolicy.html
+  name: NormAsyncPolicy
+  nameWithType: NormAsyncPolicy
+  fullName: nORM.Core.NormAsyncPolicy
+- uid: nORM.Core.NormConfigurationException
+  commentId: T:nORM.Core.NormConfigurationException
+  href: nORM.Core.NormConfigurationException.html
+  name: NormConfigurationException
+  nameWithType: NormConfigurationException
+  fullName: nORM.Core.NormConfigurationException
+- uid: nORM.Core.NormConnectionException
+  commentId: T:nORM.Core.NormConnectionException
+  href: nORM.Core.NormConnectionException.html
+  name: NormConnectionException
+  nameWithType: NormConnectionException
+  fullName: nORM.Core.NormConnectionException
+- uid: nORM.Core.NormException
+  commentId: T:nORM.Core.NormException
+  parent: nORM.Core
+  href: nORM.Core.NormException.html
+  name: NormException
+  nameWithType: NormException
+  fullName: nORM.Core.NormException
+- uid: nORM.Core.NormExceptionHandler
+  commentId: T:nORM.Core.NormExceptionHandler
+  href: nORM.Core.NormExceptionHandler.html
+  name: NormExceptionHandler
+  nameWithType: NormExceptionHandler
+  fullName: nORM.Core.NormExceptionHandler
+- uid: nORM.Core.NormDatabaseException
+  commentId: T:nORM.Core.NormDatabaseException
+  href: nORM.Core.NormDatabaseException.html
+  name: NormDatabaseException
+  nameWithType: NormDatabaseException
+  fullName: nORM.Core.NormDatabaseException
+- uid: nORM.Core.NormTimeoutException
+  commentId: T:nORM.Core.NormTimeoutException
+  href: nORM.Core.NormTimeoutException.html
+  name: NormTimeoutException
+  nameWithType: NormTimeoutException
+  fullName: nORM.Core.NormTimeoutException
+- uid: nORM.Core.NormMemoryCacheProvider
+  commentId: T:nORM.Core.NormMemoryCacheProvider
+  href: nORM.Core.NormMemoryCacheProvider.html
+  name: NormMemoryCacheProvider
+  nameWithType: NormMemoryCacheProvider
+  fullName: nORM.Core.NormMemoryCacheProvider
+- uid: nORM.Core.NormQueryable
+  commentId: T:nORM.Core.NormQueryable
+  parent: nORM.Core
+  href: nORM.Core.NormQueryable.html
+  name: NormQueryable
+  nameWithType: NormQueryable
+  fullName: nORM.Core.NormQueryable
+- uid: nORM.Core.INormQueryable`1
+  commentId: T:nORM.Core.INormQueryable`1
+  parent: nORM.Core
+  href: nORM.Core.INormQueryable-1.html
+  name: INormQueryable<T>
+  nameWithType: INormQueryable<T>
+  fullName: nORM.Core.INormQueryable<T>
+  nameWithType.vb: INormQueryable(Of T)
+  fullName.vb: nORM.Core.INormQueryable(Of T)
+  name.vb: INormQueryable(Of T)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.INormIncludableQueryable`2
+  commentId: T:nORM.Core.INormIncludableQueryable`2
+  href: nORM.Core.INormIncludableQueryable-2.html
+  name: INormIncludableQueryable<TEntity, TProperty>
+  nameWithType: INormIncludableQueryable<TEntity, TProperty>
+  fullName: nORM.Core.INormIncludableQueryable<TEntity, TProperty>
+  nameWithType.vb: INormIncludableQueryable(Of TEntity, TProperty)
+  fullName.vb: nORM.Core.INormIncludableQueryable(Of TEntity, TProperty)
+  name.vb: INormIncludableQueryable(Of TEntity, TProperty)
+  spec.csharp:
+  - uid: nORM.Core.INormIncludableQueryable`2
+    name: INormIncludableQueryable
+    href: nORM.Core.INormIncludableQueryable-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormIncludableQueryable`2
+    name: INormIncludableQueryable
+    href: nORM.Core.INormIncludableQueryable-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+- uid: nORM.Core.NormIncludableQueryableExtensions
+  commentId: T:nORM.Core.NormIncludableQueryableExtensions
+  href: nORM.Core.NormIncludableQueryableExtensions.html
+  name: NormIncludableQueryableExtensions
+  nameWithType: NormIncludableQueryableExtensions
+  fullName: nORM.Core.NormIncludableQueryableExtensions
+- uid: nORM.Core.NormQueryException
+  commentId: T:nORM.Core.NormQueryException
+  href: nORM.Core.NormQueryException.html
+  name: NormQueryException
+  nameWithType: NormQueryException
+  fullName: nORM.Core.NormQueryException
+- uid: nORM.Core.NormUnsupportedFeatureException
+  commentId: T:nORM.Core.NormUnsupportedFeatureException
+  href: nORM.Core.NormUnsupportedFeatureException.html
+  name: NormUnsupportedFeatureException
+  nameWithType: NormUnsupportedFeatureException
+  fullName: nORM.Core.NormUnsupportedFeatureException
+- uid: nORM.Core.NormUsageException
+  commentId: T:nORM.Core.NormUsageException
+  href: nORM.Core.NormUsageException.html
+  name: NormUsageException
+  nameWithType: NormUsageException
+  fullName: nORM.Core.NormUsageException
+- uid: nORM.Core.NormValidator
+  commentId: T:nORM.Core.NormValidator
+  href: nORM.Core.NormValidator.html
+  name: NormValidator
+  nameWithType: NormValidator
+  fullName: nORM.Core.NormValidator
+- uid: nORM.Core.QueryTrackingBehavior
+  commentId: T:nORM.Core.QueryTrackingBehavior
+  parent: nORM.Core
+  href: nORM.Core.QueryTrackingBehavior.html
+  name: QueryTrackingBehavior
+  nameWithType: QueryTrackingBehavior
+  fullName: nORM.Core.QueryTrackingBehavior
+- uid: nORM.Core.SetPropertyCalls`1
+  commentId: T:nORM.Core.SetPropertyCalls`1
+  parent: nORM.Core
+  href: nORM.Core.SetPropertyCalls-1.html
+  name: SetPropertyCalls<T>
+  nameWithType: SetPropertyCalls<T>
+  fullName: nORM.Core.SetPropertyCalls<T>
+  nameWithType.vb: SetPropertyCalls(Of T)
+  fullName.vb: nORM.Core.SetPropertyCalls(Of T)
+  name.vb: SetPropertyCalls(Of T)
+  spec.csharp:
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.TemporalExtensions
+  commentId: T:nORM.Core.TemporalExtensions
+  parent: nORM.Core
+  href: nORM.Core.TemporalExtensions.html
+  name: TemporalExtensions
+  nameWithType: TemporalExtensions
+  fullName: nORM.Core.TemporalExtensions
+- uid: nORM.Core.WindowFunctionsExtensions
+  commentId: T:nORM.Core.WindowFunctionsExtensions
+  href: nORM.Core.WindowFunctionsExtensions.html
+  name: WindowFunctionsExtensions
+  nameWithType: WindowFunctionsExtensions
+  fullName: nORM.Core.WindowFunctionsExtensions
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html

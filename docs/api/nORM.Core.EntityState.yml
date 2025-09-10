@@ -1,0 +1,193 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.EntityState
+  commentId: T:nORM.Core.EntityState
+  id: EntityState
+  parent: nORM.Core
+  children:
+  - nORM.Core.EntityState.Added
+  - nORM.Core.EntityState.Deleted
+  - nORM.Core.EntityState.Detached
+  - nORM.Core.EntityState.Modified
+  - nORM.Core.EntityState.Unchanged
+  langs:
+  - csharp
+  - vb
+  name: EntityState
+  nameWithType: EntityState
+  fullName: nORM.Core.EntityState
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Core/EntityState.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EntityState
+    path: src/nORM/Core/EntityState.cs
+    startLine: 6
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: public enum EntityState
+    content.vb: Public Enum EntityState
+- uid: nORM.Core.EntityState.Detached
+  commentId: F:nORM.Core.EntityState.Detached
+  id: Detached
+  parent: nORM.Core.EntityState
+  langs:
+  - csharp
+  - vb
+  name: Detached
+  nameWithType: EntityState.Detached
+  fullName: nORM.Core.EntityState.Detached
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Core/EntityState.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Detached
+    path: src/nORM/Core/EntityState.cs
+    startLine: 8
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: Detached = 0
+    return:
+      type: nORM.Core.EntityState
+- uid: nORM.Core.EntityState.Unchanged
+  commentId: F:nORM.Core.EntityState.Unchanged
+  id: Unchanged
+  parent: nORM.Core.EntityState
+  langs:
+  - csharp
+  - vb
+  name: Unchanged
+  nameWithType: EntityState.Unchanged
+  fullName: nORM.Core.EntityState.Unchanged
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Core/EntityState.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Unchanged
+    path: src/nORM/Core/EntityState.cs
+    startLine: 9
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: Unchanged = 1
+    return:
+      type: nORM.Core.EntityState
+- uid: nORM.Core.EntityState.Added
+  commentId: F:nORM.Core.EntityState.Added
+  id: Added
+  parent: nORM.Core.EntityState
+  langs:
+  - csharp
+  - vb
+  name: Added
+  nameWithType: EntityState.Added
+  fullName: nORM.Core.EntityState.Added
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Core/EntityState.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Added
+    path: src/nORM/Core/EntityState.cs
+    startLine: 10
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: Added = 2
+    return:
+      type: nORM.Core.EntityState
+- uid: nORM.Core.EntityState.Modified
+  commentId: F:nORM.Core.EntityState.Modified
+  id: Modified
+  parent: nORM.Core.EntityState
+  langs:
+  - csharp
+  - vb
+  name: Modified
+  nameWithType: EntityState.Modified
+  fullName: nORM.Core.EntityState.Modified
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Core/EntityState.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Modified
+    path: src/nORM/Core/EntityState.cs
+    startLine: 11
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: Modified = 3
+    return:
+      type: nORM.Core.EntityState
+- uid: nORM.Core.EntityState.Deleted
+  commentId: F:nORM.Core.EntityState.Deleted
+  id: Deleted
+  parent: nORM.Core.EntityState
+  langs:
+  - csharp
+  - vb
+  name: Deleted
+  nameWithType: EntityState.Deleted
+  fullName: nORM.Core.EntityState.Deleted
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Core/EntityState.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Deleted
+    path: src/nORM/Core/EntityState.cs
+    startLine: 12
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: Deleted = 4
+    return:
+      type: nORM.Core.EntityState
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: nORM.Core.EntityState
+  commentId: T:nORM.Core.EntityState
+  parent: nORM.Core
+  href: nORM.Core.EntityState.html
+  name: EntityState
+  nameWithType: EntityState
+  fullName: nORM.Core.EntityState

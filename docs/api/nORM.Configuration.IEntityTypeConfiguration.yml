@@ -1,0 +1,1342 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.IEntityTypeConfiguration
+  commentId: T:nORM.Configuration.IEntityTypeConfiguration
+  id: IEntityTypeConfiguration
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.IEntityTypeConfiguration.ColumnNames
+  - nORM.Configuration.IEntityTypeConfiguration.KeyProperties
+  - nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations
+  - nORM.Configuration.IEntityTypeConfiguration.Relationships
+  - nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
+  - nORM.Configuration.IEntityTypeConfiguration.TableName
+  - nORM.Configuration.IEntityTypeConfiguration.TableSplitWith
+  langs:
+  - csharp
+  - vb
+  name: IEntityTypeConfiguration
+  nameWithType: IEntityTypeConfiguration
+  fullName: nORM.Configuration.IEntityTypeConfiguration
+  type: Interface
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IEntityTypeConfiguration
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 8
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: public interface IEntityTypeConfiguration
+    content.vb: Public Interface IEntityTypeConfiguration
+  extensionMethods:
+  - nORM.Configuration.IEntityTypeConfiguration.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  - nORM.Configuration.IEntityTypeConfiguration.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,{TProperty}}})
+  - nORM.Configuration.IEntityTypeConfiguration.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  - nORM.Configuration.IEntityTypeConfiguration.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Configuration.IEntityTypeConfiguration.TableName
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.TableName
+  id: TableName
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: TableName
+  nameWithType: IEntityTypeConfiguration.TableName
+  fullName: nORM.Configuration.IEntityTypeConfiguration.TableName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TableName
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 10
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: string? TableName { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: ReadOnly Property TableName As String
+  overload: nORM.Configuration.IEntityTypeConfiguration.TableName*
+- uid: nORM.Configuration.IEntityTypeConfiguration.KeyProperties
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.KeyProperties
+  id: KeyProperties
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: KeyProperties
+  nameWithType: IEntityTypeConfiguration.KeyProperties
+  fullName: nORM.Configuration.IEntityTypeConfiguration.KeyProperties
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: KeyProperties
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 11
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: List<PropertyInfo> KeyProperties { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{System.Reflection.PropertyInfo}
+    content.vb: ReadOnly Property KeyProperties As List(Of PropertyInfo)
+  overload: nORM.Configuration.IEntityTypeConfiguration.KeyProperties*
+- uid: nORM.Configuration.IEntityTypeConfiguration.ColumnNames
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.ColumnNames
+  id: ColumnNames
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: ColumnNames
+  nameWithType: IEntityTypeConfiguration.ColumnNames
+  fullName: nORM.Configuration.IEntityTypeConfiguration.ColumnNames
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ColumnNames
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 12
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: Dictionary<PropertyInfo, string> ColumnNames { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,System.String}
+    content.vb: ReadOnly Property ColumnNames As Dictionary(Of PropertyInfo, String)
+  overload: nORM.Configuration.IEntityTypeConfiguration.ColumnNames*
+- uid: nORM.Configuration.IEntityTypeConfiguration.TableSplitWith
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.TableSplitWith
+  id: TableSplitWith
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: TableSplitWith
+  nameWithType: IEntityTypeConfiguration.TableSplitWith
+  fullName: nORM.Configuration.IEntityTypeConfiguration.TableSplitWith
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TableSplitWith
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 13
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: Type? TableSplitWith { get; }
+    parameters: []
+    return:
+      type: System.Type
+    content.vb: ReadOnly Property TableSplitWith As Type
+  overload: nORM.Configuration.IEntityTypeConfiguration.TableSplitWith*
+- uid: nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations
+  id: OwnedNavigations
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: OwnedNavigations
+  nameWithType: IEntityTypeConfiguration.OwnedNavigations
+  fullName: nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OwnedNavigations
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 14
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedNavigation}
+    content.vb: ReadOnly Property OwnedNavigations As Dictionary(Of PropertyInfo, OwnedNavigation)
+  overload: nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations*
+- uid: nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
+  id: ShadowProperties
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: ShadowProperties
+  nameWithType: IEntityTypeConfiguration.ShadowProperties
+  fullName: nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ShadowProperties
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 15
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.Dictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
+    content.vb: ReadOnly Property ShadowProperties As Dictionary(Of String, ShadowPropertyConfiguration)
+  overload: nORM.Configuration.IEntityTypeConfiguration.ShadowProperties*
+- uid: nORM.Configuration.IEntityTypeConfiguration.Relationships
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.Relationships
+  id: Relationships
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: Relationships
+  nameWithType: IEntityTypeConfiguration.Relationships
+  fullName: nORM.Configuration.IEntityTypeConfiguration.Relationships
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Relationships
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 16
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  syntax:
+    content: List<RelationshipConfiguration> Relationships { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{nORM.Configuration.RelationshipConfiguration}
+    content.vb: ReadOnly Property Relationships As List(Of RelationshipConfiguration)
+  overload: nORM.Configuration.IEntityTypeConfiguration.Relationships*
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Configuration.IEntityTypeConfiguration.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<IEntityTypeConfiguration>(IEntityTypeConfiguration, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<IEntityTypeConfiguration>(IEntityTypeConfiguration, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<nORM.Configuration.IEntityTypeConfiguration>(nORM.Configuration.IEntityTypeConfiguration, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of IEntityTypeConfiguration)(IEntityTypeConfiguration, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of nORM.Configuration.IEntityTypeConfiguration)(nORM.Configuration.IEntityTypeConfiguration, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of IEntityTypeConfiguration)(IEntityTypeConfiguration, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Configuration.IEntityTypeConfiguration,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: '>'
+  - name: (
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Configuration.IEntityTypeConfiguration,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: )
+  - name: (
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,{TProperty}}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<IEntityTypeConfiguration, TProperty>(IEntityTypeConfiguration, Expression<Func<IEntityTypeConfiguration, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<IEntityTypeConfiguration, TProperty>(IEntityTypeConfiguration, Expression<Func<IEntityTypeConfiguration, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<nORM.Configuration.IEntityTypeConfiguration, TProperty>(nORM.Configuration.IEntityTypeConfiguration, System.Linq.Expressions.Expression<System.Func<nORM.Configuration.IEntityTypeConfiguration, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of IEntityTypeConfiguration, TProperty)(IEntityTypeConfiguration, Expression(Of Func(Of IEntityTypeConfiguration, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of nORM.Configuration.IEntityTypeConfiguration, TProperty)(nORM.Configuration.IEntityTypeConfiguration, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Configuration.IEntityTypeConfiguration, TProperty)))
+  name.vb: IsLoaded(Of IEntityTypeConfiguration, TProperty)(IEntityTypeConfiguration, Expression(Of Func(Of IEntityTypeConfiguration, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Configuration.IEntityTypeConfiguration,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Configuration.IEntityTypeConfiguration,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<IEntityTypeConfiguration, TProperty>(IEntityTypeConfiguration, Expression<Func<IEntityTypeConfiguration, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<IEntityTypeConfiguration, TProperty>(IEntityTypeConfiguration, Expression<Func<IEntityTypeConfiguration, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Configuration.IEntityTypeConfiguration, TProperty>(nORM.Configuration.IEntityTypeConfiguration, System.Linq.Expressions.Expression<System.Func<nORM.Configuration.IEntityTypeConfiguration, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of IEntityTypeConfiguration, TProperty)(IEntityTypeConfiguration, Expression(Of Func(Of IEntityTypeConfiguration, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Configuration.IEntityTypeConfiguration, TProperty)(nORM.Configuration.IEntityTypeConfiguration, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Configuration.IEntityTypeConfiguration, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of IEntityTypeConfiguration, TProperty)(IEntityTypeConfiguration, Expression(Of Func(Of IEntityTypeConfiguration, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Configuration.IEntityTypeConfiguration,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Configuration.IEntityTypeConfiguration,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,{TProperty}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<IEntityTypeConfiguration, TProperty>(IEntityTypeConfiguration, Expression<Func<IEntityTypeConfiguration, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<IEntityTypeConfiguration, TProperty>(IEntityTypeConfiguration, Expression<Func<IEntityTypeConfiguration, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Configuration.IEntityTypeConfiguration, TProperty>(nORM.Configuration.IEntityTypeConfiguration, System.Linq.Expressions.Expression<System.Func<nORM.Configuration.IEntityTypeConfiguration, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of IEntityTypeConfiguration, TProperty)(IEntityTypeConfiguration, Expression(Of Func(Of IEntityTypeConfiguration, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Configuration.IEntityTypeConfiguration, TProperty)(nORM.Configuration.IEntityTypeConfiguration, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Configuration.IEntityTypeConfiguration, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of IEntityTypeConfiguration, TProperty)(IEntityTypeConfiguration, Expression(Of Func(Of IEntityTypeConfiguration, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Configuration.IEntityTypeConfiguration,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Configuration.IEntityTypeConfiguration,System.Linq.Expressions.Expression{System.Func{nORM.Configuration.IEntityTypeConfiguration,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.IEntityTypeConfiguration
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<T>(T, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<T>(T, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<T>(T, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of T)(T, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+- uid: nORM.Configuration.IEntityTypeConfiguration.TableName*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.TableName
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_TableName
+  name: TableName
+  nameWithType: IEntityTypeConfiguration.TableName
+  fullName: nORM.Configuration.IEntityTypeConfiguration.TableName
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Configuration.IEntityTypeConfiguration.KeyProperties*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.KeyProperties
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_KeyProperties
+  name: KeyProperties
+  nameWithType: IEntityTypeConfiguration.KeyProperties
+  fullName: nORM.Configuration.IEntityTypeConfiguration.KeyProperties
+- uid: System.Collections.Generic.List{System.Reflection.PropertyInfo}
+  commentId: T:System.Collections.Generic.List{System.Reflection.PropertyInfo}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<PropertyInfo>
+  nameWithType: List<PropertyInfo>
+  fullName: System.Collections.Generic.List<System.Reflection.PropertyInfo>
+  nameWithType.vb: List(Of PropertyInfo)
+  fullName.vb: System.Collections.Generic.List(Of System.Reflection.PropertyInfo)
+  name.vb: List(Of PropertyInfo)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: )
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Configuration.IEntityTypeConfiguration.ColumnNames*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.ColumnNames
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_ColumnNames
+  name: ColumnNames
+  nameWithType: IEntityTypeConfiguration.ColumnNames
+  fullName: nORM.Configuration.IEntityTypeConfiguration.ColumnNames
+- uid: System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,System.String}
+  commentId: T:System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,System.String}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  name: Dictionary<PropertyInfo, string>
+  nameWithType: Dictionary<PropertyInfo, string>
+  fullName: System.Collections.Generic.Dictionary<System.Reflection.PropertyInfo, string>
+  nameWithType.vb: Dictionary(Of PropertyInfo, String)
+  fullName.vb: System.Collections.Generic.Dictionary(Of System.Reflection.PropertyInfo, String)
+  name.vb: Dictionary(Of PropertyInfo, String)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: <
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: System.Collections.Generic.Dictionary`2
+  commentId: T:System.Collections.Generic.Dictionary`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  name: Dictionary<TKey, TValue>
+  nameWithType: Dictionary<TKey, TValue>
+  fullName: System.Collections.Generic.Dictionary<TKey, TValue>
+  nameWithType.vb: Dictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.Dictionary(Of TKey, TValue)
+  name.vb: Dictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: <
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.TableSplitWith*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.TableSplitWith
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_TableSplitWith
+  name: TableSplitWith
+  nameWithType: IEntityTypeConfiguration.TableSplitWith
+  fullName: nORM.Configuration.IEntityTypeConfiguration.TableSplitWith
+- uid: System.Type
+  commentId: T:System.Type
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.type
+  name: Type
+  nameWithType: Type
+  fullName: System.Type
+- uid: nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_OwnedNavigations
+  name: OwnedNavigations
+  nameWithType: IEntityTypeConfiguration.OwnedNavigations
+  fullName: nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations
+- uid: System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedNavigation}
+  commentId: T:System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedNavigation}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  name: Dictionary<PropertyInfo, OwnedNavigation>
+  nameWithType: Dictionary<PropertyInfo, OwnedNavigation>
+  fullName: System.Collections.Generic.Dictionary<System.Reflection.PropertyInfo, nORM.Configuration.OwnedNavigation>
+  nameWithType.vb: Dictionary(Of PropertyInfo, OwnedNavigation)
+  fullName.vb: System.Collections.Generic.Dictionary(Of System.Reflection.PropertyInfo, nORM.Configuration.OwnedNavigation)
+  name.vb: Dictionary(Of PropertyInfo, OwnedNavigation)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: <
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: ','
+  - name: " "
+  - uid: nORM.Configuration.OwnedNavigation
+    name: OwnedNavigation
+    href: nORM.Configuration.OwnedNavigation.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: ','
+  - name: " "
+  - uid: nORM.Configuration.OwnedNavigation
+    name: OwnedNavigation
+    href: nORM.Configuration.OwnedNavigation.html
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.ShadowProperties*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_ShadowProperties
+  name: ShadowProperties
+  nameWithType: IEntityTypeConfiguration.ShadowProperties
+  fullName: nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
+- uid: System.Collections.Generic.Dictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
+  commentId: T:System.Collections.Generic.Dictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  name: Dictionary<string, ShadowPropertyConfiguration>
+  nameWithType: Dictionary<string, ShadowPropertyConfiguration>
+  fullName: System.Collections.Generic.Dictionary<string, nORM.Configuration.ShadowPropertyConfiguration>
+  nameWithType.vb: Dictionary(Of String, ShadowPropertyConfiguration)
+  fullName.vb: System.Collections.Generic.Dictionary(Of String, nORM.Configuration.ShadowPropertyConfiguration)
+  name.vb: Dictionary(Of String, ShadowPropertyConfiguration)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: nORM.Configuration.ShadowPropertyConfiguration
+    name: ShadowPropertyConfiguration
+    href: nORM.Configuration.ShadowPropertyConfiguration.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: nORM.Configuration.ShadowPropertyConfiguration
+    name: ShadowPropertyConfiguration
+    href: nORM.Configuration.ShadowPropertyConfiguration.html
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.Relationships*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.Relationships
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_Relationships
+  name: Relationships
+  nameWithType: IEntityTypeConfiguration.Relationships
+  fullName: nORM.Configuration.IEntityTypeConfiguration.Relationships
+- uid: System.Collections.Generic.List{nORM.Configuration.RelationshipConfiguration}
+  commentId: T:System.Collections.Generic.List{nORM.Configuration.RelationshipConfiguration}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<RelationshipConfiguration>
+  nameWithType: List<RelationshipConfiguration>
+  fullName: System.Collections.Generic.List<nORM.Configuration.RelationshipConfiguration>
+  nameWithType.vb: List(Of RelationshipConfiguration)
+  fullName.vb: System.Collections.Generic.List(Of nORM.Configuration.RelationshipConfiguration)
+  name.vb: List(Of RelationshipConfiguration)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - uid: nORM.Configuration.RelationshipConfiguration
+    name: RelationshipConfiguration
+    href: nORM.Configuration.RelationshipConfiguration.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.RelationshipConfiguration
+    name: RelationshipConfiguration
+    href: nORM.Configuration.RelationshipConfiguration.html
+  - name: )

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class ConcurrentLruCache&lt;TKey, TValue&gt; </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class ConcurrentLruCache&lt;TKey, TValue&gt; ">
+    
+    <meta name="description" content="Concurrent LRU cache with optional TTL. Expired entries are removed on access. Eviction on insert is size-based only (no TTL prune on insert) to minimize churn in hot paths.">
+      <link rel="shortcut icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../styles/docfx.css">
+      <link rel="stylesheet" href="../../styles/main.css">
+      <meta property="docfx:navrel" content="">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="nORM.Internal.ConcurrentLruCache`2">
+
+
+
+  <h1 id="nORM_Internal_ConcurrentLruCache_2" data-uid="nORM.Internal.ConcurrentLruCache`2" class="text-break">Class ConcurrentLruCache&lt;TKey, TValue&gt;</h1>
+  <div class="markdown level0 summary"><p>Concurrent LRU cache with optional TTL. Expired entries are removed on access.
+Eviction on insert is size-based only (no TTL prune on insert) to minimize churn in hot paths.</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><span class="xref">ConcurrentLruCache&lt;TKey, TValue&gt;</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="nORM.html">nORM</a>.<a class="xref" href="nORM.Internal.html">Internal</a></h6>
+  <h6><strong>Assembly</strong>: nORM.dll</h6>
+  <h5 id="nORM_Internal_ConcurrentLruCache_2_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class ConcurrentLruCache&lt;TKey, TValue&gt; where TKey : notnull</code></pre>
+  </div>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">TKey</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="parametername">TValue</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="constructors">Constructors
+</h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Internal_ConcurrentLruCache_2__ctor_System_Int32_System_Nullable_System_TimeSpan__.md&amp;value=---%0Auid%3A%20nORM.Internal.ConcurrentLruCache%602.%23ctor(System.Int32%2CSystem.Nullable%7BSystem.TimeSpan%7D)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Internal/ConcurrentLruCache.cs/#L25">View Source</a>
+  </span>
+  <a id="nORM_Internal_ConcurrentLruCache_2__ctor_" data-uid="nORM.Internal.ConcurrentLruCache`2.#ctor*"></a>
+  <h4 id="nORM_Internal_ConcurrentLruCache_2__ctor_System_Int32_System_Nullable_System_TimeSpan__" data-uid="nORM.Internal.ConcurrentLruCache`2.#ctor(System.Int32,System.Nullable{System.TimeSpan})">ConcurrentLruCache(int, TimeSpan?)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ConcurrentLruCache(int maxSize = 1000, TimeSpan? timeToLive = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">maxSize</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</td>
+        <td><span class="parametername">timeToLive</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Internal_ConcurrentLruCache_2_HitRate.md&amp;value=---%0Auid%3A%20nORM.Internal.ConcurrentLruCache%602.HitRate%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Internal/ConcurrentLruCache.cs/#L154">View Source</a>
+  </span>
+  <a id="nORM_Internal_ConcurrentLruCache_2_HitRate_" data-uid="nORM.Internal.ConcurrentLruCache`2.HitRate*"></a>
+  <h4 id="nORM_Internal_ConcurrentLruCache_2_HitRate" data-uid="nORM.Internal.ConcurrentLruCache`2.HitRate">HitRate</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public double HitRate { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Internal_ConcurrentLruCache_2_Hits.md&amp;value=---%0Auid%3A%20nORM.Internal.ConcurrentLruCache%602.Hits%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Internal/ConcurrentLruCache.cs/#L152">View Source</a>
+  </span>
+  <a id="nORM_Internal_ConcurrentLruCache_2_Hits_" data-uid="nORM.Internal.ConcurrentLruCache`2.Hits*"></a>
+  <h4 id="nORM_Internal_ConcurrentLruCache_2_Hits" data-uid="nORM.Internal.ConcurrentLruCache`2.Hits">Hits</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Hits { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Internal_ConcurrentLruCache_2_Misses.md&amp;value=---%0Auid%3A%20nORM.Internal.ConcurrentLruCache%602.Misses%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Internal/ConcurrentLruCache.cs/#L153">View Source</a>
+  </span>
+  <a id="nORM_Internal_ConcurrentLruCache_2_Misses_" data-uid="nORM.Internal.ConcurrentLruCache`2.Misses*"></a>
+  <h4 id="nORM_Internal_ConcurrentLruCache_2_Misses" data-uid="nORM.Internal.ConcurrentLruCache`2.Misses">Misses</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Misses { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Internal_ConcurrentLruCache_2_Clear.md&amp;value=---%0Auid%3A%20nORM.Internal.ConcurrentLruCache%602.Clear%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Internal/ConcurrentLruCache.cs/#L56">View Source</a>
+  </span>
+  <a id="nORM_Internal_ConcurrentLruCache_2_Clear_" data-uid="nORM.Internal.ConcurrentLruCache`2.Clear*"></a>
+  <h4 id="nORM_Internal_ConcurrentLruCache_2_Clear" data-uid="nORM.Internal.ConcurrentLruCache`2.Clear">Clear()</h4>
+  <div class="markdown level1 summary"><p>Clears all entries from the cache and resets hit/miss statistics.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Clear()</code></pre>
+  </div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Internal_ConcurrentLruCache_2_GetOrAdd__0_System_Func__0__1__.md&amp;value=---%0Auid%3A%20nORM.Internal.ConcurrentLruCache%602.GetOrAdd(%600%2CSystem.Func%7B%600%2C%601%7D)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Internal/ConcurrentLruCache.cs/#L107">View Source</a>
+  </span>
+  <a id="nORM_Internal_ConcurrentLruCache_2_GetOrAdd_" data-uid="nORM.Internal.ConcurrentLruCache`2.GetOrAdd*"></a>
+  <h4 id="nORM_Internal_ConcurrentLruCache_2_GetOrAdd__0_System_Func__0__1__" data-uid="nORM.Internal.ConcurrentLruCache`2.GetOrAdd(`0,System.Func{`0,`1})">GetOrAdd(TKey, Func&lt;TKey, TValue&gt;)</h4>
+  <div class="markdown level1 summary"><p>Adds or returns existing value. The factory runs only if missing/expired.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TValue GetOrAdd(TKey key, Func&lt;TKey, TValue&gt; valueFactory)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TKey</span></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TKey, TValue&gt;</td>
+        <td><span class="parametername">valueFactory</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TValue</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Internal_ConcurrentLruCache_2_Set__0__1_System_Nullable_System_TimeSpan__System_Collections_Generic_IReadOnlyList_System_String__.md&amp;value=---%0Auid%3A%20nORM.Internal.ConcurrentLruCache%602.Set(%600%2C%601%2CSystem.Nullable%7BSystem.TimeSpan%7D%2CSystem.Collections.Generic.IReadOnlyList%7BSystem.String%7D)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Internal/ConcurrentLruCache.cs/#L121">View Source</a>
+  </span>
+  <a id="nORM_Internal_ConcurrentLruCache_2_Set_" data-uid="nORM.Internal.ConcurrentLruCache`2.Set*"></a>
+  <h4 id="nORM_Internal_ConcurrentLruCache_2_Set__0__1_System_Nullable_System_TimeSpan__System_Collections_Generic_IReadOnlyList_System_String__" data-uid="nORM.Internal.ConcurrentLruCache`2.Set(`0,`1,System.Nullable{System.TimeSpan},System.Collections.Generic.IReadOnlyList{System.String})">Set(TKey, TValue, TimeSpan?, IReadOnlyList&lt;string&gt;?)</h4>
+  <div class="markdown level1 summary"><p>Sets/replaces a value. TTL override and dependencies are accepted for call-site compatibility.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Set(TKey key, TValue value, TimeSpan? ttlOverride = null, IReadOnlyList&lt;string&gt;? dependencies = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TKey</span></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TValue</span></td>
+        <td><span class="parametername">value</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</td>
+        <td><span class="parametername">ttlOverride</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</td>
+        <td><span class="parametername">dependencies</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Internal_ConcurrentLruCache_2_SetMaxSize_System_Int32_.md&amp;value=---%0Auid%3A%20nORM.Internal.ConcurrentLruCache%602.SetMaxSize(System.Int32)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Internal/ConcurrentLruCache.cs/#L38">View Source</a>
+  </span>
+  <a id="nORM_Internal_ConcurrentLruCache_2_SetMaxSize_" data-uid="nORM.Internal.ConcurrentLruCache`2.SetMaxSize*"></a>
+  <h4 id="nORM_Internal_ConcurrentLruCache_2_SetMaxSize_System_Int32_" data-uid="nORM.Internal.ConcurrentLruCache`2.SetMaxSize(System.Int32)">SetMaxSize(int)</h4>
+  <div class="markdown level1 summary"><p>Sets the maximum number of entries the cache can hold. If the new size is
+smaller than the current number of items, least recently used entries are evicted.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SetMaxSize(int maxSize)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">maxSize</span></td>
+        <td><p>The new cache capacity.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></td>
+        <td><p>Thrown when <code class="paramref">maxSize</code> is less than or equal to zero.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Internal_ConcurrentLruCache_2_TryGet__0__1__.md&amp;value=---%0Auid%3A%20nORM.Internal.ConcurrentLruCache%602.TryGet(%600%2C%601%40)%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Edit this page</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Internal/ConcurrentLruCache.cs/#L74">View Source</a>
+  </span>
+  <a id="nORM_Internal_ConcurrentLruCache_2_TryGet_" data-uid="nORM.Internal.ConcurrentLruCache`2.TryGet*"></a>
+  <h4 id="nORM_Internal_ConcurrentLruCache_2_TryGet__0__1__" data-uid="nORM.Internal.ConcurrentLruCache`2.TryGet(`0,`1@)">TryGet(TKey, out TValue)</h4>
+  <div class="markdown level1 summary"><p>Attempts to retrieve a value from the cache. If found and not expired the entry is
+promoted to the most recently used position.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryGet(TKey key, out TValue value)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TKey</span></td>
+        <td><span class="parametername">key</span></td>
+        <td><p>Key of the cached item.</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">TValue</span></td>
+        <td><span class="parametername">value</span></td>
+        <td><p>When this method returns, contains the cached value if found.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><p><code>true</code> if the value was found in the cache; otherwise <code>false</code>.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="extensionmethods">Extension Methods</h3>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_">NavigationPropertyExtensions.EnableLazyLoading&lt;T&gt;(T, DbContext)</a>
+  </div>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___">NavigationPropertyExtensions.IsLoaded&lt;T, TProperty&gt;(T, Expression&lt;Func&lt;T, TProperty?&gt;&gt;)</a>
+  </div>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_">NavigationPropertyExtensions.LoadAsync&lt;T, TProperty&gt;(T, Expression&lt;Func&lt;T, ICollection&lt;TProperty&gt;?&gt;&gt;, CancellationToken)</a>
+  </div>
+  <div>
+      <a class="xref" href="nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_">NavigationPropertyExtensions.LoadAsync&lt;T, TProperty&gt;(T, Expression&lt;Func&lt;T, TProperty?&gt;&gt;, CancellationToken)</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/ZilverZtream/nORM/new/main/apiSpec/new?filename=nORM_Internal_ConcurrentLruCache_2.md&amp;value=---%0Auid%3A%20nORM.Internal.ConcurrentLruCache%602%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Edit this page</a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/ZilverZtream/nORM/blob/main/src/nORM/Internal/ConcurrentLruCache.cs/#L14" class="contribution-link">View Source</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      
+      <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

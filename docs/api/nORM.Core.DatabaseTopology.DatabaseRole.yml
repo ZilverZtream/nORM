@@ -1,0 +1,155 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.DatabaseTopology.DatabaseRole
+  commentId: T:nORM.Core.DatabaseTopology.DatabaseRole
+  id: DatabaseTopology.DatabaseRole
+  parent: nORM.Core
+  children:
+  - nORM.Core.DatabaseTopology.DatabaseRole.Primary
+  - nORM.Core.DatabaseTopology.DatabaseRole.ReadReplica
+  - nORM.Core.DatabaseTopology.DatabaseRole.SecondaryMaster
+  langs:
+  - csharp
+  - vb
+  name: DatabaseTopology.DatabaseRole
+  nameWithType: DatabaseTopology.DatabaseRole
+  fullName: nORM.Core.DatabaseTopology.DatabaseRole
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseTopology.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DatabaseRole
+    path: src/nORM/Core/DatabaseTopology.cs
+    startLine: 41
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: public enum DatabaseTopology.DatabaseRole
+    content.vb: Public Enum DatabaseTopology.DatabaseRole
+- uid: nORM.Core.DatabaseTopology.DatabaseRole.Primary
+  commentId: F:nORM.Core.DatabaseTopology.DatabaseRole.Primary
+  id: Primary
+  parent: nORM.Core.DatabaseTopology.DatabaseRole
+  langs:
+  - csharp
+  - vb
+  name: Primary
+  nameWithType: DatabaseTopology.DatabaseRole.Primary
+  fullName: nORM.Core.DatabaseTopology.DatabaseRole.Primary
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseTopology.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Primary
+    path: src/nORM/Core/DatabaseTopology.cs
+    startLine: 43
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: Primary = 0
+    return:
+      type: nORM.Core.DatabaseTopology.DatabaseRole
+- uid: nORM.Core.DatabaseTopology.DatabaseRole.ReadReplica
+  commentId: F:nORM.Core.DatabaseTopology.DatabaseRole.ReadReplica
+  id: ReadReplica
+  parent: nORM.Core.DatabaseTopology.DatabaseRole
+  langs:
+  - csharp
+  - vb
+  name: ReadReplica
+  nameWithType: DatabaseTopology.DatabaseRole.ReadReplica
+  fullName: nORM.Core.DatabaseTopology.DatabaseRole.ReadReplica
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseTopology.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ReadReplica
+    path: src/nORM/Core/DatabaseTopology.cs
+    startLine: 44
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: ReadReplica = 1
+    return:
+      type: nORM.Core.DatabaseTopology.DatabaseRole
+- uid: nORM.Core.DatabaseTopology.DatabaseRole.SecondaryMaster
+  commentId: F:nORM.Core.DatabaseTopology.DatabaseRole.SecondaryMaster
+  id: SecondaryMaster
+  parent: nORM.Core.DatabaseTopology.DatabaseRole
+  langs:
+  - csharp
+  - vb
+  name: SecondaryMaster
+  nameWithType: DatabaseTopology.DatabaseRole.SecondaryMaster
+  fullName: nORM.Core.DatabaseTopology.DatabaseRole.SecondaryMaster
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseTopology.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SecondaryMaster
+    path: src/nORM/Core/DatabaseTopology.cs
+    startLine: 45
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  syntax:
+    content: SecondaryMaster = 2
+    return:
+      type: nORM.Core.DatabaseTopology.DatabaseRole
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: nORM.Core.DatabaseTopology.DatabaseRole
+  commentId: T:nORM.Core.DatabaseTopology.DatabaseRole
+  parent: nORM.Core
+  href: nORM.Core.DatabaseTopology.html
+  name: DatabaseTopology.DatabaseRole
+  nameWithType: DatabaseTopology.DatabaseRole
+  fullName: nORM.Core.DatabaseTopology.DatabaseRole
+  spec.csharp:
+  - uid: nORM.Core.DatabaseTopology
+    name: DatabaseTopology
+    href: nORM.Core.DatabaseTopology.html
+  - name: .
+  - uid: nORM.Core.DatabaseTopology.DatabaseRole
+    name: DatabaseRole
+    href: nORM.Core.DatabaseTopology.DatabaseRole.html
+  spec.vb:
+  - uid: nORM.Core.DatabaseTopology
+    name: DatabaseTopology
+    href: nORM.Core.DatabaseTopology.html
+  - name: .
+  - uid: nORM.Core.DatabaseTopology.DatabaseRole
+    name: DatabaseRole
+    href: nORM.Core.DatabaseTopology.DatabaseRole.html

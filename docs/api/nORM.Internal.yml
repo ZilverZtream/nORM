@@ -1,0 +1,48 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Internal
+  commentId: N:nORM.Internal
+  id: nORM.Internal
+  children:
+  - nORM.Internal.ConcurrentLruCache`2
+  langs:
+  - csharp
+  - vb
+  name: nORM.Internal
+  nameWithType: nORM.Internal
+  fullName: nORM.Internal
+  type: Namespace
+  assemblies:
+  - nORM
+references:
+- uid: nORM.Internal.ConcurrentLruCache`2
+  commentId: T:nORM.Internal.ConcurrentLruCache`2
+  href: nORM.Internal.ConcurrentLruCache-2.html
+  name: ConcurrentLruCache<TKey, TValue>
+  nameWithType: ConcurrentLruCache<TKey, TValue>
+  fullName: nORM.Internal.ConcurrentLruCache<TKey, TValue>
+  nameWithType.vb: ConcurrentLruCache(Of TKey, TValue)
+  fullName.vb: nORM.Internal.ConcurrentLruCache(Of TKey, TValue)
+  name.vb: ConcurrentLruCache(Of TKey, TValue)
+  spec.csharp:
+  - uid: nORM.Internal.ConcurrentLruCache`2
+    name: ConcurrentLruCache
+    href: nORM.Internal.ConcurrentLruCache-2.html
+  - name: <
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Internal.ConcurrentLruCache`2
+    name: ConcurrentLruCache
+    href: nORM.Internal.ConcurrentLruCache-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: )
