@@ -795,6 +795,14 @@ namespace nORM.Query
                 _fieldCount = fieldCount;
             }
 
+            /// <summary>
+            /// Gets the number of fields that the validation reader exposes.
+            /// </summary>
+            /// <remarks>
+            /// The value is supplied when the <see cref="ValidationDbDataReader"/> is created
+            /// and represents the expected number of columns for validation.
+            /// </remarks>
+            /// <value>The total number of fields defined for validation.</value>
             public override int FieldCount => _fieldCount;
             /// <summary>
             /// Indicates that the value at the specified ordinal is always
@@ -824,10 +832,28 @@ namespace nORM.Query
             public override string GetDataTypeName(int ordinal) => nameof(Object);
             public override Type GetFieldType(int ordinal) => typeof(object);
             public override bool HasRows => false;
+            /// <summary>
+            /// Always reports that the reader remains open.
+            /// </summary>
+            /// <remarks>
+            /// The validation reader operates purely in-memory and therefore never
+            /// transitions to a closed state.
+            /// </remarks>
             public override bool IsClosed => false;
+
+            /// <summary>
+            /// Always returns <c>0</c> because no records are ever affected by the
+            /// validation reader.
+            /// </summary>
             public override int RecordsAffected => 0;
+
             public override object this[int ordinal] => DBNull.Value;
             public override object this[string name] => DBNull.Value;
+
+            /// <summary>
+            /// Returns an enumerator that iterates over an empty result set.
+            /// </summary>
+            /// <returns>An <see cref="IEnumerator"/> that contains no elements.</returns>
             public override IEnumerator GetEnumerator() => Array.Empty<object>().GetEnumerator();
             public override bool Read() => false;
             /// <summary>
@@ -843,6 +869,11 @@ namespace nORM.Query
             /// <param name="cancellationToken">Token used to cancel the operation.</param>
             /// <returns>A completed task returning <c>false</c>.</returns>
             public override Task<bool> NextResultAsync(CancellationToken cancellationToken) => Task.FromResult(false);
+            /// <summary>
+            /// Gets the nesting depth of the current row within the result set.
+            /// </summary>
+            /// <remarks>The validation reader has no hierarchy and therefore always returns <c>0</c>.</remarks>
+            /// <value>Always <c>0</c>.</value>
             public override int Depth => 0;
             public override int VisibleFieldCount => _fieldCount;
             /// <summary>Returns the default Boolean value for validation.</summary>
@@ -1084,66 +1115,136 @@ namespace nORM.Query
             public override IEnumerator GetEnumerator() => ((IEnumerable)_inner).GetEnumerator();
 
             // Typed getters with ordinal mapping
+
+            /// <summary>
+            /// Retrieves a Boolean value from the underlying reader using the mapped ordinal.
+            /// </summary>
+            /// <param name="ordinal">The zero-based column ordinal to read.</param>
+            /// <returns>The Boolean value if the ordinal is mapped; otherwise the default value.</returns>
             public override bool GetBoolean(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.GetBoolean(mapped) : default;
             }
 
+            /// <summary>
+            /// Retrieves a byte from the underlying reader using the mapped ordinal.
+            /// </summary>
+            /// <param name="ordinal">The zero-based column ordinal to read.</param>
+            /// <returns>The byte value if available; otherwise the default value.</returns>
             public override byte GetByte(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.GetByte(mapped) : default;
             }
 
+            /// <summary>
+            /// Reads a sequence of bytes from the column at the specified ordinal.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal.</param>
+            /// <param name="dataOffset">The index within the field from which to begin the read operation.</param>
+            /// <param name="buffer">The buffer into which the data will be copied.</param>
+            /// <param name="bufferOffset">The index within the buffer at which to start copying.</param>
+            /// <param name="length">The maximum number of bytes to read.</param>
+            /// <returns>The actual number of bytes read.</returns>
             public override long GetBytes(int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length)
                 => _inner.GetBytes(MapOrdinal(ordinal), dataOffset, buffer, bufferOffset, length);
 
+            /// <summary>
+            /// Retrieves a single character value from the mapped column.
+            /// </summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <returns>The character value if the ordinal is mapped; otherwise the default character.</returns>
             public override char GetChar(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.GetChar(mapped) : default;
             }
 
+            /// <summary>
+            /// Reads a sequence of characters from the column at the specified ordinal.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal.</param>
+            /// <param name="dataOffset">The index within the field from which to begin the read operation.</param>
+            /// <param name="buffer">The destination buffer.</param>
+            /// <param name="bufferOffset">The index within the buffer at which to start copying.</param>
+            /// <param name="length">The maximum number of characters to read.</param>
+            /// <returns>The actual number of characters read.</returns>
             public override long GetChars(int ordinal, long dataOffset, char[]? buffer, int bufferOffset, int length)
                 => _inner.GetChars(MapOrdinal(ordinal), dataOffset, buffer, bufferOffset, length);
 
+            /// <summary>
+            /// Retrieves a <see cref="Guid"/> value using the mapped ordinal.
+            /// </summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <returns>The <see cref="Guid"/> value if mapped; otherwise the default value.</returns>
             public override Guid GetGuid(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.GetGuid(mapped) : default;
             }
 
+            /// <summary>
+            /// Retrieves a 16-bit integer using the mapped ordinal.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal to read.</param>
+            /// <returns>The <see cref="short"/> value if mapped; otherwise the default value.</returns>
             public override short GetInt16(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.GetInt16(mapped) : default;
             }
 
+            /// <summary>
+            /// Retrieves a 32-bit integer using the mapped ordinal.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal to read.</param>
+            /// <returns>The <see cref="int"/> value if mapped; otherwise the default value.</returns>
             public override int GetInt32(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.GetInt32(mapped) : default;
             }
 
+            /// <summary>
+            /// Retrieves a 64-bit integer using the mapped ordinal.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal to read.</param>
+            /// <returns>The <see cref="long"/> value if mapped; otherwise the default value.</returns>
             public override long GetInt64(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.GetInt64(mapped) : default;
             }
 
+            /// <summary>
+            /// Retrieves a <see cref="DateTime"/> value using the mapped ordinal.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal to read.</param>
+            /// <returns>The <see cref="DateTime"/> value if mapped; otherwise the default value.</returns>
             public override DateTime GetDateTime(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.GetDateTime(mapped) : default;
             }
 
+            /// <summary>
+            /// Retrieves a string value from the mapped column.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal.</param>
+            /// <returns>The string value if mapped; otherwise an empty string.</returns>
             public override string GetString(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.GetString(mapped) : string.Empty;
             }
 
+            /// <summary>
+            /// Retrieves a <see cref="decimal"/> value from the mapped column, with
+            /// additional handling for string-based numeric representations.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal.</param>
+            /// <returns>The decimal value if mapped and convertible; otherwise the default value.</returns>
             public override decimal GetDecimal(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
@@ -1168,12 +1269,22 @@ namespace nORM.Query
                 }
             }
 
+            /// <summary>
+            /// Retrieves a double-precision floating-point value using the mapped ordinal.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal.</param>
+            /// <returns>The <see cref="double"/> value if mapped; otherwise the default value.</returns>
             public override double GetDouble(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 return mapped >= 0 ? _inner.GetDouble(mapped) : default;
             }
 
+            /// <summary>
+            /// Retrieves a single-precision floating-point value using the mapped ordinal.
+            /// </summary>
+            /// <param name="ordinal">The column ordinal.</param>
+            /// <returns>The <see cref="float"/> value if mapped; otherwise the default value.</returns>
             public override float GetFloat(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
@@ -1199,14 +1310,28 @@ namespace nORM.Query
                 TableName = tableName ?? string.Empty;
             }
 
+            /// <summary>
+            /// Determines whether the specified <see cref="MaterializerCacheKey"/> is equal to the current instance.
+            /// </summary>
+            /// <param name="other">The cache key to compare with the current key.</param>
+            /// <returns><c>true</c> if the keys represent the same configuration; otherwise, <c>false</c>.</returns>
             public bool Equals(MaterializerCacheKey other) =>
                 MappingTypeHash == other.MappingTypeHash &&
                 TargetTypeHash == other.TargetTypeHash &&
                 ProjectionHash == other.ProjectionHash &&
                 string.Equals(TableName, other.TableName, StringComparison.Ordinal);
 
+            /// <summary>
+            /// Determines whether the specified object is equal to the current <see cref="MaterializerCacheKey"/>.
+            /// </summary>
+            /// <param name="obj">The object to compare with the current key.</param>
+            /// <returns><c>true</c> if <paramref name="obj"/> is a <see cref="MaterializerCacheKey"/> and represents the same configuration; otherwise, <c>false</c>.</returns>
             public override bool Equals(object? obj) => obj is MaterializerCacheKey other && Equals(other);
 
+            /// <summary>
+            /// Generates a hash code for the current key instance.
+            /// </summary>
+            /// <returns>A hash code that can be used in hashing algorithms and data structures.</returns>
             public override int GetHashCode() => HashCode.Combine(MappingTypeHash, TargetTypeHash, ProjectionHash, TableName);
         }
 
