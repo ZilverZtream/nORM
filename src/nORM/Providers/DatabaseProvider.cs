@@ -30,14 +30,68 @@ namespace nORM.Providers
         public virtual string ParamPrefix => ParameterPrefixChar.ToString();
         public virtual int MaxSqlLength => int.MaxValue;
         public virtual int MaxParameters => int.MaxValue;
+
+        /// <summary>
+        /// Escapes an identifier (such as a table or column name) for inclusion in SQL statements.
+        /// </summary>
+        /// <param name="id">The identifier to escape.</param>
+        /// <returns>The escaped identifier.</returns>
         public abstract string Escape(string id);
+
+        /// <summary>
+        /// Applies provider-specific paging clauses to the supplied SQL builder.
+        /// </summary>
+        /// <param name="sb">The builder containing the base SQL statement.</param>
+        /// <param name="limit">The maximum number of rows to return.</param>
+        /// <param name="offset">The number of rows to skip before starting to return rows.</param>
+        /// <param name="limitParameterName">The parameter name used for the limit value.</param>
+        /// <param name="offsetParameterName">The parameter name used for the offset value.</param>
         public abstract void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName);
+
+        /// <summary>
+        /// Returns SQL that retrieves the identity value generated for an inserted row.
+        /// </summary>
+        /// <param name="m">The mapping for the table being inserted into.</param>
+        /// <returns>A SQL fragment that retrieves the generated identity.</returns>
         public abstract string GetIdentityRetrievalString(TableMapping m);
+
+        /// <summary>
+        /// Creates a database parameter with the given name and value.
+        /// </summary>
+        /// <param name="name">The parameter name, including prefix.</param>
+        /// <param name="value">The parameter value.</param>
+        /// <returns>A parameter configured for the underlying provider.</returns>
         public abstract DbParameter CreateParameter(string name, object? value);
+
+        /// <summary>
+        /// Translates a .NET method invocation into its SQL equivalent for the provider.
+        /// </summary>
+        /// <param name="name">The name of the method being translated.</param>
+        /// <param name="declaringType">The type that declares the method.</param>
+        /// <param name="args">The SQL arguments to the function.</param>
+        /// <returns>The translated SQL expression, or <c>null</c> if the method is not supported.</returns>
         public abstract string? TranslateFunction(string name, Type declaringType, params string[] args);
+
+        /// <summary>
+        /// Translates a JSON path access expression for the provider.
+        /// </summary>
+        /// <param name="columnName">The name of the JSON column.</param>
+        /// <param name="jsonPath">The JSON path to access within the column.</param>
+        /// <returns>The SQL fragment that accesses the specified JSON path.</returns>
         public abstract string TranslateJsonPathAccess(string columnName, string jsonPath);
 
+        /// <summary>
+        /// Generates the SQL required to create a history table for temporal table support.
+        /// </summary>
+        /// <param name="mapping">The table mapping representing the entity.</param>
+        /// <returns>The SQL statement that creates the history table.</returns>
         public abstract string GenerateCreateHistoryTableSql(TableMapping mapping);
+
+        /// <summary>
+        /// Generates the SQL required to create triggers for maintaining the temporal history table.
+        /// </summary>
+        /// <param name="mapping">The table mapping representing the entity.</param>
+        /// <returns>The SQL script containing the trigger definitions.</returns>
         public abstract string GenerateTemporalTriggersSql(TableMapping mapping);
 
         public virtual char LikeEscapeChar => '\\';
@@ -323,6 +377,16 @@ namespace nORM.Providers
         #endregion
 
         #region SQL Generation
+        /// <summary>
+        /// Builds an INSERT statement for the specified table mapping.
+        /// </summary>
+        /// <param name="m">The table mapping describing the entity.</param>
+        /// <returns>A parameterized INSERT SQL statement.</returns>
+        /// <summary>
+        /// Builds an INSERT statement for the specified table mapping.
+        /// </summary>
+        /// <param name="m">The table mapping describing the entity.</param>
+        /// <returns>A parameterized INSERT SQL statement.</returns>
         public string BuildInsert(TableMapping m)
         {
             return _sqlCache.GetOrAdd((m.Type, "INSERT"), _ => {
@@ -337,6 +401,11 @@ namespace nORM.Providers
             });
         }
 
+        /// <summary>
+        /// Builds an UPDATE statement for the specified table mapping.
+        /// </summary>
+        /// <param name="m">The table mapping describing the entity.</param>
+        /// <returns>A parameterized UPDATE SQL statement.</returns>
         public string BuildUpdate(TableMapping m)
         {
             return _sqlCache.GetOrAdd((m.Type, "UPDATE"), _ =>
@@ -355,6 +424,11 @@ namespace nORM.Providers
             });
         }
 
+        /// <summary>
+        /// Builds a DELETE statement for the specified table mapping.
+        /// </summary>
+        /// <param name="m">The table mapping describing the entity.</param>
+        /// <returns>A parameterized DELETE SQL statement.</returns>
         public string BuildDelete(TableMapping m)
         {
             return _sqlCache.GetOrAdd((m.Type, "DELETE"), _ =>

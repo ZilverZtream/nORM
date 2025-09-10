@@ -31,8 +31,13 @@ namespace nORM.Providers
 
         public override int MaxSqlLength => int.MaxValue;
         public override int MaxParameters => 32_767;
+
+        /// <inheritdoc />
         public override string Escape(string id) => $"\"{id}\"";
-        
+
+        /// <summary>
+        /// Adds PostgreSQL-specific <c>LIMIT</c> and <c>OFFSET</c> clauses to the SQL builder.
+        /// </summary>
         public override void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
         {
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
@@ -45,15 +50,24 @@ namespace nORM.Providers
                 sb.Append(" OFFSET ").Append(offsetParameterName);
         }
         
+        /// <summary>
+        /// Generates SQL for retrieving the value of an identity column after an insert.
+        /// </summary>
         public override string GetIdentityRetrievalString(TableMapping m)
         {
             var keyCol = m.KeyColumns.FirstOrDefault(c => c.IsDbGenerated);
             return keyCol != null ? $" RETURNING {keyCol.EscCol}" : string.Empty;
         }
-        
+
+        /// <summary>
+        /// Creates a <see cref="DbParameter"/> instance for use with Npgsql commands.
+        /// </summary>
         public override DbParameter CreateParameter(string name, object? value) =>
             _parameterFactory.CreateParameter(name, value);
 
+        /// <summary>
+        /// Translates certain .NET methods to PostgreSQL function calls.
+        /// </summary>
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)
         {
             if (declaringType == typeof(string))
@@ -97,6 +111,9 @@ namespace nORM.Providers
             return null;
         }
 
+        /// <summary>
+        /// Translates access to JSON fields using PostgreSQL's JSON operators.
+        /// </summary>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
         {
             var pgPath = string.Join(",", jsonPath.Split('.').Skip(1).Select(p => $"'{p}'"));
@@ -113,6 +130,9 @@ namespace nORM.Providers
             return $"{columnName} = ANY({pName})";
         }
 
+        /// <summary>
+        /// Generates SQL to create a temporal history table for the given mapping.
+        /// </summary>
         public override string GenerateCreateHistoryTableSql(TableMapping mapping)
         {
             var historyTable = Escape(mapping.TableName + "_History");
@@ -128,6 +148,9 @@ CREATE TABLE {historyTable} (
 );";
         }
 
+        /// <summary>
+        /// Generates SQL for triggers that maintain the temporal history table.
+        /// </summary>
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
         {
             var table = Escape(mapping.TableName);

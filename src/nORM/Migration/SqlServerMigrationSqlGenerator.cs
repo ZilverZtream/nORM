@@ -21,6 +21,11 @@ namespace nORM.Migration
             { typeof(Guid).FullName!, "UNIQUEIDENTIFIER" }
         };
 
+        /// <summary>
+        /// Generates SQL Server specific statements for applying the provided schema changes.
+        /// </summary>
+        /// <param name="diff">The computed differences between the current and desired schema.</param>
+        /// <returns>The SQL statements to upgrade and downgrade the database schema.</returns>
         public MigrationSqlStatements GenerateSql(SchemaDiff diff)
         {
             var up = new List<string>();

@@ -436,10 +436,28 @@ namespace nORM.Navigation
             EntityType = entityType;
         }
         
+        /// <summary>
+        /// Determines whether the specified navigation property has already been loaded for the entity.
+        /// </summary>
+        /// <param name="propertyName">The name of the navigation property.</param>
+        /// <returns><c>true</c> if the property is considered loaded; otherwise, <c>false</c>.</returns>
         public bool IsLoaded(string propertyName) => _loadedProperties.ContainsKey(propertyName);
+
+        /// <summary>
+        /// Marks the specified navigation property as loaded within this context.
+        /// </summary>
+        /// <param name="propertyName">The name of the navigation property.</param>
         public void MarkAsLoaded(string propertyName) => _loadedProperties[propertyName] = 0;
+
+        /// <summary>
+        /// Marks the specified navigation property as unloaded so it will be reloaded on next access.
+        /// </summary>
+        /// <param name="propertyName">The name of the navigation property.</param>
         public void MarkAsUnloaded(string propertyName) => _loadedProperties.TryRemove(propertyName, out _);
 
+        /// <summary>
+        /// Clears the loaded-property cache.
+        /// </summary>
         public void Dispose() => _loadedProperties.Clear();
     }
 
@@ -485,8 +503,16 @@ namespace nORM.Navigation
         /// </summary>
         public IEnumerator<T> GetEnumerator() => GetOrLoadCollection().GetEnumerator();
 
+        /// <summary>
+        /// Returns a non-generic enumerator for the collection.
+        /// </summary>
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
+        /// <summary>
+        /// Asynchronously enumerates the items in the collection, ensuring the navigation is loaded.
+        /// </summary>
+        /// <param name="ct">A cancellation token used to cancel the asynchronous iteration.</param>
+        /// <returns>An asynchronous enumerator over the collection.</returns>
         public async IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken ct = default)
         {
             if (!_context.IsLoaded(_property.Name))
@@ -571,6 +597,11 @@ namespace nORM.Navigation
             _isLoaded = false;
         }
 
+        /// <summary>
+        /// Gets the referenced entity value, loading it from the database if it has not been loaded yet.
+        /// </summary>
+        /// <param name="ct">A cancellation token that can be used to cancel the asynchronous operation.</param>
+        /// <returns>The referenced entity, or <c>null</c> if no related entity exists.</returns>
         public async Task<T?> GetValueAsync(CancellationToken ct = default)
         {
             if (!_isLoaded)
@@ -579,6 +610,10 @@ namespace nORM.Navigation
             return _value;
         }
 
+        /// <summary>
+        /// Sets the referenced entity and marks the navigation as loaded.
+        /// </summary>
+        /// <param name="value">The entity to assign to the navigation property.</param>
         public void SetValue(T? value)
         {
             lock (_loadLock)
@@ -589,6 +624,9 @@ namespace nORM.Navigation
             }
         }
 
+        /// <summary>
+        /// Implicitly converts the reference to a task that retrieves the value.
+        /// </summary>
         public static implicit operator Task<T?>(LazyNavigationReference<T> reference) => reference.GetValueAsync();
     }
 }

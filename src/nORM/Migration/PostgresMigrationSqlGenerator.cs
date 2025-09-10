@@ -21,6 +21,11 @@ namespace nORM.Migration
             { typeof(Guid).FullName!, "UUID" }
         };
 
+        /// <summary>
+        /// Produces PostgreSQL-compatible SQL statements to transition between schema versions.
+        /// </summary>
+        /// <param name="diff">The description of schema changes to apply.</param>
+        /// <returns>A set of statements to apply the changes and to revert them.</returns>
         public MigrationSqlStatements GenerateSql(SchemaDiff diff)
         {
             var up = new List<string>();
