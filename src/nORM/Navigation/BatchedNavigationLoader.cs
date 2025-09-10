@@ -28,6 +28,15 @@ namespace nORM.Navigation
             _context.RegisterForDisposal(this);
         }
 
+        /// <summary>
+        /// Queues a request to load the specified navigation property for an entity. Multiple
+        /// requests for the same navigation are batched together and executed in a single
+        /// database query to reduce round trips.
+        /// </summary>
+        /// <param name="entity">The entity instance whose navigation should be loaded.</param>
+        /// <param name="propertyName">Name of the navigation property to load.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A list of related entities once the batch has been processed.</returns>
         public async Task<List<object>> LoadNavigationAsync(object entity, string propertyName, CancellationToken ct = default)
         {
             var entityType = entity.GetType();

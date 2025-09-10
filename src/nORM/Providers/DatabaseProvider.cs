@@ -94,8 +94,19 @@ namespace nORM.Providers
         /// <returns>The SQL script containing the trigger definitions.</returns>
         public abstract string GenerateTemporalTriggersSql(TableMapping mapping);
 
+        /// <summary>
+        /// Character used to escape wildcards in patterns passed to SQL <c>LIKE</c> clauses.
+        /// Defaults to a backslash but can be overridden by providers with different
+        /// escaping semantics.
+        /// </summary>
         public virtual char LikeEscapeChar => '\\';
 
+        /// <summary>
+        /// Escapes occurrences of wildcard characters (<c>%</c> and <c>_</c>) in a
+        /// pattern so that they are treated as literals in <c>LIKE</c> expressions.
+        /// </summary>
+        /// <param name="value">The raw pattern value supplied by the user.</param>
+        /// <returns>The escaped pattern safe for inclusion in a <c>LIKE</c> clause.</returns>
         public virtual string EscapeLikePattern(string value)
         {
             var esc = NormValidator.ValidateLikeEscapeChar(LikeEscapeChar).ToString();
@@ -120,33 +131,76 @@ namespace nORM.Providers
                 throw new ArgumentException($"Parameter name must start with '{ParamPrefix}'", argumentName);
         }
 
+        /// <summary>
+        /// Determines whether the provider can operate in the current environment. The
+        /// base implementation simply returns <c>true</c> but derived providers may
+        /// perform runtime checks for required assemblies or database availability.
+        /// </summary>
         public virtual Task<bool> IsAvailableAsync()
         {
             return Task.FromResult(true);
         }
 
+        /// <summary>
+        /// Creates a database savepoint within the given transaction. The default
+        /// implementation throws as savepoints are provider specific and may not be
+        /// supported.
+        /// </summary>
+        /// <param name="transaction">The transaction in which to create the savepoint.</param>
+        /// <param name="name">Name of the savepoint.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public virtual Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
 
+        /// <summary>
+        /// Rolls the specified transaction back to a previously created savepoint. The
+        /// default implementation throws as savepoints are provider specific.
+        /// </summary>
+        /// <param name="transaction">The active transaction.</param>
+        /// <param name="name">Name of the savepoint to roll back to.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public virtual Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
 
+        /// <summary>
+        /// Performs provider-specific initialization when a connection is opened.
+        /// </summary>
+        /// <param name="connection">The open connection to initialize.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public virtual Task InitializeConnectionAsync(DbConnection connection, CancellationToken ct) => Task.CompletedTask;
 
+        /// <summary>
+        /// Synchronous counterpart to <see cref="InitializeConnectionAsync"/> allowing
+        /// providers to perform connection initialization without asynchronous overhead.
+        /// </summary>
+        /// <param name="connection">The open connection to initialize.</param>
         public virtual void InitializeConnection(DbConnection connection) { }
 
         public virtual CommandType StoredProcedureCommandType => CommandType.StoredProcedure;
 
+        /// <summary>
+        /// Constructs a minimal <c>SELECT</c> statement directly into the provided
+        /// character buffer to avoid intermediate string allocations.
+        /// </summary>
+        /// <param name="buffer">Destination buffer that receives the generated SQL.</param>
+        /// <param name="table">Name of the table to select from.</param>
+        /// <param name="columns">Comma separated list of columns to select.</param>
+        /// <param name="length">Outputs the number of characters written to the buffer.</param>
         public virtual void BuildSimpleSelect(Span<char> buffer, ReadOnlySpan<char> table,
             ReadOnlySpan<char> columns, out int length)
         {
             length = BuildSimpleSelectSlow(buffer, table, columns);
         }
 
+        /// <summary>
+        /// Fallback implementation of <see cref="BuildSimpleSelect"/> that uses string
+        /// concatenation. Providers can override <see cref="BuildSimpleSelect"/> to
+        /// supply more efficient implementations.
+        /// </summary>
         protected virtual int BuildSimpleSelectSlow(Span<char> buffer, ReadOnlySpan<char> table,
             ReadOnlySpan<char> columns)
         {
@@ -155,6 +209,15 @@ namespace nORM.Providers
             return sql.Length;
         }
 
+        /// <summary>
+        /// Builds an SQL <c>IN</c> clause for the specified column and parameter values.
+        /// Each value is added as a parameter to the provided command to guard against
+        /// SQL injection.
+        /// </summary>
+        /// <param name="cmd">The command that will execute the generated SQL.</param>
+        /// <param name="columnName">Column to apply the <c>IN</c> filter to.</param>
+        /// <param name="values">Values to include in the <c>IN</c> list.</param>
+        /// <returns>SQL fragment representing the <c>IN</c> clause.</returns>
         public virtual string BuildContainsClause(DbCommand cmd, string columnName, IReadOnlyList<object?> values)
         {
             var paramNames = new List<string>(values.Count);
@@ -378,15 +441,11 @@ namespace nORM.Providers
 
         #region SQL Generation
         /// <summary>
-        /// Builds an INSERT statement for the specified table mapping.
+        /// Builds a parameterized <c>INSERT</c> statement for the specified table
+        /// mapping, caching the generated SQL for future use.
         /// </summary>
         /// <param name="m">The table mapping describing the entity.</param>
-        /// <returns>A parameterized INSERT SQL statement.</returns>
-        /// <summary>
-        /// Builds an INSERT statement for the specified table mapping.
-        /// </summary>
-        /// <param name="m">The table mapping describing the entity.</param>
-        /// <returns>A parameterized INSERT SQL statement.</returns>
+        /// <returns>An <c>INSERT</c> statement ready for parameter substitution.</returns>
         public string BuildInsert(TableMapping m)
         {
             return _sqlCache.GetOrAdd((m.Type, "INSERT"), _ => {
@@ -402,10 +461,11 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// Builds an UPDATE statement for the specified table mapping.
+        /// Builds a parameterized <c>UPDATE</c> statement that updates all non-key
+        /// columns and filters by the entity's primary key (and timestamp when present).
         /// </summary>
         /// <param name="m">The table mapping describing the entity.</param>
-        /// <returns>A parameterized UPDATE SQL statement.</returns>
+        /// <returns>An <c>UPDATE</c> SQL statement.</returns>
         public string BuildUpdate(TableMapping m)
         {
             return _sqlCache.GetOrAdd((m.Type, "UPDATE"), _ =>
@@ -425,10 +485,11 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// Builds a DELETE statement for the specified table mapping.
+        /// Builds a parameterized <c>DELETE</c> statement that filters by the primary
+        /// key (and timestamp when applicable) to ensure a single row is targeted.
         /// </summary>
         /// <param name="m">The table mapping describing the entity.</param>
-        /// <returns>A parameterized DELETE SQL statement.</returns>
+        /// <returns>A <c>DELETE</c> SQL statement.</returns>
         public string BuildDelete(TableMapping m)
         {
             return _sqlCache.GetOrAdd((m.Type, "DELETE"), _ =>

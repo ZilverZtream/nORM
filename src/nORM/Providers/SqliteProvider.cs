@@ -241,6 +241,11 @@ END;";
                 throw new InvalidOperationException("A SqliteConnection is required for SqliteProvider.");
         }
 
+        /// <summary>
+        /// Determines if the SQLite provider can be used in the current environment by
+        /// verifying that the required <c>Microsoft.Data.Sqlite</c> assembly is available
+        /// and that the SQLite engine meets the minimum version requirement.
+        /// </summary>
         public override async Task<bool> IsAvailableAsync()
         {
             var type = Type.GetType("Microsoft.Data.Sqlite.SqliteConnection, Microsoft.Data.Sqlite");
@@ -265,6 +270,12 @@ END;";
             }
         }
 
+        /// <summary>
+        /// Creates a savepoint within a SQLite transaction allowing partial rollbacks.
+        /// </summary>
+        /// <param name="transaction">The active SQLite transaction.</param>
+        /// <param name="name">Name of the savepoint to create.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             if (transaction is SqliteTransaction sqliteTransaction)
@@ -275,6 +286,12 @@ END;";
             throw new ArgumentException("Transaction must be a SqliteTransaction.", nameof(transaction));
         }
 
+        /// <summary>
+        /// Rolls back a SQLite transaction to the specified savepoint.
+        /// </summary>
+        /// <param name="transaction">The active SQLite transaction.</param>
+        /// <param name="name">Name of the savepoint to roll back to.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             if (transaction is SqliteTransaction sqliteTransaction)
