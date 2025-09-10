@@ -134,5 +134,12 @@ namespace nORM.Query
             ArrayPool<char>.Shared.Return(_buffer);
             _buffer = newBuffer;
         }
+
+
+        public OptimizedSqlBuilder Reserve(int additionalCapacity)
+        {
+            EnsureCapacity(additionalCapacity);
+            return this;
+        }
     }
 }
