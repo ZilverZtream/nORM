@@ -465,27 +465,154 @@ namespace nORM.Query
             public override object this[int ordinal] => _inner[ordinal + _offset];
             public override object this[string name] => _inner[name];
 
+            /// <summary>
+            /// Retrieves a Boolean value from the underlying reader adjusted by the offset.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The Boolean value for the column.</returns>
             public override bool GetBoolean(int ordinal) => _inner.GetBoolean(ordinal + _offset);
+
+            /// <summary>
+            /// Retrieves a byte value from the underlying reader adjusted by the offset.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The byte value for the column.</returns>
             public override byte GetByte(int ordinal) => _inner.GetByte(ordinal + _offset);
+
+            /// <summary>
+            /// Reads a sequence of bytes from the specified column starting at the given offset.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <param name="dataOffset">Index within the field from which to begin the read operation.</param>
+            /// <param name="buffer">Destination array for the bytes.</param>
+            /// <param name="bufferOffset">Index within the buffer at which to start placing the data.</param>
+            /// <param name="length">Maximum number of bytes to read.</param>
+            /// <returns>The actual number of bytes read.</returns>
             public override long GetBytes(int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length)
                 => _inner.GetBytes(ordinal + _offset, dataOffset, buffer, bufferOffset, length);
+
+            /// <summary>
+            /// Retrieves a single character from the specified column.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The character value for the column.</returns>
             public override char GetChar(int ordinal) => _inner.GetChar(ordinal + _offset);
+
+            /// <summary>
+            /// Reads a sequence of characters from the specified column starting at the given offset.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <param name="dataOffset">Index within the field from which to begin the read operation.</param>
+            /// <param name="buffer">Destination array for the characters.</param>
+            /// <param name="bufferOffset">Index within the buffer at which to start placing the data.</param>
+            /// <param name="length">Maximum number of characters to read.</param>
+            /// <returns>The actual number of characters read.</returns>
             public override long GetChars(int ordinal, long dataOffset, char[]? buffer, int bufferOffset, int length)
                 => _inner.GetChars(ordinal + _offset, dataOffset, buffer, bufferOffset, length);
+
+            /// <summary>
+            /// Gets the data type name for the column at the specified ordinal.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The database-specific type name.</returns>
             public override string GetDataTypeName(int ordinal) => _inner.GetDataTypeName(ordinal + _offset);
+
+            /// <summary>
+            /// Retrieves a <see cref="DateTime"/> value from the specified column.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The <see cref="DateTime"/> value for the column.</returns>
             public override DateTime GetDateTime(int ordinal) => _inner.GetDateTime(ordinal + _offset);
+
+            /// <summary>
+            /// Retrieves a <see cref="decimal"/> value from the specified column.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The decimal value for the column.</returns>
             public override decimal GetDecimal(int ordinal) => _inner.GetDecimal(ordinal + _offset);
+
+            /// <summary>
+            /// Retrieves a double-precision floating-point value from the specified column.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The <see cref="double"/> value for the column.</returns>
             public override double GetDouble(int ordinal) => _inner.GetDouble(ordinal + _offset);
+
+            /// <summary>
+            /// Gets the runtime type of the column at the specified ordinal.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The <see cref="Type"/> of the data stored in the column.</returns>
             public override Type GetFieldType(int ordinal) => _inner.GetFieldType(ordinal + _offset);
+
+            /// <summary>
+            /// Retrieves a single-precision floating-point value from the specified column.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The <see cref="float"/> value for the column.</returns>
             public override float GetFloat(int ordinal) => _inner.GetFloat(ordinal + _offset);
+
+            /// <summary>
+            /// Retrieves a <see cref="Guid"/> value from the specified column.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The <see cref="Guid"/> value for the column.</returns>
             public override Guid GetGuid(int ordinal) => _inner.GetGuid(ordinal + _offset);
+
+            /// <summary>
+            /// Retrieves a 16-bit integer from the specified column.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The <see cref="short"/> value for the column.</returns>
             public override short GetInt16(int ordinal) => _inner.GetInt16(ordinal + _offset);
+
+            /// <summary>
+            /// Retrieves a 32-bit integer from the specified column.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The <see cref="int"/> value for the column.</returns>
             public override int GetInt32(int ordinal) => _inner.GetInt32(ordinal + _offset);
+
+            /// <summary>
+            /// Retrieves a 64-bit integer from the specified column.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The <see cref="long"/> value for the column.</returns>
             public override long GetInt64(int ordinal) => _inner.GetInt64(ordinal + _offset);
+
+            /// <summary>
+            /// Gets the name of the column at the specified ordinal.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The column name.</returns>
             public override string GetName(int ordinal) => _inner.GetName(ordinal + _offset);
+
+            /// <summary>
+            /// Retrieves the column ordinal given its name, compensating for the offset.
+            /// </summary>
+            /// <param name="name">The name of the column.</param>
+            /// <returns>The zero-based column ordinal.</returns>
             public override int GetOrdinal(string name) => _inner.GetOrdinal(name) - _offset;
+
+            /// <summary>
+            /// Retrieves a string value from the specified column.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The string value for the column.</returns>
             public override string GetString(int ordinal) => _inner.GetString(ordinal + _offset);
+
+            /// <summary>
+            /// Retrieves the value of the specified column as an object.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns>The value of the column.</returns>
             public override object GetValue(int ordinal) => _inner.GetValue(ordinal + _offset);
+
+            /// <summary>
+            /// Populates the provided array with values from the current row, accounting for the offset.
+            /// </summary>
+            /// <param name="values">Destination array for the values.</param>
+            /// <returns>The number of values copied into the array.</returns>
             public override int GetValues(object[] values)
             {
                 var temp = new object[values.Length + _offset];
@@ -497,6 +624,12 @@ namespace nORM.Query
                     Array.Fill(values, DBNull.Value, len, values.Length - len);
                 return Math.Max(0, len);
             }
+
+            /// <summary>
+            /// Determines whether the column at the specified ordinal contains <c>DBNull</c>.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal relative to the offset.</param>
+            /// <returns><c>true</c> if the column is <c>DBNull</c>; otherwise, <c>false</c>.</returns>
             public override bool IsDBNull(int ordinal) => _inner.IsDBNull(ordinal + _offset);
             /// <summary>
             /// Asynchronously determines whether the specified column is <c>DBNull</c>.
