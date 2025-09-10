@@ -27,8 +27,18 @@ namespace nORM.Providers
         }
         public override int MaxSqlLength => 4_194_304;
         public override int MaxParameters => 65_535;
+
+        /// <inheritdoc />
         public override string Escape(string id) => $"`{id}`";
-        
+
+        /// <summary>
+        /// Appends a MySQL <c>LIMIT</c> clause to the SQL builder to paginate results.
+        /// </summary>
+        /// <param name="sb">The SQL builder being appended to.</param>
+        /// <param name="limit">The maximum number of rows to return.</param>
+        /// <param name="offset">The number of rows to skip before returning results.</param>
+        /// <param name="limitParameterName">Parameter name for the limit value.</param>
+        /// <param name="offsetParameterName">Parameter name for the offset value.</param>
         public override void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
         {
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
@@ -52,11 +62,20 @@ namespace nORM.Providers
             }
         }
         
+        /// <summary>
+        /// Returns a SQL fragment that retrieves the last auto-incremented identity value.
+        /// </summary>
         public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT LAST_INSERT_ID();";
-        
+
+        /// <summary>
+        /// Creates a new <see cref="DbParameter"/> for use with MySQL commands.
+        /// </summary>
         public override DbParameter CreateParameter(string name, object? value) =>
             _parameterFactory.CreateParameter(name, value);
 
+        /// <summary>
+        /// Translates selected .NET methods to their MySQL SQL equivalents.
+        /// </summary>
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)
         {
             if (declaringType == typeof(string))
@@ -100,9 +119,15 @@ namespace nORM.Providers
             return null;
         }
 
+        /// <summary>
+        /// Translates access to a JSON value using MySQL's <c>JSON_EXTRACT</c> function.
+        /// </summary>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
             => $"JSON_UNQUOTE(JSON_EXTRACT({columnName}, '{jsonPath}'))";
 
+        /// <summary>
+        /// Generates the SQL statement to create the temporal history table for an entity.
+        /// </summary>
         public override string GenerateCreateHistoryTableSql(TableMapping mapping)
         {
             var historyTable = Escape(mapping.TableName + "_History");
@@ -118,6 +143,9 @@ CREATE TABLE {historyTable} (
 ) ENGINE=InnoDB;";
         }
 
+        /// <summary>
+        /// Generates the SQL needed to create triggers that populate the temporal history table.
+        /// </summary>
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
         {
             var table = Escape(mapping.TableName);

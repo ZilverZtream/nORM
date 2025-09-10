@@ -21,6 +21,11 @@ namespace nORM.Migration
             { typeof(Guid).FullName!, "TEXT" }
         };
 
+        /// <summary>
+        /// Creates SQLite SQL statements for the operations described by the schema diff.
+        /// </summary>
+        /// <param name="diff">The set of schema changes to be applied.</param>
+        /// <returns>The statements needed to apply and rollback the changes.</returns>
         public MigrationSqlStatements GenerateSql(SchemaDiff diff)
         {
             var up = new List<string>();

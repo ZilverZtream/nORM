@@ -27,6 +27,11 @@ namespace nORM.Migration
 
     public static class SchemaSnapshotBuilder
     {
+        /// <summary>
+        /// Builds a snapshot of the entity schema by inspecting the types in the provided assembly.
+        /// </summary>
+        /// <param name="assembly">The assembly containing the entity types to scan.</param>
+        /// <returns>A snapshot describing the tables and columns inferred from the assembly.</returns>
         public static SchemaSnapshot Build(Assembly assembly)
         {
             var snapshot = new SchemaSnapshot();
@@ -81,6 +86,12 @@ namespace nORM.Migration
 
     public static class SchemaDiffer
     {
+        /// <summary>
+        /// Computes the difference between two schema snapshots.
+        /// </summary>
+        /// <param name="oldSnapshot">The snapshot representing the current database schema.</param>
+        /// <param name="newSnapshot">The snapshot representing the desired schema.</param>
+        /// <returns>A <see cref="SchemaDiff"/> describing the operations required to transform the schema.</returns>
         public static SchemaDiff Diff(SchemaSnapshot oldSnapshot, SchemaSnapshot newSnapshot)
         {
             var diff = new SchemaDiff();
