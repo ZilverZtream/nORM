@@ -248,6 +248,12 @@ BEGIN
 END;";
         }
 
+        /// <summary>
+        /// Ensures that the provided <see cref="DbConnection"/> is a SQL Server
+        /// connection compatible with this provider.
+        /// </summary>
+        /// <param name="connection">The connection instance to validate.</param>
+        /// <exception cref="InvalidOperationException">Thrown when the connection is not a <see cref="SqlConnection"/>.</exception>
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);

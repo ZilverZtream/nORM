@@ -50,12 +50,23 @@ namespace nORM.Configuration
         public IDbCacheProvider? CacheProvider { get; set; } = null;
         public TimeSpan CacheExpiration { get; set; } = TimeSpan.FromMinutes(5);
 
+        /// <summary>
+        /// Enables the built-in in-memory cache for query results using
+        /// <see cref="NormMemoryCacheProvider"/>. The cache is scoped by tenant when a
+        /// <see cref="ITenantProvider"/> is available.
+        /// </summary>
+        /// <returns>The current <see cref="DbContextOptions"/> instance for chaining.</returns>
         public DbContextOptions UseInMemoryCache()
         {
             this.CacheProvider = new NormMemoryCacheProvider(() => this.TenantProvider?.GetCurrentTenantId());
             return this;
         }
 
+        /// <summary>
+        /// Enables temporal versioning for all entities in the context. When enabled the
+        /// provider generates history tables and triggers to track changes over time.
+        /// </summary>
+        /// <returns>The current <see cref="DbContextOptions"/> instance for chaining.</returns>
         public DbContextOptions EnableTemporalVersioning()
         {
             _temporalVersioningEnabled = true;

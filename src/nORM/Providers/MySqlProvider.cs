@@ -180,6 +180,11 @@ BEGIN
 END;";
         }
 
+        /// <summary>
+        /// Validates that the supplied connection is compatible with the MySQL provider.
+        /// </summary>
+        /// <param name="connection">The connection to validate.</param>
+        /// <exception cref="InvalidOperationException">Thrown when the connection is not a MySQL connection.</exception>
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);
@@ -188,6 +193,10 @@ END;";
                 throw new InvalidOperationException("A MySqlConnection is required for MySqlProvider. Please install MySqlConnector or MySql.Data.");
         }
 
+        /// <summary>
+        /// Checks whether the necessary MySQL client libraries are available and that a
+        /// modern MySQL server (version 8.0 or higher) can be reached.
+        /// </summary>
         public override async Task<bool> IsAvailableAsync()
         {
             var type =
