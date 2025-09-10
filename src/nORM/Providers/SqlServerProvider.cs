@@ -498,6 +498,10 @@ END;";
                 _columns = columns;
             }
 
+            /// <summary>
+            /// Advances the reader to the next record in the underlying entity sequence.
+            /// </summary>
+            /// <returns><c>true</c> if another record is available; otherwise, <c>false</c>.</returns>
             public bool Read()
             {
                 if (_enumerator.MoveNext())
@@ -509,22 +513,62 @@ END;";
                 return false;
             }
 
+            /// <summary>
+            /// Gets the number of fields exposed by the data reader.
+            /// </summary>
             public int FieldCount => _columns.Count;
+
+            /// <summary>
+            /// Gets the value of the specified field by ordinal position.
+            /// </summary>
             public object this[int i] => GetValue(i);
+
+            /// <summary>
+            /// Gets the value of the specified field by column name.
+            /// </summary>
             public object this[string name] => GetValue(GetOrdinal(name));
 
+            /// <summary>
+            /// Retrieves the value of the field at the given ordinal.
+            /// </summary>
+            /// <param name="i">Zero-based column ordinal.</param>
+            /// <returns>The boxed value of the column or <see cref="DBNull"/>.</returns>
             public object GetValue(int i)
             {
                 if (_current == null) throw new InvalidOperationException("No current record");
                 return _columns[i].Getter(_current) ?? DBNull.Value;
             }
 
+            /// <summary>
+            /// Gets the name of the column at the specified ordinal.
+            /// </summary>
             public string GetName(int i) => _columns[i].PropName;
+
+            /// <summary>
+            /// Gets the data type name of the column at the specified ordinal.
+            /// </summary>
             public string GetDataTypeName(int i) => GetFieldType(i).Name;
+
+            /// <summary>
+            /// Gets the <see cref="Type"/> of the column at the specified ordinal.
+            /// </summary>
             public Type GetFieldType(int i) => _columns[i].Prop.PropertyType;
+
+            /// <summary>
+            /// Returns the zero-based column ordinal given the column name.
+            /// </summary>
             public int GetOrdinal(string name) => _columns.FindIndex(c => c.PropName == name);
+
+            /// <summary>
+            /// Determines whether the column at the specified ordinal is set to <see cref="DBNull"/>.
+            /// </summary>
             public bool IsDBNull(int i) => GetValue(i) == DBNull.Value;
 
+            /// <summary>
+            /// Copies field values into the provided array.
+            /// </summary>
+            /// <param name="values">Destination array.</param>
+            /// <returns>The number of values copied.</returns>
             public int GetValues(object[] values)
             {
                 var count = Math.Min(values.Length, FieldCount);
@@ -533,29 +577,116 @@ END;";
                 return count;
             }
 
+            /// <summary>
+            /// Advances to the next result set. Always returns <c>false</c> as only a single
+            /// result set is supported.
+            /// </summary>
             public bool NextResult() => false;
+
+            /// <summary>
+            /// Gets the depth of nesting for the current row. Always <c>0</c> for this reader.
+            /// </summary>
             public int Depth => 0;
+
+            /// <summary>
+            /// Gets a value indicating whether the reader is closed.
+            /// </summary>
             public bool IsClosed => _disposed;
+
+            /// <summary>
+            /// Gets the number of rows affected. Always <c>-1</c> for this reader.
+            /// </summary>
             public int RecordsAffected => -1;
+
+            /// <summary>
+            /// Returns a <see cref="DataTable"/> describing the column metadata. Not supported and
+            /// always returns <c>null</c>.
+            /// </summary>
             public DataTable? GetSchemaTable() => null;
+
+            /// <summary>
+            /// Closes the reader and releases the underlying enumerator.
+            /// </summary>
             public void Close() => Dispose();
 
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="bool"/>.
+            /// </summary>
             public bool GetBoolean(int i) => (bool)GetValue(i);
+
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="byte"/>.
+            /// </summary>
             public byte GetByte(int i) => (byte)GetValue(i);
+
+            /// <summary>
+            /// Reads a stream of bytes from the specified column. Not supported in this reader.
+            /// </summary>
             public long GetBytes(int i, long fieldOffset, byte[]? buffer, int bufferoffset, int length) => throw new NotSupportedException();
+
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="char"/>.
+            /// </summary>
             public char GetChar(int i) => (char)GetValue(i);
+
+            /// <summary>
+            /// Reads a stream of characters from the specified column. Not supported in this reader.
+            /// </summary>
             public long GetChars(int i, long fieldoffset, char[]? buffer, int bufferoffset, int length) => throw new NotSupportedException();
+
+            /// <summary>
+            /// Gets an <see cref="IDataReader"/> for the specified column. Not supported in this reader.
+            /// </summary>
             public IDataReader GetData(int i) => throw new NotSupportedException();
+
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="DateTime"/>.
+            /// </summary>
             public DateTime GetDateTime(int i) => (DateTime)GetValue(i);
+
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="decimal"/>.
+            /// </summary>
             public decimal GetDecimal(int i) => (decimal)GetValue(i);
+
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="double"/>.
+            /// </summary>
             public double GetDouble(int i) => (double)GetValue(i);
+
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="float"/>.
+            /// </summary>
             public float GetFloat(int i) => (float)GetValue(i);
+
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="Guid"/>.
+            /// </summary>
             public Guid GetGuid(int i) => (Guid)GetValue(i);
+
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="short"/>.
+            /// </summary>
             public short GetInt16(int i) => (short)GetValue(i);
+
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="int"/>.
+            /// </summary>
             public int GetInt32(int i) => (int)GetValue(i);
+
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="long"/>.
+            /// </summary>
             public long GetInt64(int i) => (long)GetValue(i);
+
+            /// <summary>
+            /// Gets the value of the specified column cast to <see cref="string"/>.
+            /// </summary>
             public string GetString(int i) => (string)GetValue(i);
 
+            /// <summary>
+            /// Releases resources associated with the reader.
+            /// </summary>
             public void Dispose()
             {
                 if (_disposed) return;
