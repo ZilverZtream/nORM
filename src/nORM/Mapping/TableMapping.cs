@@ -168,6 +168,14 @@ namespace nORM.Mapping
             }
         }
 
+        /// <summary>
+        /// Represents the mapping of a relationship from the principal entity to a dependent entity type.
+        /// </summary>
+        /// <param name="NavProp">The navigation property on the principal entity that exposes the related data.</param>
+        /// <param name="DependentType">The CLR type of the dependent entity.</param>
+        /// <param name="PrincipalKey">The key column on the principal entity used as the relationship principal.</param>
+        /// <param name="ForeignKey">The foreign key column on the dependent entity referencing the principal key.</param>
+        /// <param name="CascadeDelete">Specifies whether deletes on the principal entity cascade to dependents.</param>
         public record Relation(PropertyInfo NavProp, Type DependentType, Column PrincipalKey, Column ForeignKey, bool CascadeDelete = true);
     }
 }

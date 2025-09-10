@@ -23,8 +23,13 @@ namespace nORM.Providers
         private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: 100);
         public override int MaxSqlLength => 8_000;
         public override int MaxParameters => 2_100;
+
+        /// <inheritdoc />
         public override string Escape(string id) => $"[{id}]";
-        
+
+        /// <summary>
+        /// Adds SQL Server paging clauses to the SQL builder using <c>OFFSET</c> and <c>FETCH</c>.
+        /// </summary>
         public override void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
         {
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
@@ -43,8 +48,14 @@ namespace nORM.Providers
             }
         }
         
+        /// <summary>
+        /// Returns SQL for retrieving the last identity value generated in the current scope.
+        /// </summary>
         public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT SCOPE_IDENTITY();";
 
+        /// <summary>
+        /// Creates a SQL Server specific <see cref="DbParameter"/> instance.
+        /// </summary>
         public override System.Data.Common.DbParameter CreateParameter(string name, object? value)
         {
             var param = new SqlParameter(name, value ?? DBNull.Value);
@@ -61,6 +72,9 @@ namespace nORM.Providers
                 .Replace("^", esc + "^");
         }
 
+        /// <summary>
+        /// Translates a subset of .NET methods into their SQL Server equivalents.
+        /// </summary>
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)
         {
             if (declaringType == typeof(string))
@@ -104,6 +118,9 @@ namespace nORM.Providers
             return null;
         }
 
+        /// <summary>
+        /// Translates a JSON value access expression using SQL Server's <c>JSON_VALUE</c> function.
+        /// </summary>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
             => $"JSON_VALUE({columnName}, '{jsonPath}')";
 
@@ -115,6 +132,9 @@ namespace nORM.Providers
             return $"{columnName} IN (SELECT value FROM STRING_SPLIT({pName}, ','))";
         }
 
+        /// <summary>
+        /// Generates SQL to create a history table used for temporal tracking.
+        /// </summary>
         public override string GenerateCreateHistoryTableSql(TableMapping mapping)
         {
             var historyTable = Escape(mapping.TableName + "_History");
@@ -130,6 +150,9 @@ CREATE TABLE {historyTable} (
 );";
         }
 
+        /// <summary>
+        /// Generates SQL Server triggers that maintain the temporal history table.
+        /// </summary>
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
         {
             var table = Escape(mapping.TableName);

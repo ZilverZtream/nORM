@@ -21,6 +21,11 @@ namespace nORM.Migration
             { typeof(Guid).FullName!, "CHAR(36)" }
         };
 
+        /// <summary>
+        /// Generates MySQL-specific SQL statements that apply the schema changes described by the provided diff.
+        /// </summary>
+        /// <param name="diff">The differences between the current and desired database schema.</param>
+        /// <returns>A pair of SQL statement lists for migrating up and rolling back.</returns>
         public MigrationSqlStatements GenerateSql(SchemaDiff diff)
         {
             var up = new List<string>();
