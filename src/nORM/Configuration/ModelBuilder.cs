@@ -27,6 +27,13 @@ namespace nORM.Configuration
         internal IEntityTypeConfiguration? GetConfiguration(Type type)
             => _configurations.TryGetValue(type, out var config) ? config : null;
 
+        /// <summary>
+        /// Enumerates all entity CLR types that have been explicitly configured
+        /// using <see cref="Entity{TEntity}()"/>. The resulting sequence can be
+        /// used by infrastructure components to build mappings or perform
+        /// additional model validation at runtime.
+        /// </summary>
+        /// <returns>An enumerable collection of configured entity types.</returns>
         internal IEnumerable<Type> GetConfiguredEntityTypes()
             => _configurations.Keys;
     }

@@ -50,6 +50,15 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Converts low-level exceptions into richer <see cref="NormException"/>
+        /// instances that include contextual information such as the executed SQL,
+        /// parameters, duration and a correlation identifier. Specific exception
+        /// types are translated into more specialized subclasses when possible.
+        /// </summary>
+        /// <param name="originalException">The exception thrown by the underlying operation.</param>
+        /// <param name="context">Additional context describing the failed operation.</param>
+        /// <returns>A <see cref="NormException"/> enriched with contextual data.</returns>
         private NormException EnrichException(Exception originalException, Dictionary<string, object> context)
         {
             return originalException switch

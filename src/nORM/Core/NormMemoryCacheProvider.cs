@@ -26,6 +26,13 @@ namespace nORM.Core
             _getTenantId = getTenantId;
         }
 
+        /// <summary>
+        /// Combines the provided tag with the current tenant identifier to produce a
+        /// cache tag that is unique per tenant. When no tenant provider is configured
+        /// the original tag is returned unchanged.
+        /// </summary>
+        /// <param name="tag">The tag to qualify.</param>
+        /// <returns>A tenant-qualified tag string.</returns>
         private string QualifyTag(string tag)
         {
             if (_getTenantId == null)

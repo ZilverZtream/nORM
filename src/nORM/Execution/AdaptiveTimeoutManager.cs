@@ -111,6 +111,13 @@ namespace nORM.Execution
             return finalTimeout > maxTimeout ? maxTimeout : finalTimeout;
         }
 
+        /// <summary>
+        /// Determines the baseline timeout for a given operation type before any
+        /// adaptive adjustments are applied. The value is derived from the configured
+        /// <see cref="TimeoutConfiguration"/>.
+        /// </summary>
+        /// <param name="operationType">The type of operation being executed.</param>
+        /// <returns>The base timeout to use for the operation.</returns>
         private TimeSpan GetBaseTimeoutForOperation(OperationType operationType)
         {
             return operationType switch
@@ -173,6 +180,13 @@ namespace nORM.Execution
             }
         }
 
+        /// <summary>
+        /// Updates the rolling execution statistics for the specified operation. These
+        /// metrics are used to adapt future timeout calculations based on past behavior.
+        /// </summary>
+        /// <param name="operationKey">Unique identifier for the operation.</param>
+        /// <param name="executionTime">Actual execution duration.</param>
+        /// <param name="success">Indicates whether the operation completed successfully.</param>
         private void UpdateOperationStatistics(string operationKey, TimeSpan executionTime, bool success)
         {
             _operationStats.AddOrUpdate(operationKey,
