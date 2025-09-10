@@ -171,7 +171,7 @@ namespace nORM.Core
         {
             if (_disposed) return;
 
-            // ADD: reentrancy guard — System.Threading.Timer may overlap callbacks
+            // ADD: reentrancy guard Â— System.Threading.Timer may overlap callbacks
             if (Interlocked.Exchange(ref _cleanupRunning, 1) == 1) return;
 
             try
@@ -241,6 +241,10 @@ namespace nORM.Core
             _semaphore.Dispose();
         }
 
+        /// <summary>
+        /// Asynchronously disposes the connection pool and all pooled connections.
+        /// </summary>
+        /// <returns>A task that completes when disposal is finished.</returns>
         public async ValueTask DisposeAsync()
         {
             Dispose();
