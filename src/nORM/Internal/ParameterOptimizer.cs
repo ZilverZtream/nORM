@@ -20,6 +20,15 @@ namespace nORM.Internal
             [typeof(Guid)] = DbType.Guid
         };
 
+        /// <summary>
+        /// Adds a parameter to the command, attempting to infer the optimal <see cref="DbType"/> and
+        /// size based on the supplied value. When a <paramref name="knownType"/> is provided and the
+        /// value is <c>null</c>, the mapping is still applied to avoid provider ambiguity.
+        /// </summary>
+        /// <param name="cmd">The command to which the parameter is added.</param>
+        /// <param name="name">The parameter name including prefix (e.g. <c>@Id</c>).</param>
+        /// <param name="value">The value to bind to the parameter.</param>
+        /// <param name="knownType">Optional type hint used when <paramref name="value"/> is <c>null</c>.</param>
         public static void AddOptimizedParam(this DbCommand cmd, string name, object? value, Type? knownType = null)
         {
             var param = cmd.CreateParameter();
@@ -51,6 +60,13 @@ namespace nORM.Internal
             cmd.Parameters.Add(param);
         }
 
+        /// <summary>
+        /// Adds a parameter without additional type metadata by delegating to
+        /// <see cref="AddOptimizedParam(DbCommand,string,object?,Type?)"/>.
+        /// </summary>
+        /// <param name="cmd">The command to which the parameter is added.</param>
+        /// <param name="name">The parameter name including prefix.</param>
+        /// <param name="value">The value to bind to the parameter.</param>
         public static void AddParam(this DbCommand cmd, string name, object? value)
             => AddOptimizedParam(cmd, name, value, null);
     }

@@ -61,6 +61,12 @@ namespace nORM.Migration
             return pending.Select(p => $"{p.Version}_{p.Name}").ToArray();
         }
 
+        /// <summary>
+        /// Scans the migrations assembly and returns migrations that have not yet been applied to the
+        /// target SQLite database.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A list of pending <see cref="Migration"/> instances ordered by version.</returns>
         private async Task<List<Migration>> GetPendingMigrationsInternalAsync(CancellationToken ct)
         {
             var all = _migrationsAssembly.GetTypes()
@@ -74,6 +80,12 @@ namespace nORM.Migration
             return all.Where(m => !appliedVersions.Contains(m.Version)).ToList();
         }
 
+        /// <summary>
+        /// Records in the history table that the specified migration has been successfully applied.
+        /// </summary>
+        /// <param name="migration">The migration that was applied.</param>
+        /// <param name="transaction">The active transaction.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         private async Task MarkMigrationAppliedAsync(Migration migration, DbTransaction transaction, CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
@@ -85,6 +97,11 @@ namespace nORM.Migration
             await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Retrieves the set of migration versions that have already been applied to the database.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A set containing the version numbers of applied migrations.</returns>
         private async Task<HashSet<long>> GetAppliedMigrationVersionsAsync(CancellationToken ct)
         {
             var versions = new HashSet<long>();
@@ -105,6 +122,10 @@ namespace nORM.Migration
             return versions;
         }
 
+        /// <summary>
+        /// Creates the migration history table if it does not already exist.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         private async Task EnsureHistoryTableAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
@@ -112,9 +133,21 @@ namespace nORM.Migration
             await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Executes a non-query command, optionally routing through interceptors when a context is available.
+        /// </summary>
+        /// <param name="cmd">The command to execute.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The number of rows affected.</returns>
         private Task<int> ExecuteNonQueryAsync(DbCommand cmd, CancellationToken ct)
             => _context != null ? cmd.ExecuteNonQueryWithInterceptionAsync(_context, ct) : cmd.ExecuteNonQueryAsync(ct);
 
+        /// <summary>
+        /// Executes a reader command, optionally routing through interceptors when a context is available.
+        /// </summary>
+        /// <param name="cmd">The command to execute.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A <see cref="DbDataReader"/> containing the results.</returns>
         private Task<DbDataReader> ExecuteReaderAsync(DbCommand cmd, CancellationToken ct)
             => _context != null ? cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct) : cmd.ExecuteReaderAsync(ct);
     }
