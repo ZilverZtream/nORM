@@ -260,6 +260,13 @@ namespace nORM.Query
             return (Func<DbDataReader, object>)method.CreateDelegate(typeof(Func<DbDataReader, object>));
         }
 
+        /// <summary>
+        /// Creates a materializer delegate that converts a <see cref="DbDataReader"/> row into the target type.
+        /// </summary>
+        /// <param name="mapping">Mapping describing the source table schema.</param>
+        /// <param name="targetType">CLR type to materialize.</param>
+        /// <param name="projection">Optional projection expression selecting specific members.</param>
+        /// <returns>A delegate that asynchronously materializes objects from a data reader.</returns>
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(
             TableMapping mapping,
             Type targetType,
@@ -304,6 +311,13 @@ namespace nORM.Query
         }
 
         // Optimized schema-aware materializer for JOIN scenarios
+        /// <summary>
+        /// Creates a materializer that is aware of the actual reader schema, enabling efficient JOIN projections.
+        /// </summary>
+        /// <param name="mapping">Mapping describing the table layout.</param>
+        /// <param name="targetType">Type of object to materialize.</param>
+        /// <param name="projection">Optional projection expression.</param>
+        /// <returns>A delegate that materializes objects taking the reader schema into account.</returns>
         public Func<DbDataReader, CancellationToken, Task<object>> CreateSchemaAwareMaterializer(
             TableMapping mapping,
             Type targetType,
@@ -783,6 +797,12 @@ namespace nORM.Query
 
             public override int FieldCount => _fieldCount;
             public override bool IsDBNull(int ordinal) => true;
+            /// <summary>
+            /// Always reports the field as <c>DBNull</c> for validation purposes.
+            /// </summary>
+            /// <param name="ordinal">The zero-based column ordinal.</param>
+            /// <param name="cancellationToken">Token used to cancel the operation.</param>
+            /// <returns>A completed task returning <c>true</c>.</returns>
             public override Task<bool> IsDBNullAsync(int ordinal, CancellationToken cancellationToken) => Task.FromResult(true);
             public override object GetValue(int ordinal) => DBNull.Value;
 
@@ -803,8 +823,18 @@ namespace nORM.Query
             public override object this[string name] => DBNull.Value;
             public override IEnumerator GetEnumerator() => Array.Empty<object>().GetEnumerator();
             public override bool Read() => false;
+            /// <summary>
+            /// Always returns <c>false</c> because this reader has no rows.
+            /// </summary>
+            /// <param name="cancellationToken">Token used to cancel the read operation.</param>
+            /// <returns>A completed task returning <c>false</c>.</returns>
             public override Task<bool> ReadAsync(CancellationToken cancellationToken) => Task.FromResult(false);
             public override bool NextResult() => false;
+            /// <summary>
+            /// Always returns <c>false</c> because there are no additional result sets.
+            /// </summary>
+            /// <param name="cancellationToken">Token used to cancel the operation.</param>
+            /// <returns>A completed task returning <c>false</c>.</returns>
             public override Task<bool> NextResultAsync(CancellationToken cancellationToken) => Task.FromResult(false);
             public override int Depth => 0;
             public override int VisibleFieldCount => _fieldCount;
@@ -931,8 +961,18 @@ namespace nORM.Query
             public override bool IsClosed => _inner.IsClosed;
             public override int RecordsAffected => _inner.RecordsAffected;
             public override bool Read() => _inner.Read();
+            /// <summary>
+            /// Asynchronously reads the next row, delegating to the inner reader while applying ordinal mapping.
+            /// </summary>
+            /// <param name="cancellationToken">Token used to cancel the read operation.</param>
+            /// <returns>A task that resolves to <c>true</c> if a row was read.</returns>
             public override Task<bool> ReadAsync(CancellationToken cancellationToken) => _inner.ReadAsync(cancellationToken);
             public override bool NextResult() => _inner.NextResult();
+            /// <summary>
+            /// Advances to the next result set asynchronously.
+            /// </summary>
+            /// <param name="cancellationToken">Token used to cancel the operation.</param>
+            /// <returns>A task that resolves to <c>true</c> if another result set is available.</returns>
             public override Task<bool> NextResultAsync(CancellationToken cancellationToken) => _inner.NextResultAsync(cancellationToken);
             public override int GetValues(object[] values) => _inner.GetValues(values);
             public override object this[int ordinal] => GetValue(ordinal);

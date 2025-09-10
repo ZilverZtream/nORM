@@ -39,6 +39,13 @@ namespace nORM.Query
             _exceptionHandler = new NormExceptionHandler(_logger);
         }
 
+        /// <summary>
+        /// Executes the supplied command and materializes the result set into a list of entities.
+        /// </summary>
+        /// <param name="plan">Query plan describing how to materialize results.</param>
+        /// <param name="cmd">Prepared database command.</param>
+        /// <param name="ct">Token used to cancel the operation.</param>
+        /// <returns>A list containing the materialized entities.</returns>
         public async Task<IList> MaterializeAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
             await using var command = cmd;
@@ -491,6 +498,12 @@ namespace nORM.Query
                 return Math.Max(0, len);
             }
             public override bool IsDBNull(int ordinal) => _inner.IsDBNull(ordinal + _offset);
+            /// <summary>
+            /// Asynchronously determines whether the specified column is <c>DBNull</c>.
+            /// </summary>
+            /// <param name="ordinal">Column ordinal adjusted by the offset.</param>
+            /// <param name="cancellationToken">Token used to cancel the operation.</param>
+            /// <returns>A task returning <c>true</c> if the column contains <c>DBNull</c>.</returns>
             public override Task<bool> IsDBNullAsync(int ordinal, CancellationToken cancellationToken)
                 => _inner.IsDBNullAsync(ordinal + _offset, cancellationToken);
             public override T GetFieldValue<T>(int ordinal) => _inner.GetFieldValue<T>(ordinal + _offset);
@@ -499,8 +512,19 @@ namespace nORM.Query
 
             public override IEnumerator GetEnumerator() => _inner.GetEnumerator();
             public override bool NextResult() => _inner.NextResult();
-            public override Task<bool> NextResultAsync(CancellationToken cancellationToken) => _inner.NextResultAsync(cancellationToken);
             public override bool Read() => _inner.Read();
+            /// <summary>
+            /// Advances to the next result set asynchronously.
+            /// </summary>
+            /// <param name="cancellationToken">Token used to cancel the operation.</param>
+            /// <returns>A task indicating whether another result set is available.</returns>
+            public override Task<bool> NextResultAsync(CancellationToken cancellationToken) => _inner.NextResultAsync(cancellationToken);
+
+            /// <summary>
+            /// Asynchronously reads the next row from the current result set.
+            /// </summary>
+            /// <param name="cancellationToken">Token used to cancel the read operation.</param>
+            /// <returns>A task returning <c>true</c> if a row was read.</returns>
             public override Task<bool> ReadAsync(CancellationToken cancellationToken) => _inner.ReadAsync(cancellationToken);
             public override System.Data.DataTable GetSchemaTable() => _inner.GetSchemaTable()!;
         }

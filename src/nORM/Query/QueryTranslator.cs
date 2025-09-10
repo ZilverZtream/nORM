@@ -180,6 +180,13 @@ namespace nORM.Query
                 _asOfTimestamp = null;
             }
         }
+        /// <summary>
+        /// Creates a delegate that materializes rows from a reader into the specified type.
+        /// </summary>
+        /// <param name="mapping">Mapping describing the table schema.</param>
+        /// <param name="targetType">Type to materialize into.</param>
+        /// <param name="projection">Optional projection expression.</param>
+        /// <returns>A materializer delegate.</returns>
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(TableMapping mapping, Type targetType, LambdaExpression? projection = null)
             => _materializerFactory.CreateMaterializer(mapping, targetType, projection);
         private static Type GetElementType(Expression queryExpression)
