@@ -47,9 +47,18 @@ namespace nORM.Core
 
         private sealed class HashSetPolicy : PooledObjectPolicy<HashSet<object>>
         {
+            /// <summary>
+            /// Creates a new <see cref="HashSet{T}"/> configured with reference equality for tracking visited entities.
+            /// </summary>
+            /// <returns>A fresh hash set instance.</returns>
             public override HashSet<object> Create()
                 => new HashSet<object>(ReferenceEqualityComparer.Instance);
 
+            /// <summary>
+            /// Resets the given hash set so it can be reused by the pool.
+            /// </summary>
+            /// <param name="obj">The hash set to reset.</param>
+            /// <returns>Always <c>true</c> to indicate the object may be reused.</returns>
             public override bool Return(HashSet<object> obj)
             {
                 obj.Clear();
@@ -146,6 +155,13 @@ namespace nORM.Core
                 throw new ArgumentException($"Bulk {operation} operation cannot be empty");
         }
 
+        /// <summary>
+        /// Validates a raw SQL string to ensure it does not contain dangerous patterns or an excessive
+        /// number of parameters.
+        /// </summary>
+        /// <param name="sql">The SQL statement to validate.</param>
+        /// <param name="parameters">Optional parameters used with the SQL statement.</param>
+        /// <exception cref="ArgumentException">Thrown when the SQL is deemed unsafe.</exception>
         public static void ValidateRawSql(string sql, IReadOnlyDictionary<string, object>? parameters = null)
         {
             if (string.IsNullOrWhiteSpace(sql))
@@ -221,6 +237,12 @@ namespace nORM.Core
 
         private static readonly HashSet<char> AllowedLikeEscapeChars = new("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,-./:;<=>?@[]^_{|}~\\");
 
+        /// <summary>
+        /// Validates that the given character is permitted for use as an SQL LIKE escape character.
+        /// </summary>
+        /// <param name="escapeChar">The character to validate.</param>
+        /// <returns>The validated escape character.</returns>
+        /// <exception cref="ArgumentException">Thrown when the character is not allowed.</exception>
         public static char ValidateLikeEscapeChar(char escapeChar)
         {
             if (!AllowedLikeEscapeChars.Contains(escapeChar))
@@ -229,6 +251,12 @@ namespace nORM.Core
             return escapeChar;
         }
 
+        /// <summary>
+        /// Validates the supplied connection string for the specified provider, throwing if it is malformed.
+        /// </summary>
+        /// <param name="connectionString">The connection string to validate.</param>
+        /// <param name="provider">Normalized provider name (e.g., "sqlserver").</param>
+        /// <exception cref="ArgumentException">Thrown when the connection string fails validation.</exception>
         public static void ValidateConnectionString(string connectionString, string provider)
         {
             if (string.IsNullOrWhiteSpace(connectionString))

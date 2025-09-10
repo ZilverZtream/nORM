@@ -62,6 +62,13 @@ namespace nORM.Internal
             }
         }
 
+        /// <summary>
+        /// Executes <see cref="DbCommand.ExecuteNonQuery"/> while invoking registered command interceptors
+        /// before and after execution.
+        /// </summary>
+        /// <param name="command">The command to execute.</param>
+        /// <param name="ctx">The current <see cref="DbContext"/>.</param>
+        /// <returns>The number of rows affected.</returns>
         public static int ExecuteNonQueryWithInterception(this DbCommand command, DbContext ctx)
         {
             var interceptors = ctx.Options.CommandInterceptors;
@@ -152,6 +159,13 @@ namespace nORM.Internal
             }
         }
 
+        /// <summary>
+        /// Executes <see cref="DbCommand.ExecuteScalar"/> while invoking registered command interceptors
+        /// before and after execution.
+        /// </summary>
+        /// <param name="command">The command to execute.</param>
+        /// <param name="ctx">The current <see cref="DbContext"/>.</param>
+        /// <returns>The scalar result returned by the command.</returns>
         public static object? ExecuteScalarWithInterception(this DbCommand command, DbContext ctx)
         {
             var interceptors = ctx.Options.CommandInterceptors;
