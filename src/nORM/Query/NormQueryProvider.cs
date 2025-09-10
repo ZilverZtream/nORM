@@ -159,6 +159,12 @@ namespace nORM.Query
                ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteInternalAsync<TResult>(expression, token), ct)
                : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteInternalAsync<TResult>(expression, token), ct);
         }
+        /// <summary>
+        /// Executes a translated <c>DELETE</c> query asynchronously.
+        /// </summary>
+        /// <param name="expression">Expression representing the delete query.</param>
+        /// <param name="ct">Token used to cancel the operation.</param>
+        /// <returns>A task containing the number of rows affected.</returns>
         public Task<int> ExecuteDeleteAsync(Expression expression, CancellationToken ct)
         {
             return _ctx.Options.RetryPolicy != null

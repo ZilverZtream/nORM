@@ -20,12 +20,27 @@ namespace nORM.Configuration
             public Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; } = new();
             public List<RelationshipConfiguration> Relationships { get; } = new();
 
+            /// <summary>
+            /// Sets the database table name that <typeparamref name="TEntity"/> maps to.
+            /// </summary>
+            /// <param name="name">The unescaped table name.</param>
             public void SetTableName(string name) => TableName = name;
+
+            /// <summary>
+            /// Registers a property as part of the entity's primary key.
+            /// </summary>
+            /// <param name="prop">The property to mark as a key member.</param>
             public void AddKey(PropertyInfo prop)
             {
                 if (!KeyProperties.Contains(prop))
                     KeyProperties.Add(prop);
             }
+
+            /// <summary>
+            /// Overrides the column name used for the specified property.
+            /// </summary>
+            /// <param name="prop">The property whose column name to configure.</param>
+            /// <param name="name">The column name to map the property to.</param>
             public void SetColumnName(PropertyInfo prop, string name) => ColumnNames[prop] = name;
             public void SetTableSplit(Type principal) => TableSplitWith = principal;
             public void AddOwned(PropertyInfo prop, IEntityTypeConfiguration? config) => OwnedNavigations[prop] = new OwnedNavigation(prop.PropertyType, config);

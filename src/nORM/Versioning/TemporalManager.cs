@@ -8,8 +8,16 @@ using nORM.Mapping;
 
 namespace nORM.Versioning
 {
+    /// <summary>
+    /// Handles creation of temporal history tables and triggers for entities configured for versioning.
+    /// </summary>
     internal static class TemporalManager
     {
+        /// <summary>
+        /// Ensures that temporal infrastructure exists for all mapped entities.
+        /// </summary>
+        /// <param name="context">The <see cref="DbContext"/> containing the mappings.</param>
+        /// <returns>A task representing the initialization process.</returns>
         public static async Task InitializeAsync(DbContext context)
         {
             var provider = context.Provider;
