@@ -169,6 +169,11 @@ namespace nORM.Core
                 Interlocked.Exchange(ref _currentTransaction, null);
         }
 
+        /// <summary>
+        /// Checks whether the database connection is healthy by executing a lightweight query.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns><c>true</c> if the connection is healthy; otherwise <c>false</c>.</returns>
         public async Task<bool> IsHealthyAsync(CancellationToken ct = default)
         {
             try
@@ -253,6 +258,11 @@ namespace nORM.Core
             };
             return Options;
         }
+        /// <summary>
+        /// Persists all tracked changes to the database using the configured retry policy.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The total number of state entries written to the database.</returns>
         public Task<int> SaveChangesAsync(CancellationToken ct = default)
             => SaveChangesWithRetryAsync(ct);
 

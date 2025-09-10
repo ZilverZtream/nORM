@@ -16,6 +16,12 @@ namespace nORM.Core
 
         public DbTransaction? CurrentTransaction => _context.CurrentTransaction;
 
+        /// <summary>
+        /// Begins a new database transaction for the current context.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A <see cref="DbContextTransaction"/> representing the started transaction.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when a transaction is already active.</exception>
         public async Task<DbContextTransaction> BeginTransactionAsync(CancellationToken ct = default)
         {
             if (_context.CurrentTransaction != null)

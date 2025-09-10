@@ -84,6 +84,11 @@ namespace nORM.Configuration
             return AddGlobalFilter(lambda);
         }
 
+        /// <summary>
+        /// Validates the configured options ensuring all values fall within allowed ranges
+        /// and required settings are provided. Throws <see cref="InvalidOperationException"/>
+        /// if any configuration is invalid.
+        /// </summary>
         public void Validate()
         {
             if (RetryPolicy != null)

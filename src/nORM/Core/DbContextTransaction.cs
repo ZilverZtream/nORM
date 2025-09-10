@@ -25,6 +25,10 @@ namespace nORM.Core
             Dispose();
         }
 
+        /// <summary>
+        /// Asynchronously commits the underlying transaction and disposes the wrapper.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task CommitAsync(CancellationToken ct = default)
         {
             if (_transaction != null)
@@ -38,6 +42,10 @@ namespace nORM.Core
             Dispose();
         }
 
+        /// <summary>
+        /// Asynchronously rolls back the underlying transaction and disposes the wrapper.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task RollbackAsync(CancellationToken ct = default)
         {
             if (_transaction != null)
@@ -56,6 +64,10 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Asynchronously disposes the transaction and clears it from the context.
+        /// </summary>
+        /// <returns>A task representing the dispose operation.</returns>
         public async ValueTask DisposeAsync()
         {
             if (!_completed)

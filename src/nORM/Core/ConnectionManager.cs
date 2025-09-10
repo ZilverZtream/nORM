@@ -91,6 +91,13 @@ namespace nORM.Core
                 .ToList();
         }
 
+        /// <summary>
+        /// Retrieves an open connection to the primary node for write operations.
+        /// Implements a simple circuit breaker and failover mechanism.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>An open <see cref="DbConnection"/> suitable for write operations.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when no primary node is available.</exception>
         public async Task<DbConnection> GetWriteConnectionAsync(CancellationToken ct = default)
         {
             lock (_circuitBreakerLock)
@@ -127,6 +134,12 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Retrieves an open connection optimized for read operations, using available read replicas
+        /// and falling back to the primary node when necessary.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>An open <see cref="DbConnection"/> suitable for read operations.</returns>
         public async Task<DbConnection> GetReadConnectionAsync(CancellationToken ct = default)
         {
             var replicas = _availableReadReplicas;
@@ -280,6 +293,10 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Disposes the manager and all pooled connections, terminating background tasks
+        /// and releasing unmanaged resources.
+        /// </summary>
         public void Dispose()
         {
             if (_disposed)
