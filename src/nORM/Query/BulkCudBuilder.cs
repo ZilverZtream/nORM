@@ -21,6 +21,14 @@ namespace nORM.Query
 
         public BulkCudBuilder(DbContext ctx) => _ctx = ctx;
 
+        /// <summary>
+        /// Validates that the provided SQL fragment represents a simple, non-aggregated query
+        /// suitable for bulk update or delete operations. Certain constructs such as grouping,
+        /// ordering and joins are explicitly disallowed because they would change the semantics of
+        /// the bulk operation.
+        /// </summary>
+        /// <param name="sql">The SQL statement to validate.</param>
+        /// <exception cref="NotSupportedException">Thrown when the statement contains unsupported constructs.</exception>
         public void ValidateCudPlan(string sql)
         {
             if (sql.IndexOf(" GROUP BY ", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -30,6 +38,14 @@ namespace nORM.Query
                 throw new NotSupportedException("ExecuteUpdate/Delete does not support grouped, ordered, joined or aggregated queries.");
         }
 
+        /// <summary>
+        /// Attempts to extract the <c>WHERE</c> clause from an arbitrary SQL statement while removing
+        /// any table aliases that may be present. The resulting clause can be reused in generated
+        /// bulk update or delete statements.
+        /// </summary>
+        /// <param name="sql">The original SQL statement.</param>
+        /// <param name="escTable">The escaped table name used in the statement.</param>
+        /// <returns>The extracted <c>WHERE</c> clause, or an empty string if no clause exists.</returns>
         public string ExtractWhereClause(string sql, string escTable)
         {
             var upper = sql.ToUpperInvariant();
