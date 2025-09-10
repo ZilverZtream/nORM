@@ -23,6 +23,8 @@ namespace nORM.Query
         private string _tableAlias = string.Empty;
         private OptimizedSqlBuilder _sql = null!;
         private readonly Dictionary<string, object> _params = new();
+        // Parameter sink (can be redirected to a shared dictionary)
+        private Dictionary<string, object> _paramSink = null!;
         private int _paramIndex = 0;
         private readonly List<string> _ownedCompiledParams = new();
         private readonly Dictionary<ParameterExpression, string> _ownedParamMap = new();
@@ -59,6 +61,7 @@ namespace nORM.Query
         }
         public void Initialize(in VisitorContext context)
         {
+            _paramSink = _params;
             _ctx = context.Context;
             _mapping = context.Mapping;
             _provider = context.Provider;
@@ -361,7 +364,7 @@ namespace nORM.Query
                             {
                                 if (!first) _sql.Append(", ");
                                 var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                                _sql.AppendParameterizedValue(paramName, item, _params);
+                                _sql.AppendParameterizedValue(paramName, item, _paramSink);
                                 first = false;
                             }
                             _sql.Append(")");
@@ -376,7 +379,7 @@ namespace nORM.Query
                         {
                             if (i > 0) _sql.Append(", ");
                             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _sql.AppendParameterizedValue(paramName, items[i], _params);
+                            _sql.AppendParameterizedValue(paramName, items[i], _paramSink);
                         }
                         _sql.Append(")");
                     }
@@ -515,7 +518,7 @@ namespace nORM.Query
                 return;
             }
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-            _sql.AppendParameterizedValue(paramName, value, _params);
+            _sql.AppendParameterizedValue(paramName, value, _paramSink);
             if (_constParamMap.Count >= _constParamMapLimit)
                 _constParamMap.Clear();
             _constParamMap[key] = paramName;
@@ -752,5 +755,27 @@ namespace nORM.Query
                 }
             }
         }
+
+        public void UseSharedParameterDictionary(Dictionary<string, object> shared)
+        {
+            _paramSink = shared ?? _params;
+        }
+
+
+
+        public void FastReset()
+        {
+            if (_sql != null) _sql.Clear();
+            _params.Clear();
+            if (!ReferenceEquals(_paramSink, _params))
+                _paramSink.Clear();
+            _paramIndex = 0;
+            _suppressNullCheck = false;
+            _constParamMap.Clear();
+            _memberParamMap.Clear();
+            _ownedCompiledParams.Clear();
+            _ownedParamMap.Clear();
+        }
+
     }
 }

@@ -263,8 +263,25 @@ namespace nORM.Query
                 {
                     materializerType = typeof(int);
                 }
-                var materializer = _t._materializerFactory.CreateMaterializer(_t._mapping, materializerType, _t._projection);
+                var materializer = (_t._projection != null)
+                    ? _t._materializerFactory.CreateSchemaAwareMaterializer(_t._mapping, materializerType, _t._projection)
+                    : _t._materializerFactory.CreateMaterializer(_t._mapping, materializerType, null);
+
                 var isScalar = _t._isAggregate && _t._groupBy.Count == 0;
+                if (isScalar)
+                {
+                    materializer = static async (DbDataReader r, CancellationToken ct) =>
+                    {
+                        if (await r.ReadAsync(ct).ConfigureAwait(false))
+                        {
+                            var v = r.GetValue(0);
+                            return v is long l ? (object)l : Convert.ToInt64(v);
+                        }
+                        return 0L;
+                    };
+                    materializerType = typeof(long);
+                }
+
                 if (_t._sql.Length == 0)
                 {
                     var fromClause = _t._mapping.EscTable;
@@ -553,8 +570,9 @@ namespace nORM.Query
                 _params[kvp.Key] = kvp.Value;
             FastExpressionVisitorPool.Return(innerKeyVisitor);
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
+            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
             _sql.Clear();
-            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
+            _sql.Append(sql);
             return node;
         }
         private Expression HandleGroupJoin(MethodCallExpression node)
@@ -590,8 +608,9 @@ namespace nORM.Query
                 _params[kvp.Key] = kvp.Value;
             FastExpressionVisitorPool.Return(innerKeyVisitor);
             JoinBuilder.SetupJoinProjection(null, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
+            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
             _sql.Clear();
-            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
+            _sql.Append(sql);
             var outerType = outerKeySelector.Parameters[0].Type;
             var innerType = innerKeySelector.Parameters[0].Type;
             var resultType = resultSelector.Body.Type;

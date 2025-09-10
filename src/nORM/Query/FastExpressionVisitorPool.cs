@@ -68,7 +68,11 @@ internal static class FastExpressionVisitorPool
         return visitor;
     }
 
-    public static void Return(ExpressionToSqlVisitor visitor) => _pool.Return(visitor);
+    public static void Return(ExpressionToSqlVisitor visitor)
+    {
+        visitor.FastReset();
+        _pool.Return(visitor);
+    }
 
     public static object? GetMemberValue(MemberInfo member, object? instance)
     {
