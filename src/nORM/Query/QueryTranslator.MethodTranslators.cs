@@ -87,6 +87,12 @@ namespace nORM.Query
 
         private sealed class CacheableTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Marks the query as cacheable and records an optional cache expiration before continuing translation.
+            /// </summary>
+            /// <param name="t">The active <see cref="QueryTranslator"/> instance.</param>
+            /// <param name="node">The method call expression representing <c>Cacheable</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._isCacheable = true;
@@ -100,6 +106,12 @@ namespace nORM.Query
 
         private sealed class WhereTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Translates a LINQ <c>Where</c> call into an equivalent SQL <c>WHERE</c> clause.
+            /// </summary>
+            /// <param name="t">The active <see cref="QueryTranslator"/>.</param>
+            /// <param name="node">The method call expression for <c>Where</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var source = t.Visit(node.Arguments[0]);
@@ -129,6 +141,12 @@ namespace nORM.Query
 
         private sealed class SelectTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Handles projection of elements by capturing the provided selector expression.
+            /// </summary>
+            /// <param name="t">The current translator.</param>
+            /// <param name="node">The method call expression for <c>Select</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._projection = QueryTranslator.StripQuotes(node.Arguments[1]) as LambdaExpression;
@@ -138,6 +156,12 @@ namespace nORM.Query
 
         private sealed class OrderByTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Translates <c>OrderBy</c> and related ordering methods into SQL <c>ORDER BY</c> clauses.
+            /// </summary>
+            /// <param name="t">The <see cref="QueryTranslator"/> orchestrating translation.</param>
+            /// <param name="node">The method call expression for the ordering method.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var source = t.Visit(node.Arguments[0]);
@@ -162,6 +186,12 @@ namespace nORM.Query
 
         private sealed class TakeTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Applies the <c>Take</c> operation by tracking the row limit and corresponding parameter.
+            /// </summary>
+            /// <param name="t">The <see cref="QueryTranslator"/> performing translation.</param>
+            /// <param name="node">The method call expression for <c>Take</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var source = t.Visit(node.Arguments[0]);
@@ -189,6 +219,12 @@ namespace nORM.Query
 
         private sealed class SkipTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Implements the <c>Skip</c> operation by setting the offset and parameter information.
+            /// </summary>
+            /// <param name="t">The current <see cref="QueryTranslator"/>.</param>
+            /// <param name="node">The method call expression for <c>Skip</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var source = t.Visit(node.Arguments[0]);
@@ -218,6 +254,13 @@ namespace nORM.Query
         {
             private readonly bool _isGroupJoin;
             public JoinTranslator(bool isGroupJoin) => _isGroupJoin = isGroupJoin;
+
+            /// <summary>
+            /// Translates <c>Join</c> and <c>GroupJoin</c> operations by delegating to the appropriate handler.
+            /// </summary>
+            /// <param name="t">The active translator.</param>
+            /// <param name="node">The method call expression representing the join.</param>
+            /// <returns>The translated expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 return _isGroupJoin ? t.HandleGroupJoin(node) : t.HandleInnerJoin(node);
@@ -226,6 +269,12 @@ namespace nORM.Query
 
         private sealed class SelectManyTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Translates <c>SelectMany</c> calls into SQL <c>JOIN</c> operations.
+            /// </summary>
+            /// <param name="t">The <see cref="QueryTranslator"/> executing translation.</param>
+            /// <param name="node">The method call expression for <c>SelectMany</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 return t.HandleSelectMany(node);
@@ -234,6 +283,12 @@ namespace nORM.Query
 
         private sealed class DistinctTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Marks the query results as distinct by setting the <c>DISTINCT</c> flag.
+            /// </summary>
+            /// <param name="t">The current translator.</param>
+            /// <param name="node">The method call expression for <c>Distinct</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._isDistinct = true;
@@ -243,6 +298,12 @@ namespace nORM.Query
 
         private sealed class ReverseTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Reverses the current ordering or applies a descending order on key columns if none exists.
+            /// </summary>
+            /// <param name="t">The translator working on the query.</param>
+            /// <param name="node">The method call expression for <c>Reverse</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var revSource = t.Visit(node.Arguments[0]);
@@ -265,6 +326,13 @@ namespace nORM.Query
 
         private sealed class SetOperationTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Handles set operations such as <c>Union</c>, <c>Intersect</c>, and <c>Except</c> by combining
+            /// the SQL generated for the left and right sequences.
+            /// </summary>
+            /// <param name="t">The active translator.</param>
+            /// <param name="node">The method call expression representing the set operation.</param>
+            /// <returns>The original method call expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var leftSql = t.TranslateSubExpression(node.Arguments[0]);
@@ -284,6 +352,12 @@ namespace nORM.Query
 
         private sealed class SetPredicateTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Translates set-based predicates like <c>Any</c> or <c>Contains</c>.
+            /// </summary>
+            /// <param name="t">The current translator.</param>
+            /// <param name="node">The method call expression for the predicate.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 return t.HandleSetOperation(node);
@@ -292,6 +366,12 @@ namespace nORM.Query
 
         private sealed class ElementAtTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Applies <c>ElementAt</c> or <c>ElementAtOrDefault</c> semantics by adjusting the skip/take parameters.
+            /// </summary>
+            /// <param name="t">The active <see cref="QueryTranslator"/>.</param>
+            /// <param name="node">The method call expression for the element access.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var elementSource = t.Visit(node.Arguments[0]);
@@ -340,6 +420,13 @@ namespace nORM.Query
 
         private sealed class FirstSingleTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Translates <c>First</c>, <c>Single</c> and their <c>OrDefault</c> variants, applying optional predicates
+            /// and limiting the result set accordingly.
+            /// </summary>
+            /// <param name="t">The translator in use.</param>
+            /// <param name="node">The method call expression for the terminal operator.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression predicate)
@@ -368,6 +455,12 @@ namespace nORM.Query
 
         private sealed class LastTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Handles <c>Last</c> and <c>LastOrDefault</c> by reversing the ordering and applying predicates when present.
+            /// </summary>
+            /// <param name="t">The active translator.</param>
+            /// <param name="node">The method call expression for <c>Last</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression lastPredicate)
@@ -410,6 +503,12 @@ namespace nORM.Query
 
         private sealed class CountTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Processes <c>Count</c> and <c>LongCount</c>, optionally translating a predicate and marking the query as aggregate.
+            /// </summary>
+            /// <param name="t">The current translator.</param>
+            /// <param name="node">The method call expression for the count operation.</param>
+            /// <returns>The updated expression node.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._isAggregate = true;
@@ -442,6 +541,12 @@ namespace nORM.Query
 
         private sealed class AggregateExpressionTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Delegates translation of aggregate expressions used in projected form, such as <c>Sum(x =&gt; ...)</c>.
+            /// </summary>
+            /// <param name="t">The active translator.</param>
+            /// <param name="node">The method call expression representing the aggregate.</param>
+            /// <returns>The translated expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 return t.HandleAggregateExpression(node);
@@ -450,6 +555,12 @@ namespace nORM.Query
 
         private sealed class GroupByTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Converts a LINQ <c>GroupBy</c> call into the SQL <c>GROUP BY</c> clause and related projections.
+            /// </summary>
+            /// <param name="t">The translator responsible for query compilation.</param>
+            /// <param name="node">The method call expression for <c>GroupBy</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 return t.HandleGroupBy(node);
@@ -458,6 +569,12 @@ namespace nORM.Query
 
         private sealed class DirectAggregateTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Handles direct aggregate operators like <c>Sum</c>, <c>Min</c>, or <c>Max</c> that operate on the entire sequence.
+            /// </summary>
+            /// <param name="t">The current translator.</param>
+            /// <param name="node">The method call expression for the aggregate.</param>
+            /// <returns>The translated expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 return t.HandleDirectAggregate(node);
@@ -466,6 +583,12 @@ namespace nORM.Query
 
         private sealed class AllTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Translates the <c>All</c> predicate to its SQL equivalent, typically using <c>NOT EXISTS</c>.
+            /// </summary>
+            /// <param name="t">The active translator.</param>
+            /// <param name="node">The method call expression for <c>All</c>.</param>
+            /// <returns>The translated expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 return t.HandleAllOperation(node);
@@ -474,6 +597,12 @@ namespace nORM.Query
 
         private sealed class RowNumberTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Adds a <c>ROW_NUMBER()</c> window function to the query and binds the result to the supplied selector.
+            /// </summary>
+            /// <param name="t">The translator creating the window function.</param>
+            /// <param name="node">The method call expression for <c>WithRowNumber</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var resultSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
@@ -487,6 +616,12 @@ namespace nORM.Query
 
         private sealed class RankTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Registers a <c>RANK()</c> window function and maps the result via the provided selector.
+            /// </summary>
+            /// <param name="t">The current translator.</param>
+            /// <param name="node">The method call expression for <c>WithRank</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var resultSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
@@ -500,6 +635,12 @@ namespace nORM.Query
 
         private sealed class DenseRankTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Adds a <c>DENSE_RANK()</c> window function to the query.
+            /// </summary>
+            /// <param name="t">The active translator.</param>
+            /// <param name="node">The method call expression for <c>WithDenseRank</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var resultSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
@@ -513,6 +654,12 @@ namespace nORM.Query
 
         private sealed class LagTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Generates a <c>LAG</c> window function, capturing value, offset and optional default expressions.
+            /// </summary>
+            /// <param name="t">The translator creating the window.</param>
+            /// <param name="node">The method call expression for <c>WithLag</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var valueSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
@@ -532,6 +679,12 @@ namespace nORM.Query
 
         private sealed class LeadTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Generates a <c>LEAD</c> window function, capturing value, offset and optional default expressions.
+            /// </summary>
+            /// <param name="t">The translator creating the window.</param>
+            /// <param name="node">The method call expression for <c>WithLead</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var valueSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
@@ -551,6 +704,12 @@ namespace nORM.Query
 
         private sealed class IncludeTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Processes an <c>Include</c> call, registering the requested navigation path for eager loading.
+            /// </summary>
+            /// <param name="t">The current translator.</param>
+            /// <param name="node">The method call expression for <c>Include</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 if (node.Arguments.Count > 1)
@@ -575,6 +734,12 @@ namespace nORM.Query
 
         private sealed class ThenIncludeTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Extends the most recently registered include path with an additional navigation property.
+            /// </summary>
+            /// <param name="t">The active translator.</param>
+            /// <param name="node">The method call expression for <c>ThenInclude</c>.</param>
+            /// <returns>The translated expression representing the parent include.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var parentExpression = t.Visit(node.Arguments[0]);
@@ -602,6 +767,12 @@ namespace nORM.Query
 
         private sealed class AsNoTrackingTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Marks the query so that returned entities are not tracked by the context.
+            /// </summary>
+            /// <param name="t">The translator applying the option.</param>
+            /// <param name="node">The method call expression for <c>AsNoTracking</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._noTracking = true;
@@ -611,6 +782,12 @@ namespace nORM.Query
 
         private sealed class AsSplitQueryTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Indicates that related data should be loaded using multiple queries instead of a single join.
+            /// </summary>
+            /// <param name="t">The active translator.</param>
+            /// <param name="node">The method call expression for <c>AsSplitQuery</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._splitQuery = true;
@@ -620,6 +797,12 @@ namespace nORM.Query
 
         private sealed class AsOfTranslator : IMethodCallTranslator
         {
+            /// <summary>
+            /// Applies temporal querying by translating the <c>AsOf</c> operation into a timestamp filter.
+            /// </summary>
+            /// <param name="t">The translator managing the temporal context.</param>
+            /// <param name="node">The method call expression for <c>AsOf</c>.</param>
+            /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var timeTravelArg = node.Arguments[1];
