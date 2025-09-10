@@ -32,6 +32,12 @@ namespace nORM.Migration
             }
         }
 
+        /// <summary>
+        /// Applies all pending migrations to the connected SQLite database. The method
+        /// wraps migration execution in a transaction ensuring that either all migrations
+        /// succeed or none are applied.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
         {
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
@@ -47,6 +53,12 @@ namespace nORM.Migration
             await transaction.CommitAsync(ct).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Determines whether there are migrations in the assembly that have not yet been
+        /// applied to the database.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns><c>true</c> if migrations are pending; otherwise, <c>false</c>.</returns>
         public async Task<bool> HasPendingMigrationsAsync(CancellationToken ct = default)
         {
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
@@ -54,6 +66,12 @@ namespace nORM.Migration
             return pending.Any();
         }
 
+        /// <summary>
+        /// Retrieves the identifiers of migrations that have not yet been applied to the
+        /// database in the format "<c>Version_Name</c>".
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>An array of pending migration identifiers.</returns>
         public async Task<string[]> GetPendingMigrationsAsync(CancellationToken ct = default)
         {
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
