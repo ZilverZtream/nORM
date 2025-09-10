@@ -202,6 +202,12 @@ namespace nORM.Query
             if (iface != null) return iface.GetGenericArguments()[0];
             throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Cannot determine element type from expression of type {type}"));
         }
+        /// <summary>
+        /// Converts a LINQ <see cref="Expression"/> into an executable <see cref="QueryPlan"/>,
+        /// performing validation, setup and SQL generation in a thread-safe manner.
+        /// </summary>
+        /// <param name="e">The query expression to translate.</param>
+        /// <returns>The resulting <see cref="QueryPlan"/>.</returns>
         public QueryPlan Translate(Expression e)
         {
             lock (_syncRoot)
@@ -262,6 +268,10 @@ namespace nORM.Query
                 }
                 return this;
             }
+            /// <summary>
+            /// Generates the final <see cref="QueryPlan"/> including SQL text, parameters and materializer.
+            /// </summary>
+            /// <returns>The completed query plan.</returns>
             public QueryPlan Generate()
             {
                 _t.Visit(_expression);
@@ -500,6 +510,9 @@ namespace nORM.Query
                 throw new NormQueryException($"Tag '{tagName}' not found.");
             return Convert.ToDateTime(result);
         }
+        /// <summary>
+        /// Releases resources used by the translator and, if pooled, returns it to the shared pool.
+        /// </summary>
         public void Dispose()
         {
             lock (_syncRoot)
@@ -519,16 +532,36 @@ namespace nORM.Query
         }
         private sealed class QueryTranslatorPooledObjectPolicy : PooledObjectPolicy<QueryTranslator>
         {
+            /// <summary>
+            /// Creates a new <see cref="QueryTranslator"/> for inclusion in the pool.
+            /// </summary>
+            /// <returns>A newly constructed translator instance.</returns>
             public override QueryTranslator Create() => new QueryTranslator();
+
+            /// <summary>
+            /// Resets a translator before returning it to the pool for reuse.
+            /// </summary>
+            /// <param name="obj">The translator to recycle.</param>
+            /// <returns>Always <c>true</c> to indicate pooling should continue.</returns>
             public override bool Return(QueryTranslator obj)
             {
                 obj.Clear();
                 return true;
             }
         }
+
         private sealed class ListPooledObjectPolicy<T> : PooledObjectPolicy<List<T>>
         {
+            /// <summary>
+            /// Creates a new list instance for pooling.
+            /// </summary>
             public override List<T> Create() => new List<T>();
+
+            /// <summary>
+            /// Clears the list prior to returning it to the pool.
+            /// </summary>
+            /// <param name="obj">The list to reset.</param>
+            /// <returns>Always <c>true</c>, indicating the list can be reused.</returns>
             public override bool Return(List<T> obj)
             {
                 obj.Clear();

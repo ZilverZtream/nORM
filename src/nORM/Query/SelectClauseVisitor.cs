@@ -27,6 +27,11 @@ namespace nORM.Query
             _provider = provider;
         }
 
+        /// <summary>
+        /// Translates a projection expression into a comma-separated SQL <c>SELECT</c> clause.
+        /// </summary>
+        /// <param name="e">The projection expression to translate.</param>
+        /// <returns>SQL representing the projection.</returns>
         public string Translate(Expression e)
         {
             _sb = _stringBuilderPool.Get();

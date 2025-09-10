@@ -76,6 +76,16 @@ namespace nORM.Scaffolding
             }
         }
 
+        /// <summary>
+        /// Generates C# source code for a single entity type based on the provided database schema information.
+        /// </summary>
+        /// <param name="connection">Active database connection.</param>
+        /// <param name="provider">Database provider in use.</param>
+        /// <param name="schemaName">Optional schema name.</param>
+        /// <param name="tableName">Table name in the database.</param>
+        /// <param name="entityName">Name of the entity class to produce.</param>
+        /// <param name="namespaceName">Namespace for the generated entity.</param>
+        /// <returns>A string containing the generated C# code.</returns>
         private static async Task<string> ScaffoldEntityAsync(DbConnection connection, DatabaseProvider provider, string? schemaName, string tableName, string entityName, string namespaceName)
         {
             var sb = _stringBuilderPool.Get();

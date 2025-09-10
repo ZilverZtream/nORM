@@ -22,6 +22,9 @@ namespace nORM.Query
         public string? SkipParam { get; set; }
         public bool IsDistinct { get; set; }
 
+        /// <summary>
+        /// Releases the clause builders and any resources they consume.
+        /// </summary>
         public void Dispose()
         {
             Sql.Dispose();
