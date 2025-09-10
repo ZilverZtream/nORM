@@ -42,20 +42,53 @@ namespace nORM.Configuration
             /// <param name="prop">The property whose column name to configure.</param>
             /// <param name="name">The column name to map the property to.</param>
             public void SetColumnName(PropertyInfo prop, string name) => ColumnNames[prop] = name;
+            /// <summary>
+            /// Configures this entity to share its database table with the specified
+            /// principal entity type.
+            /// </summary>
+            /// <param name="principal">The CLR type of the principal entity that owns the table.</param>
             public void SetTableSplit(Type principal) => TableSplitWith = principal;
+
+            /// <summary>
+            /// Registers an owned navigation property for the entity type. Owned entities
+            /// are mapped to the same table as the owning entity.
+            /// </summary>
+            /// <param name="prop">The navigation property representing the owned entity.</param>
+            /// <param name="config">Optional configuration for the owned entity type.</param>
             public void AddOwned(PropertyInfo prop, IEntityTypeConfiguration? config) => OwnedNavigations[prop] = new OwnedNavigation(prop.PropertyType, config);
+
+            /// <summary>
+            /// Adds a shadow property – a property not defined on the CLR type – to the entity configuration.
+            /// </summary>
+            /// <param name="name">The name of the shadow property.</param>
+            /// <param name="clrType">The CLR type the shadow property should expose.</param>
             public void AddShadowProperty(string name, Type clrType) => ShadowProperties[name] = new ShadowPropertyConfiguration(clrType);
+
+            /// <summary>
+            /// Sets the database column name for a previously defined shadow property.
+            /// </summary>
+            /// <param name="name">The name of the shadow property.</param>
+            /// <param name="column">The column name to map the property to.</param>
             public void SetShadowColumnName(string name, string column)
             {
                 if (ShadowProperties.TryGetValue(name, out var sp)) ShadowProperties[name] = sp with { ColumnName = column };
             }
 
+            /// <summary>
+            /// Adds a configured relationship to this entity type.
+            /// </summary>
+            /// <param name="relationship">The relationship configuration to register.</param>
             public void AddRelationship(RelationshipConfiguration relationship) => Relationships.Add(relationship);
         }
 
         private readonly MappingConfiguration _config = new();
         internal IEntityTypeConfiguration Configuration => _config;
 
+        /// <summary>
+        /// Specifies the database table that <typeparamref name="TEntity"/> maps to.
+        /// </summary>
+        /// <param name="name">The unqualified table name.</param>
+        /// <returns>The same <see cref="EntityTypeBuilder{TEntity}"/> instance for chaining.</returns>
         public EntityTypeBuilder<TEntity> ToTable(string name)
         {
             _config.SetTableName(name);
@@ -68,6 +101,11 @@ namespace nORM.Configuration
             return this;
         }
 
+        /// <summary>
+        /// Configures one or more properties to constitute the entity's primary key.
+        /// </summary>
+        /// <param name="keyExpression">Expression selecting the key property or properties.</param>
+        /// <returns>The same builder instance for fluent chaining.</returns>
         public EntityTypeBuilder<TEntity> HasKey(Expression<Func<TEntity, object>> keyExpression)
         {
             if (keyExpression.Body is NewExpression ne)
@@ -86,6 +124,11 @@ namespace nORM.Configuration
             return this;
         }
 
+        /// <summary>
+        /// Begins configuration for the specified property.
+        /// </summary>
+        /// <param name="propertyExpression">Expression selecting the property to configure.</param>
+        /// <returns>A <see cref="PropertyBuilder"/> for further configuration of the property.</returns>
         public PropertyBuilder Property(Expression<Func<TEntity, object>> propertyExpression)
         {
             var prop = GetProperty(propertyExpression);

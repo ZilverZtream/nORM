@@ -21,8 +21,15 @@ namespace nORM.Enterprise
             Result = result;
         }
 
+        /// <summary>
+        /// Returns an <see cref="InterceptionResult{T}"/> that allows the operation to continue normally.
+        /// </summary>
         public static InterceptionResult<T> Continue() => default;
 
+        /// <summary>
+        /// Creates an <see cref="InterceptionResult{T}"/> that suppresses the operation and returns the provided result.
+        /// </summary>
+        /// <param name="result">The result to return instead of executing the operation.</param>
         public static InterceptionResult<T> SuppressWithResult(T result) => new(true, result);
     }
 }
