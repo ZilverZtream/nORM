@@ -228,6 +228,12 @@ BEGIN
 END;";
         }
 
+        /// <summary>
+        /// Verifies that the provided connection is a <see cref="SqliteConnection"/>, as required
+        /// by this provider.
+        /// </summary>
+        /// <param name="connection">The connection to validate.</param>
+        /// <exception cref="InvalidOperationException">Thrown if the connection is not compatible.</exception>
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);

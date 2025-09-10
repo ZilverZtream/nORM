@@ -52,6 +52,12 @@ namespace nORM.Navigation
             return (List<object>)await tcs.Task.ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Callback invoked by the internal timer to trigger processing of pending navigation
+        /// loads. The method ensures only one batch is processed at a time by using an atomic
+        /// flag and dispatches the work to the thread pool.
+        /// </summary>
+        /// <param name="state">Unused timer state object.</param>
         private void TimerTick(object? state)
         {
             if (Interlocked.Exchange(ref _processing, 1) == 1) return;
@@ -158,6 +164,12 @@ namespace nORM.Navigation
             return results;
         }
 
+        /// <summary>
+        /// Removes any queued navigation load requests associated with the specified entity.
+        /// This is typically called when an entity is disposed or otherwise no longer requires
+        /// lazy-loading operations.
+        /// </summary>
+        /// <param name="entity">The entity whose pending navigation loads should be cleared.</param>
         internal void RemovePendingLoadsForEntity(object entity)
         {
             _batchSemaphore.Wait();

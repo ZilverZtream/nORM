@@ -177,6 +177,14 @@ namespace nORM.Query
             return 0;
         }
 
+        /// <summary>
+        /// Materializes the results of a LINQ <c>GroupJoin</c> operation by streaming records from
+        /// the provided command and constructing the grouped results in memory.
+        /// </summary>
+        /// <param name="plan">The query plan describing mappings and selectors.</param>
+        /// <param name="cmd">The database command to execute.</param>
+        /// <param name="ct">Token used to cancel the operation.</param>
+        /// <returns>An <see cref="IList"/> containing the grouped join results.</returns>
         private async Task<IList> MaterializeGroupJoinAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
             var info = plan.GroupJoinInfo!;

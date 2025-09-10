@@ -32,6 +32,16 @@ namespace nORM.Providers
             public int OptimalBatchSize { get; set; } = 1000;
         }
 
+        /// <summary>
+        /// Determines an efficient batch size for bulk operations by analyzing a sample of
+        /// records and considering historical performance, memory usage and provider limits.
+        /// </summary>
+        /// <typeparam name="T">Type of the entity being processed.</typeparam>
+        /// <param name="sample">Sample records used to estimate sizes and costs.</param>
+        /// <param name="mapping">Mapping information for the entity.</param>
+        /// <param name="operationKey">Key identifying the operation for caching performance history.</param>
+        /// <param name="totalRecords">Optional total record count to further constrain the batch size.</param>
+        /// <returns>Calculated sizing information including optimal batch size and estimates.</returns>
         public BatchSizingResult CalculateOptimalBatchSize<T>(
             IEnumerable<T> sample,
             TableMapping mapping,

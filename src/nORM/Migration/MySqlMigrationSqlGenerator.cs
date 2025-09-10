@@ -57,6 +57,13 @@ namespace nORM.Migration
             return new MigrationSqlStatements(up, down);
         }
 
+        /// <summary>
+        /// Resolves the MySQL column definition for the supplied column schema. Unmapped
+        /// CLR types default to <c>LONGTEXT</c> to ensure the migration can be executed
+        /// even when a specific mapping is unknown.
+        /// </summary>
+        /// <param name="column">The column metadata describing the CLR type.</param>
+        /// <returns>The corresponding MySQL data type.</returns>
         private static string GetSqlType(ColumnSchema column)
             => TypeMap.TryGetValue(column.ClrType, out var sql) ? sql : "LONGTEXT";
     }
