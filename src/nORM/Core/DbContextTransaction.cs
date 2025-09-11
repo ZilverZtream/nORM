@@ -5,6 +5,12 @@ using System.Threading.Tasks;
 
 namespace nORM.Core
 {
+    /// <summary>
+    /// Lightweight wrapper around <see cref="DbTransaction"/> used by the
+    /// <see cref="DbContext"/> to manage ambient transactions. The wrapper ensures
+    /// the context releases its reference when the transaction completes or is
+    /// disposed.
+    /// </summary>
     public sealed class DbContextTransaction : IAsyncDisposable, IDisposable
     {
         private readonly DbTransaction? _transaction;
@@ -17,6 +23,10 @@ namespace nORM.Core
             _context = context;
         }
 
+        /// <summary>
+        /// Gets the underlying <see cref="DbTransaction"/> represented by this wrapper.
+        /// May be <c>null</c> when no transaction was started.
+        /// </summary>
         public DbTransaction? Transaction => _transaction;
 
         /// <summary>

@@ -7,6 +7,11 @@ using nORM.Mapping;
 
 namespace nORM.Providers
 {
+    /// <summary>
+    /// Provides heuristics for determining efficient batch sizes for bulk
+    /// operations. The sizing takes into account historical performance,
+    /// estimated memory usage and operation characteristics.
+    /// </summary>
     public class DynamicBatchSizer
     {
         private const int MaxMemoryPerBatch = 16 * 1024 * 1024; // 16MB
@@ -14,11 +19,22 @@ namespace nORM.Providers
         private const int MaxBatchSize = 10000;
         private const int DefaultTargetBatchTime = 2000; // 2 seconds
 
+        /// <summary>
+        /// Represents the outcome of a batch size calculation including various
+        /// estimates that influenced the decision.
+        /// </summary>
         public class BatchSizingResult
         {
+            /// <summary>Chosen number of records to include in each batch.</summary>
             public int OptimalBatchSize { get; set; }
+
+            /// <summary>Estimated memory consumption for a batch of the chosen size.</summary>
             public int EstimatedMemoryUsage { get; set; }
+
+            /// <summary>Estimated time required to process a batch of the chosen size.</summary>
             public TimeSpan EstimatedBatchTime { get; set; }
+
+            /// <summary>Description of the strategy and factors used to derive the batch size.</summary>
             public string Strategy { get; set; } = "";
         }
 
@@ -236,6 +252,14 @@ namespace nORM.Providers
             return TimeSpan.FromMilliseconds(Math.Max(100, estimatedMs));
         }
 
+        /// <summary>
+        /// Records the outcome of a batch execution so that future sizing decisions
+        /// can incorporate observed performance characteristics.
+        /// </summary>
+        /// <param name="operationKey">Identifier of the operation being tracked.</param>
+        /// <param name="batchSize">Number of records processed.</param>
+        /// <param name="duration">Time taken to process the batch.</param>
+        /// <param name="recordCount">Actual record count processed.</param>
         public void RecordBatchPerformance(string operationKey, int batchSize, TimeSpan duration, int recordCount)
         {
             var history = _performanceHistory.GetOrAdd(operationKey, _ => new BatchPerformanceHistory());

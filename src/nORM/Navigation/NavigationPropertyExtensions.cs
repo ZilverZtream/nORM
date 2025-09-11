@@ -431,10 +431,22 @@ namespace nORM.Navigation
     public sealed class NavigationContext : IDisposable
     {
         private readonly ConcurrentDictionary<string, byte> _loadedProperties = new();
-        
+
+        /// <summary>
+        /// Gets the owning <see cref="DbContext"/> used to load navigation properties.
+        /// </summary>
         public DbContext DbContext { get; }
+
+        /// <summary>
+        /// Gets the <see cref="Type"/> of the entity associated with this context.
+        /// </summary>
         public Type EntityType { get; }
-        
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="NavigationContext"/> class.
+        /// </summary>
+        /// <param name="dbContext">The associated context.</param>
+        /// <param name="entityType">The entity type this context relates to.</param>
         public NavigationContext(DbContext dbContext, Type entityType)
         {
             DbContext = dbContext;
@@ -480,6 +492,12 @@ namespace nORM.Navigation
         private readonly PropertyInfo _property;
         private readonly NavigationContext _context;
 
+        /// <summary>
+        /// Initializes a new lazy collection wrapper for the specified navigation property.
+        /// </summary>
+        /// <param name="parent">Entity that owns the navigation property.</param>
+        /// <param name="property">Reflection metadata describing the navigation.</param>
+        /// <param name="context">Navigation loading context.</param>
         public LazyNavigationCollection(object parent, PropertyInfo property, NavigationContext context)
         {
             _parent = parent;
@@ -558,6 +576,11 @@ namespace nORM.Navigation
         /// </summary>
         public int Count => GetOrLoadCollection().Count;
 
+        /// <summary>
+        /// Gets a value indicating whether the underlying collection is read-only.
+        /// Accessing this property triggers lazy loading if the collection has not yet
+        /// been loaded.
+        /// </summary>
         public bool IsReadOnly => GetOrLoadCollection().IsReadOnly;
 
         /// <summary>
@@ -575,6 +598,10 @@ namespace nORM.Navigation
         /// </summary>
         public void RemoveAt(int index) => GetOrLoadList().RemoveAt(index);
 
+        /// <summary>
+        /// Gets or sets the element at the specified index, loading the collection if
+        /// necessary.
+        /// </summary>
         public T this[int index]
         {
             get => GetOrLoadList()[index];
@@ -594,6 +621,12 @@ namespace nORM.Navigation
         private volatile bool _isLoaded;
         private readonly object _loadLock = new();
 
+        /// <summary>
+        /// Initializes a new lazy reference wrapper for the specified navigation property.
+        /// </summary>
+        /// <param name="parent">Entity that owns the navigation property.</param>
+        /// <param name="property">Reflection metadata describing the navigation.</param>
+        /// <param name="context">Navigation loading context.</param>
         public LazyNavigationReference(object parent, PropertyInfo property, NavigationContext context)
         {
             _parent = parent;
