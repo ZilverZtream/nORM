@@ -23,7 +23,14 @@ namespace nORM.Providers
     /// </summary>
     public sealed class SqliteProvider : DatabaseProvider
     {
+        /// <summary>
+        /// Maximum length of a single SQL statement supported by SQLite.
+        /// </summary>
         public override int MaxSqlLength => 1_000_000;
+
+        /// <summary>
+        /// Maximum number of parameters allowed in a single SQLite command.
+        /// </summary>
         public override int MaxParameters => 999;
 
         /// <summary>
@@ -32,8 +39,15 @@ namespace nORM.Providers
         /// <param name="id">Identifier to escape.</param>
         /// <returns>The escaped identifier.</returns>
         public override string Escape(string id) => $"\"{id}\"";
+
+        /// <summary>
+        /// Character used to prefix parameter names in SQLite commands.
+        /// </summary>
         public override char ParameterPrefixChar => '@';
 
+        /// <summary>
+        /// SQLite does not support stored procedures; commands are always text.
+        /// </summary>
         public override CommandType StoredProcedureCommandType => CommandType.Text;
 
         /// <summary>
@@ -56,6 +70,11 @@ namespace nORM.Providers
             length = pos + table.Length;
         }
 
+        /// <summary>
+        /// Applies performance-related <c>PRAGMA</c> settings to the supplied SQLite connection asynchronously.
+        /// </summary>
+        /// <param name="connection">The connection to configure.</param>
+        /// <param name="ct">Cancellation token.</param>
         public override async Task InitializeConnectionAsync(DbConnection connection, CancellationToken ct)
         {
             ValidateConnection(connection);
@@ -303,6 +322,15 @@ END;";
         }
 
         // Optimized single-command bulk insert for SQLite
+        /// <summary>
+        /// Inserts a collection of entities using batched <c>INSERT</c> statements suitable for SQLite.
+        /// </summary>
+        /// <typeparam name="T">Type of entity being inserted.</typeparam>
+        /// <param name="ctx">Current <see cref="DbContext"/>.</param>
+        /// <param name="m">Mapping for the destination table.</param>
+        /// <param name="entities">Entities to insert.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Total number of rows inserted.</returns>
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
@@ -362,6 +390,15 @@ END;";
         }
         
         // Optimized bulk update for SQLite
+        /// <summary>
+        /// Updates multiple entities using parameterized <c>UPDATE</c> statements executed in batches.
+        /// </summary>
+        /// <typeparam name="T">Type of entity being updated.</typeparam>
+        /// <param name="ctx">Active <see cref="DbContext"/>.</param>
+        /// <param name="m">Mapping metadata for the entity's table.</param>
+        /// <param name="entities">Entities containing new values.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Number of rows updated.</returns>
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
@@ -416,6 +453,15 @@ END;";
         }
         
         // Optimized bulk delete for SQLite using IN clauses where possible
+        /// <summary>
+        /// Deletes entities in bulk based on their key values using batched <c>DELETE</c> statements.
+        /// </summary>
+        /// <typeparam name="T">Type of entity to delete.</typeparam>
+        /// <param name="ctx">The <see cref="DbContext"/> managing the connection.</param>
+        /// <param name="m">Mapping that provides key column information.</param>
+        /// <param name="entities">Entities whose keys determine the rows to remove.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Total number of rows deleted.</returns>
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
