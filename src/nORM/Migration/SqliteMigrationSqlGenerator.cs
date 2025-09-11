@@ -4,6 +4,9 @@ using System.Linq;
 
 namespace nORM.Migration
 {
+    /// <summary>
+    /// Generates SQLite-specific SQL statements to apply and roll back schema changes.
+    /// </summary>
     public class SqliteMigrationSqlGenerator : IMigrationSqlGenerator
     {
         private static readonly Dictionary<string, string> TypeMap = new()

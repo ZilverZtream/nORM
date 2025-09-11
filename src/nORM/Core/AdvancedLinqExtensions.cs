@@ -18,21 +18,61 @@ namespace nORM.Core
     {
         #region Sum
 
+        /// <summary>
+        /// Asynchronously computes the sum of the sequence of values obtained by
+        /// applying the projection to each element of an <see cref="INormQueryable{TSource}"/>.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The nORM queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the computed sum.</returns>
         public static Task<TResult> SumAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class, new()
             where TResult : struct, INumber<TResult>
             => ExecuteAggregateAsync(source, selector, "Sum", ct);
 
+        /// <summary>
+        /// Asynchronously computes the sum of the sequence of nullable values
+        /// obtained by applying the projection to each element of an <see cref="INormQueryable{TSource}"/>.
+        /// Null values are ignored.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The nORM queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the computed sum or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> SumAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class, new()
             where TResult : struct, INumber<TResult>
             => ExecuteAggregateAsync(source, selector, "Sum", ct);
 
+        /// <summary>
+        /// Asynchronously computes the sum for an arbitrary <see cref="IQueryable{TSource}"/> backed by nORM.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the computed sum.</returns>
         public static Task<TResult> SumAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class
             where TResult : struct, INumber<TResult>
             => ExecuteQueryableAggregateAsync(source, selector, "Sum", ct);
 
+        /// <summary>
+        /// Asynchronously computes the sum of nullable values for an arbitrary <see cref="IQueryable{TSource}"/> backed by nORM.
+        /// Null values are ignored.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the computed sum or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> SumAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class
             where TResult : struct, INumber<TResult>
@@ -42,21 +82,60 @@ namespace nORM.Core
 
         #region Average
 
+        /// <summary>
+        /// Asynchronously computes the average of the sequence of values obtained by applying the projection to each element of an <see cref="INormQueryable{TSource}"/>.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The nORM queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the computed average.</returns>
         public static Task<TResult> AverageAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class, new()
             where TResult : struct, INumber<TResult>
             => ExecuteAggregateAsync(source, selector, "Average", ct);
 
+        /// <summary>
+        /// Asynchronously computes the average of the sequence of nullable values
+        /// obtained by applying the projection to each element of an <see cref="INormQueryable{TSource}"/>.
+        /// Null values are ignored.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The nORM queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the computed average or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> AverageAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class, new()
             where TResult : struct, INumber<TResult>
             => ExecuteAggregateAsync(source, selector, "Average", ct);
 
+        /// <summary>
+        /// Asynchronously computes the average for an arbitrary <see cref="IQueryable{TSource}"/> backed by nORM.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the computed average.</returns>
         public static Task<TResult> AverageAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class
             where TResult : struct, INumber<TResult>
             => ExecuteQueryableAggregateAsync(source, selector, "Average", ct);
 
+        /// <summary>
+        /// Asynchronously computes the average of nullable values for an <see cref="IQueryable{TSource}"/> backed by nORM.
+        /// Null values are ignored.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the computed average or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> AverageAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class
             where TResult : struct, INumber<TResult>
@@ -66,41 +145,113 @@ namespace nORM.Core
 
         #region Min/Max
 
+        /// <summary>
+        /// Asynchronously computes the minimum value of the sequence obtained by applying the projection to each element of an <see cref="INormQueryable{TSource}"/>.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The nORM queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the minimum value.</returns>
         public static Task<TResult> MinAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class, new()
             where TResult : struct, INumber<TResult>
             => ExecuteAggregateAsync(source, selector, "Min", ct);
 
+        /// <summary>
+        /// Asynchronously computes the minimum of the sequence of nullable values obtained by applying the projection to each element of an <see cref="INormQueryable{TSource}"/>.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The nORM queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the minimum value or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> MinAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class, new()
             where TResult : struct, INumber<TResult>
             => ExecuteAggregateAsync(source, selector, "Min", ct);
 
+        /// <summary>
+        /// Asynchronously computes the minimum value for an arbitrary <see cref="IQueryable{TSource}"/> backed by nORM.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the minimum value.</returns>
         public static Task<TResult> MinAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class
             where TResult : struct, INumber<TResult>
             => ExecuteQueryableAggregateAsync(source, selector, "Min", ct);
 
+        /// <summary>
+        /// Asynchronously computes the minimum of nullable values for an <see cref="IQueryable{TSource}"/> backed by nORM.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the minimum value or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> MinAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class
             where TResult : struct, INumber<TResult>
             => ExecuteQueryableAggregateAsync(source, selector, "Min", ct);
 
+        /// <summary>
+        /// Asynchronously computes the maximum value of the sequence obtained by applying the projection to each element of an <see cref="INormQueryable{TSource}"/>.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The nORM queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the maximum value.</returns>
         public static Task<TResult> MaxAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class, new()
             where TResult : struct, INumber<TResult>
             => ExecuteAggregateAsync(source, selector, "Max", ct);
 
+        /// <summary>
+        /// Asynchronously computes the maximum of the sequence of nullable values obtained by applying the projection to each element of an <see cref="INormQueryable{TSource}"/>.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The nORM queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the maximum value or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> MaxAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class, new()
             where TResult : struct, INumber<TResult>
             => ExecuteAggregateAsync(source, selector, "Max", ct);
 
+        /// <summary>
+        /// Asynchronously computes the maximum value for an arbitrary <see cref="IQueryable{TSource}"/> backed by nORM.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the maximum value.</returns>
         public static Task<TResult> MaxAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class
             where TResult : struct, INumber<TResult>
             => ExecuteQueryableAggregateAsync(source, selector, "Max", ct);
 
+        /// <summary>
+        /// Asynchronously computes the maximum of nullable values for an <see cref="IQueryable{TSource}"/> backed by nORM.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the queryable source.</typeparam>
+        /// <typeparam name="TResult">The numeric type of the projection.</typeparam>
+        /// <param name="source">The queryable source.</param>
+        /// <param name="selector">A projection to apply to each element.</param>
+        /// <param name="ct">A cancellation token for the operation.</param>
+        /// <returns>A task containing the maximum value or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> MaxAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class
             where TResult : struct, INumber<TResult>

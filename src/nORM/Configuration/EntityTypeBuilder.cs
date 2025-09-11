@@ -8,6 +8,11 @@ using nORM.Core;
 
 namespace nORM.Configuration
 {
+    /// <summary>
+    /// Provides a fluent API for configuring how a given entity type is mapped
+    /// to database structures such as tables, columns and relationships.
+    /// </summary>
+    /// <typeparam name="TEntity">The CLR type being configured.</typeparam>
     public class EntityTypeBuilder<TEntity> where TEntity : class
     {
         internal class MappingConfiguration : IEntityTypeConfiguration
@@ -95,6 +100,11 @@ namespace nORM.Configuration
             return this;
         }
 
+        /// <summary>
+        /// Maps <typeparamref name="TEntity"/> to the same table as another principal entity type.
+        /// </summary>
+        /// <typeparam name="TPrincipal">The principal entity that owns the table.</typeparam>
+        /// <returns>The same builder instance for fluent chaining.</returns>
         public EntityTypeBuilder<TEntity> SharesTableWith<TPrincipal>()
         {
             _config.SetTableSplit(typeof(TPrincipal));
@@ -135,12 +145,26 @@ namespace nORM.Configuration
             return new PropertyBuilder(this, prop);
         }
 
+        /// <summary>
+        /// Creates a shadow property on the entity type configuration.
+        /// </summary>
+        /// <typeparam name="TProperty">CLR type of the shadow property.</typeparam>
+        /// <param name="name">The name of the shadow property.</param>
+        /// <returns>A <see cref="ShadowPropertyBuilder"/> for further configuration.</returns>
         public ShadowPropertyBuilder Property<TProperty>(string name)
         {
             _config.AddShadowProperty(name, typeof(TProperty));
             return new ShadowPropertyBuilder(this, name);
         }
 
+        /// <summary>
+        /// Configures a reference navigation property as an owned entity type.
+        /// Owned types share the same table as the owner.
+        /// </summary>
+        /// <typeparam name="TOwned">The CLR type of the owned entity.</typeparam>
+        /// <param name="navigation">Expression selecting the navigation property.</param>
+        /// <param name="buildAction">Optional configuration for the owned entity type.</param>
+        /// <returns>The same builder instance.</returns>
         public EntityTypeBuilder<TEntity> OwnsOne<TOwned>(Expression<Func<TEntity, TOwned>> navigation, Action<EntityTypeBuilder<TOwned>>? buildAction = null) where TOwned : class
         {
             var prop = GetProperty(navigation);
@@ -150,6 +174,12 @@ namespace nORM.Configuration
             return this;
         }
 
+        /// <summary>
+        /// Begins configuration of a collection navigation property.
+        /// </summary>
+        /// <typeparam name="TProperty">The type of the dependent entity.</typeparam>
+        /// <param name="navigation">Expression selecting the collection navigation.</param>
+        /// <returns>A <see cref="CollectionNavigationBuilder{TProperty}"/> for relationship configuration.</returns>
         public CollectionNavigationBuilder<TProperty> HasMany<TProperty>(Expression<Func<TEntity, IEnumerable<TProperty>>> navigation) where TProperty : class
         {
             var prop = GetProperty(navigation);
@@ -167,6 +197,9 @@ namespace nORM.Configuration
 
         private PropertyInfo GetProperty(LambdaExpression expression) => GetProperty(expression.Body);
 
+        /// <summary>
+        /// Provides configuration options for a specific property on the entity type.
+        /// </summary>
         public class PropertyBuilder
         {
             private readonly EntityTypeBuilder<TEntity> _parent;
@@ -190,6 +223,9 @@ namespace nORM.Configuration
             }
         }
 
+        /// <summary>
+        /// Configures a shadow property that exists only in the model and database.
+        /// </summary>
         public class ShadowPropertyBuilder
         {
             private readonly EntityTypeBuilder<TEntity> _parent;
@@ -213,6 +249,10 @@ namespace nORM.Configuration
             }
         }
 
+        /// <summary>
+        /// Supports configuration of collection navigations to dependent entity types.
+        /// </summary>
+        /// <typeparam name="TDependent">The CLR type of the dependent entity.</typeparam>
         public class CollectionNavigationBuilder<TDependent> where TDependent : class
         {
             private readonly EntityTypeBuilder<TEntity> _parent;
@@ -225,9 +265,10 @@ namespace nORM.Configuration
             }
 
             /// <summary>
-            /// Configures the relationship to have a single optional reference back to the principal entity.
+            /// Configures the relationship to include an optional reference navigation
+            /// from the dependent entity back to the principal.
             /// </summary>
-            /// <param name="navigation">Optional expression specifying the navigation property on the dependent type.</param>
+            /// <param name="navigation">Expression selecting the dependent's navigation property, if any.</param>
             /// <returns>A builder for configuring the relationship further.</returns>
             public ReferenceCollectionBuilder WithOne(Expression<Func<TDependent, TEntity?>>? navigation = null)
             {
@@ -237,6 +278,10 @@ namespace nORM.Configuration
                 return new ReferenceCollectionBuilder(_parent, PrincipalNavigation, dependentNav);
             }
 
+            /// <summary>
+            /// Enables configuration of relationship details between the principal
+            /// and dependent types for a collection navigation.
+            /// </summary>
             public class ReferenceCollectionBuilder
             {
                 private readonly EntityTypeBuilder<TEntity> _parent;
@@ -251,10 +296,10 @@ namespace nORM.Configuration
                 }
 
                 /// <summary>
-                /// Configures the foreign key property used by the dependent entity in the relationship.
+                /// Defines the foreign key used by the dependent entity in this relationship.
                 /// </summary>
-                /// <param name="foreignKeyExpression">Expression selecting the foreign key property on the dependent type.</param>
-                /// <param name="principalKeyExpression">Optional expression selecting the principal key; required when the principal has composite keys.</param>
+                /// <param name="foreignKeyExpression">Expression selecting the foreign key property on the dependent.</param>
+                /// <param name="principalKeyExpression">Optional expression selecting the referenced principal key property.</param>
                 /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for further configuration.</returns>
                 /// <exception cref="NormConfigurationException">Thrown when the principal key cannot be inferred.</exception>
                 public EntityTypeBuilder<TEntity> HasForeignKey(

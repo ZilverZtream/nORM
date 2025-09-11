@@ -6,14 +6,45 @@ using System.Reflection;
 
 namespace nORM.Configuration
 {
+    /// <summary>
+    /// Defines mapping metadata for a single entity type including table, key,
+    /// property and relationship configuration.
+    /// </summary>
     public interface IEntityTypeConfiguration
     {
+        /// <summary>
+        /// Gets the unqualified table name that the entity maps to.
+        /// </summary>
         string? TableName { get; }
+
+        /// <summary>
+        /// Gets the collection of properties that compose the primary key.
+        /// </summary>
         List<PropertyInfo> KeyProperties { get; }
+
+        /// <summary>
+        /// Gets a mapping of property infos to explicit column names.
+        /// </summary>
         Dictionary<PropertyInfo, string> ColumnNames { get; }
+
+        /// <summary>
+        /// Gets the CLR type that this entity shares its table with, if any.
+        /// </summary>
         Type? TableSplitWith { get; }
+
+        /// <summary>
+        /// Gets owned navigation properties configured for this entity.
+        /// </summary>
         Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; }
+
+        /// <summary>
+        /// Gets the shadow properties defined for the entity type.
+        /// </summary>
         Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; }
+
+        /// <summary>
+        /// Gets the relationship configurations defined for the entity type.
+        /// </summary>
         List<RelationshipConfiguration> Relationships { get; }
     }
 
