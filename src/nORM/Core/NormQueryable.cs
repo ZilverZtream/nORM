@@ -15,6 +15,12 @@ namespace nORM.Core
     /// </summary>
     public static class NormQueryable
     {
+        /// <summary>
+        /// Creates a queryable source for the specified entity type backed by the provided context.
+        /// </summary>
+        /// <typeparam name="T">The entity type to query.</typeparam>
+        /// <param name="ctx">The <see cref="DbContext"/> that provides access to the database.</param>
+        /// <returns>An <see cref="IQueryable{T}"/> to compose and execute queries.</returns>
         public static IQueryable<T> Query<T>(this DbContext ctx) where T : class
             => typeof(T).GetConstructor(Type.EmptyTypes) != null
                 ? (IQueryable<T>)Activator.CreateInstance(typeof(NormQueryableImpl<>).MakeGenericType(typeof(T)), ctx)!
@@ -24,24 +30,65 @@ namespace nORM.Core
     /// <summary>
     /// Defines a queryable data source with extended functionality like Include.
     /// </summary>
+    /// <summary>
+    /// Defines a queryable data source with extended functionality like eager-loading and
+    /// asynchronous evaluation.
+    /// </summary>
+    /// <typeparam name="T">The entity type returned by the query.</typeparam>
     public interface INormQueryable<T> : IOrderedQueryable<T>
     {
+        /// <summary>
+        /// Specifies a navigation property to include in the query results.
+        /// </summary>
+        /// <typeparam name="TProperty">Type of the navigation property.</typeparam>
+        /// <param name="navigationPropertyPath">Expression identifying the navigation to include.</param>
         INormIncludableQueryable<T, TProperty> Include<TProperty>(Expression<Func<T, TProperty>> navigationPropertyPath);
+
+        /// <summary>Disables change tracking for the query results.</summary>
         INormQueryable<T> AsNoTracking();
+
+        /// <summary>
+        /// Splits collection navigations into multiple queries to reduce result set inflation.
+        /// </summary>
         INormQueryable<T> AsSplitQuery();
+
+        /// <summary>Executes the query as an asynchronous stream of entities.</summary>
         IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default);
+
+        /// <summary>Asynchronously materializes the query results into a list.</summary>
         Task<List<T>> ToListAsync(CancellationToken ct = default);
+
+        /// <summary>Asynchronously materializes the query results into an array.</summary>
         Task<T[]> ToArrayAsync(CancellationToken ct = default);
+
+        /// <summary>Asynchronously counts the number of results.</summary>
         Task<int> CountAsync(CancellationToken ct = default);
+
+        /// <summary>Determines asynchronously whether any results exist.</summary>
         Task<bool> AnyAsync(CancellationToken ct = default);
+
+        /// <summary>Returns the first element of the sequence, throwing if none exists.</summary>
         Task<T> FirstAsync(CancellationToken ct = default);
+
+        /// <summary>Returns the first element of the sequence or <c>null</c> if none exists.</summary>
         Task<T?> FirstOrDefaultAsync(CancellationToken ct = default);
+
+        /// <summary>Returns the single element of the sequence, throwing if the sequence does not contain exactly one element.</summary>
         Task<T> SingleAsync(CancellationToken ct = default);
+
+        /// <summary>Returns the single element of the sequence or <c>null</c> if no elements exist.</summary>
         Task<T?> SingleOrDefaultAsync(CancellationToken ct = default);
+
+        /// <summary>Executes a bulk delete based on the query.</summary>
         Task<int> ExecuteDeleteAsync(CancellationToken ct = default);
+
+        /// <summary>Executes a bulk update using the provided property setter expression.</summary>
         Task<int> ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct = default);
     }
 
+    /// <summary>
+    /// Represents a queryable that supports inclusion of navigation properties.
+    /// </summary>
     public interface INormIncludableQueryable<TEntity, out TProperty> : INormQueryable<TEntity>
     {
     }
@@ -217,8 +264,21 @@ namespace nORM.Core
             => ((NormQueryProvider)Provider).ExecuteUpdateAsync(Expression, set, ct);
     }
 
+    /// <summary>
+    /// Extension methods for chaining <c>Include</c> calls on queryables that already include
+    /// a navigation property.
+    /// </summary>
     public static class NormIncludableQueryableExtensions
     {
+        /// <summary>
+        /// Specifies an additional navigation property to include after a previous <c>Include</c> call.
+        /// </summary>
+        /// <typeparam name="TEntity">Root entity type of the query.</typeparam>
+        /// <typeparam name="TPreviousProperty">Type of the previously included navigation.</typeparam>
+        /// <typeparam name="TProperty">Type of the navigation to include.</typeparam>
+        /// <param name="source">The source query with an already included navigation.</param>
+        /// <param name="path">Expression identifying the additional navigation to include.</param>
+        /// <returns>A new queryable with the navigation included.</returns>
         public static INormIncludableQueryable<TEntity, TProperty> ThenInclude<TEntity, TPreviousProperty, TProperty>(
             this INormIncludableQueryable<TEntity, TPreviousProperty> source,
             Expression<Func<TPreviousProperty, TProperty>> path)
@@ -231,6 +291,16 @@ namespace nORM.Core
             return new NormIncludableQueryable<TEntity, TProperty>(((IQueryable<TEntity>)source).Provider, expression);
         }
 
+        /// <summary>
+        /// Specifies an additional navigation property to include after a previous <c>Include</c> call
+        /// where the previous navigation was a collection.
+        /// </summary>
+        /// <typeparam name="TEntity">Root entity type of the query.</typeparam>
+        /// <typeparam name="TPreviousProperty">Type of the elements in the previously included collection.</typeparam>
+        /// <typeparam name="TProperty">Type of the navigation to include.</typeparam>
+        /// <param name="source">The source query with an already included collection navigation.</param>
+        /// <param name="path">Expression identifying the additional navigation to include.</param>
+        /// <returns>A new queryable with the navigation included.</returns>
         public static INormIncludableQueryable<TEntity, TProperty> ThenInclude<TEntity, TPreviousProperty, TProperty>(
             this INormIncludableQueryable<TEntity, IEnumerable<TPreviousProperty>> source,
             Expression<Func<TPreviousProperty, TProperty>> path)

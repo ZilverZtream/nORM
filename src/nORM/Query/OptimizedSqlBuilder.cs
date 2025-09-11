@@ -13,17 +13,29 @@ namespace nORM.Query
         private char[] _buffer;
         private int _position;
 
+        /// <summary>
+        /// Creates a new <see cref="OptimizedSqlBuilder"/> with a default initial buffer
+        /// capacity of 256 characters.
+        /// </summary>
         public OptimizedSqlBuilder()
             : this(256)
         {
         }
 
+        /// <summary>
+        /// Creates a new <see cref="OptimizedSqlBuilder"/> with the specified initial
+        /// buffer size.
+        /// </summary>
+        /// <param name="capacity">Number of characters to initially allocate.</param>
         public OptimizedSqlBuilder(int capacity)
         {
             _buffer = ArrayPool<char>.Shared.Rent(capacity);
             _position = 0;
         }
 
+        /// <summary>
+        /// Gets the number of characters currently written to the underlying buffer.
+        /// </summary>
         public int Length => _position;
 
         /// <summary>

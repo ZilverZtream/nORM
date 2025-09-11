@@ -5,10 +5,18 @@ using System.Collections.Generic;
 
 namespace nORM.Configuration
 {
+    /// <summary>
+    /// Collects entity type configuration metadata using a fluent API.
+    /// </summary>
     public class ModelBuilder
     {
         private readonly Dictionary<Type, IEntityTypeConfiguration> _configurations = new();
 
+        /// <summary>
+        /// Begins configuration for the specified entity CLR type.
+        /// </summary>
+        /// <typeparam name="TEntity">The entity type to configure.</typeparam>
+        /// <returns>An <see cref="EntityTypeBuilder{TEntity}"/> for configuring the entity.</returns>
         public EntityTypeBuilder<TEntity> Entity<TEntity>() where TEntity : class
         {
             var builder = new EntityTypeBuilder<TEntity>();
