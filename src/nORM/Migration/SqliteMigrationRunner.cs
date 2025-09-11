@@ -15,6 +15,9 @@ using nORM.Providers;
 
 namespace nORM.Migration
 {
+    /// <summary>
+    /// Executes migrations against a SQLite database using a supplied connection and migrations assembly.
+    /// </summary>
     public class SqliteMigrationRunner : IMigrationRunner
     {
         private readonly DbConnection _connection;
@@ -22,6 +25,12 @@ namespace nORM.Migration
         private readonly DbContext? _context;
         private const string HistoryTableName = "__NormMigrationsHistory";
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SqliteMigrationRunner"/> class.
+        /// </summary>
+        /// <param name="connection">Open connection to the target SQLite database.</param>
+        /// <param name="migrationsAssembly">Assembly containing migration classes.</param>
+        /// <param name="options">Optional DbContext configuration for interceptors.</param>
         public SqliteMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null)
         {
             _connection = connection;

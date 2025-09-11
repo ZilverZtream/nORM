@@ -11,47 +11,87 @@ using nORM.Core;
 
 namespace nORM.Execution
 {
+    /// <summary>
+    /// Provides heuristics for determining and tracking database command timeouts based on
+    /// operation type, complexity and historical execution statistics.
+    /// </summary>
     public class AdaptiveTimeoutManager
     {
         private readonly ILogger _logger;
         private readonly ConcurrentDictionary<string, TimeoutStatistics> _operationStats = new();
 
+        /// <summary>
+        /// Configuration options that influence how adaptive timeouts are calculated.
+        /// </summary>
         public class TimeoutConfiguration
         {
+            /// <summary>Baseline timeout for standard operations.</summary>
             public TimeSpan BaseTimeout { get; set; } = TimeSpan.FromSeconds(30);
+            /// <summary>Timeout applied to simple read-only queries.</summary>
             public TimeSpan SimpleQueryTimeout { get; set; } = TimeSpan.FromSeconds(15);
+            /// <summary>Timeout applied to complex read-only queries.</summary>
             public TimeSpan ComplexQueryTimeout { get; set; } = TimeSpan.FromSeconds(120);
+            /// <summary>Timeout applied to bulk operations such as inserts or updates.</summary>
             public TimeSpan BulkOperationTimeout { get; set; } = TimeSpan.FromSeconds(300);
+            /// <summary>Timeout applied to explicit database transactions.</summary>
             public TimeSpan TransactionTimeout { get; set; } = TimeSpan.FromSeconds(180);
+            /// <summary>Multiplier used to scale timeouts based on operation complexity.</summary>
             public double TimeoutMultiplierPerComplexity { get; set; } = 1.5;
+            /// <summary>Indicates whether adaptive timeout calculation is enabled.</summary>
             public bool EnableAdaptiveTimeouts { get; set; } = true;
         }
 
+        /// <summary>
+        /// Captures statistics about past executions to guide future timeout adjustments.
+        /// </summary>
         public class TimeoutStatistics
         {
+            /// <summary>The average execution duration of the operation.</summary>
             public TimeSpan AverageExecutionTime { get; set; }
+            /// <summary>The maximum observed execution time.</summary>
             public TimeSpan MaxExecutionTime { get; set; }
+            /// <summary>Total number of executions recorded.</summary>
             public int ExecutionCount { get; set; }
+            /// <summary>Number of executions that resulted in a timeout.</summary>
             public int TimeoutCount { get; set; }
+            /// <summary>The ratio of successful executions to total executions.</summary>
             public double SuccessRate => ExecutionCount == 0 ? 1.0 : 1.0 - (double)TimeoutCount / ExecutionCount;
         }
 
+        /// <summary>
+        /// Enumerates the types of database operations for which timeouts can be calculated.
+        /// </summary>
         public enum OperationType
         {
+            /// <summary>A simple read-only query.</summary>
             SimpleSelect,
+            /// <summary>A complex read-only query.</summary>
             ComplexSelect,
+            /// <summary>An insert operation.</summary>
             Insert,
+            /// <summary>An update operation.</summary>
             Update,
+            /// <summary>A delete operation.</summary>
             Delete,
+            /// <summary>A bulk insert operation.</summary>
             BulkInsert,
+            /// <summary>A bulk update operation.</summary>
             BulkUpdate,
+            /// <summary>A bulk delete operation.</summary>
             BulkDelete,
+            /// <summary>An explicit transaction.</summary>
             Transaction,
+            /// <summary>A stored procedure invocation.</summary>
             StoredProcedure
         }
 
         private readonly TimeoutConfiguration _config;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AdaptiveTimeoutManager"/> class.
+        /// </summary>
+        /// <param name="config">Configuration options governing timeout behavior.</param>
+        /// <param name="logger">Logger used to record diagnostic information.</param>
         public AdaptiveTimeoutManager(TimeoutConfiguration config, ILogger logger)
         {
             _config = config;
@@ -132,6 +172,18 @@ namespace nORM.Execution
             };
         }
 
+        /// <summary>
+        /// Executes the provided asynchronous operation enforcing an adaptive timeout based on the
+        /// configured heuristics and records the outcome for future adjustments.
+        /// </summary>
+        /// <typeparam name="T">Type of the result produced by the operation.</typeparam>
+        /// <param name="operation">Delegate representing the work to execute.</param>
+        /// <param name="operationType">Classification of the operation being executed.</param>
+        /// <param name="operationKey">Identifier used for tracking execution statistics.</param>
+        /// <param name="recordCount">Number of records involved, used for scaling bulk operation timeouts.</param>
+        /// <param name="complexityScore">Relative complexity score of the operation.</param>
+        /// <returns>The result produced by the <paramref name="operation"/>.</returns>
+        /// <exception cref="NormTimeoutException">Thrown when the operation exceeds the calculated timeout.</exception>
         public async Task<T> ExecuteWithAdaptiveTimeout<T>(
             Func<CancellationToken, Task<T>> operation,
             OperationType operationType,
