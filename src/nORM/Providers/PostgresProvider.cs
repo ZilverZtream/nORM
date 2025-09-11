@@ -28,12 +28,23 @@ namespace nORM.Providers
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PostgresProvider"/> class.
+        /// </summary>
+        /// <param name="parameterFactory">Factory responsible for creating PostgreSQL parameters.</param>
         public PostgresProvider(IDbParameterFactory parameterFactory)
         {
             _parameterFactory = parameterFactory ?? throw new ArgumentNullException(nameof(parameterFactory));
         }
 
+        /// <summary>
+        /// Maximum length in characters of a single SQL statement supported by PostgreSQL.
+        /// </summary>
         public override int MaxSqlLength => int.MaxValue;
+
+        /// <summary>
+        /// Maximum number of parameters permitted in a prepared statement.
+        /// </summary>
         public override int MaxParameters => 32_767;
 
         /// <inheritdoc />
@@ -231,6 +242,11 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 throw new InvalidOperationException("A NpgsqlConnection is required for PostgresProvider.");
         }
 
+        /// <summary>
+        /// Determines whether the PostgreSQL provider can be used by attempting to load
+        /// the Npgsql driver and connect to a local database.
+        /// </summary>
+        /// <returns><c>true</c> if PostgreSQL is reachable and meets version requirements; otherwise, <c>false</c>.</returns>
         public override async Task<bool> IsAvailableAsync()
         {
             var type = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
@@ -255,6 +271,12 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             }
         }
 
+        /// <summary>
+        /// Creates a transaction savepoint using Npgsql's save or savepoint APIs if available.
+        /// </summary>
+        /// <param name="transaction">The transaction on which to create the savepoint.</param>
+        /// <param name="name">Identifier for the savepoint.</param>
+        /// <param name="ct">Cancellation token.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) }) ??
@@ -267,6 +289,12 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
 
+        /// <summary>
+        /// Rolls back a transaction to the specified savepoint.
+        /// </summary>
+        /// <param name="transaction">Transaction containing the savepoint.</param>
+        /// <param name="name">Name of the savepoint to roll back to.</param>
+        /// <param name="ct">Cancellation token.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) }) ??
@@ -280,6 +308,15 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         }
 
         // PostgreSQL-optimized bulk operations
+        /// <summary>
+        /// Inserts entities using PostgreSQL's <c>COPY</c> binary protocol when available, falling back to batched inserts otherwise.
+        /// </summary>
+        /// <typeparam name="T">Type of entity being inserted.</typeparam>
+        /// <param name="ctx">Context providing the connection.</param>
+        /// <param name="m">Mapping metadata for the entity.</param>
+        /// <param name="entities">Entities to insert.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>The number of rows inserted.</returns>
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
@@ -391,6 +428,15 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             }
         }
 
+        /// <summary>
+        /// Updates a sequence of entities using parameterized <c>UPDATE</c> statements executed in batches.
+        /// </summary>
+        /// <typeparam name="T">Entity type being updated.</typeparam>
+        /// <param name="ctx">Active database context.</param>
+        /// <param name="m">Entity-table mapping information.</param>
+        /// <param name="entities">Entities with new values to persist.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Count of rows updated.</returns>
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
@@ -467,6 +513,15 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             return totalUpdated;
         }
 
+        /// <summary>
+        /// Deletes entities by primary key using batched <c>DELETE</c> statements.
+        /// </summary>
+        /// <typeparam name="T">Type of entity to delete.</typeparam>
+        /// <param name="ctx">Active <see cref="DbContext"/>.</param>
+        /// <param name="m">Table mapping containing key metadata.</param>
+        /// <param name="entities">Entities whose keys identify rows to delete.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Number of rows deleted.</returns>
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);

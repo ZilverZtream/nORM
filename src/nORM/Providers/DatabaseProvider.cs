@@ -280,6 +280,17 @@ namespace nORM.Providers
             => Task.FromResult(false);
 
         #region Bulk Operations (Abstract & Fallback)
+        /// <summary>
+        /// Inserts a large collection of entities into the database in batches.
+        /// The method dynamically tunes batch size using <see cref="DynamicBatchSizer"/>
+        /// to balance throughput with resource consumption and transaction log pressure.
+        /// </summary>
+        /// <typeparam name="T">Type of entities being inserted.</typeparam>
+        /// <param name="ctx">The active <see cref="DbContext"/> that supplies the connection and options.</param>
+        /// <param name="m">Mapping metadata describing how the entity maps to the database table.</param>
+        /// <param name="entities">The entity instances to persist.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The total number of rows inserted across all batches.</returns>
         public virtual async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
@@ -324,6 +335,15 @@ namespace nORM.Providers
             return recordsAffected;
         }
 
+        /// <summary>
+        /// Executes a single batch insert for the supplied entities.
+        /// </summary>
+        /// <typeparam name="T">Type of entity being inserted.</typeparam>
+        /// <param name="ctx">Active <see cref="DbContext"/> providing the database connection.</param>
+        /// <param name="m">Table mapping used to generate the insert statement.</param>
+        /// <param name="batch">Entities to insert in a single round-trip.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The number of rows affected by the batch.</returns>
         protected async Task<int> ExecuteInsertBatch<T>(DbContext ctx, TableMapping m, List<T> batch, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
