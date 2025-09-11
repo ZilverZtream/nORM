@@ -15,6 +15,11 @@ using nORM.Providers;
 
 namespace nORM.Migration
 {
+    /// <summary>
+    /// Executes database migrations against a SQL Server instance. The runner scans
+    /// an assembly for migration classes and applies them in order while maintaining
+    /// a history table to track applied versions.
+    /// </summary>
     public class SqlServerMigrationRunner : IMigrationRunner
     {
         private readonly DbConnection _connection;
@@ -22,6 +27,12 @@ namespace nORM.Migration
         private readonly DbContext? _context;
         internal const string HistoryTableName = "__NormMigrationsHistory";
 
+        /// <summary>
+        /// Creates a new migration runner for SQL Server.
+        /// </summary>
+        /// <param name="connection">Open connection to the target database.</param>
+        /// <param name="migrationsAssembly">Assembly containing migration classes.</param>
+        /// <param name="options">Optional context configuration used for executing migrations.</param>
         public SqlServerMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null)
         {
             _connection = connection;

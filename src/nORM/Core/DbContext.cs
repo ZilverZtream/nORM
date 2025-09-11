@@ -26,6 +26,13 @@ using System.Reflection;
 #nullable enable
 namespace nORM.Core
 {
+    /// <summary>
+    /// Represents the primary entry point for interacting with a database using nORM.
+    /// The <see cref="DbContext"/> manages the underlying <see cref="DbConnection"/>,
+    /// maintains metadata such as <see cref="TableMapping"/> instances and coordinates
+    /// change tracking, transactions and provider specific behavior. Instances are
+    /// intended to be short lived and not thread safe.
+    /// </summary>
     public class DbContext : IDisposable, IAsyncDisposable
     {
         private readonly DbConnection _cn;
@@ -43,9 +50,33 @@ namespace nORM.Core
         private readonly SemaphoreSlim _providerInitLock = new(1, 1);
         private DbTransaction? _currentTransaction; // Access via Interlocked.* only
         private bool _disposed;
+
+        /// <summary>
+        /// Gets the configuration options that control the behavior of this context
+        /// instance including logging, retry policies and mapping conventions.
+        /// </summary>
         public DbContextOptions Options { get; }
+
+        /// <summary>
+        /// Provides access to the tracking graph responsible for detecting changes
+        /// on entities and orchestrating persistence operations.
+        /// </summary>
         public ChangeTracker ChangeTracker { get; }
+
+        /// <summary>
+        /// Exposes database specific operations such as transaction management and
+        /// command execution helpers.
+        /// </summary>
         public DatabaseFacade Database { get; }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DbContext"/> class using an
+        /// existing <see cref="DbConnection"/>. The context takes ownership of the
+        /// connection and will not dispose it until the context itself is disposed.
+        /// </summary>
+        /// <param name="cn">The open or closed database connection.</param>
+        /// <param name="p">The <see cref="DatabaseProvider"/> responsible for generating provider specific SQL.</param>
+        /// <param name="options">Optional configuration controlling context behavior.</param>
         public DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options = null)
         {
             _cn = cn ?? throw new ArgumentNullException(nameof(cn));
@@ -75,6 +106,15 @@ namespace nORM.Core
             }
             _cleanupTimer = new Timer(_ => CleanupDisposables(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
+        /// <summary>
+        /// Initializes a new <see cref="DbContext"/> by creating and owning a
+        /// <see cref="DbConnection"/> using the supplied connection string and
+        /// provider. This overload is convenient for scenarios where a connection
+        /// has not yet been instantiated.
+        /// </summary>
+        /// <param name="connectionString">The database connection string.</param>
+        /// <param name="p">The provider used to create the connection.</param>
+        /// <param name="options">Optional configuration for the context.</param>
         public DbContext(string connectionString, DatabaseProvider p, DbContextOptions? options = null)
             : this(CreateConnectionSafe(connectionString, p), p, options)
         {
@@ -170,7 +210,17 @@ namespace nORM.Core
             return joinCount * 1000 + subQueryCount * 500;
         }
 
+        /// <summary>
+        /// Gets the raw <see cref="DbConnection"/> associated with this context.
+        /// Consumers should avoid closing or disposing the connection as it is
+        /// managed by the context.
+        /// </summary>
         public DbConnection Connection => _cn;
+
+        /// <summary>
+        /// Gets the <see cref="DatabaseProvider"/> that supplies provider-specific
+        /// behavior such as SQL generation and bulk operations.
+        /// </summary>
         public DatabaseProvider Provider => _p;
 
         // Safe atomic accessors using Interlocked (avoids CS0420 warnings)
@@ -256,23 +306,57 @@ namespace nORM.Core
         }
 
         #region Change Tracking
+        /// <summary>
+        /// Begins tracking the given entity in the <see cref="ChangeTracker"/> in the
+        /// <see cref="EntityState.Added"/> state. The entity will be inserted into the
+        /// database when <c>SaveChanges</c> is called.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entity.</typeparam>
+        /// <param name="entity">The entity instance to add.</param>
+        /// <returns>An <see cref="EntityEntry"/> representing the tracked entity.</returns>
         public EntityEntry Add<T>(T entity) where T : class
         {
             NormValidator.ValidateEntity(entity);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
             return ChangeTracker.Track(entity, EntityState.Added, GetMapping(typeof(T)));
         }
+
+        /// <summary>
+        /// Starts tracking the entity without modifying its state. Existing values are
+        /// assumed to match those in the database and no update will be sent unless
+        /// changes are detected.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entity.</typeparam>
+        /// <param name="entity">The entity to attach.</param>
+        /// <returns>An <see cref="EntityEntry"/> for the attached entity.</returns>
         public EntityEntry Attach<T>(T entity) where T : class
         {
             NormValidator.ValidateEntity(entity);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
             return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(typeof(T)));
         }
+
+        /// <summary>
+        /// Marks the entity as <see cref="EntityState.Modified"/> so that all of its
+        /// properties are treated as modified and will be persisted during
+        /// <c>SaveChanges</c>.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entity.</typeparam>
+        /// <param name="entity">The entity to update.</param>
+        /// <returns>An <see cref="EntityEntry"/> for the updated entity.</returns>
         public EntityEntry Update<T>(T entity) where T : class
         {
             NormValidator.ValidateEntity(entity);
             return ChangeTracker.Track(entity, EntityState.Modified, GetMapping(typeof(T)));
         }
+
+        /// <summary>
+        /// Marks the specified entity for deletion. The entity will be removed from the
+        /// database when <c>SaveChanges</c> is executed.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entity.</typeparam>
+        /// <param name="entity">The entity instance to remove.</param>
+        /// <returns>An <see cref="EntityEntry"/> for the removed entity.</returns>
         public EntityEntry Remove<T>(T entity) where T : class
         {
             NormValidator.ValidateEntity(entity);
@@ -600,20 +684,71 @@ namespace nORM.Core
         #endregion
 
         #region Standard CRUD
+        /// <summary>
+        /// Inserts the specified entity into the database asynchronously using any
+        /// configured retry policies.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entity.</typeparam>
+        /// <param name="entity">The entity to insert.</param>
+        /// <param name="ct">Cancellation token for the operation.</param>
+        /// <returns>The number of affected rows.</returns>
         public Task<int> InsertAsync<T>(T entity, CancellationToken ct = default) where T : class
             => InsertAsync(entity, null, ct);
+
+        /// <summary>
+        /// Inserts the specified entity within the provided transaction scope.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entity.</typeparam>
+        /// <param name="entity">The entity to insert.</param>
+        /// <param name="transaction">Optional transaction used to execute the command.</param>
+        /// <param name="ct">Cancellation token for the operation.</param>
+        /// <returns>The number of affected rows.</returns>
         public Task<int> InsertAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
         {
             var result = WriteOptimizedAsync(entity, WriteOperation.Insert, ct, transaction);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
             return result;
         }
+
+        /// <summary>
+        /// Updates the specified entity in the database asynchronously.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entity.</typeparam>
+        /// <param name="entity">The entity to update.</param>
+        /// <param name="ct">Cancellation token for the operation.</param>
+        /// <returns>The number of affected rows.</returns>
         public Task<int> UpdateAsync<T>(T entity, CancellationToken ct = default) where T : class
             => UpdateAsync(entity, null, ct);
+
+        /// <summary>
+        /// Updates the entity within the given transaction.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entity.</typeparam>
+        /// <param name="entity">The entity to update.</param>
+        /// <param name="transaction">Transaction to use; if null the context manages one.</param>
+        /// <param name="ct">Cancellation token for the operation.</param>
+        /// <returns>The number of affected rows.</returns>
         public Task<int> UpdateAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
             => WriteOptimizedAsync(entity, WriteOperation.Update, ct, transaction);
+
+        /// <summary>
+        /// Deletes the specified entity from the database asynchronously.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entity.</typeparam>
+        /// <param name="entity">The entity to delete.</param>
+        /// <param name="ct">Cancellation token for the operation.</param>
+        /// <returns>The number of affected rows.</returns>
         public Task<int> DeleteAsync<T>(T entity, CancellationToken ct = default) where T : class
             => DeleteAsync(entity, null, ct);
+
+        /// <summary>
+        /// Deletes the entity within the supplied transaction.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entity.</typeparam>
+        /// <param name="entity">The entity to delete.</param>
+        /// <param name="transaction">Optional transaction for the delete operation.</param>
+        /// <param name="ct">Cancellation token for the operation.</param>
+        /// <returns>The number of affected rows.</returns>
         public Task<int> DeleteAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
             => WriteOptimizedAsync(entity, WriteOperation.Delete, ct, transaction);
 
@@ -880,6 +1015,15 @@ namespace nORM.Core
         #endregion
 
         #region Bulk Operations
+        /// <summary>
+        /// Efficiently inserts a collection of entities using provider specific bulk
+        /// techniques. Validation and tenant checks are applied to each entity before
+        /// execution.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entities.</typeparam>
+        /// <param name="entities">Entities to insert.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Total number of inserted rows.</returns>
         public Task<int> BulkInsertAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
@@ -894,6 +1038,14 @@ namespace nORM.Core
                 return await _p.BulkInsertAsync(ctx, map, entities, token).ConfigureAwait(false);
             }, ct);
 
+        /// <summary>
+        /// Performs a set based update of the provided entities using the provider's
+        /// bulk update facilities.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entities.</typeparam>
+        /// <param name="entities">Entities to update.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Total number of updated rows.</returns>
         public Task<int> BulkUpdateAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
@@ -908,6 +1060,14 @@ namespace nORM.Core
                 return await _p.BulkUpdateAsync(ctx, map, entities, token).ConfigureAwait(false);
             }, ct);
 
+        /// <summary>
+        /// Removes a collection of entities from the database using bulk delete
+        /// operations.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entities.</typeparam>
+        /// <param name="entities">Entities to delete.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Total number of deleted rows.</returns>
         public Task<int> BulkDeleteAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
@@ -963,6 +1123,15 @@ namespace nORM.Core
         #endregion
 
         #region Raw SQL & Stored Procedures
+        /// <summary>
+        /// Executes the provided SQL and materializes the results into instances of
+        /// <typeparamref name="T"/> without tracking them in the <see cref="ChangeTracker"/>.
+        /// </summary>
+        /// <typeparam name="T">Type to materialize each row to.</typeparam>
+        /// <param name="sql">Raw SQL query to execute.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="parameters">Optional parameters for the SQL query.</param>
+        /// <returns>A list of entities populated from the query results.</returns>
         public Task<List<T>> QueryUnchangedAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
@@ -1012,6 +1181,17 @@ namespace nORM.Core
                 return list;
             }, ct);
 
+        /// <summary>
+        /// Executes a raw SQL query and materializes the results into instances of
+        /// <typeparamref name="T"/>. Unlike <see cref="QueryUnchangedAsync"/>, the
+        /// entities are materialized using the nORM query translation pipeline which
+        /// supports projections and navigations.
+        /// </summary>
+        /// <typeparam name="T">Result entity type.</typeparam>
+        /// <param name="sql">Raw SQL query to execute.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="parameters">Optional parameters for the SQL query.</param>
+        /// <returns>A list of materialized entities.</returns>
         public Task<List<T>> FromSqlRawAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
@@ -1037,6 +1217,15 @@ namespace nORM.Core
                 return list;
             }, ct);
 
+        /// <summary>
+        /// Executes a stored procedure and materializes the first result set into
+        /// instances of <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">Type to materialize the rows to.</typeparam>
+        /// <param name="procedureName">Name of the stored procedure.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="parameters">Anonymous object containing input parameters.</param>
+        /// <returns>A list of results returned by the procedure.</returns>
         public Task<List<T>> ExecuteStoredProcedureAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
@@ -1079,6 +1268,15 @@ namespace nORM.Core
                 return list;
             }, ct);
 
+        /// <summary>
+        /// Streams the results of a stored procedure as an <see cref="IAsyncEnumerable{T}"/>.
+        /// This is useful for large result sets where buffering would be prohibitive.
+        /// </summary>
+        /// <typeparam name="T">Type of objects yielded.</typeparam>
+        /// <param name="procedureName">Name of the stored procedure.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="parameters">Anonymous object containing input parameters.</param>
+        /// <returns>An asynchronous stream of materialized entities.</returns>
         public async IAsyncEnumerable<T> ExecuteStoredProcedureAsAsyncEnumerable<T>(string procedureName, [EnumeratorCancellation] CancellationToken ct = default, object? parameters = null) where T : class, new()
         {
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
@@ -1123,6 +1321,17 @@ namespace nORM.Core
             cmd.Parameters.Clear();
         }
 
+        /// <summary>
+        /// Executes a stored procedure that returns both a result set and output
+        /// parameters. The result set is materialized to <typeparamref name="T"/> and
+        /// output parameters are captured in the returned <see cref="StoredProcedureResult{T}"/>.
+        /// </summary>
+        /// <typeparam name="T">Type to materialize the first result set.</typeparam>
+        /// <param name="procedureName">Name of the stored procedure.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="parameters">Anonymous object containing input parameters.</param>
+        /// <param name="outputParameters">Definitions of output parameters to retrieve.</param>
+        /// <returns>A <see cref="StoredProcedureResult{T}"/> containing results and output values.</returns>
         public Task<StoredProcedureResult<T>> ExecuteStoredProcedureWithOutputAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
@@ -1252,6 +1461,12 @@ namespace nORM.Core
             }, default).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Releases resources used by the context. When <paramref name="disposing"/>
+        /// is <c>true</c>, both managed and unmanaged resources are released; otherwise
+        /// only unmanaged resources are cleaned up.
+        /// </summary>
+        /// <param name="disposing">Indicates whether the method was invoked from <see cref="Dispose()"/>.</param>
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposed && disposing)
@@ -1370,5 +1585,12 @@ namespace nORM.Core
     /// <param name="DbType">Database type of the output parameter.</param>
     /// <param name="Size">Optional size for variable-length parameters.</param>
     public sealed record OutputParameter(string Name, DbType DbType, int? Size = null);
+    /// <summary>
+    /// Encapsulates the results of a stored procedure that returns both a result set
+    /// and output parameters.
+    /// </summary>
+    /// <typeparam name="T">Type of entities in the result set.</typeparam>
+    /// <param name="Results">List of materialized entities returned by the procedure.</param>
+    /// <param name="OutputParameters">Dictionary of output parameter values keyed by name.</param>
     public sealed record StoredProcedureResult<T>(List<T> Results, IReadOnlyDictionary<string, object?> OutputParameters);
 }

@@ -12,6 +12,11 @@ using nORM.Providers;
 
 namespace nORM.Navigation
 {
+    /// <summary>
+    /// Coordinates deferred loading of navigation properties by batching multiple
+    /// requests into a single query. This reduces database round trips when many
+    /// entities require the same navigation data.
+    /// </summary>
     public sealed class BatchedNavigationLoader : IDisposable
     {
         private readonly DbContext _context;
@@ -20,6 +25,11 @@ namespace nORM.Navigation
         private int _processing;
         private readonly SemaphoreSlim _batchSemaphore = new(1, 1);
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="BatchedNavigationLoader"/>
+        /// for the specified <see cref="DbContext"/>.
+        /// </summary>
+        /// <param name="context">The owning context used to execute navigation queries.</param>
         public BatchedNavigationLoader(DbContext context)
         {
             _context = context;
