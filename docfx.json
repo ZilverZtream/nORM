@@ -2,7 +2,7 @@
   "metadata": [
     {
       "src": [
-        { "files": [ "src/nORM.csproj" ] }
+        { "cwd": "src", "files": [ "nORM.csproj" ] }
       ],
       "dest": "docs/api",
       "properties": {
@@ -17,6 +17,6 @@
       { "files": [ "docs/api/**.yml", "docs/api/toc.yml", "docs/api/index.md" ] },
       { "files": [ "docs/**/*.md" ], "exclude": [ "**/obj/**" ] }
     ],
-    "dest": "docs/_site"
+    "dest": "docs"
   }
 }
