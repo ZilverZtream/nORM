@@ -13,6 +13,10 @@ using Microsoft.SqlServer.TransactSql.ScriptDom;
 
 namespace nORM.Core
 {
+    /// <summary>
+    /// Provides runtime validation helpers for entities, bulk operations and raw SQL statements
+    /// to guard against misuse and excessively large payloads.
+    /// </summary>
     public static class NormValidator
     {
         private const int MaxEntityDepth = 10;
@@ -25,6 +29,13 @@ namespace nORM.Core
             new DefaultObjectPool<HashSet<object>>(new HashSetPolicy(), Environment.ProcessorCount * 2);
         private static readonly ConcurrentDictionary<Type, PropertyInfo[]> PropertyCache = new();
 
+        /// <summary>
+        /// Validates a single entity instance to ensure it does not contain excessively deep
+        /// or cyclic graphs that could lead to stack overflows or performance issues.
+        /// </summary>
+        /// <typeparam name="T">Type of the entity being validated.</typeparam>
+        /// <param name="entity">Entity instance to validate.</param>
+        /// <param name="parameterName">Name of the parameter for exception messages.</param>
         public static void ValidateEntity<T>(T entity, string parameterName = "entity") where T : class
         {
             if (entity == null)
@@ -146,6 +157,12 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Validates that a bulk operation contains a reasonable number of entities and none are null.
+        /// </summary>
+        /// <typeparam name="T">Type of the entities involved in the operation.</typeparam>
+        /// <param name="entities">Collection of entities to validate.</param>
+        /// <param name="operation">Name of the bulk operation (for error messages).</param>
         public static void ValidateBulkOperation<T>(IEnumerable<T> entities, string operation) where T : class
         {
             if (entities == null)

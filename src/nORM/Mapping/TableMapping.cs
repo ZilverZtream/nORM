@@ -15,24 +15,62 @@ using System.Linq.Expressions;
 
 namespace nORM.Mapping
 {
+    /// <summary>
+    /// Describes how a CLR type maps to a database table including column and relationship metadata.
+    /// </summary>
     public sealed class TableMapping
     {
+        /// <summary>Gets the CLR type represented by this mapping.</summary>
         public readonly Type Type;
+
+        /// <summary>Gets the escaped table name used in SQL statements.</summary>
         public string EscTable;
+
+        /// <summary>Gets all mapped columns.</summary>
         public readonly Column[] Columns;
+
+        /// <summary>Gets a lookup of columns by property name.</summary>
         public readonly Dictionary<string, Column> ColumnsByName;
+
+        /// <summary>Gets the columns that form the primary key.</summary>
         public readonly Column[] KeyColumns;
+
+        /// <summary>Gets the timestamp column used for concurrency, if any.</summary>
         public readonly Column? TimestampColumn;
+
+        /// <summary>Gets the tenant discriminator column, if multi-tenancy is enabled.</summary>
         public readonly Column? TenantColumn;
+
+        /// <summary>Gets the set of columns included in insert statements.</summary>
         public readonly Column[] InsertColumns;
+
+        /// <summary>Gets the set of columns included in update statements.</summary>
         public readonly Column[] UpdateColumns;
+
+        /// <summary>Gets the unescaped table name.</summary>
         public string TableName { get; }
+
+        /// <summary>Gets the relationships to dependent entities.</summary>
         public readonly Dictionary<string, Relation> Relations = new();
+
+        /// <summary>Gets the database provider associated with this mapping.</summary>
         public readonly DatabaseProvider Provider;
+
+        /// <summary>Gets the discriminator column used for TPH inheritance, if any.</summary>
         public readonly Column? DiscriminatorColumn = null;
+
+        /// <summary>Gets mappings for derived types in TPH inheritance scenarios.</summary>
         public readonly Dictionary<object, TableMapping> TphMappings = new();
+
         private readonly IEntityTypeConfiguration? _fluentConfig;
 
+        /// <summary>
+        /// Creates a new <see cref="TableMapping"/> for the specified type and provider.
+        /// </summary>
+        /// <param name="t">CLR type being mapped.</param>
+        /// <param name="p">Database provider used for identifier escaping.</param>
+        /// <param name="ctx">Context used to resolve related mappings.</param>
+        /// <param name="fluentConfig">Optional configuration overrides.</param>
         public TableMapping(Type t, DatabaseProvider p, DbContext ctx, IEntityTypeConfiguration? fluentConfig)
         {
             Type = t;

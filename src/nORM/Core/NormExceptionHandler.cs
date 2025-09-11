@@ -8,17 +8,34 @@ using Microsoft.Extensions.Logging;
 
 namespace nORM.Core
 {
+    /// <summary>
+    /// Provides rich exception handling for database operations, logging contextual information
+    /// and translating low-level exceptions into <see cref="NormException"/> instances.
+    /// </summary>
     public class NormExceptionHandler
     {
         private readonly ILogger _logger;
         private readonly string _correlationId;
 
+        /// <summary>
+        /// Creates a new <see cref="NormExceptionHandler"/> that uses the specified logger for diagnostics.
+        /// </summary>
+        /// <param name="logger">Logger used to record successes and failures.</param>
         public NormExceptionHandler(ILogger logger)
         {
             _logger = logger;
             _correlationId = Guid.NewGuid().ToString("N")[..8];
         }
 
+        /// <summary>
+        /// Executes the provided operation and wraps any thrown exception into a <see cref="NormException"/> with
+        /// additional context information and logging.
+        /// </summary>
+        /// <typeparam name="T">Type of the result returned by the operation.</typeparam>
+        /// <param name="operation">The asynchronous operation to execute.</param>
+        /// <param name="operationName">Human-readable name of the operation for logging.</param>
+        /// <param name="context">Optional additional context values.</param>
+        /// <returns>The result of the operation if successful.</returns>
         public async Task<T> ExecuteWithExceptionHandling<T>(Func<Task<T>> operation, string operationName, Dictionary<string, object>? context = null)
         {
             var stopwatch = Stopwatch.StartNew();
@@ -84,16 +101,36 @@ namespace nORM.Core
         }
     }
 
+    /// <summary>
+    /// Represents database-specific failures such as constraint violations or other provider errors.
+    /// </summary>
     public class NormDatabaseException : NormException
     {
+        /// <summary>
+        /// Initializes a new instance of <see cref="NormDatabaseException"/>.
+        /// </summary>
+        /// <param name="message">Human-readable error message.</param>
+        /// <param name="sql">SQL statement that caused the failure, if available.</param>
+        /// <param name="parameters">Parameters supplied with the SQL statement.</param>
+        /// <param name="inner">The original provider exception.</param>
         public NormDatabaseException(string message, string? sql, IReadOnlyDictionary<string, object>? parameters, Exception? inner)
             : base(message, sql, parameters, inner)
         {
         }
     }
 
+    /// <summary>
+    /// Thrown when a database operation exceeds the configured timeout.
+    /// </summary>
     public class NormTimeoutException : NormException
     {
+        /// <summary>
+        /// Initializes a new instance of <see cref="NormTimeoutException"/>.
+        /// </summary>
+        /// <param name="message">Human-readable error message.</param>
+        /// <param name="sql">SQL statement being executed, if known.</param>
+        /// <param name="parameters">Parameters supplied to the statement.</param>
+        /// <param name="inner">The original timeout exception.</param>
         public NormTimeoutException(string message, string? sql, IReadOnlyDictionary<string, object>? parameters, Exception? inner)
             : base(message, sql, parameters, inner)
         {
