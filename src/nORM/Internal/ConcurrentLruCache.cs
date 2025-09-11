@@ -22,6 +22,11 @@ namespace nORM.Internal
         private long _hits;
         private long _misses;
 
+        /// <summary>
+        /// Initializes a new concurrent LRU cache.
+        /// </summary>
+        /// <param name="maxSize">Maximum number of items the cache can hold.</param>
+        /// <param name="timeToLive">Optional time-to-live for cache entries.</param>
         public ConcurrentLruCache(int maxSize = 1000, TimeSpan? timeToLive = null)
         {
             if (maxSize <= 0) throw new ArgumentOutOfRangeException(nameof(maxSize));
@@ -149,8 +154,19 @@ namespace nORM.Internal
             }
         }
 
+        /// <summary>
+        /// Gets the total number of cache hits.
+        /// </summary>
         public long Hits => Interlocked.Read(ref _hits);
+
+        /// <summary>
+        /// Gets the total number of cache misses.
+        /// </summary>
         public long Misses => Interlocked.Read(ref _misses);
+
+        /// <summary>
+        /// Gets the ratio of hits to total lookups.
+        /// </summary>
         public double HitRate => Hits + Misses == 0 ? 0 : (double)Hits / (Hits + Misses);
 
         /// <summary>

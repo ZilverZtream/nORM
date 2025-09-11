@@ -16,6 +16,12 @@ namespace nORM.Core
         private readonly DbConnection _connection;
         private readonly ILogger _logger;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AsyncConnectionManager"/> class.
+        /// </summary>
+        /// <param name="connection">The underlying database connection to manage.</param>
+        /// <param name="maxConcurrency">Maximum number of concurrent operations allowed.</param>
+        /// <param name="logger">Logger used to record diagnostic information.</param>
         public AsyncConnectionManager(DbConnection connection, int maxConcurrency, ILogger logger)
         {
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
@@ -23,6 +29,15 @@ namespace nORM.Core
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        /// <summary>
+        /// Executes the provided asynchronous <paramref name="operation"/> ensuring
+        /// exclusive access to the underlying connection for the duration of the call.
+        /// </summary>
+        /// <typeparam name="T">The result type produced by the operation.</typeparam>
+        /// <param name="operation">Delegate that performs work using an open <see cref="DbConnection"/>.</param>
+        /// <param name="ct">Token used to cancel the asynchronous work.</param>
+        /// <returns>The value returned by the executed operation.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="operation"/> is <c>null</c>.</exception>
         public async Task<T> ExecuteWithConnectionAsync<T>(Func<DbConnection, CancellationToken, Task<T>> operation, CancellationToken ct = default)
         {
             if (operation == null) throw new ArgumentNullException(nameof(operation));

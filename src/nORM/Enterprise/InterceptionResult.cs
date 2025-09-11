@@ -11,7 +11,14 @@ namespace nORM.Enterprise
     /// <typeparam name="T">Type of the result.</typeparam>
     public readonly struct InterceptionResult<T>
     {
+        /// <summary>
+        /// Gets a value indicating whether the command execution should be suppressed.
+        /// </summary>
         public bool IsSuppressed { get; }
+
+        /// <summary>
+        /// Gets the result to return when <see cref="IsSuppressed"/> is <c>true</c>.
+        /// </summary>
         [MaybeNull]
         public T Result { get; }
 

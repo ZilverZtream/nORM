@@ -5,6 +5,10 @@ using System.Threading.Tasks;
 
 namespace nORM.Core
 {
+    /// <summary>
+    /// Provides access to database-specific functionality for a <see cref="DbContext"/>,
+    /// such as transaction management.
+    /// </summary>
     public class DatabaseFacade
     {
         private readonly DbContext _context;
@@ -14,6 +18,9 @@ namespace nORM.Core
             _context = context;
         }
 
+        /// <summary>
+        /// Gets the active <see cref="DbTransaction"/> for the context, if one exists.
+        /// </summary>
         public DbTransaction? CurrentTransaction => _context.CurrentTransaction;
 
         /// <summary>
