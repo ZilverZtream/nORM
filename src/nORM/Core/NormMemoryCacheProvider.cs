@@ -21,6 +21,10 @@ namespace nORM.Core
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _tagTokens = new();
         private readonly Func<object?>? _getTenantId;
 
+        /// <summary>
+        /// Creates a new <see cref="NormMemoryCacheProvider"/> optionally scoped by tenant.
+        /// </summary>
+        /// <param name="getTenantId">Delegate that returns the current tenant identifier or <c>null</c> for single-tenant usage.</param>
         public NormMemoryCacheProvider(Func<object?>? getTenantId = null)
         {
             _getTenantId = getTenantId;
@@ -44,11 +48,26 @@ namespace nORM.Core
             return $"TENANT:{tenant}:{tag}";
         }
 
+        /// <summary>
+        /// Attempts to retrieve a cached value.
+        /// </summary>
+        /// <param name="key">The unique cache key.</param>
+        /// <param name="value">The cached value, if present.</param>
+        /// <typeparam name="T">Type of the cached item.</typeparam>
+        /// <returns><c>true</c> if the item was found; otherwise <c>false</c>.</returns>
         public bool TryGet<T>(string key, out T? value)
         {
             return _cache.TryGetValue(key, out value);
         }
 
+        /// <summary>
+        /// Stores a value in the cache with the specified expiration and tags.
+        /// </summary>
+        /// <param name="key">Key under which the value is stored.</param>
+        /// <param name="value">Value to cache.</param>
+        /// <param name="expiration">Absolute expiration for the cache entry.</param>
+        /// <param name="tags">Tags used to group related cache entries.</param>
+        /// <typeparam name="T">Type of the value being cached.</typeparam>
         public void Set<T>(string key, T value, TimeSpan expiration, IEnumerable<string> tags)
         {
             var options = new MemoryCacheEntryOptions()

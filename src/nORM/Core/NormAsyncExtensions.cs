@@ -184,6 +184,13 @@ namespace nORM.Core
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync().");
         }
 
+        /// <summary>
+        /// Executes a bulk delete for the entities matching the query.
+        /// </summary>
+        /// <typeparam name="T">Type of the entity.</typeparam>
+        /// <param name="source">Query identifying entities to delete.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>The number of affected rows.</returns>
         public static Task<int> ExecuteDeleteAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
             where T : class
         {
@@ -197,6 +204,14 @@ namespace nORM.Core
                 "Make sure you started with context.Query<T>().");
         }
 
+        /// <summary>
+        /// Executes a bulk update for entities matching the query using the provided property assignments.
+        /// </summary>
+        /// <typeparam name="T">Type of the entity.</typeparam>
+        /// <param name="source">Query identifying entities to update.</param>
+        /// <param name="set">Delegate specifying property assignments.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>The number of affected rows.</returns>
         public static Task<int> ExecuteUpdateAsync<T>(this IQueryable<T> source, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct = default)
             where T : class
         {
@@ -209,8 +224,11 @@ namespace nORM.Core
                 "ExecuteUpdateAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>().");
         }
-        
+
         // Join operations for nORM - these don't conflict since they return IQueryable
+        /// <summary>
+        /// Performs an inner join between two queryable sources.
+        /// </summary>
         public static IQueryable<TResult> Join<TOuter, TInner, TKey, TResult>(
             this IQueryable<TOuter> outer,
             IQueryable<TInner> inner,
@@ -220,7 +238,10 @@ namespace nORM.Core
         {
             return Queryable.Join(outer, inner, outerKeySelector, innerKeySelector, resultSelector);
         }
-        
+
+        /// <summary>
+        /// Performs a group join between two queryable sources.
+        /// </summary>
         public static IQueryable<TResult> GroupJoin<TOuter, TInner, TKey, TResult>(
             this IQueryable<TOuter> outer,
             IQueryable<TInner> inner,

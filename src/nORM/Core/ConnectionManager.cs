@@ -39,6 +39,15 @@ namespace nORM.Core
         private readonly TimeSpan _baseDelay = TimeSpan.FromSeconds(1);
         private readonly TimeSpan _maxDelay = TimeSpan.FromSeconds(30);
 
+        /// <summary>
+        /// Initializes a new <see cref="ConnectionManager"/> that manages database connections
+        /// across a topology of nodes. Connection pools are created for each node and an
+        /// optional background health check loop is started.
+        /// </summary>
+        /// <param name="topology">Topology describing available database nodes.</param>
+        /// <param name="provider">Database provider responsible for creating connections.</param>
+        /// <param name="logger">Logger used for diagnostic output.</param>
+        /// <param name="healthCheckInterval">Optional interval between health check executions.</param>
         public ConnectionManager(DatabaseTopology topology, DatabaseProvider provider, ILogger logger, TimeSpan? healthCheckInterval = null)
         {
             _topology = topology ?? throw new ArgumentNullException(nameof(topology));

@@ -10,6 +10,11 @@ using RefComparer = System.Collections.Generic.ReferenceEqualityComparer;
 #nullable enable
 namespace nORM.Core
 {
+    /// <summary>
+    /// Keeps track of entity instances and monitors their state so that changes can be
+    /// persisted to the database. The tracker manages identity resolution and
+    /// coordinates change detection for entities attached to a <see cref="DbContext"/>.
+    /// </summary>
     public sealed class ChangeTracker
     {
         private readonly ConcurrentDictionary<object, EntityEntry> _entriesByReference = new(RefComparer.Instance);
@@ -18,6 +23,12 @@ namespace nORM.Core
         private readonly ConcurrentDictionary<EntityEntry, byte> _dirtyNonNotifyingEntries = new();
         private readonly ConcurrentDictionary<EntityEntry, byte> _dirtyEntries = new();
         private readonly DbContextOptions _options;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ChangeTracker"/> class using the
+        /// specified context options.
+        /// </summary>
+        /// <param name="options">Options that influence change-tracking behavior.</param>
         public ChangeTracker(DbContextOptions options)
         {
             _options = options;
@@ -174,6 +185,10 @@ namespace nORM.Core
                 }
             }
         }
+        /// <summary>
+        /// Gets an enumeration of the <see cref="EntityEntry"/> instances currently
+        /// tracked by the context.
+        /// </summary>
         public IEnumerable<EntityEntry> Entries => _entriesByReference.Values;
         /// <summary>
         /// Forces change detection for all entities that have been marked as dirty,

@@ -15,6 +15,9 @@ using nORM.Providers;
 
 namespace nORM.Mapping
 {
+    /// <summary>
+    /// Provides cached reflection-based metadata describing how entity properties map to database columns.
+    /// </summary>
     public static class ColumnMappingCache
     {
         private static readonly ConcurrentDictionary<Type, CachedTypeInfo> _typeCache = new();
