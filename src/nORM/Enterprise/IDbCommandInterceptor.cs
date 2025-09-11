@@ -64,6 +64,10 @@ namespace nORM.Enterprise
         /// </summary>
         protected ILogger Logger { get; }
 
+        /// <summary>
+        /// Initializes a new instance of the interceptor using the provided logger.
+        /// </summary>
+        /// <param name="logger">Logger used to emit diagnostic messages.</param>
         protected BaseDbCommandInterceptor(ILogger logger)
         {
             Logger = logger ?? throw new ArgumentNullException(nameof(logger));

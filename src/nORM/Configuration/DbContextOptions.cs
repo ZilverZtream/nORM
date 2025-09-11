@@ -31,7 +31,7 @@ namespace nORM.Configuration
         /// <summary>
         /// Gets or sets the base timeout applied to all commands.
         /// This property is obsolete and provided for backward compatibility. Use
-        /// <see cref="TimeoutConfiguration.BaseTimeout"/> instead.
+        /// <see cref="AdaptiveTimeoutManager.TimeoutConfiguration.BaseTimeout"/> instead.
         /// </summary>
         [Obsolete("Use TimeoutConfiguration.BaseTimeout instead")]
         public TimeSpan CommandTimeout
