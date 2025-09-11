@@ -2,6 +2,11 @@ using System;
 
 namespace nORM.Query
 {
+    /// <summary>
+    /// Attribute used to associate a .NET method with a specific SQL fragment.
+    /// When applied, the LINQ query translator substitutes calls to the method
+    /// with the provided SQL format string.
+    /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
     public sealed class SqlFunctionAttribute : Attribute
     {
