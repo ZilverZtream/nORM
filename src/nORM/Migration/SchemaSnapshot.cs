@@ -40,6 +40,10 @@ namespace nORM.Migration
         public bool IsNullable { get; set; }
     }
 
+    /// <summary>
+    /// Helper responsible for creating <see cref="SchemaSnapshot"/> instances by
+    /// scanning assemblies for entity types and their mapping attributes.
+    /// </summary>
     public static class SchemaSnapshotBuilder
     {
         /// <summary>
@@ -106,6 +110,9 @@ namespace nORM.Migration
         public bool HasChanges => AddedTables.Count > 0 || AddedColumns.Count > 0 || AlteredColumns.Count > 0;
     }
 
+    /// <summary>
+    /// Provides methods for computing differences between two schema snapshots.
+    /// </summary>
     public static class SchemaDiffer
     {
         /// <summary>

@@ -4,6 +4,9 @@ using System.Linq;
 
 namespace nORM.Migration
 {
+    /// <summary>
+    /// Generates SQL Server compatible migration scripts based on a schema diff.
+    /// </summary>
     public class SqlServerMigrationSqlGenerator : IMigrationSqlGenerator
     {
         private static readonly Dictionary<string, string> TypeMap = new()

@@ -18,17 +18,42 @@ using Microsoft.Extensions.ObjectPool;
 
 namespace nORM.Providers
 {
+    /// <summary>
+    /// Base class for provider-specific behavior such as SQL generation, parameter
+    /// creation and bulk operations. Concrete providers override members to adapt to
+    /// the capabilities and quirks of a particular database system.
+    /// </summary>
     public abstract class DatabaseProvider : IFastProvider
     {
         private readonly ConcurrentLruCache<(Type Type, string Operation), string> _sqlCache = new(maxSize: 1000);
+
+        /// <summary>
+        /// Utility used to dynamically determine optimal batch sizes for bulk
+        /// operations based on runtime metrics.
+        /// </summary>
         protected static readonly DynamicBatchSizer BatchSizer = new();
 
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
+        /// <summary>
+        /// Gets the character used to prefix parameter names in SQL statements.
+        /// </summary>
         public virtual char ParameterPrefixChar => '@';
+
+        /// <summary>
+        /// Gets the string representation of the parameter prefix used by the provider.
+        /// </summary>
         public virtual string ParamPrefix => ParameterPrefixChar.ToString();
+
+        /// <summary>
+        /// Maximum length of a single SQL statement supported by the provider.
+        /// </summary>
         public virtual int MaxSqlLength => int.MaxValue;
+
+        /// <summary>
+        /// Maximum number of parameters allowed in a single command.
+        /// </summary>
         public virtual int MaxParameters => int.MaxValue;
 
         /// <summary>
@@ -116,6 +141,11 @@ namespace nORM.Providers
                 .Replace("_", esc + "_");
         }
 
+        /// <summary>
+        /// Ensures the provided connection is open before executing provider operations.
+        /// </summary>
+        /// <param name="connection">The connection to validate.</param>
+        /// <exception cref="InvalidOperationException">Thrown if the connection is not open.</exception>
         protected virtual void ValidateConnection(DbConnection connection)
         {
             if (connection.State != ConnectionState.Open)
@@ -125,6 +155,12 @@ namespace nORM.Providers
             }
         }
 
+        /// <summary>
+        /// Validates that a parameter name uses the provider's expected prefix.
+        /// </summary>
+        /// <param name="parameterName">Name to validate.</param>
+        /// <param name="argumentName">Name of the argument being validated.</param>
+        /// <exception cref="ArgumentException">Thrown when the prefix is missing.</exception>
         protected void EnsureValidParameterName(string? parameterName, string argumentName)
         {
             if (parameterName != null && !parameterName.StartsWith(ParamPrefix, StringComparison.Ordinal))
@@ -180,6 +216,11 @@ namespace nORM.Providers
         /// <param name="connection">The open connection to initialize.</param>
         public virtual void InitializeConnection(DbConnection connection) { }
 
+        /// <summary>
+        /// Gets the <see cref="CommandType"/> used when executing stored procedures for
+        /// the provider. Providers that emulate procedures via text commands can
+        /// override this to return <see cref="CommandType.Text"/>.
+        /// </summary>
         public virtual CommandType StoredProcedureCommandType => CommandType.StoredProcedure;
 
         /// <summary>
@@ -230,6 +271,11 @@ namespace nORM.Providers
             return $"{columnName} IN ({string.Join(",", paramNames)})";
         }
 
+        /// <summary>
+        /// Indicates whether the transaction log is close to capacity and bulk
+        /// operations should be throttled. Base implementation always returns
+        /// <c>false</c>.
+        /// </summary>
         protected virtual Task<bool> IsTransactionLogNearCapacityAsync(DbContext ctx, CancellationToken ct)
             => Task.FromResult(false);
 
@@ -311,6 +357,10 @@ namespace nORM.Providers
             }
         }
 
+        /// <summary>
+        /// Performs a bulk update across the provided entities. Providers without a
+        /// native implementation fall back to batched updates when enabled.
+        /// </summary>
         public virtual Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> e, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
@@ -319,6 +369,10 @@ namespace nORM.Providers
             throw new NotImplementedException("This provider does not have a native bulk update implementation.");
         }
 
+        /// <summary>
+        /// Performs a bulk delete across the provided entities. Providers without a
+        /// native implementation fall back to batched deletes when enabled.
+        /// </summary>
         public virtual Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> e, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
@@ -327,6 +381,10 @@ namespace nORM.Providers
             throw new NotImplementedException("This provider does not have a native bulk delete implementation.");
         }
 
+        /// <summary>
+        /// Executes update statements in batches, selecting the batch size dynamically
+        /// to balance performance and resource usage.
+        /// </summary>
         protected async Task<int> BatchedUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
@@ -356,6 +414,10 @@ namespace nORM.Providers
             return totalUpdated;
         }
 
+        /// <summary>
+        /// Executes delete statements in batches, selecting the batch size dynamically
+        /// to balance performance and resource usage.
+        /// </summary>
         protected async Task<int> BatchedDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);

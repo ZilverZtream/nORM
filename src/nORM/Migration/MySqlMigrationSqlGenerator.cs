@@ -4,6 +4,11 @@ using System.Linq;
 
 namespace nORM.Migration
 {
+    /// <summary>
+    /// Generates MySQL-compatible SQL statements for applying schema migrations.
+    /// This implementation translates high level <see cref="SchemaDiff"/> objects
+    /// into SQL required to upgrade or downgrade a database.
+    /// </summary>
     public class MySqlMigrationSqlGenerator : IMigrationSqlGenerator
     {
         private static readonly Dictionary<string, string> TypeMap = new()
