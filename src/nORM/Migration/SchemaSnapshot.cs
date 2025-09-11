@@ -7,21 +7,36 @@ using System.Reflection;
 
 namespace nORM.Migration
 {
+    /// <summary>
+    /// Represents a snapshot of the database schema at a particular point in time.
+    /// </summary>
     public class SchemaSnapshot
     {
+        /// <summary>Tables captured in the snapshot.</summary>
         public List<TableSchema> Tables { get; set; } = new();
     }
 
+    /// <summary>
+    /// Describes the schema of a single table including its columns.
+    /// </summary>
     public class TableSchema
     {
+        /// <summary>Name of the table.</summary>
         public string Name { get; set; } = string.Empty;
+        /// <summary>Columns defined on the table.</summary>
         public List<ColumnSchema> Columns { get; set; } = new();
     }
 
+    /// <summary>
+    /// Describes a column within a table schema snapshot.
+    /// </summary>
     public class ColumnSchema
     {
+        /// <summary>Name of the column.</summary>
         public string Name { get; set; } = string.Empty;
+        /// <summary>Full CLR type name of the column.</summary>
         public string ClrType { get; set; } = string.Empty;
+        /// <summary>Indicates whether the column allows <c>null</c> values.</summary>
         public bool IsNullable { get; set; }
     }
 
@@ -75,12 +90,19 @@ namespace nORM.Migration
         }
     }
 
+    /// <summary>
+    /// Represents the differences between two <see cref="SchemaSnapshot"/> instances.
+    /// </summary>
     public class SchemaDiff
     {
+        /// <summary>Tables that exist in the new snapshot but not in the old.</summary>
         public List<TableSchema> AddedTables { get; } = new();
+        /// <summary>Columns that exist in the new snapshot but not in the old.</summary>
         public List<(TableSchema Table, ColumnSchema Column)> AddedColumns { get; } = new();
+        /// <summary>Columns whose definition has changed between snapshots.</summary>
         public List<(TableSchema Table, ColumnSchema NewColumn, ColumnSchema OldColumn)> AlteredColumns { get; } = new();
 
+        /// <summary>Indicates whether the diff contains any schema changes.</summary>
         public bool HasChanges => AddedTables.Count > 0 || AddedColumns.Count > 0 || AlteredColumns.Count > 0;
     }
 
