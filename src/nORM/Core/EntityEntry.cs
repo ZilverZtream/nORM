@@ -11,6 +11,11 @@ using nORM.Navigation;
 
 namespace nORM.Core
 {
+    /// <summary>
+    /// Represents the change tracking information for a single entity instance.
+    /// An <see cref="EntityEntry"/> keeps the original values and state required to
+    /// compute database updates when <c>SaveChanges</c> is invoked.
+    /// </summary>
     public class EntityEntry
     {
         private readonly TableMapping _mapping;
@@ -26,7 +31,16 @@ namespace nORM.Core
         private readonly Action<EntityEntry>? _markDirty;
         private bool _hasNotifiedChange;
 
+        /// <summary>
+        /// Gets the entity instance being tracked. May be <c>null</c> after the entity
+        /// has been detached from the context.
+        /// </summary>
         public object? Entity { get; private set; }
+
+        /// <summary>
+        /// Gets or sets the current <see cref="EntityState"/> of the tracked entity
+        /// within the context.
+        /// </summary>
         public EntityState State { get; internal set; }
         internal TableMapping Mapping => _mapping;
 
