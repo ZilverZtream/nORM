@@ -25,7 +25,15 @@ namespace nORM.Providers
     public sealed class SqlServerProvider : BulkOperationProvider
     {
         private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: 100);
+
+        /// <summary>
+        /// Maximum length of a single SQL statement supported by SQL Server.
+        /// </summary>
         public override int MaxSqlLength => 8_000;
+
+        /// <summary>
+        /// Maximum number of parameters allowed in a single SQL Server command.
+        /// </summary>
         public override int MaxParameters => 2_100;
 
         /// <summary>
@@ -261,6 +269,11 @@ END;";
                 throw new InvalidOperationException("A SqlConnection is required for SqlServerProvider.");
         }
 
+        /// <summary>
+        /// Checks whether the SQL Server provider can operate by connecting to a local instance
+        /// and verifying the server version.
+        /// </summary>
+        /// <returns><c>true</c> if SQL Server is reachable and meets the minimum version; otherwise, <c>false</c>.</returns>
         public override async Task<bool> IsAvailableAsync()
         {
             var type = Type.GetType("Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient");
@@ -287,6 +300,12 @@ END;";
             }
         }
 
+        /// <summary>
+        /// Creates a transaction savepoint using SQL Server's <see cref="SqlTransaction.Save(string)"/> API.
+        /// </summary>
+        /// <param name="transaction">The transaction on which to create the savepoint.</param>
+        /// <param name="name">Name of the savepoint.</param>
+        /// <param name="ct">Cancellation token.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             if (transaction is SqlTransaction sqlTransaction)
@@ -297,6 +316,12 @@ END;";
             throw new ArgumentException("Transaction must be a SqlTransaction.", nameof(transaction));
         }
 
+        /// <summary>
+        /// Rolls back the transaction to the specified savepoint.
+        /// </summary>
+        /// <param name="transaction">The transaction containing the savepoint.</param>
+        /// <param name="name">Name of the savepoint to roll back to.</param>
+        /// <param name="ct">Cancellation token.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             if (transaction is SqlTransaction sqlTransaction)
@@ -308,6 +333,16 @@ END;";
         }
 
         #region SQL Server Bulk Operations
+        /// <summary>
+        /// Performs a high-throughput bulk insert using the SQL Server <c>SqlBulkCopy</c> API when available,
+        /// falling back to batched inserts otherwise.
+        /// </summary>
+        /// <typeparam name="T">Entity type being inserted.</typeparam>
+        /// <param name="ctx">The <see cref="DbContext"/> driving the operation.</param>
+        /// <param name="m">Mapping metadata for the entity.</param>
+        /// <param name="entities">Entities to insert.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Total rows inserted.</returns>
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
@@ -343,6 +378,15 @@ END;";
             return totalInserted;
         }
 
+        /// <summary>
+        /// Updates multiple entities in batches using parameterized <c>UPDATE</c> statements.
+        /// </summary>
+        /// <typeparam name="T">Type of entity being updated.</typeparam>
+        /// <param name="ctx">Database context providing connection and options.</param>
+        /// <param name="m">Mapping information for the entity.</param>
+        /// <param name="entities">Entities containing updated values.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Number of rows updated.</returns>
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
@@ -409,6 +453,15 @@ END;";
             return totalInserted;
         }
 
+        /// <summary>
+        /// Deletes entities in batches using parameterized <c>DELETE</c> statements based on primary keys.
+        /// </summary>
+        /// <typeparam name="T">Type of entity to delete.</typeparam>
+        /// <param name="ctx">Active <see cref="DbContext"/>.</param>
+        /// <param name="m">Mapping describing the table and key columns.</param>
+        /// <param name="entities">Entities identifying rows to delete.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Total number of rows deleted.</returns>
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
