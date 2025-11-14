@@ -11,11 +11,13 @@ namespace nORM.Internal
     /// Concurrent LRU cache with optional TTL. Expired entries are removed on access.
     /// Eviction on insert is size-based only (no TTL prune on insert) to minimize churn in hot paths.
     /// </summary>
-    public class ConcurrentLruCache<TKey, TValue> where TKey : notnull
+    public class ConcurrentLruCache<TKey, TValue> : IDisposable where TKey : notnull
     {
         private readonly ConcurrentDictionary<TKey, LinkedListNode<CacheItem>> _cache = new();
         private readonly LinkedList<CacheItem> _lruList = new();
-        private readonly object _lock = new();
+        // PERFORMANCE FIX (TASK 2): Use ReaderWriterLockSlim for better read concurrency
+        // Multiple readers can access the LRU list simultaneously, while writes are exclusive
+        private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.NoRecursion);
 
         private int _maxSize;
         private readonly TimeSpan? _timeToLive;
@@ -43,7 +45,8 @@ namespace nORM.Internal
         public void SetMaxSize(int maxSize)
         {
             if (maxSize <= 0) throw new ArgumentOutOfRangeException(nameof(maxSize));
-            lock (_lock)
+            _lock.EnterWriteLock();
+            try
             {
                 _maxSize = maxSize;
                 while (_lruList.Count > _maxSize)
@@ -53,6 +56,10 @@ namespace nORM.Internal
                     _cache.TryRemove(last.Value.Key, out _);
                 }
             }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
         }
 
         /// <summary>
@@ -60,12 +67,17 @@ namespace nORM.Internal
         /// </summary>
         public void Clear()
         {
-            lock (_lock)
+            _lock.EnterWriteLock();
+            try
             {
                 _cache.Clear();
                 _lruList.Clear();
                 Interlocked.Exchange(ref _hits, 0);
                 Interlocked.Exchange(ref _misses, 0);
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
             }
         }
 
@@ -78,26 +90,50 @@ namespace nORM.Internal
         /// <returns><c>true</c> if the value was found in the cache; otherwise <c>false</c>.</returns>
         public bool TryGet(TKey key, out TValue value)
         {
-            // Lock-free lookup, then guarded promotion & TTL check
+            // Lock-free lookup, then upgradeable read lock for promotion & TTL check
             if (_cache.TryGetValue(key, out var node))
             {
-                lock (_lock)
+                // PERFORMANCE FIX (TASK 2): Use upgradeable read lock to allow concurrent reads
+                // while still being able to upgrade to write lock if promotion/removal is needed
+                _lock.EnterUpgradeableReadLock();
+                try
                 {
                     if (node.List != null)
                     {
                         if (!IsExpired(node.Value))
                         {
-                            _lruList.Remove(node);
-                            _lruList.AddFirst(node);
+                            // Upgrade to write lock for LRU promotion
+                            _lock.EnterWriteLock();
+                            try
+                            {
+                                _lruList.Remove(node);
+                                _lruList.AddFirst(node);
+                            }
+                            finally
+                            {
+                                _lock.ExitWriteLock();
+                            }
                             Interlocked.Increment(ref _hits);
                             value = node.Value.Value;
                             return true;
                         }
 
-                        // Expired: remove
-                        _lruList.Remove(node);
-                        _cache.TryRemove(node.Value.Key, out _);
+                        // Expired: remove (requires write lock)
+                        _lock.EnterWriteLock();
+                        try
+                        {
+                            _lruList.Remove(node);
+                            _cache.TryRemove(node.Value.Key, out _);
+                        }
+                        finally
+                        {
+                            _lock.ExitWriteLock();
+                        }
                     }
+                }
+                finally
+                {
+                    _lock.ExitUpgradeableReadLock();
                 }
             }
 
@@ -127,7 +163,8 @@ namespace nORM.Internal
         {
             var item = new CacheItem(key, value, DateTimeOffset.UtcNow, ttlOverride);
 
-            lock (_lock)
+            _lock.EnterWriteLock();
+            try
             {
                 if (_cache.TryGetValue(key, out var existing))
                 {
@@ -151,6 +188,10 @@ namespace nORM.Internal
                     _lruList.RemoveLast();
                     _cache.TryRemove(last.Value.Key, out _);
                 }
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
             }
         }
 
@@ -190,5 +231,13 @@ namespace nORM.Internal
         /// <param name="Created">Timestamp indicating when the entry was created.</param>
         /// <param name="TtlOverride">Optional TTL overriding the cache's default.</param>
         private readonly record struct CacheItem(TKey Key, TValue Value, DateTimeOffset Created, TimeSpan? TtlOverride);
+
+        /// <summary>
+        /// Disposes the cache and releases the reader-writer lock.
+        /// </summary>
+        public void Dispose()
+        {
+            _lock?.Dispose();
+        }
     }
 }

@@ -68,11 +68,24 @@ namespace nORM.Query
                 await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
                     .ConfigureAwait(false);
 
-                while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                // PERFORMANCE FIX (TASK 19): Respect SingleResult flag to avoid materializing unnecessary rows
+                if (plan.SingleResult)
                 {
-                    var entity = await plan.Materializer(reader, ct).ConfigureAwait(false);
-                    entity = ProcessEntity(entity, trackable, entityMap);
-                    list.Add(entity);
+                    if (await reader.ReadAsync(ct).ConfigureAwait(false))
+                    {
+                        var entity = await plan.Materializer(reader, ct).ConfigureAwait(false);
+                        entity = ProcessEntity(entity, trackable, entityMap);
+                        list.Add(entity);
+                    }
+                }
+                else
+                {
+                    while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                    {
+                        var entity = await plan.Materializer(reader, ct).ConfigureAwait(false);
+                        entity = ProcessEntity(entity, trackable, entityMap);
+                        list.Add(entity);
+                    }
                 }
 
                 if (plan.SplitQuery)
@@ -108,11 +121,24 @@ namespace nORM.Query
 
                 using var reader = command.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
 
-                while (reader.Read())
+                // PERFORMANCE FIX (TASK 19): Respect SingleResult flag to avoid materializing unnecessary rows
+                if (plan.SingleResult)
                 {
-                    var entity = plan.Materializer(reader, default).GetAwaiter().GetResult();
-                    entity = ProcessEntity(entity, trackable, entityMap);
-                    list.Add(entity);
+                    if (reader.Read())
+                    {
+                        var entity = plan.Materializer(reader, default).GetAwaiter().GetResult();
+                        entity = ProcessEntity(entity, trackable, entityMap);
+                        list.Add(entity);
+                    }
+                }
+                else
+                {
+                    while (reader.Read())
+                    {
+                        var entity = plan.Materializer(reader, default).GetAwaiter().GetResult();
+                        entity = ProcessEntity(entity, trackable, entityMap);
+                        list.Add(entity);
+                    }
                 }
 
                 if (plan.SplitQuery)

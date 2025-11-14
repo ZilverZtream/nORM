@@ -11,6 +11,39 @@ namespace nORM.Core
     /// <summary>
     /// Thread-safe pool managing database connections.
     /// </summary>
+    /// <remarks>
+    /// ARCHITECTURAL WARNING (TASK 5): This custom connection pool creates a second pooling layer
+    /// on top of the database provider's built-in connection pooling (ADO.NET provider pooling).
+    ///
+    /// **Double Pooling Issues:**
+    /// - SQL Server, PostgreSQL, MySQL, etc. already have efficient built-in pooling via connection strings
+    /// - Having two pooling layers leads to resource inefficiency and unpredictable behavior
+    /// - Connection limits become confusing (nORM MaxPoolSize + Provider Max Pool Size)
+    /// - Memory and handle consumption is higher than necessary
+    ///
+    /// **Recommended Approach:**
+    /// For most applications, rely solely on provider connection pooling:
+    ///
+    /// 1. **SQL Server**: Use connection string parameters (Max Pool Size, Min Pool Size, etc.)
+    ///    Example: "Server=.;Database=MyDb;Integrated Security=true;Max Pool Size=100;Min Pool Size=10;"
+    ///
+    /// 2. **PostgreSQL (Npgsql)**: Use connection string parameters (Maximum Pool Size, Minimum Pool Size)
+    ///    Example: "Host=localhost;Database=mydb;Maximum Pool Size=100;Minimum Pool Size=10;"
+    ///
+    /// 3. **MySQL**: Use connection string parameters (Maximum Pool Size, Minimum Pool Size)
+    ///    Example: "Server=localhost;Database=mydb;Maximum Pool Size=100;Minimum Pool Size=10;"
+    ///
+    /// **When Custom Pooling Might Be Useful:**
+    /// - Multi-tenant scenarios with many different connection strings (provider pooling per connection string)
+    /// - Read replica load balancing (see <see cref="ConnectionManager"/>)
+    /// - Explicit memory-aware connection limiting across multiple databases
+    ///
+    /// **Migration Path:**
+    /// Consider refactoring to use provider pooling directly and remove this custom layer.
+    /// The ConnectionManager class is better suited for topology-aware scenarios (read replicas, failover).
+    /// </remarks>
+    [Obsolete("Consider using provider-level connection pooling instead of custom pooling to avoid double-pooling overhead. " +
+              "Configure pooling via connection string parameters. This class will be evaluated for deprecation in future versions.")]
     public sealed class ConnectionPool : IAsyncDisposable, IDisposable
     {
         private readonly Func<DbConnection> _connectionFactory;
@@ -25,6 +58,9 @@ namespace nORM.Core
 
         // ADD: reentrancy guard for CleanupCallback (fixes CS0103)
         private int _cleanupRunning;
+
+        // PERFORMANCE FIX (TASK 4): Async synchronization primitive to avoid polling
+        private readonly SemaphoreSlim _availableSemaphore;
 
 
 
@@ -56,6 +92,9 @@ namespace nORM.Core
             _minSize = opts.MinPoolSize;
             _maxSize = opts.MaxPoolSize;
             _idleLifetime = opts.ConnectionIdleLifetime;
+
+            // PERFORMANCE FIX (TASK 4): Initialize semaphore for wait-free connection availability signaling
+            _availableSemaphore = new SemaphoreSlim(_maxSize, _maxSize);
 
             // Pre-warm
             if (_minSize > 0)
@@ -114,6 +153,8 @@ namespace nORM.Core
                         {
                             item.Connection.Dispose();
                             Interlocked.Decrement(ref _created);
+                            // Signal that a connection slot is available again
+                            _availableSemaphore.Release();
                             continue;
                         }
                     }
@@ -129,6 +170,8 @@ namespace nORM.Core
                     {
                         try
                         {
+                            // Acquire semaphore slot before creating connection
+                            await _availableSemaphore.WaitAsync(ct).ConfigureAwait(false);
                             var cn = _connectionFactory();
                             await cn.OpenAsync(ct).ConfigureAwait(false);
                             return cn;
@@ -136,6 +179,7 @@ namespace nORM.Core
                         catch
                         {
                             Interlocked.Decrement(ref _created);
+                            _availableSemaphore.Release();
                             throw;
                         }
                     }
@@ -143,8 +187,9 @@ namespace nORM.Core
                     Interlocked.Decrement(ref _created);
                 }
 
-                // Otherwise, wait for someone to return
-                await Task.Delay(10, ct).ConfigureAwait(false);
+                // PERFORMANCE FIX (TASK 4): Wait efficiently instead of polling with Task.Delay
+                // Park the thread until a connection is returned to the pool
+                await _availableSemaphore.WaitAsync(ct).ConfigureAwait(false);
             }
         }
 
@@ -160,6 +205,8 @@ namespace nORM.Core
             try
             {
                 _pool.Enqueue(new PooledItem(connection) { LastUsed = DateTime.UtcNow });
+                // PERFORMANCE FIX (TASK 4): Signal waiting threads that a connection is available
+                _availableSemaphore.Release();
             }
             finally
             {
@@ -242,6 +289,8 @@ namespace nORM.Core
                 try { item.Connection.Dispose(); } catch { }
             }
             _semaphore.Dispose();
+            // PERFORMANCE FIX (TASK 4): Dispose the availability semaphore
+            _availableSemaphore.Dispose();
         }
 
         /// <summary>
