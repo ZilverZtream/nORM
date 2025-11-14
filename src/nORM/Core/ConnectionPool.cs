@@ -26,6 +26,9 @@ namespace nORM.Core
         // ADD: reentrancy guard for CleanupCallback (fixes CS0103)
         private int _cleanupRunning;
 
+        // PERFORMANCE FIX (TASK 4): Async synchronization primitive to avoid polling
+        private readonly SemaphoreSlim _availableSemaphore;
+
 
 
         private sealed class PooledItem
@@ -56,6 +59,9 @@ namespace nORM.Core
             _minSize = opts.MinPoolSize;
             _maxSize = opts.MaxPoolSize;
             _idleLifetime = opts.ConnectionIdleLifetime;
+
+            // PERFORMANCE FIX (TASK 4): Initialize semaphore for wait-free connection availability signaling
+            _availableSemaphore = new SemaphoreSlim(_maxSize, _maxSize);
 
             // Pre-warm
             if (_minSize > 0)
@@ -114,6 +120,8 @@ namespace nORM.Core
                         {
                             item.Connection.Dispose();
                             Interlocked.Decrement(ref _created);
+                            // Signal that a connection slot is available again
+                            _availableSemaphore.Release();
                             continue;
                         }
                     }
@@ -129,6 +137,8 @@ namespace nORM.Core
                     {
                         try
                         {
+                            // Acquire semaphore slot before creating connection
+                            await _availableSemaphore.WaitAsync(ct).ConfigureAwait(false);
                             var cn = _connectionFactory();
                             await cn.OpenAsync(ct).ConfigureAwait(false);
                             return cn;
@@ -136,6 +146,7 @@ namespace nORM.Core
                         catch
                         {
                             Interlocked.Decrement(ref _created);
+                            _availableSemaphore.Release();
                             throw;
                         }
                     }
@@ -143,8 +154,9 @@ namespace nORM.Core
                     Interlocked.Decrement(ref _created);
                 }
 
-                // Otherwise, wait for someone to return
-                await Task.Delay(10, ct).ConfigureAwait(false);
+                // PERFORMANCE FIX (TASK 4): Wait efficiently instead of polling with Task.Delay
+                // Park the thread until a connection is returned to the pool
+                await _availableSemaphore.WaitAsync(ct).ConfigureAwait(false);
             }
         }
 
@@ -160,6 +172,8 @@ namespace nORM.Core
             try
             {
                 _pool.Enqueue(new PooledItem(connection) { LastUsed = DateTime.UtcNow });
+                // PERFORMANCE FIX (TASK 4): Signal waiting threads that a connection is available
+                _availableSemaphore.Release();
             }
             finally
             {
@@ -242,6 +256,8 @@ namespace nORM.Core
                 try { item.Connection.Dispose(); } catch { }
             }
             _semaphore.Dispose();
+            // PERFORMANCE FIX (TASK 4): Dispose the availability semaphore
+            _availableSemaphore.Dispose();
         }
 
         /// <summary>
