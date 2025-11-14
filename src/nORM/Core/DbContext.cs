@@ -396,6 +396,13 @@ namespace nORM.Core
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>The total number of state entries written to the database.</returns>
+        /// <remarks>
+        /// PERFORMANCE WARNING (TASK 12): This method automatically calls DetectChanges() which
+        /// performs snapshot-based comparison of ALL tracked entities. Avoid calling SaveChanges()
+        /// in tight loops with many tracked entities. For bulk operations, use InsertBulkAsync()
+        /// or UpdateBulkAsync() instead. For read-only queries, use AsNoTracking() to avoid
+        /// change tracking overhead entirely.
+        /// </remarks>
         public Task<int> SaveChangesAsync(CancellationToken ct = default)
             => SaveChangesWithRetryAsync(ct);
 
