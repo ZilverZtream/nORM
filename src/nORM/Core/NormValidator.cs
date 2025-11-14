@@ -212,6 +212,201 @@ namespace nORM.Core
 
             if (parameters != null && parameters.Count > MaxParameterCount)
                 throw new ArgumentException($"Parameter count {parameters.Count} exceeds maximum of {MaxParameterCount}");
+
+            // SECURITY FIX (TASK 6): Enhanced SQL injection detection
+            // Check for common injection patterns that bypass keyword detection
+            DetectInjectionPatterns(sql, parameters);
+        }
+
+        /// <summary>
+        /// Detects common SQL injection patterns in raw SQL, including UNION attacks,
+        /// comment-based injection, and embedded quotes without proper parameterization.
+        /// SECURITY FIX (TASK 6): Added comprehensive injection pattern detection.
+        /// </summary>
+        /// <param name="sql">SQL string to validate.</param>
+        /// <param name="parameters">Optional parameters dictionary.</param>
+        /// <exception cref="NormUsageException">Thrown when suspicious patterns are detected.</exception>
+        private static void DetectInjectionPatterns(string sql, IReadOnlyDictionary<string, object>? parameters)
+        {
+            var upperSql = sql.ToUpperInvariant();
+
+            // Pattern 1: UNION-based injection attempts
+            // Look for UNION SELECT that's not in a legitimate subquery context
+            if (upperSql.Contains("UNION") && upperSql.Contains("SELECT"))
+            {
+                // Allow legitimate UNION queries but check for suspicious patterns
+                var unionIndex = upperSql.IndexOf("UNION");
+                var beforeUnion = upperSql.Substring(0, unionIndex);
+
+                // Suspicious if there's a single quote near UNION (likely injected)
+                if (beforeUnion.LastIndexOf('\'') > Math.Max(beforeUnion.LastIndexOf("WHERE"), 0))
+                {
+                    throw new NormUsageException(
+                        "Potential SQL injection detected: UNION with embedded quotes. " +
+                        "Use parameterized queries instead of string concatenation.");
+                }
+            }
+
+            // Pattern 2: Comment-based injection (-- or /* */)
+            // These can be used to terminate legitimate SQL and inject malicious code
+            var doubleHyphenIndex = sql.IndexOf("--");
+            if (doubleHyphenIndex >= 0)
+            {
+                // Allow if it's in a string literal or legitimate comment at end
+                var beforeComment = sql.Substring(0, doubleHyphenIndex);
+                var singleQuoteCount = beforeComment.Count(c => c == '\'');
+
+                // If odd number of quotes, we're inside a string (allowed)
+                // Otherwise it's a comment in SQL code (suspicious)
+                if (singleQuoteCount % 2 == 0 && doubleHyphenIndex < sql.Length - 10)
+                {
+                    throw new NormUsageException(
+                        "Potential SQL injection detected: SQL comment (--) in suspicious context. " +
+                        "If this is legitimate, consider using /* */ style comments.");
+                }
+            }
+
+            // Pattern 3: Block comments used for injection
+            if (sql.Contains("/*") && sql.Contains("*/"))
+            {
+                var commentStart = sql.IndexOf("/*");
+                var commentEnd = sql.IndexOf("*/", commentStart);
+
+                // Check if there are suspicious keywords inside the comment
+                var commentContent = sql.Substring(commentStart + 2, commentEnd - commentStart - 2).ToUpperInvariant();
+                if (commentContent.Contains("UNION") || commentContent.Contains("SELECT") ||
+                    commentContent.Contains("INSERT") || commentContent.Contains("DELETE"))
+                {
+                    throw new NormUsageException(
+                        "Potential SQL injection detected: SQL keywords inside block comment. " +
+                        "This pattern is commonly used in injection attacks.");
+                }
+            }
+
+            // Pattern 4: Embedded quotes without proper parameterization
+            // Count parameter markers (@, $, :) and compare with quote usage
+            var paramMarkerCount = CountParameterMarkers(sql);
+            var whereIndex = upperSql.IndexOf("WHERE");
+
+            if (whereIndex >= 0)
+            {
+                var wherePart = sql.Substring(whereIndex);
+                var singleQuotes = wherePart.Count(c => c == '\'');
+
+                // If there are quotes in WHERE clause but no parameters passed, suspicious
+                if (singleQuotes >= 2 && (parameters == null || parameters.Count == 0) && paramMarkerCount == 0)
+                {
+                    // Exception: allow simple constant queries like WHERE Status = 'Active'
+                    // But warn if the value looks dynamic (contains spaces, numbers suggesting user input)
+                    if (ContainsSuspiciousLiteralPattern(wherePart))
+                    {
+                        throw new NormUsageException(
+                            "Potential SQL injection detected: WHERE clause with string literals but no parameters. " +
+                            "Use parameterized queries (e.g., WHERE Name = @name) instead of embedding values directly. " +
+                            "If this query uses only constant values, add a comment to document this.");
+                    }
+                }
+            }
+
+            // Pattern 5: Semicolon-based multi-statement injection
+            var semicolonCount = sql.Count(c => c == ';');
+            if (semicolonCount > 1)
+            {
+                // Multiple statements can be legitimate (batching) but check context
+                var statements = sql.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var stmt in statements)
+                {
+                    var trimmed = stmt.Trim().ToUpperInvariant();
+                    // If any statement is DDL or system procedure, it's suspicious in this context
+                    if (trimmed.StartsWith("DROP ") || trimmed.StartsWith("ALTER ") ||
+                        trimmed.StartsWith("CREATE ") || trimmed.StartsWith("EXEC "))
+                    {
+                        throw new NormUsageException(
+                            "Potential SQL injection detected: Multiple statements with DDL/EXEC commands. " +
+                            "FromSqlRaw should only execute SELECT queries, not administrative commands.");
+                    }
+                }
+            }
+
+            // Pattern 6: Encoding-based attacks (char/varchar/nchar concatenation)
+            if (upperSql.Contains("CHAR(") && (upperSql.Contains("+") || upperSql.Contains("||")))
+            {
+                throw new NormUsageException(
+                    "Potential SQL injection detected: CHAR() concatenation often used to obfuscate injection. " +
+                    "If this is legitimate, use stored procedures or refactor the query.");
+            }
+        }
+
+        /// <summary>
+        /// Counts parameter markers in SQL string (@, $, :) to detect if parameterization is used.
+        /// </summary>
+        private static int CountParameterMarkers(string sql)
+        {
+            var count = 0;
+            for (int i = 0; i < sql.Length - 1; i++)
+            {
+                var c = sql[i];
+                var next = sql[i + 1];
+
+                // Parameter marker followed by alphanumeric or underscore
+                if ((c == '@' || c == '$' || c == ':') && (char.IsLetterOrDigit(next) || next == '_'))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Checks if a WHERE clause contains suspicious literal patterns that suggest
+        /// concatenated user input rather than legitimate constants.
+        /// </summary>
+        private static bool ContainsSuspiciousLiteralPattern(string wherePart)
+        {
+            // Extract string literals (content between quotes)
+            var literals = new List<string>();
+            var inString = false;
+            var currentLiteral = new System.Text.StringBuilder();
+
+            for (int i = 0; i < wherePart.Length; i++)
+            {
+                if (wherePart[i] == '\'')
+                {
+                    if (inString)
+                    {
+                        literals.Add(currentLiteral.ToString());
+                        currentLiteral.Clear();
+                    }
+                    inString = !inString;
+                }
+                else if (inString)
+                {
+                    currentLiteral.Append(wherePart[i]);
+                }
+            }
+
+            // Check each literal for suspicious patterns
+            foreach (var literal in literals)
+            {
+                // Suspicious: email-like pattern (user@domain)
+                if (literal.Contains('@') && literal.Contains('.'))
+                    return true;
+
+                // Suspicious: URL-like pattern
+                if (literal.Contains("://") || literal.StartsWith("http"))
+                    return true;
+
+                // Suspicious: very long strings (likely user input, not constants)
+                if (literal.Length > 50)
+                    return true;
+
+                // Suspicious: mix of special characters suggesting user input
+                var specialCharCount = literal.Count(c => !char.IsLetterOrDigit(c) && c != ' ' && c != '_' && c != '-');
+                if (specialCharCount > 3)
+                    return true;
+            }
+
+            return false;
         }
 
         internal static bool IsSafeRawSql(string sql)

@@ -9,6 +9,53 @@ namespace nORM.Query
     /// Responsible for constructing SQL JOIN clauses and managing join specific
     /// projection setup. Extracted from <see cref="QueryTranslator"/>.
     /// </summary>
+    /// <remarks>
+    /// ARCHITECTURAL WARNING (TASK 13): Anonymous type projection parsing is fragile.
+    ///
+    /// **Current Limitations:**
+    /// The <see cref="ExtractNeededColumns"/> method makes simplifying assumptions that break
+    /// with complex LINQ projections:
+    ///
+    /// 1. **Simple Pattern Matching Only:**
+    ///    - Only handles MemberExpression with ParameterExpression (e.g., `x => x.Name`)
+    ///    - Only handles full ParameterExpression (e.g., `x => x`)
+    ///    - Fails silently for anything else (returns empty list, falls back to ALL columns)
+    ///
+    /// 2. **No Nested Anonymous Type Support:**
+    ///    - Doesn't handle transparent identifiers from multiple Select() chains
+    ///    - Example: `query.Select(x => new { x.Id }).Select(y => new { y.Id, Computed = y.Id * 2 })`
+    ///    - Compiler generates `<>h__TransparentIdentifier0` which isn't recognized
+    ///
+    /// 3. **No Computed/Method Call Handling:**
+    ///    - Doesn't parse method calls: `new { Upper = x.Name.ToUpper() }`
+    ///    - Doesn't parse binary operations: `new { Total = x.Price * x.Quantity }`
+    ///    - These patterns fall through to "select all columns" fallback
+    ///
+    /// 4. **String-Based Name Lookup:**
+    ///    - Uses `ColumnsByName.TryGetValue(memberExpr.Member.Name)` (line 104)
+    ///    - Case-sensitive, brittle to renamed properties or aliasing
+    ///    - No normalization or fallback strategies
+    ///
+    /// **Recommended Refactoring:**
+    /// Replace pattern matching with a proper expression tree analyzer:
+    ///
+    /// - Use ExpressionVisitor pattern to recursively analyze projection trees
+    /// - Build dependency graph of required columns for computed expressions
+    /// - Handle nested anonymous types by tracking transparent identifier chains
+    /// - Use type metadata instead of string matching for column resolution
+    /// - Emit computed expressions as SQL (e.g., UPPER([Name]), [Price] * [Quantity])
+    ///
+    /// **Current Workaround:**
+    /// When ExtractNeededColumns returns empty list (line 30), code falls back to selecting
+    /// ALL columns from both tables, which works but is inefficient for wide tables.
+    ///
+    /// **Migration Complexity:**
+    /// This is a major architectural change requiring:
+    /// - ~500 LOC for proper expression tree analysis
+    /// - Extensive testing of projection combinations
+    /// - SQL generation for computed expressions
+    /// - Proper escaping and type conversion handling
+    /// </remarks>
     internal static class JoinBuilder
     {
         public static string BuildJoinClause(
@@ -89,18 +136,36 @@ namespace nORM.Query
         /// <param name="outerAlias">Alias used for the outer table in the SQL query.</param>
         /// <param name="innerAlias">Alias used for the inner table in the SQL query.</param>
         /// <returns>A list of fully-qualified column names that must be selected.</returns>
+        /// <remarks>
+        /// LIMITATION (TASK 13): This method only handles trivial projections.
+        ///
+        /// **Supported Patterns:**
+        /// - `new { x.Name, x.Id }` - Simple member access
+        /// - `new { x, y }` - Full entity projections
+        ///
+        /// **Unsupported Patterns (returns empty list, causing ALL columns fallback):**
+        /// - `new { Upper = x.Name.ToUpper() }` - Method calls
+        /// - `new { Total = x.Price * x.Quantity }` - Computed expressions
+        /// - `new { x.Id, Nested = new { x.Name } }` - Nested anonymous types
+        /// - Transparent identifiers from chained Select() operations
+        ///
+        /// When this returns empty, caller selects ALL columns from both tables (inefficient).
+        /// </remarks>
         public static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
         {
             var neededColumns = new List<string>();
 
             foreach (var arg in newExpr.Arguments)
             {
+                // LIMITATION (TASK 13): Only handles MemberExpression with ParameterExpression
+                // Fails for: method calls, binary ops, nested anonymous types, etc.
                 if (arg is MemberExpression memberExpr && memberExpr.Expression is ParameterExpression paramExpr)
                 {
                     var isOuterTable = paramExpr.Type == outerMapping.Type;
                     var mapping = isOuterTable ? outerMapping : innerMapping;
                     var alias = isOuterTable ? outerAlias : innerAlias;
 
+                    // LIMITATION (TASK 13): String-based name lookup, case-sensitive, no normalization
                     if (mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
                     {
                         var colSql = $"{alias}.{column.EscCol}";
@@ -110,6 +175,7 @@ namespace nORM.Query
                 }
                 else if (arg is ParameterExpression param)
                 {
+                    // Only handles full entity projection (e.g., x => x)
                     var isOuter = param.Type == outerMapping.Type;
                     var mapping = isOuter ? outerMapping : innerMapping;
                     var alias = isOuter ? outerAlias : innerAlias;
@@ -120,6 +186,8 @@ namespace nORM.Query
                             neededColumns.Add(colSql);
                     }
                 }
+                // LIMITATION (TASK 13): All other expression types are silently ignored
+                // Causes empty return, triggering "select all columns" fallback
             }
 
             return neededColumns;
