@@ -229,7 +229,9 @@ namespace nORM.SourceGenerators
             foreach (var p in queryParams)
             {
                 sb.AppendLine($"        var p_{p.Name} = cmd.CreateParameter();");
-                sb.AppendLine($"        p_{p.Name}.ParameterName = \"@{p.Name}\";");
+                // DIALECT FIX (TASK 8): Use provider's parameter prefix instead of hard-coding "@"
+                // Different databases use different prefixes: SQL Server (@), PostgreSQL ($), Oracle (:)
+                sb.AppendLine($"        p_{p.Name}.ParameterName = $\"{{{ctxParam}.Provider.ParamPrefix}}{p.Name}\";");
                 sb.AppendLine($"        p_{p.Name}.Value = {GetParameterValueExpression(p)};");
                 sb.AppendLine($"        cmd.Parameters.Add(p_{p.Name});");
             }
