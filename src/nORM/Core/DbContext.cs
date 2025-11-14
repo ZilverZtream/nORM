@@ -476,11 +476,19 @@ namespace nORM.Core
                     var batchSize = CalculateBatchSize(entries.Count, paramsPerEntity);
                     var templateLength = EstimateTemplateLength(state, map);
 
+                    // PERFORMANCE FIX (TASK 14): Reuse DbCommand and StringBuilder across batches
+                    // Instead of creating 100 DbCommand and StringBuilder for 10k entities in batches of 100,
+                    // create ONE of each and clear/reset them between batches
+                    await using var cmd = commandScope.CreateCommand();
+                    var sql = new StringBuilder(templateLength * batchSize);
+
                     for (int start = 0; start < entries.Count; start += batchSize)
                     {
                         var batch = entries.Skip(start).Take(Math.Min(batchSize, entries.Count - start)).ToList();
-                        await using var cmd = commandScope.CreateCommand();
-                        var sql = new StringBuilder(templateLength * batch.Count);
+                        // Clear for reuse
+                        sql.Clear();
+                        cmd.Parameters.Clear();
+
                         switch (state)
                         {
                             case EntityState.Added:
