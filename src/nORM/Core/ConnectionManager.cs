@@ -14,6 +14,18 @@ namespace nORM.Core
     /// <summary>
     /// Provides connection management with support for read replicas and failover.
     /// </summary>
+    /// <remarks>
+    /// NOTE (TASK 5): ConnectionManager uses <see cref="ConnectionPool"/> internally for managing
+    /// connections to multiple database nodes (primary + read replicas). This is one of the legitimate
+    /// use cases for custom pooling, as it enables:
+    /// - Round-robin load balancing across read replicas
+    /// - Automatic failover when a node becomes unhealthy
+    /// - Per-node connection pooling with different connection strings
+    ///
+    /// However, be aware that provider-level pooling (in the connection string) still applies,
+    /// creating a two-tier pooling architecture. For simple single-database scenarios without
+    /// read replicas, prefer using DbContext directly with provider pooling only.
+    /// </remarks>
     public class ConnectionManager : IDisposable
     {
         private readonly DatabaseTopology _topology;
