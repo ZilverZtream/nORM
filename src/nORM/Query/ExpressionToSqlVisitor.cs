@@ -35,13 +35,8 @@ namespace nORM.Query
         private readonly Dictionary<ConstKey, string> _constParamMap = new();
         private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
         private static readonly Expression _emptyExpression = Expression.Empty();
-        private static readonly FrozenDictionary<string, IMethodTranslator> _translators =
-            new Dictionary<string, IMethodTranslator>
-            {
-                ["Contains"] = new ContainsTranslator(),
-                ["StartsWith"] = new StartsWithTranslator(),
-                ["EndsWith"] = new EndsWithTranslator()
-            }.ToFrozenDictionary(StringComparer.Ordinal);
+        // REFACTOR (TASK 16): Consolidated string method translation. Removed redundant _translators dictionary.
+        // All string methods (Contains, StartsWith, EndsWith) are now handled via _fastMethodHandlers for better performance.
         private static readonly Dictionary<MethodInfo, Action<ExpressionToSqlVisitor, MethodCallExpression>> _fastMethodHandlers =
             new()
             {
@@ -262,11 +257,7 @@ namespace nORM.Query
                     throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "JSONPath argument in Json.Value must be a constant string."));
                 }
             }
-            if (_translators.TryGetValue(node.Method.Name, out var translator) && translator.CanTranslate(node))
-            {
-                translator.Translate(this, node);
-                return node;
-            }
+            // REFACTOR (TASK 16): Removed redundant _translators check. String methods handled by _fastMethodHandlers.
             if (node.Method.DeclaringType == typeof(string))
             {
                 var strArgs = new List<string>();
@@ -655,25 +646,9 @@ namespace nORM.Query
                         return true;
                     }
                     break;
-                case MethodCallExpression mce:
-                    object? instance = null;
-                    if (mce.Object != null && !TryGetConstantValue(mce.Object, out instance, visited))
-                    {
-                        value = null;
-                        return false;
-                    }
-                    var args = new object?[mce.Arguments.Count];
-                    for (int i = 0; i < mce.Arguments.Count; i++)
-                    {
-                        if (!TryGetConstantValue(mce.Arguments[i], out var argVal, visited))
-                        {
-                            value = null;
-                            return false;
-                        }
-                        args[i] = argVal;
-                    }
-                    value = mce.Method.Invoke(instance, args);
-                    return true;
+                // SECURITY FIX (TASK 1): Removed MethodCallExpression handling to prevent RCE.
+                // Method calls should be translated to SQL (e.g., string.Contains) or throw NotSupportedException.
+                // Executing arbitrary user code via Invoke() is a critical security vulnerability.
             }
             value = null;
             return false;
@@ -738,129 +713,9 @@ namespace nORM.Query
                 throw new NotSupportedException("Only constant values are supported in EndsWith().");
             }
         }
-        private interface IMethodTranslator
-        {
-            bool CanTranslate(MethodCallExpression node);
-            void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node);
-        }
-        private sealed class ContainsTranslator : IMethodTranslator
-        {
-            /// <summary>
-            /// Determines whether the supplied <see cref="MethodCallExpression"/>
-            /// represents a string <c>Contains</c> call that can be translated to
-            /// a SQL <c>LIKE</c> expression.
-            /// </summary>
-            /// <param name="node">The expression to inspect.</param>
-            /// <returns>
-            /// <c>true</c> if the method call is <c>string.Contains</c> with a
-            /// single argument; otherwise, <c>false</c>.
-            /// </returns>
-            public bool CanTranslate(MethodCallExpression node)
-                => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
-
-            /// <summary>
-            /// Converts a <c>string.Contains</c> call into a SQL <c>LIKE</c>
-            /// expression and appends it to the visitor's SQL buffer.
-            /// </summary>
-            /// <param name="visitor">The visitor responsible for building the SQL.</param>
-            /// <param name="node">The method call expression to translate.</param>
-            /// <exception cref="NotSupportedException">
-            /// Thrown when the <c>Contains</c> argument is not a constant string.
-            /// </exception>
-            public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
-            {
-                visitor.Visit(node.Object!);
-                visitor._sql.Append(" LIKE ");
-                if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
-                {
-                    var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                    visitor.AppendConstant(visitor.CreateSafeLikePattern(cs, LikeOperation.Contains), typeof(string));
-                    visitor._sql.Append($" ESCAPE '{escChar}'");
-                }
-                else
-                {
-                    throw new NotSupportedException("Only constant values are supported in Contains().");
-                }
-            }
-        }
-        private sealed class StartsWithTranslator : IMethodTranslator
-        {
-            /// <summary>
-            /// Determines whether the given expression is a translatable
-            /// <c>string.StartsWith</c> invocation.
-            /// </summary>
-            /// <param name="node">The method call expression to examine.</param>
-            /// <returns>
-            /// <c>true</c> when the method is <c>string.StartsWith</c> with one
-            /// argument; otherwise, <c>false</c>.
-            /// </returns>
-            public bool CanTranslate(MethodCallExpression node)
-                => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
-
-            /// <summary>
-            /// Writes a SQL <c>LIKE</c> clause that emulates
-            /// <c>string.StartsWith</c> behavior.
-            /// </summary>
-            /// <param name="visitor">The visitor accumulating the SQL output.</param>
-            /// <param name="node">The <see cref="MethodCallExpression"/> to translate.</param>
-            /// <exception cref="NotSupportedException">
-            /// Thrown when the provided prefix is not a constant string value.
-            /// </exception>
-            public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
-            {
-                visitor.Visit(node.Object!);
-                visitor._sql.Append(" LIKE ");
-                if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
-                {
-                    var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                    visitor.AppendConstant(visitor.CreateSafeLikePattern(ss, LikeOperation.StartsWith), typeof(string));
-                    visitor._sql.Append($" ESCAPE '{escChar}'");
-                }
-                else
-                {
-                    throw new NotSupportedException("Only constant values are supported in StartsWith().");
-                }
-            }
-        }
-        private sealed class EndsWithTranslator : IMethodTranslator
-        {
-            /// <summary>
-            /// Checks if a method call corresponds to a translatable
-            /// <c>string.EndsWith</c> invocation.
-            /// </summary>
-            /// <param name="node">The call expression to verify.</param>
-            /// <returns>
-            /// <c>true</c> when the call is <c>string.EndsWith</c> with a single
-            /// argument; otherwise, <c>false</c>.
-            /// </returns>
-            public bool CanTranslate(MethodCallExpression node)
-                => node.Method.DeclaringType == typeof(string) && node.Arguments.Count == 1;
-
-            /// <summary>
-            /// Translates a <c>string.EndsWith</c> call into the appropriate SQL
-            /// <c>LIKE</c> pattern and appends it to the visitor.
-            /// </summary>
-            /// <param name="visitor">The visitor generating SQL output.</param>
-            /// <param name="node">The <see cref="MethodCallExpression"/> to translate.</param>
-            /// <exception cref="NotSupportedException">
-            /// Thrown when the suffix argument is not a constant string.
-            /// </exception>
-            public void Translate(ExpressionToSqlVisitor visitor, MethodCallExpression node)
-            {
-                visitor.Visit(node.Object!);
-                visitor._sql.Append(" LIKE ");
-                if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
-                {
-                    var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                    visitor.AppendConstant(visitor.CreateSafeLikePattern(es, LikeOperation.EndsWith), typeof(string));
-                    visitor._sql.Append($" ESCAPE '{escChar}'");
-                }
-                else
-                {
-                    throw new NotSupportedException("Only constant values are supported in EndsWith().");
-                }
-            }
-        }
+        // REFACTOR (TASK 16): Removed redundant IMethodTranslator interface and translator classes.
+        // ContainsTranslator, StartsWithTranslator, and EndsWithTranslator were duplicate logic.
+        // String methods are now exclusively handled by _fastMethodHandlers for better performance.
 
         /// <summary>
         /// Directs the visitor to use the provided dictionary for parameter

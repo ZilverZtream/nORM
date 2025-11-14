@@ -196,18 +196,11 @@ namespace nORM.Core
         }
         internal TimeSpan GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType operationType, string? sql = null, int recordCount = 1)
         {
-            var complexity = EstimateQueryComplexity(sql);
-            return _timeoutManager.GetTimeoutForOperation(operationType, recordCount, complexity);
-        }
-
-        private static readonly Regex JoinRegex = new(@"\bJOIN\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex SelectRegex = new(@"\bSELECT\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static int EstimateQueryComplexity(string? sql)
-        {
-            if (string.IsNullOrWhiteSpace(sql)) return 1;
-            var joinCount = JoinRegex.Matches(sql).Count;
-            var subQueryCount = Math.Max(0, SelectRegex.Matches(sql).Count - 1);
-            return joinCount * 1000 + subQueryCount * 500;
+            // PERFORMANCE FIX (TASK 10): Removed naive regex-based complexity estimation.
+            // Real complexity requires full SQL parsing. Instead, rely on operationType and historical
+            // performance tracking by the AdaptiveTimeoutManager.
+            const int baseComplexity = 1;
+            return _timeoutManager.GetTimeoutForOperation(operationType, recordCount, baseComplexity);
         }
 
         /// <summary>
@@ -1359,6 +1352,10 @@ namespace nORM.Core
                 var outputParamMap = new Dictionary<string, DbParameter>();
                 foreach (var op in outputParameters)
                 {
+                    // SECURITY FIX (TASK 20): Validate parameter name to prevent SQL injection
+                    if (!IsSafeIdentifier(op.Name))
+                        throw new NormUsageException($"Invalid output parameter name: '{op.Name}'. " +
+                            "Parameter names must contain only alphanumeric characters, underscores, and periods.");
                     var pName = _p.ParamPrefix + op.Name;
                     var p = cmd.CreateParameter();
                     p.ParameterName = pName;
@@ -1402,16 +1399,13 @@ namespace nORM.Core
             if (tenantId == null)
                 throw new InvalidOperationException("Tenant context required but not available");
             var entityTenant = tenantCol.Getter(entity);
+            // SECURITY FIX (TASK 18): Changed auto-injection to throw exception.
+            // Auto-injecting tenant ID is dangerous - developers might intend null for global records.
+            // Requiring explicit tenant ID setting prevents accidental data leakage.
             if (entityTenant == null)
             {
-                if (operation == WriteOperation.Insert)
-                {
-                    tenantCol.Setter(entity, tenantId);
-                }
-                else
-                {
-                    throw new InvalidOperationException("Tenant context required but not available");
-                }
+                throw new InvalidOperationException($"Tenant ID is required for {operation} operation but was null. " +
+                    "Explicitly set the tenant ID on the entity before saving. Auto-injection has been disabled for security.");
             }
             else if (!Equals(entityTenant, tenantId))
             {
@@ -1471,7 +1465,15 @@ namespace nORM.Core
         {
             if (!_disposed && disposing)
             {
-                _cleanupTimer?.Dispose();
+                // RESOURCE LEAK FIX (TASK 15): Use Dispose(WaitHandle) to ensure timer callbacks complete
+                // before proceeding. This prevents ObjectDisposedException if callback is running.
+                if (_cleanupTimer != null)
+                {
+                    var waitHandle = new ManualResetEvent(false);
+                    _cleanupTimer.Dispose(waitHandle);
+                    waitHandle.WaitOne();
+                    waitHandle.Dispose();
+                }
                 _providerInitLock?.Dispose();
                 lock (_disposablesLock)
                 {

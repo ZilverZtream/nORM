@@ -34,6 +34,8 @@ namespace nORM.Core
         private int _readReplicaIndex;
 
         private readonly object _circuitBreakerLock = new();
+        // RACE CONDITION FIX (TASK 11): Lock for safe access to _availableReadReplicas
+        private readonly object _replicaListLock = new();
         private int _consecutiveFailures;
         private DateTime _nextRetry = DateTime.MinValue;
         private readonly TimeSpan _baseDelay = TimeSpan.FromSeconds(1);
@@ -114,10 +116,14 @@ namespace nORM.Core
         /// </summary>
         private void UpdateAvailableReadReplicas()
         {
-            _availableReadReplicas = _topology.Nodes
-                .Where(n => n.Role == DatabaseTopology.DatabaseRole.ReadReplica && n.IsHealthy)
-                .OrderBy(n => n.Priority)
-                .ToList();
+            // RACE CONDITION FIX (TASK 11): Synchronize write to _availableReadReplicas
+            lock (_replicaListLock)
+            {
+                _availableReadReplicas = _topology.Nodes
+                    .Where(n => n.Role == DatabaseTopology.DatabaseRole.ReadReplica && n.IsHealthy)
+                    .OrderBy(n => n.Priority)
+                    .ToList();
+            }
         }
 
         /// <summary>
@@ -153,12 +159,30 @@ namespace nORM.Core
             }
             catch (OperationCanceledException)
             {
+                // CIRCUIT BREAKER FIX (TASK 17): Don't trip circuit breaker on timeout/cancellation.
+                // Timeout is a query-level issue, not a connection-level failure.
+                throw;
+            }
+            catch (DbException ex)
+            {
+                // CIRCUIT BREAKER FIX (TASK 17): Only trip on connection-level DB exceptions
+                RegisterFailure();
+                _logger.LogError(ex, "Failed to acquire write connection due to database error");
+                throw;
+            }
+            catch (Exception ex) when (ex.Message.Contains("network", StringComparison.OrdinalIgnoreCase) ||
+                                       ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
+                                       ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase))
+            {
+                // CIRCUIT BREAKER FIX (TASK 17): Trip on network/connection-related exceptions
+                RegisterFailure();
+                _logger.LogError(ex, "Failed to acquire write connection due to network/connection issue");
                 throw;
             }
             catch (Exception ex)
             {
-                RegisterFailure();
-                _logger.LogError(ex, "Failed to acquire write connection");
+                // Other exceptions (e.g., application errors) don't trip the circuit breaker
+                _logger.LogError(ex, "Failed to acquire write connection (non-connection error)");
                 throw;
             }
         }
@@ -171,7 +195,12 @@ namespace nORM.Core
         /// <returns>An open <see cref="DbConnection"/> suitable for read operations.</returns>
         public async Task<DbConnection> GetReadConnectionAsync(CancellationToken ct = default)
         {
-            var replicas = _availableReadReplicas;
+            // RACE CONDITION FIX (TASK 11): Synchronize read of _availableReadReplicas
+            List<DatabaseTopology.DatabaseNode> replicas;
+            lock (_replicaListLock)
+            {
+                replicas = _availableReadReplicas;
+            }
             if (replicas.Count == 0)
             {
                 _logger.LogWarning("No healthy read replicas available; using primary for read");

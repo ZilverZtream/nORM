@@ -896,25 +896,9 @@ namespace nORM.Query
                         return true;
                     }
                     break;
-                case MethodCallExpression mce:
-                    object? instance = null;
-                    if (mce.Object != null && !TryGetConstantValue(mce.Object, out instance))
-                    {
-                        value = null;
-                        return false;
-                    }
-                    var args = new object?[mce.Arguments.Count];
-                    for (int i = 0; i < mce.Arguments.Count; i++)
-                    {
-                        if (!TryGetConstantValue(mce.Arguments[i], out var argVal))
-                        {
-                            value = null;
-                            return false;
-                        }
-                        args[i] = argVal;
-                    }
-                    value = mce.Method.Invoke(instance, args);
-                    return true;
+                // SECURITY FIX (TASK 1): Removed MethodCallExpression handling to prevent RCE.
+                // Method calls should be translated to SQL (e.g., string.Contains) or throw NotSupportedException.
+                // Executing arbitrary user code via Invoke() is a critical security vulnerability.
             }
             value = null;
             return false;
