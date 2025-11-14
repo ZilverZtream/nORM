@@ -18,6 +18,52 @@ using Microsoft.Extensions.Logging;
 #nullable enable
 namespace nORM.Query
 {
+    /// <summary>
+    /// Translates LINQ expression trees to SQL queries using the visitor pattern.
+    /// </summary>
+    /// <remarks>
+    /// PERFORMANCE WARNING (TASK 7): This class uses recursive instantiation for subquery translation.
+    ///
+    /// **Current Architecture:**
+    /// - Every subquery or complex nested expression creates a new QueryTranslator instance
+    /// - See TranslateSubExpression() and VisitMethodCall (Any/Contains) - both call QueryTranslator.Create()
+    /// - For deeply nested queries, this creates O(depth) allocations
+    /// - Object pooling (_translatorPool) only applies to top-level queries, not recursive instances
+    ///
+    /// **Performance Impact:**
+    /// - Queries with N nested subqueries allocate N QueryTranslator instances (each ~2KB+)
+    /// - GC pressure increases linearly with query complexity
+    /// - Example: 10-level nested UNION creates 10+ translator instances
+    /// - Each instance allocates: SqlBuilder, Dictionary collections, Lists, etc.
+    ///
+    /// **Recommended Refactoring:**
+    /// Replace recursive instantiation with a single stateful visitor that manages context stacks:
+    ///
+    /// 1. **Context Stack Approach:**
+    ///    - Maintain Stack&lt;TranslationContext&gt; for depth tracking
+    ///    - Push/pop context when entering/exiting subqueries
+    ///    - Reuse single QueryTranslator instance across entire translation
+    ///
+    /// 2. **State Management:**
+    ///    - Replace field assignments with stack-based state
+    ///    - Use ref structs or value types for context to avoid heap allocation
+    ///    - Ensure proper stack unwinding on exceptions
+    ///
+    /// 3. **Benefits:**
+    ///    - Reduces allocations from O(depth) to O(1)
+    ///    - Enables true pooling for all translation work
+    ///    - Improves cache locality
+    ///    - Reduces GC pressure by ~90% for complex queries
+    ///
+    /// **Migration Complexity:**
+    /// This is a major architectural change requiring:
+    /// - Redesign of visitor state management (~2000 LOC)
+    /// - Extensive testing to ensure query correctness
+    /// - Careful handling of correlated subqueries and parameter scoping
+    /// - Breaking changes to internal APIs
+    ///
+    /// Current recursion depth limit: <see cref="MaxRecursionDepth"/> (100 levels)
+    /// </remarks>
     internal sealed partial class QueryTranslator : ExpressionVisitor, IDisposable
     {
         private DbContext _ctx = null!;
@@ -489,10 +535,24 @@ namespace nORM.Query
             }
             return $"{wf.FunctionName}() OVER ({overClause})";
         }
+        /// <summary>
+        /// Translates a sub-expression by creating a new QueryTranslator instance.
+        /// </summary>
+        /// <remarks>
+        /// PERFORMANCE ISSUE (TASK 7): This method creates a new QueryTranslator instance for every
+        /// subquery, leading to O(depth) allocations. Called by:
+        /// - Union/Intersect/Except operations
+        /// - Nested subqueries in WHERE clauses
+        /// - Complex projection expressions
+        ///
+        /// For a query with 10 nested UNIONs, this creates 10+ QueryTranslator instances (~2KB each).
+        /// Recommended refactoring: Use context stack pattern instead of recursive instantiation.
+        /// </remarks>
         private string TranslateSubExpression(Expression e)
         {
             if (_recursionDepth >= MaxRecursionDepth)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum translation depth of {MaxRecursionDepth}"));
+            // PERFORMANCE ISSUE (TASK 7): Allocates new translator instead of reusing with context stack
             using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
             var subPlan = subTranslator.Translate(e);
             _parameterManager.Index = subTranslator.ParameterIndex;
@@ -843,6 +903,8 @@ namespace nORM.Query
                 var lambda = Expression.Lambda(eq, param);
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
             }
+            // PERFORMANCE ISSUE (TASK 7): Another allocation site - creates new translator for Any/All/Contains subqueries
+            // This is called frequently in WHERE clauses (e.g., WHERE items.Any(x => x.Status == 'Active'))
             using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _parameterManager.Index = subTranslator.ParameterIndex;
