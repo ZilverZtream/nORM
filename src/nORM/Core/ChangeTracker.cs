@@ -194,6 +194,21 @@ namespace nORM.Core
         /// Forces change detection for all entities that have been marked as dirty,
         /// updating their <see cref="EntityState"/> based on current property values.
         /// </summary>
+        /// <remarks>
+        /// PERFORMANCE WARNING (TASK 12): This method is called automatically on every SaveChanges() call.
+        /// It performs snapshot-based comparison of ALL tracked entities, iterating through all properties
+        /// and comparing current values against original snapshots. This is O(entities × properties) complexity.
+        ///
+        /// Performance considerations:
+        /// - Avoid calling SaveChanges() in tight loops with many tracked entities
+        /// - Consider using batch operations (InsertBulkAsync, UpdateBulkAsync) for bulk changes
+        /// - For read-only queries, use AsNoTracking() to avoid change tracking overhead
+        /// - If tracking thousands of entities, consider periodically detaching unchanged entities
+        ///
+        /// This design matches Entity Framework Core semantics where change detection is snapshot-based
+        /// and happens automatically. For entities implementing INotifyPropertyChanged, the overhead is
+        /// reduced as changes are tracked incrementally.
+        /// </remarks>
         internal void DetectChanges()
         {
             var dirtyNonNotifyingSnapshot = _dirtyNonNotifyingEntries.Keys.ToArray();
