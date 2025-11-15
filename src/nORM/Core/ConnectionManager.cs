@@ -392,17 +392,26 @@ namespace nORM.Core
             if (_disposed)
                 return;
             _disposed = true;
+
+            // RACE CONDITION FIX (TASK 4): Signal cancellation and properly wait for health check task
             _disposeCts.Cancel();
             _healthCheckTimer.Dispose();
+
             try
             {
-                // Avoid indefinite blocking on shutdown
-                Task.WhenAny(_healthCheckTask, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
+                // Wait for the health check task to complete, with a reasonable timeout
+                // If it doesn't complete within 10 seconds, we'll give up to avoid blocking forever
+                if (!_healthCheckTask.Wait(TimeSpan.FromSeconds(10)))
+                {
+                    // Task didn't complete in time, but we've already canceled it.
+                    // The cancellation token will eventually cause it to exit.
+                }
             }
             catch
             {
-                // Ignore exceptions during shutdown
+                // Ignore exceptions during shutdown (task was likely canceled)
             }
+
             _disposeCts.Dispose();
 
             foreach (var pool in _connectionPools.Values)
@@ -410,6 +419,8 @@ namespace nORM.Core
                 pool.Dispose();
             }
 
+            // RACE CONDITION FIX (TASK 4): Only dispose semaphores after the health check task
+            // has been given a chance to complete, reducing the risk of ObjectDisposedException
             _failoverSemaphore.Dispose();
             _poolInitSemaphore.Dispose();
             _healthCheckSemaphore.Dispose();

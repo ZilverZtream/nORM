@@ -24,6 +24,10 @@ namespace nORM.Internal
         private long _hits;
         private long _misses;
 
+        // PERFORMANCE FIX (TASK 13): Probabilistic promotion to reduce write lock contention
+        // Only promote 1% of reads to avoid serializing all cache reads on the write lock
+        private const double PromotionProbability = 0.01; // 1% of reads will promote
+
         /// <summary>
         /// Initializes a new concurrent LRU cache.
         /// </summary>
@@ -102,17 +106,30 @@ namespace nORM.Internal
                     {
                         if (!IsExpired(node.Value))
                         {
-                            // Upgrade to write lock for LRU promotion
-                            _lock.EnterWriteLock();
-                            try
+                            // PERFORMANCE FIX (TASK 13): Probabilistic promotion
+                            // Only promote 1% of the time to avoid write lock contention on hot cache items
+                            // This dramatically reduces lock contention while maintaining reasonable LRU accuracy
+                            bool shouldPromote = Random.Shared.NextDouble() < PromotionProbability;
+
+                            if (shouldPromote)
                             {
-                                _lruList.Remove(node);
-                                _lruList.AddFirst(node);
+                                // Upgrade to write lock for LRU promotion
+                                _lock.EnterWriteLock();
+                                try
+                                {
+                                    // Verify node is still in list (could have been removed by another thread)
+                                    if (node.List != null)
+                                    {
+                                        _lruList.Remove(node);
+                                        _lruList.AddFirst(node);
+                                    }
+                                }
+                                finally
+                                {
+                                    _lock.ExitWriteLock();
+                                }
                             }
-                            finally
-                            {
-                                _lock.ExitWriteLock();
-                            }
+
                             Interlocked.Increment(ref _hits);
                             value = node.Value.Value;
                             return true;
