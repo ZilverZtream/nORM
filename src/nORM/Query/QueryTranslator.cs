@@ -326,13 +326,36 @@ namespace nORM.Query
                 {
                     materializerType = typeof(int);
                 }
-                var materializer = (_t._projection != null)
-                    ? _t._materializerFactory.CreateSchemaAwareMaterializer(_t._mapping, materializerType, _t._projection)
-                    : _t._materializerFactory.CreateMaterializer(_t._mapping, materializerType, null);
+
+                // PERFORMANCE FIX (TASK 14): Create both sync and async materializers
+                Func<DbDataReader, object> syncMaterializer;
+                Func<DbDataReader, CancellationToken, Task<object>> materializer;
+
+                if (_t._projection != null)
+                {
+                    syncMaterializer = _t._materializerFactory.CreateSyncMaterializer(_t._mapping, materializerType, _t._projection);
+                    materializer = _t._materializerFactory.CreateSchemaAwareMaterializer(_t._mapping, materializerType, _t._projection);
+                }
+                else
+                {
+                    syncMaterializer = _t._materializerFactory.CreateSyncMaterializer(_t._mapping, materializerType, null);
+                    materializer = _t._materializerFactory.CreateMaterializer(_t._mapping, materializerType, null);
+                }
 
                 var isScalar = _t._isAggregate && _t._groupBy.Count == 0;
                 if (isScalar)
                 {
+                    // PERFORMANCE FIX (TASK 14): Provide scalar-specific sync and async materializers
+                    syncMaterializer = static (DbDataReader r) =>
+                    {
+                        if (r.Read())
+                        {
+                            var v = r.GetValue(0);
+                            return v is long l ? (object)l : Convert.ToInt64(v);
+                        }
+                        return 0L;
+                    };
+
                     materializer = static async (DbDataReader r, CancellationToken ct) =>
                     {
                         if (await r.ReadAsync(ct).ConfigureAwait(false))
@@ -432,7 +455,27 @@ namespace nORM.Query
                 var singleResult = _t._singleResult || _t._methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
                     or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
                 var elementType = _t._groupJoinInfo?.ResultType ?? materializerType;
-                var plan = new QueryPlan(_t._sql.ToString(), (IReadOnlyDictionary<string, object>)_t._params, _t._compiledParams, materializer, elementType, isScalar, singleResult, _t._noTracking, _t._methodName, _t._includes, _t._groupJoinInfo, _t._tables.ToArray(), _t._splitQuery, _t._estimatedTimeout, _t._isCacheable, _t._cacheExpiration);
+
+                // PERFORMANCE FIX (TASK 14): Pass both sync and async materializers to QueryPlan
+                var plan = new QueryPlan(
+                    _t._sql.ToString(),
+                    (IReadOnlyDictionary<string, object>)_t._params,
+                    _t._compiledParams,
+                    materializer,
+                    syncMaterializer,
+                    elementType,
+                    isScalar,
+                    singleResult,
+                    _t._noTracking,
+                    _t._methodName,
+                    _t._includes,
+                    _t._groupJoinInfo,
+                    _t._tables.ToArray(),
+                    _t._splitQuery,
+                    _t._estimatedTimeout,
+                    _t._isCacheable,
+                    _t._cacheExpiration
+                );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
             }

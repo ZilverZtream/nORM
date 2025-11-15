@@ -73,12 +73,16 @@ namespace nORM.Query
                 await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
                     .ConfigureAwait(false);
 
+                // PERFORMANCE FIX (TASK 14): Use sync materializer to avoid per-row Task allocation
+                var syncMaterializer = plan.SyncMaterializer;
+
                 // PERFORMANCE FIX (TASK 19): Respect SingleResult flag to avoid materializing unnecessary rows
                 if (plan.SingleResult)
                 {
                     if (await reader.ReadAsync(ct).ConfigureAwait(false))
                     {
-                        var entity = await plan.Materializer(reader, ct).ConfigureAwait(false);
+                        ct.ThrowIfCancellationRequested();
+                        var entity = syncMaterializer(reader);
                         entity = ProcessEntity(entity, trackable, entityMap, isReadOnly);
                         list.Add(entity);
                     }
@@ -87,7 +91,8 @@ namespace nORM.Query
                 {
                     while (await reader.ReadAsync(ct).ConfigureAwait(false))
                     {
-                        var entity = await plan.Materializer(reader, ct).ConfigureAwait(false);
+                        ct.ThrowIfCancellationRequested();
+                        var entity = syncMaterializer(reader);
                         entity = ProcessEntity(entity, trackable, entityMap, isReadOnly);
                         list.Add(entity);
                     }
@@ -129,12 +134,15 @@ namespace nORM.Query
 
                 using var reader = command.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
 
+                // PERFORMANCE FIX (TASK 14): Use sync materializer directly - no Task allocation at all!
+                var syncMaterializer = plan.SyncMaterializer;
+
                 // PERFORMANCE FIX (TASK 19): Respect SingleResult flag to avoid materializing unnecessary rows
                 if (plan.SingleResult)
                 {
                     if (reader.Read())
                     {
-                        var entity = plan.Materializer(reader, default).GetAwaiter().GetResult();
+                        var entity = syncMaterializer(reader);
                         entity = ProcessEntity(entity, trackable, entityMap, isReadOnly);
                         list.Add(entity);
                     }
@@ -143,7 +151,7 @@ namespace nORM.Query
                 {
                     while (reader.Read())
                     {
-                        var entity = plan.Materializer(reader, default).GetAwaiter().GetResult();
+                        var entity = syncMaterializer(reader);
                         entity = ProcessEntity(entity, trackable, entityMap, isReadOnly);
                         list.Add(entity);
                     }
