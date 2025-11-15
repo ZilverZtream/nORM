@@ -15,16 +15,17 @@ namespace nORM.Core
     /// Provides connection management with support for read replicas and failover.
     /// </summary>
     /// <remarks>
-    /// NOTE (TASK 5): ConnectionManager uses <see cref="ConnectionPool"/> internally for managing
-    /// connections to multiple database nodes (primary + read replicas). This is one of the legitimate
-    /// use cases for custom pooling, as it enables:
+    /// IMPORTANT: This class no longer uses custom connection pooling. Instead, it relies on
+    /// the database provider's native connection pooling (configured via connection string).
+    /// This eliminates redundant "double pooling" and reduces resource overhead.
+    ///
+    /// ConnectionManager provides:
     /// - Round-robin load balancing across read replicas
     /// - Automatic failover when a node becomes unhealthy
-    /// - Per-node connection pooling with different connection strings
+    /// - Health monitoring of database nodes
     ///
-    /// However, be aware that provider-level pooling (in the connection string) still applies,
-    /// creating a two-tier pooling architecture. For simple single-database scenarios without
-    /// read replicas, prefer using DbContext directly with provider pooling only.
+    /// All connections are created fresh and should be disposed by the caller, which returns
+    /// them to the ADO.NET provider's connection pool.
     /// </remarks>
     public class ConnectionManager : IDisposable
     {
@@ -34,13 +35,11 @@ namespace nORM.Core
         private readonly PeriodicTimer _healthCheckTimer;
         private readonly Task _healthCheckTask;
         private readonly SemaphoreSlim _failoverSemaphore = new(1, 1);
-        private readonly SemaphoreSlim _poolInitSemaphore = new(1, 1);
         private readonly SemaphoreSlim _healthCheckSemaphore = new(1, 1);
         private readonly CancellationTokenSource _disposeCts = new();
 
         private bool _disposed;
 
-        private readonly ConcurrentDictionary<string, ConnectionPool> _connectionPools = new();
         private volatile DatabaseTopology.DatabaseNode? _currentPrimary;
         private volatile List<DatabaseTopology.DatabaseNode> _availableReadReplicas = new();
         private int _readReplicaIndex;
@@ -55,8 +54,7 @@ namespace nORM.Core
 
         /// <summary>
         /// Initializes a new <see cref="ConnectionManager"/> that manages database connections
-        /// across a topology of nodes. Connection pools are created for each node and an
-        /// optional background health check loop is started.
+        /// across a topology of nodes. Starts an optional background health check loop.
         /// </summary>
         /// <param name="topology">Topology describing available database nodes.</param>
         /// <param name="provider">Database provider responsible for creating connections.</param>
@@ -68,34 +66,12 @@ namespace nORM.Core
             _provider = provider ?? throw new ArgumentNullException(nameof(provider));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-            InitializeConnectionPools();
             DeterminePrimaryNode();
             UpdateAvailableReadReplicas();
 
             var interval = healthCheckInterval ?? TimeSpan.FromSeconds(30);
             _healthCheckTimer = new PeriodicTimer(interval);
             _healthCheckTask = Task.Run(() => HealthCheckLoopAsync(_disposeCts.Token));
-        }
-
-        /// <summary>
-        /// Initializes a connection pool for each node defined in the database topology.
-        /// This method is guarded by a semaphore to ensure pools are created only once
-        /// in multi-threaded scenarios.
-        /// </summary>
-        private void InitializeConnectionPools()
-        {
-            _poolInitSemaphore.Wait();
-            try
-            {
-                foreach (var node in _topology.Nodes)
-                {
-                    _connectionPools.GetOrAdd(node.ConnectionString, cs => new ConnectionPool(() => CreateConnection(cs)));
-                }
-            }
-            finally
-            {
-                _poolInitSemaphore.Release();
-            }
         }
 
         /// <summary>
@@ -141,6 +117,7 @@ namespace nORM.Core
         /// <summary>
         /// Retrieves an open connection to the primary node for write operations.
         /// Implements a simple circuit breaker and failover mechanism.
+        /// The caller must dispose the returned connection.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>An open <see cref="DbConnection"/> suitable for write operations.</returns>
@@ -162,22 +139,22 @@ namespace nORM.Core
                     throw new InvalidOperationException("No primary node available.");
             }
 
-            var pool = _connectionPools[primary.ConnectionString];
             try
             {
-                var cn = await pool.RentAsync(ct).ConfigureAwait(false);
+                var cn = CreateConnection(primary.ConnectionString);
+                await cn.OpenAsync(ct).ConfigureAwait(false);
                 ResetCircuitBreaker();
                 return cn;
             }
             catch (OperationCanceledException)
             {
-                // CIRCUIT BREAKER FIX (TASK 17): Don't trip circuit breaker on timeout/cancellation.
+                // Don't trip circuit breaker on timeout/cancellation.
                 // Timeout is a query-level issue, not a connection-level failure.
                 throw;
             }
             catch (DbException ex)
             {
-                // CIRCUIT BREAKER FIX (TASK 17): Only trip on connection-level DB exceptions
+                // Only trip on connection-level DB exceptions
                 RegisterFailure();
                 _logger.LogError(ex, "Failed to acquire write connection due to database error");
                 throw;
@@ -186,7 +163,7 @@ namespace nORM.Core
                                        ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
                                        ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase))
             {
-                // CIRCUIT BREAKER FIX (TASK 17): Trip on network/connection-related exceptions
+                // Trip on network/connection-related exceptions
                 RegisterFailure();
                 _logger.LogError(ex, "Failed to acquire write connection due to network/connection issue");
                 throw;
@@ -202,12 +179,13 @@ namespace nORM.Core
         /// <summary>
         /// Retrieves an open connection optimized for read operations, using available read replicas
         /// and falling back to the primary node when necessary.
+        /// The caller must dispose the returned connection.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>An open <see cref="DbConnection"/> suitable for read operations.</returns>
         public async Task<DbConnection> GetReadConnectionAsync(CancellationToken ct = default)
         {
-            // RACE CONDITION FIX (TASK 11): Synchronize read of _availableReadReplicas
+            // Synchronize read of _availableReadReplicas
             List<DatabaseTopology.DatabaseNode> replicas;
             lock (_replicaListLock)
             {
@@ -220,10 +198,11 @@ namespace nORM.Core
             }
 
             var replica = SelectOptimalReadReplica(replicas);
-            var pool = _connectionPools[replica.ConnectionString];
             try
             {
-                return await pool.RentAsync(ct).ConfigureAwait(false);
+                var cn = CreateConnection(replica.ConnectionString);
+                await cn.OpenAsync(ct).ConfigureAwait(false);
+                return cn;
             }
             catch (OperationCanceledException)
             {
@@ -303,12 +282,11 @@ namespace nORM.Core
             {
                 foreach (var node in _topology.Nodes)
                 {
-                    var pool = _connectionPools[node.ConnectionString];
-                    DbConnection? cn = null;
                     var sw = System.Diagnostics.Stopwatch.StartNew();
                     try
                     {
-                        cn = await pool.RentAsync(token).ConfigureAwait(false);
+                        using var cn = CreateConnection(node.ConnectionString);
+                        await cn.OpenAsync(token).ConfigureAwait(false);
                         using var pingCmd = cn.CreateCommand();
                         pingCmd.CommandText = "SELECT 1";
                         pingCmd.CommandType = CommandType.Text;
@@ -328,13 +306,6 @@ namespace nORM.Core
                         sw.Stop();
                         node.IsHealthy = false;
                         node.LastHealthCheck = DateTime.UtcNow;
-                    }
-                    finally
-                    {
-                        if (cn != null)
-                        {
-                            try { pool.Return(cn); } catch { /* ignore */ }
-                        }
                     }
                 }
 
@@ -384,8 +355,7 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Disposes the manager and all pooled connections, terminating background tasks
-        /// and releasing unmanaged resources.
+        /// Disposes the manager, terminating background tasks and releasing unmanaged resources.
         /// </summary>
         public void Dispose()
         {
@@ -393,7 +363,7 @@ namespace nORM.Core
                 return;
             _disposed = true;
 
-            // RACE CONDITION FIX (TASK 4): Signal cancellation and properly wait for health check task
+            // Signal cancellation and properly wait for health check task
             _disposeCts.Cancel();
             _healthCheckTimer.Dispose();
 
@@ -414,15 +384,11 @@ namespace nORM.Core
 
             _disposeCts.Dispose();
 
-            foreach (var pool in _connectionPools.Values)
-            {
-                pool.Dispose();
-            }
+            // No need to dispose connection pools - we rely on ADO.NET provider pooling now.
+            // Connections are disposed by callers, which returns them to the provider pool.
 
-            // RACE CONDITION FIX (TASK 4): Only dispose semaphores after the health check task
-            // has been given a chance to complete, reducing the risk of ObjectDisposedException
+            // Only dispose semaphores after the health check task has been given a chance to complete
             _failoverSemaphore.Dispose();
-            _poolInitSemaphore.Dispose();
             _healthCheckSemaphore.Dispose();
         }
     }

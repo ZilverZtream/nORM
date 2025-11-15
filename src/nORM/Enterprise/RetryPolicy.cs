@@ -22,10 +22,25 @@ namespace nORM.Enterprise
         public TimeSpan BaseDelay { get; set; } = TimeSpan.FromSeconds(1);
 
         /// <summary>
-        /// Delegate that determines whether a given <see cref="DbException"/> is
+        /// Delegate that determines whether a given <see cref="Exception"/> is
         /// considered transient and should trigger a retry.
+        /// Now supports DbException, TimeoutException, IOException, and SocketException.
         /// </summary>
-        public Func<DbException, bool> ShouldRetry { get; set; } = ex =>
-            ex is SqlException sqlEx && sqlEx.Number is 4060 or 40197 or 40501 or 40613 or 49918 or 49919 or 49920 or 1205 or 1222;
+        public Func<Exception, bool> ShouldRetry { get; set; } = ex =>
+        {
+            // SQL Server transient errors
+            if (ex is SqlException sqlEx && sqlEx.Number is 4060 or 40197 or 40501 or 40613 or 49918 or 49919 or 49920 or 1205 or 1222)
+                return true;
+
+            // Command timeouts
+            if (ex is TimeoutException)
+                return true;
+
+            // Network-level failures
+            if (ex is System.IO.IOException || ex is System.Net.Sockets.SocketException)
+                return true;
+
+            return false;
+        };
     }
 }

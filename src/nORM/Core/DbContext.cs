@@ -444,8 +444,12 @@ namespace nORM.Core
             {
                 MaxRetries = 3,
                 BaseDelay = TimeSpan.FromSeconds(1),
-                ShouldRetry = ex => ex is DbException dbEx &&
-                    (int?)dbEx.GetType().GetProperty("Number")?.GetValue(dbEx) == 1205
+                ShouldRetry = ex =>
+                {
+                    if (ex is DbException dbEx)
+                        return (int?)dbEx.GetType().GetProperty("Number")?.GetValue(dbEx) == 1205;
+                    return false;
+                }
             };
             return Options;
         }

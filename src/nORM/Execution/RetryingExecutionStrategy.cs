@@ -30,14 +30,14 @@ namespace nORM.Execution
                 {
                     return await operation(_ctx, ct).ConfigureAwait(false);
                 }
-                catch (DbException ex)
+                catch (Exception ex) when (ex is DbException or TimeoutException or System.IO.IOException or System.Net.Sockets.SocketException)
                 {
-                    var normEx = new NormException(ex.Message, null, null, ex);
-                    _ctx.Options.Logger?.LogError(normEx, retryCount);
+                    var normEx = ex is NormException ? ex as NormException : new NormException(ex.Message, null, null, ex);
+                    _ctx.Options.Logger?.LogError(normEx!, retryCount);
 
                     if (retryCount >= _policy.MaxRetries || !_policy.ShouldRetry(ex))
                     {
-                        throw normEx;
+                        throw normEx!;
                     }
                     var delay = TimeSpan.FromMilliseconds(_policy.BaseDelay.TotalMilliseconds * Math.Pow(2, retryCount));
                     await Task.Delay(delay, ct).ConfigureAwait(false);
