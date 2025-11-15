@@ -110,6 +110,12 @@ namespace nORM.Query
         /// <param name="expr">The expression to extract a value from.</param>
         /// <param name="value">The extracted value, or null if extraction failed.</param>
         /// <returns>True if the value was successfully extracted; false otherwise.</returns>
+        /// <remarks>
+        /// CONSISTENCY NOTE (TASK 26): This implementation is intentionally simpler than
+        /// ExpressionToSqlVisitor.TryGetConstantValue(). The fast path only needs to handle
+        /// simple constant extraction, while the full query translator handles more complex
+        /// recursive expressions. Both implementations are safe and avoid RCE vulnerabilities.
+        /// </remarks>
         private static bool TryGetSimpleValue(Expression expr, out object? value)
         {
             value = null;

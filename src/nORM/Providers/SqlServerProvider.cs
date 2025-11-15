@@ -676,10 +676,44 @@ END;";
             public int RecordsAffected => -1;
 
             /// <summary>
-            /// Returns a <see cref="DataTable"/> describing the column metadata. Not supported and
-            /// always returns <c>null</c>.
+            /// Returns a <see cref="DataTable"/> describing the column metadata for this reader.
+            /// BUG FIX (TASK 25): Implemented GetSchemaTable to support SqlBulkCopy scenarios
+            /// that rely on schema information.
             /// </summary>
-            public DataTable? GetSchemaTable() => null;
+            public DataTable? GetSchemaTable()
+            {
+                var schemaTable = new DataTable("SchemaTable");
+
+                // Add standard schema columns used by SqlBulkCopy and other data readers
+                schemaTable.Columns.Add("ColumnName", typeof(string));
+                schemaTable.Columns.Add("ColumnOrdinal", typeof(int));
+                schemaTable.Columns.Add("ColumnSize", typeof(int));
+                schemaTable.Columns.Add("DataType", typeof(Type));
+                schemaTable.Columns.Add("AllowDBNull", typeof(bool));
+                schemaTable.Columns.Add("IsKey", typeof(bool));
+                schemaTable.Columns.Add("IsUnique", typeof(bool));
+                schemaTable.Columns.Add("IsReadOnly", typeof(bool));
+
+                // Populate schema rows from column metadata
+                for (int i = 0; i < _columns.Count; i++)
+                {
+                    var column = _columns[i];
+                    var row = schemaTable.NewRow();
+
+                    row["ColumnName"] = column.PropName;
+                    row["ColumnOrdinal"] = i;
+                    row["ColumnSize"] = -1; // Unknown/variable size
+                    row["DataType"] = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
+                    row["AllowDBNull"] = Nullable.GetUnderlyingType(column.Prop.PropertyType) != null || !column.Prop.PropertyType.IsValueType;
+                    row["IsKey"] = column.IsKey;
+                    row["IsUnique"] = column.IsKey;
+                    row["IsReadOnly"] = false;
+
+                    schemaTable.Rows.Add(row);
+                }
+
+                return schemaTable;
+            }
 
             /// <summary>
             /// Closes the reader and releases the underlying enumerator.
