@@ -348,7 +348,9 @@ END;";
         }
 
         /// <summary>
-        /// Updates multiple entities using batched <c>UPDATE</c> statements with parameterized commands.
+        /// Updates multiple entities using MySQL-optimized temp table approach for efficient bulk updates.
+        /// PERFORMANCE FIX (TASK 14): Always uses MySQL-specific implementation with temp tables
+        /// instead of falling back to slow base class batched operations.
         /// </summary>
         /// <typeparam name="T">Entity type being updated.</typeparam>
         /// <param name="ctx">The active <see cref="DbContext"/>.</param>
@@ -359,7 +361,8 @@ END;";
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
-            if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct).ConfigureAwait(false);
+            // PERFORMANCE FIX (TASK 14): Removed slow base.BatchedUpdateAsync fallback
+            // Always use MySQL-specific temp table implementation for optimal performance
 
             var sw = Stopwatch.StartNew();
             var tempTableName = $"`BulkUpdate_{Guid.NewGuid():N}`";
@@ -389,7 +392,9 @@ END;";
         }
         
         /// <summary>
-        /// Deletes multiple records matching the supplied entities' primary keys using batched <c>DELETE</c> statements.
+        /// Deletes multiple records using MySQL-optimized WHERE IN clauses for efficient bulk deletes.
+        /// PERFORMANCE FIX (TASK 14): Always uses MySQL-specific implementation with batched WHERE IN
+        /// instead of falling back to slow base class operations.
         /// </summary>
         /// <typeparam name="T">Entity type to delete.</typeparam>
         /// <param name="ctx">The <see cref="DbContext"/> managing the connection.</param>
@@ -400,7 +405,8 @@ END;";
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
-            if (ctx.Options.UseBatchedBulkOps) return await base.BatchedDeleteAsync(ctx, m, entities, ct).ConfigureAwait(false);
+            // PERFORMANCE FIX (TASK 14): Removed slow base.BatchedDeleteAsync fallback
+            // Always use MySQL-specific WHERE IN implementation for optimal performance
 
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();

@@ -465,7 +465,7 @@ namespace nORM.Providers
             {
                 for (int i = 0; i < entityList.Count; i += batchSize)
                 {
-                    var batch = entityList.Skip(i).Take(batchSize).ToList();
+                    var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
                     await using var cmd = ctx.Connection.CreateCommand();
                     cmd.Transaction = transaction;
                     cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;

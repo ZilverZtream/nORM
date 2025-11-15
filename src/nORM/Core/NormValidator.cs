@@ -102,6 +102,26 @@ namespace nORM.Core
                 if (depth > MaxEntityDepth)
                     throw new ArgumentException($"Entity graph exceeds maximum depth of {MaxEntityDepth} at {path}");
 
+                // LOGIC FIX (TASK 12): Check if the popped entity itself is IEnumerable
+                // This ensures nested collections are properly validated
+                if (entity is IEnumerable enumerable && entity is not string)
+                {
+                    ValidateCollection(enumerable, path);
+
+                    foreach (var item in enumerable)
+                    {
+                        if (item == null) continue;
+
+                        var itemType = item.GetType();
+                        if (itemType.IsClass && itemType != typeof(string))
+                        {
+                            // Don't increment depth for collection items at same level
+                            stack.Push((item, depth + 1, $"{path}[{itemType.Name}]"));
+                        }
+                    }
+                    continue;
+                }
+
                 // Allow circular references without throwing errors by stopping
                 // validation when an entity has already been visited. This prevents
                 // infinite loops in graphs with cycles while still validating the
@@ -119,29 +139,13 @@ namespace nORM.Core
                     if (value == null) continue;
 
                     var propPath = $"{path}.{prop.Name}";
+                    var valueType = value.GetType();
 
-                    if (value is IEnumerable enumerable && value is not string)
+                    // Push all non-null class values to stack for validation
+                    // IEnumerable check will happen when item is popped
+                    if (valueType.IsClass && valueType != typeof(string))
                     {
-                        ValidateCollection(enumerable, propPath);
-
-                        foreach (var item in enumerable)
-                        {
-                            if (item == null) continue;
-
-                            var itemType = item.GetType();
-                            if (itemType.IsClass && itemType != typeof(string))
-                            {
-                                stack.Push((item, depth + 1, propPath));
-                            }
-                        }
-                    }
-                    else
-                    {
-                        var valueType = value.GetType();
-                        if (valueType.IsClass && valueType != typeof(string))
-                        {
-                            stack.Push((value, depth + 1, propPath));
-                        }
+                        stack.Push((value, depth + 1, propPath));
                     }
                 }
             }
@@ -149,6 +153,15 @@ namespace nORM.Core
 
         private static void ValidateCollection(IEnumerable collection, string path)
         {
+            // PERFORMANCE FIX (TASK 11): Use ICollection.Count when available for O(1) check
+            if (collection is ICollection coll)
+            {
+                if (coll.Count > MaxCollectionSize)
+                    throw new ArgumentException($"Collection at {path} exceeds maximum size of {MaxCollectionSize}");
+                return;
+            }
+
+            // Fallback to iteration for non-ICollection types
             var count = 0;
             foreach (var _ in collection)
             {

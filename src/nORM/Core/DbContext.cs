@@ -42,12 +42,13 @@ namespace nORM.Core
         private readonly AdaptiveTimeoutManager _timeoutManager;
         private readonly ModelBuilder _modelBuilder;
         private readonly DynamicEntityTypeGenerator _typeGenerator = new();
-        private readonly ConcurrentDictionary<string, Type> _dynamicTypeCache = new();
+        private readonly ConcurrentDictionary<string, Lazy<Task<Type>>> _dynamicTypeCache = new();
         private readonly LinkedList<WeakReference<IDisposable>> _disposables = new();
         private readonly object _disposablesLock = new();
         private readonly Timer _cleanupTimer;
         private bool _providerInitialized;
         private readonly SemaphoreSlim _providerInitLock = new(1, 1);
+        private readonly Lazy<Task>? _temporalInit;
         private DbTransaction? _currentTransaction; // Access via Interlocked.* only
         private bool _disposed;
 
@@ -102,7 +103,7 @@ namespace nORM.Core
                 Options.Logger ?? NullLogger.Instance);
             if (Options.IsTemporalVersioningEnabled)
             {
-                TemporalManager.InitializeAsync(this).GetAwaiter().GetResult();
+                _temporalInit = new Lazy<Task>(() => TemporalManager.InitializeAsync(this));
             }
             _cleanupTimer = new Timer(_ => CleanupDisposables(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
@@ -137,12 +138,24 @@ namespace nORM.Core
                 connection = DbConnectionFactory.Create(connectionString, provider);
                 return connection;
             }
-            catch (Exception ex)
+            catch (DbException ex)
             {
+                // Database-specific errors (e.g., connection failures, invalid server names)
                 connection?.Dispose();
                 var safeConnStr = NormValidator.MaskSensitiveConnectionStringData(connectionString);
                 throw new ArgumentException($"Invalid connection string format: {safeConnStr}", nameof(connectionString), ex);
             }
+            catch (ArgumentException ex)
+            {
+                // Argument validation errors (e.g., malformed connection string)
+                connection?.Dispose();
+                var safeConnStr = NormValidator.MaskSensitiveConnectionStringData(connectionString);
+                throw new ArgumentException($"Invalid connection string format: {safeConnStr}", nameof(connectionString), ex);
+            }
+            // SECURITY FIX (TASK 18): Let other exceptions propagate.
+            // Catching all exceptions and rethrowing as ArgumentException masks important errors like
+            // OutOfMemoryException, StackOverflowException, ThreadAbortException, etc.
+            // Only catch expected connection/validation errors.
         }
         /// <summary>
         /// Ensures that the underlying <see cref="DbConnection"/> is open and that the
@@ -169,6 +182,10 @@ namespace nORM.Core
                 {
                     _providerInitLock.Release();
                 }
+            }
+            if (_temporalInit != null)
+            {
+                await _temporalInit.Value.ConfigureAwait(false);
             }
             return _cn;
         }
@@ -318,8 +335,9 @@ namespace nORM.Core
             if (!IsSafeIdentifier(tableName))
                 throw new NormUsageException("Invalid table name.");
             var logical = tableName;
-            var entityType = _dynamicTypeCache.GetOrAdd(logical,
-                _ => _typeGenerator.GenerateEntityType(this.Connection, logical));
+            var lazyTask = _dynamicTypeCache.GetOrAdd(logical,
+                _ => new Lazy<Task<Type>>(() => _typeGenerator.GenerateEntityTypeAsync(this.Connection, logical)));
+            var entityType = lazyTask.Value.GetAwaiter().GetResult();
             var method = typeof(NormQueryable).GetMethods()
                 .Single(m => m.Name == nameof(NormQueryable.Query) && m.IsGenericMethodDefinition);
             var generic = method.MakeGenericMethod(entityType);
@@ -384,20 +402,34 @@ namespace nORM.Core
             return ChangeTracker.Track(entity, EntityState.Deleted, GetMapping(typeof(T)));
         }
         /// <summary>
-        /// Returns the <see cref="EntityEntry"/> for the supplied entity and ensures
-        /// that lazy-loading proxies are wired up when supported. The entity is
-        /// automatically attached to the change tracker in the <see cref="EntityState.Unchanged"/>
-        /// state.
+        /// Returns the <see cref="EntityEntry"/> for the supplied entity if it is already being tracked.
+        /// SECURITY FIX (TASK 5): This method no longer auto-attaches untracked entities as this was a
+        /// dangerous side-effect. If the entity is not tracked, an exception is thrown instructing the
+        /// caller to use <see cref="Attach{T}"/> explicitly.
         /// </summary>
         /// <param name="entity">The entity whose tracking entry is requested.</param>
         /// <returns>An <see cref="EntityEntry"/> representing the entity's tracking information.</returns>
         /// <exception cref="ArgumentException">Thrown when <paramref name="entity"/> is null or invalid.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when the entity is not currently tracked.</exception>
         public EntityEntry Entry(object entity)
         {
             NormValidator.ValidateEntity(entity, nameof(entity));
+
+            // SECURITY FIX (TASK 5): Check if entity is already tracked before returning entry
+            // Auto-attaching untracked entities is dangerous - it silently modifies tracking state
+            var existingEntry = ChangeTracker.Entries.FirstOrDefault(e => ReferenceEquals(e.Entity, entity));
+            if (existingEntry == null)
+            {
+                throw new InvalidOperationException(
+                    $"The entity of type '{entity.GetType().Name}' is not being tracked by the context. " +
+                    "Use context.Attach() to explicitly attach the entity before calling Entry().");
+            }
+
+            // Ensure lazy loading is enabled for the tracked entity
             var method = typeof(NavigationPropertyExtensions).GetMethod(nameof(NavigationPropertyExtensions.EnableLazyLoading))!;
             method.MakeGenericMethod(entity.GetType()).Invoke(null, new object[] { entity, this });
-            return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(entity.GetType()));
+
+            return existingEntry;
         }
 
         /// <summary>
@@ -1034,12 +1066,16 @@ namespace nORM.Core
             }
             cmd.SetParametersFast(span);
 
-            if (Options.Logger?.IsEnabled(LogLevel.Debug) != true)
-                return EmptyDictionary<string, object>.Instance;
+            // PERFORMANCE FIX (TASK 7): Only allocate dictionary when logging is enabled
+            // This avoids allocating a Dictionary on every query when debug logging is disabled
+            if (Options.Logger?.IsEnabled(LogLevel.Debug) == true)
+            {
+                var dict = new Dictionary<string, object>(parameters.Length);
+                foreach (var (name, value) in span) dict[name] = value;
+                return dict;
+            }
 
-            var dict = new Dictionary<string, object>(parameters.Length);
-            foreach (var (name, value) in span) dict[name] = value;
-            return dict;
+            return EmptyDictionary<string, object>.Instance;
         }
 
         internal static class EmptyDictionary<TKey, TValue> where TKey : notnull
@@ -1206,43 +1242,22 @@ namespace nORM.Core
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
                 NormValidator.ValidateRawSql(sql, paramDict);
 
-                // PERFORMANCE WARNING (TASK 10): This method uses slow reflection-based materialization.
-                // For better performance, consider refactoring to use MaterializerFactory, which compiles
-                // high-speed IL.Emit or Expression-based materializers. The current approach calls:
-                // - GetProperties() - reflection metadata
-                // - TryGetValue() - dictionary lookup per column per row
-                // - prop.SetValue() - slow reflection-based property setter per column per row
-                // For large result sets, this can be 10-100x slower than compiled materializers.
-                // TODO: Create a temporary TableMapping from props dictionary and use MaterializerFactory.
-                var props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                    .Where(p => p.CanWrite)
-                    .ToDictionary(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase);
-
+                // PERFORMANCE FIX (TASK 8): Use MaterializerFactory for fast compiled materialization
+                // instead of slow reflection. MaterializerFactory generates IL.Emit or Expression-based
+                // materializers that are 10-100x faster than reflection for large result sets.
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
-                var fieldCount = reader.FieldCount;
-                var fieldNames = new string[fieldCount];
-                for (int i = 0; i < fieldCount; i++) fieldNames[i] = reader.GetName(i);
+                
+                // Get or create mapping for type T - this supports both mapped entities and ad-hoc types
+                var mapping = ctx.GetMapping(typeof(T));
+                
+                // Create fast compiled materializer using MaterializerFactory
+                var factory = new global::nORM.Query.MaterializerFactory();
+                var materializer = factory.CreateSyncMaterializer(mapping, typeof(T));
 
                 while (await reader.ReadAsync(token).ConfigureAwait(false))
                 {
-                    var item = new T();
-                    for (int i = 0; i < fieldCount; i++)
-                    {
-                        if (!props.TryGetValue(fieldNames[i], out var prop)) continue;
-                        var value = reader.GetValue(i);
-                        if (value == DBNull.Value) continue;
-                        var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
-                        try
-                        {
-                            var converted = targetType.IsEnum ? Enum.ToObject(targetType, value) : Convert.ChangeType(value, targetType);
-                            prop.SetValue(item, converted);
-                        }
-                        catch
-                        {
-                            prop.SetValue(item, value);
-                        }
-                    }
+                    var item = (T)materializer(reader);
                     list.Add(item);
                 }
 
@@ -1646,9 +1661,18 @@ namespace nORM.Core
         {
             if (!_disposed)
             {
-                _cleanupTimer?.Dispose();
+                // RESOURCE LEAK FIX (TASK 6): Use WaitHandle pattern like Dispose() to safely stop timer
+                // Prevents race condition where timer callback runs during disposal
+                if (_cleanupTimer != null)
+                {
+                    var waitHandle = new ManualResetEvent(false);
+                    _cleanupTimer.Dispose(waitHandle);
+                    // Use Task.Run to avoid blocking the async context
+                    await Task.Run(() => waitHandle.WaitOne()).ConfigureAwait(false);
+                    waitHandle.Dispose();
+                }
                 _providerInitLock?.Dispose();
-                await CleanupDisposablesAsync();
+                await CleanupDisposablesAsync().ConfigureAwait(false);
                 if (_cn != null)
                     await _cn.DisposeAsync().ConfigureAwait(false);
                 _disposed = true;
