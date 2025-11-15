@@ -35,6 +35,10 @@ namespace nORM.Core
     /// asynchronous evaluation.
     /// </summary>
     /// <typeparam name="T">The entity type returned by the query.</typeparam>
+    /// <remarks>
+    /// IMPORTANT: This interface no longer requires the new() constraint to support
+    /// entities with parameterized constructors (e.g., records, immutable classes).
+    /// </remarks>
     public interface INormQueryable<T> : IOrderedQueryable<T>
     {
         /// <summary>
@@ -99,7 +103,7 @@ namespace nORM.Core
         // No async methods here to avoid constraint conflicts
     }
 
-    internal sealed class NormQueryableImpl<T> : NormQueryableBase<T>, INormQueryable<T> where T : class, new()
+    internal sealed class NormQueryableImpl<T> : NormQueryableBase<T>, INormQueryable<T> where T : class
     {
         public NormQueryableImpl(DbContext ctx) : base(ctx)
         {
@@ -178,8 +182,9 @@ namespace nORM.Core
     /// <summary>
     /// Internal queryable implementation without constraints, used for intermediate query operations
     /// like Join that produce anonymous types or other types without parameterless constructors.
+    /// Now fully supports async LINQ methods for all entity types.
     /// </summary>
-    internal sealed class NormQueryableImplUnconstrained<T> : NormQueryableBase<T>, INormQueryableInternal<T>
+    internal sealed class NormQueryableImplUnconstrained<T> : NormQueryableBase<T>, INormQueryable<T>
     {
         public NormQueryableImplUnconstrained(DbContext ctx) : base(ctx)
         {
@@ -188,9 +193,117 @@ namespace nORM.Core
         public NormQueryableImplUnconstrained(IQueryProvider provider, Expression expression) : base(provider, expression)
         {
         }
+
+        public INormIncludableQueryable<T, TProperty> Include<TProperty>(Expression<Func<T, TProperty>> path)
+        {
+            var method = typeof(INormQueryable<>).MakeGenericType(typeof(T))
+                .GetMethods()
+                .Single(m => m.Name == nameof(Include) && m.IsGenericMethod);
+            var generic = method.MakeGenericMethod(typeof(TProperty));
+            var expression = Expression.Call(Expression, generic, Expression.Quote(path));
+            return new NormIncludableQueryableUnconstrained<T, TProperty>(Provider, expression);
+        }
+
+        public INormQueryable<T> AsNoTracking()
+        {
+            var expression = Expression.Call(
+                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
+                nameof(AsNoTracking),
+                Type.EmptyTypes,
+                Expression
+            );
+            return new NormQueryableImplUnconstrained<T>(Provider, expression);
+        }
+
+        public INormQueryable<T> AsSplitQuery()
+        {
+            var expression = Expression.Call(
+                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
+                nameof(AsSplitQuery),
+                Type.EmptyTypes,
+                Expression
+            );
+            return new NormQueryableImplUnconstrained<T>(Provider, expression);
+        }
+
+        public IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).AsAsyncEnumerable<T>(Expression, ct);
+
+        public Task<List<T>> ToListAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<List<T>>(Expression, ct);
+        public async Task<T[]> ToArrayAsync(CancellationToken ct = default) => (await ToListAsync(ct).ConfigureAwait(false)).ToArray();
+        public Task<int> CountAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<int>(Expression.Call(typeof(Queryable), nameof(Queryable.Count), new[] { typeof(T) }, Expression), ct);
+        public async Task<bool> AnyAsync(CancellationToken ct = default) => await ((NormQueryProvider)Provider).ExecuteAsync<bool>(Expression.Call(typeof(Queryable), nameof(Queryable.Any), new[] { typeof(T) }, Expression), ct).ConfigureAwait(false);
+        public Task<T> FirstAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<T>(Expression.Call(typeof(Queryable), nameof(Queryable.First), new[] { typeof(T) }, Expression), ct);
+        public Task<T?> FirstOrDefaultAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<T?>(Expression.Call(typeof(Queryable), nameof(Queryable.FirstOrDefault), new[] { typeof(T) }, Expression), ct);
+        public Task<T> SingleAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<T>(Expression.Call(typeof(Queryable), nameof(Queryable.Single), new[] { typeof(T) }, Expression), ct);
+        public Task<T?> SingleOrDefaultAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteAsync<T?>(Expression.Call(typeof(Queryable), nameof(Queryable.SingleOrDefault), new[] { typeof(T) }, Expression), ct);
+        public Task<int> ExecuteDeleteAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteDeleteAsync(Expression, ct);
+        public Task<int> ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).ExecuteUpdateAsync(Expression, set, ct);
     }
 
-    internal sealed class NormIncludableQueryable<T, TProperty> : NormQueryableBase<T>, INormIncludableQueryable<T, TProperty> where T : class, new()
+    internal sealed class NormIncludableQueryableUnconstrained<T, TProperty> : NormQueryableBase<T>, INormIncludableQueryable<T, TProperty>
+    {
+        public NormIncludableQueryableUnconstrained(IQueryProvider provider, Expression expression) : base(provider, expression)
+        {
+        }
+
+        public INormIncludableQueryable<T, TProperty2> Include<TProperty2>(Expression<Func<T, TProperty2>> path)
+        {
+            var method = typeof(INormQueryable<>).MakeGenericType(typeof(T))
+                .GetMethods()
+                .Single(m => m.Name == nameof(INormQueryable<T>.Include) && m.IsGenericMethod);
+            var generic = method.MakeGenericMethod(typeof(TProperty2));
+            var expression = Expression.Call(Expression, generic, Expression.Quote(path));
+            return new NormIncludableQueryableUnconstrained<T, TProperty2>(Provider, expression);
+        }
+
+        public INormQueryable<T> AsNoTracking()
+        {
+            var expression = Expression.Call(
+                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
+                nameof(INormQueryable<T>.AsNoTracking),
+                Type.EmptyTypes,
+                Expression
+            );
+            return new NormQueryableImplUnconstrained<T>(Provider, expression);
+        }
+
+        public INormQueryable<T> AsSplitQuery()
+        {
+            var expression = Expression.Call(
+                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
+                nameof(INormQueryable<T>.AsSplitQuery),
+                Type.EmptyTypes,
+                Expression
+            );
+            return new NormQueryableImplUnconstrained<T>(Provider, expression);
+        }
+
+        public IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).AsAsyncEnumerable<T>(Expression, ct);
+
+        public Task<List<T>> ToListAsync(CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).ExecuteAsync<List<T>>(Expression, ct);
+        public async Task<T[]> ToArrayAsync(CancellationToken ct = default) => (await ToListAsync(ct).ConfigureAwait(false)).ToArray();
+        public Task<int> CountAsync(CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).ExecuteAsync<int>(Expression.Call(typeof(Queryable), nameof(Queryable.Count), new[] { typeof(T) }, Expression), ct);
+        public async Task<bool> AnyAsync(CancellationToken ct = default)
+            => await ((NormQueryProvider)Provider).ExecuteAsync<bool>(Expression.Call(typeof(Queryable), nameof(Queryable.Any), new[] { typeof(T) }, Expression), ct).ConfigureAwait(false);
+        public Task<T> FirstAsync(CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).ExecuteAsync<T>(Expression.Call(typeof(Queryable), nameof(Queryable.First), new[] { typeof(T) }, Expression), ct);
+        public Task<T?> FirstOrDefaultAsync(CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).ExecuteAsync<T?>(Expression.Call(typeof(Queryable), nameof(Queryable.FirstOrDefault), new[] { typeof(T) }, Expression), ct);
+        public Task<T> SingleAsync(CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).ExecuteAsync<T>(Expression.Call(typeof(Queryable), nameof(Queryable.Single), new[] { typeof(T) }, Expression), ct);
+        public Task<T?> SingleOrDefaultAsync(CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).ExecuteAsync<T?>(Expression.Call(typeof(Queryable), nameof(Queryable.SingleOrDefault), new[] { typeof(T) }, Expression), ct);
+        public Task<int> ExecuteDeleteAsync(CancellationToken ct = default) => ((NormQueryProvider)Provider).ExecuteDeleteAsync(Expression, ct);
+        public Task<int> ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct = default)
+            => ((NormQueryProvider)Provider).ExecuteUpdateAsync(Expression, set, ct);
+    }
+
+    internal sealed class NormIncludableQueryable<T, TProperty> : NormQueryableBase<T>, INormIncludableQueryable<T, TProperty> where T : class
     {
         public NormIncludableQueryable(IQueryProvider provider, Expression expression) : base(provider, expression)
         {
@@ -282,7 +395,7 @@ namespace nORM.Core
         public static INormIncludableQueryable<TEntity, TProperty> ThenInclude<TEntity, TPreviousProperty, TProperty>(
             this INormIncludableQueryable<TEntity, TPreviousProperty> source,
             Expression<Func<TPreviousProperty, TProperty>> path)
-            where TEntity : class, new()
+            where TEntity : class
         {
             var method = ((System.Reflection.MethodInfo)System.Reflection.MethodBase.GetCurrentMethod()!)
                 .GetGenericMethodDefinition()
@@ -304,7 +417,7 @@ namespace nORM.Core
         public static INormIncludableQueryable<TEntity, TProperty> ThenInclude<TEntity, TPreviousProperty, TProperty>(
             this INormIncludableQueryable<TEntity, IEnumerable<TPreviousProperty>> source,
             Expression<Func<TPreviousProperty, TProperty>> path)
-            where TEntity : class, new()
+            where TEntity : class
         {
             var method = ((System.Reflection.MethodInfo)System.Reflection.MethodBase.GetCurrentMethod()!)
                 .GetGenericMethodDefinition()

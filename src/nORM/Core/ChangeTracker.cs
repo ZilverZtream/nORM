@@ -158,7 +158,9 @@ namespace nORM.Core
             {
                 var (entity, mapping, depth) = queue.Dequeue();
                 if (depth >= MaxCascadeDepth)
-                    continue;
+                    throw new InvalidOperationException(
+                        $"Cascade delete depth exceeded maximum of {MaxCascadeDepth}. " +
+                        "This may indicate a circular relationship or an unexpectedly deep hierarchy.");
                 foreach (var relation in mapping.Relations.Values)
                 {
                     if (!relation.CascadeDelete)

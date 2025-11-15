@@ -651,45 +651,69 @@ namespace nORM.Query
         {
             visitor.Visit(node.Object!);
             visitor._sql.Append(" LIKE ");
+
+            // Support both constant and variable values
             if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
             {
+                // Fast path for constants: pre-build the pattern
                 var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
                 visitor.AppendConstant(visitor.CreateSafeLikePattern(cs, LikeOperation.Contains), typeof(string));
                 visitor._sql.Append($" ESCAPE '{escChar}'");
             }
             else
             {
-                throw new NotSupportedException("Only constant values are supported in Contains().");
+                // Variable path: build pattern using SQL concatenation
+                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
+                visitor._sql.Append("CONCAT('%', ");
+                visitor.Visit(node.Arguments[0]);
+                visitor._sql.Append(", '%')");
+                visitor._sql.Append($" ESCAPE '{escChar}'");
             }
         }
         private static void HandleStringStartsWith(ExpressionToSqlVisitor visitor, MethodCallExpression node)
         {
             visitor.Visit(node.Object!);
             visitor._sql.Append(" LIKE ");
+
+            // Support both constant and variable values
             if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
             {
+                // Fast path for constants: pre-build the pattern
                 var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
                 visitor.AppendConstant(visitor.CreateSafeLikePattern(ss, LikeOperation.StartsWith), typeof(string));
                 visitor._sql.Append($" ESCAPE '{escChar}'");
             }
             else
             {
-                throw new NotSupportedException("Only constant values are supported in StartsWith().");
+                // Variable path: build pattern using SQL concatenation
+                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
+                visitor._sql.Append("CONCAT(");
+                visitor.Visit(node.Arguments[0]);
+                visitor._sql.Append(", '%')");
+                visitor._sql.Append($" ESCAPE '{escChar}'");
             }
         }
         private static void HandleStringEndsWith(ExpressionToSqlVisitor visitor, MethodCallExpression node)
         {
             visitor.Visit(node.Object!);
             visitor._sql.Append(" LIKE ");
+
+            // Support both constant and variable values
             if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
             {
+                // Fast path for constants: pre-build the pattern
                 var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
                 visitor.AppendConstant(visitor.CreateSafeLikePattern(es, LikeOperation.EndsWith), typeof(string));
                 visitor._sql.Append($" ESCAPE '{escChar}'");
             }
             else
             {
-                throw new NotSupportedException("Only constant values are supported in EndsWith().");
+                // Variable path: build pattern using SQL concatenation
+                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
+                visitor._sql.Append("CONCAT('%', ");
+                visitor.Visit(node.Arguments[0]);
+                visitor._sql.Append(")");
+                visitor._sql.Append($" ESCAPE '{escChar}'");
             }
         }
         // REFACTOR (TASK 16): Removed redundant IMethodTranslator interface and translator classes.
