@@ -20,6 +20,35 @@ namespace nORM.Query
     /// Creates and caches materializers used to project <see cref="DbDataReader"/> rows into objects.
     /// Optimized for JOIN scenarios with robust column mapping.
     /// </summary>
+    /// <remarks>
+    /// PERFORMANCE WARNING (TASK 14): This factory has an architectural issue with unnecessary task allocation.
+    ///
+    /// **The Problem:**
+    /// - The cache stores delegates of type `Func&lt;DbDataReader, CancellationToken, Task&lt;object&gt;&gt;`
+    /// - However, CreateMaterializerInternal produces synchronous delegates: `Func&lt;DbDataReader, object&gt;`
+    /// - These are wrapped in async lambdas: `(reader, ct) =&gt; Task.FromResult(sync(reader))`
+    /// - This means **every single row** allocates a new Task object via Task.FromResult
+    /// - For large result sets (100K+ rows), this creates significant GC pressure
+    ///
+    /// **Why This Happens:**
+    /// The async wrapper is cached, but Task.FromResult creates a new Task instance every time it's called.
+    /// Even though the underlying materializer is synchronous (IL.Emit, Expression trees), we pay the
+    /// async allocation cost on every row.
+    ///
+    /// **Correct Solution (Future Refactoring):**
+    /// 1. Cache synchronous delegates: `Func&lt;DbDataReader, object&gt;` (current CreateMaterializerInternal)
+    /// 2. Have QueryExecutor call sync delegates directly for synchronous queries (Materialize)
+    /// 3. Only wrap in Task.FromResult for async queries (MaterializeAsync), outside the cache
+    /// 4. This eliminates per-row Task allocation entirely for sync queries
+    /// 5. For async queries, consider using a ValueTask&lt;object&gt; cache to reduce allocations
+    ///
+    /// **Impact:**
+    /// - Async queries: ~40-80 bytes per row (Task object + continuation overhead)
+    /// - 100K rows = 4-8 MB of additional GC pressure
+    /// - Sync queries could be 5-10% faster without Task allocation
+    ///
+    /// This requires refactoring QueryExecutor to handle sync and async materializers separately.
+    /// </remarks>
     internal sealed class MaterializerFactory
     {
         private const int DefaultCacheSize = 2000; // Increased for JOIN scenarios
