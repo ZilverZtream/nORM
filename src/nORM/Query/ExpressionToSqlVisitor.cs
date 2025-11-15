@@ -626,33 +626,12 @@ namespace nORM.Query
             _sql.Remove(start, _sql.Length - start);
             return segment;
         }
+        /// <summary>
+        /// REFACTOR (TASK 19): Use shared ExpressionValueExtractor utility.
+        /// Eliminates duplicate logic and ensures consistent behavior across the codebase.
+        /// </summary>
         private static bool TryGetConstantValue(Expression e, out object? value, HashSet<Expression>? visited = null)
-        {
-            visited ??= new HashSet<Expression>(ReferenceEqualityComparer.Instance);
-            if (!visited.Add(e))
-            {
-                value = null;
-                return false;
-            }
-            switch (e)
-            {
-                case ConstantExpression ce:
-                    value = ce.Value;
-                    return true;
-                case MemberExpression me:
-                    if (me.Expression != null && TryGetConstantValue(me.Expression, out var obj, visited))
-                    {
-                        value = FastExpressionVisitorPool.GetMemberValue(me.Member, obj);
-                        return true;
-                    }
-                    break;
-                // SECURITY FIX (TASK 1): Removed MethodCallExpression handling to prevent RCE.
-                // Method calls should be translated to SQL (e.g., string.Contains) or throw NotSupportedException.
-                // Executing arbitrary user code via Invoke() is a critical security vulnerability.
-            }
-            value = null;
-            return false;
-        }
+            => ExpressionValueExtractor.TryGetConstantValue(e, out value, visited);
         private static Expression StripQuotes(Expression e)
             => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
         private static Type GetElementType(Expression queryExpression)
