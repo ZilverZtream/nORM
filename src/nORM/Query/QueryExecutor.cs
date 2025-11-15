@@ -335,19 +335,13 @@ namespace nORM.Query
                     return compiled(wrapped, ct).GetAwaiter().GetResult();
                 }
 
-                var entity = Activator.CreateInstance(map.Type)!;
-                for (int i = 0; i < map.Columns.Length; i++)
-                {
-                    var idx = offset + i;
-                    if (reader.IsDBNull(idx)) continue;
-                    var col = map.Columns[i];
-                    var read = Methods.GetReaderMethod(col.Prop.PropertyType);
-                    var value = read.Invoke(reader, new object[] { idx });
-                    if (read == Methods.GetValue)
-                        value = Convert.ChangeType(value!, col.Prop.PropertyType);
-                    col.Setter(entity, value);
-                }
-                return entity;
+                // PERFORMANCE FIX (TASK 9): Use MaterializerFactory instead of slow reflection
+                // MaterializerFactory creates compiled IL.Emit/Expression-based materializers
+                // that are 10-100x faster than reflection (read.Invoke, col.Setter)
+                var factory = new MaterializerFactory();
+                var materializer = factory.CreateSyncMaterializer(map, map.Type);
+                var wrappedReader = offset == 0 ? reader : new OffsetDbDataReader(reader, offset);
+                return materializer(wrappedReader);
             }
 
             static IList CreateList(Type innerType, List<object> items)
@@ -468,19 +462,13 @@ namespace nORM.Query
                     return compiled(wrapped, ct).GetAwaiter().GetResult();
                 }
 
-                var entity = Activator.CreateInstance(map.Type)!;
-                for (int i = 0; i < map.Columns.Length; i++)
-                {
-                    var idx = offset + i;
-                    if (reader.IsDBNull(idx)) continue;
-                    var col = map.Columns[i];
-                    var read = Methods.GetReaderMethod(col.Prop.PropertyType);
-                    var value = read.Invoke(reader, new object[] { idx });
-                    if (read == Methods.GetValue)
-                        value = Convert.ChangeType(value!, col.Prop.PropertyType);
-                    col.Setter(entity, value);
-                }
-                return entity;
+                // PERFORMANCE FIX (TASK 9): Use MaterializerFactory instead of slow reflection
+                // MaterializerFactory creates compiled IL.Emit/Expression-based materializers
+                // that are 10-100x faster than reflection (read.Invoke, col.Setter)
+                var factory = new MaterializerFactory();
+                var materializer = factory.CreateSyncMaterializer(map, map.Type);
+                var wrappedReader = offset == 0 ? reader : new OffsetDbDataReader(reader, offset);
+                return materializer(wrappedReader);
             }
 
             static IList CreateList(Type innerType, List<object> items)

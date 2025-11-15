@@ -136,10 +136,63 @@ namespace nORM.Providers
         /// <param name="columnName">The JSON column being accessed.</param>
         /// <param name="jsonPath">The JSON path expression (dot-delimited).</param>
         /// <returns>SQL fragment that retrieves the JSON value as text.</returns>
+        /// <remarks>
+        /// LIMITATION (TASK 13): This implementation only supports simple dot-notation paths (e.g., "root.child.property").
+        /// It does NOT support:
+        /// - Array accessors (e.g., "items[0]", "data[*]")
+        /// - Complex path expressions with brackets
+        /// - JSONPath filter expressions
+        /// For complex JSON querying, use raw SQL with PostgreSQL's native JSON operators instead.
+        /// Example supported: "user.address.city"
+        /// Example NOT supported: "users[0].address", "items[*].name"
+        ///
+        /// PERFORMANCE FIX (TASK 20): Use pooled StringBuilder instead of LINQ + string.Join.
+        /// Previous implementation: jsonPath.Split('.').Skip(1).Select(p => $"'{p}'") created:
+        /// - string[] array from Split
+        /// - IEnumerable wrapper from Skip
+        /// - IEnumerable wrapper from Select
+        /// - Multiple string allocations per path segment
+        /// New implementation: Single pooled StringBuilder, manual IndexOf iteration, zero LINQ allocations.
+        /// </remarks>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
         {
-            var pgPath = string.Join(",", jsonPath.Split('.').Skip(1).Select(p => $"'{p}'"));
-            return $"jsonb_extract_path_text({columnName}, {pgPath})";
+            var sb = _stringBuilderPool.Get();
+            try
+            {
+                sb.Append("jsonb_extract_path_text(");
+                sb.Append(columnName);
+                sb.Append(", ");
+
+                // Skip first segment (root '$') and build comma-separated quoted path
+                int startIndex = jsonPath.IndexOf('.') + 1;
+                bool isFirst = true;
+
+                while (startIndex < jsonPath.Length)
+                {
+                    int dotIndex = jsonPath.IndexOf('.', startIndex);
+                    int endIndex = dotIndex >= 0 ? dotIndex : jsonPath.Length;
+
+                    if (!isFirst)
+                    {
+                        sb.Append(", ");
+                    }
+                    isFirst = false;
+
+                    sb.Append('\'');
+                    sb.Append(jsonPath, startIndex, endIndex - startIndex);
+                    sb.Append('\'');
+
+                    startIndex = endIndex + 1;
+                }
+
+                sb.Append(')');
+                return sb.ToString();
+            }
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
         }
 
         /// <summary>

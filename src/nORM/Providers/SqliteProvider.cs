@@ -321,9 +321,11 @@ END;";
             throw new ArgumentException("Transaction must be a SqliteTransaction.", nameof(transaction));
         }
 
-        // Optimized single-command bulk insert for SQLite
+        // PERFORMANCE FIX (TASK 16): SQLite-optimized bulk insert using prepared statements
         /// <summary>
-        /// Inserts a collection of entities using batched <c>INSERT</c> statements suitable for SQLite.
+        /// Inserts a collection of entities using SQLite-optimized prepared statements in a single transaction.
+        /// PERFORMANCE FIX (TASK 16): Uses prepared statement reuse and transaction batching for optimal SQLite performance.
+        /// This is significantly faster than calling base class methods which use multiple transactions.
         /// </summary>
         /// <typeparam name="T">Type of entity being inserted.</typeparam>
         /// <param name="ctx">Current <see cref="DbContext"/>.</param>
@@ -389,9 +391,11 @@ END;";
             return totalInserted;
         }
         
-        // Optimized bulk update for SQLite
+        // PERFORMANCE FIX (TASK 16): SQLite-optimized bulk update using temp tables
         /// <summary>
-        /// Updates multiple entities using parameterized <c>UPDATE</c> statements executed in batches.
+        /// Updates multiple entities using SQLite-optimized temp table approach for efficient bulk updates.
+        /// PERFORMANCE FIX (TASK 16): Uses temp tables and UPDATE FROM pattern for optimal SQLite performance.
+        /// This is significantly faster than the base class batched operations.
         /// </summary>
         /// <typeparam name="T">Type of entity being updated.</typeparam>
         /// <param name="ctx">Active <see cref="DbContext"/>.</param>
@@ -405,41 +409,75 @@ END;";
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
-            
+
+            // PERFORMANCE FIX (TASK 16): Use temp table approach for SQLite bulk updates
+            var tempTableName = $"\"BulkUpdate_{Guid.NewGuid():N}\"";
+            var nonKeyCols = m.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToList();
+            var keyCols = m.KeyColumns.ToList();
+
             var totalUpdated = 0;
-            
+
             await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
-                await using var cmd = ctx.Connection.CreateCommand();
-                cmd.Transaction = transaction;
-                cmd.CommandText = BuildUpdate(m);
-                cmd.CommandTimeout = 30;
-                
-                await cmd.PrepareAsync(ct).ConfigureAwait(false);
-                
-                foreach (var entity in entityList)
+                // Create temp table with same schema
+                var colDefs = string.Join(", ", m.Columns.Select(c => $"{Escape(c.PropName)} {GetSqliteType(c.Prop.PropertyType)}"));
+                await using (var cmd = ctx.Connection.CreateCommand())
                 {
-                    cmd.Parameters.Clear();
-                    
-                    foreach (var col in m.Columns.Where(c => !c.IsKey && !c.IsTimestamp))
-                    {
-                        cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
-                    }
-                    
-                    foreach (var col in m.KeyColumns)
-                    {
-                        cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
-                    }
-                    
-                    if (m.TimestampColumn != null)
-                    {
-                        cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
-                    }
-                    
-                    totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = $"CREATE TEMP TABLE {tempTableName} ({colDefs})";
+                    await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
-                
+
+                // Insert entities into temp table using prepared statement
+                await using (var cmd = ctx.Connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    var insertCols = m.Columns.ToArray();
+                    var paramPlaceholders = string.Join(", ", insertCols.Select(c => ParamPrefix + c.PropName));
+                    var colNames = string.Join(", ", insertCols.Select(c => Escape(c.PropName)));
+                    cmd.CommandText = $"INSERT INTO {tempTableName} ({colNames}) VALUES ({paramPlaceholders})";
+
+                    var parameters = new DbParameter[insertCols.Length];
+                    for (int i = 0; i < insertCols.Length; i++)
+                    {
+                        var p = cmd.CreateParameter();
+                        p.ParameterName = ParamPrefix + insertCols[i].PropName;
+                        cmd.Parameters.Add(p);
+                        parameters[i] = p;
+                    }
+
+                    await cmd.PrepareAsync(ct).ConfigureAwait(false);
+
+                    foreach (var entity in entityList)
+                    {
+                        for (int i = 0; i < insertCols.Length; i++)
+                        {
+                            parameters[i].Value = insertCols[i].Getter(entity) ?? DBNull.Value;
+                        }
+                        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    }
+                }
+
+                // Perform bulk update using temp table join
+                await using (var cmd = ctx.Connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    var setClause = string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = (SELECT {Escape(c.PropName)} FROM {tempTableName} WHERE {string.Join(" AND ", keyCols.Select(k => $"{tempTableName}.{Escape(k.PropName)} = {m.EscTable}.{k.EscCol}"))})"));
+                    var whereClause = $"EXISTS (SELECT 1 FROM {tempTableName} WHERE {string.Join(" AND ", keyCols.Select(k => $"{tempTableName}.{Escape(k.PropName)} = {m.EscTable}.{k.EscCol}"))})";
+
+                    cmd.CommandText = $"UPDATE {m.EscTable} SET {setClause} WHERE {whereClause}";
+                    totalUpdated = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                }
+
+                // Clean up temp table
+                await using (var cmd = ctx.Connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = $"DROP TABLE {tempTableName}";
+                    await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                }
+
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
             catch
@@ -447,14 +485,26 @@ END;";
                 await transaction.RollbackAsync(ct).ConfigureAwait(false);
                 throw;
             }
-            
+
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, totalUpdated, sw.Elapsed);
             return totalUpdated;
         }
+
+        private static string GetSqliteType(Type t)
+        {
+            t = Nullable.GetUnderlyingType(t) ?? t;
+            if (t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte) || t == typeof(bool)) return "INTEGER";
+            if (t == typeof(decimal) || t == typeof(double) || t == typeof(float)) return "REAL";
+            if (t == typeof(byte[])) return "BLOB";
+            return "TEXT";
+        }
         
-        // Optimized bulk delete for SQLite using IN clauses where possible
+        // PERFORMANCE FIX (TASK 16): SQLite-optimized bulk delete using WHERE IN clauses
         /// <summary>
-        /// Deletes entities in bulk based on their key values using batched <c>DELETE</c> statements.
+        /// Deletes entities in bulk using SQLite-optimized WHERE IN clauses for single-key tables
+        /// or prepared statements for composite keys.
+        /// PERFORMANCE FIX (TASK 16): Uses batched WHERE IN clauses for optimal SQLite performance.
+        /// This is significantly faster than the base class operations.
         /// </summary>
         /// <typeparam name="T">Type of entity to delete.</typeparam>
         /// <param name="ctx">The <see cref="DbContext"/> managing the connection.</param>

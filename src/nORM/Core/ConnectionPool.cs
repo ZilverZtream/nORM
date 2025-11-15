@@ -47,7 +47,9 @@ namespace nORM.Core
     public sealed class ConnectionPool : IAsyncDisposable, IDisposable
     {
         private readonly Func<DbConnection> _connectionFactory;
-        private readonly ConcurrentQueue<PooledItem> _pool = new();
+        // PERFORMANCE FIX (TASK 15): Use ConcurrentBag instead of ConcurrentQueue to avoid
+        // churning during cleanup. ConcurrentBag allows iteration without dequeue/enqueue cycles.
+        private readonly ConcurrentBag<PooledItem> _pool = new();
         private readonly SemaphoreSlim _semaphore = new(1, 1);
         private readonly Timer _cleanupTimer;
         private readonly int _minSize;
@@ -111,7 +113,7 @@ namespace nORM.Core
                             {
                                 cn = _connectionFactory();
                                 await cn.OpenAsync().ConfigureAwait(false);
-                                _pool.Enqueue(new PooledItem(cn));
+                                _pool.Add(new PooledItem(cn));
                                 Interlocked.Increment(ref _created);
                                 cn = null;
                             }
@@ -138,7 +140,7 @@ namespace nORM.Core
 
             while (true)
             {
-                if (_pool.TryDequeue(out var item))
+                if (_pool.TryTake(out var item))
                 {
                     // Ensure it's open and usable
                     if (item.Connection.State != ConnectionState.Open)
@@ -204,7 +206,7 @@ namespace nORM.Core
             Interlocked.Increment(ref _returning);
             try
             {
-                _pool.Enqueue(new PooledItem(connection) { LastUsed = DateTime.UtcNow });
+                _pool.Add(new PooledItem(connection) { LastUsed = DateTime.UtcNow });
                 // PERFORMANCE FIX (TASK 4): Signal waiting threads that a connection is available
                 _availableSemaphore.Release();
             }
@@ -223,33 +225,38 @@ namespace nORM.Core
 
             try
             {
+                // PERFORMANCE FIX (TASK 15): Iterate ConcurrentBag without dequeue/enqueue churn
+                // ConcurrentBag allows enumeration without modification, avoiding queue churning
                 var threshold = DateTime.UtcNow - _idleLifetime;
-                var itemsToRequeue = new List<PooledItem>();
                 int currentCreated = Volatile.Read(ref _created);
                 int maxToDispose = currentCreated - _minSize;
                 if (maxToDispose <= 0) return;
 
-                int checkedCount = 0;
-                const int MaxCheckFactor = 2;
-                int maxCheck = maxToDispose * MaxCheckFactor;
+                var itemsToDispose = new List<PooledItem>();
 
-                while (checkedCount < maxCheck && maxToDispose > 0 && _pool.TryDequeue(out var item))
+                // Collect items that need disposal without removing them yet
+                foreach (var item in _pool)
                 {
-                    checkedCount++;
+                    if (item.LastUsed < threshold && itemsToDispose.Count < maxToDispose)
+                    {
+                        itemsToDispose.Add(item);
+                    }
+                }
 
-                    if (item.LastUsed < threshold)
+                // Now remove and dispose collected items
+                foreach (var item in itemsToDispose)
+                {
+                    if (_pool.TryTake(out var taken) && ReferenceEquals(taken, item))
                     {
                         try { item.Connection.Dispose(); } catch { }
                         Interlocked.Decrement(ref _created);
-                        maxToDispose--;
-                        continue;
                     }
-
-                    itemsToRequeue.Add(item);
+                    else if (taken != null)
+                    {
+                        // Put back if we took wrong item
+                        _pool.Add(taken);
+                    }
                 }
-
-                foreach (var item in itemsToRequeue)
-                    _pool.Enqueue(item);
             }
             finally
             {
@@ -284,7 +291,7 @@ namespace nORM.Core
             if (_disposed) return;
             _disposed = true;
             _cleanupTimer.Dispose();
-            while (_pool.TryDequeue(out var item))
+            while (_pool.TryTake(out var item))
             {
                 try { item.Connection.Dispose(); } catch { }
             }
