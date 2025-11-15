@@ -92,10 +92,47 @@ namespace nORM.Query
             }
             if (body is BinaryExpression be && be.NodeType == ExpressionType.Equal && be.Left is MemberExpression me)
             {
+                // SECURITY FIX (TASK 1): Only accept ConstantExpression or simple MemberExpression.
+                // Never compile and execute arbitrary expressions (RCE vulnerability).
+                // Complex expressions should fall back to the safe ExpressionToSqlVisitor.
+                if (!TryGetSimpleValue(be.Right, out var value))
+                    return false;
+
+                info = new WhereInfo(me.Member.Name, value!);
+                return true;
+            }
+            return false;
+        }
+        /// <summary>
+        /// Safely extracts a constant value from an expression without executing arbitrary code.
+        /// Only supports ConstantExpression and simple MemberExpression (accessing a field/property).
+        /// </summary>
+        /// <param name="expr">The expression to extract a value from.</param>
+        /// <param name="value">The extracted value, or null if extraction failed.</param>
+        /// <returns>True if the value was successfully extracted; false otherwise.</returns>
+        private static bool TryGetSimpleValue(Expression expr, out object? value)
+        {
+            value = null;
+
+            // Direct constant
+            if (expr is ConstantExpression ce)
+            {
+                value = ce.Value;
+                return true;
+            }
+
+            // Simple member access (e.g., accessing a captured variable or field)
+            if (expr is MemberExpression me && me.Expression is ConstantExpression mce)
+            {
                 try
                 {
-                    object value = be.Right is ConstantExpression c ? c.Value! : Expression.Lambda(be.Right).Compile().DynamicInvoke()!;
-                    info = new WhereInfo(me.Member.Name, value);
+                    // Safe: We're only accessing a field/property on a known constant object
+                    if (me.Member is System.Reflection.FieldInfo fi)
+                        value = fi.GetValue(mce.Value);
+                    else if (me.Member is System.Reflection.PropertyInfo pi)
+                        value = pi.GetValue(mce.Value);
+                    else
+                        return false;
                     return true;
                 }
                 catch
@@ -103,8 +140,12 @@ namespace nORM.Query
                     return false;
                 }
             }
+
+            // All other expressions (method calls, complex expressions, etc.) are rejected
+            // to avoid potential code execution vulnerabilities
             return false;
         }
+
         private static bool IsSimpleTakePattern(Expression expr, out int? takeCount)
         {
             takeCount = null;

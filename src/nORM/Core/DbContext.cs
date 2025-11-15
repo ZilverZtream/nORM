@@ -404,15 +404,32 @@ namespace nORM.Core
         /// change tracking overhead entirely.
         /// </remarks>
         public Task<int> SaveChangesAsync(CancellationToken ct = default)
-            => SaveChangesWithRetryAsync(ct);
+            => SaveChangesWithRetryAsync(detectChanges: true, ct);
+
+        /// <summary>
+        /// Persists all tracked changes to the database. The operation is executed
+        /// using the configured retry policy which transparently retries transient
+        /// failures such as deadlocks.
+        /// </summary>
+        /// <param name="detectChanges">
+        /// PERFORMANCE FIX (TASK 12): If true, automatically calls <see cref="ChangeTracker.DetectChanges"/>
+        /// before saving. If false, assumes changes have been manually tracked or detected.
+        /// Set to false for performance in scenarios with many tracked entities where you've
+        /// manually set entity states using <c>context.Entry(entity).State = EntityState.Modified</c>.
+        /// </param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The total number of state entries written to the database.</returns>
+        public Task<int> SaveChangesAsync(bool detectChanges, CancellationToken ct = default)
+            => SaveChangesWithRetryAsync(detectChanges, ct);
 
         /// <summary>
         /// Invokes <see cref="SaveChangesInternalAsync"/> using the configured retry policy to
         /// transparently retry transient failures such as deadlocks.
         /// </summary>
+        /// <param name="detectChanges">If true, calls ChangeTracker.DetectChanges before saving.</param>
         /// <param name="ct">Token used to cancel the save operation.</param>
         /// <returns>The number of state entries written to the database.</returns>
-        private async Task<int> SaveChangesWithRetryAsync(CancellationToken ct)
+        private async Task<int> SaveChangesWithRetryAsync(bool detectChanges, CancellationToken ct)
         {
             var policy = Options.RetryPolicy;
             var maxRetries = policy?.MaxRetries ?? 1;
@@ -422,7 +439,7 @@ namespace nORM.Core
             {
                 try
                 {
-                    return await SaveChangesInternalAsync(ct).ConfigureAwait(false);
+                    return await SaveChangesInternalAsync(detectChanges, ct).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (attempt < maxRetries - 1 && IsRetryableException(ex))
                 {
@@ -437,11 +454,20 @@ namespace nORM.Core
         /// <summary>
         /// Persists all tracked entity changes to the database within a single transaction.
         /// </summary>
+        /// <param name="detectChanges">
+        /// PERFORMANCE FIX (TASK 12): If true, calls ChangeTracker.DetectChanges before saving.
+        /// DetectChanges iterates all tracked entities and compares their current values to
+        /// original values, which can be expensive for contexts tracking thousands of entities.
+        /// </param>
         /// <param name="ct">Token used to cancel the save operation.</param>
         /// <returns>The total number of state entries written to the database.</returns>
-        private async Task<int> SaveChangesInternalAsync(CancellationToken ct)
+        private async Task<int> SaveChangesInternalAsync(bool detectChanges, CancellationToken ct)
         {
-            ChangeTracker.DetectChanges();
+            // PERFORMANCE FIX (TASK 12): Only detect changes if requested
+            if (detectChanges)
+            {
+                ChangeTracker.DetectChanges();
+            }
             var changedEntries = ChangeTracker.Entries
                 .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
                 .ToList();
