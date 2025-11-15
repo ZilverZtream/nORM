@@ -459,12 +459,18 @@ namespace nORM.Query
                 elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
             }
             var mapping = _ctx.GetMapping(elementType);
-            var materializer = new MaterializerFactory().CreateMaterializer(mapping, elementType);
+
+            // PERFORMANCE FIX (TASK 14): Create both sync and async materializers
+            var factory = new MaterializerFactory();
+            var materializer = factory.CreateMaterializer(mapping, elementType);
+            var syncMaterializer = factory.CreateSyncMaterializer(mapping, elementType);
+
             var plan = new QueryPlan(
                 sql,
                 parameters,
                 Array.Empty<string>(),
                 materializer,
+                syncMaterializer,
                 elementType,
                 IsScalar: false,
                 SingleResult: !returnsList,
@@ -516,12 +522,18 @@ namespace nORM.Query
                 elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
             }
             var mapping = _ctx.GetMapping(elementType);
-            var materializer = new MaterializerFactory().CreateMaterializer(mapping, elementType);
+
+            // PERFORMANCE FIX (TASK 14): Create both sync and async materializers
+            var factory = new MaterializerFactory();
+            var materializer = factory.CreateMaterializer(mapping, elementType);
+            var syncMaterializer = factory.CreateSyncMaterializer(mapping, elementType);
+
             var plan = new QueryPlan(
                 sql,
                 parameters,
                 Array.Empty<string>(),
                 materializer,
+                syncMaterializer,
                 elementType,
                 IsScalar: false,
                 SingleResult: !returnsList,

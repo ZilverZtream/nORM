@@ -10,6 +10,32 @@ namespace nORM.Core
     /// <summary>
     /// Manages a single database connection in an asynchronous and thread-safe manner.
     /// </summary>
+    /// <remarks>
+    /// CRITICAL ARCHITECTURAL WARNING (TASK 2): This class is fundamentally broken and should not be used.
+    ///
+    /// **The Problem:**
+    /// This class wraps a single <see cref="DbConnection"/> instance and uses a <see cref="SemaphoreSlim"/>
+    /// to allow multiple concurrent operations to execute on it. However, a single DbConnection instance
+    /// is NOT thread-safe. Running concurrent operations on the same connection, even if async, will lead to:
+    /// - Data corruption and race conditions
+    /// - Unpredictable exceptions (e.g., "DataReader already open")
+    /// - Invalid state (e.g., one operation reading results while another starts a new command)
+    ///
+    /// **Why the Semaphore Doesn't Help:**
+    /// The semaphore ensures that at most N operations can run concurrently, but they all share the same
+    /// DbConnection object. ADO.NET providers (SQL Server, PostgreSQL, MySQL, etc.) do not support
+    /// concurrent command execution on a single connection instance.
+    ///
+    /// **Correct Alternatives:**
+    /// - Use <see cref="ConnectionPool"/> to manage multiple connections (one per concurrent operation)
+    /// - Use <see cref="ConnectionManager"/> for topology-aware scenarios (read replicas, failover)
+    /// - Rely on provider-level connection pooling (configured via connection string)
+    ///
+    /// This class is marked as Obsolete and will be removed in a future version.
+    /// </remarks>
+    [Obsolete("This class is fundamentally broken due to concurrent access to a single DbConnection instance. " +
+              "Use ConnectionPool or ConnectionManager instead, which provide proper connection-per-operation semantics. " +
+              "This class will be removed in a future version.", error: true)]
     public class AsyncConnectionManager
     {
         private readonly SemaphoreSlim _connectionSemaphore;

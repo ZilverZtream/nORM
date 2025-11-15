@@ -38,10 +38,28 @@ namespace nORM.Providers
 
         /// <summary>
         /// Escapes an identifier such as a table or column name using SQL Server brackets.
+        /// Handles multi-part identifiers (schema.table) correctly by escaping each part.
         /// </summary>
-        /// <param name="id">The identifier to escape.</param>
-        /// <returns>The escaped identifier.</returns>
-        public override string Escape(string id) => $"[{id}]";
+        /// <param name="id">The identifier to escape (e.g., "table" or "schema.table").</param>
+        /// <returns>The escaped identifier (e.g., "[table]" or "[schema].[table]").</returns>
+        /// <remarks>
+        /// BUG FIX (TASK 17): Properly escape multi-part identifiers.
+        /// Previously "schema.table" became "[schema.table]" (invalid SQL).
+        /// Now it correctly becomes "[schema].[table]".
+        /// </remarks>
+        public override string Escape(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return id;
+
+            // Split by dot and escape each part individually to support schema.table notation
+            if (id.Contains('.'))
+            {
+                return string.Join(".", id.Split('.').Select(part => $"[{part}]"));
+            }
+
+            return $"[{id}]";
+        }
 
         /// <summary>
         /// Adds SQL Server paging clauses to the SQL builder using <c>OFFSET</c> and <c>FETCH</c>.
@@ -658,10 +676,44 @@ END;";
             public int RecordsAffected => -1;
 
             /// <summary>
-            /// Returns a <see cref="DataTable"/> describing the column metadata. Not supported and
-            /// always returns <c>null</c>.
+            /// Returns a <see cref="DataTable"/> describing the column metadata for this reader.
+            /// BUG FIX (TASK 25): Implemented GetSchemaTable to support SqlBulkCopy scenarios
+            /// that rely on schema information.
             /// </summary>
-            public DataTable? GetSchemaTable() => null;
+            public DataTable? GetSchemaTable()
+            {
+                var schemaTable = new DataTable("SchemaTable");
+
+                // Add standard schema columns used by SqlBulkCopy and other data readers
+                schemaTable.Columns.Add("ColumnName", typeof(string));
+                schemaTable.Columns.Add("ColumnOrdinal", typeof(int));
+                schemaTable.Columns.Add("ColumnSize", typeof(int));
+                schemaTable.Columns.Add("DataType", typeof(Type));
+                schemaTable.Columns.Add("AllowDBNull", typeof(bool));
+                schemaTable.Columns.Add("IsKey", typeof(bool));
+                schemaTable.Columns.Add("IsUnique", typeof(bool));
+                schemaTable.Columns.Add("IsReadOnly", typeof(bool));
+
+                // Populate schema rows from column metadata
+                for (int i = 0; i < _columns.Count; i++)
+                {
+                    var column = _columns[i];
+                    var row = schemaTable.NewRow();
+
+                    row["ColumnName"] = column.PropName;
+                    row["ColumnOrdinal"] = i;
+                    row["ColumnSize"] = -1; // Unknown/variable size
+                    row["DataType"] = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
+                    row["AllowDBNull"] = Nullable.GetUnderlyingType(column.Prop.PropertyType) != null || !column.Prop.PropertyType.IsValueType;
+                    row["IsKey"] = column.IsKey;
+                    row["IsUnique"] = column.IsKey;
+                    row["IsReadOnly"] = false;
+
+                    schemaTable.Rows.Add(row);
+                }
+
+                return schemaTable;
+            }
 
             /// <summary>
             /// Closes the reader and releases the underlying enumerator.
@@ -679,9 +731,34 @@ END;";
             public byte GetByte(int i) => (byte)GetValue(i);
 
             /// <summary>
-            /// Reads a stream of bytes from the specified column. Not supported in this reader.
+            /// Reads a stream of bytes from the specified column.
+            /// BUG FIX (TASK 21): Implemented GetBytes to support bulk copying entities with byte[] properties.
             /// </summary>
-            public long GetBytes(int i, long fieldOffset, byte[]? buffer, int bufferoffset, int length) => throw new NotSupportedException();
+            public long GetBytes(int i, long fieldOffset, byte[]? buffer, int bufferoffset, int length)
+            {
+                if (_current == null)
+                    throw new InvalidOperationException("No current record");
+
+                var value = _columns[i].Getter(_current);
+                if (value == null || value == DBNull.Value)
+                    return 0;
+
+                if (value is not byte[] bytes)
+                    throw new InvalidCastException($"Column {i} is not a byte array");
+
+                // If buffer is null, return the total length of the data
+                if (buffer == null)
+                    return bytes.Length;
+
+                // Calculate how many bytes to copy
+                var bytesToCopy = Math.Min(length, bytes.Length - (int)fieldOffset);
+                if (bytesToCopy <= 0)
+                    return 0;
+
+                // Copy the data
+                Array.Copy(bytes, (int)fieldOffset, buffer, bufferoffset, bytesToCopy);
+                return bytesToCopy;
+            }
 
             /// <summary>
             /// Gets the value of the specified column cast to <see cref="char"/>.
@@ -689,9 +766,45 @@ END;";
             public char GetChar(int i) => (char)GetValue(i);
 
             /// <summary>
-            /// Reads a stream of characters from the specified column. Not supported in this reader.
+            /// Reads a stream of characters from the specified column.
+            /// BUG FIX (TASK 21): Implemented GetChars to support bulk copying entities with char[] or string properties.
             /// </summary>
-            public long GetChars(int i, long fieldoffset, char[]? buffer, int bufferoffset, int length) => throw new NotSupportedException();
+            public long GetChars(int i, long fieldoffset, char[]? buffer, int bufferoffset, int length)
+            {
+                if (_current == null)
+                    throw new InvalidOperationException("No current record");
+
+                var value = _columns[i].Getter(_current);
+                if (value == null || value == DBNull.Value)
+                    return 0;
+
+                char[] chars;
+                if (value is string str)
+                {
+                    chars = str.ToCharArray();
+                }
+                else if (value is char[] charArray)
+                {
+                    chars = charArray;
+                }
+                else
+                {
+                    throw new InvalidCastException($"Column {i} is not a string or char array");
+                }
+
+                // If buffer is null, return the total length of the data
+                if (buffer == null)
+                    return chars.Length;
+
+                // Calculate how many characters to copy
+                var charsToCopy = Math.Min(length, chars.Length - (int)fieldoffset);
+                if (charsToCopy <= 0)
+                    return 0;
+
+                // Copy the data
+                Array.Copy(chars, (int)fieldoffset, buffer, bufferoffset, charsToCopy);
+                return charsToCopy;
+            }
 
             /// <summary>
             /// Gets an <see cref="IDataReader"/> for the specified column. Not supported in this reader.
