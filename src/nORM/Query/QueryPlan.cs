@@ -14,6 +14,7 @@ namespace nORM.Query
         IReadOnlyDictionary<string, object> Parameters,
         IReadOnlyList<string> CompiledParameters,
         Func<DbDataReader, CancellationToken, Task<object>> Materializer,
+        Func<DbDataReader, object> SyncMaterializer,
         Type ElementType,
         bool IsScalar,
         bool SingleResult,

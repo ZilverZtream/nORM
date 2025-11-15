@@ -196,10 +196,38 @@ namespace nORM.Core
         }
         internal TimeSpan GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType operationType, string? sql = null, int recordCount = 1)
         {
-            // PERFORMANCE FIX (TASK 10): Removed naive regex-based complexity estimation.
-            // Real complexity requires full SQL parsing. Instead, rely on operationType and historical
-            // performance tracking by the AdaptiveTimeoutManager.
-            const int baseComplexity = 1;
+            // PERFORMANCE FIX (TASK 16): Provide basic query complexity estimation.
+            // Previous implementation used const baseComplexity = 1 for all queries, making the
+            // "adaptive" timeout manager ineffective. A simple length-based heuristic helps
+            // differentiate simple queries (SELECT * FROM T WHERE PK=1) from complex ones
+            // (full-text search, multi-way joins, subqueries).
+            //
+            // This is still basic, but better than treating all queries identically. The adaptive
+            // timeout manager can now learn that simple queries should be fast while complex queries
+            // may take longer.
+            int baseComplexity = 1;
+
+            if (!string.IsNullOrEmpty(sql))
+            {
+                // Simple heuristic: longer SQL = more complex
+                // Base of 1 + (length / 100) gives reasonable scaling
+                // - 100 char query = complexity 2
+                // - 500 char query = complexity 6
+                // - 1000 char query = complexity 11
+                baseComplexity = 1 + (sql.Length / 100);
+
+                // Additional complexity signals (case-insensitive checks)
+                var upperSql = sql.ToUpperInvariant();
+                if (upperSql.Contains("JOIN")) baseComplexity += 2;
+                if (upperSql.Contains("UNION")) baseComplexity += 2;
+                if (upperSql.Contains("GROUP BY")) baseComplexity += 1;
+                if (upperSql.Contains("ORDER BY")) baseComplexity += 1;
+                if (upperSql.Contains("DISTINCT")) baseComplexity += 1;
+
+                // Cap complexity to avoid extreme timeouts
+                baseComplexity = Math.Min(baseComplexity, 50);
+            }
+
             return _timeoutManager.GetTimeoutForOperation(operationType, recordCount, baseComplexity);
         }
 
@@ -404,15 +432,32 @@ namespace nORM.Core
         /// change tracking overhead entirely.
         /// </remarks>
         public Task<int> SaveChangesAsync(CancellationToken ct = default)
-            => SaveChangesWithRetryAsync(ct);
+            => SaveChangesWithRetryAsync(detectChanges: true, ct);
+
+        /// <summary>
+        /// Persists all tracked changes to the database. The operation is executed
+        /// using the configured retry policy which transparently retries transient
+        /// failures such as deadlocks.
+        /// </summary>
+        /// <param name="detectChanges">
+        /// PERFORMANCE FIX (TASK 12): If true, automatically calls <see cref="ChangeTracker.DetectChanges"/>
+        /// before saving. If false, assumes changes have been manually tracked or detected.
+        /// Set to false for performance in scenarios with many tracked entities where you've
+        /// manually set entity states using <c>context.Entry(entity).State = EntityState.Modified</c>.
+        /// </param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>The total number of state entries written to the database.</returns>
+        public Task<int> SaveChangesAsync(bool detectChanges, CancellationToken ct = default)
+            => SaveChangesWithRetryAsync(detectChanges, ct);
 
         /// <summary>
         /// Invokes <see cref="SaveChangesInternalAsync"/> using the configured retry policy to
         /// transparently retry transient failures such as deadlocks.
         /// </summary>
+        /// <param name="detectChanges">If true, calls ChangeTracker.DetectChanges before saving.</param>
         /// <param name="ct">Token used to cancel the save operation.</param>
         /// <returns>The number of state entries written to the database.</returns>
-        private async Task<int> SaveChangesWithRetryAsync(CancellationToken ct)
+        private async Task<int> SaveChangesWithRetryAsync(bool detectChanges, CancellationToken ct)
         {
             var policy = Options.RetryPolicy;
             var maxRetries = policy?.MaxRetries ?? 1;
@@ -422,7 +467,7 @@ namespace nORM.Core
             {
                 try
                 {
-                    return await SaveChangesInternalAsync(ct).ConfigureAwait(false);
+                    return await SaveChangesInternalAsync(detectChanges, ct).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (attempt < maxRetries - 1 && IsRetryableException(ex))
                 {
@@ -437,11 +482,20 @@ namespace nORM.Core
         /// <summary>
         /// Persists all tracked entity changes to the database within a single transaction.
         /// </summary>
+        /// <param name="detectChanges">
+        /// PERFORMANCE FIX (TASK 12): If true, calls ChangeTracker.DetectChanges before saving.
+        /// DetectChanges iterates all tracked entities and compares their current values to
+        /// original values, which can be expensive for contexts tracking thousands of entities.
+        /// </param>
         /// <param name="ct">Token used to cancel the save operation.</param>
         /// <returns>The total number of state entries written to the database.</returns>
-        private async Task<int> SaveChangesInternalAsync(CancellationToken ct)
+        private async Task<int> SaveChangesInternalAsync(bool detectChanges, CancellationToken ct)
         {
-            ChangeTracker.DetectChanges();
+            // PERFORMANCE FIX (TASK 12): Only detect changes if requested
+            if (detectChanges)
+            {
+                ChangeTracker.DetectChanges();
+            }
             var changedEntries = ChangeTracker.Entries
                 .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
                 .ToList();
@@ -1152,6 +1206,14 @@ namespace nORM.Core
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
                 NormValidator.ValidateRawSql(sql, paramDict);
 
+                // PERFORMANCE WARNING (TASK 10): This method uses slow reflection-based materialization.
+                // For better performance, consider refactoring to use MaterializerFactory, which compiles
+                // high-speed IL.Emit or Expression-based materializers. The current approach calls:
+                // - GetProperties() - reflection metadata
+                // - TryGetValue() - dictionary lookup per column per row
+                // - prop.SetValue() - slow reflection-based property setter per column per row
+                // For large result sets, this can be 10-100x slower than compiled materializers.
+                // TODO: Create a temporary TableMapping from props dictionary and use MaterializerFactory.
                 var props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
                     .Where(p => p.CanWrite)
                     .ToDictionary(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase);
