@@ -134,12 +134,112 @@ namespace nORM.Providers
         /// Produces a SQL fragment that accesses a JSON value using PostgreSQL's <c>jsonb_extract_path_text</c>.
         /// </summary>
         /// <param name="columnName">The JSON column being accessed.</param>
-        /// <param name="jsonPath">The JSON path expression (dot-delimited).</param>
+        /// <param name="jsonPath">The JSON path expression supporting dot notation and array accessors (e.g., $.items[0].tags[1].name).</param>
         /// <returns>SQL fragment that retrieves the JSON value as text.</returns>
+        /// <remarks>
+        /// RELIABILITY FIX (TASK 18): Robust JSONPath parser replaces brittle Split('.') approach.
+        /// Now correctly handles array accessors and complex nested paths.
+        /// </remarks>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
         {
-            var pgPath = string.Join(",", jsonPath.Split('.').Skip(1).Select(p => $"'{p}'"));
+            var segments = ParseJsonPath(jsonPath);
+            var pgPath = string.Join(", ", segments.Select(s => $"'{s}'"));
             return $"jsonb_extract_path_text({columnName}, {pgPath})";
+        }
+
+        /// <summary>
+        /// Parses a JSONPath expression into individual path segments.
+        /// Handles dot notation ($.field), array accessors ($.items[0]), and complex nested paths.
+        /// </summary>
+        /// <param name="jsonPath">JSONPath expression to parse (e.g., $.items[0].tags[1].name).</param>
+        /// <returns>List of path segments to pass to jsonb_extract_path_text.</returns>
+        /// <exception cref="ArgumentException">Thrown when the JSONPath syntax is invalid.</exception>
+        private static List<string> ParseJsonPath(string jsonPath)
+        {
+            if (string.IsNullOrWhiteSpace(jsonPath))
+                throw new ArgumentException("JSONPath cannot be null or empty.", nameof(jsonPath));
+
+            var segments = new List<string>();
+            var pos = 0;
+
+            // Skip leading '$' if present
+            if (jsonPath[pos] == '$')
+            {
+                pos++;
+                // Skip '.' after '$' if present (e.g., $.field vs $field)
+                if (pos < jsonPath.Length && jsonPath[pos] == '.')
+                    pos++;
+            }
+
+            while (pos < jsonPath.Length)
+            {
+                var ch = jsonPath[pos];
+
+                if (ch == '.')
+                {
+                    // Skip leading dots between segments
+                    pos++;
+                    continue;
+                }
+                else if (ch == '[')
+                {
+                    // Parse array index: [0], [123], etc.
+                    pos++; // Skip '['
+                    var indexStart = pos;
+
+                    while (pos < jsonPath.Length && jsonPath[pos] != ']')
+                    {
+                        if (!char.IsDigit(jsonPath[pos]))
+                            throw new ArgumentException($"Invalid array index at position {pos} in JSONPath: {jsonPath}", nameof(jsonPath));
+                        pos++;
+                    }
+
+                    if (pos >= jsonPath.Length)
+                        throw new ArgumentException($"Unclosed array accessor in JSONPath: {jsonPath}", nameof(jsonPath));
+
+                    var index = jsonPath.Substring(indexStart, pos - indexStart);
+                    if (string.IsNullOrEmpty(index))
+                        throw new ArgumentException($"Empty array index at position {indexStart} in JSONPath: {jsonPath}", nameof(jsonPath));
+
+                    segments.Add(index);
+                    pos++; // Skip ']'
+                }
+                else if (char.IsLetter(ch) || ch == '_')
+                {
+                    // Parse property name: letters, digits, underscores
+                    var nameStart = pos;
+
+                    while (pos < jsonPath.Length)
+                    {
+                        var c = jsonPath[pos];
+                        if (char.IsLetterOrDigit(c) || c == '_')
+                        {
+                            pos++;
+                        }
+                        else if (c == '.' || c == '[')
+                        {
+                            // End of property name
+                            break;
+                        }
+                        else
+                        {
+                            throw new ArgumentException($"Invalid character '{c}' at position {pos} in JSONPath: {jsonPath}", nameof(jsonPath));
+                        }
+                    }
+
+                    var propertyName = jsonPath.Substring(nameStart, pos - nameStart);
+                    segments.Add(propertyName);
+                }
+                else
+                {
+                    throw new ArgumentException($"Unexpected character '{ch}' at position {pos} in JSONPath: {jsonPath}", nameof(jsonPath));
+                }
+            }
+
+            if (segments.Count == 0)
+                throw new ArgumentException($"No valid segments found in JSONPath: {jsonPath}", nameof(jsonPath));
+
+            return segments;
         }
 
         /// <summary>
