@@ -778,32 +778,46 @@ END;";
                 if (value == null || value == DBNull.Value)
                     return 0;
 
-                char[] chars;
+                // PERFORMANCE FIX (TASK 19): Use string.CopyTo to avoid allocating char[] for entire string.
+                // Previously called ToCharArray() which allocates even if SqlBulkCopy only needs a small chunk.
                 if (value is string str)
                 {
-                    chars = str.ToCharArray();
+                    // If buffer is null, return the total length of the string
+                    if (buffer == null)
+                        return str.Length;
+
+                    // Calculate how many characters to copy from the string
+                    var startIndex = (int)fieldoffset;
+                    if (startIndex >= str.Length)
+                        return 0;
+
+                    var charsToCopy = Math.Min(length, str.Length - startIndex);
+                    if (charsToCopy <= 0)
+                        return 0;
+
+                    // Copy directly from string to buffer without intermediate allocation
+                    str.CopyTo(startIndex, buffer, bufferoffset, charsToCopy);
+                    return charsToCopy;
                 }
                 else if (value is char[] charArray)
                 {
-                    chars = charArray;
+                    // If buffer is null, return the total length of the char array
+                    if (buffer == null)
+                        return charArray.Length;
+
+                    // Calculate how many characters to copy from the char array
+                    var charsToCopy = Math.Min(length, charArray.Length - (int)fieldoffset);
+                    if (charsToCopy <= 0)
+                        return 0;
+
+                    // Copy the data from char array
+                    Array.Copy(charArray, (int)fieldoffset, buffer, bufferoffset, charsToCopy);
+                    return charsToCopy;
                 }
                 else
                 {
                     throw new InvalidCastException($"Column {i} is not a string or char array");
                 }
-
-                // If buffer is null, return the total length of the data
-                if (buffer == null)
-                    return chars.Length;
-
-                // Calculate how many characters to copy
-                var charsToCopy = Math.Min(length, chars.Length - (int)fieldoffset);
-                if (charsToCopy <= 0)
-                    return 0;
-
-                // Copy the data
-                Array.Copy(chars, (int)fieldoffset, buffer, bufferoffset, charsToCopy);
-                return charsToCopy;
             }
 
             /// <summary>
