@@ -133,29 +133,35 @@ namespace nORM.Core
         private static DbConnection CreateConnectionSafe(string connectionString, DatabaseProvider provider)
         {
             DbConnection? connection = null;
+            bool success = false;
             try
             {
                 connection = DbConnectionFactory.Create(connectionString, provider);
+                success = true;
                 return connection;
             }
             catch (DbException ex)
             {
                 // Database-specific errors (e.g., connection failures, invalid server names)
-                connection?.Dispose();
                 var safeConnStr = NormValidator.MaskSensitiveConnectionStringData(connectionString);
                 throw new ArgumentException($"Invalid connection string format: {safeConnStr}", nameof(connectionString), ex);
             }
             catch (ArgumentException ex)
             {
                 // Argument validation errors (e.g., malformed connection string)
-                connection?.Dispose();
                 var safeConnStr = NormValidator.MaskSensitiveConnectionStringData(connectionString);
                 throw new ArgumentException($"Invalid connection string format: {safeConnStr}", nameof(connectionString), ex);
             }
-            // SECURITY FIX (TASK 18): Let other exceptions propagate.
-            // Catching all exceptions and rethrowing as ArgumentException masks important errors like
-            // OutOfMemoryException, StackOverflowException, ThreadAbortException, etc.
-            // Only catch expected connection/validation errors.
+            finally
+            {
+                // RESOURCE LEAK FIX (TASK 16): Always dispose connection on failure.
+                // If any exception occurs (including TypeLoadException, FileNotFoundException, etc.),
+                // ensure the connection is properly disposed to prevent handle leaks.
+                if (!success)
+                {
+                    connection?.Dispose();
+                }
+            }
         }
         /// <summary>
         /// Ensures that the underlying <see cref="DbConnection"/> is open and that the
