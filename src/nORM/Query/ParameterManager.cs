@@ -49,18 +49,25 @@ namespace nORM.Query
         {
             if (v is null) { p.Value = DBNull.Value; return; }
 
+            // Let the database provider handle type mapping via CreateParameter().
+            // Previously, DateTime was hardcoded as String with ISO format for SQLite,
+            // which broke SqlServer (expects DateTime2) and Postgres (expects Timestamp).
+            // Now each provider's CreateParameter() will set the correct DbType.
             switch (v)
             {
                 case int i: p.DbType = System.Data.DbType.Int32; p.Value = i; return;
                 case long l: p.DbType = System.Data.DbType.Int64; p.Value = l; return;
                 case short s: p.DbType = System.Data.DbType.Int16; p.Value = s; return;
                 case byte b: p.DbType = System.Data.DbType.Byte; p.Value = b; return;
-                case bool bo: p.DbType = System.Data.DbType.Boolean; p.Value = bo; return; // Use Boolean type
+                case bool bo: p.DbType = System.Data.DbType.Boolean; p.Value = bo; return;
                 case double d: p.DbType = System.Data.DbType.Double; p.Value = d; return;
                 case float f: p.DbType = System.Data.DbType.Double; p.Value = (double)f; return;
                 case decimal m: p.DbType = System.Data.DbType.Decimal; p.Value = m; return;
                 case string s2: p.DbType = System.Data.DbType.String; p.Value = s2; return;
-                case DateTime dt: p.DbType = System.Data.DbType.String; p.Value = dt.ToString("O"); return; // ISO for SQLite
+                case DateTime dt:
+                    // Provider will set correct DbType (DateTime2 for SQL Server, Timestamp for Postgres, etc.)
+                    p.Value = dt;
+                    return;
                 default:
                     p.Value = v; return;
             }
