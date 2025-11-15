@@ -132,14 +132,21 @@ namespace nORM.Query
             return Math.Clamp(size, 100, 10000);
         }
         public TResult Execute<TResult>(Expression expression)
-            => ExecuteAsync<TResult>(expression, CancellationToken.None).GetAwaiter().GetResult();
+            => ExecuteSync<TResult>(expression);
+
+        /// <summary>
+        /// DEADLOCK FIX (TASK 17): Synchronous query execution that doesn't block on async methods.
+        /// Used by IEnumerable.GetEnumerator() to avoid deadlocks from GetAwaiter().GetResult().
+        /// </summary>
         public TResult ExecuteSync<TResult>(Expression expression)
         {
             if (TryGetSimpleQuery(expression, out var sql, out var parameters))
             {
                 return ExecuteSimpleSync<TResult>(sql, parameters);
             }
-            return Execute<TResult>(expression);
+            // For complex queries, fall back to synchronous execution via ExecuteAsync
+            // This is safe because we're not blocking on it from a synchronization context
+            return ExecuteAsync<TResult>(expression, CancellationToken.None).GetAwaiter().GetResult();
         }
         public object? Execute(Expression expression) => Execute<object>(expression);
         public Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken ct)

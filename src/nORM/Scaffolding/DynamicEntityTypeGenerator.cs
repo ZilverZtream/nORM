@@ -22,6 +22,73 @@ namespace nORM.Scaffolding
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
         /// <summary>
+        /// Generates a CLR type representing the specified table asynchronously.
+        /// </summary>
+        /// <param name="connection">Database connection.</param>
+        /// <param name="tableName">Name of the table to generate. May include schema (schema.table).</param>
+        /// <returns>The generated <see cref="Type"/>.</returns>
+        public async Task<Type> GenerateEntityTypeAsync(DbConnection connection, string tableName)
+        {
+            if (connection == null) throw new ArgumentNullException(nameof(connection));
+            if (string.IsNullOrWhiteSpace(tableName)) throw new ArgumentException("Value cannot be null or whitespace.", nameof(tableName));
+            if (connection.State != ConnectionState.Open)
+                await connection.OpenAsync().ConfigureAwait(false);
+
+            var className = EscapeCSharpIdentifier(ToPascalCase(GetUnqualifiedName(tableName)));
+            var (schemaName, bareTable) = SplitSchema(tableName);
+            var columns = GetTableSchema(connection, schemaName, bareTable);
+
+            var sb = _stringBuilderPool.Get();
+            try
+            {
+                sb.AppendLine("using System;");
+                sb.AppendLine("using System.ComponentModel.DataAnnotations;");
+                sb.AppendLine("using System.ComponentModel.DataAnnotations.Schema;");
+                sb.AppendLine($"namespace nORM.Dynamic {{ public class {className} {{");
+
+                foreach (var col in columns)
+                {
+                    if (col.IsKey) sb.AppendLine("    [Key]");
+                    if (col.IsAuto) sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
+                    if (col.MaxLength.HasValue) sb.AppendLine($"    [MaxLength({col.MaxLength.Value})]");
+                    sb.AppendLine($"    [Column(\"{col.ColumnName}\")]");
+                    sb.AppendLine($"    public {col.TypeName} {col.PropertyName} {{ get; set; }}");
+                }
+
+                sb.AppendLine("} }");
+                var syntaxTree = CSharpSyntaxTree.ParseText(sb.ToString());
+
+                var references = AppDomain.CurrentDomain.GetAssemblies()
+                    .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
+                    .Select(a => MetadataReference.CreateFromFile(a.Location));
+
+                var compilation = CSharpCompilation.Create(
+                    "nORM.Dynamic.Entities",
+                    new[] { syntaxTree },
+                    references,
+                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+                using var ms = new MemoryStream();
+                var result = compilation.Emit(ms);
+                if (!result.Success)
+                {
+                    var errors = string.Join(Environment.NewLine, result.Diagnostics
+                        .Where(d => d.Severity == DiagnosticSeverity.Error)
+                        .Select(d => d.ToString()));
+                    throw new InvalidOperationException($"Failed to generate dynamic entity type. {errors}");
+                }
+                ms.Seek(0, SeekOrigin.Begin);
+                var assembly = Assembly.Load(ms.ToArray());
+                return assembly.GetType($"nORM.Dynamic.{className}")!;
+            }
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
+        }
+
+        /// <summary>
         /// Generates a CLR type representing the specified table.
         /// </summary>
         /// <param name="connection">Open database connection.</param>
