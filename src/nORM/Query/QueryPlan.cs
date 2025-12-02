@@ -27,7 +27,7 @@ namespace nORM.Query
         TimeSpan CommandTimeout,
         bool IsCacheable,
         TimeSpan? CacheExpiration,
-        int Fingerprint = 0,
+        ExpressionFingerprint Fingerprint = default,
         int? Take = null
     );
 

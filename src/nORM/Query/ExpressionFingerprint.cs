@@ -1,46 +1,64 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.IO.Hashing;
 using System.Linq.Expressions;
+using System.Text;
 
 namespace nORM.Query
 {
-    internal static class ExpressionFingerprint
+    internal readonly struct ExpressionFingerprint : IEquatable<ExpressionFingerprint>
     {
-        /// <summary>
-        /// Computes a stable hash code that uniquely identifies the structural shape of the
-        /// provided expression tree. The hash is insensitive to parameter names and constant
-        /// values so that semantically equivalent queries yield the same fingerprint.
-        /// </summary>
-        /// <param name="expression">The expression tree to fingerprint.</param>
-        /// <returns>A deterministic hash representing the structure of the expression.</returns>
-        public static int Compute(Expression expression)
+        private readonly ulong _low;
+        private readonly ulong _high;
+
+        private ExpressionFingerprint(ulong low, ulong high)
+        {
+            _low = low;
+            _high = high;
+        }
+
+        public static ExpressionFingerprint Compute(Expression expression)
         {
             var visitor = new FingerprintVisitor();
             visitor.Visit(expression);
-            return visitor.Hash;
+            Span<byte> hash = stackalloc byte[16];
+            visitor.GetCurrentHash(hash);
+            var low = BinaryPrimitives.ReadUInt64LittleEndian(hash[..8]);
+            var high = BinaryPrimitives.ReadUInt64LittleEndian(hash[8..]);
+            return new ExpressionFingerprint(low, high);
         }
+
+        public ExpressionFingerprint Extend(int value)
+        {
+            Span<byte> buffer = stackalloc byte[20];
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer[..8], _low);
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer[8..16], _high);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer[16..], value);
+            var hash = XxHash128.Hash(buffer);
+            var low = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(0, 8));
+            var high = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(8, 8));
+            return new ExpressionFingerprint(low, high);
+        }
+
+        public bool Equals(ExpressionFingerprint other) => _low == other._low && _high == other._high;
+        public override bool Equals(object? obj) => obj is ExpressionFingerprint fp && Equals(fp);
+        public override int GetHashCode() => HashCode.Combine(_low, _high);
 
         private sealed class FingerprintVisitor : ExpressionVisitor
         {
-            private readonly HashCode _hash = new();
+            private readonly XxHash128 _hasher = new();
             private readonly Dictionary<ParameterExpression, int> _parameters = new();
 
-            public int Hash => _hash.ToHashCode();
+            public void GetCurrentHash(Span<byte> destination) => _hasher.GetCurrentHash(destination);
 
-            /// <summary>
-            /// Visits each node in the expression tree, adding its type information to the running
-            /// hash used to compute the fingerprint. Constants are handled in specialized overrides
-            /// so they do not affect the fingerprint value.
-            /// </summary>
-            /// <param name="node">The current expression node.</param>
-            /// <returns>The visited expression.</returns>
             public override Expression? Visit(Expression? node)
             {
                 if (node == null)
                     return null;
 
-                _hash.Add(node.NodeType);
-                _hash.Add(node.Type.FullName);
+                AppendInt((int)node.NodeType);
+                AppendString(node.Type.FullName ?? string.Empty);
 
                 return base.Visit(node);
             }
@@ -48,20 +66,22 @@ namespace nORM.Query
             protected override Expression VisitConstant(ConstantExpression node)
             {
                 // Ignore constant value; base.VisitConstant does nothing
-                return node;
+                AppendString(node.Type.FullName ?? string.Empty);
+                return base.VisitConstant(node);
             }
 
             protected override Expression VisitMember(MemberExpression node)
             {
-                _hash.Add(node.Member.Module.ModuleVersionId);
-                _hash.Add(node.Member.MetadataToken);
+                AppendGuid(node.Member.Module.ModuleVersionId);
+                AppendInt(node.Member.MetadataToken);
                 return base.VisitMember(node);
             }
 
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
-                _hash.Add(node.Method.Module.ModuleVersionId);
-                _hash.Add(node.Method.MetadataToken);
+                AppendGuid(node.Method.Module.ModuleVersionId);
+                AppendInt(node.Method.MetadataToken);
+                AppendInt(node.Arguments.Count);
                 return base.VisitMethodCall(node);
             }
 
@@ -72,13 +92,14 @@ namespace nORM.Query
                     id = _parameters.Count;
                     _parameters[node] = id;
                 }
-                _hash.Add(id);
-                _hash.Add(node.Type.FullName);
+                AppendInt(id);
+                AppendString(node.Type.FullName ?? string.Empty);
                 return base.VisitParameter(node);
             }
 
             protected override Expression VisitLambda<T>(Expression<T> node)
             {
+                AppendInt(node.Parameters.Count);
                 foreach (var parameter in node.Parameters)
                 {
                     if (!_parameters.ContainsKey(parameter))
@@ -88,6 +109,31 @@ namespace nORM.Query
                     }
                 }
                 return base.VisitLambda(node);
+            }
+
+            private void AppendInt(int value)
+            {
+                Span<byte> data = stackalloc byte[4];
+                BinaryPrimitives.WriteInt32LittleEndian(data, value);
+                _hasher.Append(data);
+            }
+
+            private void AppendGuid(Guid value)
+            {
+                Span<byte> data = stackalloc byte[16];
+                value.TryWriteBytes(data);
+                _hasher.Append(data);
+            }
+
+            private void AppendString(string value)
+            {
+                Span<byte> length = stackalloc byte[4];
+                BinaryPrimitives.WriteInt32LittleEndian(length, value.Length);
+                _hasher.Append(length);
+                if (value.Length == 0) return;
+                Span<byte> buffer = stackalloc byte[Math.Min(value.Length * sizeof(char), 256)];
+                var written = System.Text.Encoding.UTF8.GetBytes(value, buffer);
+                _hasher.Append(buffer[..written]);
             }
         }
     }
