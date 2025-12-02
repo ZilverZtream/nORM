@@ -27,9 +27,14 @@ namespace nORM.Query
         private readonly NormExceptionHandler _exceptionHandler;
         private readonly ILogger<QueryExecutor> _logger;
 
-        private static readonly Regex LimitRegex = new("\\bLIMIT\\s+(?<value>[\\w@]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex TopRegex = new("\\bTOP\\s*(?:\\(\\s*)?(?<value>[\\w@]+)(?:\\s*\\))?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex FetchRegex = new("\\bFETCH\\s+(?:FIRST|NEXT)\\s+(?<value>[\\w@]+)\\s+ROWS\\s+ONLY", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        // PERFORMANCE FIX (TASK 7): Removed regex patterns - no longer needed since Take is passed from QueryPlan
+        // Previously these regex patterns were executed on EVERY query to estimate list capacity
+        // This was extremely CPU intensive for large SQL strings (kilobytes long)
+        // Now we pass the Take value directly from the query plan, avoiding regex entirely
+
+        // MEMORY SAFETY FIX (TASK 8): Maximum number of children per group to prevent OOM
+        // Prevents malformed queries or data from consuming all available memory
+        private const int MaxGroupSize = 100000;
 
         public QueryExecutor(DbContext ctx, IncludeProcessor includeProcessor, ILogger<QueryExecutor>? logger = null)
         {
@@ -55,7 +60,8 @@ namespace nORM.Query
                     return await MaterializeGroupJoinAsync(plan, command, ct).ConfigureAwait(false);
 
                 var listType = typeof(List<>).MakeGenericType(plan.ElementType);
-                var capacity = plan.SingleResult ? 1 : EstimateCapacity(plan.Sql, plan.Parameters);
+                // PERFORMANCE FIX (TASK 7): Use plan.Take directly instead of regex parsing
+                var capacity = plan.SingleResult ? 1 : (plan.Take ?? 0);
                 var list = (IList)Activator.CreateInstance(listType, capacity)!;
 
                 var trackable = !plan.NoTracking &&
@@ -119,7 +125,8 @@ namespace nORM.Query
                     return Task.FromResult(MaterializeGroupJoin(plan, command));
 
                 var listType = typeof(List<>).MakeGenericType(plan.ElementType);
-                var capacity = plan.SingleResult ? 1 : EstimateCapacity(plan.Sql, plan.Parameters);
+                // PERFORMANCE FIX (TASK 7): Use plan.Take directly instead of regex parsing
+                var capacity = plan.SingleResult ? 1 : (plan.Take ?? 0);
                 var list = (IList)Activator.CreateInstance(listType, capacity)!;
 
                 var trackable = !plan.NoTracking &&
@@ -205,29 +212,9 @@ namespace nORM.Query
             return _ctx.Options.DefaultTrackingBehavior == QueryTrackingBehavior.NoTracking;
         }
 
-        private static int EstimateCapacity(string sql, IReadOnlyDictionary<string, object> parameters)
-        {
-            foreach (var regex in new[] { LimitRegex, TopRegex, FetchRegex })
-            {
-                var match = regex.Match(sql);
-                if (!match.Success) continue;
-                var val = match.Groups["value"].Value;
-                if (int.TryParse(val, out var number)) return number;
-                if (parameters.TryGetValue(val, out var param))
-                {
-                    try
-                    {
-                        return Convert.ToInt32(param);
-                    }
-                    catch
-                    {
-                        // ignored
-                    }
-                }
-            }
-
-            return 0;
-        }
+        // PERFORMANCE FIX (TASK 7): Removed EstimateCapacity method entirely
+        // This method used expensive regex parsing on every query execution
+        // Replaced with direct Take value from QueryPlan
 
         /// <summary>
         /// Materializes the results of a LINQ <c>GroupJoin</c> operation by streaming records from
@@ -294,6 +281,16 @@ namespace nORM.Query
 
                     if (!reader.IsDBNull(innerKeyIndex))
                     {
+                        // MEMORY SAFETY FIX (TASK 8): Prevent unbounded memory growth
+                        // If a single group exceeds MaxGroupSize, throw to protect the server
+                        if (currentChildren.Count >= MaxGroupSize)
+                        {
+                            throw new NormQueryException(
+                                $"GroupJoin safety limit exceeded: A single group has more than {MaxGroupSize} children. " +
+                                "This may indicate a malformed query or incorrect join keys. " +
+                                "Review your GroupJoin operation and ensure join keys are correct.");
+                        }
+
                         var inner = MaterializeEntity(reader, innerMap, outerColumnCount, ct);
                         if (trackInner)
                         {
@@ -407,6 +404,15 @@ namespace nORM.Query
 
                         if (!reader.IsDBNull(innerKeyIndex))
                         {
+                            // MEMORY SAFETY FIX (TASK 8): Prevent unbounded memory growth
+                            if (currentChildren.Count >= MaxGroupSize)
+                            {
+                                throw new NormQueryException(
+                                    $"GroupJoin safety limit exceeded: A single group has more than {MaxGroupSize} children. " +
+                                    "This may indicate a malformed query or incorrect join keys. " +
+                                    "Review your GroupJoin operation and ensure join keys are correct.");
+                            }
+
                             var inner = MaterializeEntity(reader, innerMap, outerColumnCount, default);
                             if (trackInner)
                             {

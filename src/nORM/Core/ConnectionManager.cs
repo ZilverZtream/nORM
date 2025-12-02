@@ -154,23 +154,32 @@ namespace nORM.Core
             }
             catch (DbException ex)
             {
-                // Only trip on connection-level DB exceptions
-                RegisterFailure();
-                _logger.LogError(ex, "Failed to acquire write connection due to database error");
+                // RELIABILITY FIX (TASK 9): Check specific error codes instead of message strings
+                // Message-based detection is fragile (localization, provider changes)
+                if (IsTransientDatabaseError(ex))
+                {
+                    RegisterFailure();
+                    _logger.LogError(ex, "Failed to acquire write connection due to transient database error");
+                }
                 throw;
             }
-            catch (Exception ex) when (ex.Message.Contains("network", StringComparison.OrdinalIgnoreCase) ||
-                                       ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
-                                       ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase))
+            catch (System.Net.Sockets.SocketException ex)
             {
-                // Trip on network/connection-related exceptions
+                // RELIABILITY FIX (TASK 9): Detect network failures by exception type
                 RegisterFailure();
-                _logger.LogError(ex, "Failed to acquire write connection due to network/connection issue");
+                _logger.LogError(ex, "Failed to acquire write connection due to network socket error");
+                throw;
+            }
+            catch (System.IO.IOException ex) when (IsNetworkIOException(ex))
+            {
+                // RELIABILITY FIX (TASK 9): Some network errors manifest as IOException
+                RegisterFailure();
+                _logger.LogError(ex, "Failed to acquire write connection due to network I/O error");
                 throw;
             }
             catch (Exception ex)
             {
-                // Other exceptions (e.g., application errors) don't trip the circuit breaker
+                // Other exceptions (e.g., application errors, auth failures) don't trip the circuit breaker
                 _logger.LogError(ex, "Failed to acquire write connection (non-connection error)");
                 throw;
             }
@@ -198,18 +207,23 @@ namespace nORM.Core
             }
 
             var replica = SelectOptimalReadReplica(replicas);
+            DbConnection? cn = null;
             try
             {
-                var cn = CreateConnection(replica.ConnectionString);
+                cn = CreateConnection(replica.ConnectionString);
                 await cn.OpenAsync(ct).ConfigureAwait(false);
                 return cn;
             }
             catch (OperationCanceledException)
             {
+                // CONNECTION LEAK FIX (TASK 2): Dispose failed connection before re-throwing
+                cn?.Dispose();
                 throw;
             }
             catch (Exception ex)
             {
+                // CONNECTION LEAK FIX (TASK 2): Dispose failed connection before falling back
+                cn?.Dispose();
                 _logger.LogWarning(ex, "Failed to acquire connection from read replica {Replica}", replica.ConnectionString);
                 replica.IsHealthy = false;
                 UpdateAvailableReadReplicas();
@@ -247,6 +261,63 @@ namespace nORM.Core
                 _consecutiveFailures = 0;
                 _nextRetry = DateTime.MinValue;
             }
+        }
+
+        /// <summary>
+        /// Determines if a database exception represents a transient error that should trip the circuit breaker.
+        /// RELIABILITY FIX (TASK 9): Uses error codes instead of message parsing for robust detection.
+        /// </summary>
+        /// <param name="ex">The database exception to check.</param>
+        /// <returns>True if the exception represents a transient connection/network error.</returns>
+        private static bool IsTransientDatabaseError(DbException ex)
+        {
+            // Check for SQL Server specific errors
+            if (ex.GetType().Name == "SqlException")
+            {
+                var numberProp = ex.GetType().GetProperty("Number");
+                if (numberProp != null && numberProp.GetValue(ex) is int errorNumber)
+                {
+                    // SQL Server transient errors:
+                    // -2: Timeout
+                    // 53: Named Pipes Provider error (network)
+                    // 64: Error located on server
+                    // 233: Connection initialization error
+                    // 10053: Transport-level error (broken connection)
+                    // 10054: Existing connection forcibly closed by remote host
+                    // 10060: Connection timeout
+                    // 40197: Service error processing request
+                    // 40501: Service busy
+                    // 40613: Database unavailable
+                    return errorNumber is -2 or 53 or 64 or 233 or 10053 or 10054 or 10060 or 40197 or 40501 or 40613;
+                }
+            }
+
+            // Check inner exception for SocketException (more reliable than message parsing)
+            return HasSocketExceptionInChain(ex);
+        }
+
+        /// <summary>
+        /// Checks if an IOException represents a network-related error.
+        /// </summary>
+        private static bool IsNetworkIOException(System.IO.IOException ex)
+        {
+            // Check if inner exception is a SocketException
+            return HasSocketExceptionInChain(ex);
+        }
+
+        /// <summary>
+        /// Recursively checks the exception chain for a SocketException.
+        /// </summary>
+        private static bool HasSocketExceptionInChain(Exception ex)
+        {
+            var current = ex;
+            while (current != null)
+            {
+                if (current is System.Net.Sockets.SocketException)
+                    return true;
+                current = current.InnerException;
+            }
+            return false;
         }
 
         /// <summary>
