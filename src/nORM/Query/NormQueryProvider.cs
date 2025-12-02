@@ -14,7 +14,6 @@ using System.Text;
 using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using System.Globalization;
-using System.Buffers.Binary;
 using System.Buffers;
 using nORM.Core;
 using nORM.Execution;
@@ -28,13 +27,12 @@ namespace nORM.Query
     internal sealed class NormQueryProvider : IQueryProvider, IDisposable
     {
         internal readonly DbContext _ctx;
-        private static readonly ConcurrentLruCache<PlanCacheKey, QueryPlan> _planCache =
+        private static readonly ConcurrentLruCache<ExpressionFingerprint, QueryPlan> _planCache =
             new(maxSize: CalculateInitialPlanCacheSize(), timeToLive: TimeSpan.FromHours(1));
         private static readonly Timer _planCacheMonitor = new(AdjustPlanCacheSize, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
         private static readonly ConcurrentDictionary<Type, int> _typeHashCodes = new();
-        private static readonly ConcurrentLruCache<int, QueryPlan> _sqlCache = new(maxSize: 1000);
         private static long _totalPlanSize;
         private static int _planSizeSamples;
         private readonly QueryExecutor _executor;
@@ -776,17 +774,20 @@ namespace nORM.Query
             filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(UnwrapQueryExpression(filtered));
             var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
-            var fingerprint = ExpressionFingerprint.Compute(filtered);
-            var combinedHash = HashCode.Combine(fingerprint, tenantHash, GetTypeHash(elementType), GetTypeHash(filtered.Type));
-            if (_sqlCache.TryGet(combinedHash, out var cached))
+            var fingerprint = ExpressionFingerprint
+                .Compute(filtered)
+                .Extend(tenantHash)
+                .Extend(GetTypeHash(elementType))
+                .Extend(GetTypeHash(filtered.Type));
+
+            if (_planCache.TryGet(fingerprint, out var cached))
             {
-                // When a plan is retrieved from the SQL cache, ensure the caller gets
-                // its own parameter dictionary so modifications won't affect the cached plan.
-                return cached with { Parameters = new Dictionary<string, object>(cached.Parameters) };
+                var bound = BindParameters(filtered, cached);
+                return cached with { Parameters = bound };
             }
-            var cacheKey = BuildPlanCacheKey(fingerprint, tenantHash, elementType, filtered.Type);
+
             var localFiltered = filtered;
-            var plan = _planCache.GetOrAdd(cacheKey, _ =>
+            var plan = _planCache.GetOrAdd(fingerprint, _ =>
             {
                 using var translator = new QueryTranslator(_ctx);
                 var before = GC.GetAllocatedBytesForCurrentThread();
@@ -795,8 +796,6 @@ namespace nORM.Query
                 var size = after - before;
                 Interlocked.Add(ref _totalPlanSize, size);
                 Interlocked.Increment(ref _planSizeSamples);
-                // Cache the plan with clones of the parameter collections so the plan is
-                // self-contained and not affected when the translator clears its data.
                 var clonedParams = new Dictionary<string, object>(p.Parameters);
                 var clonedCompiledParams = new List<string>(p.CompiledParameters);
                 return p with
@@ -806,33 +805,29 @@ namespace nORM.Query
                     CompiledParameters = clonedCompiledParams
                 };
             });
-            _sqlCache.GetOrAdd(combinedHash, _ => plan);
-            // Each execution should receive a fresh copy of the parameters dictionary
-            // from the plan cache.
-            return plan with { Parameters = new Dictionary<string, object>(plan.Parameters) };
+
+            var parameters = BindParameters(filtered, plan);
+            return plan with { Parameters = parameters };
         }
-        private static PlanCacheKey BuildPlanCacheKey(int fingerprint, int tenantHash, Type elementType, Type expressionType)
-            => new PlanCacheKey(fingerprint, tenantHash, GetTypeHash(elementType), GetTypeHash(expressionType));
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int GetTypeHash(Type type) => _typeHashCodes.GetOrAdd(type, static t => t.GetHashCode());
-        private readonly struct PlanCacheKey : IEquatable<PlanCacheKey>
+        private IReadOnlyDictionary<string, object> BindParameters(Expression expression, QueryPlan plan)
         {
-            private readonly ulong _high;
-            private readonly ulong _low;
-            public PlanCacheKey(int fingerprint, int tenantHash, int elementHash, int expressionHash)
+            if (plan.CompiledParameters.Count == 0)
             {
-                Span<byte> data = stackalloc byte[16];
-                BinaryPrimitives.WriteInt32LittleEndian(data[0..4], fingerprint);
-                BinaryPrimitives.WriteInt32LittleEndian(data[4..8], tenantHash);
-                BinaryPrimitives.WriteInt32LittleEndian(data[8..12], elementHash);
-                BinaryPrimitives.WriteInt32LittleEndian(data[12..16], expressionHash);
-                var hash = XxHash128.Hash(data);
-                _low = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(0, 8));
-                _high = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(8, 8));
+                return new Dictionary<string, object>(plan.Parameters);
             }
-            public bool Equals(PlanCacheKey other) => _high == other._high && _low == other._low;
-            public override bool Equals(object? obj) => obj is PlanCacheKey other && Equals(other);
-            public override int GetHashCode() => HashCode.Combine(_high, _low);
+
+            var extractor = new ParameterValueExtractor();
+            extractor.Visit(expression);
+            var values = extractor.Values;
+            var parameters = new Dictionary<string, object>(plan.Parameters);
+            var count = Math.Min(plan.CompiledParameters.Count, values.Count);
+            for (int i = 0; i < count; i++)
+            {
+                parameters[plan.CompiledParameters[i]] = values[i] ?? DBNull.Value;
+            }
+            return parameters;
         }
         private string BuildCacheKeyWithValues<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
         {
@@ -919,6 +914,37 @@ namespace nORM.Query
                 .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
             if (iface != null) return iface.GetGenericArguments()[0];
             throw new ArgumentException($"Cannot determine element type from expression of type {type}");
+        }
+        private sealed class ParameterValueExtractor : ExpressionVisitor
+        {
+            private readonly List<object?> _values = new();
+            public IReadOnlyList<object?> Values => _values;
+
+            protected override Expression VisitConstant(ConstantExpression node)
+            {
+                if (node.Value is IQueryable)
+                {
+                    return node;
+                }
+                _values.Add(node.Value ?? DBNull.Value);
+                return base.VisitConstant(node);
+            }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (QueryTranslator.TryGetConstantValue(node, out var value))
+                {
+                    _values.Add(value ?? DBNull.Value);
+                    return node;
+                }
+                return base.VisitMember(node);
+            }
+
+            protected override Expression VisitParameter(ParameterExpression node)
+            {
+                _values.Add(DBNull.Value);
+                return base.VisitParameter(node);
+            }
         }
     }
 }
