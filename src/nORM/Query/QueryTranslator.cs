@@ -305,7 +305,7 @@ namespace nORM.Query
                         if (discAttr != null)
                         {
                             var paramName = _t._ctx.Provider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
-                            _t._params[paramName] = discAttr.Value;
+                            _t.AddParameter(paramName, discAttr.Value);
                             _t._where.Append($"({_t._mapping.DiscriminatorColumn!.EscCol} = {paramName})");
                         }
                         break;
@@ -376,7 +376,7 @@ namespace nORM.Query
                     {
                         alias ??= _t.EscapeAlias("T0");
                         var timeParamName = _t._provider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
-                        _t._params[timeParamName] = _t._asOfTimestamp.Value;
+                        _t.AddParameter(timeParamName, _t._asOfTimestamp.Value);
                         var historyTable = _t._provider.Escape(_t._mapping.TableName + "_History");
                         var cols = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
                         var t1 = _t.EscapeAlias("T1");
@@ -524,7 +524,7 @@ namespace nORM.Query
                         var visitor = FastExpressionVisitorPool.Get(in vctx);
                         var sql = visitor.Translate(arg);
                         foreach (var kvp in visitor.GetParameters())
-                            _params[kvp.Key] = kvp.Value;
+                            AddParameter(kvp.Key, kvp.Value);
                         FastExpressionVisitorPool.Return(visitor);
                         sb.Append(sql).Append(" AS ").Append(_provider.Escape(alias));
                     }
@@ -550,7 +550,7 @@ namespace nORM.Query
                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                 var valueSql = visitor.Translate(wf.ValueSelector.Body);
                 foreach (var kvp in visitor.GetParameters())
-                    _params[kvp.Key] = kvp.Value;
+                    AddParameter(kvp.Key, kvp.Value);
                 FastExpressionVisitorPool.Return(visitor);
                 string defaultSql = string.Empty;
                 if (wf.DefaultValueSelector != null)
@@ -565,7 +565,7 @@ namespace nORM.Query
                     var visitor2 = FastExpressionVisitorPool.Get(in vctx2);
                     var defSql = visitor2.Translate(wf.DefaultValueSelector.Body);
                     foreach (var kv in visitor2.GetParameters())
-                        _params[kv.Key] = kv.Value;
+                        AddParameter(kv.Key, kv.Value);
                     FastExpressionVisitorPool.Return(visitor2);
                     defaultSql = $", {defSql}";
                 }
@@ -575,7 +575,7 @@ namespace nORM.Query
                     offsetParam = _provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
                 }
                 while (_params.ContainsKey(offsetParam));
-                _params[offsetParam] = wf.Offset;
+                AddParameter(offsetParam, wf.Offset);
                 return $"{wf.FunctionName}({valueSql}, {offsetParam}{defaultSql}) OVER ({overClause})";
             }
             return $"{wf.FunctionName}() OVER ({overClause})";
@@ -718,10 +718,10 @@ namespace nORM.Query
             var innerKeyVisitor = FastExpressionVisitorPool.Get(in vctxInner);
             var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
             foreach (var kvp in outerKeyVisitor.GetParameters())
-                _params[kvp.Key] = kvp.Value;
+                AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(outerKeyVisitor);
             foreach (var kvp in innerKeyVisitor.GetParameters())
-                _params[kvp.Key] = kvp.Value;
+                AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(innerKeyVisitor);
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
             var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
@@ -756,10 +756,10 @@ namespace nORM.Query
             var innerKeyVisitor = FastExpressionVisitorPool.Get(in vctxInner);
             var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
             foreach (var kvp in outerKeyVisitor.GetParameters())
-                _params[kvp.Key] = kvp.Value;
+                AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(outerKeyVisitor);
             foreach (var kvp in innerKeyVisitor.GetParameters())
-                _params[kvp.Key] = kvp.Value;
+                AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(innerKeyVisitor);
             JoinBuilder.SetupJoinProjection(null, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
             var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
@@ -966,7 +966,7 @@ namespace nORM.Query
                 subSqlBuilder.Append(subPlan.Sql);
             }
             var limitParam = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
-            _params[limitParam] = 1;
+            AddParameter(limitParam, 1);
             _ctx.Provider.ApplyPaging(subSqlBuilder, 1, null, limitParam, null);
             switch (node.Method.Name)
             {
@@ -984,7 +984,7 @@ namespace nORM.Query
             }
             return node;
         }
-        private static bool TryGetConstantValue(Expression e, out object? value)
+        internal static bool TryGetConstantValue(Expression e, out object? value)
         {
             switch (e)
             {
@@ -1010,6 +1010,14 @@ namespace nORM.Query
             value = null;
             return false;
         }
+        private void AddParameter(string name, object? value)
+        {
+            _params[name] = value ?? DBNull.Value;
+            if (!_compiledParams.Contains(name))
+            {
+                _compiledParams.Add(name);
+            }
+        }
         private static bool TryGetIntValue(Expression expr, out int value)
         {
             value = 0;
@@ -1034,7 +1042,7 @@ namespace nORM.Query
             if (node.Value != null)
             {
                 var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
-                _params[paramName] = node.Value;
+                AddParameter(paramName, node.Value);
                 _sql.Append(paramName);
             }
             return node;
@@ -1049,8 +1057,7 @@ namespace nORM.Query
                 return node;
             }
             var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
-            _params[paramName] = DBNull.Value;
-            _compiledParams.Add(paramName);
+            AddParameter(paramName, DBNull.Value);
             _paramMap[node] = paramName;
             _sql.Append(paramName);
             return node;
@@ -1123,7 +1130,7 @@ namespace nORM.Query
             if (TryGetConstantValue(node, out var value))
             {
                 var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
-                _params[paramName] = value ?? DBNull.Value;
+                AddParameter(paramName, value ?? DBNull.Value);
                 _sql.Append(paramName);
                 return node;
             }
@@ -1187,7 +1194,7 @@ namespace nORM.Query
             var visitor = FastExpressionVisitorPool.Get(in vctx);
             var columnSql = visitor.Translate(selectorLambda.Body);
             foreach (var kvp in visitor.GetParameters())
-                _params[kvp.Key] = kvp.Value;
+                AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(visitor);
             _isAggregate = true;
             _sql.Clear();
@@ -1218,7 +1225,7 @@ namespace nORM.Query
             var visitor = FastExpressionVisitorPool.Get(in vctx2);
             var groupBySql = visitor.Translate(keySelectorLambda.Body);
             foreach (var kvp in visitor.GetParameters())
-                _params[kvp.Key] = kvp.Value;
+                AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(visitor);
             _groupBy.Add(groupBySql);
 
@@ -1285,7 +1292,7 @@ namespace nORM.Query
                             selectItems.Add(builder.ToString());
                             PooledStringBuilder.Return(builder);
                             foreach (var kvp in visitor.GetParameters())
-                                _params[kvp.Key] = kvp.Value;
+                                AddParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
                         }
                     }
@@ -1321,7 +1328,7 @@ namespace nORM.Query
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
-                                _params[kvp.Key] = kvp.Value;
+                                AddParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
                             return $"SUM({columnSql})";
                         }
@@ -1339,7 +1346,7 @@ namespace nORM.Query
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
-                                _params[kvp.Key] = kvp.Value;
+                                AddParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
                             return $"AVG({columnSql})";
                         }
@@ -1357,7 +1364,7 @@ namespace nORM.Query
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
-                                _params[kvp.Key] = kvp.Value;
+                                AddParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
                             return $"MIN({columnSql})";
                         }
@@ -1375,7 +1382,7 @@ namespace nORM.Query
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
-                                _params[kvp.Key] = kvp.Value;
+                                AddParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
                             return $"MAX({columnSql})";
                         }
@@ -1398,12 +1405,12 @@ namespace nORM.Query
                 var alias = EscapeAlias("T" + _joinCounter);
                 if (!_correlatedParams.ContainsKey(param))
                     _correlatedParams[param] = (_mapping, alias);
-                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
-                var visitor = FastExpressionVisitorPool.Get(in vctx);
-                var columnSql = visitor.Translate(selector.Body);
-                foreach (var kvp in visitor.GetParameters())
-                    _params[kvp.Key] = kvp.Value;
-                FastExpressionVisitorPool.Return(visitor);
+            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
+            var visitor = FastExpressionVisitorPool.Get(in vctx);
+            var columnSql = visitor.Translate(selector.Body);
+            foreach (var kvp in visitor.GetParameters())
+                AddParameter(kvp.Key, kvp.Value);
+            FastExpressionVisitorPool.Return(visitor);
                 _isAggregate = true;
                 _sql.Clear();
 
@@ -1435,7 +1442,7 @@ namespace nORM.Query
             var visitor = FastExpressionVisitorPool.Get(in vctx2);
             var predicateSql = visitor.Translate(predicate.Body);
             foreach (var kvp in visitor.GetParameters())
-                _params[kvp.Key] = kvp.Value;
+                AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(visitor);
             // Wrap in NOT EXISTS
             _sql.Insert(0, "SELECT CASE WHEN NOT EXISTS(");
