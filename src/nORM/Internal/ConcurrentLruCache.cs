@@ -24,9 +24,9 @@ namespace nORM.Internal
         private long _hits;
         private long _misses;
 
-        // PERFORMANCE FIX (TASK 13): Probabilistic promotion to reduce write lock contention
-        // Only promote 1% of reads to avoid serializing all cache reads on the write lock
-        private const double PromotionProbability = 0.01; // 1% of reads will promote
+        // PERFORMANCE FIX (TASK 6): Lazy LRU using timestamps instead of list manipulation
+        // Update LastAccessed with Interlocked (no lock required), defer structural promotion
+        // This allows true lock-free reads while maintaining approximate LRU semantics
 
         /// <summary>
         /// Initializes a new concurrent LRU cache.
@@ -86,71 +86,47 @@ namespace nORM.Internal
         }
 
         /// <summary>
-        /// Attempts to retrieve a value from the cache. If found and not expired the entry is
-        /// promoted to the most recently used position.
+        /// Attempts to retrieve a value from the cache. If found and not expired the entry's
+        /// last accessed timestamp is updated lock-free using Interlocked operations.
         /// </summary>
         /// <param name="key">Key of the cached item.</param>
         /// <param name="value">When this method returns, contains the cached value if found.</param>
         /// <returns><c>true</c> if the value was found in the cache; otherwise <c>false</c>.</returns>
         public bool TryGet(TKey key, out TValue value)
         {
-            // Lock-free lookup, then upgradeable read lock for promotion & TTL check
+            // PERFORMANCE FIX (TASK 6): Lock-free read path with Interlocked timestamp update
+            // This allows thousands of concurrent reads without blocking
             if (_cache.TryGetValue(key, out var node))
             {
-                // PERFORMANCE FIX (TASK 2): Use upgradeable read lock to allow concurrent reads
-                // while still being able to upgrade to write lock if promotion/removal is needed
-                _lock.EnterUpgradeableReadLock();
+                var item = node.Value;
+
+                // Check expiration without locking
+                if (!IsExpired(item))
+                {
+                    // PERFORMANCE FIX (TASK 6): Update LastAccessed using Interlocked (no lock!)
+                    // Convert DateTime to long ticks for atomic update
+                    var nowTicks = DateTime.UtcNow.Ticks;
+                    Interlocked.Exchange(ref item.LastAccessedTicks, nowTicks);
+
+                    Interlocked.Increment(ref _hits);
+                    value = item.Value;
+                    return true;
+                }
+
+                // Expired: remove (requires write lock, but this is rare)
+                _lock.EnterWriteLock();
                 try
                 {
-                    if (node.List != null)
+                    // Re-check after acquiring lock (double-check pattern)
+                    if (_cache.TryGetValue(key, out var nodeToRemove) && nodeToRemove.List != null)
                     {
-                        if (!IsExpired(node.Value))
-                        {
-                            // PERFORMANCE FIX (TASK 13): Probabilistic promotion
-                            // Only promote 1% of the time to avoid write lock contention on hot cache items
-                            // This dramatically reduces lock contention while maintaining reasonable LRU accuracy
-                            bool shouldPromote = Random.Shared.NextDouble() < PromotionProbability;
-
-                            if (shouldPromote)
-                            {
-                                // Upgrade to write lock for LRU promotion
-                                _lock.EnterWriteLock();
-                                try
-                                {
-                                    // Verify node is still in list (could have been removed by another thread)
-                                    if (node.List != null)
-                                    {
-                                        _lruList.Remove(node);
-                                        _lruList.AddFirst(node);
-                                    }
-                                }
-                                finally
-                                {
-                                    _lock.ExitWriteLock();
-                                }
-                            }
-
-                            Interlocked.Increment(ref _hits);
-                            value = node.Value.Value;
-                            return true;
-                        }
-
-                        // Expired: remove (requires write lock)
-                        _lock.EnterWriteLock();
-                        try
-                        {
-                            _lruList.Remove(node);
-                            _cache.TryRemove(node.Value.Key, out _);
-                        }
-                        finally
-                        {
-                            _lock.ExitWriteLock();
-                        }
+                        _lruList.Remove(nodeToRemove);
+                        _cache.TryRemove(key, out _);
                     }
                 }
                 finally
                 {
-                    _lock.ExitUpgradeableReadLock();
+                    _lock.ExitWriteLock();
                 }
             }
 
@@ -178,7 +154,8 @@ namespace nORM.Internal
         /// </summary>
         public void Set(TKey key, TValue value, TimeSpan? ttlOverride = null, IReadOnlyList<string>? dependencies = null)
         {
-            var item = new CacheItem(key, value, DateTimeOffset.UtcNow, ttlOverride);
+            var nowUtc = DateTimeOffset.UtcNow;
+            var item = new CacheItem(key, value, nowUtc, ttlOverride, nowUtc.UtcDateTime.Ticks);
 
             _lock.EnterWriteLock();
             try
@@ -198,12 +175,29 @@ namespace nORM.Internal
                     _lruList.AddFirst(newNode);
                 }
 
-                // Size-based eviction only (no TTL prune here to avoid extra churn)
+                // PERFORMANCE FIX (TASK 6): Evict based on LastAccessed timestamp (approximate LRU)
+                // Find least recently accessed item by scanning timestamps
                 if (_lruList.Count > _maxSize)
                 {
-                    var last = _lruList.Last!;
-                    _lruList.RemoveLast();
-                    _cache.TryRemove(last.Value.Key, out _);
+                    LinkedListNode<CacheItem>? oldestNode = null;
+                    long oldestTicks = long.MaxValue;
+
+                    // Scan to find least recently accessed (this is infrequent, only on eviction)
+                    for (var node = _lruList.First; node != null; node = node.Next)
+                    {
+                        var ticks = Interlocked.Read(ref node.Value.LastAccessedTicks);
+                        if (ticks < oldestTicks)
+                        {
+                            oldestTicks = ticks;
+                            oldestNode = node;
+                        }
+                    }
+
+                    if (oldestNode != null)
+                    {
+                        _lruList.Remove(oldestNode);
+                        _cache.TryRemove(oldestNode.Value.Key, out _);
+                    }
                 }
             }
             finally
@@ -240,14 +234,34 @@ namespace nORM.Internal
         }
 
         /// <summary>
-        /// Represents a cache entry along with its creation time and optional
-        /// time-to-live override.
+        /// Represents a cache entry along with its creation time, optional TTL override,
+        /// and last accessed timestamp (stored as ticks for Interlocked updates).
         /// </summary>
         /// <param name="Key">The key associated with the cached value.</param>
         /// <param name="Value">The cached value.</param>
         /// <param name="Created">Timestamp indicating when the entry was created.</param>
         /// <param name="TtlOverride">Optional TTL overriding the cache's default.</param>
-        private readonly record struct CacheItem(TKey Key, TValue Value, DateTimeOffset Created, TimeSpan? TtlOverride);
+        /// <param name="LastAccessedTicks">
+        /// Mutable field storing last access time as ticks. Updated via Interlocked for lock-free reads.
+        /// PERFORMANCE FIX (TASK 6): This allows updating access time without acquiring write locks.
+        /// </param>
+        private sealed class CacheItem
+        {
+            public TKey Key { get; }
+            public TValue Value { get; }
+            public DateTimeOffset Created { get; }
+            public TimeSpan? TtlOverride { get; }
+            public long LastAccessedTicks;
+
+            public CacheItem(TKey key, TValue value, DateTimeOffset created, TimeSpan? ttlOverride, long lastAccessedTicks)
+            {
+                Key = key;
+                Value = value;
+                Created = created;
+                TtlOverride = ttlOverride;
+                LastAccessedTicks = lastAccessedTicks;
+            }
+        }
 
         /// <summary>
         /// Disposes the cache and releases the reader-writer lock.

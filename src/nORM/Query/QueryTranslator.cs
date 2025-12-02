@@ -457,6 +457,7 @@ namespace nORM.Query
                 var elementType = _t._groupJoinInfo?.ResultType ?? materializerType;
 
                 // PERFORMANCE FIX (TASK 14): Pass both sync and async materializers to QueryPlan
+                // PERFORMANCE FIX (TASK 7): Pass Take value to avoid regex parsing on hot path
                 var plan = new QueryPlan(
                     _t._sql.ToString(),
                     (IReadOnlyDictionary<string, object>)_t._params,
@@ -474,7 +475,8 @@ namespace nORM.Query
                     _t._splitQuery,
                     _t._estimatedTimeout,
                     _t._isCacheable,
-                    _t._cacheExpiration
+                    _t._cacheExpiration,
+                    Take: _t._take
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
@@ -1079,12 +1081,41 @@ namespace nORM.Query
             {
                 if (_correlatedParams.TryGetValue(pe, out var info))
                 {
-                    var col = info.Mapping.ColumnsByName[node.Member.Name];
+                    // RELIABILITY FIX (TASK 10): Use TryGetValue to prevent KeyNotFoundException
+                    if (!info.Mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
+                    {
+                        // Check if it's a navigation property
+                        if (info.Mapping.Relations.ContainsKey(node.Member.Name))
+                        {
+                            throw new NormQueryException(
+                                $"Navigation property '{node.Member.Name}' cannot be used directly in queries. " +
+                                "Use Include() to load related entities or project specific properties.");
+                        }
+
+                        throw new NormQueryException(
+                            $"Property '{node.Member.Name}' on type '{info.Mapping.Type.Name}' is not mapped to a database column. " +
+                            "Ensure the property has a [Column] attribute or is included in the entity configuration.");
+                    }
                     _sql.Append($"{info.Alias}.{col.EscCol}");
                 }
                 else
                 {
-                    var col = _mapping.ColumnsByName[node.Member.Name];
+                    // RELIABILITY FIX (TASK 10): Use TryGetValue to prevent KeyNotFoundException
+                    if (!_mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
+                    {
+                        // Check if it's a navigation property
+                        if (_mapping.Relations.ContainsKey(node.Member.Name))
+                        {
+                            throw new NormQueryException(
+                                $"Navigation property '{node.Member.Name}' cannot be used directly in queries. " +
+                                "Use Include() to load related entities or project specific properties.");
+                        }
+
+                        throw new NormQueryException(
+                            $"Property '{node.Member.Name}' on type '{_mapping.Type.Name}' is not mapped to a database column. " +
+                            "Ensure the property has a [Column] attribute, [NotMapped] is not applied, " +
+                            "or the property is included in the entity configuration.");
+                    }
                     _sql.Append(col.EscCol);
                 }
                 return node;

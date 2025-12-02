@@ -42,7 +42,10 @@ namespace nORM.Core
         private readonly AdaptiveTimeoutManager _timeoutManager;
         private readonly ModelBuilder _modelBuilder;
         private readonly DynamicEntityTypeGenerator _typeGenerator = new();
-        private readonly ConcurrentDictionary<string, Lazy<Task<Type>>> _dynamicTypeCache = new();
+        // PERFORMANCE FIX (TASK 3): Static cache to avoid recreating for every DbContext instance
+        // Dynamic type generation is expensive (uses Reflection.Emit), so cache should be shared
+        // across all DbContext instances in the application.
+        private static readonly ConcurrentDictionary<string, Lazy<Task<Type>>> _dynamicTypeCache = new();
         private readonly LinkedList<WeakReference<IDisposable>> _disposables = new();
         private readonly object _disposablesLock = new();
         private readonly Timer _cleanupTimer;
@@ -612,6 +615,23 @@ namespace nORM.Core
                         await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, ct).ConfigureAwait(false);
                 }
                 await transactionManager.CommitAsync().ConfigureAwait(false);
+
+                // DATA INTEGRITY FIX (TASK 1): Accept changes only after successful commit
+                // This ensures entities are not marked as Unchanged if transaction fails
+                foreach (var entry in changedEntries)
+                {
+                    if (entry.State == EntityState.Deleted)
+                    {
+                        // Remove deleted entities from the ChangeTracker
+                        if (entry.Entity is { } entityToRemove)
+                            ChangeTracker.Remove(entityToRemove, true);
+                    }
+                    else
+                    {
+                        // Mark Added/Modified entities as Unchanged
+                        entry.AcceptChanges();
+                    }
+                }
             }
             catch
             {
@@ -695,7 +715,8 @@ namespace nORM.Core
                         if (entity != null)
                             map.SetPrimaryKey(entity, newId);
                     }
-                    batch[i].AcceptChanges();
+                    // DATA INTEGRITY FIX (TASK 1): Removed AcceptChanges() call
+                    // AcceptChanges must only be called after transaction commits successfully
                     i++;
                 }
                 while (await reader.NextResultAsync(ct).ConfigureAwait(false) && i < batch.Count);
@@ -703,8 +724,8 @@ namespace nORM.Core
             }
 
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            foreach (var entry in batch)
-                entry.AcceptChanges();
+            // DATA INTEGRITY FIX (TASK 1): Removed AcceptChanges() calls
+            // AcceptChanges must only be called after transaction commits successfully
             return affected;
         }
 
@@ -735,8 +756,8 @@ namespace nORM.Core
             var updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
             if (map.TimestampColumn != null && updated != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
-            foreach (var entry in batch)
-                entry.AcceptChanges();
+            // DATA INTEGRITY FIX (TASK 1): Removed AcceptChanges() calls
+            // AcceptChanges must only be called after transaction commits successfully
             return updated;
         }
 
@@ -767,11 +788,8 @@ namespace nORM.Core
             var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
             if (map.TimestampColumn != null && deleted != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
-            foreach (var entry in batch)
-            {
-                if (entry.Entity is { } entityToRemove)
-                    ChangeTracker.Remove(entityToRemove, true);
-            }
+            // DATA INTEGRITY FIX (TASK 1): Removed entity removal from ChangeTracker
+            // This must only be done after transaction commits successfully
             return deleted;
         }
 
@@ -1577,6 +1595,10 @@ namespace nORM.Core
                     waitHandle.Dispose();
                 }
                 _providerInitLock?.Dispose();
+
+                // DEADLOCK FIX (TASK 5): Copy disposables to local list inside lock, then dispose outside lock
+                // This prevents deadlock if a disposable's Dispose() method tries to access DbContext or acquire locks
+                List<IDisposable> toDispose = new();
                 lock (_disposablesLock)
                 {
                     CleanupDisposablesInternal();
@@ -1585,12 +1607,26 @@ namespace nORM.Core
                         var next = node.Next;
                         if (node.Value.TryGetTarget(out var d))
                         {
-                            d.Dispose();
+                            toDispose.Add(d);
                         }
                         _disposables.Remove(node);
                         node = next;
                     }
                 }
+
+                // Dispose items outside the lock to prevent deadlocks
+                foreach (var d in toDispose)
+                {
+                    try
+                    {
+                        d.Dispose();
+                    }
+                    catch
+                    {
+                        // Suppress exceptions during disposal
+                    }
+                }
+
                 _cn?.Dispose();
                 _disposed = true;
             }
