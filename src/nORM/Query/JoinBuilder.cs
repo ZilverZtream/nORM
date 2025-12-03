@@ -25,7 +25,7 @@ namespace nORM.Query
     /// 2. **No Nested Anonymous Type Support:**
     ///    - Doesn't handle transparent identifiers from multiple Select() chains
     ///    - Example: `query.Select(x => new { x.Id }).Select(y => new { y.Id, Computed = y.Id * 2 })`
-    ///    - Compiler generates `<>h__TransparentIdentifier0` which isn't recognized
+    ///    - Compiler generates `&lt;&gt;h__TransparentIdentifier0` which isn't recognized
     ///
     /// 3. **No Computed/Method Call Handling:**
     ///    - Doesn't parse method calls: `new { Upper = x.Name.ToUpper() }`
