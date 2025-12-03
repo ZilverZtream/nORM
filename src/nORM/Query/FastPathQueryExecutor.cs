@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Threading.Tasks;
 #nullable enable
 namespace nORM.Query
@@ -16,6 +17,38 @@ namespace nORM.Query
     {
         private static readonly ConcurrentDictionary<int, string> _sqlTemplateCache = new();
         private readonly record struct WhereInfo(string Property, object Value);
+
+        /// <summary>
+        /// PERFORMANCE FIX: Cached delegates to avoid MakeGenericMethod and Invoke on every query.
+        /// This eliminates the reflection overhead in the fast path.
+        /// </summary>
+        private delegate bool TryExecuteDelegate(Expression expr, DbContext ctx, out Task<object> result);
+        private static readonly ConcurrentDictionary<Type, TryExecuteDelegate> _cachedExecutors = new();
+
+        /// <summary>
+        /// Non-generic entry point that uses cached delegates to avoid reflection overhead.
+        /// </summary>
+        public static bool TryExecuteNonGeneric(Type elementType, Expression expr, DbContext ctx, out Task<object> result)
+        {
+            result = default!;
+
+            // Fast check: element type must be a class with parameterless constructor
+            if (!elementType.IsClass || elementType.GetConstructor(Type.EmptyTypes) == null)
+                return false;
+
+            var executor = _cachedExecutors.GetOrAdd(elementType, t =>
+            {
+                // Compile the generic TryExecute<T> method once per type
+                var method = typeof(FastPathQueryExecutor)
+                    .GetMethod(nameof(TryExecute), BindingFlags.Public | BindingFlags.Static)!
+                    .MakeGenericMethod(t);
+
+                return (TryExecuteDelegate)Delegate.CreateDelegate(typeof(TryExecuteDelegate), method);
+            });
+
+            return executor(expr, ctx, out result);
+        }
+
         public static bool TryExecute<T>(Expression expr, DbContext ctx, out Task<object> result) where T : class, new()
         {
             result = default!;
