@@ -61,7 +61,7 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<Type, Func<object>> _parameterlessCtorDelegates = new();
         private static readonly ConcurrentDictionary<Type, bool> _simpleTypeCache = new();
         private static readonly ConcurrentDictionary<Type, Func<DbDataReader, object>> _fastMaterializers = new();
-        private static readonly ConcurrentDictionary<Type, Action<object, DbDataReader>[]> _setterCache = new();
+        private static readonly ConcurrentDictionary<(Type Type, int Offset), Action<object, DbDataReader>[]> _setterCache = new();
         private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _propertiesCache = new();
 
         // Pre-computed type conversion delegates for better performance
@@ -149,7 +149,7 @@ namespace nORM.Query
             }
         }
 
-        private static Func<DbDataReader, object> CreateILMaterializer<T>() where T : class
+        private static Func<DbDataReader, object> CreateILMaterializer<T>(int startOffset = 0) where T : class
         {
             var type = typeof(T);
             var method = new DynamicMethod("Materialize", typeof(object), new[] { typeof(DbDataReader) }, typeof(MaterializerFactory), true);
@@ -171,13 +171,13 @@ namespace nORM.Query
 
                     var skip = il.DefineLabel();
                     il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, i);
+                    il.Emit(OpCodes.Ldc_I4, i + startOffset);
                     il.Emit(OpCodes.Callvirt, Methods.IsDbNull);
                     il.Emit(OpCodes.Brtrue_S, skip);
 
                     il.Emit(OpCodes.Ldloc_0);
                     il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, i);
+                    il.Emit(OpCodes.Ldc_I4, i + startOffset);
 
                     var readerMethod = Methods.GetReaderMethod(prop.PropertyType);
                     il.Emit(OpCodes.Callvirt, readerMethod);
@@ -311,7 +311,8 @@ namespace nORM.Query
         /// <returns>A delegate that synchronously materializes objects from a data reader without boxing.</returns>
         public Func<DbDataReader, T> CreateSyncMaterializer<T>(
             TableMapping mapping,
-            LambdaExpression? projection = null)
+            LambdaExpression? projection = null,
+            int startOffset = 0)
         {
             ArgumentNullException.ThrowIfNull(mapping);
 
@@ -320,19 +321,20 @@ namespace nORM.Query
                 mapping.Type.GetHashCode(),
                 targetType.GetHashCode(),
                 projection != null ? ExpressionFingerprint.Compute(projection) : 0,
-                mapping.TableName);
+                mapping.TableName,
+                startOffset);
 
             // Get the object-returning materializer from cache
             var objectMaterializer = _syncCache.GetOrAdd(cacheKey, _ =>
             {
                 // For simple entity materialization without projection, prefer fast materializers
-                if (projection == null && _fastMaterializers.TryGetValue(targetType, out var fast))
+                if (projection == null && startOffset == 0 && _fastMaterializers.TryGetValue(targetType, out var fast))
                 {
                     return fast;
                 }
 
                 // Fall back to existing reflection-based approach
-                var sync = CreateMaterializerInternal(mapping, targetType, projection);
+                var sync = CreateMaterializerInternal(mapping, targetType, projection, false, startOffset);
                 ValidateMaterializer(sync, mapping, targetType);
                 return sync;
             });
@@ -352,7 +354,8 @@ namespace nORM.Query
         public Func<DbDataReader, object> CreateSyncMaterializer(
             TableMapping mapping,
             Type targetType,
-            LambdaExpression? projection = null)
+            LambdaExpression? projection = null,
+            int startOffset = 0)
         {
             ArgumentNullException.ThrowIfNull(mapping);
             ArgumentNullException.ThrowIfNull(targetType);
@@ -361,18 +364,19 @@ namespace nORM.Query
                 mapping.Type.GetHashCode(),
                 targetType.GetHashCode(),
                 projection != null ? ExpressionFingerprint.Compute(projection) : 0,
-                mapping.TableName);
+                mapping.TableName,
+                startOffset);
 
             return _syncCache.GetOrAdd(cacheKey, _ =>
             {
                 // For simple entity materialization without projection, prefer fast materializers
-                if (projection == null && _fastMaterializers.TryGetValue(targetType, out var fast))
+                if (projection == null && startOffset == 0 && _fastMaterializers.TryGetValue(targetType, out var fast))
                 {
                     return fast;
                 }
 
                 // Fall back to existing reflection-based approach
-                var sync = CreateMaterializerInternal(mapping, targetType, projection);
+                var sync = CreateMaterializerInternal(mapping, targetType, projection, false, startOffset);
                 ValidateMaterializer(sync, mapping, targetType);
                 return sync;
             });
@@ -422,13 +426,14 @@ namespace nORM.Query
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(
             TableMapping mapping,
             Type targetType,
-            LambdaExpression? projection = null)
+            LambdaExpression? projection = null,
+            int startOffset = 0)
         {
             ArgumentNullException.ThrowIfNull(mapping);
             ArgumentNullException.ThrowIfNull(targetType);
 
             // CHECK FOR COMPILED MATERIALIZER FIRST
-            if (projection == null && CompiledMaterializerStore.TryGet(targetType, out var compiled))
+            if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, out var compiled))
             {
                 return compiled;
             }
@@ -437,13 +442,14 @@ namespace nORM.Query
                 mapping.Type.GetHashCode(),
                 targetType.GetHashCode(),
                 projection != null ? ExpressionFingerprint.Compute(projection) : 0,
-                mapping.TableName);
+                mapping.TableName,
+                startOffset);
 
             return _asyncCache.GetOrAdd(cacheKey, _ =>
             {
                 // PERFORMANCE FIX (TASK 14): Get the sync materializer and wrap it once
                 // This wrapper is cached, so we don't allocate a Task per row
-                var syncMaterializer = CreateSyncMaterializer(mapping, targetType, projection);
+                var syncMaterializer = CreateSyncMaterializer(mapping, targetType, projection, startOffset);
 
                 return (reader, ct) =>
                 {
@@ -464,13 +470,14 @@ namespace nORM.Query
         public Func<DbDataReader, CancellationToken, Task<object>> CreateSchemaAwareMaterializer(
             TableMapping mapping,
             Type targetType,
-            LambdaExpression? projection = null)
+            LambdaExpression? projection = null,
+            int startOffset = 0)
         {
             ArgumentNullException.ThrowIfNull(mapping);
             ArgumentNullException.ThrowIfNull(targetType);
 
             // For simple cases without JOINs, use regular materializer
-            if (projection == null && CompiledMaterializerStore.TryGet(targetType, out var compiled))
+            if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, out var compiled))
             {
                 return compiled;
             }
@@ -479,11 +486,12 @@ namespace nORM.Query
                 mapping.Type.GetHashCode(),
                 targetType.GetHashCode(),
                 projection != null ? ExpressionFingerprint.Compute(projection) : 0,
-                mapping.TableName);
+                mapping.TableName,
+                startOffset);
 
             return _asyncCache.GetOrAdd(cacheKey, _ =>
             {
-                var baseMaterializer = CreateMaterializerInternal(mapping, targetType, projection);
+                var baseMaterializer = CreateMaterializerInternal(mapping, targetType, projection, false, startOffset);
 
                 // For most cases, use base materializer with minimal overhead
                 if (projection == null)
@@ -668,19 +676,19 @@ namespace nORM.Query
                    type == typeof(decimal);
         }
 
-        private Func<DbDataReader, object> CreateMaterializerInternal(TableMapping mapping, Type targetType, LambdaExpression? projection = null, bool ignoreTph = false)
+        private Func<DbDataReader, object> CreateMaterializerInternal(TableMapping mapping, Type targetType, LambdaExpression? projection = null, bool ignoreTph = false, int startOffset = 0)
         {
             if (!ignoreTph && mapping.DiscriminatorColumn != null && mapping.TphMappings.Count > 0 && projection == null)
             {
-                var discIndex = Array.IndexOf(mapping.Columns, mapping.DiscriminatorColumn);
-                var baseMat = CreateMaterializerInternal(mapping, targetType, null, true);
+                var discIndex = startOffset + Array.IndexOf(mapping.Columns, mapping.DiscriminatorColumn);
+                var baseMat = CreateMaterializerInternal(mapping, targetType, null, true, startOffset);
                 var derivedMats = mapping.TphMappings.ToDictionary(
                     kvp => kvp.Key,
                     kvp =>
                     {
                         var dmap = kvp.Value;
-                        var indices = dmap.Columns.Select(c => Array.IndexOf(mapping.Columns, mapping.ColumnsByName[c.Prop.Name])).ToArray();
-                        var getters = dmap.Columns.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, indices[i])).ToArray();
+                        var indices = dmap.Columns.Select(c => startOffset + Array.IndexOf(mapping.Columns, mapping.ColumnsByName[c.Prop.Name])).ToArray();
+                        var getters = dmap.Columns.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, indices[i], 0)).ToArray();
                         var ctor = _parameterlessCtorDelegates.GetOrAdd(dmap.Type, t =>
                         {
                             var newExpr = Expression.New(t);
@@ -713,7 +721,7 @@ namespace nORM.Query
             // Handle simple scalar types directly
             if (IsSimpleType(targetType))
             {
-                var getter = CreateReaderGetter(targetType, 0);
+                var getter = CreateReaderGetter(targetType, 0, startOffset);
                 var defaultFactory = _parameterlessCtorDelegates.GetOrAdd(targetType, t =>
                 {
                     var body = Expression.Convert(Expression.New(t), typeof(object));
@@ -722,7 +730,7 @@ namespace nORM.Query
 
                 return reader =>
                 {
-                    if (reader.IsDBNull(0))
+                    if (reader.IsDBNull(startOffset))
                         return targetType.IsValueType ? defaultFactory() : null!;
                     return getter(reader)!;
                 };
@@ -736,7 +744,7 @@ namespace nORM.Query
 
             if (parameterlessCtor != null && columns.All(c => c.Prop.DeclaringType == targetType && c.Prop.GetSetMethod() != null))
             {
-                return CreateOptimizedMaterializer(columns, targetType);
+                return CreateOptimizedMaterializer(columns, targetType, startOffset);
             }
 
             if (parameterlessCtor != null)
@@ -762,7 +770,7 @@ namespace nORM.Query
 
                 if (canOptimize)
                 {
-                    var setters = GetOptimizedSetters(targetType);
+                    var setters = GetOptimizedSetters(targetType, startOffset);
                     return reader =>
                     {
                         var entity = parameterlessCtorDelegate();
@@ -774,13 +782,13 @@ namespace nORM.Query
                     };
                 }
 
-                var getters = columns.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, i)).ToArray();
+                var getters = columns.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, i, startOffset)).ToArray();
                 return reader =>
                 {
                     var entity = parameterlessCtorDelegate();
                     for (int i = 0; i < columns.Length; i++)
                     {
-                        if (reader.IsDBNull(i)) continue;
+                        if (reader.IsDBNull(i + startOffset)) continue;
                         var col = columns[i];
                         var value = getters[i](reader);
                         col.Setter(entity, value);
@@ -793,14 +801,14 @@ namespace nORM.Query
             var ctor = GetCachedConstructor(targetType, columns);
             var ctorParams = ctor.GetParameters();
             var ctorDelegate = _constructorDelegates.GetOrAdd(targetType, _ => CreateConstructorDelegate(ctor));
-            var paramGetters = ctorParams.Select((p, i) => CreateReaderGetter(p.ParameterType, i)).ToArray();
+            var paramGetters = ctorParams.Select((p, i) => CreateReaderGetter(p.ParameterType, i, startOffset)).ToArray();
 
             return reader =>
             {
                 var args = new object?[ctorParams.Length];
                 for (int i = 0; i < ctorParams.Length; i++)
                 {
-                    if (reader.IsDBNull(i))
+                    if (reader.IsDBNull(i + startOffset))
                     {
                         var paramType = ctorParams[i].ParameterType;
                         args[i] = paramType.IsValueType ? Activator.CreateInstance(paramType) : default;
@@ -883,15 +891,15 @@ namespace nORM.Query
             return mapping.Columns;
         }
 
-        private static Func<DbDataReader, object> CreateReaderGetter(Type type, int index)
+        private static Func<DbDataReader, object> CreateReaderGetter(Type type, int index, int startOffset)
         {
             var readerParam = Expression.Parameter(typeof(DbDataReader), "reader");
-            var valueExpr = GetOptimizedReaderCall(readerParam, type, index);
+            var valueExpr = GetOptimizedReaderCall(readerParam, type, index + startOffset);
             var body = Expression.Convert(valueExpr, typeof(object));
             return Expression.Lambda<Func<DbDataReader, object>>(body, readerParam).Compile();
         }
 
-        private static Func<DbDataReader, object> CreateOptimizedMaterializer(Column[] columns, Type targetType)
+        private static Func<DbDataReader, object> CreateOptimizedMaterializer(Column[] columns, Type targetType, int startOffset)
         {
             var readerParam = Expression.Parameter(typeof(DbDataReader), "reader");
             var entityVar = Expression.Variable(targetType, "entity");
@@ -903,8 +911,8 @@ namespace nORM.Query
             for (int i = 0; i < columns.Length; i++)
             {
                 var column = columns[i];
-                var isNullCheck = Expression.Call(readerParam, Methods.IsDbNull, Expression.Constant(i));
-                var getValue = GetOptimizedReaderCall(readerParam, column.Prop.PropertyType, i);
+                var isNullCheck = Expression.Call(readerParam, Methods.IsDbNull, Expression.Constant(i + startOffset));
+                var getValue = GetOptimizedReaderCall(readerParam, column.Prop.PropertyType, i + startOffset);
                 var setProperty = Expression.Call(entityVar, column.Prop.GetSetMethod()!, getValue);
                 var conditionalSet = Expression.IfThen(Expression.Not(isNullCheck), setProperty);
                 expressions.Add(conditionalSet);
@@ -1100,17 +1108,17 @@ namespace nORM.Query
             return call;
         }
 
-        private static Action<object, DbDataReader>[] GetOptimizedSetters(Type type)
+        private static Action<object, DbDataReader>[] GetOptimizedSetters(Type type, int startOffset)
         {
-            return _setterCache.GetOrAdd(type, t =>
+            return _setterCache.GetOrAdd((type, startOffset), t =>
             {
-                var properties = _propertiesCache.GetOrAdd(t, tt => tt.GetProperties(BindingFlags.Instance | BindingFlags.Public));
+                var properties = _propertiesCache.GetOrAdd(t.Item1, tt => tt.GetProperties(BindingFlags.Instance | BindingFlags.Public));
                 var setters = new Action<object, DbDataReader>[properties.Length];
 
                 for (int i = 0; i < properties.Length; i++)
                 {
                     var prop = properties[i];
-                    setters[i] = CreateOptimizedSetter(prop, i);
+                    setters[i] = CreateOptimizedSetter(prop, i + startOffset);
                 }
                 return setters;
             });
@@ -1444,13 +1452,15 @@ namespace nORM.Query
             public readonly int TargetTypeHash;
             public readonly int ProjectionHash;
             public readonly string TableName;
+            public readonly int StartOffset;
 
-            public MaterializerCacheKey(int mappingTypeHash, int targetTypeHash, int projectionHash, string tableName)
+            public MaterializerCacheKey(int mappingTypeHash, int targetTypeHash, int projectionHash, string tableName, int startOffset)
             {
                 MappingTypeHash = mappingTypeHash;
                 TargetTypeHash = targetTypeHash;
                 ProjectionHash = projectionHash;
                 TableName = tableName ?? string.Empty;
+                StartOffset = startOffset;
             }
 
             /// <summary>
@@ -1462,6 +1472,7 @@ namespace nORM.Query
                 MappingTypeHash == other.MappingTypeHash &&
                 TargetTypeHash == other.TargetTypeHash &&
                 ProjectionHash == other.ProjectionHash &&
+                StartOffset == other.StartOffset &&
                 string.Equals(TableName, other.TableName, StringComparison.Ordinal);
 
             /// <summary>
@@ -1475,7 +1486,7 @@ namespace nORM.Query
             /// Generates a hash code for the current key instance.
             /// </summary>
             /// <returns>A hash code that can be used in hashing algorithms and data structures.</returns>
-            public override int GetHashCode() => HashCode.Combine(MappingTypeHash, TargetTypeHash, ProjectionHash, TableName);
+            public override int GetHashCode() => HashCode.Combine(MappingTypeHash, TargetTypeHash, ProjectionHash, TableName, StartOffset);
         }
 
         private readonly struct SchemaCacheKey : IEquatable<SchemaCacheKey>
