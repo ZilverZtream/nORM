@@ -20,6 +20,7 @@ namespace nORM.Configuration
     {
         private int _bulkBatchSize = 1000;
         private bool _temporalVersioningEnabled = false;
+        private int _maxGroupJoinSize = 100000;
 
         /// <summary>
         /// Gets or sets the timeout configuration used when executing database commands.
@@ -27,6 +28,23 @@ namespace nORM.Configuration
         /// bulk operations or transactions.
         /// </summary>
         public AdaptiveTimeoutManager.TimeoutConfiguration TimeoutConfiguration { get; set; } = new();
+
+        /// <summary>
+        /// Gets or sets the maximum number of child entities allowed per group in a GroupJoin operation.
+        /// This prevents out-of-memory errors when joining large datasets. Set to a higher value for
+        /// datasets with legitimate large hierarchies, or to int.MaxValue to disable the limit entirely.
+        /// Default: 100,000.
+        /// </summary>
+        public int MaxGroupJoinSize
+        {
+            get => _maxGroupJoinSize;
+            set
+            {
+                if (value <= 0)
+                    throw new ArgumentOutOfRangeException(nameof(value), "MaxGroupJoinSize must be positive");
+                _maxGroupJoinSize = value;
+            }
+        }
 
         /// <summary>
         /// Gets or sets the base timeout applied to all commands.

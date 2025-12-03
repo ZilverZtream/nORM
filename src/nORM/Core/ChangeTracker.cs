@@ -60,39 +60,67 @@ namespace nORM.Core
                 }
                 return existingEntry;
             }
+
             var pk = GetPrimaryKeyValue(entity, mapping);
-            // If not found by reference, check by primary key
-            if (pk != null && _entriesByKey.TryGetValue(mapping.Type, out var existingTypeEntries) &&
-                existingTypeEntries.TryGetValue(pk, out var existing))
+
+            // FIX (TASK 10): Use GetOrAdd pattern to atomically check and insert by PK
+            // This prevents race conditions where two threads tracking the same entity by PK
+            // might both create entries, causing duplicate tracking or inconsistent state
+            if (pk != null)
             {
-                existing.State = state;
-                return existing;
+                var typeEntries = _entriesByKey.GetOrAdd(
+                    mapping.Type,
+                    _ => new ConcurrentDictionary<object, EntityEntry>());
+
+                // Atomically get or create entry for this PK
+                var pkEntry = typeEntries.GetOrAdd(pk, _ =>
+                {
+                    // Create entry only if not already tracked by PK
+                    var newEntry = state == EntityState.Unchanged && !_options.EagerChangeTracking
+                        ? CreateLazyEntry(entity, mapping)
+                        : new EntityEntry(entity, state, mapping, _options, MarkDirty);
+
+                    // Also track by reference
+                    _entriesByReference.TryAdd(entity, newEntry);
+
+                    // Set up additional tracking
+                    if (entity is not INotifyPropertyChanged)
+                        _nonNotifyingEntries.TryAdd(newEntry, 0);
+
+                    return newEntry;
+                });
+
+                // If entry was created by another thread, update state
+                if (!ReferenceEquals(pkEntry.Entity, entity))
+                {
+                    // Different instance with same PK - update the tracked instance's state
+                    pkEntry.State = state;
+                }
+
+                return pkEntry;
             }
-            // Create new entry only when needed
+
+            // No PK - only track by reference
             var entry = state == EntityState.Unchanged && !_options.EagerChangeTracking
                 ? CreateLazyEntry(entity, mapping)
                 : new EntityEntry(entity, state, mapping, _options, MarkDirty);
+
             if (_entriesByReference.TryAdd(entity, entry))
             {
                 // Successfully added - set up additional tracking
                 if (entity is not INotifyPropertyChanged)
                     _nonNotifyingEntries.TryAdd(entry, 0);
-                if (pk != null)
-                {
-                    var typeEntries = _entriesByKey.GetOrAdd(
-                        mapping.Type,
-                        static _ => new ConcurrentDictionary<object, EntityEntry>());
-                    typeEntries.TryAdd(pk, entry);
-                }
                 return entry;
             }
+
             // Another thread added it between check and add
             if (_entriesByReference.TryGetValue(entity, out var raceEntry))
             {
                 raceEntry.State = state;
                 return raceEntry;
             }
-            // Fallback: return the one we created
+
+            // Fallback: return the one we created (shouldn't normally reach here)
             return entry;
         }
 
@@ -150,10 +178,16 @@ namespace nORM.Core
         /// <param name="rootMapping">Mapping information for the root entity.</param>
         private void CascadeDelete(object rootEntity, TableMapping rootMapping)
         {
+            // FIX (TASK 2): Collect all entities to delete first, then remove them
+            // This prevents the issue where removing an entity early prevents discovering its descendants
             var queue = new Queue<(object Entity, TableMapping Mapping, int Depth)>();
             var visited = new HashSet<object>(RefComparer.Instance);
+            var toRemove = new List<object>();
+
             queue.Enqueue((rootEntity, rootMapping, 0));
             visited.Add(rootEntity);
+
+            // Phase 1: Discover all entities in the cascade delete graph
             while (queue.Count > 0)
             {
                 var (entity, mapping, depth) = queue.Dequeue();
@@ -161,6 +195,11 @@ namespace nORM.Core
                     throw new InvalidOperationException(
                         $"Cascade delete depth exceeded maximum of {MaxCascadeDepth}. " +
                         "This may indicate a circular relationship or an unexpectedly deep hierarchy.");
+
+                // Only add to removal list if this is not the root (root is already being removed by caller)
+                if (depth > 0)
+                    toRemove.Add(entity);
+
                 foreach (var relation in mapping.Relations.Values)
                 {
                     if (!relation.CascadeDelete)
@@ -174,7 +213,6 @@ namespace nORM.Core
                                 _entriesByReference.TryGetValue(child, out var childEntry))
                             {
                                 queue.Enqueue((child, childEntry.Mapping, depth + 1));
-                                Remove(child, false);
                             }
                         }
                     }
@@ -182,9 +220,14 @@ namespace nORM.Core
                              _entriesByReference.TryGetValue(navValue, out var childEntry))
                     {
                         queue.Enqueue((navValue, childEntry.Mapping, depth + 1));
-                        Remove(navValue, false);
                     }
                 }
+            }
+
+            // Phase 2: Remove all collected entities (prevents graph traversal issues)
+            foreach (var entityToRemove in toRemove)
+            {
+                Remove(entityToRemove, cascade: false);
             }
         }
         /// <summary>
@@ -213,19 +256,25 @@ namespace nORM.Core
         /// </remarks>
         internal void DetectChanges()
         {
-            var dirtyNonNotifyingSnapshot = _dirtyNonNotifyingEntries.Keys.ToArray();
-            foreach (var entry in dirtyNonNotifyingSnapshot)
+            // FIX (TASK 1): Detect changes in ALL non-notifying entries, not just dirty ones
+            // POCOs don't raise property change events, so we must compare snapshots for all of them
+            var allNonNotifyingSnapshot = _nonNotifyingEntries.Keys.ToArray();
+            foreach (var entry in allNonNotifyingSnapshot)
             {
                 if (entry.Entity != null)
                     entry.DetectChanges();
             }
-            _dirtyNonNotifyingEntries.Clear();
+
+            // Also process explicitly marked dirty entries
             var dirtySnapshot = _dirtyEntries.Keys.ToArray();
             foreach (var entry in dirtySnapshot)
             {
                 if (entry.Entity != null)
                     entry.DetectChanges();
             }
+
+            // Clear the dirty tracking sets after detection
+            _dirtyNonNotifyingEntries.Clear();
             _dirtyEntries.Clear();
         }
 

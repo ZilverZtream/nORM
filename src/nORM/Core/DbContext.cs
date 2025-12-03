@@ -222,39 +222,71 @@ namespace nORM.Core
         }
         internal TimeSpan GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType operationType, string? sql = null, int recordCount = 1)
         {
-            // PERFORMANCE FIX (TASK 16): Provide basic query complexity estimation.
-            // Previous implementation used const baseComplexity = 1 for all queries, making the
-            // "adaptive" timeout manager ineffective. A simple length-based heuristic helps
-            // differentiate simple queries (SELECT * FROM T WHERE PK=1) from complex ones
-            // (full-text search, multi-way joins, subqueries).
-            //
-            // This is still basic, but better than treating all queries identically. The adaptive
-            // timeout manager can now learn that simple queries should be fast while complex queries
-            // may take longer.
+            // FIX (TASK 9): Enhanced query complexity estimation with better keyword weighting.
+            // This provides more accurate timeout predictions by analyzing query structure
+            // rather than just SQL length. The adaptive timeout manager uses this to learn
+            // which types of queries typically require longer execution times.
             int baseComplexity = 1;
 
             if (!string.IsNullOrEmpty(sql))
             {
-                // Simple heuristic: longer SQL = more complex
-                // Base of 1 + (length / 100) gives reasonable scaling
-                // - 100 char query = complexity 2
-                // - 500 char query = complexity 6
-                // - 1000 char query = complexity 11
+                // Base complexity from SQL length (normalized)
                 baseComplexity = 1 + (sql.Length / 100);
 
-                // Additional complexity signals (case-insensitive checks)
+                // Enhanced complexity signals with improved weighting
                 var upperSql = sql.ToUpperInvariant();
-                if (upperSql.Contains("JOIN")) baseComplexity += 2;
-                if (upperSql.Contains("UNION")) baseComplexity += 2;
-                if (upperSql.Contains("GROUP BY")) baseComplexity += 1;
-                if (upperSql.Contains("ORDER BY")) baseComplexity += 1;
+
+                // High-cost operations (significant complexity increase)
+                int joinCount = CountOccurrences(upperSql, "JOIN");
+                if (joinCount > 0) baseComplexity += 2 * joinCount; // Multiple joins are expensive
+
+                if (upperSql.Contains("UNION")) baseComplexity += 3; // Set operations are costly
+                if (upperSql.Contains("INTERSECT")) baseComplexity += 3;
+                if (upperSql.Contains("EXCEPT")) baseComplexity += 3;
+
+                // Medium-cost operations
+                if (upperSql.Contains("GROUP BY")) baseComplexity += 2;
+                if (upperSql.Contains("HAVING")) baseComplexity += 1;
+                if (upperSql.Contains("ORDER BY")) baseComplexity += 2;
+
+                // Subqueries add significant complexity
+                int subqueryCount = CountOccurrences(upperSql, "SELECT") - 1; // Subtract main SELECT
+                if (subqueryCount > 0) baseComplexity += 2 * subqueryCount;
+
+                // Other complexity indicators
                 if (upperSql.Contains("DISTINCT")) baseComplexity += 1;
+                if (upperSql.Contains("CROSS JOIN")) baseComplexity += 3; // Cartesian products are very expensive
+                if (upperSql.Contains("LEFT JOIN") || upperSql.Contains("RIGHT JOIN")) baseComplexity += 1;
+                if (upperSql.Contains("OUTER JOIN")) baseComplexity += 1;
+
+                // Window functions and CTEs
+                if (upperSql.Contains("OVER(") || upperSql.Contains("OVER (")) baseComplexity += 2;
+                if (upperSql.Contains("WITH") && upperSql.Contains("AS(")) baseComplexity += 2; // CTE
 
                 // Cap complexity to avoid extreme timeouts
                 baseComplexity = Math.Min(baseComplexity, 50);
             }
 
             return _timeoutManager.GetTimeoutForOperation(operationType, recordCount, baseComplexity);
+        }
+
+        /// <summary>
+        /// Counts the number of occurrences of a substring in a string (case-sensitive).
+        /// </summary>
+        private static int CountOccurrences(string text, string pattern)
+        {
+            if (string.IsNullOrEmpty(pattern)) return 0;
+
+            int count = 0;
+            int index = 0;
+
+            while ((index = text.IndexOf(pattern, index, StringComparison.Ordinal)) != -1)
+            {
+                count++;
+                index += pattern.Length;
+            }
+
+            return count;
         }
 
         /// <summary>
@@ -324,8 +356,37 @@ namespace nORM.Core
                 yield return GetMapping(type);
         }
 
+        /// <summary>
+        /// FIX (TASK 7): Relaxed identifier validation to allow provider-specific delimiters.
+        /// Validates that an identifier is safe for use in SQL queries. Allows:
+        /// - Alphanumeric characters, underscores, dots
+        /// - Quoted identifiers: "name", `name`, [name]
+        /// - Spaces and hyphens when properly delimited
+        /// This enables mapping to legacy schemas with non-standard table names.
+        /// </summary>
         private static bool IsSafeIdentifier(string name)
-            => !string.IsNullOrWhiteSpace(name) && Regex.IsMatch(name, @"^[A-Za-z0-9_\.]+$");
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return false;
+
+            // Allow standard identifiers: alphanumeric, underscore, dot
+            if (Regex.IsMatch(name, @"^[A-Za-z0-9_\.]+$"))
+                return true;
+
+            // Allow delimited identifiers with brackets (SQL Server): [My Table]
+            if (name.StartsWith("[") && name.EndsWith("]") && name.Length > 2)
+                return true;
+
+            // Allow delimited identifiers with double quotes (PostgreSQL, standard SQL): "My Table"
+            if (name.StartsWith("\"") && name.EndsWith("\"") && name.Length > 2)
+                return true;
+
+            // Allow delimited identifiers with backticks (MySQL): `My Table`
+            if (name.StartsWith("`") && name.EndsWith("`") && name.Length > 2)
+                return true;
+
+            return false;
+        }
 
         /// <summary>
         /// Creates an untyped <see cref="IQueryable"/> for the specified table name.
@@ -802,7 +863,19 @@ namespace nORM.Core
             }
             return ex is TimeoutException;
         }
-        private static int ToSecondsClamped(TimeSpan t) => Math.Max(1, (int)Math.Ceiling(t.TotalSeconds));
+        /// <summary>
+        /// FIX (TASK 8): Prevents integer overflow when converting TimeSpan to seconds.
+        /// If TimeSpan.MaxValue or very large timeouts are provided, this ensures the value
+        /// is clamped to int.MaxValue instead of wrapping to negative numbers.
+        /// </summary>
+        private static int ToSecondsClamped(TimeSpan t)
+        {
+            // Check for overflow before casting
+            if (t.TotalSeconds > int.MaxValue)
+                return int.MaxValue;
+
+            return Math.Max(1, (int)Math.Ceiling(t.TotalSeconds));
+        }
         #endregion
 
         #region Standard CRUD
