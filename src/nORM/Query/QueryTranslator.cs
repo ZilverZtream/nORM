@@ -1628,6 +1628,7 @@ namespace nORM.Query
                 builderForKey.Append(groupBySql).Append(" AS GroupKey");
                 selectItems.Add(builderForKey.ToString());
                 PooledStringBuilder.Return(builderForKey);
+                var builder = (System.Text.StringBuilder?)null;
                 // Analyze the result selector body to find aggregates
                 if (resultSelector.Body is NewExpression newExpr)
                 {
@@ -1635,9 +1636,9 @@ namespace nORM.Query
                     {
                         var arg = newExpr.Arguments[i];
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
-                        if (arg is MethodCallExpression methodCall)
+                        if (arg is MethodCallExpression aggregateCall)
                         {
-                            var aggregateSql = TranslateGroupAggregateMethod(methodCall, alias);
+                            var aggregateSql = TranslateGroupAggregateMethod(aggregateCall, alias);
                             if (aggregateSql != null)
                             {
                                 builder = PooledStringBuilder.Rent();

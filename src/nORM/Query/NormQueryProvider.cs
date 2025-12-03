@@ -345,7 +345,7 @@ namespace nORM.Query
                     _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                     if (scalarResult == null || scalarResult is DBNull) return default(TResult)!;
                     // PERFORMANCE FIX: Use ConvertScalarResult to avoid boxing for value types
-                    result = ConvertScalarResult<TResult>(scalarResult);
+                    result = ConvertScalarResult<TResult>(scalarResult)!;
                 }
                 else
                 {
@@ -415,7 +415,7 @@ namespace nORM.Query
                     _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                     if (scalarResult == null || scalarResult is DBNull) return default!;
                     // PERFORMANCE FIX: Use ConvertScalarResult to avoid boxing for value types
-                    result = ConvertScalarResult<TResult>(scalarResult);
+                    result = ConvertScalarResult<TResult>(scalarResult)!;
                 }
                 else
                 {
