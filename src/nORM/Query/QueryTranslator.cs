@@ -870,6 +870,50 @@ namespace nORM.Query
             }
             return node;
         }
+        /// <summary>
+        /// Translates LINQ SelectMany operations into SQL JOIN clauses, handling collection flattening
+        /// and transparent identifier management.
+        /// </summary>
+        /// <remarks>
+        /// <para><b>Supported Scenarios:</b></para>
+        /// <list type="number">
+        /// <item><description>
+        /// <b>Simple Navigation Property:</b> <c>blogs.SelectMany(b => b.Posts)</c>
+        /// Translates to: <c>INNER JOIN Posts ON blogs.Id = Posts.BlogId</c>
+        /// </description></item>
+        /// <item><description>
+        /// <b>Filtered Navigation:</b> <c>blogs.SelectMany(b => b.Posts.Where(p => p.Active))</c>
+        /// Translates to: <c>INNER JOIN Posts ON blogs.Id = Posts.BlogId WHERE Posts.Active = 1</c>
+        /// </description></item>
+        /// <item><description>
+        /// <b>With Result Selector:</b> <c>blogs.SelectMany(b => b.Posts, (b, p) => new { b.Name, p.Title })</c>
+        /// Creates transparent identifier for downstream operations and projects both entities
+        /// </description></item>
+        /// <item><description>
+        /// <b>Cross Join:</b> <c>blogs.SelectMany(b => allCategories)</c>
+        /// Translates to: <c>CROSS JOIN Categories</c>
+        /// </description></item>
+        /// </list>
+        ///
+        /// <para><b>Transparent Identifier Handling:</b></para>
+        /// <para>
+        /// When a result selector is provided, both the outer (collection) and inner (element) parameters
+        /// are registered in <c>_correlatedParams</c>, allowing subsequent Select/Where operations to
+        /// reference both entities through compiler-generated transparent identifier types
+        /// (e.g., <c>&lt;&gt;h__TransparentIdentifier0</c>).
+        /// </para>
+        ///
+        /// <para>Example:</para>
+        /// <code>
+        /// ctx.Query&lt;Blog&gt;()
+        ///    .SelectMany(b => b.Posts, (b, p) => new { Blog = b, Post = p })
+        ///    .Select(x => new { x.Blog.Name, x.Post.Title })
+        /// </code>
+        /// <para>
+        /// The transparent identifier <c>x</c> maintains references to both <c>b</c> and <c>p</c>,
+        /// which are tracked in <c>_correlatedParams</c> with their respective table aliases.
+        /// </para>
+        /// </remarks>
         private Expression HandleSelectMany(MethodCallExpression node)
         {
             // SelectMany can be used in different ways:
@@ -891,16 +935,42 @@ namespace nORM.Query
             var resultSelector = node.Arguments.Count > 2
                 ? StripQuotes(node.Arguments[2]) as LambdaExpression
                 : null;
-            // Navigation property: treat as INNER JOIN
+
+            // Check for filtered navigation property: b => b.Posts.Where(p => p.Active)
+            TableMapping.Relation? relation = null;
+            LambdaExpression? filterPredicate = null;
+            MemberExpression? navigationMember = null;
+
             if (collectionSelector.Body is MemberExpression memberExpr &&
-                outerMapping.Relations.TryGetValue(memberExpr.Member.Name, out var relation))
+                outerMapping.Relations.TryGetValue(memberExpr.Member.Name, out relation))
+            {
+                // Simple navigation property without filter
+                navigationMember = memberExpr;
+            }
+            else if (collectionSelector.Body is MethodCallExpression methodCall &&
+                     methodCall.Method.Name == "Where" &&
+                     methodCall.Arguments.Count == 2 &&
+                     methodCall.Arguments[0] is MemberExpression navMember &&
+                     outerMapping.Relations.TryGetValue(navMember.Member.Name, out relation))
+            {
+                // Filtered navigation property: b.Posts.Where(p => p.Active)
+                navigationMember = navMember;
+                filterPredicate = StripQuotes(methodCall.Arguments[1]) as LambdaExpression;
+            }
+
+            // Navigation property: treat as INNER JOIN
+            if (navigationMember != null && relation != null)
             {
                 var innerMapping = TrackMapping(relation.DependentType);
                 var innerAlias = EscapeAlias("T" + (++_joinCounter));
-                if (resultSelector != null && resultSelector.Parameters.Count > 1 &&
-                    !_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
+
+                // Register both result selector parameters for transparent identifier support
+                if (resultSelector != null && resultSelector.Parameters.Count > 1)
                 {
-                    _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
+                    if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                        _correlatedParams[resultSelector.Parameters[0]] = (outerMapping, outerAlias);
+                    if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
+                        _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
                 }
                 using var joinSql = new OptimizedSqlBuilder(256);
                 if (_projection?.Body is NewExpression newExpr)
@@ -941,6 +1011,27 @@ namespace nORM.Query
                 joinSql.Append($"ON {outerAlias}.{relation.PrincipalKey.EscCol} = {innerAlias}.{relation.ForeignKey.EscCol}");
                 _sql.Clear();
                 _sql.Append(joinSql.ToSqlString());
+
+                // Apply filter predicate if present
+                if (filterPredicate != null)
+                {
+                    var filterParam = filterPredicate.Parameters[0];
+                    if (!_correlatedParams.ContainsKey(filterParam))
+                        _correlatedParams[filterParam] = (innerMapping, innerAlias);
+
+                    var vctxFilter = new VisitorContext(_ctx, innerMapping, _provider, filterParam, innerAlias, _correlatedParams, _compiledParams, _paramMap);
+                    var filterVisitor = FastExpressionVisitorPool.Get(in vctxFilter);
+                    var filterSql = filterVisitor.Translate(filterPredicate.Body);
+
+                    if (_where.Length > 0)
+                        _where.Append(" AND ");
+                    _where.Append($"({filterSql})");
+
+                    foreach (var kvp in filterVisitor.GetParameters())
+                        _params[kvp.Key] = kvp.Value;
+                    FastExpressionVisitorPool.Return(filterVisitor);
+                }
+
                 if (resultSelector != null)
                 {
                     _projection = resultSelector;
@@ -955,10 +1046,14 @@ namespace nORM.Query
             var innerType = GetElementType(collectionSelector.Body);
             var crossMapping = TrackMapping(innerType);
             var crossAlias = EscapeAlias("T" + (++_joinCounter));
-            if (resultSelector != null && resultSelector.Parameters.Count > 1 &&
-                !_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
+
+            // Register both result selector parameters for transparent identifier support
+            if (resultSelector != null && resultSelector.Parameters.Count > 1)
             {
-                _correlatedParams[resultSelector.Parameters[1]] = (crossMapping, crossAlias);
+                if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                    _correlatedParams[resultSelector.Parameters[0]] = (outerMapping, outerAlias);
+                if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
+                    _correlatedParams[resultSelector.Parameters[1]] = (crossMapping, crossAlias);
             }
             using var crossSql = new OptimizedSqlBuilder(256);
             if (_projection?.Body is NewExpression crossNew)
