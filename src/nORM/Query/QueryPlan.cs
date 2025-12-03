@@ -49,16 +49,16 @@ namespace nORM.Query
     /// Defines a secondary query for fetching dependent collection data in split query scenarios.
     /// Used to mitigate Cartesian explosion when projecting nested collections.
     /// </summary>
+    /// <param name="TargetMapping">The table to fetch children from.</param>
+    /// <param name="ForeignKeyColumn">The foreign key column on the child table linking to the parent.</param>
+    /// <param name="ParentKeyProperty">The primary key property on the parent object to extract IDs from.</param>
+    /// <param name="TargetCollectionProperty">The collection property on the parent object to populate with children.</param>
+    /// <param name="CollectionElementType">The type of elements in the collection.</param>
     internal sealed record DependentQueryDefinition(
-        /// <summary>The table to fetch children from.</summary>
         TableMapping TargetMapping,
-        /// <summary>The foreign key column on the child table linking to the parent.</summary>
         Column ForeignKeyColumn,
-        /// <summary>The primary key property on the parent object to extract IDs from.</summary>
         PropertyInfo ParentKeyProperty,
-        /// <summary>The collection property on the parent object to populate with children.</summary>
         PropertyInfo TargetCollectionProperty,
-        /// <summary>The type of elements in the collection.</summary>
         Type CollectionElementType
     );
 
