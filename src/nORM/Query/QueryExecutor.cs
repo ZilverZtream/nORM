@@ -117,6 +117,11 @@ namespace nORM.Query
                     {
                         ct.ThrowIfCancellationRequested();
                         var entity = syncMaterializer(reader);
+                        // Apply client-side projection if present (for untranslatable expressions)
+                        if (plan.ClientProjection != null)
+                        {
+                            entity = plan.ClientProjection(entity);
+                        }
                         entity = ProcessEntity(entity, trackable, entityMap, isReadOnly);
                         list.Add(entity);
                     }
@@ -127,6 +132,11 @@ namespace nORM.Query
                     {
                         ct.ThrowIfCancellationRequested();
                         var entity = syncMaterializer(reader);
+                        // Apply client-side projection if present (for untranslatable expressions)
+                        if (plan.ClientProjection != null)
+                        {
+                            entity = plan.ClientProjection(entity);
+                        }
                         entity = ProcessEntity(entity, trackable, entityMap, isReadOnly);
                         list.Add(entity);
                     }
@@ -187,6 +197,11 @@ namespace nORM.Query
                     if (reader.Read())
                     {
                         var entity = syncMaterializer(reader);
+                        // Apply client-side projection if present (for untranslatable expressions)
+                        if (plan.ClientProjection != null)
+                        {
+                            entity = plan.ClientProjection(entity);
+                        }
                         entity = ProcessEntity(entity, trackable, entityMap, isReadOnly);
                         list.Add(entity);
                     }
@@ -196,6 +211,11 @@ namespace nORM.Query
                     while (reader.Read())
                     {
                         var entity = syncMaterializer(reader);
+                        // Apply client-side projection if present (for untranslatable expressions)
+                        if (plan.ClientProjection != null)
+                        {
+                            entity = plan.ClientProjection(entity);
+                        }
                         entity = ProcessEntity(entity, trackable, entityMap, isReadOnly);
                         list.Add(entity);
                     }
