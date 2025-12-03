@@ -44,7 +44,7 @@ public class CacheKeyTests
             CommandTimeout: TimeSpan.FromSeconds(30),
             IsCacheable: true,
             CacheExpiration: null,
-            Fingerprint: 0);
+            Fingerprint: default);
     }
 
     private static string BuildKey(NormQueryProvider provider, QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
