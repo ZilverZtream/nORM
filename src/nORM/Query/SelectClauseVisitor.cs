@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.ObjectPool;
 using nORM.Mapping;
@@ -19,6 +21,8 @@ namespace nORM.Query
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
         private StringBuilder _sb = null!;
+        private readonly List<PropertyInfo> _detectedCollections = new();
+        private bool _isInsideCollectionDetection;
 
         public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider)
         {
@@ -26,6 +30,12 @@ namespace nORM.Query
             _groupBy = groupBy;
             _provider = provider;
         }
+
+        /// <summary>
+        /// Gets the list of navigation properties detected during translation that should be
+        /// fetched via separate queries to avoid Cartesian explosion.
+        /// </summary>
+        public IReadOnlyList<PropertyInfo> DetectedCollections => _detectedCollections;
 
         /// <summary>
         /// Translates a projection expression into a comma-separated SQL <c>SELECT</c> clause.
@@ -49,11 +59,25 @@ namespace nORM.Query
 
         protected override Expression VisitNew(NewExpression node)
         {
+            bool firstColumn = true;
             for (int i = 0; i < node.Arguments.Count; i++)
             {
-                if (i > 0) _sb.Append(", ");
-                Visit(node.Arguments[i]);
-                _sb.Append($" AS {_provider.Escape(node.Members![i].Name)}");
+                var arg = node.Arguments[i];
+                var memberName = node.Members![i].Name;
+
+                // Check if this is a navigation property (collection)
+                if (IsNavigationCollection(arg, out var navProperty))
+                {
+                    // Track it for later split query processing
+                    _detectedCollections.Add(navProperty);
+                    // Skip adding to SQL SELECT - it will be fetched separately
+                    continue;
+                }
+
+                if (!firstColumn) _sb.Append(", ");
+                Visit(arg);
+                _sb.Append($" AS {_provider.Escape(memberName)}");
+                firstColumn = false;
             }
             return node;
         }
@@ -100,16 +124,58 @@ namespace nORM.Query
 
         protected override Expression VisitMemberInit(MemberInitExpression node)
         {
+            bool firstColumn = true;
             for (int i = 0; i < node.Bindings.Count; i++)
             {
-                if (i > 0) _sb.Append(", ");
                 if (node.Bindings[i] is MemberAssignment assignment)
                 {
+                    // Check if this is a navigation property (collection)
+                    if (IsNavigationCollection(assignment.Expression, out var navProperty))
+                    {
+                        // Track it for later split query processing
+                        _detectedCollections.Add(navProperty);
+                        // Skip adding to SQL SELECT - it will be fetched separately
+                        continue;
+                    }
+
+                    if (!firstColumn) _sb.Append(", ");
                     Visit(assignment.Expression);
                     _sb.Append($" AS {_provider.Escape(assignment.Member.Name)}");
+                    firstColumn = false;
                 }
             }
             return node;
+        }
+
+        /// <summary>
+        /// Determines if the expression represents a navigation property that is a collection.
+        /// </summary>
+        private bool IsNavigationCollection(Expression expr, out PropertyInfo property)
+        {
+            property = null!;
+
+            // Look for member access like "b.Posts"
+            if (expr is MemberExpression memberExpr &&
+                memberExpr.Member is PropertyInfo propInfo &&
+                memberExpr.Expression is ParameterExpression)
+            {
+                var propType = propInfo.PropertyType;
+
+                // Check if it's a collection type (IEnumerable<T> but not string)
+                if (propType != typeof(string) &&
+                    typeof(IEnumerable).IsAssignableFrom(propType) &&
+                    propType.IsGenericType)
+                {
+                    // Verify it's actually a navigation property (not a column)
+                    if (!_mapping.ColumnsByName.ContainsKey(propInfo.Name))
+                    {
+                        property = propInfo;
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;

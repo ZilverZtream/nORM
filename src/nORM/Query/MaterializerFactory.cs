@@ -869,6 +869,12 @@ namespace nORM.Query
                     var arg = newExpr.Arguments[i];
                     if (arg is MemberExpression m)
                     {
+                        // Skip navigation collections - they'll be populated by split queries
+                        if (IsNavigationCollection(m, mapping))
+                        {
+                            continue;
+                        }
+
                         // Try to resolve against the current mapping first
                         if (mapping.ColumnsByName.TryGetValue(m.Member.Name, out var col))
                         {
@@ -889,6 +895,31 @@ namespace nORM.Query
                 return cols.ToArray();
             }
             return mapping.Columns;
+        }
+
+        /// <summary>
+        /// Checks if a member expression represents a navigation collection property.
+        /// </summary>
+        private static bool IsNavigationCollection(MemberExpression memberExpr, TableMapping mapping)
+        {
+            if (memberExpr.Member is not PropertyInfo propInfo)
+                return false;
+
+            var propType = propInfo.PropertyType;
+
+            // Check if it's a collection type (IEnumerable<T> but not string)
+            if (propType != typeof(string) &&
+                typeof(IEnumerable).IsAssignableFrom(propType) &&
+                propType.IsGenericType)
+            {
+                // Verify it's NOT a column (meaning it's likely a navigation property)
+                if (!mapping.ColumnsByName.ContainsKey(propInfo.Name))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static Func<DbDataReader, object> CreateReaderGetter(Type type, int index, int startOffset)
