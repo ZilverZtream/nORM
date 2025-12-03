@@ -7,17 +7,55 @@ using System.Data.Common;
 
 namespace nORM.Internal
 {
+    /// <summary>
+    /// PERFORMANCE OPTIMIZATION: Expanded type map from 7 to 25+ types.
+    /// Reduces fallback to DbType.Object which can cause inefficient query plans.
+    /// </summary>
     internal static class ParameterOptimizer
     {
         private static readonly ConcurrentDictionary<Type, DbType> _typeMap = new()
         {
+            // Original 7 types
             [typeof(int)] = DbType.Int32,
             [typeof(long)] = DbType.Int64,
             [typeof(string)] = DbType.String,
             [typeof(DateTime)] = DbType.DateTime2,
             [typeof(bool)] = DbType.Boolean,
             [typeof(decimal)] = DbType.Decimal,
-            [typeof(Guid)] = DbType.Guid
+            [typeof(Guid)] = DbType.Guid,
+
+            // Additional integer types
+            [typeof(short)] = DbType.Int16,
+            [typeof(byte)] = DbType.Byte,
+            [typeof(sbyte)] = DbType.SByte,
+            [typeof(ushort)] = DbType.UInt16,
+            [typeof(uint)] = DbType.UInt32,
+            [typeof(ulong)] = DbType.UInt64,
+
+            // Additional floating point types
+            [typeof(float)] = DbType.Single,
+            [typeof(double)] = DbType.Double,
+
+            // Date/time types
+            [typeof(DateTimeOffset)] = DbType.DateTimeOffset,
+            [typeof(TimeSpan)] = DbType.Time,
+
+            // Binary data
+            [typeof(byte[])] = DbType.Binary,
+
+            // Nullable versions of common types
+            [typeof(int?)] = DbType.Int32,
+            [typeof(long?)] = DbType.Int64,
+            [typeof(DateTime?)] = DbType.DateTime2,
+            [typeof(bool?)] = DbType.Boolean,
+            [typeof(decimal?)] = DbType.Decimal,
+            [typeof(Guid?)] = DbType.Guid,
+            [typeof(short?)] = DbType.Int16,
+            [typeof(byte?)] = DbType.Byte,
+            [typeof(float?)] = DbType.Single,
+            [typeof(double?)] = DbType.Double,
+            [typeof(DateTimeOffset?)] = DbType.DateTimeOffset,
+            [typeof(TimeSpan?)] = DbType.Time
         };
 
         /// <summary>
