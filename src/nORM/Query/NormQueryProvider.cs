@@ -32,7 +32,10 @@ namespace nORM.Query
         private static readonly Timer _planCacheMonitor = new(AdjustPlanCacheSize, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
-        private static readonly ConcurrentDictionary<Type, int> _typeHashCodes = new();
+        // PERFORMANCE FIX: Cache GetElementType results to avoid repeated reflection
+        private static readonly ConcurrentDictionary<Type, Type> _elementTypeCache = new();
+        // PERFORMANCE FIX: Cache constructor existence checks
+        private static readonly ConcurrentDictionary<Type, bool> _constrainedQueryableCache = new();
         private static long _totalPlanSize;
         private static int _planSizeSamples;
         private readonly QueryExecutor _executor;
@@ -80,17 +83,24 @@ namespace nORM.Query
                 return (IQueryable)Activator.CreateInstance(unconstrainedQueryableType, new object[] { this, expression })!;
             }
         }
+        /// <summary>
+        /// PERFORMANCE FIX: Cached check for whether a type can use constrained queryable.
+        /// GetConstructor is expensive reflection that's called for every query creation.
+        /// </summary>
         private static bool CanUseConstrainedQueryable(Type elementType)
         {
-            // Check if type is a class and has a public parameterless constructor
-            if (!elementType.IsClass)
-                return false;
-            // Anonymous types start with '<>' and don't have public parameterless constructors
-            if (elementType.Name.StartsWith("<>"))
-                return false;
-            // Check for public parameterless constructor
-            var defaultConstructor = elementType.GetConstructor(Type.EmptyTypes);
-            return defaultConstructor != null && defaultConstructor.IsPublic;
+            return _constrainedQueryableCache.GetOrAdd(elementType, static t =>
+            {
+                // Check if type is a class and has a public parameterless constructor
+                if (!t.IsClass)
+                    return false;
+                // Anonymous types start with '<>' and don't have public parameterless constructors
+                if (t.Name.StartsWith("<>"))
+                    return false;
+                // Check for public parameterless constructor
+                var defaultConstructor = t.GetConstructor(Type.EmptyTypes);
+                return defaultConstructor != null && defaultConstructor.IsPublic;
+            });
         }
         /// <summary>
         /// PERFORMANCE OPTIMIZATION: Enhanced cache lock cleanup.
@@ -255,19 +265,19 @@ namespace nORM.Query
         private async Task<TResult> ExecuteInternalAsync<TResult>(Expression expression, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
-            var plan = GetPlan(expression, out var filtered);
+            var plan = GetPlan(expression, out var filtered, out var parameters);
             Func<Task<TResult>> queryExecutorFactory = async () =>
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 await using var cmd = _ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
-                foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
+                foreach (var p in parameters) cmd.AddOptimizedParam(p.Key, p.Value);
                 object result;
                 if (plan.IsScalar)
                 {
                     var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                     if (scalarResult == null || scalarResult is DBNull) return default(TResult)!;
                     var resultType = typeof(TResult);
                     result = Convert.ChangeType(scalarResult, Nullable.GetUnderlyingType(resultType) ?? resultType)!;
@@ -275,19 +285,21 @@ namespace nORM.Query
                 else
                 {
                     var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, list.Count);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, list.Count);
                     if (plan.SingleResult)
                     {
+                        // PERFORMANCE FIX: Direct list access instead of Cast<object>().First()
+                        // Avoids unnecessary IEnumerable cast and LINQ iterator allocation
                         result = plan.MethodName switch
                         {
-                            "First" => ((IEnumerable)list).Cast<object>().First(),
-                            "FirstOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
-                            "Single" => ((IEnumerable)list).Cast<object>().Single(),
-                            "SingleOrDefault" => ((IEnumerable)list).Cast<object>().SingleOrDefault(),
-                            "ElementAt" => ((IEnumerable)list).Cast<object>().First(),
-                            "ElementAtOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
-                            "Last" => ((IEnumerable)list).Cast<object>().First(),
-                            "LastOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
+                            "First" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                            "FirstOrDefault" => list.Count > 0 ? list[0] : null,
+                            "Single" => list.Count == 1 ? list[0] : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
+                            "SingleOrDefault" => list.Count == 0 ? null : list.Count == 1 ? list[0] : throw new InvalidOperationException("Sequence contains more than one element"),
+                            "ElementAt" => list.Count > 0 ? list[0] : throw new ArgumentOutOfRangeException("index"),
+                            "ElementAtOrDefault" => list.Count > 0 ? list[0] : null,
+                            "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                            "LastOrDefault" => list.Count > 0 ? list[0] : null,
                             _ => list
                         } ?? (object)list;
                     }
@@ -300,7 +312,7 @@ namespace nORM.Query
             };
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
-                var cacheKey = BuildCacheKeyWithValues<TResult>(plan, plan.Parameters);
+                var cacheKey = BuildCacheKeyWithValues<TResult>(plan, parameters);
                 var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
                 return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
             }
@@ -346,16 +358,17 @@ namespace nORM.Query
                     _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw.Elapsed, list.Count);
                     if (plan.SingleResult)
                     {
+                        // PERFORMANCE FIX: Direct list access instead of Cast<object>().First()
                         result = plan.MethodName switch
                         {
-                            "First" => ((IEnumerable)list).Cast<object>().First(),
-                            "FirstOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
-                            "Single" => ((IEnumerable)list).Cast<object>().Single(),
-                            "SingleOrDefault" => ((IEnumerable)list).Cast<object>().SingleOrDefault(),
-                            "ElementAt" => ((IEnumerable)list).Cast<object>().First(),
-                            "ElementAtOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
-                            "Last" => ((IEnumerable)list).Cast<object>().First(),
-                            "LastOrDefault" => ((IEnumerable)list).Cast<object>().FirstOrDefault(),
+                            "First" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                            "FirstOrDefault" => list.Count > 0 ? list[0] : null,
+                            "Single" => list.Count == 1 ? list[0] : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
+                            "SingleOrDefault" => list.Count == 0 ? null : list.Count == 1 ? list[0] : throw new InvalidOperationException("Sequence contains more than one element"),
+                            "ElementAt" => list.Count > 0 ? list[0] : throw new ArgumentOutOfRangeException("index"),
+                            "ElementAtOrDefault" => list.Count > 0 ? list[0] : null,
+                            "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                            "LastOrDefault" => list.Count > 0 ? list[0] : null,
                             _ => list
                         } ?? (object)list;
                     }
@@ -411,10 +424,11 @@ namespace nORM.Query
             var cacheKey = ExpressionFingerprint.Compute(expr) + ":" + elementType.FullName;
             if (!_simpleSqlCache.TryGetValue(cacheKey, out var cachedSql))
             {
-                var sb = new StringBuilder();
-                sb.Append("SELECT ");
-                sb.Append(string.Join(", ", map.Columns.Select(c => c.EscCol)));
-                sb.Append(" FROM ").Append(map.EscTable);
+                // PERFORMANCE FIX: Use string interpolation instead of StringBuilder for small queries
+                // StringBuilder has overhead that's not worth it for these simple SELECT statements
+                var columnList = string.Join(", ", map.Columns.Select(c => c.EscCol));
+                string whereClause = "";
+
                 if (whereCall != null)
                 {
                     var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
@@ -423,7 +437,7 @@ namespace nORM.Query
                     {
                         if (!map.ColumnsByName.TryGetValue(boolMember.Member.Name, out var boolCol))
                             return false;
-                        sb.Append(" WHERE ").Append(boolCol.EscCol).Append(" = 1");
+                        whereClause = $" WHERE {boolCol.EscCol} = 1";
                     }
                     else
                     {
@@ -434,12 +448,16 @@ namespace nORM.Query
                         if (!map.ColumnsByName.TryGetValue(me.Member.Name, out var column))
                             return false;
                         var paramName = _ctx.Provider.ParamPrefix + "p0";
-                        sb.Append(" WHERE ").Append(column.EscCol).Append(" = ").Append(paramName);
-                        var value = Expression.Lambda(be.Right, lambda.Parameters).Compile().DynamicInvoke(new object?[] { null });
+                        whereClause = $" WHERE {column.EscCol} = {paramName}";
+                        // PERFORMANCE & SECURITY FIX: Use ExpressionValueExtractor instead of Compile().DynamicInvoke()
+                        // DynamicInvoke is 100x slower and poses RCE risks
+                        if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
+                            return false;
                         parameters[paramName] = value!;
                     }
                 }
-                sql = sb.ToString();
+
+                sql = $"SELECT {columnList} FROM {map.EscTable}{whereClause}";
                 _simpleSqlCache[cacheKey] = sql;
                 return true;
             }
@@ -457,7 +475,9 @@ namespace nORM.Query
                     if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
                         return false;
                     var paramName = _ctx.Provider.ParamPrefix + "p0";
-                    var value = Expression.Lambda(be.Right, lambda.Parameters).Compile().DynamicInvoke(new object?[] { null });
+                    // PERFORMANCE & SECURITY FIX: Use ExpressionValueExtractor instead of Compile().DynamicInvoke()
+                    if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
+                        return false;
                     parameters[paramName] = value!;
                 }
             }
@@ -524,7 +544,8 @@ namespace nORM.Query
             {
                 return (TResult)list;
             }
-            return list.Count > 0 ? (TResult)list.Cast<object>().First()! : default!;
+            // PERFORMANCE FIX: Direct list access instead of Cast<object>().First()
+            return list.Count > 0 ? (TResult)list[0]! : default!;
         }
         private TResult ExecuteSimpleSync<TResult>(string sql, Dictionary<string, object> parameters)
         {
@@ -587,7 +608,8 @@ namespace nORM.Query
             {
                 return (TResult)list;
             }
-            return list.Count > 0 ? (TResult)list.Cast<object>().First()! : default!;
+            // PERFORMANCE FIX: Direct list access instead of Cast<object>().First()
+            return list.Count > 0 ? (TResult)list[0]! : default!;
         }
         private static Expression StripQuotes(Expression e)
         {
@@ -707,7 +729,7 @@ namespace nORM.Query
         private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
-            var plan = GetPlan(expression, out var filtered);
+            var plan = GetPlan(expression, out var filtered, out var parameters);
             if (plan.Tables.Count != 1)
                 throw new NotSupportedException("ExecuteDeleteAsync only supports single table queries.");
             var rootType = GetElementType(filtered);
@@ -719,16 +741,16 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             var finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
             cmd.CommandText = finalSql;
-            foreach (var p in plan.Parameters)
+            foreach (var p in parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
-            _ctx.Options.Logger?.LogQuery(finalSql, plan.Parameters, sw.Elapsed, affected);
+            _ctx.Options.Logger?.LogQuery(finalSql, parameters, sw.Elapsed, affected);
             return affected;
         }
         private async Task<int> ExecuteUpdateInternalAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
-            var plan = GetPlan(expression, out var filtered);
+            var plan = GetPlan(expression, out var filtered, out var parameters);
             if (plan.Tables.Count != 1)
                 throw new NotSupportedException("ExecuteUpdateAsync only supports single table queries.");
             var rootType = GetElementType(filtered);
@@ -741,11 +763,11 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             var finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
             cmd.CommandText = finalSql;
-            foreach (var p in plan.Parameters)
+            foreach (var p in parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
             foreach (var p in setParams)
                 cmd.AddOptimizedParam(p.Key, p.Value);
-            var allParams = plan.Parameters.ToDictionary(k => k.Key, v => v.Value);
+            var allParams = parameters.ToDictionary(k => k.Key, v => v.Value);
             foreach (var p in setParams)
                 allParams[p.Key] = p.Value;
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
@@ -755,13 +777,13 @@ namespace nORM.Query
         public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
         {
             // Execute in true streaming mode so only one row is materialized at a time.
-            var plan = GetPlan(expression, out _);
+            var plan = GetPlan(expression, out _, out var parameters);
             var sw = Stopwatch.StartNew();
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
-            foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
+            foreach (var p in parameters) cmd.AddOptimizedParam(p.Key, p.Value);
             if (plan.Includes.Count > 0 || plan.GroupJoinInfo != null)
                 throw new NotSupportedException("AsAsyncEnumerable does not support Include or GroupJoin operations.");
             var trackable = !plan.NoTracking &&
@@ -790,23 +812,29 @@ namespace nORM.Query
                 count++;
                 yield return entity;
             }
-            _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, count);
+            _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, count);
         }
-        internal QueryPlan GetPlan(Expression expression, out Expression filtered)
+        /// <summary>
+        /// PERFORMANCE FIX: Returns the cached plan and binds parameters separately.
+        /// This avoids cloning the parameters dictionary on every cache hit.
+        /// </summary>
+        internal QueryPlan GetPlan(Expression expression, out Expression filtered, out Dictionary<string, object> boundParameters)
         {
             filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(UnwrapQueryExpression(filtered));
             var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
+            // PERFORMANCE FIX: Use Type.GetHashCode() directly instead of caching it
+            // Type.GetHashCode() is intrinsic and cached by runtime, dictionary lookup is slower
             var fingerprint = ExpressionFingerprint
                 .Compute(filtered)
                 .Extend(tenantHash)
-                .Extend(GetTypeHash(elementType))
-                .Extend(GetTypeHash(filtered.Type));
+                .Extend(elementType.GetHashCode())
+                .Extend(filtered.Type.GetHashCode());
 
             if (_planCache.TryGet(fingerprint, out var cached))
             {
-                var bound = BindParameters(filtered, cached);
-                return cached with { Parameters = bound };
+                boundParameters = BindParameters(filtered, cached);
+                return cached;
             }
 
             var localFiltered = filtered;
@@ -829,11 +857,19 @@ namespace nORM.Query
                 };
             });
 
-            var parameters = BindParameters(filtered, plan);
+            boundParameters = BindParameters(filtered, plan);
+            return plan;
+        }
+
+        /// <summary>
+        /// DEPRECATED: Use overload with boundParameters out parameter for better performance.
+        /// </summary>
+        [Obsolete("Use overload with boundParameters out parameter")]
+        internal QueryPlan GetPlan(Expression expression, out Expression filtered)
+        {
+            var plan = GetPlan(expression, out filtered, out var parameters);
             return plan with { Parameters = parameters };
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int GetTypeHash(Type type) => _typeHashCodes.GetOrAdd(type, static t => t.GetHashCode());
         private IReadOnlyDictionary<string, object> BindParameters(Expression expression, QueryPlan plan)
         {
             if (plan.CompiledParameters.Count == 0)
@@ -925,18 +961,29 @@ namespace nORM.Query
             }
             return expression;
         }
+        /// <summary>
+        /// PERFORMANCE FIX: Cached version of GetElementType to avoid repeated reflection.
+        /// GetInterfaces() is expensive and this is called frequently in hot paths.
+        /// </summary>
         private static Type GetElementType(Expression queryExpression)
         {
             var type = queryExpression.Type;
+
+            // Fast path for generic types with arguments
             if (type.IsGenericType)
             {
                 var args = type.GetGenericArguments();
                 if (args.Length > 0) return args[0];
             }
-            var iface = type.GetInterfaces()
-                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
-            if (iface != null) return iface.GetGenericArguments()[0];
-            throw new ArgumentException($"Cannot determine element type from expression of type {type}");
+
+            // Cached reflection path
+            return _elementTypeCache.GetOrAdd(type, static t =>
+            {
+                var iface = t.GetInterfaces()
+                    .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
+                if (iface != null) return iface.GetGenericArguments()[0];
+                throw new ArgumentException($"Cannot determine element type from expression of type {t}");
+            });
         }
         private sealed class ParameterValueExtractor : ExpressionVisitor
         {

@@ -317,12 +317,33 @@ namespace nORM.Core
         /// The key value, a composite key object when multiple key columns exist, or
         /// <c>null</c> if the entity type does not define a primary key.
         /// </returns>
+        /// <summary>
+        /// PERFORMANCE FIX: Use ValueTuple for small composite keys to avoid array allocation.
+        /// For 2-3 key columns, ValueTuple is stack-allocated and more efficient.
+        /// </summary>
         private static object? GetPrimaryKeyValue(object entity, TableMapping mapping)
         {
             if (mapping.KeyColumns.Length == 1)
                 return mapping.KeyColumns[0].Getter(entity);
-            if (mapping.KeyColumns.Length > 1)
+
+            if (mapping.KeyColumns.Length == 2)
             {
+                var v0 = mapping.KeyColumns[0].Getter(entity);
+                var v1 = mapping.KeyColumns[1].Getter(entity);
+                return (v0, v1);
+            }
+
+            if (mapping.KeyColumns.Length == 3)
+            {
+                var v0 = mapping.KeyColumns[0].Getter(entity);
+                var v1 = mapping.KeyColumns[1].Getter(entity);
+                var v2 = mapping.KeyColumns[2].Getter(entity);
+                return (v0, v1, v2);
+            }
+
+            if (mapping.KeyColumns.Length > 3)
+            {
+                // Fallback to array for larger composite keys (rare)
                 var values = new object?[mapping.KeyColumns.Length];
                 for (int i = 0; i < mapping.KeyColumns.Length; i++)
                 {
@@ -330,6 +351,7 @@ namespace nORM.Core
                 }
                 return new CompositeKey(values);
             }
+
             return null;
         }
         private sealed class CompositeKey : IEquatable<CompositeKey>
