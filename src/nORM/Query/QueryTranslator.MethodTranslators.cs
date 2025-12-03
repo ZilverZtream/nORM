@@ -151,9 +151,33 @@ namespace nORM.Query
             /// <param name="t">The current translator.</param>
             /// <param name="node">The method call expression for <c>Select</c>.</param>
             /// <returns>The translated source expression.</returns>
+            /// <remarks>
+            /// PARTIAL IMPLEMENTATION (TASK 4): Client-side evaluation fallback infrastructure is in place
+            /// (ClientProjection property in QueryPlan and QueryExecutor support), but automatic detection
+            /// and fallback for untranslatable expressions is not yet implemented.
+            ///
+            /// To complete this feature, the following logic needs to be added:
+            /// 1. Detect when projection contains untranslatable expressions (e.g., custom helper methods)
+            /// 2. Extract required member accesses from those expressions
+            /// 3. Rewrite SQL projection to select only raw columns needed
+            /// 4. Compile original projection expression into ClientProjection delegate
+            /// 5. Set the delegate on the QueryPlan for post-materialization execution
+            ///
+            /// Current behavior: Untranslatable expressions still throw NormUnsupportedFeatureException
+            /// Future behavior: Automatically fall back to client-side evaluation when possible
+            /// </remarks>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._projection = QueryTranslator.StripQuotes(node.Arguments[1]) as LambdaExpression;
+
+                // TODO (TASK 4): Add client-side evaluation fallback detection here
+                // Pseudocode:
+                // 1. Try to extract member accesses from projection
+                // 2. If projection contains untranslatable method calls:
+                //    a. Build intermediate projection with just member accesses
+                //    b. Compile original projection to work with intermediate type
+                //    c. Store compiled projection for client-side execution
+
                 return t.Visit(node.Arguments[0]);
             }
         }
