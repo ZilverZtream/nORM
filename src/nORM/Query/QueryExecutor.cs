@@ -56,8 +56,11 @@ namespace nORM.Query
                     return await MaterializeGroupJoinAsync(plan, command, ct).ConfigureAwait(false);
 
                 var listType = typeof(List<>).MakeGenericType(plan.ElementType);
-                // PERFORMANCE FIX (TASK 7): Use plan.Take directly instead of regex parsing
-                var capacity = plan.SingleResult ? 1 : (plan.Take ?? 0);
+                // PERFORMANCE OPTIMIZATION 15: Improved list capacity pre-sizing
+                // - SingleResult: capacity = 1
+                // - Take specified: use Take value
+                // - No Take: use heuristic (16 is typical small result set, avoids resize for most queries)
+                var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
                 var list = (IList)Activator.CreateInstance(listType, capacity)!;
 
                 var trackable = !plan.NoTracking &&
@@ -121,8 +124,11 @@ namespace nORM.Query
                     return Task.FromResult(MaterializeGroupJoin(plan, command));
 
                 var listType = typeof(List<>).MakeGenericType(plan.ElementType);
-                // PERFORMANCE FIX (TASK 7): Use plan.Take directly instead of regex parsing
-                var capacity = plan.SingleResult ? 1 : (plan.Take ?? 0);
+                // PERFORMANCE OPTIMIZATION 15: Improved list capacity pre-sizing
+                // - SingleResult: capacity = 1
+                // - Take specified: use Take value
+                // - No Take: use heuristic (16 is typical small result set, avoids resize for most queries)
+                var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
                 var list = (IList)Activator.CreateInstance(listType, capacity)!;
 
                 var trackable = !plan.NoTracking &&
@@ -182,6 +188,8 @@ namespace nORM.Query
         /// PERFORMANCE FIX (TASK 15): Whether this is a read-only query (hoisted from per-row check).
         /// </param>
         /// <returns>The processed entity (may be a tracking proxy).</returns>
+        // PERFORMANCE OPTIMIZATION 14: Aggressive inlining for per-row hot path
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         private object ProcessEntity(object entity, bool trackable, TableMapping? entityMap, bool isReadOnly)
         {
             if (!trackable)
