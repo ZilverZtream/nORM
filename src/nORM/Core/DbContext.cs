@@ -9,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Transactions;
-using System.Text.RegularExpressions;
 using System.Text;
 using nORM.Configuration;
 using nORM.Execution;
@@ -370,7 +369,17 @@ namespace nORM.Core
                 return false;
 
             // Allow standard identifiers: alphanumeric, underscore, dot
-            if (Regex.IsMatch(name, @"^[A-Za-z0-9_\.]+$"))
+            var isAlphanumericIdentifier = true;
+            foreach (var c in name.AsSpan())
+            {
+                if (!char.IsLetterOrDigit(c) && c != '_' && c != '.')
+                {
+                    isAlphanumericIdentifier = false;
+                    break;
+                }
+            }
+
+            if (isAlphanumericIdentifier)
                 return true;
 
             // Allow delimited identifiers with brackets (SQL Server): [My Table]
