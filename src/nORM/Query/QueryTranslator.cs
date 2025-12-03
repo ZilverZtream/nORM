@@ -90,6 +90,7 @@ namespace nORM.Query
         private bool _splitQuery;
         private HashSet<string> _tables = new();
         private readonly Stack<TranslationContextSnapshot> _contextStack = new();
+        private List<PropertyInfo> _detectedCollections = new();
         private TimeSpan _estimatedTimeout;
         private bool _isCacheable;
         private TimeSpan? _cacheExpiration;
@@ -196,6 +197,7 @@ namespace nORM.Query
                 _isCacheable = false;
                 _cacheExpiration = null;
                 _asOfTimestamp = null;
+                _detectedCollections = new List<PropertyInfo>();
             }
         }
         private void Clear()
@@ -227,6 +229,7 @@ namespace nORM.Query
                 _isCacheable = false;
                 _cacheExpiration = null;
                 _asOfTimestamp = null;
+                _detectedCollections = new List<PropertyInfo>();
             }
         }
         /// <summary>
@@ -425,6 +428,32 @@ namespace nORM.Query
                         {
                             var selectVisitor = new SelectClauseVisitor(_t._mapping, _t._groupBy, _t._provider);
                             select = selectVisitor.Translate(_t._projection.Body);
+
+                            // Capture detected collections for split query processing
+                            _t._detectedCollections.AddRange(selectVisitor.DetectedCollections);
+
+                            // If we detected collections, ensure primary key is included in SELECT
+                            if (_t._detectedCollections.Count > 0 && _t._mapping.KeyColumns.Length > 0)
+                            {
+                                var keyColumns = new List<string>();
+                                foreach (var keyCol in _t._mapping.KeyColumns)
+                                {
+                                    var escapedCol = keyCol.EscCol;
+                                    // Only add if not already present
+                                    if (!select.Contains(escapedCol))
+                                    {
+                                        keyColumns.Add($"{escapedCol} AS {_t._provider.Escape(keyCol.PropName)}");
+                                    }
+                                }
+
+                                if (keyColumns.Count > 0)
+                                {
+                                    if (!string.IsNullOrEmpty(select))
+                                        select = select + ", " + string.Join(", ", keyColumns);
+                                    else
+                                        select = string.Join(", ", keyColumns);
+                                }
+                            }
                         }
                         else
                         {
@@ -459,6 +488,13 @@ namespace nORM.Query
                     or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
                 var elementType = _t._groupJoinInfo?.ResultType ?? materializerType;
 
+                // Build dependent query definitions for nested collections
+                List<DependentQueryDefinition>? dependentQueries = null;
+                if (_t._detectedCollections.Count > 0)
+                {
+                    dependentQueries = _t.BuildDependentQueryDefinitions();
+                }
+
                 // PERFORMANCE FIX (TASK 14): Pass both sync and async materializers to QueryPlan
                 // PERFORMANCE FIX (TASK 7): Pass Take value to avoid regex parsing on hot path
                 var plan = new QueryPlan(
@@ -479,7 +515,8 @@ namespace nORM.Query
                     _t._estimatedTimeout,
                     _t._isCacheable,
                     _t._cacheExpiration,
-                    Take: _t._take
+                    Take: _t._take,
+                    DependentQueries: dependentQueries
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
@@ -492,6 +529,60 @@ namespace nORM.Query
             _tables.Add(map.TableName);
             return map;
         }
+
+        /// <summary>
+        /// Builds dependent query definitions for detected navigation collections.
+        /// This enables split query execution to avoid Cartesian explosion.
+        /// </summary>
+        private List<DependentQueryDefinition> BuildDependentQueryDefinitions()
+        {
+            var dependentQueries = new List<DependentQueryDefinition>();
+
+            foreach (var collectionProperty in _detectedCollections)
+            {
+                // Try to find the relation for this navigation property
+                if (!_mapping.Relations.TryGetValue(collectionProperty.Name, out var relation))
+                {
+                    continue; // Skip if relation not found
+                }
+
+                // Get the element type of the collection
+                var collectionType = collectionProperty.PropertyType;
+                Type elementType;
+
+                if (collectionType.IsGenericType)
+                {
+                    elementType = collectionType.GetGenericArguments()[0];
+                }
+                else
+                {
+                    // Try to find IEnumerable<T>
+                    var iEnumerable = collectionType.GetInterfaces()
+                        .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+                    if (iEnumerable == null)
+                        continue;
+
+                    elementType = iEnumerable.GetGenericArguments()[0];
+                }
+
+                // Get the target mapping for the dependent type
+                var targetMapping = _ctx.GetMapping(relation.DependentType);
+
+                // Create the dependent query definition
+                var dependentQuery = new DependentQueryDefinition(
+                    TargetMapping: targetMapping,
+                    ForeignKeyColumn: relation.ForeignKey,
+                    ParentKeyProperty: relation.PrincipalKey.Prop,
+                    TargetCollectionProperty: collectionProperty,
+                    CollectionElementType: elementType
+                );
+
+                dependentQueries.Add(dependentQuery);
+            }
+
+            return dependentQueries;
+        }
+
         private string BuildSelectWithWindowFunctions(LambdaExpression projection, List<WindowFunctionInfo> windowFuncs, string overClause)
         {
             if (projection.Body is not NewExpression ne)
