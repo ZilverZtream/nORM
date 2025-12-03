@@ -507,8 +507,27 @@ namespace nORM.Query
                 cmd.CommandText = plan.Sql;
 
                 // 1. Add static parameters from plan (constants)
+                // BUG FIX: Skip parameters that will be provided as dynamic values
                 foreach (var p in plan.Parameters)
-                    cmd.AddOptimizedParam(p.Key, p.Value);
+                {
+                    // Check if this parameter is reserved for a dynamic value
+                    bool isDynamic = false;
+                    for (int i = 0; i < plan.CompiledParameters.Count; i++)
+                    {
+                        // Use Ordinal comparison for parameter names
+                        if (string.Equals(plan.CompiledParameters[i], p.Key, StringComparison.Ordinal))
+                        {
+                            isDynamic = true;
+                            break;
+                        }
+                    }
+
+                    // Only add if it's NOT a dynamic parameter (prevents duplicates)
+                    if (!isDynamic)
+                    {
+                        cmd.AddOptimizedParam(p.Key, p.Value);
+                    }
+                }
 
                 // 2. Add dynamic parameters from array
                 // The ExpressionCompiler guarantees that parameterValues match CompiledParameters order
