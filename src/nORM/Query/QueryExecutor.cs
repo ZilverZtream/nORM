@@ -380,8 +380,8 @@ namespace nORM.Query
 
             static IList CreateListFromItems(Type innerType, List<object> items)
             {
-                // PERFORMANCE FIX (TASK 13): Could optimize this too, but it's only called once per group, not per row
-                var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(innerType))!;
+                // PERFORMANCE: Reuse cached list factory to avoid Activator reflection per group
+                var list = CreateList(innerType, items.Count);
                 foreach (var item in items) list.Add(item);
                 return list;
             }
@@ -422,7 +422,7 @@ namespace nORM.Query
                         {
                             if (currentOuter != null)
                             {
-                                var list = CreateList(info.InnerType, currentChildren);
+                                var list = CreateListFromItems(info.InnerType, currentChildren);
                                 // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
                                 var result = info.ResultSelector(currentOuter, list);
                                 resultList.Add(result);
@@ -521,8 +521,8 @@ namespace nORM.Query
 
             static IList CreateListFromItems(Type innerType, List<object> items)
             {
-                // PERFORMANCE FIX (TASK 13): Could optimize this too, but it's only called once per group, not per row
-                var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(innerType))!;
+                // PERFORMANCE: Reuse cached list factory to avoid Activator reflection per group
+                var list = CreateList(innerType, items.Count);
                 foreach (var item in items) list.Add(item);
                 return list;
             }
