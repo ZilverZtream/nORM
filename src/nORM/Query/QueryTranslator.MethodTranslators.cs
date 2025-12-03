@@ -147,13 +147,58 @@ namespace nORM.Query
         {
             /// <summary>
             /// Handles projection of elements by capturing the provided selector expression.
+            /// Automatically detects untranslatable expressions and splits them into
+            /// server-side (SQL) and client-side (in-memory) projections.
             /// </summary>
             /// <param name="t">The current translator.</param>
             /// <param name="node">The method call expression for <c>Select</c>.</param>
             /// <returns>The translated source expression.</returns>
+            /// <remarks>
+            /// FULL IMPLEMENTATION (TASK 4): Automatic client-side evaluation fallback.
+            ///
+            /// Process:
+            /// 1. Analyze projection for untranslatable expressions (e.g., custom helper methods)
+            /// 2. Extract required member accesses from those expressions
+            /// 3. Rewrite SQL projection to select only raw columns needed
+            /// 4. Compile original projection expression into ClientProjection delegate
+            /// 5. Store delegate for post-materialization execution in QueryExecutor
+            ///
+            /// Example:
+            /// - Original: ctx.Users.Select(u => Helper.FormatName(u.FirstName, u.LastName))
+            /// - SQL: SELECT FirstName, LastName FROM Users
+            /// - Client: rows.Select(row => Helper.FormatName(row.FirstName, row.LastName))
+            ///
+            /// Benefits:
+            /// - No more "method not supported" exceptions for simple projections
+            /// - Seamless fallback maintains expected LINQ behavior
+            /// - Only fetches columns actually needed, minimizing data transfer
+            /// </remarks>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                t._projection = QueryTranslator.StripQuotes(node.Arguments[1]) as LambdaExpression;
+                var originalProjection = QueryTranslator.StripQuotes(node.Arguments[1]) as LambdaExpression;
+
+                if (originalProjection != null)
+                {
+                    // Try to split the projection into server and client parts
+                    if (t.TrySplitProjection(originalProjection, out var serverProjection, out var clientProjection))
+                    {
+                        // Store both projections
+                        t._projection = serverProjection;
+                        t._clientProjection = clientProjection;
+
+                        t._ctx.Options.Logger?.LogQuery(
+                            $"-- CLIENT-EVAL: Projection split for client-side evaluation",
+                            new Dictionary<string, object>(),
+                            TimeSpan.Zero,
+                            0);
+                    }
+                    else
+                    {
+                        // Use original projection (fully translatable to SQL)
+                        t._projection = originalProjection;
+                    }
+                }
+
                 return t.Visit(node.Arguments[0]);
             }
         }
