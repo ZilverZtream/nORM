@@ -1660,6 +1660,49 @@ namespace nORM.Core
             }, default).ConfigureAwait(false);
         }
 
+        #region Prepared Statements
+        /// <summary>
+        /// Creates a prepared INSERT statement for the specified entity type. This allows
+        /// the cost of SQL generation and command preparation to be paid only once, with
+        /// subsequent executions only updating parameter values. Ideal for batch insert
+        /// scenarios where the same operation is repeated many times.
+        /// </summary>
+        /// <typeparam name="T">The entity type to prepare the insert for.</typeparam>
+        /// <param name="ct">Cancellation token for the operation.</param>
+        /// <returns>A <see cref="PreparedOperation{T}"/> that can be executed multiple times.</returns>
+        /// <remarks>
+        /// Example usage:
+        /// <code>
+        /// await using var preparedInsert = await context.PrepareInsertAsync&lt;User&gt;();
+        /// for (int i = 0; i &lt; users.Length; i++)
+        /// {
+        ///     await preparedInsert.ExecuteAsync(users[i]);
+        /// }
+        /// </code>
+        /// </remarks>
+        public async Task<PreparedOperation<T>> PrepareInsertAsync<T>(CancellationToken ct = default) where T : class
+        {
+            await EnsureConnectionAsync(ct).ConfigureAwait(false);
+            var mapping = GetMapping(typeof(T));
+            var cmd = _cn.CreateCommand();
+            cmd.CommandText = _p.BuildInsert(mapping);
+            cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText));
+
+            // Pre-create parameters for all insert columns
+            foreach (var col in mapping.InsertColumns)
+            {
+                var p = cmd.CreateParameter();
+                p.ParameterName = _p.ParamPrefix + col.PropName;
+                cmd.Parameters.Add(p);
+            }
+
+            // Prepare the command at the database level
+            await cmd.PrepareAsync(ct).ConfigureAwait(false);
+
+            return new PreparedOperation<T>(cmd, mapping, this);
+        }
+        #endregion
+
         /// <summary>
         /// Releases resources used by the context. When <paramref name="disposing"/>
         /// is <c>true</c>, both managed and unmanaged resources are released; otherwise
@@ -1827,4 +1870,88 @@ namespace nORM.Core
     /// <param name="Results">List of materialized entities returned by the procedure.</param>
     /// <param name="OutputParameters">Dictionary of output parameter values keyed by name.</param>
     public sealed record StoredProcedureResult<T>(List<T> Results, IReadOnlyDictionary<string, object?> OutputParameters);
+
+    /// <summary>
+    /// Represents a prepared database operation that can be executed multiple times
+    /// with different parameter values. The SQL and command structure are prepared
+    /// once and reused, providing significant performance benefits for repeated
+    /// operations like batch inserts.
+    /// </summary>
+    /// <typeparam name="T">The entity type this operation works with.</typeparam>
+    public sealed class PreparedOperation<T> : IAsyncDisposable where T : class
+    {
+        private readonly DbCommand _command;
+        private readonly TableMapping _mapping;
+        private readonly DbContext _context;
+        private bool _disposed;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PreparedOperation{T}"/> class.
+        /// </summary>
+        /// <param name="command">The prepared database command.</param>
+        /// <param name="mapping">The table mapping for the entity type.</param>
+        /// <param name="context">The database context that created this operation.</param>
+        internal PreparedOperation(DbCommand command, TableMapping mapping, DbContext context)
+        {
+            _command = command ?? throw new ArgumentNullException(nameof(command));
+            _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+        }
+
+        /// <summary>
+        /// Executes the prepared operation for the specified entity. Parameter values
+        /// are updated from the entity properties and the command is executed.
+        /// </summary>
+        /// <param name="entity">The entity to insert.</param>
+        /// <param name="ct">Cancellation token for the operation.</param>
+        /// <returns>The number of rows affected.</returns>
+        public async Task<int> ExecuteAsync(T entity, CancellationToken ct = default)
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(PreparedOperation<T>));
+            if (entity == null)
+                throw new ArgumentNullException(nameof(entity));
+
+            // Update parameter values from entity
+            foreach (var col in _mapping.InsertColumns)
+            {
+                var paramName = _context.Provider.ParamPrefix + col.PropName;
+                var param = _command.Parameters[paramName];
+                if (param != null)
+                {
+                    var value = col.Getter(entity);
+                    param.Value = value ?? DBNull.Value;
+                }
+            }
+
+            // Execute the command
+            if (_mapping.KeyColumns.Any(k => k.IsDbGenerated))
+            {
+                // For tables with db-generated keys, use ExecuteScalar to get the new ID
+                var newId = await _command.ExecuteScalarWithInterceptionAsync(_context, ct).ConfigureAwait(false);
+                if (newId != null && newId != DBNull.Value)
+                {
+                    _mapping.SetPrimaryKey(entity, newId);
+                }
+                return 1;
+            }
+            else
+            {
+                // For tables without db-generated keys, use ExecuteNonQuery
+                return await _command.ExecuteNonQueryWithInterceptionAsync(_context, ct).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Releases all resources used by this prepared operation.
+        /// </summary>
+        public async ValueTask DisposeAsync()
+        {
+            if (!_disposed)
+            {
+                await _command.DisposeAsync().ConfigureAwait(false);
+                _disposed = true;
+            }
+        }
+    }
 }
