@@ -845,22 +845,45 @@ namespace nORM.Query
 
         private static Func<object?[], object> CreateConstructorDelegate(ConstructorInfo ctor)
         {
-            var argsParam = Expression.Parameter(typeof(object[]), "args");
-            var ctorParams = ctor.GetParameters();
-            var argExprs = new Expression[ctorParams.Length];
+            // Use DynamicMethod to bypass visibility checks (restrictedSkipVisibility: true)
+            // This allows materializing internal/anonymous types from external assemblies
+            var method = new DynamicMethod(
+                $"Ctor_{ctor.DeclaringType?.Name}_{Guid.NewGuid():N}",
+                typeof(object),
+                new[] { typeof(object?[]) },
+                typeof(MaterializerFactory),
+                true); // <--- Key fix: true skips visibility checks for internal types
 
-            for (int i = 0; i < ctorParams.Length; i++)
+            var il = method.GetILGenerator();
+            var parameters = ctor.GetParameters();
+
+            for (int i = 0; i < parameters.Length; i++)
             {
-                var index = Expression.Constant(i);
-                var access = Expression.ArrayIndex(argsParam, index);
-                var convert = Expression.Convert(access, ctorParams[i].ParameterType);
-                argExprs[i] = convert;
+                // Load array argument
+                il.Emit(OpCodes.Ldarg_0);
+                // Load index
+                il.Emit(OpCodes.Ldc_I4, i);
+                // Load element at index
+                il.Emit(OpCodes.Ldelem_Ref);
+
+                // Cast/Unbox to parameter type
+                var paramType = parameters[i].ParameterType;
+                if (paramType.IsValueType)
+                    il.Emit(OpCodes.Unbox_Any, paramType);
+                else
+                    il.Emit(OpCodes.Castclass, paramType);
             }
 
-            var newExpr = Expression.New(ctor, argExprs);
-            var body = Expression.Convert(newExpr, typeof(object));
-            var lambda = Expression.Lambda<Func<object?[], object>>(body, argsParam);
-            return lambda.Compile();
+            // Call constructor
+            il.Emit(OpCodes.Newobj, ctor);
+
+            // Box if it's a value type (unlikely for anonymous types, but good safety)
+            if (ctor.DeclaringType!.IsValueType)
+                il.Emit(OpCodes.Box, ctor.DeclaringType);
+
+            il.Emit(OpCodes.Ret);
+
+            return (Func<object?[], object>)method.CreateDelegate(typeof(Func<object?[], object>));
         }
 
         private static Column[] ExtractColumnsFromProjection(TableMapping mapping, LambdaExpression projection)
