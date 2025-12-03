@@ -119,6 +119,7 @@ namespace nORM.Query
                 {
                     lambda = t.ExpandProjection(lambda);
                     var param = lambda.Parameters[0];
+                    var isGrouping = node.Arguments[0] is MethodCallExpression mc && mc.Method.Name == "GroupBy";
                     if (!t._correlatedParams.TryGetValue(param, out var info))
                     {
                         info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
@@ -126,8 +127,11 @@ namespace nORM.Query
                     }
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
+                    if (isGrouping)
+                    {
+                        visitor.RegisterGroupingKey(param, PooledStringBuilder.Join(t._groupBy));
+                    }
                     var sql = visitor.Translate(lambda.Body);
-                    var isGrouping = node.Arguments[0] is MethodCallExpression mc && mc.Method.Name == "GroupBy";
                     var target = isGrouping ? t._having : t._where;
                     if (target.Length > 0) target.Append(" AND ");
                     target.Append($"({sql})");
