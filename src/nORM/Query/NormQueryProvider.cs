@@ -370,7 +370,15 @@ namespace nORM.Query
                     }
                     else
                     {
-                        result = list;
+                        // FIX: Handle covariance for List<object> (e.g. casting List<AnonymousType> to List<object>)
+                        if (typeof(TResult) == typeof(List<object>) && list is not List<object>)
+                        {
+                            result = ((IEnumerable)list).Cast<object>().ToList();
+                        }
+                        else
+                        {
+                            result = list;
+                        }
                     }
                 }
                 return (TResult)result!;
@@ -439,7 +447,15 @@ namespace nORM.Query
                     }
                     else
                     {
-                        result = list;
+                        // FIX: Handle covariance for List<object> (e.g. casting List<AnonymousType> to List<object>)
+                        if (typeof(TResult) == typeof(List<object>) && list is not List<object>)
+                        {
+                            result = ((IEnumerable)list).Cast<object>().ToList();
+                        }
+                        else
+                        {
+                            result = list;
+                        }
                     }
                 }
                 return (TResult)result!;
