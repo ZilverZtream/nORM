@@ -314,19 +314,35 @@ namespace nORM.Query
         private async Task<TResult> ExecuteInternalAsync<TResult>(Expression expression, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
-            var plan = GetPlan(expression, out var filtered, out var parameters);
+            var plan = GetPlan(expression, out var filtered, out var paramValues);
+            IReadOnlyDictionary<string, object>? parameterDictionary = null;
+            IReadOnlyDictionary<string, object> GetParameterDictionary()
+            {
+                parameterDictionary ??= EnsureParameterDictionary(plan, paramValues);
+                return parameterDictionary;
+            }
             Func<Task<TResult>> queryExecutorFactory = async () =>
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 await using var cmd = _ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
-                foreach (var p in parameters) cmd.AddOptimizedParam(p.Key, p.Value);
+                foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
+
+                if (paramValues != null)
+                {
+                    for (int i = 0; i < plan.CompiledParameters.Count; i++)
+                    {
+                        var name = plan.CompiledParameters[i];
+                        var value = i < paramValues.Length ? paramValues[i] : DBNull.Value;
+                        cmd.AddOptimizedParam(name, value);
+                    }
+                }
                 object result;
                 if (plan.IsScalar)
                 {
                     var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                     if (scalarResult == null || scalarResult is DBNull) return default(TResult)!;
                     // PERFORMANCE FIX: Use ConvertScalarResult to avoid boxing for value types
                     result = ConvertScalarResult<TResult>(scalarResult);
@@ -334,7 +350,7 @@ namespace nORM.Query
                 else
                 {
                     var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, list.Count);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw.Elapsed, list.Count);
                     if (plan.SingleResult)
                     {
                         // PERFORMANCE FIX: Direct list access instead of Cast<object>().First()
@@ -361,7 +377,7 @@ namespace nORM.Query
             };
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
-                var cacheKey = BuildCacheKeyWithValues<TResult>(plan, parameters);
+                var cacheKey = BuildCacheKeyWithValues<TResult>(plan, GetParameterDictionary());
                 var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
                 return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
             }
@@ -778,7 +794,7 @@ namespace nORM.Query
         private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
-            var plan = GetPlan(expression, out var filtered, out var parameters);
+            var plan = GetPlan(expression, out var filtered, out var paramValues);
             if (plan.Tables.Count != 1)
                 throw new NotSupportedException("ExecuteDeleteAsync only supports single table queries.");
             var rootType = GetElementType(filtered);
@@ -790,16 +806,25 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             var finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
             cmd.CommandText = finalSql;
-            foreach (var p in parameters)
+            foreach (var p in plan.Parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
+            if (paramValues != null)
+            {
+                for (int i = 0; i < plan.CompiledParameters.Count; i++)
+                {
+                    var name = plan.CompiledParameters[i];
+                    var value = i < paramValues.Length ? paramValues[i] : DBNull.Value;
+                    cmd.AddOptimizedParam(name, value);
+                }
+            }
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
-            _ctx.Options.Logger?.LogQuery(finalSql, parameters, sw.Elapsed, affected);
+            _ctx.Options.Logger?.LogQuery(finalSql, EnsureParameterDictionary(plan, paramValues), sw.Elapsed, affected);
             return affected;
         }
         private async Task<int> ExecuteUpdateInternalAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
-            var plan = GetPlan(expression, out var filtered, out var parameters);
+            var plan = GetPlan(expression, out var filtered, out var paramValues);
             if (plan.Tables.Count != 1)
                 throw new NotSupportedException("ExecuteUpdateAsync only supports single table queries.");
             var rootType = GetElementType(filtered);
@@ -812,11 +837,20 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             var finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
             cmd.CommandText = finalSql;
-            foreach (var p in parameters)
+            foreach (var p in plan.Parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
+            if (paramValues != null)
+            {
+                for (int i = 0; i < plan.CompiledParameters.Count; i++)
+                {
+                    var name = plan.CompiledParameters[i];
+                    var value = i < paramValues.Length ? paramValues[i] : DBNull.Value;
+                    cmd.AddOptimizedParam(name, value);
+                }
+            }
             foreach (var p in setParams)
                 cmd.AddOptimizedParam(p.Key, p.Value);
-            var allParams = parameters.ToDictionary(k => k.Key, v => v.Value);
+            var allParams = EnsureParameterDictionary(plan, paramValues).ToDictionary(k => k.Key, v => v.Value);
             foreach (var p in setParams)
                 allParams[p.Key] = p.Value;
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
@@ -826,13 +860,22 @@ namespace nORM.Query
         public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
         {
             // Execute in true streaming mode so only one row is materialized at a time.
-            var plan = GetPlan(expression, out _, out var parameters);
+            var plan = GetPlan(expression, out _, out var paramValues);
             var sw = Stopwatch.StartNew();
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.Connection.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
-            foreach (var p in parameters) cmd.AddOptimizedParam(p.Key, p.Value);
+            foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
+            if (paramValues != null)
+            {
+                for (int i = 0; i < plan.CompiledParameters.Count; i++)
+                {
+                    var name = plan.CompiledParameters[i];
+                    var value = i < paramValues.Length ? paramValues[i] : DBNull.Value;
+                    cmd.AddOptimizedParam(name, value);
+                }
+            }
             if (plan.Includes.Count > 0 || plan.GroupJoinInfo != null)
                 throw new NotSupportedException("AsAsyncEnumerable does not support Include or GroupJoin operations.");
             var trackable = !plan.NoTracking &&
@@ -861,13 +904,13 @@ namespace nORM.Query
                 count++;
                 yield return entity;
             }
-            _ctx.Options.Logger?.LogQuery(plan.Sql, parameters, sw.Elapsed, count);
+            _ctx.Options.Logger?.LogQuery(plan.Sql, EnsureParameterDictionary(plan, paramValues), sw.Elapsed, count);
         }
         /// <summary>
         /// PERFORMANCE FIX: Returns the cached plan and binds parameters separately.
         /// This avoids cloning the parameters dictionary on every cache hit.
         /// </summary>
-        internal QueryPlan GetPlan(Expression expression, out Expression filtered, out IReadOnlyDictionary<string, object> boundParameters)
+        internal QueryPlan GetPlan(Expression expression, out Expression filtered, out object?[]? parameterValues)
         {
             filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(UnwrapQueryExpression(filtered));
@@ -882,7 +925,7 @@ namespace nORM.Query
 
             if (_planCache.TryGet(fingerprint, out var cached))
             {
-                boundParameters = BindParameters(filtered, cached);
+                parameterValues = ExtractParameterValues(filtered, cached);
                 return cached;
             }
 
@@ -906,7 +949,7 @@ namespace nORM.Query
                 };
             });
 
-            boundParameters = BindParameters(filtered, plan);
+            parameterValues = ExtractParameterValues(filtered, plan);
             return plan;
         }
 
@@ -916,33 +959,48 @@ namespace nORM.Query
         [Obsolete("Use overload with boundParameters out parameter")]
         internal QueryPlan GetPlan(Expression expression, out Expression filtered)
         {
-            var plan = GetPlan(expression, out filtered, out var parameters);
-            return plan with { Parameters = parameters };
+            var plan = GetPlan(expression, out filtered, out var parameterValues);
+            return plan with { Parameters = EnsureParameterDictionary(plan, parameterValues) };
         }
 
         /// <summary>
-        /// PERFORMANCE FIX: Optimized parameter binding that avoids unnecessary dictionary allocations.
-        /// When there are no compiled parameters, returns the cached dictionary directly.
+        /// Returns ONLY the extracted values, no Dictionary allocation
         /// </summary>
-        private IReadOnlyDictionary<string, object> BindParameters(Expression expression, QueryPlan plan)
+        private object?[]? ExtractParameterValues(Expression expression, QueryPlan plan)
         {
-            // PERFORMANCE FIX: If no compiled parameters, return plan.Parameters directly
-            // This avoids allocating a new Dictionary on every cached query execution
             if (plan.CompiledParameters.Count == 0)
-            {
-                return plan.Parameters;
-            }
+                return null;
 
-            // Only allocate a new dictionary when we have compiled parameters to bind
             var extractor = new ParameterValueExtractor();
             extractor.Visit(expression);
-            var values = extractor.Values;
+            
+            // Use the values list from the extractor directly if possible,
+            // or return as array. Ideally, ParameterValueExtractor would pull from a pool.
+            return extractor.Values.ToArray();
+        }
+
+        private IReadOnlyDictionary<string, object> EnsureParameterDictionary(QueryPlan plan, object?[]? parameterValues)
+        {
+            if (plan.CompiledParameters.Count == 0)
+                return plan.Parameters;
+
             var parameters = new Dictionary<string, object>(plan.Parameters);
-            var count = Math.Min(plan.CompiledParameters.Count, values.Count);
-            for (int i = 0; i < count; i++)
+            if (parameterValues != null)
             {
-                parameters[plan.CompiledParameters[i]] = values[i] ?? DBNull.Value;
+                var count = Math.Min(plan.CompiledParameters.Count, parameterValues.Length);
+                for (int i = 0; i < count; i++)
+                {
+                    parameters[plan.CompiledParameters[i]] = parameterValues[i] ?? DBNull.Value;
+                }
             }
+            else
+            {
+                for (int i = 0; i < plan.CompiledParameters.Count; i++)
+                {
+                    parameters[plan.CompiledParameters[i]] = DBNull.Value;
+                }
+            }
+
             return parameters;
         }
         private string BuildCacheKeyWithValues<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
