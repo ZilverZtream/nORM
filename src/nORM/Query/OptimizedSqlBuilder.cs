@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace nORM.Query
 {
@@ -43,6 +44,8 @@ namespace nORM.Query
         /// </summary>
         /// <param name="value">The string to append.</param>
         /// <returns>The current builder instance.</returns>
+        // PERFORMANCE OPTIMIZATION 16: Aggressive inlining for SQL builder hot path
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public OptimizedSqlBuilder Append(string? value)
         {
             if (value != null)
@@ -55,11 +58,14 @@ namespace nORM.Query
         /// </summary>
         /// <param name="value">The characters to append.</param>
         /// <returns>The current builder instance.</returns>
+        // PERFORMANCE OPTIMIZATION 17: Aggressive inlining + optimization for span append
+        [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
         public OptimizedSqlBuilder Append(ReadOnlySpan<char> value)
         {
-            EnsureCapacity(value.Length);
+            int valueLength = value.Length;
+            EnsureCapacity(valueLength);
             value.CopyTo(_buffer.AsSpan(_position));
-            _position += value.Length;
+            _position += valueLength;
             return this;
         }
 
@@ -68,6 +74,8 @@ namespace nORM.Query
         /// </summary>
         /// <param name="value">The character to append.</param>
         /// <returns>The current builder instance.</returns>
+        // PERFORMANCE OPTIMIZATION 18: Aggressive inlining for char append
+        [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
         public OptimizedSqlBuilder Append(char value)
         {
             EnsureCapacity(1);
@@ -215,13 +223,19 @@ namespace nORM.Query
         /// number of additional characters, resizing and copying the buffer when necessary.
         /// </summary>
         /// <param name="additional">The number of characters that need to be appended.</param>
+        // PERFORMANCE OPTIMIZATION 19: Aggressive inlining + optimized capacity check
+        [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
         private void EnsureCapacity(int additional)
         {
-            var required = _position + additional;
-            if (required <= _buffer.Length)
+            int required = _position + additional;
+            int bufferLength = _buffer.Length;
+
+            // PERFORMANCE OPTIMIZATION 20: Hoist buffer length check for better branch prediction
+            if (required <= bufferLength)
                 return;
 
-            var newSize = Math.Max(_buffer.Length * 2, required);
+            // Grow by 2x or required, whichever is larger
+            int newSize = Math.Max(bufferLength * 2, required);
             var newBuffer = ArrayPool<char>.Shared.Rent(newSize);
             _buffer.AsSpan(0, _position).CopyTo(newBuffer);
             ArrayPool<char>.Shared.Return(_buffer);

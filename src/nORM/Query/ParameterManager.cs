@@ -44,33 +44,113 @@ namespace nORM.Query
 {
     internal static class ParameterAssign
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // PERFORMANCE OPTIMIZATION 1: AggressiveInlining + AggressiveOptimization for hot path
+        [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
         internal static void AssignValue(DbParameter p, object? v)
         {
-            if (v is null) { p.Value = DBNull.Value; return; }
-
-            // Let the database provider handle type mapping via CreateParameter().
-            // Previously, DateTime was hardcoded as String with ISO format for SQLite,
-            // which broke SqlServer (expects DateTime2) and Postgres (expects Timestamp).
-            // Now each provider's CreateParameter() will set the correct DbType.
-            switch (v)
+            // PERFORMANCE OPTIMIZATION 2: Fast null check first (most common nullable scenario)
+            if (v is null)
             {
-                case int i: p.DbType = System.Data.DbType.Int32; p.Value = i; return;
-                case long l: p.DbType = System.Data.DbType.Int64; p.Value = l; return;
-                case short s: p.DbType = System.Data.DbType.Int16; p.Value = s; return;
-                case byte b: p.DbType = System.Data.DbType.Byte; p.Value = b; return;
-                case bool bo: p.DbType = System.Data.DbType.Boolean; p.Value = bo; return;
-                case double d: p.DbType = System.Data.DbType.Double; p.Value = d; return;
-                case float f: p.DbType = System.Data.DbType.Double; p.Value = (double)f; return;
-                case decimal m: p.DbType = System.Data.DbType.Decimal; p.Value = m; return;
-                case string s2: p.DbType = System.Data.DbType.String; p.Value = s2; return;
-                case DateTime dt:
-                    // Provider will set correct DbType (DateTime2 for SQL Server, Timestamp for Postgres, etc.)
-                    p.Value = dt;
-                    return;
-                default:
-                    p.Value = v; return;
+                p.Value = DBNull.Value;
+                return;
             }
+
+            // PERFORMANCE OPTIMIZATION 3: Reordered cases by frequency (int/string/long most common)
+            // Pattern matching with is + cast is faster than switch expression for primitives
+            var type = v.GetType();
+
+            // Most common types first (int, string, long, bool)
+            if (type == typeof(int))
+            {
+                p.DbType = System.Data.DbType.Int32;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(string))
+            {
+                p.DbType = System.Data.DbType.String;
+                p.Value = v;
+                // PERFORMANCE OPTIMIZATION 4: Set size hint for strings to avoid provider guessing
+                if (v is string str && str.Length <= 4000)
+                    p.Size = str.Length;
+                return;
+            }
+
+            if (type == typeof(long))
+            {
+                p.DbType = System.Data.DbType.Int64;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(bool))
+            {
+                p.DbType = System.Data.DbType.Boolean;
+                p.Value = v;
+                return;
+            }
+
+            // Other numeric types
+            if (type == typeof(decimal))
+            {
+                p.DbType = System.Data.DbType.Decimal;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(double))
+            {
+                p.DbType = System.Data.DbType.Double;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(short))
+            {
+                p.DbType = System.Data.DbType.Int16;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(byte))
+            {
+                p.DbType = System.Data.DbType.Byte;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(float))
+            {
+                p.DbType = System.Data.DbType.Double;
+                p.Value = (double)(float)v;
+                return;
+            }
+
+            // DateTime and related types
+            if (type == typeof(DateTime))
+            {
+                // Provider will set correct DbType (DateTime2 for SQL Server, Timestamp for Postgres, etc.)
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(Guid))
+            {
+                p.DbType = System.Data.DbType.Guid;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(byte[]))
+            {
+                p.DbType = System.Data.DbType.Binary;
+                p.Value = v;
+                return;
+            }
+
+            // Default fallback
+            p.Value = v;
         }
     }
 }
