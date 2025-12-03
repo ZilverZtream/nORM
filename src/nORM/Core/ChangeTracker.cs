@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.ComponentModel;
-using System.Linq;
 using nORM.Configuration;
 using nORM.Mapping;
 using RefComparer = System.Collections.Generic.ReferenceEqualityComparer;
@@ -258,16 +257,14 @@ namespace nORM.Core
         {
             // FIX (TASK 1): Detect changes in ALL non-notifying entries, not just dirty ones
             // POCOs don't raise property change events, so we must compare snapshots for all of them
-            var allNonNotifyingSnapshot = _nonNotifyingEntries.Keys.ToArray();
-            foreach (var entry in allNonNotifyingSnapshot)
+            foreach (var entry in _nonNotifyingEntries.Keys)
             {
                 if (entry.Entity != null)
                     entry.DetectChanges();
             }
 
             // Also process explicitly marked dirty entries
-            var dirtySnapshot = _dirtyEntries.Keys.ToArray();
-            foreach (var entry in dirtySnapshot)
+            foreach (var entry in _dirtyEntries.Keys)
             {
                 if (entry.Entity != null)
                     entry.DetectChanges();
