@@ -245,14 +245,14 @@ namespace nORM.Internal
         /// Represents a cache entry along with its creation time, optional TTL override,
         /// and last accessed timestamp (stored as ticks for Interlocked updates).
         /// </summary>
-        /// <param name="Key">The key associated with the cached value.</param>
-        /// <param name="Value">The cached value.</param>
-        /// <param name="Created">Timestamp indicating when the entry was created.</param>
-        /// <param name="TtlOverride">Optional TTL overriding the cache's default.</param>
-        /// <param name="LastAccessedTicks">
-        /// Mutable field storing last access time as ticks. Updated via Interlocked for lock-free reads.
-        /// PERFORMANCE FIX (TASK 6): This allows updating access time without acquiring write locks.
-        /// </param>
+        /// <remarks>
+        /// <para><strong>Key</strong>: The key associated with the cached value.</para>
+        /// <para><strong>Value</strong>: The cached value.</para>
+        /// <para><strong>Created</strong>: Timestamp indicating when the entry was created.</para>
+        /// <para><strong>TtlOverride</strong>: Optional TTL overriding the cache's default.</para>
+        /// <para><strong>LastAccessedTicks</strong>: Mutable field storing last access time as ticks. Updated via Interlocked for lock-free reads.
+        /// PERFORMANCE FIX (TASK 6): This allows updating access time without acquiring write locks.</para>
+        /// </remarks>
         private sealed class CacheItem
         {
             public TKey Key { get; }

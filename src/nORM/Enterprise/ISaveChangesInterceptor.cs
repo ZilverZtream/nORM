@@ -8,7 +8,7 @@ using nORM.Core;
 namespace nORM.Enterprise
 {
     /// <summary>
-    /// Provides hooks that run before and after <see cref="DbContext.SaveChangesAsync"/>.
+    /// Provides hooks that run before and after <see cref="DbContext.SaveChangesAsync(System.Threading.CancellationToken)"/>.
     /// Implementations may inspect or modify tracked entities or react to persistence results.
     /// </summary>
     public interface ISaveChangesInterceptor
