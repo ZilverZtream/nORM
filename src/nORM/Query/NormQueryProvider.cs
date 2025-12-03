@@ -334,7 +334,7 @@ namespace nORM.Query
                     for (int i = 0; i < plan.CompiledParameters.Count; i++)
                     {
                         var name = plan.CompiledParameters[i];
-                        var value = i < paramValues.Length ? paramValues[i] : DBNull.Value;
+                        var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
                         cmd.AddOptimizedParam(name, value);
                     }
                 }
@@ -813,7 +813,7 @@ namespace nORM.Query
                 for (int i = 0; i < plan.CompiledParameters.Count; i++)
                 {
                     var name = plan.CompiledParameters[i];
-                    var value = i < paramValues.Length ? paramValues[i] : DBNull.Value;
+                    var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
                     cmd.AddOptimizedParam(name, value);
                 }
             }
@@ -844,7 +844,7 @@ namespace nORM.Query
                 for (int i = 0; i < plan.CompiledParameters.Count; i++)
                 {
                     var name = plan.CompiledParameters[i];
-                    var value = i < paramValues.Length ? paramValues[i] : DBNull.Value;
+                    var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
                     cmd.AddOptimizedParam(name, value);
                 }
             }
@@ -872,7 +872,7 @@ namespace nORM.Query
                 for (int i = 0; i < plan.CompiledParameters.Count; i++)
                 {
                     var name = plan.CompiledParameters[i];
-                    var value = i < paramValues.Length ? paramValues[i] : DBNull.Value;
+                    var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
                     cmd.AddOptimizedParam(name, value);
                 }
             }
@@ -910,7 +910,7 @@ namespace nORM.Query
         /// PERFORMANCE FIX: Returns the cached plan and binds parameters separately.
         /// This avoids cloning the parameters dictionary on every cache hit.
         /// </summary>
-        internal QueryPlan GetPlan(Expression expression, out Expression filtered, out object?[]? parameterValues)
+        internal QueryPlan GetPlan(Expression expression, out Expression filtered, out IReadOnlyList<object?>? parameterValues)
         {
             filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(UnwrapQueryExpression(filtered));
@@ -966,7 +966,7 @@ namespace nORM.Query
         /// <summary>
         /// Returns ONLY the extracted values, no Dictionary allocation
         /// </summary>
-        private object?[]? ExtractParameterValues(Expression expression, QueryPlan plan)
+        private IReadOnlyList<object?>? ExtractParameterValues(Expression expression, QueryPlan plan)
         {
             if (plan.CompiledParameters.Count == 0)
                 return null;
@@ -974,12 +974,10 @@ namespace nORM.Query
             var extractor = new ParameterValueExtractor();
             extractor.Visit(expression);
             
-            // Use the values list from the extractor directly if possible,
-            // or return as array. Ideally, ParameterValueExtractor would pull from a pool.
-            return extractor.Values.ToArray();
+            return extractor.Values;
         }
 
-        private IReadOnlyDictionary<string, object> EnsureParameterDictionary(QueryPlan plan, object?[]? parameterValues)
+        private IReadOnlyDictionary<string, object> EnsureParameterDictionary(QueryPlan plan, IReadOnlyList<object?>? parameterValues)
         {
             if (plan.CompiledParameters.Count == 0)
                 return plan.Parameters;
@@ -987,7 +985,7 @@ namespace nORM.Query
             var parameters = new Dictionary<string, object>(plan.Parameters);
             if (parameterValues != null)
             {
-                var count = Math.Min(plan.CompiledParameters.Count, parameterValues.Length);
+                var count = Math.Min(plan.CompiledParameters.Count, parameterValues.Count);
                 for (int i = 0; i < count; i++)
                 {
                     parameters[plan.CompiledParameters[i]] = parameterValues[i] ?? DBNull.Value;
