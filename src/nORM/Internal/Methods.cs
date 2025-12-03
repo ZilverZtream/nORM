@@ -2,6 +2,7 @@ using System;
 using System.Data;
 using System.Data.Common;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 #nullable enable
 
@@ -26,23 +27,30 @@ namespace nORM.Internal
         public static readonly MethodInfo GetFieldValue = typeof(DbDataReader).GetMethod(nameof(DbDataReader.GetFieldValue))!;
         public static readonly MethodInfo SetShadowValue = typeof(ShadowPropertyStore).GetMethod(nameof(ShadowPropertyStore.Set))!;
 
+        // PERFORMANCE OPTIMIZATION 12: Aggressive inlining for hot path method resolution
+        [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
         internal static MethodInfo GetReaderMethod(Type type)
         {
             type = Nullable.GetUnderlyingType(type) ?? type;
+
+            // PERFORMANCE OPTIMIZATION 13: Fast path for most common types (int, string, long, bool)
+            // Avoid TypeCode lookup for these frequent cases
+            if (type == typeof(int)) return GetInt32;
+            if (type == typeof(string)) return GetString;
+            if (type == typeof(long)) return GetInt64;
+            if (type == typeof(bool)) return GetBoolean;
+            if (type == typeof(decimal)) return GetDecimal;
+            if (type == typeof(DateTime)) return GetDateTime;
+            if (type == typeof(double)) return GetDouble;
+            if (type == typeof(Guid)) return GetGuid;
+
             if (type.IsEnum) return GetValue;
+
             return Type.GetTypeCode(type) switch
             {
-                TypeCode.Boolean => GetBoolean,
                 TypeCode.Byte => GetByte,
                 TypeCode.Int16 => GetInt16,
-                TypeCode.Int32 => GetInt32,
-                TypeCode.Int64 => GetInt64,
                 TypeCode.Single => GetFloat,
-                TypeCode.Double => GetDouble,
-                TypeCode.Decimal => GetDecimal,
-                TypeCode.DateTime => GetDateTime,
-                TypeCode.String => GetString,
-                _ when type == typeof(Guid) => GetGuid,
                 _ when type == typeof(byte[]) => GetBytes,
                 _ => GetValue
             };
