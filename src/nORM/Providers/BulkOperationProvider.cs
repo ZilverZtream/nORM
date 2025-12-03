@@ -39,7 +39,21 @@ namespace nORM.Providers
             {
                 for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
                 {
-                    var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
+                    var batchCount = Math.Min(sizing.OptimalBatchSize, entityList.Count - i);
+                    List<T> batch;
+
+                    if (entityList is List<T> list)
+                    {
+                        batch = list.GetRange(i, batchCount);
+                    }
+                    else
+                    {
+                        batch = new List<T>(batchCount);
+                        for (var j = 0; j < batchCount; j++)
+                        {
+                            batch.Add(entityList[i + j]);
+                        }
+                    }
                     var batchSw = Stopwatch.StartNew();
                     total += await batchAction(batch, transaction, ct).ConfigureAwait(false);
                     batchSw.Stop();
