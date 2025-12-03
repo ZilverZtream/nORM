@@ -32,10 +32,6 @@ namespace nORM.Query
         // This was extremely CPU intensive for large SQL strings (kilobytes long)
         // Now we pass the Take value directly from the query plan, avoiding regex entirely
 
-        // MEMORY SAFETY FIX (TASK 8): Maximum number of children per group to prevent OOM
-        // Prevents malformed queries or data from consuming all available memory
-        private const int MaxGroupSize = 100000;
-
         public QueryExecutor(DbContext ctx, IncludeProcessor includeProcessor, ILogger<QueryExecutor>? logger = null)
         {
             _ctx = ctx;
@@ -281,13 +277,15 @@ namespace nORM.Query
 
                     if (!reader.IsDBNull(innerKeyIndex))
                     {
-                        // MEMORY SAFETY FIX (TASK 8): Prevent unbounded memory growth
-                        // If a single group exceeds MaxGroupSize, throw to protect the server
-                        if (currentChildren.Count >= MaxGroupSize)
+                        // FIX (TASK 5): Use configurable MaxGroupJoinSize instead of hard-coded limit
+                        // Prevents unbounded memory growth while allowing users to opt-in to larger datasets
+                        var maxSize = _ctx.Options.MaxGroupJoinSize;
+                        if (currentChildren.Count >= maxSize)
                         {
                             throw new NormQueryException(
-                                $"GroupJoin safety limit exceeded: A single group has more than {MaxGroupSize} children. " +
+                                $"GroupJoin safety limit exceeded: A single group has more than {maxSize} children. " +
                                 "This may indicate a malformed query or incorrect join keys. " +
+                                "To increase this limit, set DbContextOptions.MaxGroupJoinSize to a higher value. " +
                                 "Review your GroupJoin operation and ensure join keys are correct.");
                         }
 
@@ -404,12 +402,14 @@ namespace nORM.Query
 
                         if (!reader.IsDBNull(innerKeyIndex))
                         {
-                            // MEMORY SAFETY FIX (TASK 8): Prevent unbounded memory growth
-                            if (currentChildren.Count >= MaxGroupSize)
+                            // FIX (TASK 5): Use configurable MaxGroupJoinSize instead of hard-coded limit
+                            var maxSize = _ctx.Options.MaxGroupJoinSize;
+                            if (currentChildren.Count >= maxSize)
                             {
                                 throw new NormQueryException(
-                                    $"GroupJoin safety limit exceeded: A single group has more than {MaxGroupSize} children. " +
+                                    $"GroupJoin safety limit exceeded: A single group has more than {maxSize} children. " +
                                     "This may indicate a malformed query or incorrect join keys. " +
+                                    "To increase this limit, set DbContextOptions.MaxGroupJoinSize to a higher value. " +
                                     "Review your GroupJoin operation and ensure join keys are correct.");
                             }
 
