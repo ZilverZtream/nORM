@@ -32,12 +32,16 @@ namespace nORM.Query
             }
             if (IsSimpleWherePattern(expr, out var whereInfo, out var takeCount))
             {
-                result = ExecuteSimpleWhere<T>(ctx, whereInfo, takeCount).ContinueWith(t => (object)t.Result);
+                // PERFORMANCE FIX (TASK 14): Avoid ContinueWith closure allocation
+                // Instead of: ExecuteSimpleWhere<T>(...).ContinueWith(t => (object)t.Result)
+                // Use async/await wrapper which is more efficient
+                result = ExecuteSimpleWhereAsObject<T>(ctx, whereInfo, takeCount);
                 return true;
             }
             if (IsSimpleTakePattern(expr, out takeCount))
             {
-                result = ExecuteSimpleTake<T>(ctx, takeCount).ContinueWith(t => (object)t.Result);
+                // PERFORMANCE FIX (TASK 14): Avoid ContinueWith closure allocation
+                result = ExecuteSimpleTakeAsObject<T>(ctx, takeCount);
                 return true;
             }
             return false;
@@ -160,6 +164,16 @@ namespace nORM.Query
                 return sql + $" LIMIT {limit}";
             }
         }
+        /// <summary>
+        /// PERFORMANCE FIX (TASK 14): Wrapper to avoid ContinueWith closure allocation.
+        /// Returns Task&lt;object&gt; directly instead of using ContinueWith.
+        /// </summary>
+        private static async Task<object> ExecuteSimpleWhereAsObject<T>(DbContext ctx, WhereInfo info, int? takeCount) where T : class, new()
+        {
+            var results = await ExecuteSimpleWhere<T>(ctx, info, takeCount).ConfigureAwait(false);
+            return results;
+        }
+
         private static async Task<List<T>> ExecuteSimpleWhere<T>(DbContext ctx, WhereInfo info, int? takeCount) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));
@@ -186,14 +200,25 @@ namespace nORM.Query
                 cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value);
             }
             var results = new List<T>();
-            var materializer = new MaterializerFactory().CreateMaterializer(map, typeof(T));
+            // PERFORMANCE FIX (TASK 12): Use generic materializer to avoid boxing
+            var materializer = new MaterializerFactory().CreateMaterializer<T>(map);
             await using var reader = await cmd.ExecuteReaderAsync(System.Threading.CancellationToken.None).ConfigureAwait(false);
             while (await reader.ReadAsync(default).ConfigureAwait(false))
             {
-                results.Add((T)await materializer(reader, default).ConfigureAwait(false));
+                results.Add(await materializer(reader, default).ConfigureAwait(false));
             }
             return results;
         }
+        /// <summary>
+        /// PERFORMANCE FIX (TASK 14): Wrapper to avoid ContinueWith closure allocation.
+        /// Returns Task&lt;object&gt; directly instead of using ContinueWith.
+        /// </summary>
+        private static async Task<object> ExecuteSimpleTakeAsObject<T>(DbContext ctx, int? takeCount) where T : class, new()
+        {
+            var results = await ExecuteSimpleTake<T>(ctx, takeCount).ConfigureAwait(false);
+            return results;
+        }
+
         private static async Task<List<T>> ExecuteSimpleTake<T>(DbContext ctx, int? takeCount) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));
@@ -206,11 +231,12 @@ namespace nORM.Query
             await using var cmd = ctx.Connection.CreateCommand();
             cmd.CommandText = sql;
             var results = new List<T>();
-            var materializer = new MaterializerFactory().CreateMaterializer(map, typeof(T));
+            // PERFORMANCE FIX (TASK 12): Use generic materializer to avoid boxing
+            var materializer = new MaterializerFactory().CreateMaterializer<T>(map);
             await using var reader = await cmd.ExecuteReaderAsync(System.Threading.CancellationToken.None).ConfigureAwait(false);
             while (await reader.ReadAsync(default).ConfigureAwait(false))
             {
-                results.Add((T)await materializer(reader, default).ConfigureAwait(false));
+                results.Add(await materializer(reader, default).ConfigureAwait(false));
             }
             return results;
         }

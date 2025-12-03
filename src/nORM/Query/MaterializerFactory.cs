@@ -302,6 +302,46 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// PERFORMANCE FIX (TASK 12): Generic version that avoids boxing for value types.
+        /// Creates a strongly-typed synchronous materializer delegate.
+        /// </summary>
+        /// <typeparam name="T">The type to materialize.</typeparam>
+        /// <param name="mapping">Mapping describing the source table schema.</param>
+        /// <param name="projection">Optional projection expression selecting specific members.</param>
+        /// <returns>A delegate that synchronously materializes objects from a data reader without boxing.</returns>
+        public Func<DbDataReader, T> CreateSyncMaterializer<T>(
+            TableMapping mapping,
+            LambdaExpression? projection = null)
+        {
+            ArgumentNullException.ThrowIfNull(mapping);
+
+            var targetType = typeof(T);
+            var cacheKey = new MaterializerCacheKey(
+                mapping.Type.GetHashCode(),
+                targetType.GetHashCode(),
+                projection != null ? ExpressionFingerprint.Compute(projection) : 0,
+                mapping.TableName);
+
+            // Get the object-returning materializer from cache
+            var objectMaterializer = _syncCache.GetOrAdd(cacheKey, _ =>
+            {
+                // For simple entity materialization without projection, prefer fast materializers
+                if (projection == null && _fastMaterializers.TryGetValue(targetType, out var fast))
+                {
+                    return fast;
+                }
+
+                // Fall back to existing reflection-based approach
+                var sync = CreateMaterializerInternal(mapping, targetType, projection);
+                ValidateMaterializer(sync, mapping, targetType);
+                return sync;
+            });
+
+            // Wrap to return strongly-typed result (JIT will optimize this cast away for reference types)
+            return reader => (T)objectMaterializer(reader);
+        }
+
+        /// <summary>
         /// Creates a synchronous materializer delegate that converts a <see cref="DbDataReader"/> row into the target type.
         /// PERFORMANCE FIX (TASK 14): This method caches sync delegates to avoid Task allocation overhead.
         /// </summary>
@@ -336,6 +376,39 @@ namespace nORM.Query
                 ValidateMaterializer(sync, mapping, targetType);
                 return sync;
             });
+        }
+
+        /// <summary>
+        /// PERFORMANCE FIX (TASK 12): Generic version that avoids boxing for value types.
+        /// Creates a strongly-typed async materializer delegate.
+        /// </summary>
+        /// <typeparam name="T">The type to materialize.</typeparam>
+        /// <param name="mapping">Mapping describing the source table schema.</param>
+        /// <param name="projection">Optional projection expression selecting specific members.</param>
+        /// <returns>A delegate that asynchronously materializes objects from a data reader without boxing.</returns>
+        public Func<DbDataReader, CancellationToken, Task<T>> CreateMaterializer<T>(
+            TableMapping mapping,
+            LambdaExpression? projection = null)
+        {
+            ArgumentNullException.ThrowIfNull(mapping);
+
+            var targetType = typeof(T);
+
+            // CHECK FOR COMPILED MATERIALIZER FIRST
+            if (projection == null && CompiledMaterializerStore.TryGet(targetType, out var compiled))
+            {
+                // Wrap the compiled materializer to return strongly-typed result
+                return async (reader, ct) => (T)(await compiled(reader, ct).ConfigureAwait(false));
+            }
+
+            // Get the strongly-typed sync materializer
+            var syncMaterializer = CreateSyncMaterializer<T>(mapping, projection);
+
+            return (reader, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return Task.FromResult(syncMaterializer(reader));
+            };
         }
 
         /// <summary>
@@ -408,7 +481,7 @@ namespace nORM.Query
                 projection != null ? ExpressionFingerprint.Compute(projection) : 0,
                 mapping.TableName);
 
-            return _cache.GetOrAdd(cacheKey, _ =>
+            return _asyncCache.GetOrAdd(cacheKey, _ =>
             {
                 var baseMaterializer = CreateMaterializerInternal(mapping, targetType, projection);
 
