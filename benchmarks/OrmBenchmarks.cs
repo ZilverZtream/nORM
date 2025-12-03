@@ -118,6 +118,13 @@ namespace nORM.Benchmarks
                     .Skip(5)
                     .Take(20));
 
+        private static readonly Func<nORM.Core.DbContext, int, Task<List<object>>> _normJoinCompiled
+            = Norm.CompileQuery<nORM.Core.DbContext, int, object>((ctx, amount) =>
+                ctx.Query<BenchmarkUser>()
+                    .Join(ctx.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new { u.Name, o.Amount, o.ProductName })
+                    .Where(x => x.Amount > amount)
+                    .Take(50));
+
         // ---------- SQLite PRAGMA helpers (applied uniformly once per connection) ----------
         private static void ApplySqlitePragmas(SqliteConnection conn)
         {
@@ -616,6 +623,9 @@ namespace nORM.Benchmarks
             var result = await _dapperConnection!.QueryAsync(sql, new { Amount = 100 });
             return result.Cast<object>().ToList();
         }
+
+        [Benchmark]
+        public Task<List<object>> Query_Join_nORM_Compiled() => _normJoinCompiled(_nOrmContext!, 100);
 
         // ========== COUNT ==========
 
