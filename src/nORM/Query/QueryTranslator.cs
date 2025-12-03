@@ -1875,18 +1875,6 @@ namespace nORM.Query
             using var cts = new CancellationTokenSource(timeout);
             return ExpressionUtils.CompileWithFallback(lambda, cts.Token);
         }
-        private sealed class ParameterReplacer : ExpressionVisitor
-        {
-            private readonly ParameterExpression _from;
-            private readonly Expression _to;
-            public ParameterReplacer(ParameterExpression from, Expression to)
-            {
-                _from = from;
-                _to = to;
-            }
-            protected override Expression VisitParameter(ParameterExpression node) =>
-                node == _from ? _to : base.VisitParameter(node);
-        }
         private sealed class ProjectionMemberReplacer : ExpressionVisitor
         {
             protected override Expression VisitMember(MemberExpression node)
