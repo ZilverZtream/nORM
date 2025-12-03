@@ -792,6 +792,33 @@ namespace nORM.Benchmarks
             await tx.CommitAsync();
         }
 
+        [Benchmark(Description = "BulkInsert Batched - nORM Prepared")]
+        public async Task BulkInsert_Batched_nORM_Prepared()
+        {
+            await using var tx = await _nOrmConnection!.BeginTransactionAsync();
+
+            // Prepare once, execute many times (Matches Dapper behavior)
+            await using var preparedInsert = await _nOrmContext!.PrepareInsertAsync<BenchmarkUser>();
+
+            for (int i = 1; i <= 100; i++)
+            {
+                var u = new BenchmarkUser
+                {
+                    Name = $"Batch nORM {i}",
+                    Email = $"batch{i}@norm.com",
+                    CreatedAt = DateTime.Now,
+                    IsActive = true,
+                    Age = 30,
+                    City = "BulkCity",
+                    Department = "BulkDept",
+                    Salary = 60_000
+                };
+                await preparedInsert.ExecuteAsync(u);
+            }
+
+            await tx.CommitAsync();
+        }
+
         [Benchmark(Description = "BulkInsert Idiomatic - EF AddRange")]
         public async Task BulkInsert_Idiomatic_EfCore()
         {
