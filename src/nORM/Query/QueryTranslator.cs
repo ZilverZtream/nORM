@@ -1592,10 +1592,10 @@ namespace nORM.Query
                 // Handle direct Key access: g => g.Key
                 if (resultSelector.Body is MemberExpression memberExpr && memberExpr.Member.Name == "Key")
                 {
-                    var builder = PooledStringBuilder.Rent();
-                    builder.Append(groupBySql).Append(" AS ").Append(_provider.Escape("Key"));
-                    selectItems.Add(builder.ToString());
-                    PooledStringBuilder.Return(builder);
+                    var keyBuilder = PooledStringBuilder.Rent();
+                    keyBuilder.Append(groupBySql).Append(" AS ").Append(_provider.Escape("Key"));
+                    selectItems.Add(keyBuilder.ToString());
+                    PooledStringBuilder.Return(keyBuilder);
                     _sql.AppendSelect(ReadOnlySpan<char>.Empty);
                     _sql.AppendJoin(", ", selectItems);
                     return;
@@ -1607,16 +1607,16 @@ namespace nORM.Query
                     var aggregateSql = TranslateGroupAggregateMethod(methodCall, alias);
                     if (aggregateSql != null)
                     {
-                        var builder = PooledStringBuilder.Rent();
+                        var aggregateBuilder = PooledStringBuilder.Rent();
                         // Include the group key for proper grouping
-                        builder.Append(groupBySql).Append(" AS GroupKey");
-                        selectItems.Add(builder.ToString());
-                        PooledStringBuilder.Return(builder);
+                        aggregateBuilder.Append(groupBySql).Append(" AS GroupKey");
+                        selectItems.Add(aggregateBuilder.ToString());
+                        PooledStringBuilder.Return(aggregateBuilder);
 
-                        builder = PooledStringBuilder.Rent();
-                        builder.Append(aggregateSql).Append(" AS ").Append(_provider.Escape("Value"));
-                        selectItems.Add(builder.ToString());
-                        PooledStringBuilder.Return(builder);
+                        aggregateBuilder = PooledStringBuilder.Rent();
+                        aggregateBuilder.Append(aggregateSql).Append(" AS ").Append(_provider.Escape("Value"));
+                        selectItems.Add(aggregateBuilder.ToString());
+                        PooledStringBuilder.Return(aggregateBuilder);
 
                         _sql.AppendSelect(ReadOnlySpan<char>.Empty);
                         _sql.AppendJoin(", ", selectItems);
