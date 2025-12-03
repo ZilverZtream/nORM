@@ -308,6 +308,7 @@ namespace nORM.Query
         /// <typeparam name="T">The type to materialize.</typeparam>
         /// <param name="mapping">Mapping describing the source table schema.</param>
         /// <param name="projection">Optional projection expression selecting specific members.</param>
+        /// <param name="startOffset">Zero-based column offset to start reading from the data reader.</param>
         /// <returns>A delegate that synchronously materializes objects from a data reader without boxing.</returns>
         public Func<DbDataReader, T> CreateSyncMaterializer<T>(
             TableMapping mapping,
@@ -350,6 +351,7 @@ namespace nORM.Query
         /// <param name="mapping">Mapping describing the source table schema.</param>
         /// <param name="targetType">CLR type to materialize.</param>
         /// <param name="projection">Optional projection expression selecting specific members.</param>
+        /// <param name="startOffset">Zero-based column offset to start reading from the data reader.</param>
         /// <returns>A delegate that synchronously materializes objects from a data reader.</returns>
         public Func<DbDataReader, object> CreateSyncMaterializer(
             TableMapping mapping,
@@ -422,6 +424,7 @@ namespace nORM.Query
         /// <param name="mapping">Mapping describing the source table schema.</param>
         /// <param name="targetType">CLR type to materialize.</param>
         /// <param name="projection">Optional projection expression selecting specific members.</param>
+        /// <param name="startOffset">Zero-based column offset to start reading from the data reader.</param>
         /// <returns>A delegate that asynchronously materializes objects from a data reader.</returns>
         public Func<DbDataReader, CancellationToken, Task<object>> CreateMaterializer(
             TableMapping mapping,
@@ -466,6 +469,7 @@ namespace nORM.Query
         /// <param name="mapping">Mapping describing the table layout.</param>
         /// <param name="targetType">Type of object to materialize.</param>
         /// <param name="projection">Optional projection expression.</param>
+        /// <param name="startOffset">Zero-based column offset to start reading from the data reader.</param>
         /// <returns>A delegate that materializes objects taking the reader schema into account.</returns>
         public Func<DbDataReader, CancellationToken, Task<object>> CreateSchemaAwareMaterializer(
             TableMapping mapping,
