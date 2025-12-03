@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using nORM.Core;
+using nORM.Internal;
 using nORM.Providers;
 
 namespace nORM.Query

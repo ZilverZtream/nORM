@@ -320,7 +320,7 @@ namespace nORM.Query
             var cacheKey = new MaterializerCacheKey(
                 mapping.Type.GetHashCode(),
                 targetType.GetHashCode(),
-                projection != null ? ExpressionFingerprint.Compute(projection) : 0,
+                projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
                 mapping.TableName,
                 startOffset);
 
@@ -363,7 +363,7 @@ namespace nORM.Query
             var cacheKey = new MaterializerCacheKey(
                 mapping.Type.GetHashCode(),
                 targetType.GetHashCode(),
-                projection != null ? ExpressionFingerprint.Compute(projection) : 0,
+                projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
                 mapping.TableName,
                 startOffset);
 
@@ -441,7 +441,7 @@ namespace nORM.Query
             var cacheKey = new MaterializerCacheKey(
                 mapping.Type.GetHashCode(),
                 targetType.GetHashCode(),
-                projection != null ? ExpressionFingerprint.Compute(projection) : 0,
+                projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
                 mapping.TableName,
                 startOffset);
 
@@ -485,7 +485,7 @@ namespace nORM.Query
             var cacheKey = new MaterializerCacheKey(
                 mapping.Type.GetHashCode(),
                 targetType.GetHashCode(),
-                projection != null ? ExpressionFingerprint.Compute(projection) : 0,
+                projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
                 mapping.TableName,
                 startOffset);
 

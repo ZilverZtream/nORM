@@ -4,7 +4,9 @@ using System.Linq.Expressions;
 using System.Text;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 using nORM.Core;
+using nORM.Internal;
 using nORM.Mapping;
 
 namespace nORM.Query
