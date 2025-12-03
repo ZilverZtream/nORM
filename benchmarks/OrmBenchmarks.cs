@@ -123,6 +123,7 @@ namespace nORM.Benchmarks
                 ctx.Query<BenchmarkUser>()
                     .Join(ctx.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new { u.Name, o.Amount, o.ProductName })
                     .Where(x => x.Amount > amount)
+                    .Select(x => (object)new { x.Name, x.Amount, x.ProductName })
                     .Take(50));
 
         // ---------- SQLite PRAGMA helpers (applied uniformly once per connection) ----------
