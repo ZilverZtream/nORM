@@ -134,25 +134,18 @@ namespace nORM.Providers
         /// Produces a SQL fragment that accesses a JSON value using PostgreSQL's <c>jsonb_extract_path_text</c>.
         /// </summary>
         /// <param name="columnName">The JSON column being accessed.</param>
-        /// <param name="jsonPath">The JSON path expression (dot-delimited).</param>
+        /// <param name="jsonPath">The JSON path expression (dot-delimited with optional array indices).</param>
         /// <returns>SQL fragment that retrieves the JSON value as text.</returns>
         /// <remarks>
-        /// LIMITATION (TASK 13): This implementation only supports simple dot-notation paths (e.g., "root.child.property").
-        /// It does NOT support:
-        /// - Array accessors (e.g., "items[0]", "data[*]")
-        /// - Complex path expressions with brackets
-        /// - JSONPath filter expressions
-        /// For complex JSON querying, use raw SQL with PostgreSQL's native JSON operators instead.
-        /// Example supported: "user.address.city"
-        /// Example NOT supported: "users[0].address", "items[*].name"
+        /// ENHANCEMENT (TASK 3): Now supports both dot-notation and array accessors.
+        /// Supported patterns:
+        /// - Simple dot-notation: "user.address.city"
+        /// - Array accessors: "items[0]", "items[0].name", "data[1].users[2].id"
+        /// - Mixed: "order.items[0].product.name"
+        /// NOT supported: JSONPath filter expressions like "items[*]", "items[?(@.active)]"
         ///
         /// PERFORMANCE FIX (TASK 20): Use pooled StringBuilder instead of LINQ + string.Join.
-        /// Previous implementation: jsonPath.Split('.').Skip(1).Select(p => $"'{p}'") created:
-        /// - string[] array from Split
-        /// - IEnumerable wrapper from Skip
-        /// - IEnumerable wrapper from Select
-        /// - Multiple string allocations per path segment
-        /// New implementation: Single pooled StringBuilder, manual IndexOf iteration, zero LINQ allocations.
+        /// Manual parsing with zero allocations for path segment extraction.
         /// </remarks>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
         {
@@ -163,26 +156,82 @@ namespace nORM.Providers
                 sb.Append(columnName);
                 sb.Append(", ");
 
-                // Skip first segment (root '$') and build comma-separated quoted path
-                int startIndex = jsonPath.IndexOf('.') + 1;
+                // Skip first segment (root '$') if present
+                int startIndex = jsonPath.StartsWith("$.") ? 2 : (jsonPath.StartsWith("$") ? 1 : 0);
+                if (startIndex > 0 && startIndex < jsonPath.Length && jsonPath[startIndex] == '.')
+                    startIndex++;
+
                 bool isFirst = true;
 
                 while (startIndex < jsonPath.Length)
                 {
-                    int dotIndex = jsonPath.IndexOf('.', startIndex);
-                    int endIndex = dotIndex >= 0 ? dotIndex : jsonPath.Length;
-
                     if (!isFirst)
                     {
                         sb.Append(", ");
                     }
                     isFirst = false;
 
-                    sb.Append('\'');
-                    sb.Append(jsonPath, startIndex, endIndex - startIndex);
-                    sb.Append('\'');
+                    // Find next delimiter: either '.' or '['
+                    int dotIndex = jsonPath.IndexOf('.', startIndex);
+                    int bracketIndex = jsonPath.IndexOf('[', startIndex);
 
-                    startIndex = endIndex + 1;
+                    int nextDelimiter;
+                    if (dotIndex == -1 && bracketIndex == -1)
+                    {
+                        // No more delimiters, consume rest of string
+                        nextDelimiter = jsonPath.Length;
+                    }
+                    else if (dotIndex == -1)
+                    {
+                        nextDelimiter = bracketIndex;
+                    }
+                    else if (bracketIndex == -1)
+                    {
+                        nextDelimiter = dotIndex;
+                    }
+                    else
+                    {
+                        nextDelimiter = Math.Min(dotIndex, bracketIndex);
+                    }
+
+                    // Extract property name before delimiter
+                    if (nextDelimiter > startIndex)
+                    {
+                        sb.Append('\'');
+                        sb.Append(jsonPath, startIndex, nextDelimiter - startIndex);
+                        sb.Append('\'');
+
+                        startIndex = nextDelimiter;
+                    }
+
+                    // Handle array index if present
+                    if (startIndex < jsonPath.Length && jsonPath[startIndex] == '[')
+                    {
+                        int closeBracketIndex = jsonPath.IndexOf(']', startIndex);
+                        if (closeBracketIndex == -1)
+                        {
+                            throw new ArgumentException($"Invalid JSON path: unclosed bracket at position {startIndex}", nameof(jsonPath));
+                        }
+
+                        // Extract array index (between '[' and ']')
+                        int indexStart = startIndex + 1;
+                        int indexLength = closeBracketIndex - indexStart;
+
+                        if (indexLength > 0)
+                        {
+                            sb.Append(", '");
+                            sb.Append(jsonPath, indexStart, indexLength);
+                            sb.Append('\'');
+                        }
+
+                        startIndex = closeBracketIndex + 1;
+                    }
+
+                    // Skip dot delimiter
+                    if (startIndex < jsonPath.Length && jsonPath[startIndex] == '.')
+                    {
+                        startIndex++;
+                    }
                 }
 
                 sb.Append(')');

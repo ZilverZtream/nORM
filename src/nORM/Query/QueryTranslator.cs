@@ -937,17 +937,30 @@ namespace nORM.Query
                 : null;
 
             // Check for filtered navigation property: b => b.Posts.Where(p => p.Active)
+            // Also check for DefaultIfEmpty for LEFT JOIN: b => b.Posts.DefaultIfEmpty()
             TableMapping.Relation? relation = null;
             LambdaExpression? filterPredicate = null;
             MemberExpression? navigationMember = null;
+            bool useLeftJoin = false;
 
-            if (collectionSelector.Body is MemberExpression memberExpr &&
+            // Check for DefaultIfEmpty wrapper
+            Expression collectionBody = collectionSelector.Body;
+            if (collectionBody is MethodCallExpression defaultIfEmptyCall &&
+                defaultIfEmptyCall.Method.Name == "DefaultIfEmpty" &&
+                defaultIfEmptyCall.Arguments.Count >= 1)
+            {
+                // Unwrap DefaultIfEmpty to get the actual collection
+                collectionBody = defaultIfEmptyCall.Arguments[0];
+                useLeftJoin = true;
+            }
+
+            if (collectionBody is MemberExpression memberExpr &&
                 outerMapping.Relations.TryGetValue(memberExpr.Member.Name, out relation))
             {
                 // Simple navigation property without filter
                 navigationMember = memberExpr;
             }
-            else if (collectionSelector.Body is MethodCallExpression methodCall &&
+            else if (collectionBody is MethodCallExpression methodCall &&
                      methodCall.Method.Name == "Where" &&
                      methodCall.Arguments.Count == 2 &&
                      methodCall.Arguments[0] is MemberExpression navMember &&
@@ -1007,7 +1020,8 @@ namespace nORM.Query
                     joinSql.Append(' ');
                 }
                 joinSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
-                joinSql.Append($"INNER JOIN {innerMapping.EscTable} {innerAlias} ");
+                var joinType = useLeftJoin ? "LEFT JOIN" : "INNER JOIN";
+                joinSql.Append($"{joinType} {innerMapping.EscTable} {innerAlias} ");
                 joinSql.Append($"ON {outerAlias}.{relation.PrincipalKey.EscCol} = {innerAlias}.{relation.ForeignKey.EscCol}");
                 _sql.Clear();
                 _sql.Append(joinSql.ToSqlString());
@@ -1090,7 +1104,15 @@ namespace nORM.Query
                 crossSql.Append(' ');
             }
             crossSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
-            crossSql.Append($"CROSS JOIN {crossMapping.EscTable} {crossAlias}");
+            if (useLeftJoin)
+            {
+                // For DefaultIfEmpty with CROSS JOIN, use LEFT JOIN with trivial condition
+                crossSql.Append($"LEFT JOIN {crossMapping.EscTable} {crossAlias} ON 1=1");
+            }
+            else
+            {
+                crossSql.Append($"CROSS JOIN {crossMapping.EscTable} {crossAlias}");
+            }
             _sql.Clear();
             _sql.Append(crossSql.ToSqlString());
             if (resultSelector != null)
@@ -1563,10 +1585,45 @@ namespace nORM.Query
             var selectItems = _selectItemsPool.Get();
             try
             {
-                var builder = PooledStringBuilder.Rent();
-                builder.Append(groupBySql).Append(" AS GroupKey");
-                selectItems.Add(builder.ToString());
-                PooledStringBuilder.Return(builder);
+                // Handle direct Key access: g => g.Key
+                if (resultSelector.Body is MemberExpression memberExpr && memberExpr.Member.Name == "Key")
+                {
+                    var builder = PooledStringBuilder.Rent();
+                    builder.Append(groupBySql).Append(" AS ").Append(_provider.Escape("Key"));
+                    selectItems.Add(builder.ToString());
+                    PooledStringBuilder.Return(builder);
+                    _sql.AppendSelect(ReadOnlySpan<char>.Empty);
+                    _sql.AppendJoin(", ", selectItems);
+                    return;
+                }
+
+                // Handle direct aggregate: g => g.Count()
+                if (resultSelector.Body is MethodCallExpression methodCall)
+                {
+                    var aggregateSql = TranslateGroupAggregateMethod(methodCall, alias);
+                    if (aggregateSql != null)
+                    {
+                        var builder = PooledStringBuilder.Rent();
+                        // Include the group key for proper grouping
+                        builder.Append(groupBySql).Append(" AS GroupKey");
+                        selectItems.Add(builder.ToString());
+                        PooledStringBuilder.Return(builder);
+
+                        builder = PooledStringBuilder.Rent();
+                        builder.Append(aggregateSql).Append(" AS ").Append(_provider.Escape("Value"));
+                        selectItems.Add(builder.ToString());
+                        PooledStringBuilder.Return(builder);
+
+                        _sql.AppendSelect(ReadOnlySpan<char>.Empty);
+                        _sql.AppendJoin(", ", selectItems);
+                        return;
+                    }
+                }
+
+                var builderForKey = PooledStringBuilder.Rent();
+                builderForKey.Append(groupBySql).Append(" AS GroupKey");
+                selectItems.Add(builderForKey.ToString());
+                PooledStringBuilder.Return(builderForKey);
                 // Analyze the result selector body to find aggregates
                 if (resultSelector.Body is NewExpression newExpr)
                 {

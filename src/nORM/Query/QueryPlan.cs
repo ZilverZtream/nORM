@@ -30,7 +30,8 @@ namespace nORM.Query
         TimeSpan? CacheExpiration,
         ExpressionFingerprint Fingerprint = default,
         int? Take = null,
-        List<DependentQueryDefinition>? DependentQueries = null
+        List<DependentQueryDefinition>? DependentQueries = null,
+        Func<object, object>? ClientProjection = null
     );
 
     internal sealed record IncludePlan(List<TableMapping.Relation> Path);
