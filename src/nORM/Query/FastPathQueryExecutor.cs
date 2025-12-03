@@ -234,11 +234,11 @@ namespace nORM.Query
             }
             var results = new List<T>();
             // PERFORMANCE FIX (TASK 12): Use generic materializer to avoid boxing
-            var materializer = new MaterializerFactory().CreateMaterializer<T>(map);
+            var materializer = new MaterializerFactory().CreateSyncMaterializer<T>(map);
             await using var reader = await cmd.ExecuteReaderAsync(System.Threading.CancellationToken.None).ConfigureAwait(false);
             while (await reader.ReadAsync(default).ConfigureAwait(false))
             {
-                results.Add(await materializer(reader, default).ConfigureAwait(false));
+                results.Add(materializer(reader));
             }
             return results;
         }
@@ -265,11 +265,11 @@ namespace nORM.Query
             cmd.CommandText = sql;
             var results = new List<T>();
             // PERFORMANCE FIX (TASK 12): Use generic materializer to avoid boxing
-            var materializer = new MaterializerFactory().CreateMaterializer<T>(map);
+            var materializer = new MaterializerFactory().CreateSyncMaterializer<T>(map);
             await using var reader = await cmd.ExecuteReaderAsync(System.Threading.CancellationToken.None).ConfigureAwait(false);
             while (await reader.ReadAsync(default).ConfigureAwait(false))
             {
-                results.Add(await materializer(reader, default).ConfigureAwait(false));
+                results.Add(materializer(reader));
             }
             return results;
         }
