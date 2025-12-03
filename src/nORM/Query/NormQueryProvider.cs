@@ -92,19 +92,42 @@ namespace nORM.Query
             var defaultConstructor = elementType.GetConstructor(Type.EmptyTypes);
             return defaultConstructor != null && defaultConstructor.IsPublic;
         }
+        /// <summary>
+        /// PERFORMANCE OPTIMIZATION: Enhanced cache lock cleanup.
+        /// - Limits cleanup to prevent unbounded growth
+        /// - Disposes unused semaphores to release resources
+        /// - Processes locks in batches to reduce iteration overhead
+        /// </summary>
         private static void CleanupCacheLocks(object? state)
         {
-            var keysToRemove = new List<string>();
+            const int MaxLocksToKeep = 1000;
+            const int CleanupBatchSize = 100;
+
+            if (_cacheLocks.Count <= MaxLocksToKeep)
+                return;
+
+            var locksToRemove = new List<(string Key, SemaphoreSlim Semaphore)>(CleanupBatchSize);
+
             foreach (var kvp in _cacheLocks)
             {
+                // Only remove locks that are not currently in use
                 if (kvp.Value.CurrentCount == 1)
                 {
-                    keysToRemove.Add(kvp.Key);
+                    locksToRemove.Add((kvp.Key, kvp.Value));
+
+                    // Process in batches to avoid holding iterator too long
+                    if (locksToRemove.Count >= CleanupBatchSize)
+                        break;
                 }
             }
-            foreach (var key in keysToRemove)
+
+            // Remove and dispose in separate pass to avoid concurrent modification
+            foreach (var (key, semaphore) in locksToRemove)
             {
-                _cacheLocks.TryRemove(key, out _);
+                if (_cacheLocks.TryRemove(key, out _))
+                {
+                    semaphore.Dispose();
+                }
             }
         }
         private static int CalculateInitialPlanCacheSize()

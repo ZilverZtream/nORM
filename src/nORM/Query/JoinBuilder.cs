@@ -151,46 +151,114 @@ namespace nORM.Query
         ///
         /// When this returns empty, caller selects ALL columns from both tables (inefficient).
         /// </remarks>
+        /// <summary>
+        /// PERFORMANCE OPTIMIZATION: Enhanced column extraction with recursive analysis.
+        /// Now handles nested member access, method calls on properties, and transparent identifiers.
+        /// Falls back to all columns only when truly necessary.
+        /// </summary>
+        /// <summary>
+        /// PERFORMANCE: Pre-size collections based on argument count to reduce reallocations.
+        /// </summary>
         public static List<string> ExtractNeededColumns(NewExpression newExpr, TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias)
         {
-            var neededColumns = new List<string>();
+            // PERFORMANCE: Pre-size to reduce allocations (most projections have 2-10 columns)
+            var estimatedSize = Math.Min(newExpr.Arguments.Count * 2, 20);
+            var neededColumns = new List<string>(estimatedSize);
+            var processedColumns = new HashSet<string>(estimatedSize, StringComparer.Ordinal);
 
             foreach (var arg in newExpr.Arguments)
             {
-                // LIMITATION (TASK 13): Only handles MemberExpression with ParameterExpression
-                // Fails for: method calls, binary ops, nested anonymous types, etc.
-                if (arg is MemberExpression memberExpr && memberExpr.Expression is ParameterExpression paramExpr)
-                {
-                    var isOuterTable = paramExpr.Type == outerMapping.Type;
-                    var mapping = isOuterTable ? outerMapping : innerMapping;
-                    var alias = isOuterTable ? outerAlias : innerAlias;
+                ExtractColumnsFromExpression(arg, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
+            }
 
-                    // LIMITATION (TASK 13): String-based name lookup, case-sensitive, no normalization
-                    if (mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
+            return neededColumns;
+        }
+
+        private static void ExtractColumnsFromExpression(
+            Expression expr,
+            TableMapping outerMapping,
+            TableMapping innerMapping,
+            string outerAlias,
+            string innerAlias,
+            List<string> neededColumns,
+            HashSet<string> processedColumns)
+        {
+            switch (expr)
+            {
+                case MemberExpression memberExpr:
+                    // Handle simple property access: x.Name
+                    if (memberExpr.Expression is ParameterExpression paramExpr)
                     {
-                        var colSql = $"{alias}.{column.EscCol}";
-                        if (!neededColumns.Contains(colSql))
-                            neededColumns.Add(colSql);
+                        var isOuterTable = paramExpr.Type == outerMapping.Type;
+                        var mapping = isOuterTable ? outerMapping : innerMapping;
+                        var alias = isOuterTable ? outerAlias : innerAlias;
+
+                        if (mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
+                        {
+                            var colSql = $"{alias}.{column.EscCol}";
+                            if (processedColumns.Add(colSql))
+                                neededColumns.Add(colSql);
+                        }
                     }
-                }
-                else if (arg is ParameterExpression param)
-                {
-                    // Only handles full entity projection (e.g., x => x)
+                    // PERFORMANCE: Handle nested member access: transparentId.x.Name
+                    else if (memberExpr.Expression is MemberExpression nestedMember)
+                    {
+                        ExtractColumnsFromExpression(nestedMember, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
+                    }
+                    break;
+
+                case ParameterExpression param:
+                    // Full entity projection: x => x
                     var isOuter = param.Type == outerMapping.Type;
                     var mapping = isOuter ? outerMapping : innerMapping;
                     var alias = isOuter ? outerAlias : innerAlias;
                     foreach (var col in mapping.Columns)
                     {
                         var colSql = $"{alias}.{col.EscCol}";
-                        if (!neededColumns.Contains(colSql))
+                        if (processedColumns.Add(colSql))
                             neededColumns.Add(colSql);
                     }
-                }
-                // LIMITATION (TASK 13): All other expression types are silently ignored
-                // Causes empty return, triggering "select all columns" fallback
-            }
+                    break;
 
-            return neededColumns;
+                case MethodCallExpression methodCall:
+                    // PERFORMANCE: Handle method calls on properties: x.Name.ToUpper()
+                    // Extract the underlying property, method will be applied client-side
+                    if (methodCall.Object != null)
+                    {
+                        ExtractColumnsFromExpression(methodCall.Object, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
+                    }
+                    // Also check method arguments for property references
+                    foreach (var arg in methodCall.Arguments)
+                    {
+                        if (arg is MemberExpression || arg is ParameterExpression)
+                        {
+                            ExtractColumnsFromExpression(arg, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
+                        }
+                    }
+                    break;
+
+                case BinaryExpression binary:
+                    // PERFORMANCE: Handle binary operations: x.Price * x.Quantity
+                    // Extract columns from both sides
+                    ExtractColumnsFromExpression(binary.Left, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
+                    ExtractColumnsFromExpression(binary.Right, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
+                    break;
+
+                case UnaryExpression unary:
+                    // Handle conversions and casts
+                    ExtractColumnsFromExpression(unary.Operand, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
+                    break;
+
+                case NewExpression nested:
+                    // PERFORMANCE: Handle nested anonymous types
+                    foreach (var arg in nested.Arguments)
+                    {
+                        ExtractColumnsFromExpression(arg, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
+                    }
+                    break;
+
+                // For other expression types (constants, etc.), we don't need to extract columns
+            }
         }
 
 
