@@ -104,6 +104,21 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Appends a <c>GROUP BY</c> clause with the supplied columns.
+        /// </summary>
+        /// <param name="columns">The column list for the <c>GROUP BY</c> clause.</param>
+        /// <returns>The current builder instance.</returns>
+        public OptimizedSqlBuilder AppendGroupBy(ReadOnlySpan<char> columns)
+        {
+            if (!columns.IsEmpty)
+            {
+                Append(" GROUP BY ");
+                Append(columns);
+            }
+            return this;
+        }
+
+        /// <summary>
         /// Appends a SQL aggregate function invocation such as <c>COUNT(column)</c>.
         /// </summary>
         /// <param name="function">Name of the aggregate function.</param>
