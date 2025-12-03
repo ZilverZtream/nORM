@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO.Hashing;
 using System.Linq.Expressions;
 using System.Text;
+using Microsoft.Extensions.ObjectPool;
 
 namespace nORM.Query
 {
@@ -11,6 +12,9 @@ namespace nORM.Query
     {
         private readonly ulong _low;
         private readonly ulong _high;
+
+        private static readonly ObjectPool<FingerprintVisitor> _visitorPool =
+            new DefaultObjectPool<FingerprintVisitor>(new FingerprintVisitorPooledObjectPolicy(), Environment.ProcessorCount * 2);
 
         private ExpressionFingerprint(ulong low, ulong high)
         {
@@ -20,13 +24,20 @@ namespace nORM.Query
 
         public static ExpressionFingerprint Compute(Expression expression)
         {
-            var visitor = new FingerprintVisitor();
-            visitor.Visit(expression);
-            Span<byte> hash = stackalloc byte[16];
-            visitor.GetCurrentHash(hash);
-            var low = BinaryPrimitives.ReadUInt64LittleEndian(hash[..8]);
-            var high = BinaryPrimitives.ReadUInt64LittleEndian(hash[8..]);
-            return new ExpressionFingerprint(low, high);
+            var visitor = _visitorPool.Get();
+            try
+            {
+                visitor.Visit(expression);
+                Span<byte> hash = stackalloc byte[16];
+                visitor.GetCurrentHash(hash);
+                var low = BinaryPrimitives.ReadUInt64LittleEndian(hash[..8]);
+                var high = BinaryPrimitives.ReadUInt64LittleEndian(hash[8..]);
+                return new ExpressionFingerprint(low, high);
+            }
+            finally
+            {
+                _visitorPool.Return(visitor);
+            }
         }
 
         public ExpressionFingerprint Extend(int value)
@@ -51,6 +62,12 @@ namespace nORM.Query
             private readonly Dictionary<ParameterExpression, int> _parameters = new();
 
             public void GetCurrentHash(Span<byte> destination) => _hasher.GetCurrentHash(destination);
+
+            public void Reset()
+            {
+                _hasher.Reset();
+                _parameters.Clear();
+            }
 
             public override Expression? Visit(Expression? node)
             {
@@ -159,6 +176,17 @@ namespace nORM.Query
                         offset += chunkSize;
                     }
                 }
+            }
+        }
+
+        private sealed class FingerprintVisitorPooledObjectPolicy : PooledObjectPolicy<FingerprintVisitor>
+        {
+            public override FingerprintVisitor Create() => new();
+
+            public override bool Return(FingerprintVisitor obj)
+            {
+                obj.Reset();
+                return true;
             }
         }
     }
