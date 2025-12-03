@@ -15,7 +15,7 @@ namespace nORM.Query
 {
     internal static class FastPathQueryExecutor
     {
-        private static readonly ConcurrentDictionary<int, string> _sqlTemplateCache = new();
+        private static readonly ConcurrentDictionary<Type, string> _sqlTemplateCache = new();
         private readonly record struct WhereInfo(string Property, object Value);
 
         /// <summary>
@@ -175,15 +175,13 @@ namespace nORM.Query
         }
         private static string GetSqlTemplate<T>(DbContext ctx) where T : class
         {
-            var key = typeof(T).GetHashCode();
-            if (!_sqlTemplateCache.TryGetValue(key, out var template))
+            var type = typeof(T);
+            return _sqlTemplateCache.GetOrAdd(type, static (t, context) =>
             {
-                var map = ctx.GetMapping(typeof(T));
+                var map = context.GetMapping(t);
                 var cols = string.Join(", ", map.Columns.Select(c => c.EscCol));
-                template = $"SELECT {cols} FROM {map.EscTable}";
-                _sqlTemplateCache[key] = template;
-            }
-            return template;
+                return $"SELECT {cols} FROM {map.EscTable}";
+            }, ctx);
         }
         private static string ApplyLimit(string sql, int limit, DatabaseProvider provider)
         {
