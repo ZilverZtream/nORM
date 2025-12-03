@@ -125,15 +125,40 @@ namespace nORM.Query
                 _hasher.Append(data);
             }
 
+            // PERFORMANCE OPTIMIZATION 10: Optimized string hashing with reduced allocations
             private void AppendString(string value)
             {
                 Span<byte> length = stackalloc byte[4];
                 BinaryPrimitives.WriteInt32LittleEndian(length, value.Length);
                 _hasher.Append(length);
+
                 if (value.Length == 0) return;
-                Span<byte> buffer = stackalloc byte[Math.Min(value.Length * sizeof(char), 256)];
-                var written = System.Text.Encoding.UTF8.GetBytes(value, buffer);
-                _hasher.Append(buffer[..written]);
+
+                // PERFORMANCE OPTIMIZATION 11: Use larger stack buffer to reduce encoding calls
+                // Most type names fit in 512 bytes, avoiding heap allocation
+                const int MaxStackBufferSize = 512;
+                int maxByteCount = value.Length * 3; // UTF-8 worst case is 3 bytes per char for BMP
+
+                if (maxByteCount <= MaxStackBufferSize)
+                {
+                    // Fast path: fits on stack
+                    Span<byte> buffer = stackalloc byte[MaxStackBufferSize];
+                    int written = System.Text.Encoding.UTF8.GetBytes(value, buffer);
+                    _hasher.Append(buffer[..written]);
+                }
+                else
+                {
+                    // Slow path: encode in chunks
+                    Span<byte> buffer = stackalloc byte[MaxStackBufferSize];
+                    int offset = 0;
+                    while (offset < value.Length)
+                    {
+                        int chunkSize = Math.Min(MaxStackBufferSize / 3, value.Length - offset);
+                        int written = System.Text.Encoding.UTF8.GetBytes(value.AsSpan(offset, chunkSize), buffer);
+                        _hasher.Append(buffer[..written]);
+                        offset += chunkSize;
+                    }
+                }
             }
         }
     }

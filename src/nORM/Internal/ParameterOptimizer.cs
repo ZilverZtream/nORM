@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
+using System.Runtime.CompilerServices;
 
 #nullable enable
 
@@ -67,6 +68,8 @@ namespace nORM.Internal
         /// <param name="name">The parameter name including prefix (e.g. <c>@Id</c>).</param>
         /// <param name="value">The value to bind to the parameter.</param>
         /// <param name="knownType">Optional type hint used when <paramref name="value"/> is <c>null</c>.</param>
+        // PERFORMANCE OPTIMIZATION 21: Aggressive optimization for parameter creation hot path
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public static void AddOptimizedParam(this DbCommand cmd, string name, object? value, Type? knownType = null)
         {
             var param = cmd.CreateParameter();
@@ -75,23 +78,52 @@ namespace nORM.Internal
             if (value == null)
             {
                 param.Value = DBNull.Value;
-                param.DbType = knownType != null && _typeMap.TryGetValue(knownType, out var dbType)
-                    ? dbType
-                    : DbType.Object;
+                // PERFORMANCE OPTIMIZATION 22: Fast path for null parameters with known types
+                if (knownType != null && _typeMap.TryGetValue(knownType, out var dbType))
+                {
+                    param.DbType = dbType;
+                }
+                else
+                {
+                    param.DbType = DbType.Object;
+                }
             }
             else
             {
                 param.Value = value;
                 var valueType = value.GetType();
 
-                if (_typeMap.TryGetValue(valueType, out var mappedType))
+                // PERFORMANCE OPTIMIZATION 23: Avoid TryGetValue overhead for most common types
+                // Check common types directly first
+                if (valueType == typeof(int))
+                {
+                    param.DbType = DbType.Int32;
+                }
+                else if (valueType == typeof(string))
+                {
+                    param.DbType = DbType.String;
+                    var str = (string)value;
+                    param.Size = str.Length <= 4000 ? str.Length : -1;
+                }
+                else if (valueType == typeof(long))
+                {
+                    param.DbType = DbType.Int64;
+                }
+                else if (valueType == typeof(bool))
+                {
+                    param.DbType = DbType.Boolean;
+                }
+                else if (valueType == typeof(decimal))
+                {
+                    param.DbType = DbType.Decimal;
+                }
+                else if (valueType == typeof(DateTime))
+                {
+                    param.DbType = DbType.DateTime2;
+                }
+                else if (_typeMap.TryGetValue(valueType, out var mappedType))
                 {
                     param.DbType = mappedType;
-
-                    if (mappedType == DbType.String && value is string str)
-                    {
-                        param.Size = str.Length <= 4000 ? str.Length : -1;
-                    }
                 }
             }
 
