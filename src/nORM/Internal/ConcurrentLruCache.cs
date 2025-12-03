@@ -175,38 +175,26 @@ namespace nORM.Internal
                     _lruList.AddFirst(newNode);
                 }
 
-                // PERFORMANCE FIX (TASK 3): Use random sampling instead of O(N) scan
-                // For caches with 10,000+ entries, scanning is prohibitively expensive
-                // Random sampling (CLOCK-Pro inspired) provides approximate LRU with O(1) complexity
+                // PERFORMANCE FIX (TASK 3): Sample only the tail portion to choose an eviction candidate
+                // Inspecting a small, fixed window keeps eviction O(1) and avoids deep traversal under lock
                 if (_lruList.Count > _maxSize)
                 {
-                    const int sampleSize = 5;
+                    const int sampleWindow = 20;
                     LinkedListNode<CacheItem>? oldestNode = null;
                     long oldestTicks = long.MaxValue;
 
-                    // Random sample approach: pick sampleSize random nodes, evict the oldest among them
-                    // This gives approximate LRU behavior with O(sampleSize) complexity instead of O(N)
-                    var node = _lruList.First;
-                    var listCount = _lruList.Count;
-                    var samplesCollected = 0;
-
-                    // Use simple linear sampling (every N-th element) to approximate random sampling
-                    // This avoids random number generation overhead while still providing good distribution
-                    var step = Math.Max(1, listCount / sampleSize);
-
-                    for (int i = 0; i < listCount && samplesCollected < sampleSize && node != null; i++)
+                    // Walk a limited number of nodes starting from the tail (LRU end)
+                    var node = _lruList.Last;
+                    for (int i = 0; i < sampleWindow && node != null; i++)
                     {
-                        if (i % step == 0)
+                        var ticks = Interlocked.Read(ref node.Value.LastAccessedTicks);
+                        if (ticks < oldestTicks)
                         {
-                            var ticks = Interlocked.Read(ref node.Value.LastAccessedTicks);
-                            if (ticks < oldestTicks)
-                            {
-                                oldestTicks = ticks;
-                                oldestNode = node;
-                            }
-                            samplesCollected++;
+                            oldestTicks = ticks;
+                            oldestNode = node;
                         }
-                        node = node.Next;
+
+                        node = node.Previous;
                     }
 
                     // Fallback: if sampling didn't find anything, evict the last node (tail of list)
