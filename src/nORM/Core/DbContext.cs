@@ -225,6 +225,9 @@ namespace nORM.Core
             // This provides more accurate timeout predictions by analyzing query structure
             // rather than just SQL length. The adaptive timeout manager uses this to learn
             // which types of queries typically require longer execution times.
+            //
+            // PERFORMANCE FIX: Use case-insensitive comparisons instead of ToUpperInvariant()
+            // to avoid allocating a new string on every database operation.
             int baseComplexity = 1;
 
             if (!string.IsNullOrEmpty(sql))
@@ -233,34 +236,34 @@ namespace nORM.Core
                 baseComplexity = 1 + (sql.Length / 100);
 
                 // Enhanced complexity signals with improved weighting
-                var upperSql = sql.ToUpperInvariant();
+                // OPTIMIZATION: Use StringComparison.OrdinalIgnoreCase to avoid allocating upperSql
 
                 // High-cost operations (significant complexity increase)
-                int joinCount = CountOccurrences(upperSql, "JOIN");
+                int joinCount = CountOccurrences(sql, "JOIN", StringComparison.OrdinalIgnoreCase);
                 if (joinCount > 0) baseComplexity += 2 * joinCount; // Multiple joins are expensive
 
-                if (upperSql.Contains("UNION")) baseComplexity += 3; // Set operations are costly
-                if (upperSql.Contains("INTERSECT")) baseComplexity += 3;
-                if (upperSql.Contains("EXCEPT")) baseComplexity += 3;
+                if (sql.Contains("UNION", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3; // Set operations are costly
+                if (sql.Contains("INTERSECT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3;
+                if (sql.Contains("EXCEPT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3;
 
                 // Medium-cost operations
-                if (upperSql.Contains("GROUP BY")) baseComplexity += 2;
-                if (upperSql.Contains("HAVING")) baseComplexity += 1;
-                if (upperSql.Contains("ORDER BY")) baseComplexity += 2;
+                if (sql.Contains("GROUP BY", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
+                if (sql.Contains("HAVING", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
+                if (sql.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
 
                 // Subqueries add significant complexity
-                int subqueryCount = CountOccurrences(upperSql, "SELECT") - 1; // Subtract main SELECT
+                int subqueryCount = CountOccurrences(sql, "SELECT", StringComparison.OrdinalIgnoreCase) - 1; // Subtract main SELECT
                 if (subqueryCount > 0) baseComplexity += 2 * subqueryCount;
 
                 // Other complexity indicators
-                if (upperSql.Contains("DISTINCT")) baseComplexity += 1;
-                if (upperSql.Contains("CROSS JOIN")) baseComplexity += 3; // Cartesian products are very expensive
-                if (upperSql.Contains("LEFT JOIN") || upperSql.Contains("RIGHT JOIN")) baseComplexity += 1;
-                if (upperSql.Contains("OUTER JOIN")) baseComplexity += 1;
+                if (sql.Contains("DISTINCT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
+                if (sql.Contains("CROSS JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3; // Cartesian products are very expensive
+                if (sql.Contains("LEFT JOIN", StringComparison.OrdinalIgnoreCase) || sql.Contains("RIGHT JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
+                if (sql.Contains("OUTER JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
 
                 // Window functions and CTEs
-                if (upperSql.Contains("OVER(") || upperSql.Contains("OVER (")) baseComplexity += 2;
-                if (upperSql.Contains("WITH") && upperSql.Contains("AS(")) baseComplexity += 2; // CTE
+                if (sql.Contains("OVER(", StringComparison.OrdinalIgnoreCase) || sql.Contains("OVER (", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
+                if (sql.Contains("WITH", StringComparison.OrdinalIgnoreCase) && sql.Contains("AS(", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2; // CTE
 
                 // Cap complexity to avoid extreme timeouts
                 baseComplexity = Math.Min(baseComplexity, 50);
@@ -270,16 +273,16 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Counts the number of occurrences of a substring in a string (case-sensitive).
+        /// Counts the number of occurrences of a substring in a string.
         /// </summary>
-        private static int CountOccurrences(string text, string pattern)
+        private static int CountOccurrences(string text, string pattern, StringComparison comparison = StringComparison.Ordinal)
         {
             if (string.IsNullOrEmpty(pattern)) return 0;
 
             int count = 0;
             int index = 0;
 
-            while ((index = text.IndexOf(pattern, index, StringComparison.Ordinal)) != -1)
+            while ((index = text.IndexOf(pattern, index, comparison)) != -1)
             {
                 count++;
                 index += pattern.Length;
