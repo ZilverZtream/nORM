@@ -35,6 +35,7 @@ namespace nORM.Query
         private readonly Dictionary<ConstKey, string> _constParamMap = new();
         private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
         private static readonly Expression _emptyExpression = Expression.Empty();
+        private readonly Dictionary<ParameterExpression, string> _groupingKeys = new();
         // REFACTOR (TASK 16): Consolidated string method translation. Removed redundant _translators dictionary.
         // All string methods (Contains, StartsWith, EndsWith) are now handled via _fastMethodHandlers for better performance.
         private static readonly Dictionary<MethodInfo, Action<ExpressionToSqlVisitor, MethodCallExpression>> _fastMethodHandlers =
@@ -86,6 +87,7 @@ namespace nORM.Query
             _paramIndex = 0;
             _suppressNullCheck = false;
             _memberParamMap.Clear();
+            _groupingKeys.Clear();
         }
         /// <summary>
         /// Resets the internal state so that the visitor can be returned to an object pool and
@@ -109,6 +111,7 @@ namespace nORM.Query
             _suppressNullCheck = false;
             _constParamMap.Clear();
             _memberParamMap.Clear();
+            _groupingKeys.Clear();
         }
         /// <summary>
         /// Releases resources by resetting the visitor's state. The instance can be reused after
@@ -155,6 +158,11 @@ namespace nORM.Query
         {
             if (node.Expression is ParameterExpression pe && _parameterMappings.TryGetValue(pe, out var info))
             {
+                if (_groupingKeys.TryGetValue(pe, out var groupKey) && node.Member.Name == "Key")
+                {
+                    _sql.Append(groupKey);
+                    return node;
+                }
                 if (info.Mapping.ColumnsByName.TryGetValue(node.Member.Name, out var column))
                 {
                     // Table aliases are generated internally and escaped when created,
@@ -277,6 +285,9 @@ namespace nORM.Query
             {
                 switch (node.Method.Name)
                 {
+                    case nameof(Queryable.GroupBy):
+                        HandleGroupByMethod(node);
+                        return node;
                     case "Count":
                     case "LongCount":
                         if (node.Arguments.Count >= 1 && node.Arguments[0] is ParameterExpression cp && _parameterMappings.ContainsKey(cp))
@@ -730,6 +741,39 @@ namespace nORM.Query
         public void UseSharedParameterDictionary(Dictionary<string, object> shared)
         {
             _paramSink = shared ?? _params;
+        }
+
+        public void RegisterGroupingKey(ParameterExpression parameter, string keySql)
+        {
+            _groupingKeys[parameter] = keySql;
+        }
+
+        private void HandleGroupByMethod(MethodCallExpression node)
+        {
+            var keySelector = StripQuotes(node.Arguments[1]) as LambdaExpression
+                ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "GroupBy key selector must be a lambda expression"));
+
+            var keySql = GetSql(keySelector.Body);
+
+            // Register grouping scope for downstream accesses to g.Key
+            if (node.Arguments.Count > 2 && StripQuotes(node.Arguments[2]) is LambdaExpression resultSelector)
+            {
+                if (resultSelector.Parameters.Count > 1)
+                {
+                    RegisterGroupingKey(resultSelector.Parameters[1], keySql);
+                    Visit(resultSelector.Body);
+                }
+                else
+                {
+                    Visit(resultSelector.Body);
+                }
+            }
+            else
+            {
+                _sql.Append(keySql);
+            }
+
+            _sql.AppendGroupBy(keySql);
         }
 
 
