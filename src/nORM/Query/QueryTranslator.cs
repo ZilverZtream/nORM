@@ -89,6 +89,7 @@ namespace nORM.Query
         private bool _noTracking;
         private bool _splitQuery;
         private HashSet<string> _tables = new();
+        private readonly Stack<TranslationContextSnapshot> _contextStack = new();
         private TimeSpan _estimatedTimeout;
         private bool _isCacheable;
         private TimeSpan? _cacheExpiration;
@@ -190,6 +191,7 @@ namespace nORM.Query
                 _splitQuery = false;
                 _tables = new HashSet<string>();
                 _clauses = new SqlBuilder();
+                _contextStack.Clear();
                 _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
                 _isCacheable = false;
                 _cacheExpiration = null;
@@ -217,6 +219,7 @@ namespace nORM.Query
                 _groupJoinInfo = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
+                _contextStack.Clear();
                 _singleResult = false;
                 _noTracking = false;
                 _splitQuery = false;
@@ -581,26 +584,17 @@ namespace nORM.Query
             return $"{wf.FunctionName}() OVER ({overClause})";
         }
         /// <summary>
-        /// Translates a sub-expression by creating a new QueryTranslator instance.
+        /// Translates a sub-expression using a nested translation context.
         /// </summary>
         /// <remarks>
-        /// PERFORMANCE ISSUE (TASK 7): This method creates a new QueryTranslator instance for every
-        /// subquery, leading to O(depth) allocations. Called by:
-        /// - Union/Intersect/Except operations
-        /// - Nested subqueries in WHERE clauses
-        /// - Complex projection expressions
-        ///
-        /// For a query with 10 nested UNIONs, this creates 10+ QueryTranslator instances (~2KB each).
-        /// Recommended refactoring: Use context stack pattern instead of recursive instantiation.
+        /// Uses a stack-based context swap instead of allocating a new <see cref="QueryTranslator"/>,
+        /// reducing allocations for nested subqueries such as unions or correlated WHERE clauses.
         /// </remarks>
         private string TranslateSubExpression(Expression e)
         {
             if (_recursionDepth >= MaxRecursionDepth)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum translation depth of {MaxRecursionDepth}"));
-            // PERFORMANCE ISSUE (TASK 7): Allocates new translator instead of reusing with context stack
-            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
-            var subPlan = subTranslator.Translate(e);
-            _parameterManager.Index = subTranslator.ParameterIndex;
+            var subPlan = TranslateInSubContext(e, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out _);
             return subPlan.Sql;
         }
         /// <summary>
@@ -948,12 +942,8 @@ namespace nORM.Query
                 var lambda = Expression.Lambda(eq, param);
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambda));
             }
-            // PERFORMANCE ISSUE (TASK 7): Another allocation site - creates new translator for Any/All/Contains subqueries
-            // This is called frequently in WHERE clauses (e.g., WHERE items.Any(x => x.Status == 'Active'))
-            using var subTranslator = QueryTranslator.Create(_ctx, _mapping, _params, _parameterManager.Index, _correlatedParams, _tables, _compiledParams, _paramMap, _joinCounter, _recursionDepth + 1);
-            var subPlan = subTranslator.Translate(source);
-            _parameterManager.Index = subTranslator.ParameterIndex;
-            _mapping = subTranslator._mapping;
+            var subPlan = TranslateInSubContext(source, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subMapping);
+            _mapping = subMapping;
             using var subSqlBuilder = new OptimizedSqlBuilder();
             var fromIndex = subPlan.Sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
             if (fromIndex >= 0)
@@ -1017,6 +1007,141 @@ namespace nORM.Query
             {
                 _compiledParams.Add(name);
             }
+        }
+        private TranslationContextSnapshot CaptureContext()
+        {
+            return new TranslationContextSnapshot(
+                _clauses,
+                _includes,
+                _projection,
+                _isAggregate,
+                _methodName,
+                _groupJoinInfo,
+                _joinCounter,
+                _singleResult,
+                _noTracking,
+                _splitQuery,
+                _mapping,
+                _rootType,
+                _estimatedTimeout,
+                _isCacheable,
+                _cacheExpiration,
+                _asOfTimestamp,
+                _recursionDepth);
+        }
+        private void RestoreContext(TranslationContextSnapshot snapshot)
+        {
+            _clauses = snapshot.Clauses;
+            _includes = snapshot.Includes;
+            _projection = snapshot.Projection;
+            _isAggregate = snapshot.IsAggregate;
+            _methodName = snapshot.MethodName;
+            _groupJoinInfo = snapshot.GroupJoinInfo;
+            _joinCounter = snapshot.JoinCounter;
+            _singleResult = snapshot.SingleResult;
+            _noTracking = snapshot.NoTracking;
+            _splitQuery = snapshot.SplitQuery;
+            _mapping = snapshot.Mapping;
+            _rootType = snapshot.RootType;
+            _estimatedTimeout = snapshot.EstimatedTimeout;
+            _isCacheable = snapshot.IsCacheable;
+            _cacheExpiration = snapshot.CacheExpiration;
+            _asOfTimestamp = snapshot.AsOfTimestamp;
+            _recursionDepth = snapshot.RecursionDepth;
+        }
+        private QueryPlan TranslateInSubContext(Expression e, TableMapping mapping, int parameterIndex, int joinStart, int recursionDepth, out TableMapping resultingMapping)
+        {
+            var snapshot = CaptureContext();
+            _contextStack.Push(snapshot);
+            try
+            {
+                _clauses = new SqlBuilder();
+                _includes = new List<IncludePlan>();
+                _projection = null;
+                _isAggregate = false;
+                _methodName = string.Empty;
+                _groupJoinInfo = null;
+                _joinCounter = joinStart;
+                _singleResult = false;
+                _noTracking = false;
+                _splitQuery = false;
+                _mapping = mapping;
+                _rootType = mapping.Type;
+                _estimatedTimeout = _ctx.Options.TimeoutConfiguration.BaseTimeout;
+                _isCacheable = false;
+                _cacheExpiration = null;
+                _asOfTimestamp = null;
+                _parameterManager.Index = parameterIndex;
+                _recursionDepth = recursionDepth;
+                _tables.Add(mapping.TableName);
+                var plan = Translate(e);
+                resultingMapping = _mapping;
+                return plan;
+            }
+            finally
+            {
+                var subClauses = _clauses;
+                var contextToRestore = _contextStack.Pop();
+                RestoreContext(contextToRestore);
+                subClauses.Dispose();
+            }
+        }
+        private readonly struct TranslationContextSnapshot
+        {
+            public TranslationContextSnapshot(
+                SqlBuilder clauses,
+                List<IncludePlan> includes,
+                LambdaExpression? projection,
+                bool isAggregate,
+                string methodName,
+                GroupJoinInfo? groupJoinInfo,
+                int joinCounter,
+                bool singleResult,
+                bool noTracking,
+                bool splitQuery,
+                TableMapping mapping,
+                Type? rootType,
+                TimeSpan estimatedTimeout,
+                bool isCacheable,
+                TimeSpan? cacheExpiration,
+                DateTime? asOfTimestamp,
+                int recursionDepth)
+            {
+                Clauses = clauses;
+                Includes = includes;
+                Projection = projection;
+                IsAggregate = isAggregate;
+                MethodName = methodName;
+                GroupJoinInfo = groupJoinInfo;
+                JoinCounter = joinCounter;
+                SingleResult = singleResult;
+                NoTracking = noTracking;
+                SplitQuery = splitQuery;
+                Mapping = mapping;
+                RootType = rootType;
+                EstimatedTimeout = estimatedTimeout;
+                IsCacheable = isCacheable;
+                CacheExpiration = cacheExpiration;
+                AsOfTimestamp = asOfTimestamp;
+                RecursionDepth = recursionDepth;
+            }
+            public SqlBuilder Clauses { get; }
+            public List<IncludePlan> Includes { get; }
+            public LambdaExpression? Projection { get; }
+            public bool IsAggregate { get; }
+            public string MethodName { get; }
+            public GroupJoinInfo? GroupJoinInfo { get; }
+            public int JoinCounter { get; }
+            public bool SingleResult { get; }
+            public bool NoTracking { get; }
+            public bool SplitQuery { get; }
+            public TableMapping Mapping { get; }
+            public Type? RootType { get; }
+            public TimeSpan EstimatedTimeout { get; }
+            public bool IsCacheable { get; }
+            public TimeSpan? CacheExpiration { get; }
+            public DateTime? AsOfTimestamp { get; }
+            public int RecursionDepth { get; }
         }
         private static bool TryGetIntValue(Expression expr, out int value)
         {
