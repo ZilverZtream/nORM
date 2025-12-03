@@ -140,6 +140,12 @@ namespace nORM.Query
                     }
                 }
 
+                // Execute dependent queries for nested collections (split query for projections)
+                if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
+                {
+                    await ExecuteDependentQueriesAsync(plan.DependentQueries, list, ct, plan.NoTracking).ConfigureAwait(false);
+                }
+
                 return list;
             }, "MaterializeAsync", new Dictionary<string, object> { ["Sql"] = command.CommandText }).ConfigureAwait(false);
         }
@@ -201,6 +207,12 @@ namespace nORM.Query
                     {
                         _includeProcessor.EagerLoadAsync(include, list, default, plan.NoTracking).GetAwaiter().GetResult();
                     }
+                }
+
+                // Execute dependent queries for nested collections (split query for projections)
+                if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
+                {
+                    ExecuteDependentQueriesAsync(plan.DependentQueries, list, default, plan.NoTracking).GetAwaiter().GetResult();
                 }
 
                 return Task.FromResult(list);
@@ -522,6 +534,186 @@ namespace nORM.Query
                 foreach (var item in items) list.Add(item);
                 return list;
             }
+        }
+
+        /// <summary>
+        /// Executes dependent queries for nested collections to mitigate Cartesian explosion.
+        /// Fetches child records separately and stitches them to parent entities.
+        /// </summary>
+        private async Task ExecuteDependentQueriesAsync(
+            List<DependentQueryDefinition> dependentQueries,
+            IList parents,
+            CancellationToken ct,
+            bool noTracking)
+        {
+            if (parents.Count == 0)
+                return;
+
+            foreach (var depQuery in dependentQueries)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                // Phase 1: Extract parent IDs
+                var parentIds = new HashSet<object>();
+                foreach (var parent in parents.Cast<object>())
+                {
+                    var keyValue = depQuery.ParentKeyProperty.GetValue(parent);
+                    if (keyValue != null)
+                    {
+                        parentIds.Add(keyValue);
+                    }
+                }
+
+                if (parentIds.Count == 0)
+                {
+                    // No parents have keys, assign empty collections
+                    foreach (var parent in parents.Cast<object>())
+                    {
+                        AssignEmptyCollection(parent, depQuery);
+                    }
+                    continue;
+                }
+
+                // Phase 2: Fetch children in batches (to handle SQL parameter limits)
+                const int MaxBatchSize = 2000; // SQL Server limit
+                var allChildren = new List<object>();
+
+                var parentIdList = parentIds.ToList();
+                for (int i = 0; i < parentIdList.Count; i += MaxBatchSize)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    var batchIds = parentIdList.Skip(i).Take(MaxBatchSize).ToList();
+                    var batchChildren = await FetchChildrenBatchAsync(depQuery, batchIds, ct, noTracking).ConfigureAwait(false);
+                    allChildren.AddRange(batchChildren);
+                }
+
+                // Phase 3: Stitch children to parents
+                StitchChildrenToParents(parents, allChildren, depQuery);
+            }
+        }
+
+        /// <summary>
+        /// Fetches a batch of children for a dependent query using an IN clause.
+        /// </summary>
+        private async Task<List<object>> FetchChildrenBatchAsync(
+            DependentQueryDefinition depQuery,
+            List<object> parentIds,
+            CancellationToken ct,
+            bool noTracking)
+        {
+            var children = new List<object>();
+
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
+            await using var cmd = _ctx.Connection.CreateCommand();
+
+            // Build SQL: SELECT * FROM ChildTable WHERE ForeignKey IN (@p0, @p1, ...)
+            var sql = new System.Text.StringBuilder();
+            sql.Append("SELECT * FROM ").Append(depQuery.TargetMapping.EscTable);
+            sql.Append(" WHERE ").Append(depQuery.ForeignKeyColumn.EscCol);
+            sql.Append(" IN (");
+
+            for (int i = 0; i < parentIds.Count; i++)
+            {
+                if (i > 0) sql.Append(", ");
+                var paramName = $"{_ctx.Provider.ParamPrefix}p{i}";
+                sql.Append(paramName);
+                cmd.AddParam(paramName, parentIds[i]);
+            }
+
+            sql.Append(")");
+
+            cmd.CommandText = sql.ToString();
+            cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
+                AdaptiveTimeoutManager.OperationType.ComplexSelect,
+                cmd.CommandText).TotalSeconds;
+
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(
+                _ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
+
+            // Materialize children
+            var materializer = new MaterializerFactory().CreateMaterializer(
+                depQuery.TargetMapping,
+                depQuery.CollectionElementType);
+
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                ct.ThrowIfCancellationRequested();
+                var child = await materializer(reader, ct).ConfigureAwait(false);
+
+                if (!noTracking)
+                {
+                    var entry = _ctx.ChangeTracker.Track(child, EntityState.Unchanged, depQuery.TargetMapping);
+                    child = entry.Entity!;
+                    NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
+                }
+
+                children.Add(child);
+            }
+
+            return children;
+        }
+
+        /// <summary>
+        /// Stitches fetched children back to their parent entities using a lookup.
+        /// </summary>
+        private void StitchChildrenToParents(
+            IList parents,
+            List<object> children,
+            DependentQueryDefinition depQuery)
+        {
+            // Create lookup: ParentId -> List<Child>
+            var childrenByParentKey = new Dictionary<object, List<object>>();
+
+            foreach (var child in children)
+            {
+                var foreignKeyValue = depQuery.ForeignKeyColumn.Getter(child);
+                if (foreignKeyValue != null)
+                {
+                    if (!childrenByParentKey.TryGetValue(foreignKeyValue, out var list))
+                    {
+                        list = new List<object>();
+                        childrenByParentKey[foreignKeyValue] = list;
+                    }
+                    list.Add(child);
+                }
+            }
+
+            // Assign children to parents
+            foreach (var parent in parents.Cast<object>())
+            {
+                var parentKeyValue = depQuery.ParentKeyProperty.GetValue(parent);
+
+                IList childCollection;
+                if (parentKeyValue != null && childrenByParentKey.TryGetValue(parentKeyValue, out var childList))
+                {
+                    // Create typed list and populate
+                    var listType = typeof(List<>).MakeGenericType(depQuery.CollectionElementType);
+                    childCollection = (IList)Activator.CreateInstance(listType)!;
+                    foreach (var child in childList)
+                    {
+                        childCollection.Add(child);
+                    }
+                }
+                else
+                {
+                    // No children found, create empty list
+                    var listType = typeof(List<>).MakeGenericType(depQuery.CollectionElementType);
+                    childCollection = (IList)Activator.CreateInstance(listType)!;
+                }
+
+                depQuery.TargetCollectionProperty.SetValue(parent, childCollection);
+            }
+        }
+
+        /// <summary>
+        /// Assigns an empty collection to a parent entity's navigation property.
+        /// </summary>
+        private static void AssignEmptyCollection(object parent, DependentQueryDefinition depQuery)
+        {
+            var listType = typeof(List<>).MakeGenericType(depQuery.CollectionElementType);
+            var emptyList = (IList)Activator.CreateInstance(listType)!;
+            depQuery.TargetCollectionProperty.SetValue(parent, emptyList);
         }
 
     }
