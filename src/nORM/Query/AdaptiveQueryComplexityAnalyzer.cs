@@ -14,7 +14,7 @@ namespace nORM.Query
     internal sealed class AdaptiveQueryComplexityAnalyzer : IDisposable
     {
         private readonly IMemoryMonitor _memoryMonitor;
-        private static readonly ConcurrentDictionary<int, QueryComplexityInfo> _analysisCache = new();
+        private static readonly ConcurrentDictionary<ExpressionFingerprint, QueryComplexityInfo> _analysisCache = new();
         private const int DefaultEnumerationLimit = 2000;
         private const int MaxCacheSize = 10000;
         public AdaptiveQueryComplexityAnalyzer(IMemoryMonitor memoryMonitor)

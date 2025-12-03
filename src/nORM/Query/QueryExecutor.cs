@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using nORM.Execution;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
@@ -328,7 +329,7 @@ namespace nORM.Query
                         {
                             var list = CreateListFromItems(info.InnerType, currentChildren);
                             // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
-                            var result = info.ResultSelector(currentOuter, list);
+                            var result = info.ResultSelector(currentOuter, list.Cast<object>());
                             resultList.Add(result);
                             currentChildren = new List<object>();
                         }
@@ -375,7 +376,7 @@ namespace nORM.Query
                 {
                     var list = CreateListFromItems(info.InnerType, currentChildren);
                     // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
-                    var result = info.ResultSelector(currentOuter, list);
+                    var result = info.ResultSelector(currentOuter, list.Cast<object>());
                     resultList.Add(result);
                 }
 
@@ -454,7 +455,7 @@ namespace nORM.Query
                             {
                                 var list = CreateListFromItems(info.InnerType, currentChildren);
                                 // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
-                                var result = info.ResultSelector(currentOuter, list);
+                                var result = info.ResultSelector(currentOuter, list.Cast<object>());
                                 resultList.Add(result);
                                 currentChildren = new List<object>();
                             }
@@ -500,7 +501,7 @@ namespace nORM.Query
                     {
                         var list = CreateListFromItems(info.InnerType, currentChildren);
                         // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
-                        var result = info.ResultSelector(currentOuter, list);
+                        var result = info.ResultSelector(currentOuter, list.Cast<object>());
                         resultList.Add(result);
                     }
 

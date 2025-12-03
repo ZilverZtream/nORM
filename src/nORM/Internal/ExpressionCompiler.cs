@@ -14,7 +14,7 @@ namespace nORM.Internal
 {
     internal static class ExpressionCompiler
     {
-        private static readonly ConcurrentDictionary<int, Delegate> _compiledDelegateCache = new();
+        private static readonly ConcurrentDictionary<ExpressionFingerprint, Delegate> _compiledDelegateCache = new();
 
         public static Func<T, TResult> CompileExpression<T, TResult>(Expression<Func<T, TResult>> expr)
         {

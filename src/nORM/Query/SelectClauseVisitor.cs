@@ -22,7 +22,6 @@ namespace nORM.Query
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
         private StringBuilder _sb = null!;
         private readonly List<PropertyInfo> _detectedCollections = new();
-        private bool _isInsideCollectionDetection;
 
         public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider)
         {
