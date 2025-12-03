@@ -79,6 +79,7 @@ namespace nORM.Query
         internal int ParameterIndex => _parameterManager.Index;
         private List<IncludePlan> _includes = new();
         private LambdaExpression? _projection;
+        private Func<object, object>? _clientProjection;
         private bool _isAggregate;
         private string _methodName = "";
         private Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams = new();
@@ -181,6 +182,7 @@ namespace nORM.Query
                 _parameterManager.Reset();
                 _includes = new List<IncludePlan>();
                 _projection = null;
+                _clientProjection = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
@@ -516,7 +518,8 @@ namespace nORM.Query
                     _t._isCacheable,
                     _t._cacheExpiration,
                     Take: _t._take,
-                    DependentQueries: dependentQueries
+                    DependentQueries: dependentQueries,
+                    ClientProjection: _t._clientProjection
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
@@ -1266,6 +1269,7 @@ namespace nORM.Query
                 _clauses = new SqlBuilder();
                 _includes = new List<IncludePlan>();
                 _projection = null;
+                _clientProjection = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _groupJoinInfo = null;
