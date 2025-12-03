@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using nORM.Mapping;
@@ -163,101 +164,159 @@ namespace nORM.Query
         {
             // PERFORMANCE: Pre-size to reduce allocations (most projections have 2-10 columns)
             var estimatedSize = Math.Min(newExpr.Arguments.Count * 2, 20);
-            var neededColumns = new List<string>(estimatedSize);
-            var processedColumns = new HashSet<string>(estimatedSize, StringComparer.Ordinal);
-
-            foreach (var arg in newExpr.Arguments)
-            {
-                ExtractColumnsFromExpression(arg, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
-            }
-
-            return neededColumns;
+            var visitor = new ColumnExtractionVisitor(outerMapping, innerMapping, outerAlias, innerAlias, estimatedSize);
+            visitor.Visit(newExpr);
+            return visitor.GetColumns();
         }
 
-        private static void ExtractColumnsFromExpression(
-            Expression expr,
-            TableMapping outerMapping,
-            TableMapping innerMapping,
-            string outerAlias,
-            string innerAlias,
-            List<string> neededColumns,
-            HashSet<string> processedColumns)
+        /// <summary>
+        /// Expression visitor that walks projection trees to collect required column references.
+        /// Handles nested anonymous types, transparent identifiers, and computed expressions.
+        /// </summary>
+        private sealed class ColumnExtractionVisitor : ExpressionVisitor
         {
-            switch (expr)
+            private readonly TableMapping _outerMapping;
+            private readonly TableMapping _innerMapping;
+            private readonly string _outerAlias;
+            private readonly string _innerAlias;
+            private readonly List<string> _neededColumns;
+            private readonly HashSet<string> _processedColumns;
+
+            public ColumnExtractionVisitor(TableMapping outerMapping, TableMapping innerMapping, string outerAlias, string innerAlias, int estimatedSize)
             {
-                case MemberExpression memberExpr:
-                    // Handle simple property access: x.Name
-                    if (memberExpr.Expression is ParameterExpression paramExpr)
+                _outerMapping = outerMapping;
+                _innerMapping = innerMapping;
+                _outerAlias = outerAlias;
+                _innerAlias = innerAlias;
+                _neededColumns = new List<string>(estimatedSize);
+                _processedColumns = new HashSet<string>(estimatedSize, StringComparer.Ordinal);
+            }
+
+            public List<string> GetColumns() => _neededColumns;
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (node.Expression is ParameterExpression param)
+                {
+                    // Direct member access: x => x.Name
+                    if (!TryAddMemberColumn(param.Type, node.Member.Name))
                     {
-                        var isOuterTable = paramExpr.Type == outerMapping.Type;
-                        var mapping = isOuterTable ? outerMapping : innerMapping;
-                        var alias = isOuterTable ? outerAlias : innerAlias;
-
-                        if (mapping.ColumnsByName.TryGetValue(memberExpr.Member.Name, out var column))
-                        {
-                            var colSql = $"{alias}.{column.EscCol}";
-                            if (processedColumns.Add(colSql))
-                                neededColumns.Add(colSql);
-                        }
+                        // If the member is itself an entity (transparent identifier property)
+                        TryAddFullEntity(node.Type);
                     }
-                    // PERFORMANCE: Handle nested member access: transparentId.x.Name
-                    else if (memberExpr.Expression is MemberExpression nestedMember)
-                    {
-                        ExtractColumnsFromExpression(nestedMember, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
-                    }
-                    break;
+                }
+                else if (node.Expression is MemberExpression || node.Expression is NewExpression || node.Expression is MemberInitExpression)
+                {
+                    // Nested member access: transparentId.x.Name or anonymous type chains
+                    Visit(node.Expression);
+                    // If the leaf resolves to an entity type, include its columns
+                    TryAddFullEntity(node.Type);
+                }
+                else
+                {
+                    TryAddFullEntity(node.Type);
+                }
 
-                case ParameterExpression param:
-                    // Full entity projection: x => x
-                    var isOuter = param.Type == outerMapping.Type;
-                    var mapping = isOuter ? outerMapping : innerMapping;
-                    var alias = isOuter ? outerAlias : innerAlias;
-                    foreach (var col in mapping.Columns)
-                    {
-                        var colSql = $"{alias}.{col.EscCol}";
-                        if (processedColumns.Add(colSql))
-                            neededColumns.Add(colSql);
-                    }
-                    break;
+                return base.VisitMember(node);
+            }
 
-                case MethodCallExpression methodCall:
-                    // PERFORMANCE: Handle method calls on properties: x.Name.ToUpper()
-                    // Extract the underlying property, method will be applied client-side
-                    if (methodCall.Object != null)
-                    {
-                        ExtractColumnsFromExpression(methodCall.Object, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
-                    }
-                    // Also check method arguments for property references
-                    foreach (var arg in methodCall.Arguments)
-                    {
-                        if (arg is MemberExpression || arg is ParameterExpression)
-                        {
-                            ExtractColumnsFromExpression(arg, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
-                        }
-                    }
-                    break;
+            protected override Expression VisitMemberInit(MemberInitExpression node)
+            {
+                foreach (var binding in node.Bindings.OfType<MemberAssignment>())
+                {
+                    Visit(binding.Expression);
+                }
 
-                case BinaryExpression binary:
-                    // PERFORMANCE: Handle binary operations: x.Price * x.Quantity
-                    // Extract columns from both sides
-                    ExtractColumnsFromExpression(binary.Left, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
-                    ExtractColumnsFromExpression(binary.Right, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
-                    break;
+                return base.VisitMemberInit(node);
+            }
 
-                case UnaryExpression unary:
-                    // Handle conversions and casts
-                    ExtractColumnsFromExpression(unary.Operand, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
-                    break;
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                // Inspect instance and arguments for column references
+                if (node.Object != null)
+                    Visit(node.Object);
 
-                case NewExpression nested:
-                    // PERFORMANCE: Handle nested anonymous types
-                    foreach (var arg in nested.Arguments)
-                    {
-                        ExtractColumnsFromExpression(arg, outerMapping, innerMapping, outerAlias, innerAlias, neededColumns, processedColumns);
-                    }
-                    break;
+                foreach (var arg in node.Arguments)
+                    Visit(arg);
 
-                // For other expression types (constants, etc.), we don't need to extract columns
+                return node;
+            }
+
+            protected override Expression VisitBinary(BinaryExpression node)
+            {
+                Visit(node.Left);
+                Visit(node.Right);
+                return node;
+            }
+
+            protected override Expression VisitUnary(UnaryExpression node)
+            {
+                Visit(node.Operand);
+                return node;
+            }
+
+            protected override Expression VisitNew(NewExpression node)
+            {
+                foreach (var arg in node.Arguments)
+                    Visit(arg);
+
+                return node;
+            }
+
+            protected override Expression VisitParameter(ParameterExpression node)
+            {
+                // Full entity projection: x => x
+                TryAddFullEntity(node.Type);
+                return node;
+            }
+
+            private bool TryAddMemberColumn(Type declaringType, string memberName)
+            {
+                var mapping = ResolveMapping(declaringType, out var alias);
+                if (mapping == null)
+                    return false;
+
+                if (mapping.ColumnsByName.TryGetValue(memberName, out var column))
+                {
+                    AddColumn(alias!, column.EscCol);
+                    return true;
+                }
+
+                return false;
+            }
+
+            private void TryAddFullEntity(Type type)
+            {
+                var mapping = ResolveMapping(type, out var alias);
+                if (mapping == null)
+                    return;
+
+                foreach (var col in mapping.Columns)
+                    AddColumn(alias!, col.EscCol);
+            }
+
+            private TableMapping? ResolveMapping(Type type, out string? alias)
+            {
+                if (type == _outerMapping.Type)
+                {
+                    alias = _outerAlias;
+                    return _outerMapping;
+                }
+                if (type == _innerMapping.Type)
+                {
+                    alias = _innerAlias;
+                    return _innerMapping;
+                }
+
+                alias = null;
+                return null;
+            }
+
+            private void AddColumn(string alias, string escCol)
+            {
+                var colSql = $"{alias}.{escCol}";
+                if (_processedColumns.Add(colSql))
+                    _neededColumns.Add(colSql);
             }
         }
 
