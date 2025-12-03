@@ -1883,6 +1883,9 @@ namespace nORM.Core
         private readonly DbCommand _command;
         private readonly TableMapping _mapping;
         private readonly DbContext _context;
+        // OPTIMIZATION: Cache parameter objects and their corresponding column accessors
+        // to avoid dictionary lookups (O(N) or O(1)) inside the tight execution loop.
+        private readonly (DbParameter Parameter, Mapping.Column Column)[] _bindings;
         private bool _disposed;
 
         /// <summary>
@@ -1896,6 +1899,18 @@ namespace nORM.Core
             _command = command ?? throw new ArgumentNullException(nameof(command));
             _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
             _context = context ?? throw new ArgumentNullException(nameof(context));
+
+            // Pre-calculate bindings
+            var insertCols = _mapping.InsertColumns;
+            _bindings = new (DbParameter, Mapping.Column)[insertCols.Length];
+            var prefix = _context.Provider.ParamPrefix;
+
+            for (int i = 0; i < insertCols.Length; i++)
+            {
+                var col = insertCols[i];
+                var paramName = prefix + col.PropName;
+                _bindings[i] = (_command.Parameters[paramName], col);
+            }
         }
 
         /// <summary>
@@ -1912,16 +1927,13 @@ namespace nORM.Core
             if (entity == null)
                 throw new ArgumentNullException(nameof(entity));
 
-            // Update parameter values from entity
-            foreach (var col in _mapping.InsertColumns)
+            // Update parameter values using cached bindings (Array iteration is faster than Dictionary lookup)
+            var bindings = _bindings; // Local copy for elimination of bounds checks (potentially)
+            for (int i = 0; i < bindings.Length; i++)
             {
-                var paramName = _context.Provider.ParamPrefix + col.PropName;
-                var param = _command.Parameters[paramName];
-                if (param != null)
-                {
-                    var value = col.Getter(entity);
-                    param.Value = value ?? DBNull.Value;
-                }
+                var (param, col) = bindings[i];
+                var value = col.Getter(entity);
+                param.Value = value ?? DBNull.Value;
             }
 
             // Execute the command
