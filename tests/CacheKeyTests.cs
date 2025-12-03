@@ -24,12 +24,14 @@ public class CacheKeyTests
     private static QueryPlan CreatePlan(IReadOnlyDictionary<string, object> parameters)
     {
         static Task<object> Materializer(DbDataReader r, CancellationToken ct) => Task.FromResult<object>(null!);
+        static object SyncMaterializer(DbDataReader _) => null!;
 
         return new QueryPlan(
             Sql: "select 1",
             Parameters: parameters,
             CompiledParameters: Array.Empty<string>(),
             Materializer: Materializer,
+            SyncMaterializer: SyncMaterializer,
             ElementType: typeof(int),
             IsScalar: true,
             SingleResult: true,
