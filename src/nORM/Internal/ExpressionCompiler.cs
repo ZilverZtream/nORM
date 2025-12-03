@@ -91,24 +91,43 @@ namespace nORM.Internal
                     paramNames = cachedPlan.CompiledParameters;
                 }
 
-                var parameters = cachedPlan.Parameters.ToDictionary(k => k.Key, v => v.Value);
-                if (paramNames != null)
+                // PERFORMANCE FIX: Use array instead of dictionary to avoid allocation
+                object?[] args;
+
+                if (paramNames != null && paramNames.Count > 0)
                 {
+                    args = new object?[paramNames.Count];
                     if (value is System.Runtime.CompilerServices.ITuple tuple)
                     {
                         var count = Math.Min(tuple.Length, paramNames.Count);
                         for (int i = 0; i < count; i++)
-                            parameters[paramNames[i]] = tuple[i]!;
+                            args[i] = tuple[i];
                     }
                     else
                     {
-                        foreach (var name in paramNames)
-                            parameters[name] = value!;
+                        // Single parameter case - map value to first argument
+                        if (args.Length == 1)
+                        {
+                            args[0] = value;
+                        }
+                        else
+                        {
+                            // For multiple parameters without tuple, use value for all (rare case)
+                            for (int i = 0; i < paramNames.Count; i++)
+                            {
+                                args[i] = value;
+                            }
+                        }
                     }
+                }
+                else
+                {
+                    args = Array.Empty<object?>();
                 }
 
                 var execProvider = new NormQueryProvider(ctx);
-                return await execProvider.ExecuteCompiledAsync<List<T>>(cachedPlan, parameters, default).ConfigureAwait(false);
+                // Call the optimized array overload
+                return await execProvider.ExecuteCompiledAsync<List<T>>(cachedPlan, args, default).ConfigureAwait(false);
             };
         }
 
