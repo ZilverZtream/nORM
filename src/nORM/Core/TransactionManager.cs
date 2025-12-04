@@ -66,8 +66,7 @@ namespace nORM.Core
             if (ownsTransaction)
             {
                 await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                var connection = context.Connection ?? throw new InvalidOperationException("Database connection is not initiali
-zed.");
+                var connection = context.Connection ?? throw new InvalidOperationException("Database connection is not initialized.");
                 transaction = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
 
                 // Create a CTS that cancels if the ambient token cancels.
