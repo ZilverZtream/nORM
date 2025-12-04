@@ -106,6 +106,17 @@ namespace nORM.Query
         {
             if (dbValue == null || dbValue is DBNull)
             {
+                // NULL CHECK FIX: Handle Nullable<T> correctly without expensive Activator.CreateInstance
+                // Nullable<T> is a value type, but should return null, not default(Nullable<T>)
+                var underlyingNullable = Nullable.GetUnderlyingType(targetType);
+                if (underlyingNullable != null)
+                {
+                    // This is Nullable<T>, return null directly (which is default(Nullable<T>))
+                    return null;
+                }
+
+                // For non-nullable value types, create default instance
+                // For reference types, return null
                 return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
             }
 

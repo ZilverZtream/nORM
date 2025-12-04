@@ -35,6 +35,28 @@ namespace nORM.Core
             var ambientTransaction = System.Transactions.Transaction.Current;
             var ownsTransaction = existingTransaction == null && ambientTransaction == null;
 
+            // TRANSACTION CONTEXT VALIDATION FIX: Warn about potential mismatch with ambient transactions
+            // Ambient TransactionScope may be associated with a different connection/database
+            if (ambientTransaction != null && existingTransaction == null)
+            {
+                context.Options.Logger?.LogWarning(
+                    "Ambient System.Transactions.Transaction detected but no database transaction is active. " +
+                    "Ensure the TransactionScope is associated with the correct database connection. " +
+                    "Connection string: {ConnectionString}, Ambient transaction ID: {TransactionId}",
+                    context.Connection?.ConnectionString ?? "null",
+                    ambientTransaction.TransactionInformation.LocalIdentifier);
+
+                // Additional validation: Check if connection is enlisted in the ambient transaction
+                if (context.Connection != null && context.Connection.State == System.Data.ConnectionState.Open)
+                {
+                    // Note: We cannot reliably detect if the connection is enlisted without attempting
+                    // an operation, so we log a warning to alert developers of potential issues
+                    context.Options.Logger?.LogDebug(
+                        "Connection state: {State}. Verify this connection is enrolled in the ambient transaction.",
+                        context.Connection.State);
+                }
+            }
+
             DbTransaction? transaction = null;
             CancellationTokenSource? cts = null;
             var token = ct;

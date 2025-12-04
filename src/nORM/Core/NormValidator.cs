@@ -480,8 +480,17 @@ namespace nORM.Core
         /// <exception cref="ArgumentException">Thrown when the character is not allowed.</exception>
         public static char ValidateLikeEscapeChar(char escapeChar)
         {
+            // SECURITY FIX: Explicitly reject SQL-dangerous characters that could cause injection
+            // even if someone modifies AllowedLikeEscapeChars at runtime
+            if (escapeChar == '\'' || escapeChar == '"' || escapeChar == ';' || escapeChar == '\0')
+                throw new ArgumentException(
+                    $"LIKE escape character '{escapeChar}' is not allowed for security reasons. " +
+                    "Use a safe character like backslash (\\), tilde (~), or caret (^).");
+
             if (!AllowedLikeEscapeChars.Contains(escapeChar))
-                throw new ArgumentException($"Invalid LIKE escape character: {escapeChar}");
+                throw new ArgumentException(
+                    $"Invalid LIKE escape character: {escapeChar}. " +
+                    "Must be an alphanumeric or safe symbol character.");
 
             return escapeChar;
         }
