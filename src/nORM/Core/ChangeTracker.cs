@@ -307,22 +307,62 @@ namespace nORM.Core
         {
             // FIX (TASK 1): Detect changes in ALL non-notifying entries, not just dirty ones
             // POCOs don't raise property change events, so we must compare snapshots for all of them
+
+            // ERROR HANDLING FIX: Catch exceptions from user property getters to prevent
+            // one failing entity from blocking SaveChanges for all entities
+            var failures = new List<(object Entity, Exception Exception)>();
+
             foreach (var entry in _nonNotifyingEntries.Keys)
             {
                 if (entry.Entity != null)
-                    entry.DetectChanges();
+                {
+                    try
+                    {
+                        entry.DetectChanges();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log the error but continue processing other entities
+                        failures.Add((entry.Entity, ex));
+                        _options.Logger?.LogError(ex,
+                            "Error detecting changes for entity {EntityType}. Entity will be skipped for this SaveChanges operation.",
+                            entry.Entity.GetType().Name);
+                    }
+                }
             }
 
             // Also process explicitly marked dirty entries
             foreach (var entry in _dirtyEntries.Keys)
             {
                 if (entry.Entity != null)
-                    entry.DetectChanges();
+                {
+                    try
+                    {
+                        entry.DetectChanges();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log the error but continue processing other entities
+                        failures.Add((entry.Entity, ex));
+                        _options.Logger?.LogError(ex,
+                            "Error detecting changes for entity {EntityType}. Entity will be skipped for this SaveChanges operation.",
+                            entry.Entity.GetType().Name);
+                    }
+                }
             }
 
             // Clear the dirty tracking sets after detection
             _dirtyNonNotifyingEntries.Clear();
             _dirtyEntries.Clear();
+
+            // If there were failures, log a summary
+            if (failures.Count > 0)
+            {
+                _options.Logger?.LogWarning(
+                    "Change detection failed for {FailureCount} entities. These entities will not be saved. " +
+                    "Check property getters for exceptions or data validation logic.",
+                    failures.Count);
+            }
         }
 
         /// <summary>

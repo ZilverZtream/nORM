@@ -390,10 +390,23 @@ namespace nORM.Query
                         _sql.Append("(1=0)");
                         return node;
                     }
-                    var remainingParams = _provider.MaxParameters - _paramIndex - 10;
-                    if (remainingParams <= 0 || items.Count > remainingParams)
-                        throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
-                            $"IN clause exceeds maximum parameter count of {remainingParams}"));
+                    // PARAMETER LIMIT FIX: Use percentage-based buffer instead of fixed value
+                    // Reserve 20% of max parameters for other query parts (joins, WHERE, projections, etc.)
+                    // This is more robust than a fixed buffer of 10 which doesn't scale with query complexity
+                    var reservedBuffer = Math.Max(20, (int)(_provider.MaxParameters * 0.2));
+                    var remainingParams = _provider.MaxParameters - _paramIndex - reservedBuffer;
+
+                    if (remainingParams <= 0)
+                        throw new NormQueryException(
+                            $"Query complexity exceeds database parameter limit. " +
+                            $"Current parameters: {_paramIndex}, Maximum: {_provider.MaxParameters}, Reserved: {reservedBuffer}. " +
+                            $"Consider simplifying the query or using fewer items in IN clauses.");
+
+                    if (items.Count > remainingParams)
+                        throw new NormQueryException(
+                            $"IN clause with {items.Count} items exceeds remaining parameter budget of {remainingParams}. " +
+                            $"Current parameters: {_paramIndex}, Maximum: {_provider.MaxParameters}. " +
+                            $"Consider using a temporary table or reducing the number of items.");
                     var maxBatchSize = Math.Max(1, Math.Min(1000, remainingParams));
                     if (items.Count > maxBatchSize)
                     {

@@ -586,15 +586,18 @@ namespace nORM.Query
                 }
 
                 // Phase 2: Fetch children in batches (to handle SQL parameter limits)
-                const int MaxBatchSize = 2000; // SQL Server limit
+                // HARDCODED LIMIT FIX: Use provider's MaxParameters instead of hardcoding 2000
+                // Different databases have different limits: SQL Server=2100, Oracle=1000, PostgreSQL=65535
+                // Reserve 100 params for other query parts (WHERE, joins, etc.)
+                var maxBatchSize = Math.Max(100, _ctx.Provider.MaxParameters - 100);
                 var allChildren = new List<object>();
 
                 var parentIdList = parentIds.ToList();
-                for (int i = 0; i < parentIdList.Count; i += MaxBatchSize)
+                for (int i = 0; i < parentIdList.Count; i += maxBatchSize)
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    var batchIds = parentIdList.Skip(i).Take(MaxBatchSize).ToList();
+                    var batchIds = parentIdList.Skip(i).Take(maxBatchSize).ToList();
                     var batchChildren = await FetchChildrenBatchAsync(depQuery, batchIds, ct, noTracking).ConfigureAwait(false);
                     allChildren.AddRange(batchChildren);
                 }
