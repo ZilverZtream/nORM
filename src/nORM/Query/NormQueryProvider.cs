@@ -172,6 +172,11 @@ namespace nORM.Query
         /// </summary>
         public TResult ExecuteSync<TResult>(Expression expression)
         {
+            if (TryGetCountQuery(expression, out var countSql, out var countParameters))
+            {
+                return ExecuteCountSync<TResult>(countSql, countParameters);
+            }
+
             if (TryGetSimpleQuery(expression, out var sql, out var parameters))
             {
                 return ExecuteSimpleSync<TResult>(sql, parameters);
@@ -182,6 +187,14 @@ namespace nORM.Query
         public object? Execute(Expression expression) => Execute<object>(expression);
         public Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken ct)
         {
+            if (TryGetCountQuery(expression, out var countSql, out var countParameters))
+            {
+                Func<CancellationToken, Task<TResult>> factory = token => ExecuteCountAsync<TResult>(countSql, countParameters, token);
+                return _ctx.Options.RetryPolicy != null
+                    ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => factory(token), ct)
+                    : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => factory(token), ct);
+            }
+
             // Fast path – bypass translator for recognized simple patterns
             if (TryExecuteFastPath<TResult>(expression, out var fastResult))
                 return fastResult;
@@ -697,6 +710,137 @@ namespace nORM.Query
             }
             return true;
         }
+
+        private bool TryGetCountQuery(Expression expr, out string sql, out Dictionary<string, object> parameters)
+        {
+            sql = string.Empty;
+            parameters = new Dictionary<string, object>();
+
+            if (_ctx.Options.GlobalFilters.Count > 0 || _ctx.Options.TenantProvider != null)
+                return false;
+
+            if (expr is not MethodCallExpression rootCall || rootCall.Method.DeclaringType != typeof(Queryable))
+                return false;
+
+            var methodName = rootCall.Method.Name;
+            if (methodName is not nameof(Queryable.Count) and not nameof(Queryable.LongCount))
+                return false;
+
+            Expression source = rootCall.Arguments[0];
+            LambdaExpression? predicate = rootCall.Arguments.Count > 1 ? (LambdaExpression)StripQuotes(rootCall.Arguments[1]) : null;
+
+            if (source is MethodCallExpression whereCall && whereCall.Method.DeclaringType == typeof(Queryable) && whereCall.Method.Name == nameof(Queryable.Where))
+            {
+                if (predicate != null)
+                    return false; // Only support a single predicate source
+
+                predicate = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
+                source = whereCall.Arguments[0];
+            }
+
+            if (source is not ConstantExpression constant)
+                return false;
+
+            var elementType = GetElementType(constant);
+            var map = _ctx.GetMapping(elementType);
+            var cacheKey = ExpressionFingerprint.Compute(expr) + ":" + elementType.FullName + ":COUNT";
+
+            if (!_simpleSqlCache.TryGetValue(cacheKey, out var cachedSql))
+            {
+                string whereClause = string.Empty;
+
+                if (predicate != null)
+                {
+                    if (!TryBuildCountWhereClause(predicate, map, parameters, out whereClause, populateParameters: true))
+                        return false;
+                }
+
+                sql = $"SELECT COUNT(*) FROM {map.EscTable}{whereClause}";
+                _simpleSqlCache[cacheKey] = sql;
+                return true;
+            }
+
+            sql = cachedSql!;
+
+            if (predicate != null)
+            {
+                if (!TryBuildCountWhereClause(predicate, map, parameters, out _, populateParameters: true))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private bool TryBuildCountWhereClause(LambdaExpression lambda, TableMapping map, Dictionary<string, object> parameters, out string whereClause, bool populateParameters)
+        {
+            whereClause = string.Empty;
+
+            if (lambda.Body is MemberExpression boolMember && boolMember.Type == typeof(bool))
+            {
+                if (!map.ColumnsByName.TryGetValue(boolMember.Member.Name, out var boolCol))
+                    return false;
+
+                whereClause = $" WHERE {boolCol.EscCol} = 1";
+                return true;
+            }
+
+            if (lambda.Body is BinaryExpression be && be.NodeType == ExpressionType.Equal && be.Left is MemberExpression me)
+            {
+                if (!map.ColumnsByName.TryGetValue(me.Member.Name, out var column))
+                    return false;
+
+                var paramName = _ctx.Provider.ParamPrefix + "p0";
+                whereClause = $" WHERE {column.EscCol} = {paramName}";
+
+                if (populateParameters)
+                {
+                    if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
+                        return false;
+
+                    parameters[paramName] = value!;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+        private async Task<TResult> ExecuteCountAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
+        {
+            var sw = Stopwatch.StartNew();
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
+            await using var cmd = _ctx.Connection.CreateCommand();
+            cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+            cmd.CommandText = sql;
+            foreach (var p in parameters)
+                cmd.AddOptimizedParam(p.Key, p.Value);
+
+            var scalar = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
+            _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, scalar == null || scalar is DBNull ? 0 : 1);
+            if (scalar == null || scalar is DBNull)
+                return default!;
+
+            return ConvertScalarResult<TResult>(scalar);
+        }
+
+        private TResult ExecuteCountSync<TResult>(string sql, Dictionary<string, object> parameters)
+        {
+            var sw = Stopwatch.StartNew();
+            _ctx.EnsureConnection();
+            using var cmd = _ctx.Connection.CreateCommand();
+            cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+            cmd.CommandText = sql;
+            foreach (var p in parameters)
+                cmd.AddOptimizedParam(p.Key, p.Value);
+
+            var scalar = cmd.ExecuteScalarWithInterception(_ctx);
+            _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, scalar == null || scalar is DBNull ? 0 : 1);
+            if (scalar == null || scalar is DBNull)
+                return default!;
+
+            return ConvertScalarResult<TResult>(scalar);
+        }
+
         private async Task<TResult> ExecuteSimpleAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
