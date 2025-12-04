@@ -161,9 +161,9 @@ namespace nORM.Core
             // Minimal entry that defers property change setup
             return new EntityEntry(entity, EntityState.Unchanged, mapping, _options, MarkDirty, lazy: true);
         }
-        // CASCADE DELETE PROTECTION FIX: Reduced from 100 to 20 to prevent excessive memory usage
-        // and catch potential cycles earlier. 20 levels is still generous for legitimate hierarchies.
-        private const int MaxCascadeDepth = 20;
+        // CASCADE DELETE PROTECTION FIX: Reduced from 100 to 20, then further to 10 to prevent excessive memory usage
+        // and catch potential cycles earlier. 10 levels is sufficient for legitimate hierarchies.
+        private const int MaxCascadeDepth = 10;
         /// <summary>
         /// Removes an entity from the change tracker, optionally cascading the removal
         /// to related entities that are configured for cascade delete.

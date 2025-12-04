@@ -630,6 +630,17 @@ namespace nORM.Query
         private string CreateSafeLikePattern(string value, LikeOperation operation)
         {
             if (string.IsNullOrEmpty(value)) return string.Empty;
+
+            // DOS PROTECTION FIX: Validate pattern length to prevent database CPU spike
+            // Extremely long LIKE patterns (millions of '%' chars) can cause severe performance issues
+            const int MaxLikePatternLength = 5000;
+            if (value.Length > MaxLikePatternLength)
+            {
+                throw new NormQueryException(
+                    $"LIKE pattern too long ({value.Length} characters). Maximum allowed: {MaxLikePatternLength}. " +
+                    $"Long LIKE patterns can cause database performance issues.");
+            }
+
             var escaped = _provider.EscapeLikePattern(value);
             return operation switch
             {

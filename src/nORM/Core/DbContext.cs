@@ -44,12 +44,15 @@ namespace nORM.Core
         // PERFORMANCE FIX (TASK 3): Static cache to avoid recreating for every DbContext instance
         // Dynamic type generation is expensive (uses Reflection.Emit), so cache should be shared
         // across all DbContext instances in the application.
-        private static readonly ConcurrentDictionary<string, Lazy<Task<Type>>> _dynamicTypeCache = new();
+        // MEMORY LEAK FIX: Use LRU cache instead of unbounded ConcurrentDictionary to prevent
+        // unbounded memory growth as new dynamic types are generated
+        private static readonly ConcurrentLruCache<string, Lazy<Task<Type>>> _dynamicTypeCache = new(capacity: 1000);
         private readonly LinkedList<WeakReference<IDisposable>> _disposables = new();
         private readonly object _disposablesLock = new();
         private readonly Timer _cleanupTimer;
         private bool _providerInitialized;
         private readonly SemaphoreSlim _providerInitLock = new(1, 1);
+        private readonly object _providerInitSyncLock = new object(); // For synchronous initialization to avoid deadlock
         private readonly Lazy<Task>? _temporalInit;
         private DbTransaction? _currentTransaction; // Access via Interlocked.* only
         private bool _disposed;
@@ -203,18 +206,15 @@ namespace nORM.Core
                 _cn.Open();
             if (!_providerInitialized)
             {
-                _providerInitLock.Wait();
-                try
+                // PROVIDER INITIALIZATION RACE FIX: Use regular lock instead of SemaphoreSlim.Wait()
+                // to avoid deadlock in synchronous contexts (ASP.NET, UI threads with sync context)
+                lock (_providerInitSyncLock)
                 {
                     if (!_providerInitialized)
                     {
                         _p.InitializeConnection(_cn);
                         _providerInitialized = true;
                     }
-                }
-                finally
-                {
-                    _providerInitLock.Release();
                 }
             }
             return _cn;

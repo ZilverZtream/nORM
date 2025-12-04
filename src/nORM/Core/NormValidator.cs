@@ -539,6 +539,22 @@ namespace nORM.Core
                 if (builder.ContainsKey("Password")) builder["Password"] = "***";
                 if (builder.ContainsKey("Pwd")) builder["Pwd"] = "***";
                 if (builder.ContainsKey("User Password")) builder["User Password"] = "***";
+                // SECURITY FIX: Mask additional sensitive parameters beyond just passwords
+                // API keys, tokens, and secrets in extended properties can leak in logs
+                if (builder.ContainsKey("API Key")) builder["API Key"] = "***";
+                if (builder.ContainsKey("ApiKey")) builder["ApiKey"] = "***";
+                if (builder.ContainsKey("Token")) builder["Token"] = "***";
+                if (builder.ContainsKey("AccessToken")) builder["AccessToken"] = "***";
+                if (builder.ContainsKey("Access Token")) builder["Access Token"] = "***";
+                if (builder.ContainsKey("Secret")) builder["Secret"] = "***";
+                if (builder.ContainsKey("SecretKey")) builder["SecretKey"] = "***";
+                if (builder.ContainsKey("Secret Key")) builder["Secret Key"] = "***";
+                if (builder.ContainsKey("AccessKey")) builder["AccessKey"] = "***";
+                if (builder.ContainsKey("Access Key")) builder["Access Key"] = "***";
+                if (builder.ContainsKey("PrivateKey")) builder["PrivateKey"] = "***";
+                if (builder.ContainsKey("Private Key")) builder["Private Key"] = "***";
+                if (builder.ContainsKey("ClientSecret")) builder["ClientSecret"] = "***";
+                if (builder.ContainsKey("Client Secret")) builder["Client Secret"] = "***";
                 return builder.ConnectionString;
             }
             catch

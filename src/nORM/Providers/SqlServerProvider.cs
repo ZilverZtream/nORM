@@ -406,8 +406,14 @@ END;";
                         BulkCopyTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds
                     };
 
+                    // BULK INSERT SCHEMA MISMATCH FIX: Properly unescape SQL Server identifiers
+                    // Trim('[', ']') fails for names with brackets: [My[Special]Column] becomes My[Special]Column (wrong!)
+                    // Proper unescaping: remove outer brackets only
                     foreach (var col in insertableCols)
-                        bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
+                    {
+                        var unescapedName = UnescapeSqlServerIdentifier(col.EscCol);
+                        bulkCopy.ColumnMappings.Add(col.PropName, unescapedName);
+                    }
 
                     using var reader = new EntityDataReader<T>(batch, insertableCols);
                     await bulkCopy.WriteToServerAsync(reader, token).ConfigureAwait(false);
@@ -565,6 +571,26 @@ END;";
             if (t == typeof(Guid)) return "UNIQUEIDENTIFIER";
             if (t == typeof(byte[])) return "VARBINARY(MAX)";
             return "NVARCHAR(MAX)";
+        }
+
+        /// <summary>
+        /// Properly unescapes a SQL Server identifier by removing outer brackets.
+        /// Handles edge cases like nested brackets correctly.
+        /// </summary>
+        /// <param name="escapedIdentifier">The escaped identifier (e.g., [ColumnName] or [My[Special]Column])</param>
+        /// <returns>The unescaped identifier</returns>
+        private static string UnescapeSqlServerIdentifier(string escapedIdentifier)
+        {
+            if (string.IsNullOrEmpty(escapedIdentifier))
+                return escapedIdentifier;
+
+            // Remove outer brackets only if present
+            if (escapedIdentifier.StartsWith("[") && escapedIdentifier.EndsWith("]") && escapedIdentifier.Length >= 2)
+            {
+                return escapedIdentifier.Substring(1, escapedIdentifier.Length - 2);
+            }
+
+            return escapedIdentifier;
         }
 
         private static DataTable GetKeyTable(TableMapping m)

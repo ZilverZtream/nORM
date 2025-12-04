@@ -1,5 +1,6 @@
 using System;
 using System.Data.Common;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -102,7 +103,26 @@ namespace nORM.Core
         {
             if (OwnsTransaction && Transaction != null)
             {
-                try { await Transaction.DisposeAsync().ConfigureAwait(false); } catch { }
+                // ERROR MASKING FIX: Log exceptions instead of silently swallowing them
+                // While Dispose should not throw, logging helps diagnose connection state issues
+                try
+                {
+                    await Transaction.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Expected - transaction already disposed, safe to ignore
+                }
+                catch (InvalidOperationException)
+                {
+                    // Expected - transaction in invalid state for disposal, safe to ignore
+                }
+                catch (Exception ex)
+                {
+                    // Unexpected exception during dispose - log for diagnostics but don't throw
+                    // per .NET guidelines (Dispose should not throw)
+                    Debug.WriteLine($"Warning: Exception disposing transaction: {ex.GetType().Name}: {ex.Message}");
+                }
             }
             _cts?.Dispose();
             GC.SuppressFinalize(this);
@@ -115,7 +135,26 @@ namespace nORM.Core
         {
             if (OwnsTransaction && Transaction != null)
             {
-                try { Transaction.Dispose(); } catch { }
+                // ERROR MASKING FIX: Log exceptions instead of silently swallowing them
+                // While Dispose should not throw, logging helps diagnose connection state issues
+                try
+                {
+                    Transaction.Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Expected - transaction already disposed, safe to ignore
+                }
+                catch (InvalidOperationException)
+                {
+                    // Expected - transaction in invalid state for disposal, safe to ignore
+                }
+                catch (Exception ex)
+                {
+                    // Unexpected exception during dispose - log for diagnostics but don't throw
+                    // per .NET guidelines (Dispose should not throw)
+                    Debug.WriteLine($"Warning: Exception disposing transaction: {ex.GetType().Name}: {ex.Message}");
+                }
             }
             _cts?.Dispose();
             GC.SuppressFinalize(this);
