@@ -1485,33 +1485,25 @@ namespace nORM.Query
             }
 
             /// <summary>
-            /// Retrieves a <see cref="decimal"/> value from the mapped column, with
-            /// additional handling for string-based numeric representations.
+            /// Retrieves a <see cref="decimal"/> value from the mapped column.
+            /// DATA INTEGRITY FIX: Now throws FormatException on invalid data instead of silently returning 0.
             /// </summary>
             /// <param name="ordinal">The column ordinal.</param>
-            /// <returns>The decimal value if mapped and convertible; otherwise the default value.</returns>
+            /// <returns>The decimal value if mapped and convertible.</returns>
+            /// <exception cref="FormatException">Thrown when the data cannot be converted to decimal.</exception>
             public override decimal GetDecimal(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);
                 if (mapped < 0) return default;
 
-                // Additional safety check - if the field is a string, try to parse it safely
-                try
+                // DATA INTEGRITY FIX: Let exceptions propagate instead of silently returning 0
+                // This prevents catastrophic silent data corruption in financial applications
+                if (_inner.GetFieldType(mapped) == typeof(string) && !_inner.IsDBNull(mapped))
                 {
-                    if (_inner.GetFieldType(mapped) == typeof(string) && !_inner.IsDBNull(mapped))
-                    {
-                        var stringValue = _inner.GetString(mapped);
-                        if (decimal.TryParse(stringValue, out var result))
-                            return result;
-                        return default; // Return default instead of throwing
-                    }
-                    return _inner.GetDecimal(mapped);
+                    var stringValue = _inner.GetString(mapped);
+                    return decimal.Parse(stringValue); // Throws FormatException on invalid data
                 }
-                catch (FormatException)
-                {
-                    // If conversion fails, return default value instead of throwing
-                    return default;
-                }
+                return _inner.GetDecimal(mapped); // Throws FormatException on invalid data
             }
 
             /// <summary>

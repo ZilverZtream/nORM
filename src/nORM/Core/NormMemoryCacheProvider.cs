@@ -77,8 +77,37 @@ namespace nORM.Core
             foreach (var tag in tags)
             {
                 var qualified = QualifyTag(tag);
-                var tokenSource = _tagTokens.GetOrAdd(qualified, _ => new CancellationTokenSource());
-                options.AddExpirationToken(new CancellationChangeToken(tokenSource.Token));
+
+                // RACE CONDITION FIX: Retry loop to handle concurrent InvalidateTag disposal
+                // If InvalidateTag disposes the CTS between GetOrAdd and accessing .Token,
+                // we retry with a new token. After max retries, skip caching (tag is churning).
+                int retryCount = 0;
+                const int maxRetries = 3;
+
+                while (true)
+                {
+                    var tokenSource = _tagTokens.GetOrAdd(qualified, _ => new CancellationTokenSource());
+
+                    try
+                    {
+                        // This can throw ObjectDisposedException if another thread calls InvalidateTag
+                        // between GetOrAdd and accessing .Token
+                        options.AddExpirationToken(new CancellationChangeToken(tokenSource.Token));
+                        break; // Success - exit retry loop
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // The CTS was disposed by InvalidateTag - retry with a new token
+                        retryCount++;
+                        if (retryCount >= maxRetries)
+                        {
+                            // After max retries, the tag is being invalidated too frequently
+                            // Skip caching this entry (it would be immediately invalidated anyway)
+                            return;
+                        }
+                        // Retry: next iteration will call GetOrAdd again
+                    }
+                }
             }
 
             _cache.Set(key, value, options);
