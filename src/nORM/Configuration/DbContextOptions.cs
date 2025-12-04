@@ -20,7 +20,10 @@ namespace nORM.Configuration
     {
         private int _bulkBatchSize = 1000;
         private bool _temporalVersioningEnabled = false;
-        private int _maxGroupJoinSize = 100000;
+        // MEMORY SAFETY FIX: Reduced default from 100,000 to 10,000 to prevent OOM
+        // 10 concurrent GroupJoins × 10k records × 1KB/record = ~100MB (safe for most environments)
+        // Previous default (100k) could cause 1GB+ memory usage with concurrent queries
+        private int _maxGroupJoinSize = 10000;
 
         /// <summary>
         /// Gets or sets the timeout configuration used when executing database commands.
@@ -33,7 +36,7 @@ namespace nORM.Configuration
         /// Gets or sets the maximum number of child entities allowed per group in a GroupJoin operation.
         /// This prevents out-of-memory errors when joining large datasets. Set to a higher value for
         /// datasets with legitimate large hierarchies, or to int.MaxValue to disable the limit entirely.
-        /// Default: 100,000.
+        /// Default: 10,000 (reduced from 100,000 for better memory safety).
         /// </summary>
         public int MaxGroupJoinSize
         {

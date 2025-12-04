@@ -139,21 +139,26 @@ namespace nORM.Core
                     throw new InvalidOperationException("No primary node available.");
             }
 
+            DbConnection? cn = null;
             try
             {
-                var cn = CreateConnection(primary.ConnectionString);
+                cn = CreateConnection(primary.ConnectionString);
                 await cn.OpenAsync(ct).ConfigureAwait(false);
                 ResetCircuitBreaker();
                 return cn;
             }
             catch (OperationCanceledException)
             {
+                // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
                 // Don't trip circuit breaker on timeout/cancellation.
                 // Timeout is a query-level issue, not a connection-level failure.
+                cn?.Dispose();
                 throw;
             }
             catch (DbException ex)
             {
+                // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
+                cn?.Dispose();
                 // RELIABILITY FIX (TASK 9): Check specific error codes instead of message strings
                 // Message-based detection is fragile (localization, provider changes)
                 if (IsTransientDatabaseError(ex))
@@ -165,6 +170,8 @@ namespace nORM.Core
             }
             catch (System.Net.Sockets.SocketException ex)
             {
+                // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
+                cn?.Dispose();
                 // RELIABILITY FIX (TASK 9): Detect network failures by exception type
                 RegisterFailure();
                 _logger.LogError(ex, "Failed to acquire write connection due to network socket error");
@@ -172,6 +179,8 @@ namespace nORM.Core
             }
             catch (System.IO.IOException ex) when (IsNetworkIOException(ex))
             {
+                // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
+                cn?.Dispose();
                 // RELIABILITY FIX (TASK 9): Some network errors manifest as IOException
                 RegisterFailure();
                 _logger.LogError(ex, "Failed to acquire write connection due to network I/O error");
@@ -179,6 +188,8 @@ namespace nORM.Core
             }
             catch (Exception ex)
             {
+                // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
+                cn?.Dispose();
                 // Other exceptions (e.g., application errors, auth failures) don't trip the circuit breaker
                 _logger.LogError(ex, "Failed to acquire write connection (non-connection error)");
                 throw;
@@ -240,9 +251,12 @@ namespace nORM.Core
         /// <returns>The selected replica node.</returns>
         private DatabaseTopology.DatabaseNode SelectOptimalReadReplica(IReadOnlyList<DatabaseTopology.DatabaseNode> replicas)
         {
-            // FIX: Cast to uint to handle overflow (negative numbers) gracefully
+            // INTEGER OVERFLOW FIX: Cast to uint to handle overflow (negative numbers) gracefully
+            // After ~2.1 billion increments, _readReplicaIndex overflows to negative.
+            // Casting to uint treats it as unsigned, preventing negative modulo results.
+            var count = replicas.Count; // Cache count to prevent multiple property access
             var index = (uint)Interlocked.Increment(ref _readReplicaIndex);
-            return replicas[(int)(index % replicas.Count)];
+            return replicas[(int)(index % (uint)count)];
         }
 
         private void RegisterFailure()

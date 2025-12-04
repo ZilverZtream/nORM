@@ -142,6 +142,20 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// Generates SQL that escapes wildcard characters in a SQL expression for safe use in LIKE patterns.
+        /// This is used when the LIKE pattern value comes from a runtime variable (not a constant).
+        /// </summary>
+        /// <param name="sqlExpression">The SQL expression (parameter reference or column) to escape.</param>
+        /// <returns>SQL that escapes the expression for safe use in LIKE patterns.</returns>
+        public virtual string GetLikeEscapeSql(string sqlExpression)
+        {
+            var esc = NormValidator.ValidateLikeEscapeChar(LikeEscapeChar).ToString();
+            // Generate nested REPLACE calls to escape the escape char, %, and _
+            // Example: REPLACE(REPLACE(REPLACE(value, '\', '\\'), '%', '\%'), '_', '\_')
+            return $"REPLACE(REPLACE(REPLACE({sqlExpression}, '{esc}', '{esc}{esc}'), '%', '{esc}%'), '_', '{esc}_')";
+        }
+
+        /// <summary>
         /// Ensures the provided connection is open before executing provider operations.
         /// </summary>
         /// <param name="connection">The connection to validate.</param>

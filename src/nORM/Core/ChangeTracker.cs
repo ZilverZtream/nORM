@@ -22,6 +22,7 @@ namespace nORM.Core
         private readonly ConcurrentDictionary<EntityEntry, byte> _dirtyNonNotifyingEntries = new();
         private readonly ConcurrentDictionary<EntityEntry, byte> _dirtyEntries = new();
         private readonly DbContextOptions _options;
+        private readonly object _trackLock = new object(); // Synchronizes Track operations to prevent TOCTOU races
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ChangeTracker"/> class using the
@@ -44,83 +45,106 @@ namespace nORM.Core
         /// <returns>The <see cref="EntityEntry"/> representing the tracked entity.</returns>
         internal EntityEntry Track(object entity, EntityState state, TableMapping mapping)
         {
-            // Fast path: entity already tracked by reference
-            if (_entriesByReference.TryGetValue(entity, out var existingEntry))
+            // RACE CONDITION FIX: Lock the entire operation to prevent TOCTOU between
+            // reference check and PK operations. This prevents two threads from tracking
+            // the same entity concurrently and causing state corruption.
+            lock (_trackLock)
             {
-                existingEntry.State = state;
-                // If the entity now has a primary key that wasn't tracked, add it
-                var existingPk = GetPrimaryKeyValue(entity, existingEntry.Mapping);
-                if (existingPk != null)
+                // Fast path: entity already tracked by reference
+                if (_entriesByReference.TryGetValue(entity, out var existingEntry))
+                {
+                    // Only update state if not downgrading from a "dirty" state to Unchanged
+                    // This prevents races where Added/Modified entities get reset to Unchanged
+                    if (!(existingEntry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+                          && state == EntityState.Unchanged))
+                    {
+                        existingEntry.State = state;
+                    }
+
+                    // If the entity now has a primary key that wasn't tracked, add it
+                    var existingPk = GetPrimaryKeyValue(entity, existingEntry.Mapping);
+                    if (existingPk != null)
+                    {
+                        var typeEntries = _entriesByKey.GetOrAdd(
+                            existingEntry.Mapping.Type,
+                            _ => new ConcurrentDictionary<object, EntityEntry>());
+                        typeEntries.TryAdd(existingPk, existingEntry);
+                    }
+                    return existingEntry;
+                }
+
+                var pk = GetPrimaryKeyValue(entity, mapping);
+
+                // FIX (TASK 10): Use GetOrAdd pattern to atomically check and insert by PK
+                // This prevents race conditions where two threads tracking the same entity by PK
+                // might both create entries, causing duplicate tracking or inconsistent state
+                if (pk != null)
                 {
                     var typeEntries = _entriesByKey.GetOrAdd(
-                        existingEntry.Mapping.Type,
+                        mapping.Type,
                         _ => new ConcurrentDictionary<object, EntityEntry>());
-                    typeEntries.TryAdd(existingPk, existingEntry);
+
+                    // Atomically get or create entry for this PK
+                    var pkEntry = typeEntries.GetOrAdd(pk, _ =>
+                    {
+                        // Create entry only if not already tracked by PK
+                        var newEntry = state == EntityState.Unchanged && !_options.EagerChangeTracking
+                            ? CreateLazyEntry(entity, mapping)
+                            : new EntityEntry(entity, state, mapping, _options, MarkDirty);
+
+                        // Also track by reference
+                        _entriesByReference.TryAdd(entity, newEntry);
+
+                        // Set up additional tracking
+                        if (entity is not INotifyPropertyChanged)
+                            _nonNotifyingEntries.TryAdd(newEntry, 0);
+
+                        return newEntry;
+                    });
+
+                    // If entry was created by another thread or different instance with same PK
+                    if (!ReferenceEquals(pkEntry.Entity, entity))
+                    {
+                        // Different instance with same PK - update the tracked instance's state
+                        // but don't downgrade from dirty states
+                        if (!(pkEntry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+                              && state == EntityState.Unchanged))
+                        {
+                            pkEntry.State = state;
+                        }
+                    }
+
+                    return pkEntry;
                 }
-                return existingEntry;
-            }
 
-            var pk = GetPrimaryKeyValue(entity, mapping);
+                // No PK - only track by reference
+                var entry = state == EntityState.Unchanged && !_options.EagerChangeTracking
+                    ? CreateLazyEntry(entity, mapping)
+                    : new EntityEntry(entity, state, mapping, _options, MarkDirty);
 
-            // FIX (TASK 10): Use GetOrAdd pattern to atomically check and insert by PK
-            // This prevents race conditions where two threads tracking the same entity by PK
-            // might both create entries, causing duplicate tracking or inconsistent state
-            if (pk != null)
-            {
-                var typeEntries = _entriesByKey.GetOrAdd(
-                    mapping.Type,
-                    _ => new ConcurrentDictionary<object, EntityEntry>());
-
-                // Atomically get or create entry for this PK
-                var pkEntry = typeEntries.GetOrAdd(pk, _ =>
+                if (_entriesByReference.TryAdd(entity, entry))
                 {
-                    // Create entry only if not already tracked by PK
-                    var newEntry = state == EntityState.Unchanged && !_options.EagerChangeTracking
-                        ? CreateLazyEntry(entity, mapping)
-                        : new EntityEntry(entity, state, mapping, _options, MarkDirty);
-
-                    // Also track by reference
-                    _entriesByReference.TryAdd(entity, newEntry);
-
-                    // Set up additional tracking
+                    // Successfully added - set up additional tracking
                     if (entity is not INotifyPropertyChanged)
-                        _nonNotifyingEntries.TryAdd(newEntry, 0);
-
-                    return newEntry;
-                });
-
-                // If entry was created by another thread, update state
-                if (!ReferenceEquals(pkEntry.Entity, entity))
-                {
-                    // Different instance with same PK - update the tracked instance's state
-                    pkEntry.State = state;
+                        _nonNotifyingEntries.TryAdd(entry, 0);
+                    return entry;
                 }
 
-                return pkEntry;
-            }
+                // Another thread added it between check and add
+                if (_entriesByReference.TryGetValue(entity, out var raceEntry))
+                {
+                    // Don't downgrade from dirty states
+                    if (!(raceEntry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+                          && state == EntityState.Unchanged))
+                    {
+                        raceEntry.State = state;
+                    }
+                    return raceEntry;
+                }
 
-            // No PK - only track by reference
-            var entry = state == EntityState.Unchanged && !_options.EagerChangeTracking
-                ? CreateLazyEntry(entity, mapping)
-                : new EntityEntry(entity, state, mapping, _options, MarkDirty);
-
-            if (_entriesByReference.TryAdd(entity, entry))
-            {
-                // Successfully added - set up additional tracking
-                if (entity is not INotifyPropertyChanged)
-                    _nonNotifyingEntries.TryAdd(entry, 0);
+                // Fallback: return the one we created (shouldn't normally reach here)
                 return entry;
             }
-
-            // Another thread added it between check and add
-            if (_entriesByReference.TryGetValue(entity, out var raceEntry))
-            {
-                raceEntry.State = state;
-                return raceEntry;
-            }
-
-            // Fallback: return the one we created (shouldn't normally reach here)
-            return entry;
         }
 
         /// <summary>
@@ -137,7 +161,9 @@ namespace nORM.Core
             // Minimal entry that defers property change setup
             return new EntityEntry(entity, EntityState.Unchanged, mapping, _options, MarkDirty, lazy: true);
         }
-        private const int MaxCascadeDepth = 100;
+        // CASCADE DELETE PROTECTION FIX: Reduced from 100 to 20 to prevent excessive memory usage
+        // and catch potential cycles earlier. 20 levels is still generous for legitimate hierarchies.
+        private const int MaxCascadeDepth = 20;
         /// <summary>
         /// Removes an entity from the change tracker, optionally cascading the removal
         /// to related entities that are configured for cascade delete.
@@ -208,17 +234,41 @@ namespace nORM.Core
                     {
                         foreach (var child in collection)
                         {
-                            if (child != null && visited.Add(child) &&
-                                _entriesByReference.TryGetValue(child, out var childEntry))
+                            if (child == null)
+                                continue;
+
+                            // CASCADE DELETE PROTECTION FIX: Detect cycles early with better error message
+                            if (!visited.Add(child))
+                            {
+                                // Child already visited - this indicates a circular reference
+                                throw new InvalidOperationException(
+                                    $"Circular reference detected in cascade delete at depth {depth}. " +
+                                    $"Entity type {child.GetType().Name} forms a cycle in the relationship graph. " +
+                                    "Either remove the circular reference or disable cascade delete on one of the relationships.");
+                            }
+
+                            if (_entriesByReference.TryGetValue(child, out var childEntry))
                             {
                                 queue.Enqueue((child, childEntry.Mapping, depth + 1));
                             }
                         }
                     }
-                    else if (navValue != null && visited.Add(navValue) &&
-                             _entriesByReference.TryGetValue(navValue, out var childEntry))
+                    else if (navValue != null)
                     {
-                        queue.Enqueue((navValue, childEntry.Mapping, depth + 1));
+                        // CASCADE DELETE PROTECTION FIX: Detect cycles early with better error message
+                        if (!visited.Add(navValue))
+                        {
+                            // Navigation value already visited - circular reference
+                            throw new InvalidOperationException(
+                                $"Circular reference detected in cascade delete at depth {depth}. " +
+                                $"Entity type {navValue.GetType().Name} forms a cycle in the relationship graph. " +
+                                "Either remove the circular reference or disable cascade delete on one of the relationships.");
+                        }
+
+                        if (_entriesByReference.TryGetValue(navValue, out var childEntry))
+                        {
+                            queue.Enqueue((navValue, childEntry.Mapping, depth + 1));
+                        }
                     }
                 }
             }
