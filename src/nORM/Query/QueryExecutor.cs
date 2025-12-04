@@ -424,92 +424,89 @@ namespace nORM.Query
 
             return _exceptionHandler.ExecuteWithExceptionHandling(() =>
             {
-                try
+                // PERFORMANCE FIX (TASK 13): Use cached list factory instead of Activator.CreateInstance
+                var resultList = CreateList(info.ResultType, 16);
+
+                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
+                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith("<>") && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
+
+                var outerMap = _ctx.GetMapping(info.OuterType);
+                var innerMap = _ctx.GetMapping(info.InnerType);
+
+                var outerColumnCount = outerMap.Columns.Length;
+                var innerKeyIndex = outerColumnCount + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
+
+                using var reader = cmd.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+
+                object? currentOuter = null;
+                object? currentKey = null;
+                List<object> currentChildren = new();
+
+                while (reader.Read())
                 {
-                    // PERFORMANCE FIX (TASK 13): Use cached list factory instead of Activator.CreateInstance
-                    var resultList = CreateList(info.ResultType, 16);
+                    var outer = plan.Materializer(reader, default).GetAwaiter().GetResult();
+                    var key = info.OuterKeySelector(outer) ?? DBNull.Value;
 
-                    var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
-                    var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith("<>") && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
-
-                    var outerMap = _ctx.GetMapping(info.OuterType);
-                    var innerMap = _ctx.GetMapping(info.InnerType);
-
-                    var outerColumnCount = outerMap.Columns.Length;
-                    var innerKeyIndex = outerColumnCount + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
-
-                    using var reader = cmd.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
-
-                    object? currentOuter = null;
-                    object? currentKey = null;
-                    List<object> currentChildren = new();
-
-                    while (reader.Read())
+                    if (currentOuter == null || !Equals(currentKey, key))
                     {
-                        var outer = plan.Materializer(reader, default).GetAwaiter().GetResult();
-                        var key = info.OuterKeySelector(outer) ?? DBNull.Value;
-
-                        if (currentOuter == null || !Equals(currentKey, key))
+                        if (currentOuter != null)
                         {
-                            if (currentOuter != null)
-                            {
-                                var list = CreateListFromItems(info.InnerType, currentChildren);
-                                // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
-                                var result = info.ResultSelector(currentOuter, list.Cast<object>());
-                                resultList.Add(result);
-                                currentChildren = new List<object>();
-                            }
-
-                            if (trackOuter)
-                            {
-                                var actualMap = _ctx.GetMapping(outer.GetType());
-                                var entry = _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
-                                outer = entry.Entity!;
-                                NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
-                            }
-
-                            currentOuter = outer;
-                            currentKey = key;
+                            var list = CreateListFromItems(info.InnerType, currentChildren);
+                            // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
+                            var result = info.ResultSelector(currentOuter, list.Cast<object>());
+                            resultList.Add(result);
+                            currentChildren = new List<object>();
                         }
 
-                        if (!reader.IsDBNull(innerKeyIndex))
+                        if (trackOuter)
                         {
-                            // FIX (TASK 5): Use configurable MaxGroupJoinSize instead of hard-coded limit
-                            var maxSize = _ctx.Options.MaxGroupJoinSize;
-                            if (currentChildren.Count >= maxSize)
-                            {
-                                throw new NormQueryException(
-                                    $"GroupJoin safety limit exceeded: A single group has more than {maxSize} children. " +
-                                    "This may indicate a malformed query or incorrect join keys. " +
-                                    "To increase this limit, set DbContextOptions.MaxGroupJoinSize to a higher value. " +
-                                    "Review your GroupJoin operation and ensure join keys are correct.");
-                            }
-
-                            var inner = MaterializeEntity(reader, innerMap, outerColumnCount, default);
-                            if (trackInner)
-                            {
-                                var actualMap = _ctx.GetMapping(inner.GetType());
-                                var entry = _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualMap);
-                                inner = entry.Entity!;
-                                NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
-                            }
-                            currentChildren.Add(inner);
+                            var actualMap = _ctx.GetMapping(outer.GetType());
+                            var entry = _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
+                            outer = entry.Entity!;
+                            NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
                         }
+
+                        currentOuter = outer;
+                        currentKey = key;
                     }
 
-                    if (currentOuter != null)
+                    if (!reader.IsDBNull(innerKeyIndex))
                     {
-                        var list = CreateListFromItems(info.InnerType, currentChildren);
-                        // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
-                        var result = info.ResultSelector(currentOuter, list.Cast<object>());
-                        resultList.Add(result);
-                    }
+                        // FIX (TASK 5): Use configurable MaxGroupJoinSize instead of hard-coded limit
+                        var maxSize = _ctx.Options.MaxGroupJoinSize;
+                        if (currentChildren.Count >= maxSize)
+                        {
+                            throw new NormQueryException(
+                                $"GroupJoin safety limit exceeded: A single group has more than {maxSize} children. " +
+                                "This may indicate a malformed query or incorrect join keys. " +
+                                "To increase this limit, set DbContextOptions.MaxGroupJoinSize to a higher value. " +
+                                "Review your GroupJoin operation and ensure join keys are correct.");
+                        }
 
-                    return Task.FromResult(resultList);
+                        var inner = MaterializeEntity(reader, innerMap, outerColumnCount, default);
+                        if (trackInner)
+                        {
+                            var actualMap = _ctx.GetMapping(inner.GetType());
+                            var entry = _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualMap);
+                            inner = entry.Entity!;
+                            NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
+                        }
+                        currentChildren.Add(inner);
+                    }
                 }
+
+                if (currentOuter != null)
+                {
+                    var list = CreateListFromItems(info.InnerType, currentChildren);
+                    // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
+                    var result = info.ResultSelector(currentOuter, list.Cast<object>());
+                    resultList.Add(result);
+                }
+
                 // DISPOSAL RACE FIX: Removed redundant manual Dispose in catch block
                 // The command is already owned by the calling method (Materialize) via "using var command = cmd"
                 // Manual disposal here causes double-dispose which can mask original exceptions
+                return Task.FromResult(resultList);
             }, "MaterializeGroupJoin", new Dictionary<string, object> { ["Sql"] = cmd.CommandText }).GetAwaiter().GetResult();
 
             static object MaterializeEntity(DbDataReader reader, TableMapping map, int offset, CancellationToken ct)
