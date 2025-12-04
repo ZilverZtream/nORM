@@ -458,11 +458,12 @@ namespace nORM.Core
                 // RELIABILITY FIX: Use Task.WaitAsync instead of Task.Wait to avoid potential deadlock
                 // Task.Wait() can deadlock in certain SynchronizationContext scenarios (e.g., WPF, WinForms)
                 // WaitAsync with timeout is safer and works correctly in all contexts
-                if (!_healthCheckTask.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult())
-                {
-                    // Task didn't complete in time, but we've already canceled it.
-                    // The cancellation token will eventually cause it to exit.
-                }
+                _healthCheckTask.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+            }
+            catch (TimeoutException)
+            {
+                // Task didn't complete in time, but we've already canceled it.
+                // The cancellation token will eventually cause it to exit.
             }
             catch
             {
