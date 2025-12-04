@@ -240,8 +240,9 @@ namespace nORM.Core
         /// <returns>The selected replica node.</returns>
         private DatabaseTopology.DatabaseNode SelectOptimalReadReplica(IReadOnlyList<DatabaseTopology.DatabaseNode> replicas)
         {
-            var index = Interlocked.Increment(ref _readReplicaIndex);
-            return replicas[index % replicas.Count];
+            // FIX: Cast to uint to handle overflow (negative numbers) gracefully
+            var index = (uint)Interlocked.Increment(ref _readReplicaIndex);
+            return replicas[(int)(index % replicas.Count)];
         }
 
         private void RegisterFailure()
