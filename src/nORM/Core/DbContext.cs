@@ -44,12 +44,15 @@ namespace nORM.Core
         // PERFORMANCE FIX (TASK 3): Static cache to avoid recreating for every DbContext instance
         // Dynamic type generation is expensive (uses Reflection.Emit), so cache should be shared
         // across all DbContext instances in the application.
-        private static readonly ConcurrentDictionary<string, Lazy<Task<Type>>> _dynamicTypeCache = new();
+        // MEMORY LEAK FIX: Use LRU cache instead of unbounded ConcurrentDictionary to prevent
+        // unbounded memory growth as new dynamic types are generated
+        private static readonly ConcurrentLruCache<string, Lazy<Task<Type>>> _dynamicTypeCache = new(capacity: 1000);
         private readonly LinkedList<WeakReference<IDisposable>> _disposables = new();
         private readonly object _disposablesLock = new();
         private readonly Timer _cleanupTimer;
         private bool _providerInitialized;
         private readonly SemaphoreSlim _providerInitLock = new(1, 1);
+        private readonly object _providerInitSyncLock = new object(); // For synchronous initialization to avoid deadlock
         private readonly Lazy<Task>? _temporalInit;
         private DbTransaction? _currentTransaction; // Access via Interlocked.* only
         private bool _disposed;
@@ -203,18 +206,15 @@ namespace nORM.Core
                 _cn.Open();
             if (!_providerInitialized)
             {
-                _providerInitLock.Wait();
-                try
+                // PROVIDER INITIALIZATION RACE FIX: Use regular lock instead of SemaphoreSlim.Wait()
+                // to avoid deadlock in synchronous contexts (ASP.NET, UI threads with sync context)
+                lock (_providerInitSyncLock)
                 {
                     if (!_providerInitialized)
                     {
                         _p.InitializeConnection(_cn);
                         _providerInitialized = true;
                     }
-                }
-                finally
-                {
-                    _providerInitLock.Release();
                 }
             }
             return _cn;
@@ -228,42 +228,57 @@ namespace nORM.Core
             //
             // PERFORMANCE FIX: Use case-insensitive comparisons instead of ToUpperInvariant()
             // to avoid allocating a new string on every database operation.
+            //
+            // TIMEOUT CALCULATION FIX: Limit SQL scanning for very large queries to avoid performance issues
             int baseComplexity = 1;
 
             if (!string.IsNullOrEmpty(sql))
             {
-                // Base complexity from SQL length (normalized)
-                baseComplexity = 1 + (sql.Length / 100);
+                // PERFORMANCE FIX: Skip detailed analysis for extremely large SQL (>100KB)
+                // Scanning multi-megabyte strings with Contains/IndexOf causes severe slowdown
+                // For large SQL, estimate complexity from length only
+                if (sql.Length > 102400) // 100KB threshold
+                {
+                    baseComplexity = 20 + Math.Min(30, sql.Length / 10000); // Scale with size, cap at 50
+                    Options.Logger?.LogDebug(
+                        "Skipping detailed complexity analysis for large SQL ({Length} chars). Using length-based estimate: {Complexity}",
+                        sql.Length, baseComplexity);
+                }
+                else
+                {
+                    // Base complexity from SQL length (normalized)
+                    baseComplexity = 1 + (sql.Length / 100);
 
-                // Enhanced complexity signals with improved weighting
-                // OPTIMIZATION: Use StringComparison.OrdinalIgnoreCase to avoid allocating upperSql
+                    // Enhanced complexity signals with improved weighting
+                    // OPTIMIZATION: Use StringComparison.OrdinalIgnoreCase to avoid allocating upperSql
 
-                // High-cost operations (significant complexity increase)
-                int joinCount = CountOccurrences(sql, "JOIN", StringComparison.OrdinalIgnoreCase);
-                if (joinCount > 0) baseComplexity += 2 * joinCount; // Multiple joins are expensive
+                    // High-cost operations (significant complexity increase)
+                    int joinCount = CountOccurrences(sql, "JOIN", StringComparison.OrdinalIgnoreCase);
+                    if (joinCount > 0) baseComplexity += 2 * joinCount; // Multiple joins are expensive
 
-                if (sql.Contains("UNION", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3; // Set operations are costly
-                if (sql.Contains("INTERSECT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3;
-                if (sql.Contains("EXCEPT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3;
+                    if (sql.Contains("UNION", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3; // Set operations are costly
+                    if (sql.Contains("INTERSECT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3;
+                    if (sql.Contains("EXCEPT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3;
 
-                // Medium-cost operations
-                if (sql.Contains("GROUP BY", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
-                if (sql.Contains("HAVING", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
-                if (sql.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
+                    // Medium-cost operations
+                    if (sql.Contains("GROUP BY", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
+                    if (sql.Contains("HAVING", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
+                    if (sql.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
 
-                // Subqueries add significant complexity
-                int subqueryCount = CountOccurrences(sql, "SELECT", StringComparison.OrdinalIgnoreCase) - 1; // Subtract main SELECT
-                if (subqueryCount > 0) baseComplexity += 2 * subqueryCount;
+                    // Subqueries add significant complexity
+                    int subqueryCount = CountOccurrences(sql, "SELECT", StringComparison.OrdinalIgnoreCase) - 1; // Subtract main SELECT
+                    if (subqueryCount > 0) baseComplexity += 2 * subqueryCount;
 
-                // Other complexity indicators
-                if (sql.Contains("DISTINCT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
-                if (sql.Contains("CROSS JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3; // Cartesian products are very expensive
-                if (sql.Contains("LEFT JOIN", StringComparison.OrdinalIgnoreCase) || sql.Contains("RIGHT JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
-                if (sql.Contains("OUTER JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
+                    // Other complexity indicators
+                    if (sql.Contains("DISTINCT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
+                    if (sql.Contains("CROSS JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3; // Cartesian products are very expensive
+                    if (sql.Contains("LEFT JOIN", StringComparison.OrdinalIgnoreCase) || sql.Contains("RIGHT JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
+                    if (sql.Contains("OUTER JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
 
-                // Window functions and CTEs
-                if (sql.Contains("OVER(", StringComparison.OrdinalIgnoreCase) || sql.Contains("OVER (", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
-                if (sql.Contains("WITH", StringComparison.OrdinalIgnoreCase) && sql.Contains("AS(", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2; // CTE
+                    // Window functions and CTEs
+                    if (sql.Contains("OVER(", StringComparison.OrdinalIgnoreCase) || sql.Contains("OVER (", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
+                    if (sql.Contains("WITH", StringComparison.OrdinalIgnoreCase) && sql.Contains("AS(", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2; // CTE
+                }
 
                 // Cap complexity to avoid extreme timeouts
                 baseComplexity = Math.Min(baseComplexity, 50);

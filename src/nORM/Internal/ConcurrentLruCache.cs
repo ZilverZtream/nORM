@@ -175,15 +175,19 @@ namespace nORM.Internal
                     _lruList.AddFirst(newNode);
                 }
 
-                // PERFORMANCE FIX (TASK 3): Sample only the tail portion to choose an eviction candidate
-                // Inspecting a small, fixed window keeps eviction O(1) and avoids deep traversal under lock
+                // PERFORMANCE FIX (TASK 3): Sample tail portion to choose eviction candidate
+                // LRU CACHE EVICTION FIX: Scale sample window with cache size for better hit rate
+                // Fixed window of 20 is insufficient for large caches (only 2% of 1000-entry cache)
                 if (_lruList.Count > _maxSize)
                 {
-                    const int sampleWindow = 20;
+                    // Sample 10% of cache entries with min=20, max=100 for balanced performance
+                    // This adapts to cache size: small caches sample more %, large caches cap at 100
+                    var sampleWindow = Math.Min(100, Math.Max(20, _maxSize / 10));
+
                     LinkedListNode<CacheItem>? oldestNode = null;
                     long oldestTicks = long.MaxValue;
 
-                    // Walk a limited number of nodes starting from the tail (LRU end)
+                    // Walk sampled nodes starting from the tail (LRU end)
                     var node = _lruList.Last;
                     for (int i = 0; i < sampleWindow && node != null; i++)
                     {
