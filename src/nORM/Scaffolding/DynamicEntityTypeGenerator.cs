@@ -1,29 +1,42 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Data.Common;
-using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
+using System.Reflection.Emit;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.Extensions.ObjectPool;
 
 namespace nORM.Scaffolding
 {
     /// <summary>
     /// Generates entity types at runtime based on database schema information.
+    /// MEMORY LEAK FIX: Reuses a single ModuleBuilder instead of creating new assemblies per type.
     /// </summary>
     public class DynamicEntityTypeGenerator
     {
-        private sealed record ColumnInfo(string ColumnName, string PropertyName, string TypeName, bool IsKey, bool IsAuto, int? MaxLength);
-        private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
-            new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
+        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool IsKey, bool IsAuto, int? MaxLength);
+
+        // MEMORY LEAK FIX: Shared static AssemblyBuilder and ModuleBuilder for all generated types
+        // This prevents unloadable assembly accumulation when types are evicted from cache
+        private static readonly AssemblyBuilder _sharedAssembly;
+        private static readonly ModuleBuilder _sharedModule;
+        private static int _typeCounter = 0;
+
+        static DynamicEntityTypeGenerator()
+        {
+            // Initialize shared assembly and module once for all dynamic types
+            var assemblyName = new AssemblyName("nORM.Dynamic.Entities");
+            _sharedAssembly = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+            _sharedModule = _sharedAssembly.DefineDynamicModule("MainModule");
+        }
 
         /// <summary>
         /// Generates a CLR type representing the specified table asynchronously.
+        /// MEMORY LEAK FIX: Uses shared ModuleBuilder instead of creating new assemblies.
         /// </summary>
         /// <param name="connection">Database connection.</param>
         /// <param name="tableName">Name of the table to generate. May include schema (schema.table).</param>
@@ -35,62 +48,15 @@ namespace nORM.Scaffolding
             if (connection.State != ConnectionState.Open)
                 await connection.OpenAsync().ConfigureAwait(false);
 
-            var className = EscapeCSharpIdentifier(ToPascalCase(GetUnqualifiedName(tableName)));
             var (schemaName, bareTable) = SplitSchema(tableName);
             var columns = GetTableSchema(connection, schemaName, bareTable);
 
-            var sb = _stringBuilderPool.Get();
-            try
-            {
-                sb.AppendLine("using System;");
-                sb.AppendLine("using System.ComponentModel.DataAnnotations;");
-                sb.AppendLine("using System.ComponentModel.DataAnnotations.Schema;");
-                sb.AppendLine($"namespace nORM.Dynamic {{ public class {className} {{");
-
-                foreach (var col in columns)
-                {
-                    if (col.IsKey) sb.AppendLine("    [Key]");
-                    if (col.IsAuto) sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
-                    if (col.MaxLength.HasValue) sb.AppendLine($"    [MaxLength({col.MaxLength.Value})]");
-                    sb.AppendLine($"    [Column(\"{col.ColumnName}\")]");
-                    sb.AppendLine($"    public {col.TypeName} {col.PropertyName} {{ get; set; }}");
-                }
-
-                sb.AppendLine("} }");
-                var syntaxTree = CSharpSyntaxTree.ParseText(sb.ToString());
-
-                var references = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
-                    .Select(a => MetadataReference.CreateFromFile(a.Location));
-
-                var compilation = CSharpCompilation.Create(
-                    "nORM.Dynamic.Entities",
-                    new[] { syntaxTree },
-                    references,
-                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-                using var ms = new MemoryStream();
-                var result = compilation.Emit(ms);
-                if (!result.Success)
-                {
-                    var errors = string.Join(Environment.NewLine, result.Diagnostics
-                        .Where(d => d.Severity == DiagnosticSeverity.Error)
-                        .Select(d => d.ToString()));
-                    throw new InvalidOperationException($"Failed to generate dynamic entity type. {errors}");
-                }
-                ms.Seek(0, SeekOrigin.Begin);
-                var assembly = Assembly.Load(ms.ToArray());
-                return assembly.GetType($"nORM.Dynamic.{className}")!;
-            }
-            finally
-            {
-                sb.Clear();
-                _stringBuilderPool.Return(sb);
-            }
+            return BuildDynamicType(tableName, columns);
         }
 
         /// <summary>
         /// Generates a CLR type representing the specified table.
+        /// MEMORY LEAK FIX: Uses shared ModuleBuilder instead of creating new assemblies.
         /// </summary>
         /// <param name="connection">Open database connection.</param>
         /// <param name="tableName">Name of the table to generate. May include schema (schema.table).</param>
@@ -102,58 +68,100 @@ namespace nORM.Scaffolding
             if (connection.State != ConnectionState.Open)
                 connection.Open();
 
-            var className = EscapeCSharpIdentifier(ToPascalCase(GetUnqualifiedName(tableName)));
             var (schemaName, bareTable) = SplitSchema(tableName);
             var columns = GetTableSchema(connection, schemaName, bareTable);
 
-            var sb = _stringBuilderPool.Get();
-            try
-            {
-                sb.AppendLine("using System;");
-                sb.AppendLine("using System.ComponentModel.DataAnnotations;");
-                sb.AppendLine("using System.ComponentModel.DataAnnotations.Schema;");
-                sb.AppendLine($"namespace nORM.Dynamic {{ public class {className} {{");
+            return BuildDynamicType(tableName, columns);
+        }
 
-                foreach (var col in columns)
+        /// <summary>
+        /// MEMORY LEAK FIX: Builds a dynamic type using the shared ModuleBuilder.
+        /// All generated types reuse the same assembly and module, preventing memory leaks.
+        /// </summary>
+        private static Type BuildDynamicType(string tableName, IEnumerable<ColumnInfo> columns)
+        {
+            var className = EscapeCSharpIdentifier(ToPascalCase(GetUnqualifiedName(tableName)));
+
+            // Generate unique type name to avoid conflicts when same table is regenerated
+            var typeId = Interlocked.Increment(ref _typeCounter);
+            var uniqueTypeName = $"nORM.Dynamic.{className}_{typeId}";
+
+            // Create type using shared module
+            var typeBuilder = _sharedModule.DefineType(
+                uniqueTypeName,
+                TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed,
+                typeof(object));
+
+            // Add parameterless constructor
+            var ctor = typeBuilder.DefineDefaultConstructor(
+                MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName);
+
+            // Add properties for each column
+            foreach (var col in columns)
+            {
+                var propertyType = col.PropertyType;
+                var fieldBuilder = typeBuilder.DefineField($"_{col.PropertyName}", propertyType, FieldAttributes.Private);
+                var propertyBuilder = typeBuilder.DefineProperty(col.PropertyName, PropertyAttributes.HasDefault, propertyType, null);
+
+                // Add [Column] attribute
+                var columnAttrCtor = typeof(ColumnAttribute).GetConstructor(new[] { typeof(string) })!;
+                var columnAttr = new CustomAttributeBuilder(columnAttrCtor, new object[] { col.ColumnName });
+                propertyBuilder.SetCustomAttribute(columnAttr);
+
+                // Add [Key] attribute if needed
+                if (col.IsKey)
                 {
-                    if (col.IsKey) sb.AppendLine("    [Key]");
-                    if (col.IsAuto) sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
-                    if (col.MaxLength.HasValue) sb.AppendLine($"    [MaxLength({col.MaxLength.Value})]");
-                    sb.AppendLine($"    [Column(\"{col.ColumnName}\")]");
-                    sb.AppendLine($"    public {col.TypeName} {col.PropertyName} {{ get; set; }}");
+                    var keyAttrCtor = typeof(KeyAttribute).GetConstructor(Type.EmptyTypes)!;
+                    var keyAttr = new CustomAttributeBuilder(keyAttrCtor, Array.Empty<object>());
+                    propertyBuilder.SetCustomAttribute(keyAttr);
                 }
 
-                sb.AppendLine("} }");
-                var syntaxTree = CSharpSyntaxTree.ParseText(sb.ToString());
-
-                var references = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
-                    .Select(a => MetadataReference.CreateFromFile(a.Location));
-
-                var compilation = CSharpCompilation.Create(
-                    "nORM.Dynamic.Entities",
-                    new[] { syntaxTree },
-                    references,
-                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-                using var ms = new MemoryStream();
-                var result = compilation.Emit(ms);
-                if (!result.Success)
+                // Add [DatabaseGenerated] attribute if needed
+                if (col.IsAuto)
                 {
-                    var errors = string.Join(Environment.NewLine, result.Diagnostics
-                        .Where(d => d.Severity == DiagnosticSeverity.Error)
-                        .Select(d => d.ToString()));
-                    throw new InvalidOperationException($"Failed to generate dynamic entity type. {errors}");
+                    var dbGenAttrCtor = typeof(DatabaseGeneratedAttribute).GetConstructor(new[] { typeof(DatabaseGeneratedOption) })!;
+                    var dbGenAttr = new CustomAttributeBuilder(dbGenAttrCtor, new object[] { DatabaseGeneratedOption.Identity });
+                    propertyBuilder.SetCustomAttribute(dbGenAttr);
                 }
-                ms.Seek(0, SeekOrigin.Begin);
-                var assembly = Assembly.Load(ms.ToArray());
-                return assembly.GetType($"nORM.Dynamic.{className}")!;
+
+                // Add [MaxLength] attribute if needed
+                if (col.MaxLength.HasValue)
+                {
+                    var maxLenAttrCtor = typeof(MaxLengthAttribute).GetConstructor(new[] { typeof(int) })!;
+                    var maxLenAttr = new CustomAttributeBuilder(maxLenAttrCtor, new object[] { col.MaxLength.Value });
+                    propertyBuilder.SetCustomAttribute(maxLenAttr);
+                }
+
+                // Define getter
+                var getMethod = typeBuilder.DefineMethod(
+                    $"get_{col.PropertyName}",
+                    MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+                    propertyType,
+                    Type.EmptyTypes);
+
+                var getIl = getMethod.GetILGenerator();
+                getIl.Emit(OpCodes.Ldarg_0);
+                getIl.Emit(OpCodes.Ldfld, fieldBuilder);
+                getIl.Emit(OpCodes.Ret);
+
+                // Define setter
+                var setMethod = typeBuilder.DefineMethod(
+                    $"set_{col.PropertyName}",
+                    MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+                    null,
+                    new[] { propertyType });
+
+                var setIl = setMethod.GetILGenerator();
+                setIl.Emit(OpCodes.Ldarg_0);
+                setIl.Emit(OpCodes.Ldarg_1);
+                setIl.Emit(OpCodes.Stfld, fieldBuilder);
+                setIl.Emit(OpCodes.Ret);
+
+                propertyBuilder.SetGetMethod(getMethod);
+                propertyBuilder.SetSetMethod(setMethod);
             }
-            finally
-            {
-                sb.Clear();
-                _stringBuilderPool.Return(sb);
-            }
+
+            return typeBuilder.CreateType()!;
         }
 
         private static IEnumerable<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
@@ -169,7 +177,9 @@ namespace nORM.Scaffolding
                 var propName = EscapeCSharpIdentifier(ToPascalCase(colName));
                 var clrType = (Type)row["DataType"]!;
                 var allowNull = row["AllowDBNull"] is bool b && b;
-                var typeName = GetTypeName(clrType, allowNull);
+
+                // MEMORY LEAK FIX: Return actual Type instead of string
+                var propertyType = GetPropertyType(clrType, allowNull);
 
                 var isKey = schema.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
                 var isAuto = schema.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai;
@@ -181,7 +191,7 @@ namespace nORM.Scaffolding
                         maxLength = size;
                 }
 
-                yield return new ColumnInfo(colName, propName, typeName, isKey, isAuto, maxLength);
+                yield return new ColumnInfo(colName, propName, propertyType, isKey, isAuto, maxLength);
             }
         }
 
@@ -220,54 +230,41 @@ namespace nORM.Scaffolding
             return idx >= 0 ? identifier[(idx + 1)..] : identifier;
         }
 
-        private static string GetTypeName(Type type, bool allowNull)
+        /// <summary>
+        /// MEMORY LEAK FIX: Returns actual Type for properties instead of string representation.
+        /// This allows TypeBuilder to work with actual types.
+        /// </summary>
+        private static Type GetPropertyType(Type type, bool allowNull)
         {
-            string name = type == typeof(byte[]) ? "byte[]" : type switch
+            // For reference types (including string), nullability is implicit
+            if (!type.IsValueType)
             {
-                var t when t == typeof(int) => "int",
-                var t when t == typeof(long) => "long",
-                var t when t == typeof(short) => "short",
-                var t when t == typeof(byte) => "byte",
-                var t when t == typeof(bool) => "bool",
-                var t when t == typeof(string) => "string",
-                var t when t == typeof(DateTime) => "DateTime",
-                var t when t == typeof(decimal) => "decimal",
-                var t when t == typeof(double) => "double",
-                var t when t == typeof(float) => "float",
-                var t when t == typeof(Guid) => "Guid",
-                _ => type.FullName ?? type.Name
-            };
+                return type;
+            }
+
+            // For value types that allow null, wrap in Nullable<T>
             if (allowNull)
             {
-                if (name.EndsWith("[]", StringComparison.Ordinal))
-                    name += "?";
-                else if (type.IsValueType || type == typeof(string))
-                    name += "?";
-                else
-                    name += "?";
+                return typeof(Nullable<>).MakeGenericType(type);
             }
-            return name;
+
+            return type;
         }
 
         private static string ToPascalCase(string name)
         {
             var parts = name.Split(new[] { '_', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            var sb = _stringBuilderPool.Get();
-            try
+            var result = string.Empty;
+            foreach (var part in parts)
             {
-                foreach (var part in parts)
+                if (part.Length > 0)
                 {
-                    sb.Append(char.ToUpperInvariant(part[0]));
+                    result += char.ToUpperInvariant(part[0]);
                     if (part.Length > 1)
-                        sb.Append(part[1..].ToLowerInvariant());
+                        result += part[1..].ToLowerInvariant();
                 }
-                return sb.ToString();
             }
-            finally
-            {
-                sb.Clear();
-                _stringBuilderPool.Return(sb);
-            }
+            return result;
         }
 
         private static string EscapeCSharpIdentifier(string identifier)
