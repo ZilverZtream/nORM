@@ -254,8 +254,19 @@ END;";
                              transaction.GetType().GetMethod("Savepoint", new[] { typeof(string) });
             if (saveMethod != null)
             {
-                saveMethod.Invoke(transaction, new object[] { name });
-                return Task.CompletedTask;
+                try
+                {
+                    saveMethod.Invoke(transaction, new object[] { name });
+                    return Task.CompletedTask;
+                }
+                catch (System.Reflection.TargetInvocationException ex)
+                {
+                    // RELIABILITY FIX: Unwrap and rethrow the inner exception from reflection invoke
+                    // TargetInvocationException wraps the actual database exception, making it harder to handle
+                    if (ex.InnerException != null)
+                        throw ex.InnerException;
+                    throw;
+                }
             }
             throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
@@ -272,8 +283,19 @@ END;";
                                  transaction.GetType().GetMethod("RollbackToSavepoint", new[] { typeof(string) });
             if (rollbackMethod != null)
             {
-                rollbackMethod.Invoke(transaction, new object[] { name });
-                return Task.CompletedTask;
+                try
+                {
+                    rollbackMethod.Invoke(transaction, new object[] { name });
+                    return Task.CompletedTask;
+                }
+                catch (System.Reflection.TargetInvocationException ex)
+                {
+                    // RELIABILITY FIX: Unwrap and rethrow the inner exception from reflection invoke
+                    // TargetInvocationException wraps the actual database exception, making it harder to handle
+                    if (ex.InnerException != null)
+                        throw ex.InnerException;
+                    throw;
+                }
             }
             throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }

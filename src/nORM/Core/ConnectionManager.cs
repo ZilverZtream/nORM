@@ -455,9 +455,10 @@ namespace nORM.Core
 
             try
             {
-                // Wait for the health check task to complete, with a reasonable timeout
-                // If it doesn't complete within 10 seconds, we'll give up to avoid blocking forever
-                if (!_healthCheckTask.Wait(TimeSpan.FromSeconds(10)))
+                // RELIABILITY FIX: Use Task.WaitAsync instead of Task.Wait to avoid potential deadlock
+                // Task.Wait() can deadlock in certain SynchronizationContext scenarios (e.g., WPF, WinForms)
+                // WaitAsync with timeout is safer and works correctly in all contexts
+                if (!_healthCheckTask.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult())
                 {
                     // Task didn't complete in time, but we've already canceled it.
                     // The cancellation token will eventually cause it to exit.
