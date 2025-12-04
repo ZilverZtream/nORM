@@ -168,6 +168,7 @@ namespace nORM.Query
         /// <summary>
         /// DEADLOCK FIX (TASK 17): Synchronous query execution that doesn't block on async methods.
         /// Used by IEnumerable.GetEnumerator() to avoid deadlocks from GetAwaiter().GetResult().
+        /// THREAD STARVATION FIX: Now uses true synchronous execution path instead of blocking on async code.
         /// </summary>
         public TResult ExecuteSync<TResult>(Expression expression)
         {
@@ -175,9 +176,8 @@ namespace nORM.Query
             {
                 return ExecuteSimpleSync<TResult>(sql, parameters);
             }
-            // For complex queries, fall back to synchronous execution via ExecuteAsync
-            // This is safe because we're not blocking on it from a synchronization context
-            return ExecuteAsync<TResult>(expression, CancellationToken.None).GetAwaiter().GetResult();
+            // THREAD STARVATION FIX: Use true synchronous execution path
+            return ExecuteInternalSync<TResult>(expression);
         }
         public object? Execute(Expression expression) => Execute<object>(expression);
         public Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken ct)
@@ -825,6 +825,131 @@ namespace nORM.Query
             // PERFORMANCE FIX: Direct list access instead of Cast<object>().First()
             return list.Count > 0 ? (TResult)list[0]! : default!;
         }
+
+        /// <summary>
+        /// THREAD STARVATION FIX: True synchronous execution path for complex queries.
+        /// Uses synchronous ADO.NET methods instead of blocking on async code.
+        /// </summary>
+        private TResult ExecuteInternalSync<TResult>(Expression expression)
+        {
+            var sw = Stopwatch.StartNew();
+            var plan = GetPlan(expression, out var filtered, out var paramValues);
+            IReadOnlyDictionary<string, object>? parameterDictionary = null;
+            IReadOnlyDictionary<string, object> GetParameterDictionary()
+            {
+                parameterDictionary ??= EnsureParameterDictionary(plan, paramValues);
+                return parameterDictionary;
+            }
+
+            Func<TResult> queryExecutorFactory = () =>
+            {
+                _ctx.EnsureConnection();
+                using var cmd = _ctx.Connection.CreateCommand();
+                cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+                cmd.CommandText = plan.Sql;
+                foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
+
+                if (paramValues != null)
+                {
+                    for (int i = 0; i < plan.CompiledParameters.Count; i++)
+                    {
+                        var name = plan.CompiledParameters[i];
+                        var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
+                        cmd.AddOptimizedParam(name, value);
+                    }
+                }
+
+                object result;
+                if (plan.IsScalar)
+                {
+                    var scalarResult = cmd.ExecuteScalarWithInterception(_ctx);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
+                    if (scalarResult == null || scalarResult is DBNull) return default(TResult)!;
+                    result = ConvertScalarResult<TResult>(scalarResult)!;
+                }
+                else
+                {
+                    var list = _executor.Materialize(plan, cmd);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw.Elapsed, list.Count);
+                    if (plan.SingleResult)
+                    {
+                        result = plan.MethodName switch
+                        {
+                            "First" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                            "FirstOrDefault" => list.Count > 0 ? list[0] : null,
+                            "Single" => list.Count == 1 ? list[0] : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
+                            "SingleOrDefault" => list.Count == 0 ? null : list.Count == 1 ? list[0] : throw new InvalidOperationException("Sequence contains more than one element"),
+                            "ElementAt" => list.Count > 0 ? list[0] : throw new ArgumentOutOfRangeException("index"),
+                            "ElementAtOrDefault" => list.Count > 0 ? list[0] : null,
+                            "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                            "LastOrDefault" => list.Count > 0 ? list[0] : null,
+                            _ => list
+                        } ?? (object)list;
+                    }
+                    else
+                    {
+                        if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
+                        {
+                            var countList = nonGenericList.Count;
+                            var covariantList = new List<object>(countList);
+                            for (int i = 0; i < countList; i++)
+                            {
+                                covariantList.Add(nonGenericList[i]!);
+                            }
+                            result = covariantList;
+                        }
+                        else
+                        {
+                            result = list;
+                        }
+                    }
+                }
+                return (TResult)result!;
+            };
+
+            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
+            {
+                var cacheKey = BuildCacheKeyWithValues<TResult>(plan, GetParameterDictionary());
+                var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
+                return ExecuteWithCacheSync(cacheKey, plan.Tables, expiration, queryExecutorFactory);
+            }
+            else
+            {
+                return queryExecutorFactory();
+            }
+        }
+
+        /// <summary>
+        /// THREAD STARVATION FIX: Synchronous cache execution wrapper.
+        /// </summary>
+        private TResult ExecuteWithCacheSync<TResult>(string cacheKey, IReadOnlyCollection<string> tables, TimeSpan expiration, Func<TResult> factory)
+        {
+            var cache = _ctx.Options.CacheProvider;
+            if (cache == null)
+                return factory();
+
+            if (cache.TryGet(cacheKey, out TResult? cached))
+                return cached!;
+
+            var semaphore = _cacheLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
+            semaphore.Wait();
+            try
+            {
+                if (!cache.TryGet(cacheKey, out cached))
+                {
+                    cached = factory();
+                    cache.Set(cacheKey, cached!, expiration, tables);
+                }
+                return cached!;
+            }
+            finally
+            {
+                semaphore.Release();
+                if (semaphore.CurrentCount == 1)
+                    _cacheLocks.TryRemove(cacheKey, out _);
+            }
+        }
+
         private static Expression StripQuotes(Expression e)
         {
             while (e.NodeType == ExpressionType.Quote)
