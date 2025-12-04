@@ -16,6 +16,8 @@ using nORM.SourceGeneration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
+#pragma warning disable IDE0130
+
 namespace nORM.Query
 {
     /// <summary>

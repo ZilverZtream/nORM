@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using Microsoft.Extensions.Logging;
 using nORM.Configuration;
 using nORM.Mapping;
 using RefComparer = System.Collections.Generic.ReferenceEqualityComparer;
