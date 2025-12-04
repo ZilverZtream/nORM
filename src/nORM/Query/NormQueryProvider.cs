@@ -771,7 +771,7 @@ namespace nORM.Query
             return true;
         }
 
-        private bool TryBuildCountWhereClause(LambdaExpression lambda, EntityMap map, Dictionary<string, object> parameters, out string whereClause, bool populateParameters)
+        private bool TryBuildCountWhereClause(LambdaExpression lambda, TableMapping map, Dictionary<string, object> parameters, out string whereClause, bool populateParameters)
         {
             whereClause = string.Empty;
 
