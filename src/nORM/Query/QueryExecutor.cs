@@ -156,7 +156,7 @@ namespace nORM.Query
                 // Execute dependent queries for nested collections (split query for projections)
                 if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
                 {
-                    await ExecuteDependentQueriesAsync(plan.DependentQueries, list, ct, plan.NoTracking).ConfigureAwait(false);
+                    await ExecuteDependentQueriesAsync(plan.DependentQueries, list, plan.NoTracking, ct).ConfigureAwait(false);
                 }
 
                 return list;
@@ -240,7 +240,7 @@ namespace nORM.Query
                 {
                     // SYNC-OVER-ASYNC PATTERN: This is intentional for the synchronous Materialize path
                     // The async method uses ConfigureAwait(false) throughout to minimize deadlock risk
-                    ExecuteDependentQueriesAsync(plan.DependentQueries, list, default, plan.NoTracking).GetAwaiter().GetResult();
+                    ExecuteDependentQueriesAsync(plan.DependentQueries, list, plan.NoTracking, default).GetAwaiter().GetResult();
                 }
 
                 return Task.FromResult(list);
@@ -323,7 +323,7 @@ namespace nORM.Query
 
                 object? currentOuter = null;
                 object? currentKey = null;
-                List<object> currentChildren = new();
+                List<object> currentChildren = [];
 
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
@@ -338,7 +338,7 @@ namespace nORM.Query
                             // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
                             var result = info.ResultSelector(currentOuter, list.Cast<object>());
                             resultList.Add(result);
-                            currentChildren = new List<object>();
+                            currentChildren = [];
                         }
 
                         if (trackOuter)
@@ -447,7 +447,7 @@ namespace nORM.Query
 
                 object? currentOuter = null;
                 object? currentKey = null;
-                List<object> currentChildren = new();
+                List<object> currentChildren = [];
 
                 while (reader.Read())
                 {
@@ -462,7 +462,7 @@ namespace nORM.Query
                             // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
                             var result = info.ResultSelector(currentOuter, list.Cast<object>());
                             resultList.Add(result);
-                            currentChildren = new List<object>();
+                            currentChildren = [];
                         }
 
                         if (trackOuter)
@@ -558,8 +558,8 @@ namespace nORM.Query
         private async Task ExecuteDependentQueriesAsync(
             List<DependentQueryDefinition> dependentQueries,
             IList parents,
-            CancellationToken ct,
-            bool noTracking)
+            bool noTracking,
+            CancellationToken ct)
         {
             if (parents.Count == 0)
                 return;
@@ -602,7 +602,7 @@ namespace nORM.Query
                     ct.ThrowIfCancellationRequested();
 
                     var batchIds = parentIdList.Skip(i).Take(maxBatchSize).ToList();
-                    var batchChildren = await FetchChildrenBatchAsync(depQuery, batchIds, ct, noTracking).ConfigureAwait(false);
+                    var batchChildren = await FetchChildrenBatchAsync(depQuery, batchIds, noTracking, ct).ConfigureAwait(false);
                     allChildren.AddRange(batchChildren);
                 }
 
@@ -617,8 +617,8 @@ namespace nORM.Query
         private async Task<List<object>> FetchChildrenBatchAsync(
             DependentQueryDefinition depQuery,
             List<object> parentIds,
-            CancellationToken ct,
-            bool noTracking)
+            bool noTracking,
+            CancellationToken ct)
         {
             var children = new List<object>();
 
@@ -639,7 +639,7 @@ namespace nORM.Query
                 cmd.AddParam(paramName, parentIds[i]);
             }
 
-            sql.Append(")");
+            sql.Append(')');
 
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
@@ -675,7 +675,7 @@ namespace nORM.Query
         /// <summary>
         /// Stitches fetched children back to their parent entities using a lookup.
         /// </summary>
-        private void StitchChildrenToParents(
+        private static void StitchChildrenToParents(
             IList parents,
             List<object> children,
             DependentQueryDefinition depQuery)
@@ -690,7 +690,7 @@ namespace nORM.Query
                 {
                     if (!childrenByParentKey.TryGetValue(foreignKeyValue, out var list))
                     {
-                        list = new List<object>();
+                        list = [];
                         childrenByParentKey[foreignKeyValue] = list;
                     }
                     list.Add(child);
