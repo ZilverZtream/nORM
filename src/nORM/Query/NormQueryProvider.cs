@@ -790,14 +790,19 @@ namespace nORM.Query
                     return false;
 
                 var paramName = _ctx.Provider.ParamPrefix + "p0";
-                whereClause = $" WHERE {column.EscCol} = {paramName}";
+                if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
+                    return false;
 
-                if (populateParameters)
+                if (value is null)
                 {
-                    if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
-                        return false;
+                    whereClause = $" WHERE {column.EscCol} IS NULL";
+                }
+                else
+                {
+                    whereClause = $" WHERE {column.EscCol} = {paramName}";
 
-                    parameters[paramName] = value!;
+                    if (populateParameters)
+                        parameters[paramName] = value;
                 }
 
                 return true;
