@@ -62,7 +62,7 @@ namespace nORM.Query
     /// - Careful handling of correlated subqueries and parameter scoping
     /// - Breaking changes to internal APIs
     ///
-    /// Current recursion depth limit: <see cref="MaxRecursionDepth"/> (100 levels)
+    /// Current recursion depth limit: <see cref="MaxRecursionDepth"/> (30 levels)
     /// </remarks>
     internal sealed partial class QueryTranslator : ExpressionVisitor, IDisposable
     {
