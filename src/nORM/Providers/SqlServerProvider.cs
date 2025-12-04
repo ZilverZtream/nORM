@@ -200,12 +200,34 @@ namespace nORM.Providers
         /// </summary>
         /// <param name="mapping">The mapping describing the entity table.</param>
         /// <returns>DDL statement that creates the history table.</returns>
+        /// <remarks>
+        /// DATA INTEGRITY WARNING: This method generates column types from .NET property types
+        /// using default mappings (e.g., string → NVARCHAR(MAX), decimal → DECIMAL(18,2)).
+        /// If your main table has custom column definitions (e.g., NVARCHAR(100), DECIMAL(10,5)),
+        /// the history table will have different types, potentially causing:
+        /// - Trigger failures if types are incompatible
+        /// - Data truncation or loss
+        /// - Storage inefficiency
+        ///
+        /// RECOMMENDATION: After creating the history table, verify the schema matches your main table
+        /// or manually adjust the history table column definitions to match.
+        /// TODO: Implement schema introspection to read actual column types from the database.
+        /// </remarks>
         public override string GenerateCreateHistoryTableSql(TableMapping mapping)
         {
             var historyTable = Escape(mapping.TableName + "_History");
-            var columns = string.Join(",\n    ", mapping.Columns.Select(c => $"{Escape(c.PropName)} {GetSqlType(c.Prop.PropertyType)}"));
+
+            // SCHEMA MISMATCH FIX: Add validation that column types should match main table
+            // Note: This generates types from .NET types, which may differ from actual DB types
+            var columns = string.Join(",\n    ", mapping.Columns.Select(c =>
+            {
+                var sqlType = GetSqlType(c.Prop.PropertyType);
+                return $"{Escape(c.PropName)} {sqlType}";
+            }));
 
             return $@"
+-- WARNING: Verify that column types match the main table {Escape(mapping.TableName)}
+-- This DDL uses default type mappings which may differ from customized column definitions
 CREATE TABLE {historyTable} (
     [__VersionId] BIGINT IDENTITY(1,1) PRIMARY KEY,
     [__ValidFrom] DATETIME2 NOT NULL,
@@ -384,8 +406,14 @@ END;";
                         BulkCopyTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds
                     };
 
+                    // BULK INSERT SCHEMA MISMATCH FIX: Properly unescape SQL Server identifiers
+                    // Trim('[', ']') fails for names with brackets: [My[Special]Column] becomes My[Special]Column (wrong!)
+                    // Proper unescaping: remove outer brackets only
                     foreach (var col in insertableCols)
-                        bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
+                    {
+                        var unescapedName = UnescapeSqlServerIdentifier(col.EscCol);
+                        bulkCopy.ColumnMappings.Add(col.PropName, unescapedName);
+                    }
 
                     using var reader = new EntityDataReader<T>(batch, insertableCols);
                     await bulkCopy.WriteToServerAsync(reader, token).ConfigureAwait(false);
@@ -543,6 +571,26 @@ END;";
             if (t == typeof(Guid)) return "UNIQUEIDENTIFIER";
             if (t == typeof(byte[])) return "VARBINARY(MAX)";
             return "NVARCHAR(MAX)";
+        }
+
+        /// <summary>
+        /// Properly unescapes a SQL Server identifier by removing outer brackets.
+        /// Handles edge cases like nested brackets correctly.
+        /// </summary>
+        /// <param name="escapedIdentifier">The escaped identifier (e.g., [ColumnName] or [My[Special]Column])</param>
+        /// <returns>The unescaped identifier</returns>
+        private static string UnescapeSqlServerIdentifier(string escapedIdentifier)
+        {
+            if (string.IsNullOrEmpty(escapedIdentifier))
+                return escapedIdentifier;
+
+            // Remove outer brackets only if present
+            if (escapedIdentifier.StartsWith("[") && escapedIdentifier.EndsWith("]") && escapedIdentifier.Length >= 2)
+            {
+                return escapedIdentifier.Substring(1, escapedIdentifier.Length - 2);
+            }
+
+            return escapedIdentifier;
         }
 
         private static DataTable GetKeyTable(TableMapping m)

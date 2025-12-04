@@ -24,6 +24,7 @@ namespace nORM.Navigation
         private Timer? _batchTimer;
         private int _processing;
         private readonly SemaphoreSlim _batchSemaphore = new(1, 1);
+        private readonly object _syncLock = new object(); // For synchronous operations to avoid deadlock
         private const int BatchDelayMs = 10;
 
         /// <summary>
@@ -224,8 +225,9 @@ namespace nORM.Navigation
         /// <param name="entity">The entity whose pending navigation loads should be cleared.</param>
         internal void RemovePendingLoadsForEntity(object entity)
         {
-            _batchSemaphore.Wait();
-            try
+            // FIXED: Use regular lock instead of SemaphoreSlim.Wait() to avoid deadlock
+            // in synchronous contexts (ASP.NET, UI threads with synchronization context)
+            lock (_syncLock)
             {
                 foreach (var key in _pendingLoads.Keys.ToList())
                 {
@@ -234,10 +236,6 @@ namespace nORM.Navigation
                     if (list.Count == 0)
                         _pendingLoads.Remove(key);
                 }
-            }
-            finally
-            {
-                _batchSemaphore.Release();
             }
         }
 

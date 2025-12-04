@@ -1,5 +1,6 @@
 using System;
 using System.Data.Common;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -34,6 +35,28 @@ namespace nORM.Core
             var existingTransaction = context.Database.CurrentTransaction;
             var ambientTransaction = System.Transactions.Transaction.Current;
             var ownsTransaction = existingTransaction == null && ambientTransaction == null;
+
+            // TRANSACTION CONTEXT VALIDATION FIX: Warn about potential mismatch with ambient transactions
+            // Ambient TransactionScope may be associated with a different connection/database
+            if (ambientTransaction != null && existingTransaction == null)
+            {
+                context.Options.Logger?.LogWarning(
+                    "Ambient System.Transactions.Transaction detected but no database transaction is active. " +
+                    "Ensure the TransactionScope is associated with the correct database connection. " +
+                    "Connection string: {ConnectionString}, Ambient transaction ID: {TransactionId}",
+                    context.Connection?.ConnectionString ?? "null",
+                    ambientTransaction.TransactionInformation.LocalIdentifier);
+
+                // Additional validation: Check if connection is enlisted in the ambient transaction
+                if (context.Connection != null && context.Connection.State == System.Data.ConnectionState.Open)
+                {
+                    // Note: We cannot reliably detect if the connection is enlisted without attempting
+                    // an operation, so we log a warning to alert developers of potential issues
+                    context.Options.Logger?.LogDebug(
+                        "Connection state: {State}. Verify this connection is enrolled in the ambient transaction.",
+                        context.Connection.State);
+                }
+            }
 
             DbTransaction? transaction = null;
             CancellationTokenSource? cts = null;
@@ -80,7 +103,26 @@ namespace nORM.Core
         {
             if (OwnsTransaction && Transaction != null)
             {
-                try { await Transaction.DisposeAsync().ConfigureAwait(false); } catch { }
+                // ERROR MASKING FIX: Log exceptions instead of silently swallowing them
+                // While Dispose should not throw, logging helps diagnose connection state issues
+                try
+                {
+                    await Transaction.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Expected - transaction already disposed, safe to ignore
+                }
+                catch (InvalidOperationException)
+                {
+                    // Expected - transaction in invalid state for disposal, safe to ignore
+                }
+                catch (Exception ex)
+                {
+                    // Unexpected exception during dispose - log for diagnostics but don't throw
+                    // per .NET guidelines (Dispose should not throw)
+                    Debug.WriteLine($"Warning: Exception disposing transaction: {ex.GetType().Name}: {ex.Message}");
+                }
             }
             _cts?.Dispose();
             GC.SuppressFinalize(this);
@@ -93,7 +135,26 @@ namespace nORM.Core
         {
             if (OwnsTransaction && Transaction != null)
             {
-                try { Transaction.Dispose(); } catch { }
+                // ERROR MASKING FIX: Log exceptions instead of silently swallowing them
+                // While Dispose should not throw, logging helps diagnose connection state issues
+                try
+                {
+                    Transaction.Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Expected - transaction already disposed, safe to ignore
+                }
+                catch (InvalidOperationException)
+                {
+                    // Expected - transaction in invalid state for disposal, safe to ignore
+                }
+                catch (Exception ex)
+                {
+                    // Unexpected exception during dispose - log for diagnostics but don't throw
+                    // per .NET guidelines (Dispose should not throw)
+                    Debug.WriteLine($"Warning: Exception disposing transaction: {ex.GetType().Name}: {ex.Message}");
+                }
             }
             _cts?.Dispose();
             GC.SuppressFinalize(this);

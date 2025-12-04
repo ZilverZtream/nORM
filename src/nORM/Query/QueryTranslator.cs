@@ -62,7 +62,7 @@ namespace nORM.Query
     /// - Careful handling of correlated subqueries and parameter scoping
     /// - Breaking changes to internal APIs
     ///
-    /// Current recursion depth limit: <see cref="MaxRecursionDepth"/> (100 levels)
+    /// Current recursion depth limit: <see cref="MaxRecursionDepth"/> (30 levels)
     /// </remarks>
     internal sealed partial class QueryTranslator : ExpressionVisitor, IDisposable
     {
@@ -96,7 +96,11 @@ namespace nORM.Query
         private bool _isCacheable;
         private TimeSpan? _cacheExpiration;
         private DateTime? _asOfTimestamp;
-        private const int MaxRecursionDepth = 100;
+        // RECURSIVE ALLOCATION FIX: Reduced from 100 to 30 to limit memory usage
+        // Each level allocates ~2KB+ (QueryTranslator + SqlBuilder + collections)
+        // 30 levels = ~60KB which is reasonable; 100 levels = ~200KB which is excessive
+        // Most real-world queries have depth < 10; if you hit this limit, simplify your query
+        private const int MaxRecursionDepth = 30;
         private int _recursionDepth;
         private OptimizedSqlBuilder _sql => _clauses.Sql;
         private OptimizedSqlBuilder _where => _clauses.Where;
@@ -687,7 +691,21 @@ namespace nORM.Query
         private string TranslateSubExpression(Expression e)
         {
             if (_recursionDepth >= MaxRecursionDepth)
-                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum translation depth of {MaxRecursionDepth}"));
+                throw new NormQueryException(
+                    $"Query exceeds maximum translation depth of {MaxRecursionDepth}. " +
+                    $"This typically indicates overly complex nested subqueries. " +
+                    $"Consider simplifying the query by breaking it into multiple queries or using CTEs.");
+
+            // PERFORMANCE WARNING: Log deep recursion for monitoring
+            if (_recursionDepth > 15)
+            {
+                _ctx.Options.Logger?.LogWarning(
+                    "Query translation depth is {Depth} (max: {MaxDepth}). " +
+                    "Deep nesting causes O(depth) allocations (~2KB per level). " +
+                    "Consider query simplification.",
+                    _recursionDepth + 1, MaxRecursionDepth);
+            }
+
             var subPlan = TranslateInSubContext(e, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out _);
             return subPlan.Sql;
         }

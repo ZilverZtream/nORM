@@ -106,6 +106,17 @@ namespace nORM.Query
         {
             if (dbValue == null || dbValue is DBNull)
             {
+                // NULL CHECK FIX: Handle Nullable<T> correctly without expensive Activator.CreateInstance
+                // Nullable<T> is a value type, but should return null, not default(Nullable<T>)
+                var underlyingNullable = Nullable.GetUnderlyingType(targetType);
+                if (underlyingNullable != null)
+                {
+                    // This is Nullable<T>, return null directly (which is default(Nullable<T>))
+                    return null;
+                }
+
+                // For non-nullable value types, create default instance
+                // For reference types, return null
                 return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
             }
 
@@ -533,6 +544,31 @@ namespace nORM.Query
                         {
                             using var shimReader = new OptimizedOrdinalShimReader(reader, cachedMapping.Value);
                             return Task.FromResult(baseMaterializer(shimReader));
+                        }
+
+                        // SCHEMA VALIDATION FIX: Provide detailed error about missing/incompatible columns
+                        // This fails faster than waiting for DbException with better diagnostics
+                        if (cachedMapping != null && !cachedMapping.Value.IsValid)
+                        {
+                            var missingColumns = new System.Collections.Generic.List<string>();
+                            for (int i = 0; i < cachedMapping.Value.Ordinals.Length; i++)
+                            {
+                                if (cachedMapping.Value.Ordinals[i] == -1)
+                                {
+                                    missingColumns.Add(mapping.Columns[i].PropName);
+                                }
+                            }
+
+                            var availableColumns = new string[reader.FieldCount];
+                            for (int i = 0; i < reader.FieldCount; i++)
+                            {
+                                availableColumns[i] = reader.GetName(i);
+                            }
+
+                            throw new InvalidOperationException(
+                                $"Schema mismatch: Unable to map {missingColumns.Count} column(s) for entity type '{mapping.TableName}'. " +
+                                $"Missing or incompatible columns: {string.Join(", ", missingColumns)}. " +
+                                $"Available columns in result set: {string.Join(", ", availableColumns)}");
                         }
 
                         // If mapping failed, rethrow original exception
