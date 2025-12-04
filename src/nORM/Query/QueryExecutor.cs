@@ -226,6 +226,9 @@ namespace nORM.Query
                 {
                     foreach (var include in plan.Includes)
                     {
+                        // SYNC-OVER-ASYNC PATTERN: This is intentional for the synchronous Materialize path
+                        // The async method uses ConfigureAwait(false) throughout to minimize deadlock risk
+                        // This pattern matches the overall design where synchronous APIs are provided for backward compatibility
                         _includeProcessor.EagerLoadAsync(include, list, default, plan.NoTracking).GetAwaiter().GetResult();
                     }
                 }
@@ -233,6 +236,8 @@ namespace nORM.Query
                 // Execute dependent queries for nested collections (split query for projections)
                 if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
                 {
+                    // SYNC-OVER-ASYNC PATTERN: This is intentional for the synchronous Materialize path
+                    // The async method uses ConfigureAwait(false) throughout to minimize deadlock risk
                     ExecuteDependentQueriesAsync(plan.DependentQueries, list, default, plan.NoTracking).GetAwaiter().GetResult();
                 }
 
