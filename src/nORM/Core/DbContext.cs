@@ -46,7 +46,7 @@ namespace nORM.Core
         // across all DbContext instances in the application.
         // MEMORY LEAK FIX: Use LRU cache instead of unbounded ConcurrentDictionary to prevent
         // unbounded memory growth as new dynamic types are generated
-        private static readonly ConcurrentLruCache<string, Lazy<Task<Type>>> _dynamicTypeCache = new(capacity: 1000);
+        private static readonly ConcurrentLruCache<string, Lazy<Task<Type>>> _dynamicTypeCache = new(maxSize: 1000);
         private readonly LinkedList<WeakReference<IDisposable>> _disposables = new();
         private readonly object _disposablesLock = new();
         private readonly Timer _cleanupTimer;

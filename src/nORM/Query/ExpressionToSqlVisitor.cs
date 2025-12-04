@@ -722,14 +722,10 @@ namespace nORM.Query
                 // Variable path: escape the value at runtime to prevent SQL injection
                 var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
                 visitor._sql.Append("CONCAT('%', ");
-                var paramBuilder = new StringBuilder();
-                var tempVisitor = new ExpressionToSqlVisitor(visitor._provider, visitor._parameters, visitor._paramIndex);
-                tempVisitor.Visit(node.Arguments[0]);
-                var escapedSql = visitor._provider.GetLikeEscapeSql(tempVisitor._sql.ToString());
+                var escapedSql = visitor._provider.GetLikeEscapeSql(visitor.GetSql(node.Arguments[0]));
                 visitor._sql.Append(escapedSql);
                 visitor._sql.Append(", '%')");
                 visitor._sql.Append($" ESCAPE '{escChar}'");
-                visitor._paramIndex = tempVisitor._paramIndex;
             }
         }
         private static void HandleStringStartsWith(ExpressionToSqlVisitor visitor, MethodCallExpression node)
@@ -750,13 +746,10 @@ namespace nORM.Query
                 // Variable path: escape the value at runtime to prevent SQL injection
                 var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
                 visitor._sql.Append("CONCAT(");
-                var tempVisitor = new ExpressionToSqlVisitor(visitor._provider, visitor._parameters, visitor._paramIndex);
-                tempVisitor.Visit(node.Arguments[0]);
-                var escapedSql = visitor._provider.GetLikeEscapeSql(tempVisitor._sql.ToString());
+                var escapedSql = visitor._provider.GetLikeEscapeSql(visitor.GetSql(node.Arguments[0]));
                 visitor._sql.Append(escapedSql);
                 visitor._sql.Append(", '%')");
                 visitor._sql.Append($" ESCAPE '{escChar}'");
-                visitor._paramIndex = tempVisitor._paramIndex;
             }
         }
         private static void HandleStringEndsWith(ExpressionToSqlVisitor visitor, MethodCallExpression node)
@@ -777,13 +770,10 @@ namespace nORM.Query
                 // Variable path: escape the value at runtime to prevent SQL injection
                 var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
                 visitor._sql.Append("CONCAT('%', ");
-                var tempVisitor = new ExpressionToSqlVisitor(visitor._provider, visitor._parameters, visitor._paramIndex);
-                tempVisitor.Visit(node.Arguments[0]);
-                var escapedSql = visitor._provider.GetLikeEscapeSql(tempVisitor._sql.ToString());
+                var escapedSql = visitor._provider.GetLikeEscapeSql(visitor.GetSql(node.Arguments[0]));
                 visitor._sql.Append(escapedSql);
                 visitor._sql.Append(")");
                 visitor._sql.Append($" ESCAPE '{escChar}'");
-                visitor._paramIndex = tempVisitor._paramIndex;
             }
         }
         // REFACTOR (TASK 16): Removed redundant IMethodTranslator interface and translator classes.
