@@ -64,6 +64,10 @@ namespace nORM.Mapping
 
         private readonly IEntityTypeConfiguration? _fluentConfig;
 
+        // PERFORMANCE FIX: Cache derived type discovery to avoid expensive AppDomain.GetAssemblies() scan on every mapping
+        // Scanning all assemblies and types can take 100-1000ms+ in large applications with many assemblies
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, List<Type>> _derivedTypesCache = new();
+
         /// <summary>
         /// Creates a new <see cref="TableMapping"/> for the specified type and provider.
         /// </summary>
@@ -106,9 +110,36 @@ namespace nORM.Mapping
             if (discriminatorAttr != null)
             {
                 DiscriminatorColumn = cols.FirstOrDefault(c => string.Equals(c.Prop.Name, discriminatorAttr.PropertyName, StringComparison.OrdinalIgnoreCase));
-                var derivedTypes = AppDomain.CurrentDomain.GetAssemblies()
-                    .SelectMany(a => a.GetTypes())
-                    .Where(tp => tp.BaseType == t && tp.GetCustomAttribute<DiscriminatorValueAttribute>() != null);
+
+                // PERFORMANCE FIX: Use cached derived type discovery instead of scanning all assemblies
+                // This avoids 100-1000ms+ delay from AppDomain.GetAssemblies().SelectMany(a => a.GetTypes())
+                var derivedTypes = _derivedTypesCache.GetOrAdd(t, baseType =>
+                {
+                    // Only scan assemblies once per base type, then cache forever
+                    var types = new List<Type>();
+                    foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        try
+                        {
+                            // Filter types efficiently: only those with DiscriminatorValueAttribute and matching base
+                            var assemblyTypes = assembly.GetTypes();
+                            foreach (var tp in assemblyTypes)
+                            {
+                                if (tp.BaseType == baseType && tp.GetCustomAttribute<DiscriminatorValueAttribute>() != null)
+                                {
+                                    types.Add(tp);
+                                }
+                            }
+                        }
+                        catch (ReflectionTypeLoadException)
+                        {
+                            // Skip assemblies that can't be fully loaded (e.g., missing dependencies)
+                            // This is safer than crashing on dynamic assemblies or partially loaded modules
+                        }
+                    }
+                    return types;
+                });
+
                 foreach (var dt in derivedTypes)
                 {
                     var value = dt.GetCustomAttribute<DiscriminatorValueAttribute>()!.Value;

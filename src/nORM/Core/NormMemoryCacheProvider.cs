@@ -130,6 +130,25 @@ namespace nORM.Core
         /// <summary>
         /// Releases resources held by the memory cache.
         /// </summary>
-        public void Dispose() => _cache.Dispose();
+        public void Dispose()
+        {
+            _cache.Dispose();
+
+            // MEMORY LEAK FIX: Dispose all CancellationTokenSource instances to prevent handle leaks
+            // Each CTS holds unmanaged WaitHandle resources that must be explicitly disposed
+            // Not disposing can cause handle exhaustion in long-running applications
+            foreach (var tokenSource in _tagTokens.Values)
+            {
+                try
+                {
+                    tokenSource.Dispose();
+                }
+                catch
+                {
+                    // Ignore disposal errors (token source may already be disposed)
+                }
+            }
+            _tagTokens.Clear();
+        }
     }
 }

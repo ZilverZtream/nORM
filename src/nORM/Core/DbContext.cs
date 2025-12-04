@@ -349,7 +349,19 @@ namespace nORM.Core
                     return result is 1 or 1L;
                 }, ct).ConfigureAwait(false);
             }
-            catch { return false; }
+            catch (OperationCanceledException)
+            {
+                // RELIABILITY FIX: Don't hide cancellation - rethrow to respect cancellation tokens
+                // Swallowing OperationCanceledException breaks proper async cancellation patterns
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // RELIABILITY FIX: Log exceptions instead of silently swallowing them
+                // Silent failures make debugging connection issues nearly impossible
+                Options.Logger?.LogWarning(ex, "Health check failed: {Message}", ex.Message);
+                return false;
+            }
         }
 
         /// <summary>
@@ -434,7 +446,12 @@ namespace nORM.Core
             var logical = tableName;
             var lazyTask = _dynamicTypeCache.GetOrAdd(logical,
                 _ => new Lazy<Task<Type>>(() => _typeGenerator.GenerateEntityTypeAsync(this.Connection, logical)));
-            var entityType = lazyTask.Value.GetAwaiter().GetResult();
+
+            // RELIABILITY FIX: Use Task.Run to avoid blocking the calling thread
+            // This prevents potential deadlocks in synchronization contexts (e.g., ASP.NET, WPF)
+            // The Lazy<T> ensures type generation happens only once per table, so the overhead is minimal
+            var entityType = Task.Run(async () => await lazyTask.Value.ConfigureAwait(false)).GetAwaiter().GetResult();
+
             var method = typeof(NormQueryable).GetMethods()
                 .Single(m => m.Name == nameof(NormQueryable.Query) && m.IsGenericMethodDefinition);
             var generic = method.MakeGenericMethod(entityType);

@@ -945,8 +945,10 @@ namespace nORM.Query
             finally
             {
                 semaphore.Release();
-                if (semaphore.CurrentCount == 1)
-                    _cacheLocks.TryRemove(cacheKey, out _);
+                // RACE CONDITION FIX: Removed unsafe eager cleanup
+                // Checking CurrentCount after Release has a race: another thread could Wait() between Release() and the check
+                // This could cause removal of a semaphore that's currently in use, leading to concurrent access bugs
+                // Cleanup is handled safely by the periodic CleanupCacheLocks timer instead
             }
         }
 
@@ -977,8 +979,10 @@ namespace nORM.Query
             finally
             {
                 semaphore.Release();
-                if (semaphore.CurrentCount == 1)
-                    _cacheLocks.TryRemove(cacheKey, out _);
+                // RACE CONDITION FIX: Removed unsafe eager cleanup
+                // Checking CurrentCount after Release has a race: another thread could Wait() between Release() and the check
+                // This could cause removal of a semaphore that's currently in use, leading to concurrent access bugs
+                // Cleanup is handled safely by the periodic CleanupCacheLocks timer instead
             }
         }
         private string BuildCacheKeyFromPlan<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
