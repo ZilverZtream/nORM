@@ -2,22 +2,22 @@
 
 nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .NET that delivers **dramatic performance improvements over Entity Framework Core** while maintaining all the developer-friendly features you expect from a modern ORM. Built for enterprise applications that demand both developer productivity and exceptional performance.
 
-## 🚀 Why Choose nORM?
+## Why Choose nORM?
 
-- **🏎️ Significantly Faster than EF Core**: 2-4x performance improvements with advanced IL materialization and zero-allocation query execution
-- **🔍 Complete LINQ Support**: Full-featured LINQ provider with joins, grouping, subqueries, and complex projections
-- **📦 Zero-Learning Curve**: Familiar EF Core-style API - migrate your existing knowledge instantly
-- **📊 Enterprise-Grade Bulk Operations**: High-performance bulk insert, update, and delete operations
-- **📄 Advanced Query Capabilities**: Raw SQL, stored procedures, and compiled queries
-- **♻️ Intelligent Connection Management**: Built-in pooling and connection optimization
-- **🔧 Multi-Database Support**: SQL Server, PostgreSQL, SQLite, and MySQL
-- **🔗 Smart Relationship Handling**: Automatic relationship discovery and lazy loading
-- **🧩 Flexible Configuration**: Fluent API and attribute-based configuration
-- **🔨 Developer Tools**: Database scaffolding and reverse engineering
-- **📄 Modern Features**: JSON querying, window functions, temporal queries
-- **🏢 Enterprise Ready**: Multi-tenancy, caching, retry policies, and interceptors
+- ** Significantly Faster than EF Core**: 2-4x performance improvements with advanced IL materialization and zero-allocation query execution
+- ** Complete LINQ Support**: Full-featured LINQ provider with joins, grouping, subqueries, and complex projections
+- ** Zero-Learning Curve**: Familiar EF Core-style API - migrate your existing knowledge instantly
+- ** Enterprise-Grade Bulk Operations**: High-performance bulk insert, update, and delete operations
+- ** Advanced Query Capabilities**: Raw SQL, stored procedures, and compiled queries
+- ** Intelligent Connection Management**: Built-in pooling and connection optimization
+- ** Multi-Database Support**: SQL Server, PostgreSQL, SQLite, and MySQL
+- ** Smart Relationship Handling**: Automatic relationship discovery and lazy loading
+- ** Flexible Configuration**: Fluent API and attribute-based configuration
+- ** Developer Tools**: Database scaffolding and reverse engineering
+- ** Modern Features**: JSON querying, window functions, temporal queries
+- ** Enterprise Ready**: Multi-tenancy, caching, retry policies, and interceptors
 
-## 📊 Performance Comparison
+##  Performance Comparison
 
 nORM consistently outperforms Entity Framework Core across all major scenarios:
 
@@ -32,13 +32,13 @@ nORM consistently outperforms Entity Framework Core across all major scenarios:
 
 *Benchmarks run on .NET 8.0 with realistic database scenarios*
 
-## 📦 Installation
+## Installation
 
 ```bash
 dotnet add package nORM
 ```
 
-## 🎯 Quick Start
+## Quick Start
 
 ### Familiar EF Core-Style Setup
 
@@ -113,7 +113,7 @@ await context.BulkUpdateAsync(modifiedUsers);
 await context.BulkDeleteAsync(usersToDelete);
 ```
 
-## ✨ Advanced Features
+## Advanced Features
 
 ### Zero-Configuration Database Discovery
 
@@ -179,7 +179,7 @@ var releaseData = await context.Query<Product>()
     .ToListAsync();
 ```
 
-## 🔧 Database Providers
+## Database Providers
 
 Full support for major database engines:
 
@@ -197,7 +197,7 @@ var provider = new SqliteProvider();
 var provider = new MySqlProvider();
 ```
 
-## 📊 Raw SQL & Stored Procedures
+## Raw SQL & Stored Procedures
 
 ```csharp
 // Raw SQL with type safety
@@ -211,7 +211,7 @@ var results = await context.ExecuteStoredProcedureAsync<UserStats>(
     new { StartDate = DateTime.Now.AddMonths(-1) });
 ```
 
-## 🔄 Database Migrations
+## Database Migrations
 
 ```csharp
 public class CreateUsersTable : Migration
@@ -238,7 +238,7 @@ var runner = new SqlServerMigrationRunner(connection, Assembly.GetExecutingAssem
 await runner.ApplyMigrationsAsync();
 ```
 
-## 🏢 Production-Ready Features
+## Production-Ready Features
 
 ### Connection Management & Pooling
 
@@ -275,7 +275,7 @@ options.AddInterceptor(new LoggingInterceptor());
 options.AddGlobalFilter<ISoftDeletable>(e => !e.IsDeleted);
 ```
 
-## 🎯 Migration from Entity Framework Core
+## Migration from Entity Framework Core
 
 nORM is designed as a drop-in replacement for EF Core:
 
@@ -307,7 +307,7 @@ public class MyDbContext : nORM.Core.DbContext
 }
 ```
 
-## ⚡ Why nORM Outperforms EF Core
+## Why nORM Outperforms EF Core
 
 - **Advanced IL Materialization**: Hand-optimized IL generation eliminates reflection overhead
 - **Zero-Allocation Query Execution**: Memory-efficient query processing reduces GC pressure  
@@ -325,7 +325,7 @@ Based on production deployments:
 - **Throughput**: 2-3x improvement in requests per second for data-heavy applications
 - **Bulk Operations**: 5-10x faster for large data import/export scenarios
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
@@ -337,22 +337,22 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 4. Run `dotnet build`
 5. Run tests: `dotnet test`
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built with performance lessons learned from Entity Framework Core and Dapper
 - Optimized for the modern .NET ecosystem
 - Designed for enterprise production workloads
 
-## 📞 Support
+## Support
 
-- 📖 [Documentation](https://github.com/zilverztream/nORM/wiki)
-- 🐛 [Issues](https://github.com/zilverztream/nORM/issues)  
-- 💬 [Discussions](https://github.com/zilverztream/nORM/discussions)
+-  [Documentation](https://github.com/zilverztream/nORM/wiki)
+-  [Issues](https://github.com/zilverztream/nORM/issues)  
+-  [Discussions](https://github.com/zilverztream/nORM/discussions)
 
 ---
 
-*nORM - Entity Framework performance, without the Entity Framework overhead* ⭐
+*nORM - Entity Framework performance, without the Entity Framework overhead* 
