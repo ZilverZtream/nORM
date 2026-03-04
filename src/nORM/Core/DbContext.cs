@@ -386,45 +386,70 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// FIX (TASK 7): Relaxed identifier validation to allow provider-specific delimiters.
+        /// SG-1: Hardened identifier validation that strips optional delimiters and validates
+        /// the inner content against a strict allowlist. This prevents SQL injection via
+        /// crafted identifiers like "[foo]; DROP TABLE Users--" that previously passed
+        /// validation because they started with "[" and ended with "]".
         /// Validates that an identifier is safe for use in SQL queries. Allows:
-        /// - Alphanumeric characters, underscores, dots
-        /// - Quoted identifiers: "name", `name`, [name]
-        /// - Spaces and hyphens when properly delimited
-        /// This enables mapping to legacy schemas with non-standard table names.
+        /// - Alphanumeric characters, underscores, dots, spaces (word chars only)
+        /// - Quoted identifiers: "name", `name`, [name] with safe inner content
+        /// - Schema-qualified identifiers: dbo.Table, [dbo].[Table], "schema"."table"
         /// </summary>
-        private static bool IsSafeIdentifier(string name)
+        internal static bool IsSafeIdentifier(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
                 return false;
 
-            // Allow standard identifiers: alphanumeric, underscore, dot
-            var isAlphanumericIdentifier = true;
-            foreach (var c in name.AsSpan())
+            var trimmed = name.Trim();
+
+            // Fast reject: statement-break characters are never valid in identifiers
+            if (trimmed.Contains(';') || trimmed.Contains("--") || trimmed.Contains("/*") ||
+                trimmed.Contains("*/") || trimmed.Contains('\''))
+                return false;
+
+            // Split on '.' to handle schema-qualified names like dbo.Table or [dbo].[Table]
+            // Each part is validated independently.
+            var parts = trimmed.Split('.');
+            foreach (var part in parts)
             {
-                if (!char.IsLetterOrDigit(c) && c != '_' && c != '.')
-                {
-                    isAlphanumericIdentifier = false;
-                    break;
-                }
+                if (!IsSafeIdentifierPart(part.Trim()))
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Validates a single identifier part (possibly delimited). A part is either:
+        /// - A plain word (letters, digits, underscore, space)
+        /// - A delimited identifier: [inner], "inner", or `inner` where inner contains only word chars
+        /// </summary>
+        private static bool IsSafeIdentifierPart(string part)
+        {
+            if (part.Length == 0)
+                return false;
+
+            string inner;
+
+            // Strip single pair of delimiters
+            if ((part.StartsWith("[") && part.EndsWith("]")) ||
+                (part.StartsWith("\"") && part.EndsWith("\"")) ||
+                (part.StartsWith("`") && part.EndsWith("`")))
+            {
+                if (part.Length < 3)
+                    return false; // empty delimiter pair
+                inner = part[1..^1];
+            }
+            else
+            {
+                inner = part;
             }
 
-            if (isAlphanumericIdentifier)
-                return true;
+            if (inner.Length == 0)
+                return false;
 
-            // Allow delimited identifiers with brackets (SQL Server): [My Table]
-            if (name.StartsWith("[") && name.EndsWith("]") && name.Length > 2)
-                return true;
-
-            // Allow delimited identifiers with double quotes (PostgreSQL, standard SQL): "My Table"
-            if (name.StartsWith("\"") && name.EndsWith("\"") && name.Length > 2)
-                return true;
-
-            // Allow delimited identifiers with backticks (MySQL): `My Table`
-            if (name.StartsWith("`") && name.EndsWith("`") && name.Length > 2)
-                return true;
-
-            return false;
+            // Inner content must be strictly word characters and spaces only
+            // (no brackets, quotes, semicolons, hyphens, or other special chars)
+            return System.Text.RegularExpressions.Regex.IsMatch(inner, @"^[\w\s]+$");
         }
 
         /// <summary>
@@ -868,7 +893,7 @@ namespace nORM.Core
                 sql.Append(BuildUpdateBatch(map, paramIndex)).Append(';');
                 paramIndex = AddParametersBatched(cmd, map,
                     entry.Entity ?? throw new InvalidOperationException("Entity is null"),
-                    WriteOperation.Update, paramIndex);
+                    WriteOperation.Update, paramIndex, entry.OriginalToken);
             }
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Update, cmd.CommandText));
@@ -900,7 +925,7 @@ namespace nORM.Core
                 sql.Append(BuildDeleteBatch(map, paramIndex)).Append(';');
                 paramIndex = AddParametersBatched(cmd, map,
                     entry.Entity ?? throw new InvalidOperationException("Entity is null"),
-                    WriteOperation.Delete, paramIndex);
+                    WriteOperation.Delete, paramIndex, entry.OriginalToken);
             }
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Delete, cmd.CommandText));
@@ -1258,7 +1283,7 @@ namespace nORM.Core
             return $"DELETE FROM {map.EscTable} WHERE {where}";
         }
 
-        private int AddParametersBatched(DbCommand cmd, TableMapping map, object entity, WriteOperation operation, int startIndex)
+        private int AddParametersBatched(DbCommand cmd, TableMapping map, object entity, WriteOperation operation, int startIndex, object? originalToken = null)
         {
             var index = startIndex;
             switch (operation)
@@ -1273,13 +1298,22 @@ namespace nORM.Core
                     foreach (var col in map.KeyColumns)
                         cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
                     if (map.TimestampColumn != null)
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", map.TimestampColumn.Getter(entity));
+                    {
+                        // CT-1: Use the original snapshot token when available rather than the current
+                        // (possibly mutated) property value, to ensure the correct concurrency check.
+                        var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", tokenValue);
+                    }
                     break;
                 case WriteOperation.Delete:
                     foreach (var col in map.KeyColumns)
                         cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
                     if (map.TimestampColumn != null)
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", map.TimestampColumn.Getter(entity));
+                    {
+                        // CT-1: Use the original snapshot token when available.
+                        var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", tokenValue);
+                    }
                     break;
             }
             return index;
@@ -1548,7 +1582,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
-                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.CommandType = ctx._p.StoredProcedureCommandType;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
 
                 var paramDict = new Dictionary<string, object>();
@@ -1558,7 +1592,7 @@ namespace nORM.Core
                     var span = new (string name, object value)[props.Length];
                     for (int i = 0; i < props.Length; i++)
                     {
-                        var pName = _p.ParamPrefix + props[i].Name;
+                        var pName = ctx._p.ParamPrefix + props[i].Name;
                         var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
                         span[i] = (pName, pValue);
                         paramDict[pName] = pValue;
@@ -1566,7 +1600,10 @@ namespace nORM.Core
                     cmd.SetParametersFast(span);
                 }
 
-                if (!IsSafeIdentifier(procedureName))
+                // PRV-1: Use the same dual-check as the async-enumerable variant: accept either
+                // a safe identifier (stored proc name) or a safe raw SQL (for providers like SQLite
+                // that use CommandType.Text and pass a SELECT query as the "procedure name").
+                if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, ctx._p))
                     throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
 
                 NormValidator.ValidateRawSql(procedureName, paramDict);
@@ -1654,7 +1691,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
-                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.CommandType = ctx._p.StoredProcedureCommandType;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
 
                 var paramDict = new Dictionary<string, object>();
@@ -1664,7 +1701,7 @@ namespace nORM.Core
                     var span = new (string name, object value)[props.Length];
                     for (int i = 0; i < props.Length; i++)
                     {
-                        var pName = _p.ParamPrefix + props[i].Name;
+                        var pName = ctx._p.ParamPrefix + props[i].Name;
                         var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
                         span[i] = (pName, pValue);
                         paramDict[pName] = pValue;
@@ -1689,7 +1726,8 @@ namespace nORM.Core
                     outputParamMap[op.Name] = p;
                 }
 
-                if (!IsSafeIdentifier(procedureName))
+                // PRV-1: Use dual-check — accept either a safe identifier or safe raw SQL
+                if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, ctx._p))
                     throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
 
                 NormValidator.ValidateRawSql(procedureName, paramDict);

@@ -100,5 +100,94 @@ public class SqliteMigrationSqlGeneratorTests
         // "Value" column should be NOT NULL in the new table
         Assert.Contains("\"Value\" TEXT NOT NULL", createStmt);
     }
+
+    // MIG-1: Tests for PK / UNIQUE / INDEX DDL generation
+
+    [Fact]
+    public void CreateTable_WithPkColumn_EmitsPrimaryKeyConstraint()
+    {
+        var table = new TableSchema
+        {
+            Name = "Users",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",   ClrType = typeof(int).FullName!,    IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Users" },
+                new ColumnSchema { Name = "Name",  ClrType = typeof(string).FullName!, IsNullable = false }
+            }
+        };
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        var createStmt = sql.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("PRIMARY KEY", createStmt);
+        Assert.Contains("\"Id\"", createStmt);
+    }
+
+    [Fact]
+    public void CreateTable_WithUniqueNonPkColumn_EmitsUniqueConstraint()
+    {
+        var table = new TableSchema
+        {
+            Name = "Users",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!,    IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Users" },
+                new ColumnSchema { Name = "Email", ClrType = typeof(string).FullName!, IsNullable = false, IsUnique = true }
+            }
+        };
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        var createStmt = sql.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("UNIQUE", createStmt);
+        Assert.Contains("\"Email\"", createStmt);
+    }
+
+    [Fact]
+    public void CreateTable_WithIndexColumn_EmitsSeparateCreateIndex()
+    {
+        var table = new TableSchema
+        {
+            Name = "Users",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",   ClrType = typeof(int).FullName!,    IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Users" },
+                new ColumnSchema { Name = "Name",  ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "idx_Users_Name" }
+            }
+        };
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Contains(sql.Up, s => s.StartsWith("CREATE INDEX") && s.Contains("idx_Users_Name") && s.Contains("\"Users\"") && s.Contains("\"Name\""));
+    }
+
+    [Fact]
+    public void CreateTable_WithoutConstraints_DoesNotEmitConstraintClauses()
+    {
+        var table = new TableSchema
+        {
+            Name = "Plain",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",  ClrType = typeof(int).FullName!,    IsNullable = false },
+                new ColumnSchema { Name = "Val", ClrType = typeof(string).FullName!, IsNullable = true }
+            }
+        };
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        var createStmt = sql.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.DoesNotContain("PRIMARY KEY", createStmt);
+        Assert.DoesNotContain("UNIQUE", createStmt);
+        Assert.DoesNotContain(sql.Up, s => s.StartsWith("CREATE INDEX"));
+    }
 }
 

@@ -48,6 +48,14 @@ namespace nORM.Core
         /// within the context.
         /// </summary>
         public EntityState State { get; internal set; }
+
+        /// <summary>
+        /// CT-1: Stores the original concurrency token (timestamp/rowversion) value captured at
+        /// attach time. Used in UPDATE and DELETE WHERE clauses to ensure the correct snapshot
+        /// value is compared, even if the entity's property has been mutated before SaveChanges.
+        /// </summary>
+        internal object? OriginalToken { get; set; }
+
         internal TableMapping Mapping => _mapping;
 
         internal EntityEntry(object entity, EntityState state, TableMapping mapping, DbContextOptions options, Action<EntityEntry>? markDirty = null, bool lazy = false)
@@ -83,6 +91,12 @@ namespace nORM.Core
                 return;
 
             _nonKeyColumns = _mapping.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
+
+            // CT-1: Capture original timestamp value so UPDATE/DELETE can use the snapshot value
+            // rather than the potentially-mutated current value of the entity property.
+            var tsCol = _mapping.TimestampColumn;
+            if (tsCol != null && Entity != null)
+                OriginalToken = tsCol.Getter(Entity);
             _getHashCodes = new Func<object, int>[_nonKeyColumns.Length];
             _getValues = new Func<object, object?>[_nonKeyColumns.Length];
             _propertyIndex = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -246,6 +260,10 @@ namespace nORM.Core
             CaptureOriginalValues();
             State = EntityState.Unchanged;
             _hasNotifiedChange = false;
+            // CT-1: Refresh the original token so future saves use the latest DB value
+            var tsCol = _mapping.TimestampColumn;
+            if (tsCol != null && Entity != null)
+                OriginalToken = tsCol.Getter(Entity);
         }
 
         /// <summary>

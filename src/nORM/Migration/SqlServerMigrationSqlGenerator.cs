@@ -36,9 +36,25 @@ namespace nORM.Migration
 
             foreach (var table in diff.AddedTables)
             {
-                var cols = table.Columns.Select(c =>
-                    $"[{c.Name}] {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
-                up.Add($"CREATE TABLE [{table.Name}] ({string.Join(", ", cols)})");
+                var colDefs = table.Columns.Select(c =>
+                    $"[{c.Name}] {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+
+                // MIG-1: Emit PRIMARY KEY constraint for PK columns
+                var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
+                if (pkCols.Count > 0)
+                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => $"[{c.Name}]"))})");
+
+                // MIG-1: Emit UNIQUE constraint for unique non-PK columns
+                var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
+                if (uniqueNonPkCols.Count > 0)
+                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => $"[{c.Name}]"))})");
+
+                up.Add($"CREATE TABLE [{table.Name}] ({string.Join(", ", colDefs)})");
+
+                // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
+                foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
+                    up.Add($"CREATE INDEX [{col.IndexName}] ON [{table.Name}] ([{col.Name}])");
+
                 down.Add($"DROP TABLE [{table.Name}]");
             }
 
