@@ -284,4 +284,71 @@ public class SchemaSnapshotTests
 
         Assert.Contains(stmts.Up, s => s.Contains("DROP COLUMN") && s.Contains("RemovedCol"));
     }
+
+    // MIG-2: Index definition change detection tests
+
+    [Fact]
+    public void SchemaDiffer_DetectsChangedIsUnique_WhenIndexNameSameButUniquenessChanges()
+    {
+        // Old snapshot: Blog with non-unique index on Title
+        var oldTable = new TableSchema
+        {
+            Name = "Blog",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Blog" },
+                new ColumnSchema { Name = "Title",  ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "IX_Blog_Title", IsUnique = false }
+            }
+        };
+        var oldSnapshot = new SchemaSnapshot { Tables = { oldTable } };
+
+        // New snapshot: same index name on Title but now IsUnique = true
+        var newTable = new TableSchema
+        {
+            Name = "Blog",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Blog" },
+                new ColumnSchema { Name = "Title",  ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "IX_Blog_Title", IsUnique = true }
+            }
+        };
+        var newSnapshot = new SchemaSnapshot { Tables = { newTable } };
+
+        var diff = SchemaDiffer.Diff(oldSnapshot, newSnapshot);
+
+        // Should detect the index as both dropped (old def) and re-added (new def)
+        Assert.Single(diff.DroppedIndexes, ix => ix.IndexName == "IX_Blog_Title");
+        Assert.Single(diff.AddedIndexes, ix => ix.IndexName == "IX_Blog_Title" && ix.IsUnique);
+    }
+
+    [Fact]
+    public void SchemaDiffer_NoChange_WhenSameIndexNameAndSameDefinition()
+    {
+        var oldTable = new TableSchema
+        {
+            Name = "Blog",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Blog" },
+                new ColumnSchema { Name = "Title",  ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "IX_Blog_Title", IsUnique = false }
+            }
+        };
+        var newTable = new TableSchema
+        {
+            Name = "Blog",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Blog" },
+                new ColumnSchema { Name = "Title",  ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "IX_Blog_Title", IsUnique = false }
+            }
+        };
+
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { oldTable } },
+            new SchemaSnapshot { Tables = { newTable } });
+
+        // Same definition — no index changes
+        Assert.Empty(diff.DroppedIndexes.Where(ix => ix.IndexName == "IX_Blog_Title"));
+        Assert.Empty(diff.AddedIndexes.Where(ix => ix.IndexName == "IX_Blog_Title"));
+    }
 }

@@ -590,15 +590,34 @@ namespace nORM.Query
             var ordinals = new int[mapping.Columns.Length];
             var isValid = true;
 
-            // Build quick lookup for field names (case-insensitive)
-            var nameToOrdinal = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
+            // MM-1: Build quick lookup for field names (case-insensitive), detecting duplicates.
+            // Duplicate column names (e.g., two JOINed tables both having "Id") are tracked in
+            // the ambiguous set and excluded from name-based lookup to prevent silent wrong-table binding.
+            var nameCount = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
             var fieldTypes = new Type[fieldCount];
 
             for (int i = 0; i < fieldCount; i++)
             {
                 var name = reader.GetName(i);
-                nameToOrdinal.TryAdd(name, i); // First occurrence wins
+                nameCount[name] = nameCount.GetValueOrDefault(name, 0) + 1;
                 fieldTypes[i] = reader.GetFieldType(i);
+            }
+
+            var ambiguous = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var nameToOrdinal = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < fieldCount; i++)
+            {
+                var name = reader.GetName(i);
+                if (nameCount[name] > 1)
+                {
+                    // MM-1: Ambiguous — do not add to name map, ordinal-based binding must be used
+                    ambiguous.Add(name);
+                }
+                else
+                {
+                    nameToOrdinal.TryAdd(name, i);
+                }
             }
 
             // Map each column to its ordinal

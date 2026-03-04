@@ -194,7 +194,22 @@ namespace nORM.Migration
                 foreach (var (name, (isUnique, cols)) in newIndexes)
                 {
                     if (!oldIndexes.ContainsKey(name))
+                    {
                         diff.AddedIndexes.Add((newTable, name, isUnique, cols));
+                    }
+                    else
+                    {
+                        // MIG-2: Index exists in both — check for definition changes
+                        var (oldIsUnique, oldCols) = oldIndexes[name];
+                        var colsChanged = !oldCols.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                            .SequenceEqual(cols.OrderBy(x => x, StringComparer.OrdinalIgnoreCase),
+                                StringComparer.OrdinalIgnoreCase);
+                        if (oldIsUnique != isUnique || colsChanged)
+                        {
+                            diff.DroppedIndexes.Add((newTable, name));
+                            diff.AddedIndexes.Add((newTable, name, isUnique, cols));
+                        }
+                    }
                 }
 
                 foreach (var (name, _) in oldIndexes)
