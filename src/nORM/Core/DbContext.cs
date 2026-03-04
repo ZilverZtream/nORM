@@ -662,8 +662,6 @@ namespace nORM.Core
             await using var transactionManager = await TransactionManager.CreateAsync(this, ct).ConfigureAwait(false);
             ct = transactionManager.Token;
             var transaction = transactionManager.Transaction;
-            if (transaction is null)
-                throw new InvalidOperationException("Transaction cannot be null when creating a CommandScope.");
 
             var totalAffected = 0;
             try
@@ -1231,8 +1229,8 @@ namespace nORM.Core
         private readonly struct CommandScope : IAsyncDisposable
         {
             private readonly DbConnection _connection;
-            private readonly DbTransaction _transaction;
-            public CommandScope(DbConnection connection, DbTransaction transaction)
+            private readonly DbTransaction? _transaction;
+            public CommandScope(DbConnection connection, DbTransaction? transaction)
             {
                 _connection = connection;
                 _transaction = transaction;
@@ -1245,7 +1243,8 @@ namespace nORM.Core
             public DbCommand CreateCommand()
             {
                 var cmd = _connection.CreateCommand();
-                cmd.Transaction = _transaction;
+                if (_transaction != null)
+                    cmd.Transaction = _transaction;
                 return cmd;
             }
             /// <summary>

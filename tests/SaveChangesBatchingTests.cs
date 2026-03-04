@@ -1,5 +1,6 @@
 using System;
 using System.Data.Common;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -86,5 +87,59 @@ public class SaveChangesBatchingTests
 
         var saved = await ctx.SaveChangesAsync();
         Assert.Equal(10, saved);
+    }
+
+    // Finding 3 — duplicate default-key tests
+
+    private class AutoItem
+    {
+        [System.ComponentModel.DataAnnotations.Key]
+        [System.ComponentModel.DataAnnotations.Schema.DatabaseGenerated(System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    [Fact]
+    public async Task DefaultKey_two_added_entities_both_appear_in_ChangeTracker()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE AutoItem (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT);";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var a = new AutoItem { Name = "first" };
+        var b = new AutoItem { Name = "second" };
+        ctx.Add(a);
+        ctx.Add(b);
+
+        var entries = ctx.ChangeTracker.Entries.Where(e => e.State == EntityState.Added).ToList();
+        Assert.Equal(2, entries.Count);
+    }
+
+    [Fact]
+    public async Task DefaultKey_two_added_entities_both_saved_to_database()
+    {
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        await using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE AutoItem (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT);";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        await using var ctx = new DbContext(cn, new SqliteProvider());
+        ctx.Add(new AutoItem { Name = "first" });
+        ctx.Add(new AutoItem { Name = "second" });
+        await ctx.SaveChangesAsync();
+
+        await using var countCmd = cn.CreateCommand();
+        countCmd.CommandText = "SELECT COUNT(*) FROM AutoItem";
+        var countObj = await countCmd.ExecuteScalarAsync();
+        var count = countObj is null ? 0L : Convert.ToInt64(countObj);
+        Assert.Equal(2L, count);
     }
 }

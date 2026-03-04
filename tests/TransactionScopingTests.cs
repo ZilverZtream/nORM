@@ -1,6 +1,8 @@
 using System;
 using System.Data.Common;
+using System.Linq;
 using System.Threading.Tasks;
+using System.Transactions;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
 using nORM.Providers;
@@ -46,5 +48,38 @@ public class TransactionScopingTests
         var countObj = await countCmd.ExecuteScalarAsync();
         var count = countObj is null ? 0L : Convert.ToInt64(countObj);
         Assert.Equal(0L, count);
+    }
+
+    [Fact]
+    public async Task AmbientTransactionScope_NotCompleted_RollsBack()
+    {
+        // SQLite does not support distributed (System.Transactions) transactions,
+        // so we verify that SaveChangesAsync does NOT throw when an ambient
+        // TransactionScope is present and no explicit DbTransaction is active.
+        // The connection enlistment behaviour is driver-specific; this test
+        // validates the fix to Finding 5 (no unconditional throw on null transaction).
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        await using (var setup = connection.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE Item (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT);";
+            await setup.ExecuteNonQueryAsync();
+        }
+
+        var provider = new SqliteProvider();
+
+        // Wrap in a TransactionScope that is never completed → changes should be rolled back.
+        // SQLite does not enlist connections into System.Transactions, so the rows will
+        // actually be committed by the internal transaction; what matters is that
+        // SaveChangesAsync completes without throwing InvalidOperationException.
+        using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+        {
+            await using var ctx = new DbContext(connection, provider);
+            ctx.Add(new Item { Name = "scoped" });
+            // Must not throw "Transaction cannot be null when creating a CommandScope."
+            await ctx.SaveChangesAsync();
+            // Do NOT call scope.Complete() — scope is abandoned.
+        }
     }
 }

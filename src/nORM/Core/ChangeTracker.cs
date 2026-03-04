@@ -395,6 +395,18 @@ namespace nORM.Core
             _dirtyNonNotifyingEntries.Clear();
             _dirtyEntries.Clear();
         }
+        private static bool IsDefaultKeyValue(object? value, Type type)
+        {
+            if (value is null) return true;
+            var underlying = Nullable.GetUnderlyingType(type) ?? type;
+            if (underlying == typeof(int)   || underlying == typeof(long)  ||
+                underlying == typeof(short) || underlying == typeof(byte))
+                return Convert.ToInt64(value) == 0L;
+            if (underlying == typeof(Guid))
+                return (Guid)value == Guid.Empty;
+            return false;
+        }
+
         /// <summary>
         /// Extracts the primary key value for the given entity using the provided mapping.
         /// Supports both single-column keys and composite keys.
@@ -405,14 +417,17 @@ namespace nORM.Core
         /// The key value, a composite key object when multiple key columns exist, or
         /// <c>null</c> if the entity type does not define a primary key.
         /// </returns>
-        /// <summary>
-        /// PERFORMANCE FIX: Use ValueTuple for small composite keys to avoid array allocation.
-        /// For 2-3 key columns, ValueTuple is stack-allocated and more efficient.
-        /// </summary>
         private static object? GetPrimaryKeyValue(object entity, TableMapping mapping)
         {
             if (mapping.KeyColumns.Length == 1)
-                return mapping.KeyColumns[0].Getter(entity);
+            {
+                var col   = mapping.KeyColumns[0];
+                var value = col.Getter(entity);
+                // DB-generated key at its default means "not yet assigned" — don't key the map
+                if (col.IsDbGenerated && IsDefaultKeyValue(value, col.Prop.PropertyType))
+                    return null;
+                return value;
+            }
 
             if (mapping.KeyColumns.Length == 2)
             {
