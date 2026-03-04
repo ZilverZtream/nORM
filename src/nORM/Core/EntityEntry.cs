@@ -56,6 +56,12 @@ namespace nORM.Core
         /// </summary>
         internal object? OriginalToken { get; set; }
 
+        /// <summary>
+        /// CT-1 (PK mutation): Stores the primary key value captured at attach/track time.
+        /// Used by SaveChanges to detect PK mutations before issuing UPDATE statements.
+        /// </summary>
+        internal object? OriginalKey { get; set; }
+
         internal TableMapping Mapping => _mapping;
 
         internal EntityEntry(object entity, EntityState state, TableMapping mapping, DbContextOptions options, Action<EntityEntry>? markDirty = null, bool lazy = false)
@@ -67,12 +73,29 @@ namespace nORM.Core
             _markDirty = markDirty;
             _isInitialized = false;
 
+            // CT-1 (PK mutation): Capture original PK at attach time so mutations can be detected.
+            OriginalKey = CaptureKey(entity, mapping);
+
             // PERFORMANCE: Only initialize immediately if not lazy
             // This saves ~200-500 bytes per entity for read-only scenarios
             if (!lazy)
             {
                 InitializeTracking();
             }
+        }
+
+        /// <summary>
+        /// Reads the primary key value(s) from an entity using the provided mapping.
+        /// Returns null when the entity has no key columns defined.
+        /// </summary>
+        private static object? CaptureKey(object entity, TableMapping mapping)
+        {
+            if (mapping.KeyColumns.Length == 0) return null;
+            if (mapping.KeyColumns.Length == 1) return mapping.KeyColumns[0].Getter(entity);
+            var values = new object?[mapping.KeyColumns.Length];
+            for (int i = 0; i < mapping.KeyColumns.Length; i++)
+                values[i] = mapping.KeyColumns[i].Getter(entity);
+            return values;
         }
 
         /// <summary>
@@ -264,6 +287,11 @@ namespace nORM.Core
             var tsCol = _mapping.TimestampColumn;
             if (tsCol != null && Entity != null)
                 OriginalToken = tsCol.Getter(Entity);
+            // CT-1 (PK mutation): Refresh the tracked original key so that a DB-generated key
+            // assigned after INSERT is accepted as the new "original" and does not trigger
+            // a false-positive PK-mutation error on the next UPDATE.
+            if (Entity != null)
+                OriginalKey = CaptureKey(Entity, _mapping);
         }
 
         /// <summary>
