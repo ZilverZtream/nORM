@@ -153,5 +153,74 @@ namespace nORM.Tests
             Assert.Single(parameters);
             Assert.Equal("New York", parameters["@p0"]);
         }
+
+        // Finding 1 — null comparison tests
+
+        [Theory]
+        [MemberData(nameof(SimpleEqualityProviders))]
+        public void NullCompar_equal_null_right_generates_IS_NULL(ProviderKind providerKind)
+        {
+            var setup = CreateProvider(providerKind);
+            using var connection = setup.Connection;
+            var provider = setup.Provider;
+
+            var (sql, parameters) = Translate<Product>(p => p.Name == null, connection, provider);
+            var t0 = provider.Escape("T0");
+            var expected = $"({t0}.{provider.Escape("Name")} IS NULL)";
+            Assert.Equal(expected, sql);
+            Assert.Empty(parameters);
+        }
+
+        [Theory]
+        [MemberData(nameof(SimpleEqualityProviders))]
+        public void NullCompar_notequal_null_right_generates_IS_NOT_NULL(ProviderKind providerKind)
+        {
+            var setup = CreateProvider(providerKind);
+            using var connection = setup.Connection;
+            var provider = setup.Provider;
+
+            var (sql, parameters) = Translate<Product>(p => p.Name != null, connection, provider);
+            var t0 = provider.Escape("T0");
+            var expected = $"({t0}.{provider.Escape("Name")} IS NOT NULL)";
+            Assert.Equal(expected, sql);
+            Assert.Empty(parameters);
+        }
+
+        [Theory]
+        [MemberData(nameof(SimpleEqualityProviders))]
+        public void NullCompar_null_left_generates_IS_NULL(ProviderKind providerKind)
+        {
+            var setup = CreateProvider(providerKind);
+            using var connection = setup.Connection;
+            var provider = setup.Provider;
+
+            Expression<Func<Product, bool>> expr = p => null == p.Name;
+            var (sql, parameters) = Translate(expr, connection, provider);
+            var t0 = provider.Escape("T0");
+            var expected = $"({t0}.{provider.Escape("Name")} IS NULL)";
+            Assert.Equal(expected, sql);
+            Assert.Empty(parameters);
+        }
+
+        private class NullableEntity
+        {
+            public int Id { get; set; }
+            public int? NullableInt { get; set; }
+        }
+
+        [Theory]
+        [MemberData(nameof(SimpleEqualityProviders))]
+        public void NullCompar_nullable_int_equal_null_generates_IS_NULL(ProviderKind providerKind)
+        {
+            var setup = CreateProvider(providerKind);
+            using var connection = setup.Connection;
+            var provider = setup.Provider;
+
+            var (sql, parameters) = Translate<NullableEntity>(p => p.NullableInt == null, connection, provider);
+            var t0 = provider.Escape("T0");
+            var expected = $"({t0}.{provider.Escape("NullableInt")} IS NULL)";
+            Assert.Equal(expected, sql);
+            Assert.Empty(parameters);
+        }
     }
 }

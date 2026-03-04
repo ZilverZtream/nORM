@@ -136,6 +136,20 @@ namespace nORM.Query
         }
         protected override Expression VisitBinary(BinaryExpression node)
         {
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+            {
+                bool leftNull  = IsNullExpression(node.Left);
+                bool rightNull = IsNullExpression(node.Right);
+                if (leftNull || rightNull)
+                {
+                    _sql.Append("(");
+                    Visit(leftNull ? node.Right : node.Left);
+                    _sql.Append(node.NodeType == ExpressionType.Equal ? " IS NULL" : " IS NOT NULL");
+                    _sql.Append(")");
+                    return node;
+                }
+            }
+
             _sql.Append("(");
             Visit(node.Left);
             _sql.Append(node.NodeType switch
@@ -153,6 +167,26 @@ namespace nORM.Query
             Visit(node.Right);
             _sql.Append(")");
             return node;
+        }
+
+        private static bool IsNullExpression(Expression e)
+        {
+            if (e is ConstantExpression ce)
+                return ce.Value is null;
+            if (e is UnaryExpression ue && (ue.NodeType == ExpressionType.Convert || ue.NodeType == ExpressionType.ConvertChecked))
+                return IsNullExpression(ue.Operand);
+            if (e is MemberExpression me && me.Expression is ConstantExpression closure)
+            {
+                try
+                {
+                    var val = closure.Value == null ? null :
+                        me.Member is FieldInfo fi ? fi.GetValue(closure.Value) :
+                        me.Member is PropertyInfo pi ? pi.GetValue(closure.Value) : null;
+                    return val is null;
+                }
+                catch { return false; }
+            }
+            return false;
         }
         protected override Expression VisitMember(MemberExpression node)
         {

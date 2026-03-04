@@ -59,7 +59,7 @@ namespace nORM.Core
                 }
             }
 
-            DbTransaction? transaction = null;
+            DbTransaction? transaction = existingTransaction;
             CancellationTokenSource? cts = null;
             var token = ct;
 
