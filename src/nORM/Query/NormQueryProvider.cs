@@ -1349,7 +1349,8 @@ namespace nORM.Query
                 .Compute(filtered)
                 .Extend(tenantHash)
                 .Extend(elementType.GetHashCode())
-                .Extend(filtered.Type.GetHashCode());
+                .Extend(filtered.Type.GetHashCode())
+                .Extend(_ctx.Provider.GetType().GetHashCode());   // Q2/S1/R1: isolate plan cache per provider type
 
             if (_planCache.TryGet(fingerprint, out var cached))
             {

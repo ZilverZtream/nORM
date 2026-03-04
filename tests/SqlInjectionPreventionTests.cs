@@ -52,6 +52,18 @@ namespace nORM.Tests
             Assert.False(NormValidator.IsSafeRawSql("DELETE FROM Users"));
         }
 
+        // X1: Side-effect commands must be blocked by the keyword denylist
+        [Theory]
+        [InlineData("PRAGMA foreign_keys = ON")]
+        [InlineData("VACUUM")]
+        [InlineData("REINDEX sqlite_master")]
+        [InlineData("ANALYZE")]
+        [InlineData("CALL proc()")]
+        public void IsSafeRawSql_ReturnsFalse_ForSideEffectCommands(string sql)
+        {
+            Assert.False(NormValidator.IsSafeRawSql(sql));
+        }
+
         private class Dummy
         {
             public int Id { get; set; }

@@ -330,8 +330,8 @@ namespace nORM.Query
 
             var targetType = typeof(T);
             var cacheKey = new MaterializerCacheKey(
-                mapping.Type.GetHashCode(),
-                targetType.GetHashCode(),
+                mapping.Type,
+                targetType,
                 projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
                 mapping.TableName,
                 startOffset);
@@ -374,8 +374,8 @@ namespace nORM.Query
             ArgumentNullException.ThrowIfNull(targetType);
 
             var cacheKey = new MaterializerCacheKey(
-                mapping.Type.GetHashCode(),
-                targetType.GetHashCode(),
+                mapping.Type,
+                targetType,
                 projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
                 mapping.TableName,
                 startOffset);
@@ -453,8 +453,8 @@ namespace nORM.Query
             }
 
             var cacheKey = new MaterializerCacheKey(
-                mapping.Type.GetHashCode(),
-                targetType.GetHashCode(),
+                mapping.Type,
+                targetType,
                 projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
                 mapping.TableName,
                 startOffset);
@@ -498,8 +498,8 @@ namespace nORM.Query
             }
 
             var cacheKey = new MaterializerCacheKey(
-                mapping.Type.GetHashCode(),
-                targetType.GetHashCode(),
+                mapping.Type,
+                targetType,
                 projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
                 mapping.TableName,
                 startOffset);
@@ -1542,18 +1542,20 @@ namespace nORM.Query
         }
 
         // Value types for better cache performance
+        // M1/R2: Use actual Type references instead of hash codes to prevent collision between
+        // different types that happen to produce the same hash code.
         private readonly struct MaterializerCacheKey : IEquatable<MaterializerCacheKey>
         {
-            public readonly int MappingTypeHash;
-            public readonly int TargetTypeHash;
+            public readonly Type MappingType;     // was int MappingTypeHash
+            public readonly Type TargetType;      // was int TargetTypeHash
             public readonly int ProjectionHash;
             public readonly string TableName;
             public readonly int StartOffset;
 
-            public MaterializerCacheKey(int mappingTypeHash, int targetTypeHash, int projectionHash, string tableName, int startOffset)
+            public MaterializerCacheKey(Type mappingType, Type targetType, int projectionHash, string tableName, int startOffset)
             {
-                MappingTypeHash = mappingTypeHash;
-                TargetTypeHash = targetTypeHash;
+                MappingType = mappingType;
+                TargetType = targetType;
                 ProjectionHash = projectionHash;
                 TableName = tableName ?? string.Empty;
                 StartOffset = startOffset;
@@ -1561,12 +1563,13 @@ namespace nORM.Query
 
             /// <summary>
             /// Determines whether the specified <see cref="MaterializerCacheKey"/> is equal to the current instance.
+            /// Uses reference equality for Type fields to avoid hash collision between distinct types.
             /// </summary>
             /// <param name="other">The cache key to compare with the current key.</param>
             /// <returns><c>true</c> if the keys represent the same configuration; otherwise, <c>false</c>.</returns>
             public bool Equals(MaterializerCacheKey other) =>
-                MappingTypeHash == other.MappingTypeHash &&
-                TargetTypeHash == other.TargetTypeHash &&
+                MappingType == other.MappingType &&   // reference equality — no collision
+                TargetType == other.TargetType &&
                 ProjectionHash == other.ProjectionHash &&
                 StartOffset == other.StartOffset &&
                 string.Equals(TableName, other.TableName, StringComparison.Ordinal);
@@ -1582,7 +1585,7 @@ namespace nORM.Query
             /// Generates a hash code for the current key instance.
             /// </summary>
             /// <returns>A hash code that can be used in hashing algorithms and data structures.</returns>
-            public override int GetHashCode() => HashCode.Combine(MappingTypeHash, TargetTypeHash, ProjectionHash, TableName, StartOffset);
+            public override int GetHashCode() => HashCode.Combine(MappingType, TargetType, ProjectionHash, TableName, StartOffset);
         }
 
         private readonly struct SchemaCacheKey : IEquatable<SchemaCacheKey>

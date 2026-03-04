@@ -148,6 +148,29 @@ namespace nORM.Query
                     _sql.Append(")");
                     return node;
                 }
+
+                // Q1: Nullable column-vs-column comparison needs three-valued logic.
+                // A plain = or <> is incorrect when either side can be NULL at runtime.
+                if (IsNullableValueType(node.Left.Type) || IsNullableValueType(node.Right.Type))
+                {
+                    int ls = _sql.Length;
+                    Visit(node.Left);
+                    string lf = _sql.ToString(ls, _sql.Length - ls);
+                    _sql.TruncateTo(ls);
+
+                    int rs = _sql.Length;
+                    Visit(node.Right);
+                    string rf = _sql.ToString(rs, _sql.Length - rs);
+                    _sql.TruncateTo(rs);
+
+                    if (node.NodeType == ExpressionType.Equal)
+                        _sql.Append($"({lf} = {rf} OR ({lf} IS NULL AND {rf} IS NULL))");
+                    else
+                        _sql.Append($"(({lf} IS NOT NULL AND {rf} IS NOT NULL AND {lf} <> {rf})" +
+                                    $" OR ({lf} IS NULL AND {rf} IS NOT NULL)" +
+                                    $" OR ({lf} IS NOT NULL AND {rf} IS NULL))");
+                    return node;
+                }
             }
 
             _sql.Append("(");
@@ -188,6 +211,14 @@ namespace nORM.Query
             }
             return false;
         }
+
+        /// <summary>
+        /// Returns <c>true</c> when <paramref name="t"/> is <c>Nullable&lt;T&gt;</c>.
+        /// Used by Q1 to detect when column-vs-column comparisons need three-valued logic.
+        /// </summary>
+        private static bool IsNullableValueType(Type t) =>
+            t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>);
+
         protected override Expression VisitMember(MemberExpression node)
         {
             if (node.Expression is ParameterExpression pe && _parameterMappings.TryGetValue(pe, out var info))

@@ -724,11 +724,6 @@ namespace nORM.Core
                         }
                     }
                 }
-                if (saveInterceptors.Count > 0)
-                {
-                    foreach (var interceptor in saveInterceptors)
-                        await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, ct).ConfigureAwait(false);
-                }
                 await transactionManager.CommitAsync().ConfigureAwait(false);
 
                 // DATA INTEGRITY FIX (TASK 1): Accept changes only after successful commit
@@ -752,6 +747,15 @@ namespace nORM.Core
             {
                 await transactionManager.RollbackAsync().ConfigureAwait(false);
                 throw;
+            }
+
+            // C1: Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE the
+            // try/catch block so an interceptor exception does not attempt to roll back an
+            // already-committed transaction.
+            if (saveInterceptors.Count > 0)
+            {
+                foreach (var interceptor in saveInterceptors)
+                    await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, ct).ConfigureAwait(false);
             }
 
             var cache = Options.CacheProvider;
@@ -827,7 +831,11 @@ namespace nORM.Core
                         var newId = reader.GetValue(0);
                         var entity = batch[i].Entity;
                         if (entity != null)
+                        {
                             map.SetPrimaryKey(entity, newId);
+                            // M2: Reindex the entity in the identity map now that it has a real PK
+                            ChangeTracker.ReindexAfterInsert(entity, map);
+                        }
                     }
                     // DATA INTEGRITY FIX (TASK 1): Removed AcceptChanges() call
                     // AcceptChanges must only be called after transaction commits successfully
@@ -907,14 +915,19 @@ namespace nORM.Core
             return deleted;
         }
 
+        /// <summary>
+        /// T1: <see cref="TimeoutException"/> is intentionally NOT retried by default because a
+        /// timed-out write operation may have already been partially applied by the database and
+        /// retrying it could produce duplicate rows. Callers that want to retry on timeout must
+        /// wrap the timeout condition inside their <see cref="DbContextOptions.RetryPolicy"/>
+        /// by mapping the relevant <see cref="DbException"/> to a positive <c>ShouldRetry</c>
+        /// result.
+        /// </summary>
         private bool IsRetryableException(Exception ex)
         {
             if (ex is DbException dbEx && Options.RetryPolicy != null)
-            {
-                if (Options.RetryPolicy.ShouldRetry(dbEx))
-                    return true;
-            }
-            return ex is TimeoutException;
+                return Options.RetryPolicy.ShouldRetry(dbEx);
+            return false;   // T1: TimeoutException removed — retrying a timed-out write can duplicate data
         }
         /// <summary>
         /// FIX (TASK 8): Prevents integer overflow when converting TimeSpan to seconds.
@@ -1424,7 +1437,7 @@ namespace nORM.Core
                 await using var cmd = CommandPool.Get(ctx.Connection, sql);
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
                 var paramDict = ctx.AddParametersFast(cmd, parameters);
-                if (!NormValidator.IsSafeRawSql(sql))
+                if (!NormValidator.IsSafeRawSql(sql, ctx.Provider))
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
                 NormValidator.ValidateRawSql(sql, paramDict);
 
@@ -1471,7 +1484,7 @@ namespace nORM.Core
                 await using var cmd = CommandPool.Get(ctx.Connection, sql);
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
                 var paramDict = ctx.AddParametersFast(cmd, parameters);
-                if (!NormValidator.IsSafeRawSql(sql))
+                if (!NormValidator.IsSafeRawSql(sql, ctx.Provider))
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
                 NormValidator.ValidateRawSql(sql, paramDict);
 
@@ -1571,7 +1584,7 @@ namespace nORM.Core
                 cmd.SetParametersFast(span);
             }
 
-            if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName))
+            if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, Provider))
                 throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
 
             NormValidator.ValidateRawSql(procedureName, paramDict);

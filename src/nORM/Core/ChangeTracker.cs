@@ -401,6 +401,23 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// M2: After a DB-generated key has been assigned to an entity (post-INSERT),
+        /// adds the entity to the key-based identity map so subsequent lookups by PK
+        /// find the correct entry rather than creating a duplicate.
+        /// </summary>
+        /// <param name="entity">The entity whose key was just assigned by the database.</param>
+        /// <param name="mapping">Mapping information for the entity type.</param>
+        internal void ReindexAfterInsert(object entity, TableMapping mapping)
+        {
+            if (!_entriesByReference.TryGetValue(entity, out var entry)) return;
+            var pk = GetPrimaryKeyValue(entity, mapping);
+            if (pk == null) return;
+            var typeDict = _entriesByKey.GetOrAdd(mapping.Type,
+                _ => new ConcurrentDictionary<object, EntityEntry>());
+            typeDict.TryAdd(pk, entry);
+        }
+
+        /// <summary>
         /// Extracts the primary key value for the given entity using the provided mapping.
         /// Supports both single-column keys and composite keys.
         /// </summary>
