@@ -1345,12 +1345,21 @@ namespace nORM.Query
             var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
             // PERFORMANCE FIX: Use Type.GetHashCode() directly instead of caching it
             // Type.GetHashCode() is intrinsic and cached by runtime, dictionary lookup is slower
+            // PC-9: Compute a stable mapping signature hash so that two DbContext instances
+            // with the same provider and CLR type but different ToTable mappings produce
+            // separate cache entries.  XOR is order-independent but sufficient here because
+            // TableName+Type combinations are unique per context.
+            int mappingHash = 0;
+            foreach (var mapping in _ctx.GetAllMappings())
+                mappingHash = HashCode.Combine(mappingHash, mapping.TableName, mapping.Type);
+
             var fingerprint = ExpressionFingerprint
                 .Compute(filtered)
                 .Extend(tenantHash)
                 .Extend(elementType.GetHashCode())
                 .Extend(filtered.Type.GetHashCode())
-                .Extend(_ctx.Provider.GetType().GetHashCode());   // Q2/S1/R1: isolate plan cache per provider type
+                .Extend(_ctx.Provider.GetType().GetHashCode())   // Q2/S1/R1: isolate plan cache per provider type
+                .Extend(mappingHash);                            // PC-9: isolate plan cache per mapping configuration
 
             if (_planCache.TryGet(fingerprint, out var cached))
             {

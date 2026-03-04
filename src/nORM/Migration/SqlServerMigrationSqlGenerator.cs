@@ -57,6 +57,24 @@ namespace nORM.Migration
                 down.Add($"ALTER TABLE [{table.Name}] ALTER COLUMN {oldDef}");
             }
 
+            // SD-8: Generate DROP TABLE for tables removed in the new snapshot
+            foreach (var table in diff.DroppedTables)
+            {
+                up.Add($"DROP TABLE [{table.Name}]");
+                // Down: recreate the table
+                var cols = table.Columns.Select(c =>
+                    $"[{c.Name}] {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
+                down.Add($"CREATE TABLE [{table.Name}] ({string.Join(", ", cols)})");
+            }
+
+            // SD-8: Generate DROP COLUMN for columns removed in the new snapshot
+            foreach (var (table, column) in diff.DroppedColumns)
+            {
+                up.Add($"ALTER TABLE [{table.Name}] DROP COLUMN [{column.Name}]");
+                var colDef = $"[{column.Name}] {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
+                down.Add($"ALTER TABLE [{table.Name}] ADD {colDef}");
+            }
+
             return new MigrationSqlStatements(up, down);
         }
 

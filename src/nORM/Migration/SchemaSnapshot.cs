@@ -137,10 +137,15 @@ namespace nORM.Migration
         public List<(TableSchema Table, string IndexName, bool IsUnique, string[] ColumnNames)> AddedIndexes { get; } = new();
         /// <summary>G1: Indexes that appear in the old snapshot but not in the new.</summary>
         public List<(TableSchema Table, string IndexName)> DroppedIndexes { get; } = new();
+        /// <summary>SD-8: Tables that exist in the old snapshot but not in the new (dropped tables).</summary>
+        public List<TableSchema> DroppedTables { get; } = new();
+        /// <summary>SD-8: Columns that exist in the old snapshot but not in the new for a given table (dropped columns).</summary>
+        public List<(TableSchema Table, ColumnSchema Column)> DroppedColumns { get; } = new();
 
         /// <summary>Indicates whether the diff contains any schema changes.</summary>
         public bool HasChanges => AddedTables.Count > 0 || AddedColumns.Count > 0 || AlteredColumns.Count > 0
-            || AddedIndexes.Count > 0 || DroppedIndexes.Count > 0;
+            || AddedIndexes.Count > 0 || DroppedIndexes.Count > 0
+            || DroppedTables.Count > 0 || DroppedColumns.Count > 0;
     }
 
     /// <summary>
@@ -175,6 +180,13 @@ namespace nORM.Migration
                         diff.AlteredColumns.Add((newTable, col, oldCol));
                 }
 
+                // SD-8: Detect dropped columns — columns present in old but not in new
+                foreach (var oldCol in oldTable.Columns)
+                {
+                    if (!newTable.Columns.Any(c => string.Equals(c.Name, oldCol.Name, StringComparison.OrdinalIgnoreCase)))
+                        diff.DroppedColumns.Add((newTable, oldCol));
+                }
+
                 // G1: Detect index changes — compare named indexes between old and new
                 var oldIndexes = BuildIndexMap(oldTable);
                 var newIndexes = BuildIndexMap(newTable);
@@ -191,6 +203,14 @@ namespace nORM.Migration
                         diff.DroppedIndexes.Add((newTable, name));
                 }
             }
+
+            // SD-8: Detect dropped tables — tables present in old but not in new
+            foreach (var oldTable in oldSnapshot.Tables)
+            {
+                if (!newSnapshot.Tables.Any(t => string.Equals(t.Name, oldTable.Name, StringComparison.OrdinalIgnoreCase)))
+                    diff.DroppedTables.Add(oldTable);
+            }
+
             return diff;
         }
 

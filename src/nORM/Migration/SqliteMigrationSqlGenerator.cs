@@ -80,6 +80,48 @@ namespace nORM.Migration
                 AddRecreate(down, table, oldAlteredMap);
             }
 
+            // SD-8: Generate DROP TABLE for tables removed in the new snapshot
+            foreach (var table in diff.DroppedTables)
+            {
+                up.Add($"DROP TABLE IF EXISTS \"{table.Name}\"");
+                // Down: recreate the table
+                var cols = table.Columns.Select(c =>
+                    $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
+                down.Add($"CREATE TABLE \"{table.Name}\" ({string.Join(", ", cols)})");
+            }
+
+            // SD-8: Generate DROP COLUMN for columns removed in the new snapshot.
+            // SQLite does not support ALTER TABLE ... DROP COLUMN before version 3.35.0,
+            // so we use the table-recreation workaround for broad compatibility.
+            foreach (var group in diff.DroppedColumns.GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var newTable = diff.DroppedColumns.First(x => string.Equals(x.Table.Name, group.Key, StringComparison.OrdinalIgnoreCase)).Table;
+                var droppedColNames = group.Select(g => g.Column.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                // The columns remaining in the new table (without the dropped ones)
+                var remainingCols = newTable.Columns
+                    .Where(c => !droppedColNames.Contains(c.Name))
+                    .ToArray();
+
+                var remainingDefs = remainingCols
+                    .Select(c => $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
+                var remainingNames = remainingCols.Select(c => $"\"{c.Name}\"").ToArray();
+
+                up.Add("PRAGMA foreign_keys=off");
+                up.Add($"CREATE TABLE \"__temp__{newTable.Name}\" ({string.Join(", ", remainingDefs)})");
+                up.Add($"INSERT INTO \"__temp__{newTable.Name}\" ({string.Join(", ", remainingNames)}) SELECT {string.Join(", ", remainingNames)} FROM \"{newTable.Name}\"");
+                up.Add($"DROP TABLE \"{newTable.Name}\"");
+                up.Add($"ALTER TABLE \"__temp__{newTable.Name}\" RENAME TO \"{newTable.Name}\"");
+                up.Add("PRAGMA foreign_keys=on");
+
+                // Down: add the dropped columns back (SQLite ADD COLUMN)
+                foreach (var droppedCol in group.Select(g => g.Column))
+                {
+                    var colDef = $"\"{droppedCol.Name}\" {GetSqlType(droppedCol)} {(droppedCol.IsNullable ? "NULL" : "NOT NULL")}";
+                    down.Add($"ALTER TABLE \"{newTable.Name}\" ADD COLUMN {colDef}");
+                }
+            }
+
             return new MigrationSqlStatements(up, down);
         }
 

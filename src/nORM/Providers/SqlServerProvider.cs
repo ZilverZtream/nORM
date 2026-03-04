@@ -55,10 +55,12 @@ namespace nORM.Providers
             // Split by dot and escape each part individually to support schema.table notation
             if (id.Contains('.'))
             {
-                return string.Join(".", id.Split('.').Select(part => $"[{part}]"));
+                // ID-7: Double embedded ] characters to prevent SQL injection via identifiers
+                return string.Join(".", id.Split('.').Select(part => $"[{part.Replace("]", "]]")}]"));
             }
 
-            return $"[{id}]";
+            // ID-7: Double embedded ] characters to prevent SQL injection via identifiers
+            return $"[{id.Replace("]", "]]")}]";
         }
 
         /// <summary>

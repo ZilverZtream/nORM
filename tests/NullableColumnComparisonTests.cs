@@ -20,6 +20,8 @@ public class NullableColumnComparisonTests : TestBase
         public int? NullableB { get; set; }
         public int NonNullableA { get; set; }
         public int NonNullableB { get; set; }
+        public string? StringA { get; set; }
+        public string? StringB { get; set; }
     }
 
     private static DbConnection CreateConn()
@@ -89,5 +91,30 @@ public class NullableColumnComparisonTests : TestBase
 
         // null literal vs column should expand to IS NULL
         Assert.Contains("IS NULL", sql);
+    }
+
+    [Fact]
+    public void StringEqual_ExpandsToIsNullGuard()
+    {
+        using var cn = CreateConn();
+        var provider = new SqliteProvider();
+        var (sql, _) = Translate<NullableEntity>(e => e.StringA == e.StringB, cn, provider);
+
+        // String (reference type) equality should expand to three-valued logic with IS NULL guard
+        Assert.Contains("IS NULL", sql);
+        Assert.Contains("=", sql);
+    }
+
+    [Fact]
+    public void StringNotEqual_ExpandsToIsNullGuards()
+    {
+        using var cn = CreateConn();
+        var provider = new SqliteProvider();
+        var (sql, _) = Translate<NullableEntity>(e => e.StringA != e.StringB, cn, provider);
+
+        // String inequality should contain both IS NULL and IS NOT NULL checks
+        Assert.Contains("IS NOT NULL", sql);
+        Assert.Contains("IS NULL", sql);
+        Assert.Contains("<>", sql);
     }
 }

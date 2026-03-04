@@ -1,4 +1,6 @@
+using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
@@ -97,5 +99,82 @@ public class FkOrderingTests
         // Should not throw FK violation (child deleted before parent)
         var affected = await ctx.SaveChangesAsync(detectChanges: false);
         Assert.Equal(2, affected);
+    }
+}
+
+/// <summary>FK-2/FK-3: Tests for namespace collision handling and cycle detection in topological sort.</summary>
+public class FkOrderingAdvancedTests
+{
+    // Two entities in different namespaces with the same simple type name.
+    // Neither has a FK to the other, so they should sort without error.
+    [Table("ModuleACustomer")]
+    private class ModuleACustomer
+    {
+        [Key] public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    [Table("ModuleBCustomer")]
+    private class ModuleBCustomer
+    {
+        [Key] public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        // FK to ModuleACustomer (different namespace, same simple name "Customer" is not involved here)
+        public int ModuleACustomerId { get; set; }
+    }
+
+    [Fact]
+    public async Task SaveChanges_DoesNotConfuseTypesWithSameSimpleName()
+    {
+        // Both tables exist, no actual FK constraint in SQLite, just verifying ordering works
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        await using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE ModuleACustomer (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);" +
+                              "CREATE TABLE ModuleBCustomer (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, ModuleACustomerId INTEGER NOT NULL);";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        await using var ctx = new DbContext(cn, new SqliteProvider());
+        ctx.Add(new ModuleACustomer { Id = 1, Name = "A" });
+        ctx.Add(new ModuleBCustomer { Id = 2, Name = "B", ModuleACustomerId = 1 });
+        var affected = await ctx.SaveChangesAsync();
+        Assert.Equal(2, affected);
+    }
+
+    // Entities with a circular FK dependency
+    [Table("CircA")]
+    private class CircA
+    {
+        [Key] public int Id { get; set; }
+        public int CircBId { get; set; }  // auto-detected FK -> CircB
+    }
+
+    [Table("CircB")]
+    private class CircB
+    {
+        [Key] public int Id { get; set; }
+        public int CircAId { get; set; }  // auto-detected FK -> CircA
+    }
+
+    [Fact]
+    public async Task SaveChanges_ThrowsOnCircularFkDependency()
+    {
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        await using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE CircA (Id INTEGER PRIMARY KEY, CircBId INTEGER NOT NULL);" +
+                              "CREATE TABLE CircB (Id INTEGER PRIMARY KEY, CircAId INTEGER NOT NULL);";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        await using var ctx = new DbContext(cn, new SqliteProvider());
+        ctx.Add(new CircA { Id = 1, CircBId = 2 });
+        ctx.Add(new CircB { Id = 2, CircAId = 1 });
+
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(() => ctx.SaveChangesAsync());
+        Assert.Contains("Circular FK dependency", ex.Message);
     }
 }

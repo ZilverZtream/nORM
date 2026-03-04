@@ -115,9 +115,15 @@ namespace nORM.Query
                     return null;
                 }
 
-                // For non-nullable value types, create default instance
-                // For reference types, return null
-                return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
+                // MAP-4: Throw for non-nullable value types — DB NULL into a non-nullable member
+                // silently defaults to 0/false/etc., hiding data integrity issues.
+                if (targetType.IsValueType)
+                    throw new InvalidOperationException(
+                        $"DB column returned NULL for non-nullable value type '{targetType.Name}'. " +
+                        $"Mark the property as nullable (e.g. '{targetType.Name}?') or fix the data source.");
+
+                // For reference types, null is acceptable
+                return null;
             }
 
             var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
@@ -851,6 +857,14 @@ namespace nORM.Query
                     if (reader.IsDBNull(i + startOffset))
                     {
                         var paramType = ctorParams[i].ParameterType;
+                        var underlyingNullable = Nullable.GetUnderlyingType(paramType);
+                        if (paramType.IsValueType && underlyingNullable == null)
+                        {
+                            // MAP-4: Fail fast for non-nullable value type constructor parameters
+                            throw new InvalidOperationException(
+                                $"DB column returned NULL for non-nullable constructor parameter '{ctorParams[i].Name}' " +
+                                $"of type '{paramType.Name}'. Mark the parameter type as nullable or fix the data source.");
+                        }
                         args[i] = paramType.IsValueType ? Activator.CreateInstance(paramType) : default;
                         continue;
                     }
@@ -1015,10 +1029,29 @@ namespace nORM.Query
             for (int i = 0; i < columns.Length; i++)
             {
                 var column = columns[i];
+                var propType = column.Prop.PropertyType;
                 var isNullCheck = Expression.Call(readerParam, Methods.IsDbNull, Expression.Constant(i + startOffset));
-                var getValue = GetOptimizedReaderCall(readerParam, column.Prop.PropertyType, i + startOffset);
+                var getValue = GetOptimizedReaderCall(readerParam, propType, i + startOffset);
                 var setProperty = Expression.Call(entityVar, column.Prop.GetSetMethod()!, getValue);
-                var conditionalSet = Expression.IfThen(Expression.Not(isNullCheck), setProperty);
+
+                Expression conditionalSet;
+                // MAP-4: For non-nullable value types, throw when DB returns NULL rather than silently defaulting.
+                bool isNonNullableValueType = propType.IsValueType && Nullable.GetUnderlyingType(propType) == null;
+                if (isNonNullableValueType)
+                {
+                    // Throw when null is encountered for a non-nullable value-type property
+                    var throwExpr = Expression.Throw(
+                        Expression.New(
+                            typeof(InvalidOperationException).GetConstructor(new[] { typeof(string) })!,
+                            Expression.Constant(
+                                $"DB column returned NULL for non-nullable property '{column.Prop.Name}' " +
+                                $"of type '{propType.Name}'. Mark the property as nullable or fix the data source.")));
+                    conditionalSet = Expression.IfThenElse(Expression.Not(isNullCheck), setProperty, throwExpr);
+                }
+                else
+                {
+                    conditionalSet = Expression.IfThen(Expression.Not(isNullCheck), setProperty);
+                }
                 expressions.Add(conditionalSet);
             }
 
@@ -1034,6 +1067,13 @@ namespace nORM.Query
             try
             {
                 materializer(reader);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("DB column returned NULL for non-nullable"))
+            {
+                // MAP-4: Expected during validation — the validation reader purposely sends DBNull to
+                // every column to test the structural correctness of the materializer.  A NULL-for-non-nullable
+                // exception here means the materializer code path was reached and will throw appropriately
+                // during real execution.  This is NOT a materializer defect; suppress it.
             }
             catch (Exception ex)
             {
