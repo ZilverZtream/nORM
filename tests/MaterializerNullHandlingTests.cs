@@ -14,6 +14,8 @@ namespace nORM.Tests;
 /// <summary>
 /// MAP-4: Verifies that materializing a DB NULL into a non-nullable value type member
 /// throws rather than silently defaulting to 0/false/etc.
+/// MM-2: Verifies that enum and Nullable&lt;TEnum&gt; properties are correctly materialized
+/// from integer DB values via the reflection fallback path.
 /// </summary>
 public class MaterializerNullHandlingTests
 {
@@ -84,5 +86,59 @@ public class MaterializerNullHandlingTests
         Assert.Single(results);
         Assert.Null(results[0].NullableInt);
         Assert.Equal(42, results[0].NonNullableInt);
+    }
+
+    // MM-2: Enum conversion tests
+
+    private enum TestStatus { Active = 1, Inactive = 2, Pending = 3 }
+
+    [Table("EnumEntity")]
+    private class EnumEntity
+    {
+        [Key] public int Id { get; set; }
+        public TestStatus Status { get; set; }
+        public TestStatus? NullableStatus { get; set; }
+    }
+
+    [Fact]
+    public async Task Query_EnumProperty_ConvertsIntToEnum()
+    {
+        // MM-2: An int DB value must be correctly converted to an enum type
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        await using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE EnumEntity (Id INTEGER PRIMARY KEY, Status INTEGER NOT NULL, NullableStatus INTEGER);" +
+                                "INSERT INTO EnumEntity VALUES (1, 2, 3);";
+            await setup.ExecuteNonQueryAsync();
+        }
+
+        await using var ctx = new DbContext(cn, new SqliteProvider());
+        var results = await ctx.Query<EnumEntity>().ToListAsync();
+
+        Assert.Single(results);
+        Assert.Equal(TestStatus.Inactive, results[0].Status);
+        Assert.Equal(TestStatus.Pending, results[0].NullableStatus);
+    }
+
+    [Fact]
+    public async Task Query_NullableEnumProperty_WithDbNull_ReturnsNull()
+    {
+        // MM-2: A DB NULL for Nullable<TEnum> must return null, not throw
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        await using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE EnumEntity (Id INTEGER PRIMARY KEY, Status INTEGER NOT NULL, NullableStatus INTEGER);" +
+                                "INSERT INTO EnumEntity VALUES (1, 1, NULL);";
+            await setup.ExecuteNonQueryAsync();
+        }
+
+        await using var ctx = new DbContext(cn, new SqliteProvider());
+        var results = await ctx.Query<EnumEntity>().ToListAsync();
+
+        Assert.Single(results);
+        Assert.Equal(TestStatus.Active, results[0].Status);
+        Assert.Null(results[0].NullableStatus);
     }
 }

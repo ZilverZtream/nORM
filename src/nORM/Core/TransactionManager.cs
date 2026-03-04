@@ -89,12 +89,16 @@ namespace nORM.Core
 
         /// <summary>
         /// Rolls back the underlying transaction if owned by this instance.
+        /// Always uses <see cref="CancellationToken.None"/> so that a canceled caller token
+        /// cannot abort the rollback and leave an incomplete transaction state.
         /// </summary>
+        /// <param name="_">Ignored — rollback always uses <see cref="CancellationToken.None"/>.</param>
         /// <returns>A task that completes when the rollback has finished.</returns>
-        public async ValueTask RollbackAsync()
+        public async ValueTask RollbackAsync(CancellationToken _ = default)
         {
             if (OwnsTransaction && Transaction != null)
-                await Transaction.RollbackAsync(Token).ConfigureAwait(false);
+                // TX-1: Use CancellationToken.None — rollback must complete regardless of caller cancellation
+                await Transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
         }
 
         /// <summary>

@@ -80,4 +80,40 @@ public class MigrationRunnerLifecycleTests
 
         await runner.DisposeAsync();
     }
+
+    [Fact]
+    public async Task SqliteMigrationRunner_ClosedConnection_OpensAutomaticallyOnApply()
+    {
+        // MIG-1: Runner must open a closed connection before calling BeginTransactionAsync.
+        // Create a connection but do NOT open it.
+        var cn = new SqliteConnection("Data Source=:memory:");
+        // Connection is closed (State == Closed) at this point
+
+        await using var runner = new SqliteMigrationRunner(cn, MigrationsAssembly);
+
+        try
+        {
+            // Should succeed: ApplyMigrationsAsync must open the connection automatically.
+            // (No migrations are pending in the test assembly beyond what's already applied,
+            //  so it completes without error after opening the connection.)
+            await runner.ApplyMigrationsAsync();
+        }
+        finally
+        {
+            await cn.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task SqliteMigrationRunner_OpenConnection_DoesNotThrowOnApply()
+    {
+        // MIG-1: Runner must also work fine when connection is already open (no double-open).
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+
+        await using var runner = new SqliteMigrationRunner(cn, MigrationsAssembly);
+
+        // Should succeed without error
+        await runner.ApplyMigrationsAsync();
+    }
 }

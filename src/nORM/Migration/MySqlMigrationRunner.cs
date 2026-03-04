@@ -48,6 +48,10 @@ namespace nORM.Migration
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
         {
+            // MIG-1: Ensure the connection is open before calling BeginTransactionAsync
+            if (_connection.State != System.Data.ConnectionState.Open)
+                await _connection.OpenAsync(ct).ConfigureAwait(false);
+
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
             var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
             if (!pending.Any()) return;

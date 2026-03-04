@@ -102,6 +102,35 @@ namespace nORM.Query
             }
         }
 
+        /// <summary>
+        /// MM-2: Converts a boxed DB value (typically <see cref="long"/> from SQLite) to the
+        /// specified enum type <typeparamref name="TEnum"/>. Calling <c>Convert.ChangeType</c>
+        /// directly on an enum target type throws <see cref="InvalidCastException"/>; this helper
+        /// converts to the enum's underlying integral type first, then calls
+        /// <c>Enum.ToObject</c>.
+        /// </summary>
+        private static TEnum ConvertToEnum<TEnum>(object value) where TEnum : struct, Enum
+        {
+            var underlying = Enum.GetUnderlyingType(typeof(TEnum));
+            var converted = Convert.ChangeType(value, underlying);
+            return (TEnum)Enum.ToObject(typeof(TEnum), converted);
+        }
+
+        /// <summary>
+        /// MM-1: Computes a 64-bit projection hash by combining two independent 32-bit hashes
+        /// from the <see cref="ExpressionFingerprint"/>. This reduces collision probability
+        /// compared to a single 32-bit hash (roughly 1-in-2^64 vs 1-in-2^32 per pair).
+        /// </summary>
+        private static long ComputeProjectionHash(LambdaExpression projection)
+        {
+            var fp = ExpressionFingerprint.Compute(projection);
+            // Use the fingerprint's own hash plus an extended hash with a known constant
+            // to produce two independent 32-bit values combined into one 64-bit value.
+            var h1 = (long)(uint)fp.GetHashCode();
+            var h2 = (long)(uint)fp.Extend(unchecked((int)0xDEADBEEF)).GetHashCode();
+            return (h2 << 32) | h1;
+        }
+
         private static object? ConvertDbValue(object dbValue, Type targetType)
         {
             if (dbValue == null || dbValue is DBNull)
@@ -130,6 +159,14 @@ namespace nORM.Query
             if (dbValue.GetType() == underlyingType)
             {
                 return dbValue;
+            }
+
+            // MM-2: Handle enum types before calling Convert.ChangeType, which throws for enums.
+            if (underlyingType.IsEnum)
+            {
+                var enumUnderlying = Enum.GetUnderlyingType(underlyingType);
+                var enumConverted = Convert.ChangeType(dbValue, enumUnderlying);
+                return Enum.ToObject(underlyingType, enumConverted);
             }
 
             // Use cached conversion delegate for better performance
@@ -205,10 +242,20 @@ namespace nORM.Query
                     {
                         if (readerMethod == Methods.GetValue)
                         {
-                            il.Emit(OpCodes.Ldtoken, underlying);
-                            il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
-                            il.Emit(OpCodes.Call, typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) })!);
-                            il.Emit(OpCodes.Unbox_Any, underlying);
+                            if (underlying.IsEnum)
+                            {
+                                // MM-2: Nullable<TEnum> — convert via enum helper to avoid InvalidCastException
+                                var enumConvertMethod = typeof(MaterializerFactory).GetMethod(nameof(ConvertToEnum), BindingFlags.NonPublic | BindingFlags.Static)!
+                                    .MakeGenericMethod(underlying);
+                                il.Emit(OpCodes.Call, enumConvertMethod);
+                            }
+                            else
+                            {
+                                il.Emit(OpCodes.Ldtoken, underlying);
+                                il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
+                                il.Emit(OpCodes.Call, typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) })!);
+                                il.Emit(OpCodes.Unbox_Any, underlying);
+                            }
                         }
                         else if (readerMethod.ReturnType != underlying)
                         {
@@ -216,6 +263,14 @@ namespace nORM.Query
                         }
                         var ctorNullable = pType.GetConstructor(new[] { underlying })!;
                         il.Emit(OpCodes.Newobj, ctorNullable);
+                    }
+                    else if (pType.IsEnum)
+                    {
+                        // MM-2: Enum types — call our helper which handles Int64→int→enum conversion
+                        // that Convert.ChangeType cannot do directly (throws InvalidCastException).
+                        var enumConvertMethod = typeof(MaterializerFactory).GetMethod(nameof(ConvertToEnum), BindingFlags.NonPublic | BindingFlags.Static)!
+                            .MakeGenericMethod(pType);
+                        il.Emit(OpCodes.Call, enumConvertMethod);
                     }
                     else if (pType.IsValueType)
                     {
@@ -338,7 +393,7 @@ namespace nORM.Query
             var cacheKey = new MaterializerCacheKey(
                 mapping.Type,
                 targetType,
-                projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
+                projection != null ? ComputeProjectionHash(projection) : 0L,
                 mapping.TableName,
                 startOffset);
 
@@ -382,7 +437,7 @@ namespace nORM.Query
             var cacheKey = new MaterializerCacheKey(
                 mapping.Type,
                 targetType,
-                projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
+                projection != null ? ComputeProjectionHash(projection) : 0L,
                 mapping.TableName,
                 startOffset);
 
@@ -461,7 +516,7 @@ namespace nORM.Query
             var cacheKey = new MaterializerCacheKey(
                 mapping.Type,
                 targetType,
-                projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
+                projection != null ? ComputeProjectionHash(projection) : 0L,
                 mapping.TableName,
                 startOffset);
 
@@ -506,7 +561,7 @@ namespace nORM.Query
             var cacheKey = new MaterializerCacheKey(
                 mapping.Type,
                 targetType,
-                projection != null ? ExpressionFingerprint.Compute(projection).GetHashCode() : 0,
+                projection != null ? ComputeProjectionHash(projection) : 0L,
                 mapping.TableName,
                 startOffset);
 
@@ -1246,24 +1301,40 @@ namespace nORM.Query
             public override System.Data.DataTable GetSchemaTable() => throw new NotSupportedException();
         }
 
+        private static readonly MethodInfo _convertToEnumOpenMethod =
+            typeof(MaterializerFactory).GetMethod(nameof(ConvertToEnum), BindingFlags.NonPublic | BindingFlags.Static)!;
+
         private static Expression GetOptimizedReaderCall(ParameterExpression reader, Type propertyType, int index)
         {
             var underlyingType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
-            Expression call = underlyingType.Name switch
+            Expression call;
+
+            if (underlyingType.IsEnum)
             {
-                nameof(Int32) => Expression.Call(reader, Methods.GetInt32, Expression.Constant(index)),
-                nameof(String) => Expression.Call(reader, Methods.GetString, Expression.Constant(index)),
-                nameof(DateTime) => Expression.Call(reader, Methods.GetDateTime, Expression.Constant(index)),
-                nameof(Boolean) => Expression.Call(reader, Methods.GetBoolean, Expression.Constant(index)),
-                nameof(Decimal) => Expression.Call(reader, Methods.GetDecimal, Expression.Constant(index)),
-                nameof(Int64) => Expression.Call(reader, Methods.GetInt64, Expression.Constant(index)),
-                nameof(Double) => Expression.Call(reader, Methods.GetDouble, Expression.Constant(index)),
-                nameof(Single) => Expression.Call(reader, Methods.GetFloat, Expression.Constant(index)),
-                nameof(Guid) => Expression.Call(reader, Methods.GetGuid, Expression.Constant(index)),
-                _ => Expression.Convert(
-                        Expression.Call(reader, Methods.GetValue, Expression.Constant(index)),
-                        underlyingType)
-            };
+                // MM-2: Enum types — use ConvertToEnum<TEnum> helper to safely convert from Int64/Int32/etc.
+                // Expression.Convert(object, EnumType) throws InvalidCastException at runtime for boxed integers.
+                var enumConvertMethod = _convertToEnumOpenMethod.MakeGenericMethod(underlyingType);
+                var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
+                call = Expression.Call(enumConvertMethod, getRawValue);
+            }
+            else
+            {
+                call = underlyingType.Name switch
+                {
+                    nameof(Int32) => Expression.Call(reader, Methods.GetInt32, Expression.Constant(index)),
+                    nameof(String) => Expression.Call(reader, Methods.GetString, Expression.Constant(index)),
+                    nameof(DateTime) => Expression.Call(reader, Methods.GetDateTime, Expression.Constant(index)),
+                    nameof(Boolean) => Expression.Call(reader, Methods.GetBoolean, Expression.Constant(index)),
+                    nameof(Decimal) => Expression.Call(reader, Methods.GetDecimal, Expression.Constant(index)),
+                    nameof(Int64) => Expression.Call(reader, Methods.GetInt64, Expression.Constant(index)),
+                    nameof(Double) => Expression.Call(reader, Methods.GetDouble, Expression.Constant(index)),
+                    nameof(Single) => Expression.Call(reader, Methods.GetFloat, Expression.Constant(index)),
+                    nameof(Guid) => Expression.Call(reader, Methods.GetGuid, Expression.Constant(index)),
+                    _ => Expression.Convert(
+                            Expression.Call(reader, Methods.GetValue, Expression.Constant(index)),
+                            underlyingType)
+                };
+            }
 
             if (call.Type != propertyType)
                 call = Expression.Convert(call, propertyType);
@@ -1603,15 +1674,17 @@ namespace nORM.Query
         // Value types for better cache performance
         // M1/R2: Use actual Type references instead of hash codes to prevent collision between
         // different types that happen to produce the same hash code.
+        // MM-1: ProjectionHash upgraded from int (32-bit) to long (64-bit) to prevent hash
+        // collisions between distinct projection expression trees that happen to share a 32-bit hash.
         private readonly struct MaterializerCacheKey : IEquatable<MaterializerCacheKey>
         {
             public readonly Type MappingType;     // was int MappingTypeHash
             public readonly Type TargetType;      // was int TargetTypeHash
-            public readonly int ProjectionHash;
+            public readonly long ProjectionHash;  // was int — now 64-bit to reduce collision risk
             public readonly string TableName;
             public readonly int StartOffset;
 
-            public MaterializerCacheKey(Type mappingType, Type targetType, int projectionHash, string tableName, int startOffset)
+            public MaterializerCacheKey(Type mappingType, Type targetType, long projectionHash, string tableName, int startOffset)
             {
                 MappingType = mappingType;
                 TargetType = targetType;
