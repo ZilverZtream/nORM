@@ -8,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.SqlServer.TransactSql.ScriptDom;
+using nORM.Providers;
 
 #nullable enable
 
@@ -422,10 +423,22 @@ namespace nORM.Core
             return false;
         }
 
-        internal static bool IsSafeRawSql(string sql)
+        /// <summary>
+        /// P1: Provider-aware SQL safety gate.
+        /// Non-SQL-Server providers skip the TSQL AST parser (which produces false
+        /// negatives for dialect-specific syntax like SQLite PRAGMA) and rely solely
+        /// on the keyword denylist. SQL Server still uses the full AST allowlist path.
+        /// </summary>
+        internal static bool IsSafeRawSql(string sql, DatabaseProvider? provider = null)
         {
             if (string.IsNullOrWhiteSpace(sql))
                 return false;
+
+            // X1 + P1: keyword denylist is always applied first for all providers
+            if (!IsSafeByKeywords(sql)) return false;
+
+            // P1: skip expensive TSQL parse for non-SQL-Server providers
+            if (provider is not null && provider is not SqlServerProvider) return true;
 
             using var reader = new StringReader(sql);
             var parser = new TSql150Parser(false);
@@ -433,11 +446,8 @@ namespace nORM.Core
 
             if (errors != null && errors.Count > 0)
             {
-                var lowerSql = sql.ToLowerInvariant();
-                return !(lowerSql.Contains("drop ") || lowerSql.Contains("alter ") ||
-                         lowerSql.Contains("truncate ") || lowerSql.Contains("exec ") ||
-                         lowerSql.Contains("delete ") || lowerSql.Contains("update ") ||
-                         lowerSql.Contains("insert ") || lowerSql.Contains("merge "));
+                // Parse failed (non-TSQL syntax) — keyword check already passed, allow it
+                return true;
             }
 
             var allowed = new HashSet<Type> { typeof(SelectStatement), typeof(SetVariableStatement) };
@@ -452,6 +462,29 @@ namespace nORM.Core
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// X1: Keyword-based denylist that catches side-effect and DDL commands not
+        /// caught by the TSQL AST parser (e.g. SQLite-specific PRAGMA, VACUUM, REINDEX).
+        /// </summary>
+        private static bool IsSafeByKeywords(string sql)
+        {
+            var lowerSql = sql.ToLowerInvariant();
+            // DML / DDL denylist
+            if (lowerSql.Contains("drop ") || lowerSql.Contains("alter ") ||
+                lowerSql.Contains("truncate ") || lowerSql.Contains("exec ") ||
+                lowerSql.Contains("delete ") || lowerSql.Contains("update ") ||
+                lowerSql.Contains("insert ") || lowerSql.Contains("merge "))
+                return false;
+
+            // X1: Additional side-effect commands that bypass the AST path
+            if (lowerSql.Contains("pragma ") || lowerSql.Contains("vacuum") ||
+                lowerSql.Contains("reindex ") || lowerSql.Contains("analyze ") ||
+                lowerSql.Contains("call "))
+                return false;
+
+            return true;
         }
 
         private static readonly HashSet<char> AllowedLikeEscapeChars = new("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,-./:;<=>?@[]^_{|}~\\");

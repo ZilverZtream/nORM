@@ -205,6 +205,13 @@ namespace nORM.Query
         public void Clear() => _position = 0;
 
         /// <summary>
+        /// Truncates the builder to the specified length, discarding any characters
+        /// written after that position. Used by expression visitors to "undo" a fragment.
+        /// </summary>
+        /// <param name="length">The target length; must be &lt;= current <see cref="Length"/>.</param>
+        public void TruncateTo(int length) => _position = length;
+
+        /// <summary>
         /// Creates a <see cref="string"/> from the current contents of the buffer.
         /// </summary>
         /// <returns>The SQL text represented by this builder.</returns>

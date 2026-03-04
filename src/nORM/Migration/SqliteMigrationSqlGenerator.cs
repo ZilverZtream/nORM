@@ -69,13 +69,35 @@ namespace nORM.Migration
                 down.Add("PRAGMA foreign_keys=on");
             }
 
-            foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
+            // G2: SQLite does not support ALTER COLUMN; use the standard table-recreation workaround.
+            foreach (var group in diff.AlteredColumns.GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
             {
-                up.Add($"-- SQLite does not support altering column '{newCol.Name}' in table '{table.Name}'");
-                down.Add($"-- SQLite does not support altering column '{oldCol.Name}' in table '{table.Name}'");
+                var table         = diff.AlteredColumns.First(x => string.Equals(x.Table.Name, group.Key, StringComparison.OrdinalIgnoreCase)).Table;
+                var alteredMap    = group.ToDictionary(x => x.NewColumn.Name, x => x.NewColumn, StringComparer.OrdinalIgnoreCase);
+                var oldAlteredMap = group.ToDictionary(x => x.OldColumn.Name, x => x.OldColumn, StringComparer.OrdinalIgnoreCase);
+
+                AddRecreate(up,   table, alteredMap);
+                AddRecreate(down, table, oldAlteredMap);
             }
 
             return new MigrationSqlStatements(up, down);
+        }
+
+        /// <summary>
+        /// G2: Generates the SQLite table-recreation sequence (PRAGMA off, CREATE temp, INSERT,
+        /// DROP original, RENAME temp, PRAGMA on) required to change an existing column definition.
+        /// </summary>
+        private static void AddRecreate(List<string> stmts, TableSchema table, Dictionary<string, ColumnSchema> overrides)
+        {
+            var cols  = table.Columns.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
+            var defs  = cols.Select(c => $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
+            var names = cols.Select(c => $"\"{c.Name}\"");
+            stmts.Add("PRAGMA foreign_keys=off");
+            stmts.Add($"CREATE TABLE \"__temp__{table.Name}\" ({string.Join(", ", defs)})");
+            stmts.Add($"INSERT INTO \"__temp__{table.Name}\" SELECT {string.Join(", ", names)} FROM \"{table.Name}\"");
+            stmts.Add($"DROP TABLE \"{table.Name}\"");
+            stmts.Add($"ALTER TABLE \"__temp__{table.Name}\" RENAME TO \"{table.Name}\"");
+            stmts.Add("PRAGMA foreign_keys=on");
         }
 
         /// <summary>
