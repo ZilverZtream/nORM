@@ -244,12 +244,17 @@ END;";
 
         /// <summary>
         /// Creates a transaction savepoint to allow partial rollbacks when supported by the underlying MySQL driver.
+        /// PRV-1: Now checks the CancellationToken before executing so that pre-cancelled tokens
+        /// correctly throw <see cref="OperationCanceledException"/> rather than silently proceeding.
         /// </summary>
         /// <param name="transaction">Active transaction to create the savepoint on.</param>
         /// <param name="name">Name of the savepoint.</param>
         /// <param name="ct">Cancellation token for the asynchronous operation.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
+            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            ct.ThrowIfCancellationRequested();
+
             var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) }) ??
                              transaction.GetType().GetMethod("CreateSavepoint", new[] { typeof(string) }) ??
                              transaction.GetType().GetMethod("Savepoint", new[] { typeof(string) });
@@ -258,6 +263,10 @@ END;";
                 try
                 {
                     saveMethod.Invoke(transaction, new object[] { name });
+
+                    // PRV-1: Check after the sync call in case cancellation arrived mid-operation.
+                    ct.ThrowIfCancellationRequested();
+
                     return Task.CompletedTask;
                 }
                 catch (System.Reflection.TargetInvocationException ex)
@@ -274,12 +283,17 @@ END;";
 
         /// <summary>
         /// Rolls back the transaction to a previously created savepoint.
+        /// PRV-1: Now checks the CancellationToken before executing so that pre-cancelled tokens
+        /// correctly throw <see cref="OperationCanceledException"/> rather than silently proceeding.
         /// </summary>
         /// <param name="transaction">The transaction containing the savepoint.</param>
         /// <param name="name">Name of the savepoint to roll back to.</param>
         /// <param name="ct">Cancellation token for the asynchronous operation.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
+            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            ct.ThrowIfCancellationRequested();
+
             var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) }) ??
                                  transaction.GetType().GetMethod("RollbackToSavepoint", new[] { typeof(string) });
             if (rollbackMethod != null)
@@ -287,6 +301,10 @@ END;";
                 try
                 {
                     rollbackMethod.Invoke(transaction, new object[] { name });
+
+                    // PRV-1: Check after the sync call in case cancellation arrived mid-operation.
+                    ct.ThrowIfCancellationRequested();
+
                     return Task.CompletedTask;
                 }
                 catch (System.Reflection.TargetInvocationException ex)

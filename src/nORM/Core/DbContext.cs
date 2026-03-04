@@ -1290,6 +1290,17 @@ namespace nORM.Core
                 throw new NormConfigurationException(string.Format(
                     ErrorMessages.InvalidConfiguration,
                     $"Entity '{map.Type.Name}' has no primary key; UPDATE requires a key."));
+
+            // SQL-1: Guard against empty SET clause when entity has no mutable columns.
+            // This happens when all columns are either keys or concurrency tokens.
+            // Emitting "UPDATE T SET WHERE ..." is invalid SQL; throw a clear, actionable error.
+            if (map.UpdateColumns.Length == 0)
+                throw new NormConfigurationException(
+                    $"Entity '{map.Type.Name}' has no mutable columns to update " +
+                    "(all non-key columns are concurrency tokens or the entity only has key columns). " +
+                    "Use [NotMapped] for computed properties or add at least one mutable property " +
+                    "that is not a key or concurrency token.");
+
             var setSb = new StringBuilder();
             var idx = startParamIndex;
             for (int i = 0; i < map.UpdateColumns.Length; i++)

@@ -144,18 +144,38 @@ namespace nORM.Migration
         /// <summary>
         /// G2: Generates the SQLite table-recreation sequence (PRAGMA off, CREATE temp, INSERT,
         /// DROP original, RENAME temp, PRAGMA on) required to change an existing column definition.
+        /// MIG-1: Now emits full schema including PRIMARY KEY, UNIQUE, and CREATE INDEX constraints,
+        /// identical to the AddedTables path, so constraints are preserved through ALTER operations.
         /// </summary>
         private static void AddRecreate(List<string> stmts, TableSchema table, Dictionary<string, ColumnSchema> overrides)
         {
             var cols  = table.Columns.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
-            var defs  = cols.Select(c => $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
             var names = cols.Select(c => $"\"{c.Name}\"");
+
+            // MIG-1: Build column definitions with full constraint metadata (same as AddedTables path)
+            var colDefs = cols.Select(c =>
+                $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+
+            // MIG-1: Emit PRIMARY KEY constraint for PK columns
+            var pkCols = cols.Where(c => c.IsPrimaryKey).ToList();
+            if (pkCols.Count > 0)
+                colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => $"\"{c.Name}\""))})");
+
+            // MIG-1: Emit UNIQUE constraint for unique non-PK columns
+            var uniqueNonPkCols = cols.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
+            if (uniqueNonPkCols.Count > 0)
+                colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => $"\"{c.Name}\""))})");
+
             stmts.Add("PRAGMA foreign_keys=off");
-            stmts.Add($"CREATE TABLE \"__temp__{table.Name}\" ({string.Join(", ", defs)})");
+            stmts.Add($"CREATE TABLE \"__temp__{table.Name}\" ({string.Join(", ", colDefs)})");
             stmts.Add($"INSERT INTO \"__temp__{table.Name}\" SELECT {string.Join(", ", names)} FROM \"{table.Name}\"");
             stmts.Add($"DROP TABLE \"{table.Name}\"");
             stmts.Add($"ALTER TABLE \"__temp__{table.Name}\" RENAME TO \"{table.Name}\"");
             stmts.Add("PRAGMA foreign_keys=on");
+
+            // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
+            foreach (var col in cols.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
+                stmts.Add($"CREATE INDEX \"{col.IndexName}\" ON \"{table.Name}\" (\"{col.Name}\")");
         }
 
         /// <summary>

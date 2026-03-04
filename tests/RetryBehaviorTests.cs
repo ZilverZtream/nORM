@@ -200,4 +200,144 @@ public class RetryBehaviorTests
         // We test this indirectly: a successful save does not invoke ShouldRetry at all.
         Assert.Equal(0, retryCount);
     }
+
+    // ─── Additional retry and transaction boundary coverage ────────────────
+
+    [Fact]
+    public void RetryPolicy_NullPolicy_NoRetryAttempted()
+    {
+        // With no retry policy configured, IsRetryableException always returns false
+        using var ctx = CreateContext(policy: null);
+        var ex = new InvalidOperationException("some error");
+        Assert.False(IsRetryableException(ctx, ex));
+    }
+
+    [Fact]
+    public void RetryPolicy_NonDbException_IsNotRetryable()
+    {
+        // Non-DbException types are never retryable regardless of policy
+        var policy = new RetryPolicy { MaxRetries = 5, ShouldRetry = _ => true };
+        using var ctx = CreateContext(policy);
+        Assert.False(IsRetryableException(ctx, new InvalidOperationException("io error")));
+        Assert.False(IsRetryableException(ctx, new ArgumentNullException("param")));
+        Assert.False(IsRetryableException(ctx, new NullReferenceException("null ref")));
+    }
+
+    [Fact]
+    public void RetryPolicy_MaxRetries_DefaultsToPositiveValue()
+    {
+        // A RetryPolicy with no customization has a sensible non-zero MaxRetries default
+        var policy = new RetryPolicy();
+        Assert.True(policy.MaxRetries > 0, "Default MaxRetries should be positive");
+    }
+
+    [Fact]
+    public void RetryPolicy_BaseDelay_DefaultsToPositive()
+    {
+        // A RetryPolicy with no customization has a positive BaseDelay
+        var policy = new RetryPolicy();
+        Assert.True(policy.BaseDelay > TimeSpan.Zero, "Default BaseDelay should be positive");
+    }
+
+    [Fact]
+    public async Task SaveChanges_NoPolicy_SucceedsNormally()
+    {
+        // With no retry policy, SaveChanges still works for successful operations
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        await using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE RetryEntity (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL);";
+            await setup.ExecuteNonQueryAsync();
+        }
+        await using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var entity = new RetryEntity { Name = "NoPolicy" };
+        ctx.Add(entity);
+        var affected = await ctx.SaveChangesAsync();
+        Assert.Equal(1, affected);
+    }
+
+    [Fact]
+    public async Task SaveChanges_WithMaxRetriesZero_DoesNotRetry()
+    {
+        // MaxRetries = 0 means no retry attempts even with ShouldRetry = true
+        var retryCount = 0;
+        var policy = new RetryPolicy
+        {
+            MaxRetries = 0,
+            ShouldRetry = _ => { retryCount++; return true; }
+        };
+
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        await using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE RetryEntity (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL);";
+            await setup.ExecuteNonQueryAsync();
+        }
+        await using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions { RetryPolicy = policy });
+
+        var entity = new RetryEntity { Name = "ZeroRetry" };
+        ctx.Add(entity);
+        var affected = await ctx.SaveChangesAsync();
+        Assert.Equal(1, affected);
+        // No error occurred, so ShouldRetry was never called
+        Assert.Equal(0, retryCount);
+    }
+
+    [Fact]
+    public async Task Query_WithRetryPolicy_ReturnsCorrectData()
+    {
+        // Verify that reads work correctly when a retry policy is configured
+        var policy = new RetryPolicy { MaxRetries = 3, ShouldRetry = _ => false };
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        await using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE RetryEntity (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL);";
+            await setup.ExecuteNonQueryAsync();
+        }
+        await using (var insert = cn.CreateCommand())
+        {
+            insert.CommandText = "INSERT INTO RetryEntity (Name) VALUES ('PolicyRead')";
+            await insert.ExecuteNonQueryAsync();
+        }
+
+        await using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions { RetryPolicy = policy });
+        var count = await ctx.Query<RetryEntity>().CountAsync();
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task SaveChanges_DuplicatePrimaryKey_ThrowsException()
+    {
+        // Verify that inserting a duplicate primary key throws an exception.
+        // This tests the error path through SaveChanges.
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        await using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE RetryEntity (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);";
+            await setup.ExecuteNonQueryAsync();
+        }
+        // Pre-insert row with Id=99
+        await using (var preInsert = cn.CreateCommand())
+        {
+            preInsert.CommandText = "INSERT INTO RetryEntity (Id, Name) VALUES (99, 'Existing')";
+            await preInsert.ExecuteNonQueryAsync();
+        }
+
+        await using var ctx = new DbContext(cn, new SqliteProvider());
+
+        // Try to insert another entity with the same Id — should throw a DbException
+        ctx.Add(new RetryEntity { Id = 99, Name = "Duplicate" });
+        await Assert.ThrowsAnyAsync<Exception>(() => ctx.SaveChangesAsync());
+
+        // Verify the original row is still there (transaction was atomic)
+        await using var verify = cn.CreateCommand();
+        verify.CommandText = "SELECT COUNT(*) FROM RetryEntity WHERE Id = 99";
+        var count = Convert.ToInt64(await verify.ExecuteScalarAsync());
+        Assert.Equal(1L, count);
+    }
 }

@@ -301,15 +301,21 @@ END;";
 
         /// <summary>
         /// Creates a savepoint within a SQLite transaction allowing partial rollbacks.
+        /// PRV-1: Checks the CancellationToken before executing so that pre-cancelled tokens
+        /// correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">The active SQLite transaction.</param>
         /// <param name="name">Name of the savepoint to create.</param>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
+            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            ct.ThrowIfCancellationRequested();
+
             if (transaction is SqliteTransaction sqliteTransaction)
             {
                 sqliteTransaction.Save(name);
+                ct.ThrowIfCancellationRequested();
                 return Task.CompletedTask;
             }
             throw new ArgumentException("Transaction must be a SqliteTransaction.", nameof(transaction));
@@ -317,15 +323,21 @@ END;";
 
         /// <summary>
         /// Rolls back a SQLite transaction to the specified savepoint.
+        /// PRV-1: Checks the CancellationToken before executing so that pre-cancelled tokens
+        /// correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">The active SQLite transaction.</param>
         /// <param name="name">Name of the savepoint to roll back to.</param>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
+            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            ct.ThrowIfCancellationRequested();
+
             if (transaction is SqliteTransaction sqliteTransaction)
             {
                 sqliteTransaction.Rollback(name);
+                ct.ThrowIfCancellationRequested();
                 return Task.CompletedTask;
             }
             throw new ArgumentException("Transaction must be a SqliteTransaction.", nameof(transaction));
