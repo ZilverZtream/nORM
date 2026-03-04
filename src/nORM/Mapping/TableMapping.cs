@@ -210,18 +210,22 @@ namespace nORM.Mapping
                     Column? foreignKeyProp = dependentMap.Columns
                         .FirstOrDefault(c => string.Equals(c.ForeignKeyPrincipalTypeName, Type.Name, StringComparison.OrdinalIgnoreCase));
 
-                    if (foreignKeyProp == null && KeyColumns.Length == 1)
+                    // Determine the principal key column: explicit key or convention-based "Id"
+                    var principalKey = KeyColumns.Length == 1 ? KeyColumns[0]
+                        : Columns.FirstOrDefault(c => string.Equals(c.PropName, "Id", StringComparison.OrdinalIgnoreCase));
+
+                    if (foreignKeyProp == null && principalKey != null)
                     {
                         var fkName = $"{Type.Name}Id";
-                        var fkComposite = $"{Type.Name}_{KeyColumns[0].PropName}";
+                        var fkComposite = $"{Type.Name}_{principalKey.PropName}";
                         foreignKeyProp = dependentMap.Columns.FirstOrDefault(c =>
                             string.Equals(c.PropName, fkName, StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(c.PropName, fkComposite, StringComparison.OrdinalIgnoreCase));
                     }
 
-                    if (foreignKeyProp != null && KeyColumns.Length == 1)
+                    if (foreignKeyProp != null && principalKey != null)
                     {
-                        Relations[prop.Name] = new Relation(prop, dependentType, KeyColumns[0], foreignKeyProp);
+                        Relations[prop.Name] = new Relation(prop, dependentType, principalKey, foreignKeyProp);
                     }
                 }
             }

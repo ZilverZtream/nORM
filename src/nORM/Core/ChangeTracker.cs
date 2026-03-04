@@ -217,14 +217,14 @@ namespace nORM.Core
             while (queue.Count > 0)
             {
                 var (entity, mapping, depth) = queue.Dequeue();
-                if (depth >= MaxCascadeDepth)
-                    throw new InvalidOperationException(
-                        $"Cascade delete depth exceeded maximum of {MaxCascadeDepth}. " +
-                        "This may indicate a circular relationship or an unexpectedly deep hierarchy.");
 
                 // Only add to removal list if this is not the root (root is already being removed by caller)
                 if (depth > 0)
                     toRemove.Add(entity);
+
+                // Stop expanding children when max depth is reached
+                if (depth >= MaxCascadeDepth)
+                    continue;
 
                 foreach (var relation in mapping.Relations.Values)
                 {
@@ -238,15 +238,9 @@ namespace nORM.Core
                             if (child == null)
                                 continue;
 
-                            // CASCADE DELETE PROTECTION FIX: Detect cycles early with better error message
+                            // Skip already-visited entities to handle circular references gracefully
                             if (!visited.Add(child))
-                            {
-                                // Child already visited - this indicates a circular reference
-                                throw new InvalidOperationException(
-                                    $"Circular reference detected in cascade delete at depth {depth}. " +
-                                    $"Entity type {child.GetType().Name} forms a cycle in the relationship graph. " +
-                                    "Either remove the circular reference or disable cascade delete on one of the relationships.");
-                            }
+                                continue;
 
                             if (_entriesByReference.TryGetValue(child, out var childEntry))
                             {
@@ -304,26 +298,33 @@ namespace nORM.Core
         /// and happens automatically. For entities implementing INotifyPropertyChanged, the overhead is
         /// reduced as changes are tracked incrementally.
         /// </remarks>
+        /// <summary>
+        /// Detects changes only for entities that were explicitly marked dirty via
+        /// <see cref="MarkDirty"/>. For snapshot-based detection of all POCO entities,
+        /// use <see cref="DetectAllChanges"/> (called internally from SaveChanges).
+        /// </summary>
         internal void DetectChanges()
+            => DetectChangesCore(allNonNotifying: false);
+
+        /// <summary>
+        /// Detects changes in ALL tracked POCO entities by comparing current values against
+        /// original snapshots. Called automatically by SaveChanges.
+        /// </summary>
+        internal void DetectAllChanges()
+            => DetectChangesCore(allNonNotifying: true);
+
+        private void DetectChangesCore(bool allNonNotifying)
         {
-            // FIX (TASK 1): Detect changes in ALL non-notifying entries, not just dirty ones
-            // POCOs don't raise property change events, so we must compare snapshots for all of them
-
-            // ERROR HANDLING FIX: Catch exceptions from user property getters to prevent
-            // one failing entity from blocking SaveChanges for all entities
             var failures = new List<(object Entity, Exception Exception)>();
+            var source = allNonNotifying ? _nonNotifyingEntries.Keys : (IEnumerable<EntityEntry>)_dirtyNonNotifyingEntries.Keys;
 
-            foreach (var entry in _nonNotifyingEntries.Keys)
+            foreach (var entry in source)
             {
                 if (entry.Entity != null)
                 {
-                    try
-                    {
-                        entry.DetectChanges();
-                    }
+                    try { entry.DetectChanges(); }
                     catch (Exception ex)
                     {
-                        // Log the error but continue processing other entities
                         failures.Add((entry.Entity, ex));
                         _options.Logger?.LogError(ex,
                             "Error detecting changes for entity {EntityType}. Entity will be skipped for this SaveChanges operation.",
@@ -332,18 +333,13 @@ namespace nORM.Core
                 }
             }
 
-            // Also process explicitly marked dirty entries
             foreach (var entry in _dirtyEntries.Keys)
             {
                 if (entry.Entity != null)
                 {
-                    try
-                    {
-                        entry.DetectChanges();
-                    }
+                    try { entry.DetectChanges(); }
                     catch (Exception ex)
                     {
-                        // Log the error but continue processing other entities
                         failures.Add((entry.Entity, ex));
                         _options.Logger?.LogError(ex,
                             "Error detecting changes for entity {EntityType}. Entity will be skipped for this SaveChanges operation.",
@@ -352,11 +348,9 @@ namespace nORM.Core
                 }
             }
 
-            // Clear the dirty tracking sets after detection
             _dirtyNonNotifyingEntries.Clear();
             _dirtyEntries.Clear();
 
-            // If there were failures, log a summary
             if (failures.Count > 0)
             {
                 _options.Logger?.LogWarning(

@@ -112,7 +112,9 @@ namespace nORM.Query
         private string? _takeParam { get => _clauses.TakeParam; set => _clauses.TakeParam = value; }
         private string? _skipParam { get => _clauses.SkipParam; set => _clauses.SkipParam = value; }
         private bool _isDistinct { get => _clauses.IsDistinct; set => _clauses.IsDistinct = value; }
+#pragma warning disable CS0414
         private bool _isPooled;
+#pragma warning restore CS0414
         private static readonly ObjectPool<QueryTranslator> _translatorPool =
             new DefaultObjectPool<QueryTranslator>(new QueryTranslatorPooledObjectPolicy());
         private static readonly ObjectPool<List<string>> _selectItemsPool =
@@ -317,7 +319,10 @@ namespace nORM.Query
                         if (discAttr != null)
                         {
                             var paramName = _t._ctx.Provider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
-                            _t.AddParameter(paramName, discAttr.Value);
+                            // Use direct params assignment (not _compiledParams) - discriminator is a fixed constant,
+                            // not a closure capture. Adding to _compiledParams causes it to be overridden with DBNull
+                            // when ParameterValueExtractor extracts lambda parameter placeholders.
+                            _t._params[paramName] = discAttr.Value;
                             _t._where.Append($"({_t._mapping.DiscriminatorColumn!.EscCol} = {paramName})");
                         }
                         break;
@@ -739,15 +744,7 @@ namespace nORM.Query
             {
                 SqlBuilder? oldClauses = Interlocked.Exchange(ref _clauses, null!);
                 oldClauses?.Dispose();
-                if (_isPooled)
-                {
-                    Clear();
-                    _translatorPool.Return(this);
-                }
-                else
-                {
-                    Clear();
-                }
+                Clear();
             }
         }
         private sealed class QueryTranslatorPooledObjectPolicy : PooledObjectPolicy<QueryTranslator>
@@ -1006,8 +1003,24 @@ namespace nORM.Query
                     if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
                         _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
                 }
+
+                // When an outer .Select() projection exists alongside a result selector, try to compose
+                // them: expand the outer projection through the result selector so the SELECT only
+                // fetches the columns that the final materializer actually needs (transparent id case).
+                LambdaExpression? composedProjection = null;
+                if (resultSelector != null && _projection != null)
+                {
+                    var savedProjection = _projection;
+                    _projection = resultSelector;
+                    var expanded = ExpandProjection(savedProjection);
+                    _projection = savedProjection;
+                    if (!ReferenceEquals(expanded, savedProjection))
+                        composedProjection = expanded;
+                }
+                var effectiveProjection = composedProjection ?? _projection;
+
                 using var joinSql = new OptimizedSqlBuilder(256);
-                if (_projection?.Body is NewExpression newExpr)
+                if (effectiveProjection?.Body is NewExpression newExpr)
                 {
                     var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
                     if (neededColumns.Count == 0)
@@ -1034,11 +1047,33 @@ namespace nORM.Query
                 }
                 else
                 {
-                    var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                    var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                    joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                    joinSql.AppendJoin(", ", outerCols.Concat(innerCols));
-                    joinSql.Append(' ');
+                    // Try to extract only the columns needed by the result selector
+                    if (resultSelector.Body is System.Linq.Expressions.NewExpression resultNewExpr)
+                    {
+                        var neededCols = JoinBuilder.ExtractNeededColumns(resultNewExpr, outerMapping, innerMapping, outerAlias, innerAlias);
+                        if (neededCols.Count > 0)
+                        {
+                            joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                            joinSql.AppendJoin(", ", neededCols);
+                            joinSql.Append(' ');
+                        }
+                        else
+                        {
+                            var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+                            var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
+                            joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                            joinSql.AppendJoin(", ", outerCols.Concat(innerCols));
+                            joinSql.Append(' ');
+                        }
+                    }
+                    else
+                    {
+                        var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+                        var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
+                        joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
+                        joinSql.AppendJoin(", ", outerCols.Concat(innerCols));
+                        joinSql.Append(' ');
+                    }
                 }
                 joinSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
                 var joinType = useLeftJoin ? "LEFT JOIN" : "INNER JOIN";
@@ -1069,11 +1104,12 @@ namespace nORM.Query
 
                 if (resultSelector != null)
                 {
-                    _projection = resultSelector;
+                    _projection = composedProjection ?? resultSelector;
                 }
                 else
                 {
                     _mapping = innerMapping;
+                    _rootType = innerMapping.Type;
                 }
                 return node;
             }
