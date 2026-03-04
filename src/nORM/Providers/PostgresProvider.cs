@@ -48,7 +48,16 @@ namespace nORM.Providers
         public override int MaxParameters => 32_767;
 
         /// <inheritdoc />
-        public override string Escape(string id) => $"\"{id}\"";
+        /// SG-1/PR-1/SEC-1: Double embedded double-quote characters to prevent SQL injection via identifiers.
+        /// Handles schema-qualified identifiers (schema.table) by escaping each part separately.
+        public override string Escape(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return id;
+            if (id.Contains('.'))
+                return string.Join(".", id.Split('.').Select(part => $"\"{part.Replace("\"", "\"\"")}\""));
+            return $"\"{id.Replace("\"", "\"\"")}\"";
+        }
 
         /// <summary>
         /// Adds PostgreSQL-specific <c>LIMIT</c> and <c>OFFSET</c> clauses to the SQL builder.

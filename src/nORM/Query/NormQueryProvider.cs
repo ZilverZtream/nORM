@@ -354,7 +354,7 @@ namespace nORM.Query
                         cmd.AddOptimizedParam(name, value);
                     }
                 }
-                object result;
+                object? result;
                 if (plan.IsScalar)
                 {
                     var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
@@ -382,7 +382,7 @@ namespace nORM.Query
                             "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
                             "LastOrDefault" => list.Count > 0 ? list[0] : null,
                             _ => list
-                        } ?? (object)list;
+                        };
                     }
                     else
                     {
@@ -447,7 +447,7 @@ namespace nORM.Query
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
                 foreach (var p in finalParameters) cmd.AddOptimizedParam(p.Key, p.Value);
-                object result;
+                object? result;
                 if (plan.IsScalar)
                 {
                     var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
@@ -474,7 +474,7 @@ namespace nORM.Query
                             "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
                             "LastOrDefault" => list.Count > 0 ? list[0] : null,
                             _ => list
-                        } ?? (object)list;
+                        };
                     }
                     else
                     {
@@ -553,7 +553,7 @@ namespace nORM.Query
                     cmd.AddOptimizedParam(plan.CompiledParameters[i], parameterValues[i] ?? DBNull.Value);
                 }
 
-                object result;
+                object? result;
                 if (plan.IsScalar)
                 {
                     var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
@@ -579,7 +579,7 @@ namespace nORM.Query
                             "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
                             "LastOrDefault" => list.Count > 0 ? list[0] : null,
                             _ => list
-                        } ?? (object)list;
+                        };
                     }
                     else
                     {
@@ -638,9 +638,15 @@ namespace nORM.Query
                     whereCall = mc;
                     current = mc.Arguments[0];
                 }
-                else if (mc.Method.Name is nameof(Queryable.First) or nameof(Queryable.FirstOrDefault) or nameof(Queryable.Single) or nameof(Queryable.SingleOrDefault))
+                else if (mc.Method.Name is nameof(Queryable.First) or nameof(Queryable.FirstOrDefault))
                 {
                     current = mc.Arguments[0];
+                }
+                else if (mc.Method.Name is nameof(Queryable.Single) or nameof(Queryable.SingleOrDefault))
+                {
+                    // QP-1: Single/SingleOrDefault need TAKE 2 and cardinality checking.
+                    // Bypass the simple fast path so the full translator handles them correctly.
+                    return false;
                 }
                 else
                 {
@@ -1009,7 +1015,7 @@ namespace nORM.Query
                     }
                 }
 
-                object result;
+                object? result;
                 if (plan.IsScalar)
                 {
                     var scalarResult = cmd.ExecuteScalarWithInterception(_ctx);
@@ -1034,7 +1040,7 @@ namespace nORM.Query
                             "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
                             "LastOrDefault" => list.Count > 0 ? list[0] : null,
                             _ => list
-                        } ?? (object)list;
+                        };
                     }
                     else
                     {

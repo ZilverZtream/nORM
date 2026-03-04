@@ -425,7 +425,9 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                var terminalMethodEa = t._methodName;
                 var elementSource = t.Visit(node.Arguments[0]);
+                t._methodName = terminalMethodEa;
                 if (node.Arguments[1] is ParameterExpression eaParam)
                 {
                     if (!t._paramMap.TryGetValue(eaParam, out var eName))
@@ -495,12 +497,20 @@ namespace nORM.Query
                         t._params[kvp.Key] = kvp.Value;
                     FastExpressionVisitorPool.Return(visitor);
                 }
-                t._take = 1;
+                // QP-1: Single/SingleOrDefault must fetch 2 rows so the caller can detect duplicates.
+                // First/FirstOrDefault only need 1 row.
+                var isSingle = t._methodName == "Single" || t._methodName == "SingleOrDefault";
+                t._take = isSingle ? 2 : 1;
                 var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
-                t._params[pName] = 1;
+                t._params[pName] = t._take;
                 t._takeParam = pName;
                 t._singleResult = t._methodName == "First" || t._methodName == "Single";
-                return t.Visit(node.Arguments[0]);
+                // Preserve the terminal method name because visiting source arguments will
+                // overwrite _methodName with child operator names (e.g., "Where").
+                var terminalMethod = t._methodName;
+                var result = t.Visit(node.Arguments[0]);
+                t._methodName = terminalMethod;
+                return result;
             }
         }
 
@@ -529,7 +539,9 @@ namespace nORM.Query
                         t._params[kvp.Key] = kvp.Value;
                     FastExpressionVisitorPool.Return(visitor);
                 }
+                var terminalMethodLast = t._methodName;
                 var lastSrc = t.Visit(node.Arguments[0]);
+                t._methodName = terminalMethodLast;
                 if (t._orderBy.Count > 0)
                 {
                     for (int i = 0; i < t._orderBy.Count; i++)

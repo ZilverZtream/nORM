@@ -1,5 +1,6 @@
 using nORM.Providers;
 using Xunit;
+using System.Linq;
 
 namespace nORM.Tests;
 
@@ -85,4 +86,52 @@ public class IdentifierEscapingTests
         // a`b`c should become `a``b``c`
         Assert.Equal("`a``b``c`", provider.Escape("a`b`c"));
     }
+
+    // SG-1/PR-1/SEC-1: PostgreSQL identifier escaping tests
+
+    [Fact]
+    public void Postgres_PlainIdentifier_WrapsInDoubleQuotes()
+    {
+        var provider = CreatePostgresProvider();
+        Assert.Equal("\"Users\"", provider.Escape("Users"));
+    }
+
+    [Fact]
+    public void Postgres_EmbeddedDoubleQuote_IsDoubled()
+    {
+        var provider = CreatePostgresProvider();
+        // na"me should become "na""me"
+        Assert.Equal("\"na\"\"me\"", provider.Escape("na\"me"));
+    }
+
+    [Fact]
+    public void Postgres_MultipleEmbeddedDoubleQuotes_AllDoubled()
+    {
+        var provider = CreatePostgresProvider();
+        // a"b"c should become "a""b""c"
+        Assert.Equal("\"a\"\"b\"\"c\"", provider.Escape("a\"b\"c"));
+    }
+
+    [Fact]
+    public void Postgres_SchemaQualified_EachPartEscaped()
+    {
+        var provider = CreatePostgresProvider();
+        // dbo.Users should become "dbo"."Users"
+        Assert.Equal("\"dbo\".\"Users\"", provider.Escape("dbo.Users"));
+    }
+
+    [Fact]
+    public void Postgres_SchemaQualified_WithEmbeddedQuote_EachPartEscaped()
+    {
+        var provider = CreatePostgresProvider();
+        // dbo.my"table should become "dbo"."my""table"
+        Assert.Equal("\"dbo\".\"my\"\"table\"", provider.Escape("dbo.my\"table"));
+    }
+
+    /// <summary>
+    /// Creates a PostgresProvider without needing a real Npgsql connection.
+    /// We use a SqliteParameterFactory as a stand-in since we only test Escape().
+    /// </summary>
+    private static PostgresProvider CreatePostgresProvider()
+        => new PostgresProvider(new SqliteParameterFactory());
 }

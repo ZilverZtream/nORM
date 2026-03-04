@@ -113,11 +113,15 @@ namespace nORM.Query
                 // PERFORMANCE FIX (TASK 14): Use sync materializer to avoid per-row Task allocation
                 var syncMaterializer = plan.SyncMaterializer;
 
-                // PERFORMANCE FIX (TASK 19): Respect SingleResult flag to avoid materializing unnecessary rows
+                // PERFORMANCE FIX (TASK 19): Respect SingleResult flag to avoid materializing unnecessary rows.
+                // QP-1: Single/SingleOrDefault must read up to 2 rows to detect duplicate-row violations.
+                //        First/FirstOrDefault only need 1 row.
+                var maxRows = plan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
                 if (plan.SingleResult)
                 {
-                    if (await reader.ReadAsync(ct).ConfigureAwait(false))
+                    for (int _row = 0; _row < maxRows; _row++)
                     {
+                        if (!await reader.ReadAsync(ct).ConfigureAwait(false)) break;
                         ct.ThrowIfCancellationRequested();
                         var entity = syncMaterializer(reader);
                         // Apply client-side projection if present (for untranslatable expressions)
@@ -194,11 +198,15 @@ namespace nORM.Query
                 // PERFORMANCE FIX (TASK 14): Use sync materializer directly - no Task allocation at all!
                 var syncMaterializer = plan.SyncMaterializer;
 
-                // PERFORMANCE FIX (TASK 19): Respect SingleResult flag to avoid materializing unnecessary rows
+                // PERFORMANCE FIX (TASK 19): Respect SingleResult flag to avoid materializing unnecessary rows.
+                // QP-1: Single/SingleOrDefault must read up to 2 rows to detect duplicate-row violations.
+                //        First/FirstOrDefault only need 1 row.
+                var maxRows = plan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
                 if (plan.SingleResult)
                 {
-                    if (reader.Read())
+                    for (int _row = 0; _row < maxRows; _row++)
                     {
+                        if (!reader.Read()) break;
                         var entity = syncMaterializer(reader);
                         // Apply client-side projection if present (for untranslatable expressions)
                         if (plan.ClientProjection != null)

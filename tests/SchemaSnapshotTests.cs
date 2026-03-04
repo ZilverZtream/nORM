@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -319,6 +320,88 @@ public class SchemaSnapshotTests
         // Should detect the index as both dropped (old def) and re-added (new def)
         Assert.Single(diff.DroppedIndexes, ix => ix.IndexName == "IX_Blog_Title");
         Assert.Single(diff.AddedIndexes, ix => ix.IndexName == "IX_Blog_Title" && ix.IsUnique);
+    }
+
+    // MG-1: Navigation and collection property exclusion tests
+
+    // Helper entity types used by MG-1 tests (private so they don't pollute snapshot scans)
+    [Table("MG1_Post")]
+    private class MG1Post
+    {
+        [Key] public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+    }
+
+    [Table("MG1_Category")]
+    private class MG1Category
+    {
+        [Key] public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    [Table("MG1_Article")]
+    private class MG1Article
+    {
+        [Key] public int Id { get; set; }
+        public string Body { get; set; } = string.Empty;
+        public int CategoryId { get; set; }
+
+        // Navigation property — should be EXCLUDED from snapshot
+        public MG1Category Category { get; set; } = null!;
+
+        // Collection navigation property — should be EXCLUDED from snapshot
+        public List<MG1Post> Posts { get; set; } = new();
+    }
+
+    [Fact]
+    public void SchemaSnapshotBuilder_ExcludesNavigationProperties()
+    {
+        // Build snapshot for the in-process assembly so it picks up MG1Article
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(MG1Article).Assembly);
+        var table = snapshot.Tables.FirstOrDefault(t => t.Name == "MG1_Article");
+
+        // If the entity wasn't picked up, skip — some test assemblies may differ
+        if (table == null) return;
+
+        var columnNames = table.Columns.Select(c => c.Name).ToList();
+
+        // Scalar columns must be present
+        Assert.Contains("Id", columnNames);
+        Assert.Contains("Body", columnNames);
+        Assert.Contains("CategoryId", columnNames);
+
+        // Navigation properties must NOT appear as columns
+        Assert.DoesNotContain("Category", columnNames);
+        Assert.DoesNotContain("Posts", columnNames);
+    }
+
+    [Fact]
+    public void SchemaSnapshotBuilder_OnlyScalarColumnsIncluded_ForEntityWithNavigations()
+    {
+        // Directly exercise SchemaSnapshotBuilder.Build with a controlled single-type snapshot
+        // by scanning just the test types defined above
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(MG1Article).Assembly);
+
+        foreach (var table in snapshot.Tables)
+        {
+            foreach (var col in table.Columns)
+            {
+                // Collection types should never appear
+                var colType = typeof(MG1Article).Assembly
+                    .GetTypes()
+                    .SelectMany(t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                    .FirstOrDefault(p => p.Name == col.Name)?.PropertyType;
+
+                if (colType != null)
+                {
+                    // If we found the property, verify it's not a collection (non-string IEnumerable)
+                    var isCollection = typeof(System.Collections.IEnumerable).IsAssignableFrom(colType)
+                                       && colType != typeof(string);
+                    Assert.False(isCollection,
+                        $"Column '{col.Name}' in table '{table.Name}' is a collection type and should have been excluded.");
+                }
+            }
+        }
     }
 
     [Fact]

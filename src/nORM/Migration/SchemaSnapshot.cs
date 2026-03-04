@@ -98,6 +98,13 @@ namespace nORM.Migration
                         continue;
                     if (prop.GetCustomAttribute<NotMappedAttribute>() != null)
                         continue;
+                    // MG-1: Exclude collection/enumerable navigation properties (e.g. List<Post>, ICollection<T>)
+                    if (typeof(System.Collections.IEnumerable).IsAssignableFrom(prop.PropertyType)
+                        && prop.PropertyType != typeof(string))
+                        continue;
+                    // MG-1: Exclude reference navigation properties (class types that are not mappable scalars)
+                    if (!IsMappableType(prop.PropertyType))
+                        continue;
 
                     var colAttr = prop.GetCustomAttribute<ColumnAttribute>();
                     var clr = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
@@ -119,6 +126,29 @@ namespace nORM.Migration
             }
 
             return snapshot;
+        }
+
+        /// <summary>
+        /// MG-1: Returns true for types that map to database scalar columns.
+        /// Reference navigation properties and collection properties return false.
+        /// </summary>
+        private static bool IsMappableType(Type t)
+        {
+            // Unwrap Nullable<T> — e.g. int?, Guid?
+            var underlying = Nullable.GetUnderlyingType(t);
+            if (underlying != null)
+                return true; // Nullable value types are always mappable
+
+            // Value types (int, bool, DateTime, Guid, enum, etc.) are always mappable
+            if (t.IsValueType)
+                return true;
+
+            // string and byte[] are the only reference types that are scalar columns
+            if (t == typeof(string) || t == typeof(byte[]))
+                return true;
+
+            // All other reference types (class, interface) are navigation properties
+            return false;
         }
     }
 
