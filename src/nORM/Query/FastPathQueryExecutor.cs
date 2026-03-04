@@ -118,7 +118,10 @@ namespace nORM.Query
                 return false;
             if (Unwrap(whereCall.Arguments[0]) is not ConstantExpression)
                 return false;
-            if (whereCall.Arguments[1] is not LambdaExpression lambda)
+            var lambdaArg = whereCall.Arguments[1];
+            while (lambdaArg is UnaryExpression { NodeType: ExpressionType.Quote } q)
+                lambdaArg = q.Operand;
+            if (lambdaArg is not LambdaExpression lambda)
                 return false;
             var body = lambda.Body;
             // Support boolean member access: u => u.IsActive
@@ -279,7 +282,7 @@ namespace nORM.Query
             await using var cmd = ctx.Connection.CreateCommand();
             cmd.CommandText = sql;
             var result = await cmd.ExecuteScalarAsync(default).ConfigureAwait(false);
-            return result!;
+            return (object)Convert.ToInt32(result);
         }
     }
 }

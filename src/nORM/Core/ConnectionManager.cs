@@ -127,7 +127,7 @@ namespace nORM.Core
             lock (_circuitBreakerLock)
             {
                 if (DateTime.UtcNow < _nextRetry)
-                    throw new InvalidOperationException("Circuit breaker open: delaying write connection attempts.");
+                    throw new NormConnectionException("Circuit breaker is open: delaying write connection attempts.");
             }
 
             var primary = _currentPrimary;
@@ -159,13 +159,9 @@ namespace nORM.Core
             {
                 // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
                 cn?.Dispose();
-                // RELIABILITY FIX (TASK 9): Check specific error codes instead of message strings
-                // Message-based detection is fragile (localization, provider changes)
-                if (IsTransientDatabaseError(ex))
-                {
-                    RegisterFailure();
-                    _logger.LogError(ex, "Failed to acquire write connection due to transient database error");
-                }
+                // Trip the circuit breaker for all database connection errors
+                RegisterFailure();
+                _logger.LogError(ex, "Failed to acquire write connection due to database error");
                 throw;
             }
             catch (System.Net.Sockets.SocketException ex)

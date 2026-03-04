@@ -204,6 +204,8 @@ namespace nORM.Query
                         // If the member is itself an entity (transparent identifier property)
                         TryAddFullEntity(node.Type);
                     }
+                    // Don't call base.VisitMember — it would visit the parameter and add all entity columns
+                    return node;
                 }
                 else if (node.Expression is MemberExpression || node.Expression is NewExpression || node.Expression is MemberInitExpression)
                 {
@@ -211,6 +213,8 @@ namespace nORM.Query
                     Visit(node.Expression);
                     // If the leaf resolves to an entity type, include its columns
                     TryAddFullEntity(node.Type);
+                    // Don't call base.VisitMember — Visit(node.Expression) above is sufficient
+                    return node;
                 }
                 else
                 {

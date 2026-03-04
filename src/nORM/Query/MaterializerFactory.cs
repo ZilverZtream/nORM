@@ -864,7 +864,17 @@ namespace nORM.Query
         {
             return _constructorCache.GetOrAdd(type, t =>
             {
-                return t.GetConstructors()
+                var ctors = t.GetConstructors();
+
+                // Anonymous types (compiler-generated) use positional matching by parameter count
+                // since their constructor parameter names (camelCase) don't match column prop names
+                if (t.Namespace == null && t.Name.Contains("AnonymousType"))
+                {
+                    return ctors.FirstOrDefault(c => c.GetParameters().Length == columns.Length)
+                        ?? throw new InvalidOperationException($"No suitable constructor for {t}");
+                }
+
+                return ctors
                     .FirstOrDefault(c =>
                     {
                         var parameters = c.GetParameters();

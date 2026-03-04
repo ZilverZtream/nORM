@@ -644,7 +644,7 @@ namespace nORM.Core
             // PERFORMANCE FIX (TASK 12): Only detect changes if requested
             if (detectChanges)
             {
-                ChangeTracker.DetectChanges();
+                ChangeTracker.DetectAllChanges();
             }
             var changedEntries = ChangeTracker.Entries
                 .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
@@ -757,7 +757,6 @@ namespace nORM.Core
                 foreach (var tag in tags)
                     cache.InvalidateTag(tag);
             }
-            ChangeTracker.Clear();
             return totalAffected;
         }
 
@@ -1529,7 +1528,7 @@ namespace nORM.Core
                 cmd.SetParametersFast(span);
             }
 
-            if (!IsSafeIdentifier(procedureName))
+            if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName))
                 throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
 
             NormValidator.ValidateRawSql(procedureName, paramDict);

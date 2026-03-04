@@ -14,7 +14,7 @@ namespace nORM.Query
     internal sealed class AdaptiveQueryComplexityAnalyzer : IDisposable
     {
         private readonly IMemoryMonitor _memoryMonitor;
-        private static readonly ConcurrentDictionary<ExpressionFingerprint, QueryComplexityInfo> _analysisCache = new();
+        private readonly ConcurrentDictionary<ExpressionFingerprint, QueryComplexityInfo> _analysisCache = new();
         private const int DefaultEnumerationLimit = 2000;
         private const int MaxCacheSize = 10000;
         public AdaptiveQueryComplexityAnalyzer(IMemoryMonitor memoryMonitor)
@@ -190,24 +190,51 @@ namespace nORM.Query
                     node.Value is not string &&
                     node.Value is not IQueryable)
                 {
-                    int count;
-                    if (enumerable is System.Collections.ICollection collection)
-                    {
-                        count = collection.Count;
-                    }
-                    else
-                    {
-                        count = 0;
-                        foreach (var _ in enumerable)
-                        {
-                            count++;
-                            if (count > DefaultEnumerationLimit)
-                                break;
-                        }
-                    }
-                    _complexity.ParameterCount += count;
+                    CountEnumerable(enumerable);
                 }
                 return base.VisitConstant(node);
+            }
+
+            protected override Expression VisitMember(System.Linq.Expressions.MemberExpression node)
+            {
+                // Evaluate closure-captured IEnumerable fields/properties
+                if (node.Expression is System.Linq.Expressions.ConstantExpression constExpr)
+                {
+                    object? value = node.Member switch
+                    {
+                        System.Reflection.FieldInfo fi => fi.GetValue(constExpr.Value),
+                        System.Reflection.PropertyInfo pi => pi.GetValue(constExpr.Value),
+                        _ => null
+                    };
+                    if (value is System.Collections.IEnumerable captured &&
+                        value is not string &&
+                        value is not IQueryable)
+                    {
+                        CountEnumerable(captured);
+                        return node; // Don't descend further; the constant was already handled
+                    }
+                }
+                return base.VisitMember(node);
+            }
+
+            private void CountEnumerable(System.Collections.IEnumerable enumerable)
+            {
+                int count;
+                if (enumerable is System.Collections.ICollection collection)
+                {
+                    count = collection.Count;
+                }
+                else
+                {
+                    count = 0;
+                    foreach (var _ in enumerable)
+                    {
+                        count++;
+                        if (count > DefaultEnumerationLimit)
+                            break;
+                    }
+                }
+                _complexity.ParameterCount += count;
             }
             private void AnalyzeJoin(MethodCallExpression node)
             {
