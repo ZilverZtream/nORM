@@ -117,6 +117,9 @@ namespace nORM.Providers
 
             if (limitParameterName != null)
                 sb.Append(" LIMIT ").Append(limitParameterName);
+            else if (offsetParameterName != null)
+                // SQLite requires LIMIT when OFFSET is used; -1 means unlimited
+                sb.Append(" LIMIT -1");
 
             if (offsetParameterName != null)
                 sb.Append(" OFFSET ").Append(offsetParameterName);

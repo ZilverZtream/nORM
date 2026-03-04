@@ -628,6 +628,7 @@ namespace nORM.Core
         /// <summary>
         /// Invokes <see cref="SaveChangesInternalAsync"/> using the configured retry policy to
         /// transparently retry transient failures such as deadlocks.
+        /// Exceptions thrown during or after commit are not retried because the commit outcome is unknown.
         /// </summary>
         /// <param name="detectChanges">If true, calls ChangeTracker.DetectChanges before saving.</param>
         /// <param name="ct">Token used to cancel the save operation.</param>
@@ -640,12 +641,15 @@ namespace nORM.Core
             var rand = Random.Shared;
             for (var attempt = 0; ; attempt++)
             {
+                var commitAttempted = false;
                 try
                 {
-                    return await SaveChangesInternalAsync(detectChanges, ct).ConfigureAwait(false);
+                    return await SaveChangesInternalAsync(detectChanges, ct, onCommitAttempted: () => commitAttempted = true).ConfigureAwait(false);
                 }
-                catch (Exception ex) when (attempt < maxRetries - 1 && IsRetryableException(ex))
+                catch (Exception ex) when (!commitAttempted && attempt < maxRetries - 1 && IsRetryableException(ex))
                 {
+                    // Only retry pre-commit transient failures — if commit was attempted, the outcome
+                    // is unknown and retrying could produce duplicate rows.
                     var backoffMs = baseDelay.TotalMilliseconds * Math.Pow(2, attempt);
                     var jitter = 1 + (rand.NextDouble() * 0.4 - 0.2); // ±20%
                     var delay = TimeSpan.FromMilliseconds(backoffMs * jitter);
@@ -663,8 +667,9 @@ namespace nORM.Core
         /// original values, which can be expensive for contexts tracking thousands of entities.
         /// </param>
         /// <param name="ct">Token used to cancel the save operation.</param>
+        /// <param name="onCommitAttempted">Optional callback invoked immediately before CommitAsync is called, used by retry logic to detect commit attempts.</param>
         /// <returns>The total number of state entries written to the database.</returns>
-        private async Task<int> SaveChangesInternalAsync(bool detectChanges, CancellationToken ct)
+        private async Task<int> SaveChangesInternalAsync(bool detectChanges, CancellationToken ct, Action? onCommitAttempted = null)
         {
             // PERFORMANCE FIX (TASK 12): Only detect changes if requested
             if (detectChanges)
@@ -749,6 +754,7 @@ namespace nORM.Core
                         }
                     }
                 }
+                onCommitAttempted?.Invoke();
                 await transactionManager.CommitAsync().ConfigureAwait(false);
 
                 // DATA INTEGRITY FIX (TASK 1): Accept changes only after successful commit
