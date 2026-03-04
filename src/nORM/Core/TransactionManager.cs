@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Threading;
@@ -37,28 +38,6 @@ namespace nORM.Core
             var ambientTransaction = System.Transactions.Transaction.Current;
             var ownsTransaction = existingTransaction == null && ambientTransaction == null;
 
-            // TRANSACTION CONTEXT VALIDATION FIX: Warn about potential mismatch with ambient transactions
-            // Ambient TransactionScope may be associated with a different connection/database
-            if (ambientTransaction != null && existingTransaction == null)
-            {
-                context.Options.Logger?.LogWarning(
-                    "Ambient System.Transactions.Transaction detected but no database transaction is active. " +
-                    "Ensure the TransactionScope is associated with the correct database connection. " +
-                    "Connection string: {ConnectionString}, Ambient transaction ID: {TransactionId}",
-                    context.Connection?.ConnectionString ?? "null",
-                    ambientTransaction.TransactionInformation.LocalIdentifier);
-
-                // Additional validation: Check if connection is enlisted in the ambient transaction
-                if (context.Connection != null && context.Connection.State == System.Data.ConnectionState.Open)
-                {
-                    // Note: We cannot reliably detect if the connection is enlisted without attempting
-                    // an operation, so we log a warning to alert developers of potential issues
-                    context.Options.Logger?.LogDebug(
-                        "Connection state: {State}. Verify this connection is enrolled in the ambient transaction.",
-                        context.Connection.State);
-                }
-            }
-
             DbTransaction? transaction = existingTransaction;
             CancellationTokenSource? cts = null;
             var token = ct;
@@ -72,6 +51,37 @@ namespace nORM.Core
                 // Create a CTS that cancels if the ambient token cancels.
                 cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 token = cts.Token;
+            }
+            else if (ambientTransaction != null && existingTransaction == null)
+            {
+                // TX-1: When an ambient System.Transactions.Transaction exists but no explicit
+                // DbTransaction has been started, explicitly enlist the connection so that
+                // providers that have auto-enlist disabled (e.g. Enlist=False in connection string,
+                // or providers that never auto-enlist) are still correctly included in the
+                // TransactionScope and will roll back if the scope is disposed without Complete().
+                await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
+                var connection = context.Connection;
+                if (connection != null && connection.State == System.Data.ConnectionState.Open)
+                {
+                    try
+                    {
+                        connection.EnlistTransaction(System.Transactions.Transaction.Current);
+                        context.Options.Logger?.LogDebug(
+                            "Explicitly enlisted connection in ambient transaction {TransactionId}.",
+                            ambientTransaction.TransactionInformation.LocalIdentifier);
+                    }
+                    catch (Exception ex)
+                    {
+                        // The provider does not support EnlistTransaction (e.g. some in-memory or
+                        // test-double implementations). Log a warning so developers are aware that
+                        // operations may commit outside the ambient scope.
+                        context.Options.Logger?.LogWarning(
+                            "Could not enlist connection in ambient transaction {TransactionId}: {Message}. " +
+                            "Operations may commit independently of the TransactionScope.",
+                            ambientTransaction.TransactionInformation.LocalIdentifier,
+                            ex.Message);
+                    }
+                }
             }
 
             return new TransactionManager(transaction, ownsTransaction, cts, token);

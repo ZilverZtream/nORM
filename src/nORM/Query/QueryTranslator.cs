@@ -62,7 +62,7 @@ namespace nORM.Query
     /// - Careful handling of correlated subqueries and parameter scoping
     /// - Breaking changes to internal APIs
     ///
-    /// Current recursion depth limit: <see cref="MaxRecursionDepth"/> (30 levels)
+    /// Current recursion depth limit: configurable via <see cref="nORM.Configuration.DbContextOptions.MaxRecursionDepth"/> (default 50 levels)
     /// </remarks>
     internal sealed partial class QueryTranslator : ExpressionVisitor, IDisposable
     {
@@ -96,11 +96,10 @@ namespace nORM.Query
         private bool _isCacheable;
         private TimeSpan? _cacheExpiration;
         private DateTime? _asOfTimestamp;
-        // RECURSIVE ALLOCATION FIX: Reduced from 100 to 30 to limit memory usage
-        // Each level allocates ~2KB+ (QueryTranslator + SqlBuilder + collections)
-        // 30 levels = ~60KB which is reasonable; 100 levels = ~200KB which is excessive
-        // Most real-world queries have depth < 10; if you hit this limit, simplify your query
-        private const int MaxRecursionDepth = 30;
+        // QP-1: Recursion depth limit is now read from DbContextOptions.MaxRecursionDepth (default 50).
+        // This replaces the old hardcoded constant of 30. The effective limit is cached on the
+        // QueryTranslator instance so that options changes mid-query have no effect.
+        private int _maxRecursionDepth = 50; // Updated from _ctx.Options during Initialize()
         private int _recursionDepth;
         private OptimizedSqlBuilder _sql => _clauses.Sql;
         private OptimizedSqlBuilder _where => _clauses.Where;
@@ -155,6 +154,7 @@ namespace nORM.Query
             _tables.Add(mapping.TableName);
             _joinCounter = joinStart;
             _recursionDepth = recursionDepth;
+            _maxRecursionDepth = ctx.Options.MaxRecursionDepth;
         }
         internal static QueryTranslator Create(
             DbContext ctx,
@@ -206,6 +206,8 @@ namespace nORM.Query
                 _cacheExpiration = null;
                 _asOfTimestamp = null;
                 _detectedCollections = new List<PropertyInfo>();
+                // QP-1: Capture the configured recursion depth limit at Reset time
+                _maxRecursionDepth = ctx.Options.MaxRecursionDepth;
             }
         }
         private void Clear()
@@ -695,20 +697,24 @@ namespace nORM.Query
         /// </remarks>
         private string TranslateSubExpression(Expression e)
         {
-            if (_recursionDepth >= MaxRecursionDepth)
+            // QP-1: Use configurable _maxRecursionDepth (from DbContextOptions.MaxRecursionDepth)
+            // instead of the old hardcoded constant. Include the configured limit in the error
+            // message so users know how to increase it via DbContextOptions.MaxRecursionDepth.
+            if (_recursionDepth >= _maxRecursionDepth)
                 throw new NormQueryException(
-                    $"Query exceeds maximum translation depth of {MaxRecursionDepth}. " +
+                    $"Query exceeds maximum translation depth of {_maxRecursionDepth}. " +
                     $"This typically indicates overly complex nested subqueries. " +
-                    $"Consider simplifying the query by breaking it into multiple queries or using CTEs.");
+                    $"Consider simplifying the query by breaking it into multiple queries or using CTEs. " +
+                    $"You can also increase the limit via DbContextOptions.MaxRecursionDepth (current: {_maxRecursionDepth}, max: 200).");
 
             // PERFORMANCE WARNING: Log deep recursion for monitoring
-            if (_recursionDepth > 15)
+            if (_recursionDepth > Math.Min(15, _maxRecursionDepth / 2))
             {
                 _ctx.Options.Logger?.LogWarning(
                     "Query translation depth is {Depth} (max: {MaxDepth}). " +
                     "Deep nesting causes O(depth) allocations (~2KB per level). " +
-                    "Consider query simplification.",
-                    _recursionDepth + 1, MaxRecursionDepth);
+                    "Consider query simplification or increase DbContextOptions.MaxRecursionDepth.",
+                    _recursionDepth + 1, _maxRecursionDepth);
             }
 
             var subPlan = TranslateInSubContext(e, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out _);

@@ -24,6 +24,10 @@ namespace nORM.Configuration
         // 10 concurrent GroupJoins × 10k records × 1KB/record = ~100MB (safe for most environments)
         // Previous default (100k) could cause 1GB+ memory usage with concurrent queries
         private int _maxGroupJoinSize = 10000;
+        // QP-1: Configurable recursion depth. Default 50 (raised from hardcoded 30) to accommodate
+        // legitimate deep LINQ trees built by report composers or dynamic filter builders.
+        // Maximum 200 to prevent stack overflows from adversarial inputs.
+        private int _maxRecursionDepth = 50;
 
         /// <summary>
         /// Gets or sets the timeout configuration used when executing database commands.
@@ -31,6 +35,25 @@ namespace nORM.Configuration
         /// bulk operations or transactions.
         /// </summary>
         public AdaptiveTimeoutManager.TimeoutConfiguration TimeoutConfiguration { get; set; } = new();
+
+        /// <summary>
+        /// Gets or sets the maximum LINQ expression tree translation depth (recursion limit).
+        /// Default: 50. Maximum: 200. Raise this value for complex query builders that produce
+        /// deep nested LINQ trees (e.g., report composers with 30+ conditions). If you reach
+        /// this limit, consider breaking the query into multiple simpler queries or using CTEs.
+        /// </summary>
+        public int MaxRecursionDepth
+        {
+            get => _maxRecursionDepth;
+            set
+            {
+                if (value < 1 || value > 200)
+                    throw new ArgumentOutOfRangeException(nameof(value),
+                        "MaxRecursionDepth must be between 1 and 200. " +
+                        "If you need deeper nesting, consider breaking the query into multiple queries.");
+                _maxRecursionDepth = value;
+            }
+        }
 
         /// <summary>
         /// Gets or sets the maximum number of child entities allowed per group in a GroupJoin operation.

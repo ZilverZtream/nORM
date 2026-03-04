@@ -424,22 +424,122 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Normalizes a SQL string for safe keyword matching by:
+        /// 1. Removing line comments (-- to end of line)
+        /// 2. Removing block comments (/* ... */, including nested)
+        /// 3. Replacing all whitespace variants (tabs, newlines, \r, Unicode non-breaking spaces
+        ///    \u00A0, \u2003, etc.) with a single space
+        /// 4. Collapsing multiple spaces into one
+        /// 5. Lowercasing the result
+        ///
+        /// This defeats obfuscation techniques such as:
+        ///   DR/**/OP TABLE users  → "drop table users"
+        ///   INSERT\nINTO users    → "insert into users"
+        ///   DROP\u00A0TABLE       → "drop table"
+        /// </summary>
+        internal static string NormalizeSql(string sql)
+        {
+            if (string.IsNullOrEmpty(sql))
+                return string.Empty;
+
+            var sb = new System.Text.StringBuilder(sql.Length);
+            int i = 0;
+            int len = sql.Length;
+
+            while (i < len)
+            {
+                // Block comment removal (supports nesting).
+                // Comments are removed WITHOUT inserting a space so that tokens
+                // immediately adjacent to a comment are concatenated:
+                //   DR/**/OP  → DROP   (rejected as DDL)
+                //   SEL/**/ECT → SELECT (accepted as DML-safe)
+                if (i + 1 < len && sql[i] == '/' && sql[i + 1] == '*')
+                {
+                    i += 2;
+                    int depth = 1;
+                    while (i < len && depth > 0)
+                    {
+                        if (i + 1 < len && sql[i] == '/' && sql[i + 1] == '*')
+                        {
+                            depth++;
+                            i += 2;
+                        }
+                        else if (i + 1 < len && sql[i] == '*' && sql[i + 1] == '/')
+                        {
+                            depth--;
+                            i += 2;
+                        }
+                        else
+                        {
+                            i++;
+                        }
+                    }
+                    // No space added — adjacent tokens merge (DR/**/OP → DROP)
+                    continue;
+                }
+
+                // Line comment removal (-- to end of line)
+                if (i + 1 < len && sql[i] == '-' && sql[i + 1] == '-')
+                {
+                    i += 2;
+                    while (i < len && sql[i] != '\n' && sql[i] != '\r')
+                        i++;
+                    // Replace with a space so the next token is still separated
+                    sb.Append(' ');
+                    continue;
+                }
+
+                // Whitespace normalization — collapse all whitespace variants to space
+                char c = sql[i];
+                if (c == ' ' || c == '\t' || c == '\r' || c == '\n' ||
+                    c == '\u00A0' || c == '\u2003' || c == '\u2002' ||
+                    c == '\u2000' || c == '\u2001' || c == '\u2004' ||
+                    c == '\u2005' || c == '\u2006' || c == '\u2007' ||
+                    c == '\u2008' || c == '\u2009' || c == '\u200A' ||
+                    c == '\u3000' || char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.SpaceSeparator)
+                {
+                    sb.Append(' ');
+                    i++;
+                    continue;
+                }
+
+                // Regular character — append lowercased
+                sb.Append(char.ToLowerInvariant(c));
+                i++;
+            }
+
+            // Collapse multiple spaces into one and trim
+            var result = sb.ToString();
+            // Use a fast path: replace sequences of spaces
+            while (result.Contains("  "))
+                result = result.Replace("  ", " ");
+            return result.Trim();
+        }
+
+        /// <summary>
         /// P1: Provider-aware SQL safety gate.
         /// Non-SQL-Server providers skip the TSQL AST parser (which produces false
         /// negatives for dialect-specific syntax like SQLite PRAGMA) and rely solely
         /// on the keyword denylist. SQL Server still uses the full AST allowlist path.
+        /// All providers run keyword checks against the NORMALIZED form to defeat
+        /// comment-injection and whitespace-based obfuscation attacks.
         /// </summary>
         internal static bool IsSafeRawSql(string sql, DatabaseProvider? provider = null)
         {
             if (string.IsNullOrWhiteSpace(sql))
                 return false;
 
+            // SEC-1: Normalize BEFORE keyword checks to defeat comment/whitespace obfuscation
+            var normalized = NormalizeSql(sql);
+
             // X1 + P1: keyword denylist is always applied first for all providers
-            if (!IsSafeByKeywords(sql)) return false;
+            if (!IsSafeByKeywords(normalized)) return false;
 
             // P1: skip expensive TSQL parse for non-SQL-Server providers
             if (provider is not null && provider is not SqlServerProvider) return true;
 
+            // Feed the ORIGINAL sql to the TSQL parser (it handles its own syntax);
+            // the keyword check above already caught any obfuscated keywords.
             using var reader = new StringReader(sql);
             var parser = new TSql150Parser(false);
             var fragment = parser.Parse(reader, out var errors);
@@ -465,26 +565,73 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// X1: Keyword-based denylist that catches side-effect and DDL commands not
-        /// caught by the TSQL AST parser (e.g. SQLite-specific PRAGMA, VACUUM, REINDEX).
+        /// X1: Keyword-based denylist that catches side-effect and DDL commands.
+        /// IMPORTANT: This method expects an already-normalized (lowercased, whitespace-
+        /// collapsed, comment-stripped) SQL string from <see cref="NormalizeSql"/>.
+        /// Checks are done against the normalized form to defeat obfuscation.
         /// </summary>
-        private static bool IsSafeByKeywords(string sql)
+        private static bool IsSafeByKeywords(string normalizedSql)
         {
-            var lowerSql = sql.ToLowerInvariant();
-            // DML / DDL denylist
-            if (lowerSql.Contains("drop ") || lowerSql.Contains("alter ") ||
-                lowerSql.Contains("truncate ") || lowerSql.Contains("exec ") ||
-                lowerSql.Contains("delete ") || lowerSql.Contains("update ") ||
-                lowerSql.Contains("insert ") || lowerSql.Contains("merge "))
+            // DML / DDL denylist — checked against normalized (comment-stripped) SQL
+            // We check for word boundaries by requiring space or start/end around keywords.
+            // Use Contains with a trailing space for keywords that must precede something,
+            // or check for the keyword at end-of-string as well.
+            if (ContainsDeniedKeyword(normalizedSql, "drop") ||
+                ContainsDeniedKeyword(normalizedSql, "alter") ||
+                ContainsDeniedKeyword(normalizedSql, "truncate") ||
+                ContainsDeniedKeyword(normalizedSql, "exec") ||
+                ContainsDeniedKeyword(normalizedSql, "execute") ||
+                ContainsDeniedKeyword(normalizedSql, "delete") ||
+                ContainsDeniedKeyword(normalizedSql, "update") ||
+                ContainsDeniedKeyword(normalizedSql, "insert") ||
+                ContainsDeniedKeyword(normalizedSql, "merge") ||
+                ContainsDeniedKeyword(normalizedSql, "create") ||
+                ContainsDeniedKeyword(normalizedSql, "grant") ||
+                ContainsDeniedKeyword(normalizedSql, "revoke"))
                 return false;
 
             // X1: Additional side-effect commands that bypass the AST path
-            if (lowerSql.Contains("pragma ") || lowerSql.Contains("vacuum") ||
-                lowerSql.Contains("reindex ") || lowerSql.Contains("analyze ") ||
-                lowerSql.Contains("call "))
+            if (ContainsDeniedKeyword(normalizedSql, "pragma") ||
+                ContainsDeniedKeyword(normalizedSql, "vacuum") ||
+                ContainsDeniedKeyword(normalizedSql, "reindex") ||
+                ContainsDeniedKeyword(normalizedSql, "analyze") ||
+                ContainsDeniedKeyword(normalizedSql, "call"))
+                return false;
+
+            // Reject stacked queries — semicolon separating statements
+            // A single trailing semicolon is acceptable, but a semicolon followed by
+            // any non-whitespace content indicates a stacked query.
+            var semiIdx = normalizedSql.IndexOf(';');
+            if (semiIdx >= 0 && semiIdx < normalizedSql.Length - 1)
                 return false;
 
             return true;
+        }
+
+        /// <summary>
+        /// Returns true if the normalized SQL contains the given keyword as a whole token
+        /// (i.e., surrounded by spaces, start-of-string, or end-of-string).
+        /// This prevents false positives like "reindex" matching "index".
+        /// </summary>
+        private static bool ContainsDeniedKeyword(string normalizedSql, string keyword)
+        {
+            int idx = 0;
+            while (true)
+            {
+                idx = normalizedSql.IndexOf(keyword, idx, StringComparison.Ordinal);
+                if (idx < 0) return false;
+
+                // Check character before the keyword (must be start-of-string or space)
+                bool beforeOk = idx == 0 || normalizedSql[idx - 1] == ' ';
+                // Check character after the keyword (must be end-of-string or space)
+                int afterIdx = idx + keyword.Length;
+                bool afterOk = afterIdx >= normalizedSql.Length || normalizedSql[afterIdx] == ' ';
+
+                if (beforeOk && afterOk)
+                    return true;
+
+                idx += keyword.Length;
+            }
         }
 
         private static readonly HashSet<char> AllowedLikeEscapeChars = new("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,-./:;<=>?@[]^_{|}~\\");
