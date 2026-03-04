@@ -353,10 +353,9 @@ namespace nORM.Core
 
             if (failures.Count > 0)
             {
-                _options.Logger?.LogWarning(
-                    "Change detection failed for {FailureCount} entities. These entities will not be saved. " +
-                    "Check property getters for exceptions or data validation logic.",
-                    failures.Count);
+                var exceptions = new List<Exception>(failures.Count);
+                foreach (var f in failures) exceptions.Add(f.Exception);
+                throw new AggregateException("DetectChanges encountered errors.", exceptions);
             }
         }
 

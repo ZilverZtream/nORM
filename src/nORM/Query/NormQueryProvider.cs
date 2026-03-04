@@ -340,13 +340,16 @@ namespace nORM.Query
                 await using var cmd = _ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
-                foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
+                var compiledParamsAsync = plan.CompiledParameters;
+                foreach (var p in plan.Parameters)
+                    if (compiledParamsAsync == null || !compiledParamsAsync.Contains(p.Key))
+                        cmd.AddOptimizedParam(p.Key, p.Value);
 
                 if (paramValues != null)
                 {
-                    for (int i = 0; i < plan.CompiledParameters.Count; i++)
+                    for (int i = 0; i < compiledParamsAsync!.Count; i++)
                     {
-                        var name = plan.CompiledParameters[i];
+                        var name = compiledParamsAsync[i];
                         var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
                         cmd.AddOptimizedParam(name, value);
                     }
@@ -991,13 +994,16 @@ namespace nORM.Query
                 using var cmd = _ctx.Connection.CreateCommand();
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
-                foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
+                var compiledParamsSync = plan.CompiledParameters;
+                foreach (var p in plan.Parameters)
+                    if (compiledParamsSync == null || !compiledParamsSync.Contains(p.Key))
+                        cmd.AddOptimizedParam(p.Key, p.Value);
 
                 if (paramValues != null)
                 {
-                    for (int i = 0; i < plan.CompiledParameters.Count; i++)
+                    for (int i = 0; i < compiledParamsSync!.Count; i++)
                     {
-                        var name = plan.CompiledParameters[i];
+                        var name = compiledParamsSync[i];
                         var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
                         cmd.AddOptimizedParam(name, value);
                     }

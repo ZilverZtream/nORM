@@ -10,6 +10,7 @@ using nORM.Internal;
 using nORM.Core;
 using nORM.Configuration;
 using nORM.Providers;
+using Microsoft.Extensions.Logging;
 
 #nullable enable
 
@@ -23,6 +24,7 @@ namespace nORM.Migration
         private readonly DbConnection _connection;
         private readonly Assembly _migrationsAssembly;
         private readonly DbContext? _context;
+        private readonly ILogger? _logger;
         private const string HistoryTableName = "__NormMigrationsHistory";
 
         /// <summary>
@@ -31,10 +33,12 @@ namespace nORM.Migration
         /// <param name="connection">Open connection to the target PostgreSQL database.</param>
         /// <param name="migrationsAssembly">Assembly containing migration classes.</param>
         /// <param name="options">Optional DbContext configuration for interceptors.</param>
-        public PostgresMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null)
+        /// <param name="logger">Optional logger for drift warnings and diagnostics.</param>
+        public PostgresMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null, ILogger? logger = null)
         {
             _connection = connection;
             _migrationsAssembly = migrationsAssembly;
+            _logger = logger;
             if (options != null && options.CommandInterceptors.Count > 0)
             {
                 _context = new DbContext(connection, new PostgresProvider(new GenericParameterFactory(connection)), options);
@@ -98,9 +102,17 @@ namespace nORM.Migration
                 .OrderBy(m => m.Version)
                 .ToList();
 
-            var appliedVersions = await GetAppliedMigrationVersionsAsync(ct).ConfigureAwait(false);
+            var applied = await GetAppliedMigrationsAsync(ct).ConfigureAwait(false);
 
-            return all.Where(m => !appliedVersions.Contains(m.Version)).ToList();
+            foreach (var m in all.Where(m => applied.TryGetValue(m.Version, out var name) &&
+                !string.Equals(name, m.Name, StringComparison.Ordinal)))
+            {
+                applied.TryGetValue(m.Version, out var recordedName);
+                _logger?.LogWarning("Migration {Version} name drift: recorded '{Recorded}', found '{Current}'",
+                    m.Version, recordedName, m.Name);
+            }
+
+            return all.Where(m => !applied.ContainsKey(m.Version)).ToList();
         }
 
         /// <summary>
@@ -125,24 +137,24 @@ namespace nORM.Migration
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>A set containing the version numbers of applied migrations.</returns>
-        private async Task<HashSet<long>> GetAppliedMigrationVersionsAsync(CancellationToken ct)
+        private async Task<Dictionary<long, string>> GetAppliedMigrationsAsync(CancellationToken ct)
         {
-            var versions = new HashSet<long>();
+            var applied = new Dictionary<long, string>();
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"SELECT \"Version\" FROM \"{HistoryTableName}\"";
+            cmd.CommandText = $"SELECT \"Version\", \"Name\" FROM \"{HistoryTableName}\"";
             try
             {
                 await using var reader = await ExecuteReaderAsync(cmd, ct).ConfigureAwait(false);
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
-                    versions.Add(reader.GetInt64(0));
+                    applied[reader.GetInt64(0)] = reader.GetString(1);
                 }
             }
             catch (DbException)
             {
-                // History table probably doesn't exist yet, return empty set.
+                // History table probably doesn't exist yet, return empty dict.
             }
-            return versions;
+            return applied;
         }
 
         /// <summary>

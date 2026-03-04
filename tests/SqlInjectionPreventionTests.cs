@@ -22,6 +22,36 @@ namespace nORM.Tests
             Assert.True(NormValidator.IsSafeRawSql(safeSql));
         }
 
+        // SEC-1: DML statements must be rejected
+
+        [Theory]
+        [InlineData("DELETE FROM Users WHERE Id = 1")]
+        [InlineData("UPDATE Users SET Name='x' WHERE Id=1")]
+        [InlineData("INSERT INTO Users(Name) VALUES('x')")]
+        [InlineData("MERGE Users USING src ON ...")]
+        public void IsSafeRawSql_ReturnsFalse_ForDmlStatements(string dmlSql)
+        {
+            Assert.False(NormValidator.IsSafeRawSql(dmlSql));
+        }
+
+        [Fact]
+        public void IsSafeRawSql_ReturnsFalse_ForUpdateStatement()
+        {
+            Assert.False(NormValidator.IsSafeRawSql("UPDATE Users SET Col=1"));
+        }
+
+        [Fact]
+        public void IsSafeRawSql_ReturnsFalse_ForInsertStatement()
+        {
+            Assert.False(NormValidator.IsSafeRawSql("INSERT INTO Users VALUES(1,'x')"));
+        }
+
+        [Fact]
+        public void IsSafeRawSql_ReturnsFalse_ForDeleteStatement()
+        {
+            Assert.False(NormValidator.IsSafeRawSql("DELETE FROM Users"));
+        }
+
         private class Dummy
         {
             public int Id { get; set; }

@@ -435,39 +435,23 @@ namespace nORM.Core
             {
                 var lowerSql = sql.ToLowerInvariant();
                 return !(lowerSql.Contains("drop ") || lowerSql.Contains("alter ") ||
-                         lowerSql.Contains("truncate ") || lowerSql.Contains("exec "));
+                         lowerSql.Contains("truncate ") || lowerSql.Contains("exec ") ||
+                         lowerSql.Contains("delete ") || lowerSql.Contains("update ") ||
+                         lowerSql.Contains("insert ") || lowerSql.Contains("merge "));
             }
+
+            var allowed = new HashSet<Type> { typeof(SelectStatement), typeof(SetVariableStatement) };
 
             if (fragment is TSqlScript script)
             {
                 foreach (var batch in script.Batches)
-                {
                     foreach (var statement in batch.Statements)
-                    {
-                        var typeName = statement.GetType().Name;
-                        if (typeName.Contains("Drop", StringComparison.OrdinalIgnoreCase) ||
-                            typeName.Contains("Alter", StringComparison.OrdinalIgnoreCase) ||
-                            typeName.Contains("Truncate", StringComparison.OrdinalIgnoreCase) ||
-                            typeName.Contains("Execute", StringComparison.OrdinalIgnoreCase))
-                        {
+                        if (!allowed.Contains(statement.GetType()))
                             return false;
-                        }
-                    }
-                }
-            }
-            else
-            {
-                var typeName = fragment.GetType().Name;
-                if (typeName.Contains("Drop", StringComparison.OrdinalIgnoreCase) ||
-                    typeName.Contains("Alter", StringComparison.OrdinalIgnoreCase) ||
-                    typeName.Contains("Truncate", StringComparison.OrdinalIgnoreCase) ||
-                    typeName.Contains("Execute", StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
+                return true;
             }
 
-            return true;
+            return false;
         }
 
         private static readonly HashSet<char> AllowedLikeEscapeChars = new("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,-./:;<=>?@[]^_{|}~\\");
