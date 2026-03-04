@@ -666,7 +666,19 @@ namespace nORM.Core
             var totalAffected = 0;
             try
             {
-                foreach (var group in changedEntries.GroupBy(e => (e.State, e.Mapping)))
+                var allGroups = changedEntries.GroupBy(e => (e.State, e.Mapping)).ToList();
+                var addedGroups = allGroups.Where(g => g.Key.State == EntityState.Added).ToList();
+                var modifiedGroups = allGroups.Where(g => g.Key.State == EntityState.Modified).ToList();
+                var deletedGroups = allGroups.Where(g => g.Key.State == EntityState.Deleted).ToList();
+
+                var sortedAddedMappings = TopologicalSortMappings(addedGroups.Select(g => g.Key.Mapping)).ToList();
+                var sortedDeletedMappings = TopologicalSortMappings(deletedGroups.Select(g => g.Key.Mapping)).Reverse().ToList();
+
+                var orderedAddedGroups = sortedAddedMappings.Select(m => addedGroups.First(g => g.Key.Mapping == m));
+                var orderedDeletedGroups = sortedDeletedMappings.Select(m => deletedGroups.First(g => g.Key.Mapping == m));
+                var orderedGroups = orderedAddedGroups.Concat(modifiedGroups).Concat(orderedDeletedGroups);
+
+                foreach (var group in orderedGroups)
                 {
                     var entries = group.ToList();
                     if (entries.Count == 0)
@@ -1128,6 +1140,29 @@ namespace nORM.Core
             }
         }
 
+        private static IEnumerable<TableMapping> TopologicalSortMappings(IEnumerable<TableMapping> mappings)
+        {
+            var all = mappings.ToList();
+            var deps = all.ToDictionary(
+                m => m,
+                m => all.Where(other => other != m && m.Columns.Any(c =>
+                    string.Equals(c.ForeignKeyPrincipalTypeName, other.Type.Name,
+                        StringComparison.OrdinalIgnoreCase))).ToList());
+
+            var result = new List<TableMapping>();
+            var visited = new HashSet<TableMapping>();
+
+            void Visit(TableMapping node)
+            {
+                if (!visited.Add(node)) return;
+                foreach (var dep in deps[node]) Visit(dep);
+                result.Add(node);
+            }
+
+            foreach (var m in all) Visit(m);
+            return result;
+        }
+
         private string BuildInsertBatch(TableMapping map, int startParamIndex)
         {
             var cols = map.InsertColumns;
@@ -1140,6 +1175,10 @@ namespace nORM.Core
 
         private string BuildUpdateBatch(TableMapping map, int startParamIndex)
         {
+            if (map.KeyColumns.Length == 0)
+                throw new NormConfigurationException(string.Format(
+                    ErrorMessages.InvalidConfiguration,
+                    $"Entity '{map.Type.Name}' has no primary key; UPDATE requires a key."));
             var setSb = new StringBuilder();
             var idx = startParamIndex;
             for (int i = 0; i < map.UpdateColumns.Length; i++)
@@ -1160,6 +1199,10 @@ namespace nORM.Core
 
         private string BuildDeleteBatch(TableMapping map, int startParamIndex)
         {
+            if (map.KeyColumns.Length == 0)
+                throw new NormConfigurationException(string.Format(
+                    ErrorMessages.InvalidConfiguration,
+                    $"Entity '{map.Type.Name}' has no primary key; DELETE requires a key."));
             var idx = startParamIndex;
             var whereParts = new List<string>();
             foreach (var col in map.KeyColumns)

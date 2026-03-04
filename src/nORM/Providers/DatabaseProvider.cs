@@ -156,6 +156,15 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// Generates SQL that concatenates two SQL expressions. Defaults to ANSI CONCAT function.
+        /// Providers that do not support CONCAT (e.g. SQLite) override this method.
+        /// </summary>
+        /// <param name="left">Left SQL expression.</param>
+        /// <param name="right">Right SQL expression.</param>
+        /// <returns>SQL fragment that concatenates the two expressions.</returns>
+        public virtual string GetConcatSql(string left, string right) => $"CONCAT({left}, {right})";
+
+        /// <summary>
         /// Ensures the provided connection is open before executing provider operations.
         /// </summary>
         /// <param name="connection">The connection to validate.</param>

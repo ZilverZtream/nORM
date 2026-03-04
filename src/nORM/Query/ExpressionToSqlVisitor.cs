@@ -755,10 +755,8 @@ namespace nORM.Query
             {
                 // Variable path: escape the value at runtime to prevent SQL injection
                 var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                visitor._sql.Append("CONCAT('%', ");
                 var escapedSql = visitor._provider.GetLikeEscapeSql(visitor.GetSql(node.Arguments[0]));
-                visitor._sql.Append(escapedSql);
-                visitor._sql.Append(", '%')");
+                visitor._sql.Append(visitor._provider.GetConcatSql("'%'", visitor._provider.GetConcatSql(escapedSql, "'%'")));
                 visitor._sql.Append($" ESCAPE '{escChar}'");
             }
         }
@@ -779,10 +777,8 @@ namespace nORM.Query
             {
                 // Variable path: escape the value at runtime to prevent SQL injection
                 var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                visitor._sql.Append("CONCAT(");
                 var escapedSql = visitor._provider.GetLikeEscapeSql(visitor.GetSql(node.Arguments[0]));
-                visitor._sql.Append(escapedSql);
-                visitor._sql.Append(", '%')");
+                visitor._sql.Append(visitor._provider.GetConcatSql(escapedSql, "'%'"));
                 visitor._sql.Append($" ESCAPE '{escChar}'");
             }
         }
@@ -803,10 +799,8 @@ namespace nORM.Query
             {
                 // Variable path: escape the value at runtime to prevent SQL injection
                 var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                visitor._sql.Append("CONCAT('%', ");
                 var escapedSql = visitor._provider.GetLikeEscapeSql(visitor.GetSql(node.Arguments[0]));
-                visitor._sql.Append(escapedSql);
-                visitor._sql.Append(")");
+                visitor._sql.Append(visitor._provider.GetConcatSql("'%'", escapedSql));
                 visitor._sql.Append($" ESCAPE '{escChar}'");
             }
         }

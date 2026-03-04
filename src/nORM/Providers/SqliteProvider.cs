@@ -51,6 +51,11 @@ namespace nORM.Providers
         public override CommandType StoredProcedureCommandType => CommandType.Text;
 
         /// <summary>
+        /// SQLite uses the <c>||</c> operator for string concatenation instead of CONCAT.
+        /// </summary>
+        public override string GetConcatSql(string left, string right) => $"({left} || {right})";
+
+        /// <summary>
         /// Builds a minimal <c>SELECT</c> statement directly into a character buffer.
         /// </summary>
         /// <param name="buffer">Buffer receiving the SQL.</param>
