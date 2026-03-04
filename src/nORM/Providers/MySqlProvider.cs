@@ -46,7 +46,8 @@ namespace nORM.Providers
         public override int MaxParameters => 65_535;
 
         /// <inheritdoc />
-        public override string Escape(string id) => $"`{id}`";
+        /// ID-7: Embedded backtick characters are doubled to prevent SQL injection via identifiers.
+        public override string Escape(string id) => $"`{id.Replace("`", "``")}`";
 
         /// <summary>
         /// Appends a MySQL <c>LIMIT</c> clause to the SQL builder to paginate results.

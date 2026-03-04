@@ -19,13 +19,14 @@ namespace nORM.Migration
     /// <summary>
     /// Executes migrations against a SQLite database using a supplied connection and migrations assembly.
     /// </summary>
-    public class SqliteMigrationRunner : IMigrationRunner
+    public class SqliteMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable
     {
         private readonly DbConnection _connection;
         private readonly Assembly _migrationsAssembly;
-        private readonly DbContext? _context;
+        private DbContext? _context;
         private readonly ILogger? _logger;
         private const string HistoryTableName = "__NormMigrationsHistory";
+        private bool _disposed = false;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SqliteMigrationRunner"/> class.
@@ -195,5 +196,37 @@ namespace nORM.Migration
             => _context != null
                 ? cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct)
                 : cmd.ExecuteReaderAsync(ct);
+
+        /// <summary>
+        /// Asynchronously disposes the internal <see cref="DbContext"/> created for interceptors.
+        /// </summary>
+        public async ValueTask DisposeAsync()
+        {
+            if (!_disposed)
+            {
+                _disposed = true;
+                if (_context != null)
+                {
+                    await _context.DisposeAsync().ConfigureAwait(false);
+                    _context = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Synchronously disposes the internal <see cref="DbContext"/> created for interceptors.
+        /// </summary>
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _disposed = true;
+                if (_context != null)
+                {
+                    _context.Dispose();
+                    _context = null;
+                }
+            }
+        }
     }
 }

@@ -21,13 +21,14 @@ namespace nORM.Migration
     /// an assembly for migration classes and applies them in order while maintaining
     /// a history table to track applied versions.
     /// </summary>
-    public class SqlServerMigrationRunner : IMigrationRunner
+    public class SqlServerMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable
     {
         private readonly DbConnection _connection;
         private readonly Assembly _migrationsAssembly;
-        private readonly DbContext? _context;
+        private DbContext? _context;
         private readonly ILogger? _logger;
         internal const string HistoryTableName = "__NormMigrationsHistory";
+        private bool _disposed = false;
 
         /// <summary>
         /// Creates a new migration runner for SQL Server.
@@ -187,5 +188,37 @@ namespace nORM.Migration
         /// <returns>A <see cref="DbDataReader"/> containing the results.</returns>
         private Task<DbDataReader> ExecuteReaderAsync(DbCommand cmd, CancellationToken ct)
             => _context != null ? cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct) : cmd.ExecuteReaderAsync(ct);
+
+        /// <summary>
+        /// Asynchronously disposes the internal <see cref="DbContext"/> created for interceptors.
+        /// </summary>
+        public async ValueTask DisposeAsync()
+        {
+            if (!_disposed)
+            {
+                _disposed = true;
+                if (_context != null)
+                {
+                    await _context.DisposeAsync().ConfigureAwait(false);
+                    _context = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Synchronously disposes the internal <see cref="DbContext"/> created for interceptors.
+        /// </summary>
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _disposed = true;
+                if (_context != null)
+                {
+                    _context.Dispose();
+                    _context = null;
+                }
+            }
+        }
     }
 }

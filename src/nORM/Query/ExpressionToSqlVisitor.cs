@@ -151,7 +151,11 @@ namespace nORM.Query
 
                 // Q1: Nullable column-vs-column comparison needs three-valued logic.
                 // A plain = or <> is incorrect when either side can be NULL at runtime.
-                if (IsNullableValueType(node.Left.Type) || IsNullableValueType(node.Right.Type))
+                // For Nullable<T> value types: always expand (runtime null possible).
+                // For reference types (string, class): only expand when BOTH sides could be null
+                // at runtime (i.e., neither side is a known non-null constant or parameter).
+                // Comparing a string column to a literal "ABC" does not need expansion since "ABC" is never null.
+                if (NeedsNullSafeExpansion(node.Left, node.Right))
                 {
                     int ls = _sql.Length;
                     Visit(node.Left);
@@ -218,6 +222,76 @@ namespace nORM.Query
         /// </summary>
         private static bool IsNullableValueType(Type t) =>
             t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>);
+
+        /// <summary>
+        /// Returns <c>true</c> when <paramref name="t"/> is either a reference type (string, class, etc.)
+        /// or a <c>Nullable&lt;T&gt;</c> value type. Both can be NULL at runtime and require
+        /// three-valued SQL logic (IS NULL guards) for equality/inequality comparisons.
+        /// </summary>
+        private static bool IsNullableOrReferenceType(Type t) =>
+            !t.IsValueType ||  // reference types (string, class, etc.)
+            (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>));
+
+        /// <summary>
+        /// Determines whether an equality/inequality comparison between two expressions needs
+        /// three-valued SQL logic (IS NULL expansion). The expansion is required when:
+        /// - Either side is <c>Nullable&lt;T&gt;</c>, or
+        /// - Both sides are reference types that could be null in the database (not known non-null constants).
+        /// When one side is a known non-null constant or parameter value, plain = / &lt;&gt; is correct.
+        /// </summary>
+        private static bool NeedsNullSafeExpansion(Expression left, Expression right)
+        {
+            // Nullable<T> value types always need expansion (runtime null is possible on either side)
+            if (IsNullableValueType(left.Type) || IsNullableValueType(right.Type))
+                return true;
+
+            // Reference types need expansion only when BOTH sides could carry a runtime null.
+            // A "known non-null" side is one that is:
+            //   - A non-null compile-time constant (ConstantExpression with non-null value)
+            //   - A closure capture whose value we can verify is non-null at expression-build time
+            // In both cases there is no need for IS NULL expansion.
+            if (!left.Type.IsValueType || !right.Type.IsValueType)
+            {
+                bool leftCouldBeNull  = CouldBeNull(left);
+                bool rightCouldBeNull = CouldBeNull(right);
+                return leftCouldBeNull && rightCouldBeNull;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> when <paramref name="expr"/> might evaluate to SQL NULL at runtime.
+        /// Constants and member accesses on closures whose current value is non-null are "safe"
+        /// (they will never produce SQL NULL on the right-hand side of a comparison).
+        /// Column references (member accesses on query parameters) are always potentially nullable.
+        /// </summary>
+        private static bool CouldBeNull(Expression expr)
+        {
+            // Non-null compile-time constant: cannot be null
+            if (expr is ConstantExpression ce)
+                return ce.Value is null;
+
+            // Unwrap casts/conversions
+            if (expr is UnaryExpression ue && (ue.NodeType == ExpressionType.Convert || ue.NodeType == ExpressionType.ConvertChecked))
+                return CouldBeNull(ue.Operand);
+
+            // Closure-captured member whose value is non-null at expression-build time
+            if (expr is MemberExpression me && me.Expression is ConstantExpression closure)
+            {
+                try
+                {
+                    var val = closure.Value == null ? null :
+                        me.Member is FieldInfo fi ? fi.GetValue(closure.Value) :
+                        me.Member is PropertyInfo pi ? pi.GetValue(closure.Value) : null;
+                    return val is null;  // non-null captured value → not nullable
+                }
+                catch { return true; }
+            }
+
+            // Everything else (column references, method calls, etc.) could be null
+            return true;
+        }
 
         protected override Expression VisitMember(MemberExpression node)
         {

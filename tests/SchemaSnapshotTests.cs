@@ -171,4 +171,117 @@ public class SchemaSnapshotTests
         Assert.Single(diff.DroppedIndexes);
         Assert.Equal("IX_Blog_Title", diff.DroppedIndexes[0].IndexName);
     }
+
+    // SD-8: Tests for dropped table and column detection
+
+    [Fact]
+    public void SchemaDiffer_DetectsDroppedTable_WhenTableRemovedFromNewSnapshot()
+    {
+        var oldTable = new TableSchema
+        {
+            Name = "OldTable",
+            Columns = { new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false } }
+        };
+        var oldSnapshot = new SchemaSnapshot { Tables = { oldTable } };
+        var newSnapshot = new SchemaSnapshot(); // empty
+
+        var diff = SchemaDiffer.Diff(oldSnapshot, newSnapshot);
+
+        Assert.Single(diff.DroppedTables);
+        Assert.Equal("OldTable", diff.DroppedTables[0].Name);
+        Assert.Empty(diff.AddedTables);
+    }
+
+    [Fact]
+    public void SchemaDiffer_DetectsDroppedColumn_WhenColumnRemovedFromNewSnapshot()
+    {
+        var oldTable = new TableSchema
+        {
+            Name = "MyTable",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",     ClrType = typeof(int).FullName!, IsNullable = false },
+                new ColumnSchema { Name = "OldCol", ClrType = typeof(string).FullName!, IsNullable = true }
+            }
+        };
+        var oldSnapshot = new SchemaSnapshot { Tables = { oldTable } };
+
+        var newTable = new TableSchema
+        {
+            Name = "MyTable",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false }
+                // OldCol removed
+            }
+        };
+        var newSnapshot = new SchemaSnapshot { Tables = { newTable } };
+
+        var diff = SchemaDiffer.Diff(oldSnapshot, newSnapshot);
+
+        Assert.Single(diff.DroppedColumns);
+        Assert.Equal("OldCol", diff.DroppedColumns[0].Column.Name);
+        Assert.Equal("MyTable", diff.DroppedColumns[0].Table.Name);
+    }
+
+    [Fact]
+    public void SchemaDiffer_HasChanges_IsTrueWhenDroppedTables()
+    {
+        var oldTable = new TableSchema { Name = "Gone", Columns = { new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName! } } };
+        var diff = SchemaDiffer.Diff(new SchemaSnapshot { Tables = { oldTable } }, new SchemaSnapshot());
+        Assert.True(diff.HasChanges);
+    }
+
+    [Fact]
+    public void SqliteSqlGenerator_EmitsDropTable_ForDroppedTable()
+    {
+        var droppedTable = new TableSchema
+        {
+            Name = "GoneTable",
+            Columns = { new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false } }
+        };
+        var diff = new SchemaDiff();
+        diff.DroppedTables.Add(droppedTable);
+
+        var generator = new SqliteMigrationSqlGenerator();
+        var stmts = generator.GenerateSql(diff);
+
+        Assert.Contains(stmts.Up, s => s.Contains("DROP TABLE") && s.Contains("GoneTable"));
+    }
+
+    [Fact]
+    public void SqlServerSqlGenerator_EmitsDropTable_ForDroppedTable()
+    {
+        var droppedTable = new TableSchema
+        {
+            Name = "GoneTable",
+            Columns = { new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false } }
+        };
+        var diff = new SchemaDiff();
+        diff.DroppedTables.Add(droppedTable);
+
+        var generator = new SqlServerMigrationSqlGenerator();
+        var stmts = generator.GenerateSql(diff);
+
+        Assert.Contains(stmts.Up, s => s.Contains("DROP TABLE") && s.Contains("GoneTable"));
+    }
+
+    [Fact]
+    public void SqlServerSqlGenerator_EmitsDropColumn_ForDroppedColumn()
+    {
+        var tableInNewSnapshot = new TableSchema
+        {
+            Name = "MyTable",
+            Columns = { new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false } }
+        };
+        var droppedCol = new ColumnSchema { Name = "RemovedCol", ClrType = typeof(string).FullName!, IsNullable = true };
+
+        var diff = new SchemaDiff();
+        diff.DroppedColumns.Add((tableInNewSnapshot, droppedCol));
+
+        var generator = new SqlServerMigrationSqlGenerator();
+        var stmts = generator.GenerateSql(diff);
+
+        Assert.Contains(stmts.Up, s => s.Contains("DROP COLUMN") && s.Contains("RemovedCol"));
+    }
 }

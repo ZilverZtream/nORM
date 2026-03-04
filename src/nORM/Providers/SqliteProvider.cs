@@ -35,10 +35,12 @@ namespace nORM.Providers
 
         /// <summary>
         /// Escapes an identifier by wrapping it in double quotes, per SQLite requirements.
+        /// Embedded double-quote characters are doubled to prevent SQL injection via identifiers.
         /// </summary>
         /// <param name="id">Identifier to escape.</param>
         /// <returns>The escaped identifier.</returns>
-        public override string Escape(string id) => $"\"{id}\"";
+        public override string Escape(string id) => $"\"{id.Replace("\"", "\"\"")}\"";
+
 
         /// <summary>
         /// Character used to prefix parameter names in SQLite commands.

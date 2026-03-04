@@ -1159,21 +1159,53 @@ namespace nORM.Core
             var deps = all.ToDictionary(
                 m => m,
                 m => all.Where(other => other != m && m.Columns.Any(c =>
-                    string.Equals(c.ForeignKeyPrincipalTypeName, other.Type.Name,
-                        StringComparison.OrdinalIgnoreCase))).ToList());
+                    // FK-2: Match by full type name first (namespace-qualified) to avoid collisions
+                    // between types with the same simple name in different namespaces.
+                    MatchesPrincipalType(c.ForeignKeyPrincipalTypeName, other.Type))).ToList());
 
             var result = new List<TableMapping>();
             var visited = new HashSet<TableMapping>();
+            var inProgress = new HashSet<TableMapping>();
 
-            void Visit(TableMapping node)
+            void Visit(TableMapping node, List<TableMapping> path)
             {
+                if (inProgress.Contains(node))
+                {
+                    var cycleStart = path.IndexOf(node);
+                    var cyclePath = path.Skip(cycleStart).Append(node);
+                    throw new NormConfigurationException(
+                        $"Circular FK dependency detected: {string.Join(" -> ", cyclePath.Select(m => m.Type.Name))}");
+                }
                 if (!visited.Add(node)) return;
-                foreach (var dep in deps[node]) Visit(dep);
+                inProgress.Add(node);
+                path.Add(node);
+                foreach (var dep in deps[node]) Visit(dep, path);
+                path.RemoveAt(path.Count - 1);
+                inProgress.Remove(node);
                 result.Add(node);
             }
 
-            foreach (var m in all) Visit(m);
+            foreach (var m in all) Visit(m, new List<TableMapping>());
             return result;
+        }
+
+        /// <summary>
+        /// FK-2: Checks whether a FK principal type name matches the given type.
+        /// Prefers exact full-name match (namespace-qualified) to avoid collisions
+        /// between types with the same simple name in different namespaces.
+        /// </summary>
+        private static bool MatchesPrincipalType(string? principalTypeName, Type candidateType)
+        {
+            if (string.IsNullOrEmpty(principalTypeName)) return false;
+
+            // Prefer full name match: e.g. "ModuleA.Customer" full name ends with ".Customer"
+            var fullName = candidateType.FullName;
+            if (fullName != null &&
+                fullName.EndsWith("." + principalTypeName, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // Fall back to simple name match for backward compatibility
+            return string.Equals(principalTypeName, candidateType.Name, StringComparison.OrdinalIgnoreCase);
         }
 
         private string BuildInsertBatch(TableMapping map, int startParamIndex)
