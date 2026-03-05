@@ -200,7 +200,7 @@ namespace nORM.Query
             }
 
             // Fast path – bypass translator for recognized simple patterns
-            if (TryExecuteFastPath<TResult>(expression, out var fastResult))
+            if (TryExecuteFastPath<TResult>(expression, ct, out var fastResult))
                 return fastResult;
             // Original execution path
             if (TryGetSimpleQuery(expression, out var sql, out var parameters, out var simpleMethodName))
@@ -236,7 +236,7 @@ namespace nORM.Query
         /// PERFORMANCE FIX: Fast path execution using cached delegates instead of reflection.
         /// Eliminates MakeGenericMethod and Invoke overhead.
         /// </summary>
-        private bool TryExecuteFastPath<TResult>(Expression expression, out Task<TResult> result)
+        private bool TryExecuteFastPath<TResult>(Expression expression, CancellationToken ct, out Task<TResult> result)
         {
             result = default!;
             var resultType = typeof(TResult);
@@ -261,7 +261,7 @@ namespace nORM.Query
                 try
                 {
                     // PERFORMANCE FIX: Use cached delegate instead of MakeGenericMethod + Invoke
-                    if (FastPathQueryExecutor.TryExecuteNonGeneric(elementType, expression, _ctx, out var taskObject))
+                    if (FastPathQueryExecutor.TryExecuteNonGeneric(elementType, expression, _ctx, ct, out var taskObject))
                     {
                         // Cast Task<object> to Task<TResult> without additional overhead
                         result = CastTaskResult<TResult>(taskObject);
@@ -680,7 +680,7 @@ namespace nORM.Query
                     {
                         if (!map.ColumnsByName.TryGetValue(boolMember.Member.Name, out var boolCol))
                             return false;
-                        whereClause = $" WHERE {boolCol.EscCol} = 1";
+                        whereClause = $" WHERE {boolCol.EscCol} = {_ctx.Provider.BooleanTrueLiteral}";
                     }
                     else
                     {
@@ -796,7 +796,7 @@ namespace nORM.Query
                 if (!map.ColumnsByName.TryGetValue(boolMember.Member.Name, out var boolCol))
                     return false;
 
-                whereClause = $" WHERE {boolCol.EscCol} = 1";
+                whereClause = $" WHERE {boolCol.EscCol} = {_ctx.Provider.BooleanTrueLiteral}";
                 return true;
             }
 

@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Reflection;
+using nORM.Core;
+using nORM.Mapping;
 
 namespace nORM.Migration
 {
@@ -83,21 +85,17 @@ namespace nORM.Migration
     {
         /// <summary>
         /// Builds a snapshot of the entity schema by inspecting the types in the provided assembly.
+        /// Reflects only attributes and conventions; fluent configuration is not visible.
+        /// Use <see cref="Build(DbContext)"/> to include fluent model overrides.
         /// </summary>
         /// <param name="assembly">The assembly containing the entity types to scan.</param>
         /// <returns>A snapshot describing the tables and columns inferred from the assembly.</returns>
         public static SchemaSnapshot Build(Assembly assembly)
         {
             var snapshot = new SchemaSnapshot();
-            foreach (var type in assembly.GetTypes())
+            foreach (var type in GetEntityCandidates(assembly))
             {
-                if (!type.IsClass || type.IsAbstract)
-                    continue;
-
                 var tableAttr = type.GetCustomAttribute<TableAttribute>();
-                // If no Table attribute and no Key property, skip
-                if (tableAttr == null && !type.GetProperties().Any(p => p.GetCustomAttribute<KeyAttribute>() != null))
-                    continue;
 
                 var table = new TableSchema
                 {
@@ -177,6 +175,58 @@ namespace nORM.Migration
 
             return snapshot;
         }
+
+        /// <summary>
+        /// Builds a snapshot by merging fluent-configured types from the context with
+        /// attribute/convention-only types discovered in the context's assembly.
+        /// This ensures fluent <c>ToTable()</c>, <c>HasColumnName()</c>, and <c>HasKey()</c>
+        /// overrides are reflected in the snapshot.
+        /// </summary>
+        /// <param name="ctx">The context whose model and assembly are used.</param>
+        /// <returns>A snapshot reflecting the fully-merged runtime model.</returns>
+        public static SchemaSnapshot Build(DbContext ctx)
+        {
+            return BuildFromMappings(ctx.GetAllMappings());
+        }
+
+        /// <summary>
+        /// Builds a <see cref="SchemaSnapshot"/> from a set of resolved <see cref="TableMapping"/> instances.
+        /// </summary>
+        private static SchemaSnapshot BuildFromMappings(IEnumerable<TableMapping> mappings)
+        {
+            var snapshot = new SchemaSnapshot();
+            foreach (var map in mappings)
+            {
+                var table = new TableSchema { Name = map.TableName };
+                foreach (var col in map.Columns)
+                {
+                    var clrType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
+                    var isNullable = !col.Prop.PropertyType.IsValueType
+                                  || Nullable.GetUnderlyingType(col.Prop.PropertyType) != null;
+                    table.Columns.Add(new ColumnSchema
+                    {
+                        Name         = col.Name,
+                        ClrType      = clrType.FullName!,
+                        IsNullable   = isNullable,
+                        IsPrimaryKey = col.IsKey,
+                        IsUnique     = col.IsKey,
+                        IndexName    = col.IsKey ? $"PK_{map.TableName}" : null,
+                    });
+                }
+                snapshot.Tables.Add(table);
+            }
+            return snapshot;
+        }
+
+        /// <summary>
+        /// Returns entity candidate types from the assembly: public, non-abstract classes
+        /// that carry a <see cref="TableAttribute"/> or at least one <see cref="KeyAttribute"/> property.
+        /// </summary>
+        private static IEnumerable<Type> GetEntityCandidates(Assembly assembly) =>
+            assembly.GetTypes().Where(t =>
+                t.IsClass && !t.IsAbstract &&
+                (t.GetCustomAttribute<TableAttribute>() != null ||
+                 t.GetProperties().Any(p => p.GetCustomAttribute<KeyAttribute>() != null)));
 
         /// <summary>
         /// MG-1: Returns true for types that map to database scalar columns.

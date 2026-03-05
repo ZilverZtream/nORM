@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
@@ -49,7 +50,7 @@ public class FastPathQueryExecutorTests
 
         using var ctx = new DbContext(cn, new SqliteProvider());
         var query = ctx.Query<User>().Where(u => u.IsActive);
-        var success = FastPathQueryExecutor.TryExecute<User>(query.Expression, ctx, out var task);
+        var success = FastPathQueryExecutor.TryExecute<User>(query.Expression, ctx, CancellationToken.None, out var task);
         Assert.True(success);
 
         var results = (List<User>)await task.ConfigureAwait(true);
@@ -79,7 +80,7 @@ public class FastPathQueryExecutorTests
             new[] { typeof(User) },
             query.Expression);
 
-        var success = FastPathQueryExecutor.TryExecute<User>(expr, ctx, out var task);
+        var success = FastPathQueryExecutor.TryExecute<User>(expr, ctx, CancellationToken.None, out var task);
         Assert.True(success);
 
         var count = (int)await task.ConfigureAwait(true);
@@ -87,7 +88,7 @@ public class FastPathQueryExecutorTests
     }
 
     [Fact]
-    public void Sql_templates_are_cached_per_type()
+    public void Sql_templates_are_cached_per_context()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -100,10 +101,7 @@ public class FastPathQueryExecutorTests
         }
 
         using var ctx = new DbContext(cn, new SqliteProvider());
-        var cacheField = typeof(FastPathQueryExecutor)
-            .GetField("_sqlTemplateCache", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var cache = Assert.IsType<ConcurrentDictionary<Type, string>>(cacheField.GetValue(null));
-        cache.Clear();
+        ctx.FastPathSqlCache.Clear();
 
         var alphaTemplate = InvokeGetSqlTemplate(ctx, typeof(Alpha));
         var betaTemplate = InvokeGetSqlTemplate(ctx, typeof(Beta));
@@ -116,8 +114,8 @@ public class FastPathQueryExecutorTests
         Assert.Equal(expectedAlpha, alphaTemplate);
         Assert.Equal(expectedBeta, betaTemplate);
 
-        Assert.True(cache.TryGetValue(typeof(Alpha), out var cachedAlpha));
-        Assert.True(cache.TryGetValue(typeof(Beta), out var cachedBeta));
+        Assert.True(ctx.FastPathSqlCache.TryGetValue(typeof(Alpha), out var cachedAlpha));
+        Assert.True(ctx.FastPathSqlCache.TryGetValue(typeof(Beta), out var cachedBeta));
         Assert.Equal(expectedAlpha, cachedAlpha);
         Assert.Equal(expectedBeta, cachedBeta);
     }

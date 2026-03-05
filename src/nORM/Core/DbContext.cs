@@ -40,6 +40,8 @@ namespace nORM.Core
         private readonly bool _ownsConnection;
         private readonly DatabaseProvider _p;
         private readonly ConcurrentDictionary<Type, TableMapping> _m = new();
+        /// <summary>Per-context fast-path SQL template cache. Keyed by entity type; stores provider+model-specific SELECT templates.</summary>
+        internal readonly ConcurrentDictionary<Type, string> FastPathSqlCache = new();
         private readonly IExecutionStrategy _executionStrategy;
         private readonly AdaptiveTimeoutManager _timeoutManager;
         private readonly ModelBuilder _modelBuilder;

@@ -9,26 +9,26 @@ using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 #nullable enable
 namespace nORM.Query
 {
     internal static class FastPathQueryExecutor
     {
-        private static readonly ConcurrentDictionary<Type, string> _sqlTemplateCache = new();
         private readonly record struct WhereInfo(string Property, object Value);
 
         /// <summary>
         /// PERFORMANCE FIX: Cached delegates to avoid MakeGenericMethod and Invoke on every query.
         /// This eliminates the reflection overhead in the fast path.
         /// </summary>
-        private delegate bool TryExecuteDelegate(Expression expr, DbContext ctx, out Task<object> result);
+        private delegate bool TryExecuteDelegate(Expression expr, DbContext ctx, CancellationToken ct, out Task<object> result);
         private static readonly ConcurrentDictionary<Type, TryExecuteDelegate> _cachedExecutors = new();
 
         /// <summary>
         /// Non-generic entry point that uses cached delegates to avoid reflection overhead.
         /// </summary>
-        public static bool TryExecuteNonGeneric(Type elementType, Expression expr, DbContext ctx, out Task<object> result)
+        public static bool TryExecuteNonGeneric(Type elementType, Expression expr, DbContext ctx, CancellationToken ct, out Task<object> result)
         {
             result = default!;
 
@@ -46,10 +46,10 @@ namespace nORM.Query
                 return (TryExecuteDelegate)Delegate.CreateDelegate(typeof(TryExecuteDelegate), method);
             });
 
-            return executor(expr, ctx, out result);
+            return executor(expr, ctx, ct, out result);
         }
 
-        public static bool TryExecute<T>(Expression expr, DbContext ctx, out Task<object> result) where T : class, new()
+        public static bool TryExecute<T>(Expression expr, DbContext ctx, CancellationToken ct, out Task<object> result) where T : class, new()
         {
             result = default!;
             if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null)
@@ -60,7 +60,7 @@ namespace nORM.Query
                 {
                     return false;
                 }
-                result = ExecuteSimpleCount<T>(ctx);
+                result = ExecuteSimpleCount<T>(ctx, ct);
                 return true;
             }
             if (IsSimpleWherePattern(expr, out var whereInfo, out var takeCount))
@@ -68,13 +68,13 @@ namespace nORM.Query
                 // PERFORMANCE FIX (TASK 14): Avoid ContinueWith closure allocation
                 // Instead of: ExecuteSimpleWhere<T>(...).ContinueWith(t => (object)t.Result)
                 // Use async/await wrapper which is more efficient
-                result = ExecuteSimpleWhereAsObject<T>(ctx, whereInfo, takeCount);
+                result = ExecuteSimpleWhereAsObject<T>(ctx, whereInfo, takeCount, ct);
                 return true;
             }
             if (IsSimpleTakePattern(expr, out takeCount))
             {
                 // PERFORMANCE FIX (TASK 14): Avoid ContinueWith closure allocation
-                result = ExecuteSimpleTakeAsObject<T>(ctx, takeCount);
+                result = ExecuteSimpleTakeAsObject<T>(ctx, takeCount, ct);
                 return true;
             }
             return false;
@@ -179,7 +179,7 @@ namespace nORM.Query
         private static string GetSqlTemplate<T>(DbContext ctx) where T : class
         {
             var type = typeof(T);
-            return _sqlTemplateCache.GetOrAdd(type, static (t, context) =>
+            return ctx.FastPathSqlCache.GetOrAdd(type, static (t, context) =>
             {
                 var map = context.GetMapping(t);
                 var cols = string.Join(", ", map.Columns.Select(c => c.EscCol));
@@ -202,13 +202,13 @@ namespace nORM.Query
         /// PERFORMANCE FIX (TASK 14): Wrapper to avoid ContinueWith closure allocation.
         /// Returns Task&lt;object&gt; directly instead of using ContinueWith.
         /// </summary>
-        private static async Task<object> ExecuteSimpleWhereAsObject<T>(DbContext ctx, WhereInfo info, int? takeCount) where T : class, new()
+        private static async Task<object> ExecuteSimpleWhereAsObject<T>(DbContext ctx, WhereInfo info, int? takeCount, CancellationToken ct) where T : class, new()
         {
-            var results = await ExecuteSimpleWhere<T>(ctx, info, takeCount).ConfigureAwait(false);
+            var results = await ExecuteSimpleWhere<T>(ctx, info, takeCount, ct).ConfigureAwait(false);
             return results;
         }
 
-        private static async Task<List<T>> ExecuteSimpleWhere<T>(DbContext ctx, WhereInfo info, int? takeCount) where T : class, new()
+        private static async Task<List<T>> ExecuteSimpleWhere<T>(DbContext ctx, WhereInfo info, int? takeCount, CancellationToken ct) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));
             if (!map.ColumnsByName.TryGetValue(info.Property, out var column))
@@ -218,6 +218,10 @@ namespace nORM.Query
             {
                 sql += $" WHERE {column.EscCol} IS NULL";
             }
+            else if (info.Value is bool boolVal && boolVal)
+            {
+                sql += $" WHERE {column.EscCol} = {ctx.Provider.BooleanTrueLiteral}";
+            }
             else
             {
                 sql += $" WHERE {column.EscCol} = {ctx.Provider.ParamPrefix}p0";
@@ -226,18 +230,18 @@ namespace nORM.Query
             {
                 sql = ApplyLimit(sql, takeCount.Value, ctx.Provider);
             }
-            await ctx.EnsureConnectionAsync(default).ConfigureAwait(false);
+            await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
-            if (info.Value != null && info.Value != DBNull.Value)
+            if (info.Value != null && info.Value != DBNull.Value && !(info.Value is bool bv && bv))
             {
                 cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value);
             }
             var results = new List<T>();
             // PERFORMANCE FIX (TASK 12): Use generic materializer to avoid boxing
             var materializer = new MaterializerFactory().CreateSyncMaterializer<T>(map);
-            await using var reader = await cmd.ExecuteReaderAsync(System.Threading.CancellationToken.None).ConfigureAwait(false);
-            while (await reader.ReadAsync(default).ConfigureAwait(false))
+            await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
                 results.Add(materializer(reader));
             }
@@ -247,13 +251,13 @@ namespace nORM.Query
         /// PERFORMANCE FIX (TASK 14): Wrapper to avoid ContinueWith closure allocation.
         /// Returns Task&lt;object&gt; directly instead of using ContinueWith.
         /// </summary>
-        private static async Task<object> ExecuteSimpleTakeAsObject<T>(DbContext ctx, int? takeCount) where T : class, new()
+        private static async Task<object> ExecuteSimpleTakeAsObject<T>(DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
         {
-            var results = await ExecuteSimpleTake<T>(ctx, takeCount).ConfigureAwait(false);
+            var results = await ExecuteSimpleTake<T>(ctx, takeCount, ct).ConfigureAwait(false);
             return results;
         }
 
-        private static async Task<List<T>> ExecuteSimpleTake<T>(DbContext ctx, int? takeCount) where T : class, new()
+        private static async Task<List<T>> ExecuteSimpleTake<T>(DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));
             string sql = GetSqlTemplate<T>(ctx);
@@ -261,27 +265,27 @@ namespace nORM.Query
             {
                 sql = ApplyLimit(sql, takeCount.Value, ctx.Provider);
             }
-            await ctx.EnsureConnectionAsync(default).ConfigureAwait(false);
+            await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
             var results = new List<T>();
             // PERFORMANCE FIX (TASK 12): Use generic materializer to avoid boxing
             var materializer = new MaterializerFactory().CreateSyncMaterializer<T>(map);
-            await using var reader = await cmd.ExecuteReaderAsync(System.Threading.CancellationToken.None).ConfigureAwait(false);
-            while (await reader.ReadAsync(default).ConfigureAwait(false))
+            await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
                 results.Add(materializer(reader));
             }
             return results;
         }
-        private static async Task<object> ExecuteSimpleCount<T>(DbContext ctx) where T : class
+        private static async Task<object> ExecuteSimpleCount<T>(DbContext ctx, CancellationToken ct) where T : class
         {
             var map = ctx.GetMapping(typeof(T));
             var sql = $"SELECT COUNT(*) FROM {map.EscTable}";
-            await ctx.EnsureConnectionAsync(default).ConfigureAwait(false);
+            await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
-            var result = await cmd.ExecuteScalarAsync(default).ConfigureAwait(false);
+            var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
             return (object)Convert.ToInt32(result);
         }
     }
