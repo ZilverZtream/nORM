@@ -218,8 +218,8 @@ add.SetAction((ParseResult result) =>
         sb.AppendLine($"public class {className} : Migration");
         sb.AppendLine("{");
         sb.AppendLine($"    public {className}() : base({version}, \"{name}\") {{ }}");
-        AppendMethod("Up", sql.Up, sb);
-        AppendMethod("Down", sql.Down, sb);
+        AppendMethod("Up", sql.PreTransactionUp, sql.Up, sql.PostTransactionUp, sb);
+        AppendMethod("Down", sql.PreTransactionDown, sql.Down, sql.PostTransactionDown, sb);
         sb.AppendLine("}");
         File.WriteAllText(filePath, sb.ToString());
 
@@ -280,24 +280,51 @@ static DatabaseProvider CreateProvider(string provider) =>
         _ => throw new ArgumentException($"Unsupported provider '{provider}'.")
     };
 
-static void AppendMethod(string methodName, IReadOnlyList<string> statements, StringBuilder sb)
+static void AppendMethod(string methodName, IReadOnlyList<string>? preStatements, IReadOnlyList<string> statements, IReadOnlyList<string>? postStatements, StringBuilder sb)
 {
     sb.AppendLine($"    public override void {methodName}(DbConnection connection, DbTransaction transaction)");
     sb.AppendLine("    {");
-    sb.AppendLine("        foreach (var sql in new[] {");
-    for (int i = 0; i < statements.Count; i++)
+
+    // MG-2: Pre-transaction statements (e.g. PRAGMA foreign_keys=OFF) run outside the transaction.
+    if (preStatements != null && preStatements.Count > 0)
     {
-        var stmt = statements[i].Replace("\"", "\\\"");
-        var comma = i < statements.Count - 1 ? "," : string.Empty;
-        sb.AppendLine($"            \"{stmt}\"{comma}");
+        sb.AppendLine("        // Pre-transaction statements: execute outside the transaction.");
+        foreach (var pre in preStatements)
+        {
+            var stmt = pre.Replace("\"", "\\\"");
+            sb.AppendLine($"        using (var preCmd = connection.CreateCommand()) {{ preCmd.CommandText = \"{stmt}\"; preCmd.ExecuteNonQuery(); }}");
+        }
     }
-    sb.AppendLine("        })");
-    sb.AppendLine("        {");
-    sb.AppendLine("            using var cmd = connection.CreateCommand();");
-    sb.AppendLine("            cmd.Transaction = transaction;");
-    sb.AppendLine("            cmd.CommandText = sql;");
-    sb.AppendLine("            cmd.ExecuteNonQuery();");
-    sb.AppendLine("        }");
+
+    if (statements.Count > 0)
+    {
+        sb.AppendLine("        foreach (var sql in new[] {");
+        for (int i = 0; i < statements.Count; i++)
+        {
+            var stmt = statements[i].Replace("\"", "\\\"");
+            var comma = i < statements.Count - 1 ? "," : string.Empty;
+            sb.AppendLine($"            \"{stmt}\"{comma}");
+        }
+        sb.AppendLine("        })");
+        sb.AppendLine("        {");
+        sb.AppendLine("            using var cmd = connection.CreateCommand();");
+        sb.AppendLine("            cmd.Transaction = transaction;");
+        sb.AppendLine("            cmd.CommandText = sql;");
+        sb.AppendLine("            cmd.ExecuteNonQuery();");
+        sb.AppendLine("        }");
+    }
+
+    // MG-2: Post-transaction statements (e.g. PRAGMA foreign_keys=ON) run after commit.
+    if (postStatements != null && postStatements.Count > 0)
+    {
+        sb.AppendLine("        // Post-transaction statements: execute after the transaction commits.");
+        foreach (var post in postStatements)
+        {
+            var stmt = post.Replace("\"", "\\\"");
+            sb.AppendLine($"        using (var postCmd = connection.CreateCommand()) {{ postCmd.CommandText = \"{stmt}\"; postCmd.ExecuteNonQuery(); }}");
+        }
+    }
+
     sb.AppendLine("    }");
 }
 

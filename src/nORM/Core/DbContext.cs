@@ -1163,54 +1163,74 @@ namespace nORM.Core
         private async Task<int> WriteWithTransactionAsync<T>(T entity, TableMapping map, WriteOperation operation, DbTransaction? transaction, CancellationToken ct, bool ownsTransaction) where T : class
         {
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
-            var currentTransaction = transaction ?? await Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-            await using var commandScope = new CommandScope(Connection, currentTransaction);
+            // CT-1/TX-1: When we own the transaction, track it separately so we can always
+            // dispose it (releasing server-side lock memory and log space) in a finally block,
+            // regardless of whether the operation succeeds or fails.
+            DbTransaction currentTransaction;
+            DbTransaction? ownedTransaction = null;
+            if (ownsTransaction)
+            {
+                ownedTransaction = await Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                currentTransaction = ownedTransaction;
+            }
+            else
+            {
+                currentTransaction = transaction!;
+            }
+
             try
             {
-                await using var cmd = commandScope.CreateCommand();
-                cmd.CommandText = operation switch
+                await using var commandScope = new CommandScope(Connection, currentTransaction);
+                try
                 {
-                    WriteOperation.Insert => _p.BuildInsert(map),
-                    WriteOperation.Update => _p.BuildUpdate(map),
-                    WriteOperation.Delete => _p.BuildDelete(map),
-                    _ => throw new ArgumentOutOfRangeException(nameof(operation))
-                };
-                var opType = operation switch
-                {
-                    WriteOperation.Insert => AdaptiveTimeoutManager.OperationType.Insert,
-                    WriteOperation.Update => AdaptiveTimeoutManager.OperationType.Update,
-                    WriteOperation.Delete => AdaptiveTimeoutManager.OperationType.Delete,
-                    _ => AdaptiveTimeoutManager.OperationType.Insert
-                };
-                cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(opType, cmd.CommandText));
-                AddParametersOptimized(cmd, map, entity, operation);
+                    await using var cmd = commandScope.CreateCommand();
+                    cmd.CommandText = operation switch
+                    {
+                        WriteOperation.Insert => _p.BuildInsert(map),
+                        WriteOperation.Update => _p.BuildUpdate(map),
+                        WriteOperation.Delete => _p.BuildDelete(map),
+                        _ => throw new ArgumentOutOfRangeException(nameof(operation))
+                    };
+                    var opType = operation switch
+                    {
+                        WriteOperation.Insert => AdaptiveTimeoutManager.OperationType.Insert,
+                        WriteOperation.Update => AdaptiveTimeoutManager.OperationType.Update,
+                        WriteOperation.Delete => AdaptiveTimeoutManager.OperationType.Delete,
+                        _ => AdaptiveTimeoutManager.OperationType.Insert
+                    };
+                    cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(opType, cmd.CommandText));
+                    AddParametersOptimized(cmd, map, entity, operation);
 
-                // No unconditional Prepare() here  reduces overhead for single-row ops.
-
-                if (operation == WriteOperation.Insert && map.KeyColumns.Any(k => k.IsDbGenerated))
-                {
-                    var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
-                    if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
+                    if (operation == WriteOperation.Insert && map.KeyColumns.Any(k => k.IsDbGenerated))
+                    {
+                        var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                        if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
+                        if (ownsTransaction) await currentTransaction.CommitAsync(ct).ConfigureAwait(false);
+                        return 1;
+                    }
+                    var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                    if ((operation is WriteOperation.Update or WriteOperation.Delete) &&
+                        map.TimestampColumn != null && recordsAffected == 0)
+                    {
+                        throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+                    }
                     if (ownsTransaction) await currentTransaction.CommitAsync(ct).ConfigureAwait(false);
-                    return 1;
+                    return recordsAffected;
                 }
-                var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-                if ((operation is WriteOperation.Update or WriteOperation.Delete) &&
-                    map.TimestampColumn != null && recordsAffected == 0)
+                catch
                 {
-                    throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+                    // Use CancellationToken.None so a cancelled caller token does not abort the rollback.
+                    if (ownsTransaction) await currentTransaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                    throw;
                 }
-                if (ownsTransaction) await currentTransaction.CommitAsync(ct).ConfigureAwait(false);
-                return recordsAffected;
             }
-            catch
+            finally
             {
-                // Use CancellationToken.None so a cancelled caller token does not abort the rollback.
-                if (ownsTransaction) await currentTransaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-                throw;
+                // CT-1/TX-1: Always dispose the owned transaction to release server-side resources.
+                if (ownedTransaction != null)
+                    await ownedTransaction.DisposeAsync().ConfigureAwait(false);
             }
         }
-
         private async Task<int> ExecuteFastInsert<T>(T entity, TableMapping map, CancellationToken ct, DbTransaction? transaction) where T : class
         {
             if (transaction != null)

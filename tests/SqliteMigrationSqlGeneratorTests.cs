@@ -25,8 +25,14 @@ public class SqliteMigrationSqlGeneratorTests
         var generator = new SqliteMigrationSqlGenerator();
         var sql = generator.GenerateSql(diff);
 
-        Assert.Equal("PRAGMA foreign_keys=off", sql.Down[0]);
-        Assert.Equal("PRAGMA foreign_keys=on", sql.Down[^1]);
+        // MG-2: PRAGMA statements are now in PreTransactionDown / PostTransactionDown segments,
+        // NOT in the main Down list. This ensures they execute outside the migration transaction.
+        Assert.NotNull(sql.PreTransactionDown);
+        Assert.NotNull(sql.PostTransactionDown);
+        Assert.Equal("PRAGMA foreign_keys=off", sql.PreTransactionDown![0]);
+        Assert.Equal("PRAGMA foreign_keys=on", sql.PostTransactionDown![0]);
+        // Main Down list must NOT contain PRAGMA statements
+        Assert.DoesNotContain(sql.Down, s => s.StartsWith("PRAGMA"));
     }
 
     /// <summary>
@@ -60,8 +66,13 @@ public class SqliteMigrationSqlGeneratorTests
         Assert.Contains(sql.Up, s => s.StartsWith("INSERT INTO"));
         Assert.Contains(sql.Up, s => s.StartsWith("DROP TABLE"));
         Assert.Contains(sql.Up, s => s.Contains("RENAME TO"));
-        Assert.Contains(sql.Up, s => s == "PRAGMA foreign_keys=off");
-        Assert.Contains(sql.Up, s => s == "PRAGMA foreign_keys=on");
+
+        // MG-2: PRAGMA statements are in pre/post-transaction segments, NOT in the main Up list.
+        Assert.NotNull(sql.PreTransactionUp);
+        Assert.NotNull(sql.PostTransactionUp);
+        Assert.Equal("PRAGMA foreign_keys=off", sql.PreTransactionUp![0]);
+        Assert.Equal("PRAGMA foreign_keys=on", sql.PostTransactionUp![0]);
+        Assert.DoesNotContain(sql.Up, s => s.StartsWith("PRAGMA"));
 
         // Must NOT emit comment lines
         Assert.DoesNotContain(sql.Up, s => s.TrimStart().StartsWith("--"));
@@ -430,9 +441,12 @@ public class SqliteMigrationSqlGeneratorTests
         Assert.Contains("PRIMARY KEY", downCreate);
         // Named index on Title should be emitted as a separate CREATE INDEX
         Assert.Contains(sql.Down, s => s.StartsWith("CREATE INDEX") && s.Contains("idx_Title"));
-        // Foreign key pragma wrapping
-        Assert.Contains(sql.Down, s => s == "PRAGMA foreign_keys=off");
-        Assert.Contains(sql.Down, s => s == "PRAGMA foreign_keys=on");
+        // MG-2: Foreign key pragma wrapping is in pre/post-transaction segments, not in main Down list.
+        Assert.NotNull(sql.PreTransactionDown);
+        Assert.Contains(sql.PreTransactionDown!, s => s == "PRAGMA foreign_keys=off");
+        Assert.NotNull(sql.PostTransactionDown);
+        Assert.Contains(sql.PostTransactionDown!, s => s == "PRAGMA foreign_keys=on");
+        Assert.DoesNotContain(sql.Down, s => s.StartsWith("PRAGMA"));
     }
 
     [Fact]

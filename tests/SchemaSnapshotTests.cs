@@ -623,4 +623,107 @@ public class SchemaSnapshotTests
         Assert.Empty(diff.AddedColumns);
         Assert.Empty(diff.DroppedColumns);
     }
+
+    // ── MM-1: Read-only / init-only / computed property mapping ──────────────
+
+    /// <summary>
+    /// MM-1: A property with a standard getter+setter must be included as a column.
+    /// (Baseline sanity check; must still pass after the fix.)
+    /// </summary>
+    [Table("MM1ReadWrite")]
+    private class MM1ReadWriteEntity
+    {
+        [Key]
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    [Fact]
+    public void SchemaSnapshot_RegularReadWriteProperty_IsIncluded()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(MM1ReadWriteEntity).Assembly);
+        var table = snapshot.Tables.FirstOrDefault(t => t.Name == "MM1ReadWrite");
+        Assert.NotNull(table);
+        Assert.Contains(table.Columns, c => c.Name == "Name");
+    }
+
+    /// <summary>
+    /// MM-1: An init-only property (declared with the <c>init</c> accessor) must be included
+    /// as a column. Before the fix, <c>!prop.CanWrite</c> incorrectly excluded init-only
+    /// properties because <see cref="System.Reflection.PropertyInfo.CanWrite"/> returns false
+    /// for them in reflection when accessed from outside the defining assembly.
+    /// </summary>
+    [Table("MM1InitOnly")]
+    private class MM1InitOnlyEntity
+    {
+        [Key]
+        public int Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+    }
+
+    [Fact]
+    public void SchemaSnapshot_InitOnlyProperty_IsIncluded()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(MM1InitOnlyEntity).Assembly);
+        var table = snapshot.Tables.FirstOrDefault(t => t.Name == "MM1InitOnly");
+        Assert.NotNull(table);
+        // Both Id (key) and Name (init-only scalar) must appear as mapped columns.
+        Assert.Contains(table.Columns, c => c.Name == "Id");
+        Assert.Contains(table.Columns, c => c.Name == "Name");
+    }
+
+    /// <summary>
+    /// MM-1: A pure computed property (get-only expression body, no setter at all) must be
+    /// excluded because it has no backing database column.
+    /// </summary>
+    [Table("MM1Computed")]
+    private class MM1ComputedEntity
+    {
+        [Key]
+        public int Id { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        // Pure computed — no setter of any kind; should be excluded.
+        public string FullName => FirstName + " " + LastName;
+    }
+
+    [Fact]
+    public void SchemaSnapshot_ComputedGetOnlyProperty_IsExcluded()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(MM1ComputedEntity).Assembly);
+        var table = snapshot.Tables.FirstOrDefault(t => t.Name == "MM1Computed");
+        Assert.NotNull(table);
+        // FullName is a computed expression — must NOT appear.
+        Assert.DoesNotContain(table.Columns, c => c.Name == "FullName");
+        // Scalar backing properties must still appear.
+        Assert.Contains(table.Columns, c => c.Name == "FirstName");
+        Assert.Contains(table.Columns, c => c.Name == "LastName");
+    }
+
+    /// <summary>
+    /// MM-1: A reference-type navigation property (class type that is not string or byte[])
+    /// must still be excluded after the CanWrite fix. The exclusion criterion is the property
+    /// TYPE (non-scalar reference class), not its writability.
+    /// </summary>
+    [Table("MM1Navigation")]
+    private class MM1NavigationEntity
+    {
+        [Key]
+        public int Id { get; set; }
+        public int CategoryId { get; set; }
+        // Reference navigation property — class type, not a scalar → must be excluded.
+        public MM1ReadWriteEntity? Category { get; set; }
+    }
+
+    [Fact]
+    public void SchemaSnapshot_NavigationProperty_IsExcluded()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(MM1NavigationEntity).Assembly);
+        var table = snapshot.Tables.FirstOrDefault(t => t.Name == "MM1Navigation");
+        Assert.NotNull(table);
+        // The navigation property must not be mapped to a column.
+        Assert.DoesNotContain(table.Columns, c => c.Name == "Category");
+        // The FK scalar column must be present.
+        Assert.Contains(table.Columns, c => c.Name == "CategoryId");
+    }
 }

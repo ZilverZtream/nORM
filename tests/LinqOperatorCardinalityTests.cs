@@ -55,10 +55,9 @@ public class LinqOperatorCardinalityTests
     // ─── First ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task First_ZeroRows_ReturnsNullViaSimplePath()
+    public async Task First_ZeroRows_FirstOrDefault_ReturnsNull()
     {
-        // nORM's fast path for First() uses FirstOrDefault semantics on empty set.
-        // To get strict throwing behavior, use Single() which always goes through full path.
+        // FirstOrDefaultAsync returns null when there are no rows (fast path).
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
         var result = await ctx.Query<CardItem>().FirstOrDefaultAsync();
@@ -542,5 +541,69 @@ public class LinqOperatorCardinalityTests
         var results = await ctx.Query<CardItem>().Where(x => !(x.Value > 10)).ToListAsync();
         Assert.Single(results);
         Assert.Equal("A", results[0].Name);
+    }
+
+    // ─── QP-1: First vs FirstOrDefault semantics on fast path ─────────────────
+
+    /// <summary>
+    /// QP-1: First() must throw InvalidOperationException when no rows match, even on the
+    /// fast path (simple table scan without complex LINQ composition). Before the fix,
+    /// ExecuteSimpleAsync treated First and FirstOrDefault identically, always returning null/default.
+    /// </summary>
+    [Fact]
+    public async Task First_FastPath_WithNoMatches_Throws()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+
+        // Empty table → First must throw, not return null.
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => ctx.Query<CardItem>().FirstAsync());
+    }
+
+    /// <summary>
+    /// QP-1: FirstOrDefault() must return null (not throw) when no rows match on the fast path.
+    /// This was already the case before the fix, but we ensure the fix didn't break it.
+    /// </summary>
+    [Fact]
+    public async Task FirstOrDefault_FastPath_WithNoMatches_ReturnsDefault()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+
+        // Empty table → FirstOrDefault must return null.
+        var result = await ctx.Query<CardItem>().FirstOrDefaultAsync();
+        Assert.Null(result);
+    }
+
+    /// <summary>
+    /// QP-1: First() on the fast path must return the element when exactly one row is present.
+    /// </summary>
+    [Fact]
+    public async Task First_FastPath_WithOneMatch_ReturnsElement()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        InsertRow(cn, 5, "OnlyItem", 99);
+
+        var item = await ctx.Query<CardItem>().FirstAsync();
+        Assert.NotNull(item);
+        Assert.Equal("OnlyItem", item.Name);
+    }
+
+    /// <summary>
+    /// QP-1: First() on the slow path (with Where predicate that rules out all rows) must also
+    /// throw InvalidOperationException — verifies the fast-path fix didn't regress the slow path.
+    /// </summary>
+    [Fact]
+    public async Task First_SlowPath_WithNoMatches_Throws()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        InsertRow(cn, 1, "Alpha", 10);
+
+        // CategoryId == 999 matches nothing → First must throw.
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => ctx.Query<CardItem>().Where(x => x.CategoryId == 999).FirstAsync());
     }
 }

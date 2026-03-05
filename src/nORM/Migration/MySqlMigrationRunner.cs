@@ -149,11 +149,29 @@ namespace nORM.Migration
                     versions.Add(reader.GetInt64(0));
                 }
             }
-            catch (DbException)
+            catch (DbException ex) when (IsTableNotFoundError(ex))
             {
-                // History table probably doesn't exist yet, return empty set.
+                // MG-1: History table doesn't exist yet (first run) — return empty set.
+                // All other DbException (transient failures, permission errors, etc.) propagate.
             }
             return versions;
+        }
+
+        /// <summary>
+        /// MG-1: Returns true only when the exception indicates the history table does not exist yet.
+        /// MySQL error 1146 = "Table doesn't exist".
+        /// Transient errors (connection drops, permission failures, deadlocks) are NOT matched and
+        /// will propagate to the caller.
+        /// </summary>
+        private static bool IsTableNotFoundError(DbException ex)
+        {
+            // Check by error number when the exception exposes it (MySqlConnector.MySqlException)
+            var numberProp = ex.GetType().GetProperty("Number");
+            if (numberProp != null && numberProp.GetValue(ex) is int number && number == 1146)
+                return true;
+            // Fallback: check the message text
+            return ex.Message.Contains("doesn't exist", StringComparison.OrdinalIgnoreCase)
+                || ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
