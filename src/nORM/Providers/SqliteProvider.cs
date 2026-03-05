@@ -203,7 +203,17 @@ namespace nORM.Providers
             => $"json_extract({columnName}, '{jsonPath}')";
 
         /// <summary>
-        /// Generates SQL to create a simple temporal history table for SQLite.
+        /// TP-1/Finding-D: SQLite table-not-found errors use SQLITE_ERROR (code 1) combined with
+        /// the "no such table" message. Code 1 alone is too broad (also covers syntax errors).
+        /// Other error codes (SQLITE_PERM=3, SQLITE_CANTOPEN=14, etc.) indicate operational failures
+        /// that must NOT be silently treated as "table absent."
+        /// </summary>
+        public override bool IsObjectNotFoundError(DbException ex)
+            => ex is SqliteException sqliteEx
+               && sqliteEx.SqliteErrorCode == 1
+               && ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
         /// MIG-1: Column types now use the same SQLite type mapping as the main table
         /// (GetSqliteType) rather than forcing every column to TEXT. This ensures that the
         /// history table schema mirrors the main table schema exactly (INTEGER for int/bool/long,

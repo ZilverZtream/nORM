@@ -751,7 +751,8 @@ namespace nORM.Query
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
             var pName = _provider.ParamPrefix + "p0";
-            cmd.CommandText = $"SELECT Timestamp FROM __NormTemporalTags WHERE TagName = {pName}";
+            // TP-1/Finding-A: Use provider-escaped identifier SQL to avoid hardcoded unescaped names.
+            cmd.CommandText = _provider.GetTagLookupSql(pName);
             cmd.AddParam(pName, tagName);
             var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
             if (result == null || result == DBNull.Value)

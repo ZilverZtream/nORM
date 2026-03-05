@@ -785,6 +785,12 @@ namespace nORM.Core
                 // Interceptors may call context.Add() or modify tracked entities during
                 // SavingChangesAsync. Re-reading the change tracker ensures those additions
                 // and modifications are included in the current save operation.
+                //
+                // Finding-B: Re-run DetectAllChanges so that property-level mutations made
+                // to previously-Unchanged entities by SavingChangesAsync interceptors are picked up.
+                // Without re-detection, interceptors that mutate entity properties (e.g. audit stamping)
+                // without explicitly marking entries as Modified will silently lose those changes.
+                ChangeTracker.DetectAllChanges();
                 changedEntries = ChangeTracker.Entries
                     .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
                     .ToList();
@@ -2119,7 +2125,9 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 var p0 = _p.ParamPrefix + "p0";
                 var p1 = _p.ParamPrefix + "p1";
-                await using var cmd = CommandPool.Get(ctx.Connection, $"INSERT INTO __NormTemporalTags (TagName, Timestamp) VALUES ({p0}, {p1})");
+                // TP-1/Finding-A: Use provider-escaped identifiers — raw table/column names are not
+                // safe across all providers (e.g. SQL Server reserves "Timestamp" as a type keyword).
+                await using var cmd = CommandPool.Get(ctx.Connection, _p.GetCreateTagSql(p0, p1));
                 var span = new (string name, object value)[2];
                 span[0] = (p0, tagName);
                 span[1] = (p1, DateTime.UtcNow);

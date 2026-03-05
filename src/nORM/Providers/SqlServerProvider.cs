@@ -201,6 +201,32 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// TP-1/Finding-C: SQL Server does not support CREATE TABLE IF NOT EXISTS.
+        /// Use OBJECT_ID check to create the tags table only when absent.
+        /// Uses NVARCHAR (not TEXT) and DATETIME2 (not TEXT) for correct SQL Server types.
+        /// </summary>
+        public override string GetCreateTagsTableSql()
+        {
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $@"IF OBJECT_ID(N'__NormTemporalTags', N'U') IS NULL
+CREATE TABLE [__NormTemporalTags] ({tagCol} NVARCHAR(450) NOT NULL, {tsCol} DATETIME2 NOT NULL, PRIMARY KEY ({tagCol}))";
+        }
+
+        /// <summary>
+        /// TP-1/Finding-C: SQL Server uses SELECT TOP 1, not LIMIT 1.
+        /// </summary>
+        public override string GetHistoryTableExistsProbeSql(string escapedHistoryTable)
+            => $"SELECT TOP 1 1 FROM {escapedHistoryTable}";
+
+        /// <summary>
+        /// TP-1/Finding-D: SQL Server error 208 = "Invalid object name" = object/table does not exist.
+        /// This is a definitive schema error, not a permission or connectivity failure.
+        /// </summary>
+        public override bool IsObjectNotFoundError(DbException ex)
+            => ex is SqlException sqlEx && sqlEx.Number == 208;
+
+        /// <summary>
         /// Generates SQL to create a history table used for temporal tracking.
         /// </summary>
         /// <param name="mapping">The mapping describing the entity table.</param>
