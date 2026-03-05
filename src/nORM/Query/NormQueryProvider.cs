@@ -1204,11 +1204,23 @@ namespace nORM.Query
         /// Splits on ';', trims each pair, sorts case-insensitively, and rejoins so that
         /// different orderings of the same connection string map to the same key.
         /// </summary>
+        // PC-1: Credentials must not appear in cache key material.
+        private static readonly HashSet<string> _sensitiveConnectionStringKeys = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "password", "pwd", "user password", "access token", "accesstoken", "token", "secret"
+        };
+
         private static string NormalizeConnectionStringForCacheKey(string? cs)
         {
             if (string.IsNullOrEmpty(cs)) return string.Empty;
             return string.Join(";", cs.Split(';', StringSplitOptions.RemoveEmptyEntries)
                 .Select(p => p.Trim())
+                .Where(p =>
+                {
+                    var eq = p.IndexOf('=');
+                    if (eq <= 0) return true;
+                    return !_sensitiveConnectionStringKeys.Contains(p[..eq].Trim());
+                })
                 .OrderBy(p => p, StringComparer.OrdinalIgnoreCase));
         }
 
