@@ -131,13 +131,17 @@ namespace nORM.Query
                 }
             }
 
-            // Remove and dispose in separate pass to avoid concurrent modification
+            // Remove in separate pass to avoid concurrent modification.
+            // QP-1: Use value-matching TryRemove so we don't accidentally remove a
+            // concurrently re-inserted semaphore for the same key. Do NOT dispose —
+            // threads holding a reference obtained via GetOrAdd before this removal can
+            // still call Wait/WaitAsync safely on the semaphore. GC will collect it once
+            // all references drop. SemaphoreSlim only allocates its underlying event lazily
+            // (on contended WaitAsync); we checked CurrentCount == 1 (no waiters) so the
+            // event is not allocated and no unmanaged resources are held.
             foreach (var (key, semaphore) in locksToRemove)
             {
-                if (_cacheLocks.TryRemove(key, out _))
-                {
-                    semaphore.Dispose();
-                }
+                _cacheLocks.TryRemove(new KeyValuePair<string, SemaphoreSlim>(key, semaphore));
             }
         }
         private static int CalculateInitialPlanCacheSize()

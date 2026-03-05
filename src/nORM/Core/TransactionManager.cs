@@ -1,7 +1,6 @@
 using System;
 using System.Data;
 using System.Data.Common;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -12,18 +11,20 @@ namespace nORM.Core
     internal sealed class TransactionManager : IAsyncDisposable, IDisposable
     {
         private readonly CancellationTokenSource? _cts;
+        private readonly ILogger? _logger;
 
         public DbTransaction? Transaction { get; }
         public CancellationToken Token { get; }
         public bool OwnsTransaction { get; }
 
         private TransactionManager(DbTransaction? transaction, bool ownsTransaction,
-            CancellationTokenSource? cts, CancellationToken token)
+            CancellationTokenSource? cts, CancellationToken token, ILogger? logger)
         {
             Transaction = transaction;
             OwnsTransaction = ownsTransaction;
             _cts = cts;
             Token = token;
+            _logger = logger;
         }
 
         /// <summary>
@@ -97,7 +98,7 @@ namespace nORM.Core
                 }
             }
 
-            return new TransactionManager(transaction, ownsTransaction, cts, token);
+            return new TransactionManager(transaction, ownsTransaction, cts, token, context.Options.Logger);
         }
 
         /// <summary>
@@ -150,9 +151,11 @@ namespace nORM.Core
                 }
                 catch (Exception ex)
                 {
-                    // Unexpected exception during dispose - log for diagnostics but don't throw
-                    // per .NET guidelines (Dispose should not throw)
-                    Debug.WriteLine($"Warning: Exception disposing transaction: {ex.GetType().Name}: {ex.Message}");
+                    // TX-1: Unexpected exception during dispose — log for diagnostics but don't
+                    // throw per .NET Dispose contract. Connection pool may be in indeterminate state.
+                    _logger?.LogWarning(ex,
+                        "Unexpected exception disposing database transaction. " +
+                        "Connection pool may be in an indeterminate state.");
                 }
             }
             _cts?.Dispose();
@@ -182,9 +185,11 @@ namespace nORM.Core
                 }
                 catch (Exception ex)
                 {
-                    // Unexpected exception during dispose - log for diagnostics but don't throw
-                    // per .NET guidelines (Dispose should not throw)
-                    Debug.WriteLine($"Warning: Exception disposing transaction: {ex.GetType().Name}: {ex.Message}");
+                    // TX-1: Unexpected exception during dispose — log for diagnostics but don't
+                    // throw per .NET Dispose contract. Connection pool may be in indeterminate state.
+                    _logger?.LogWarning(ex,
+                        "Unexpected exception disposing database transaction. " +
+                        "Connection pool may be in an indeterminate state.");
                 }
             }
             _cts?.Dispose();

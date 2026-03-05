@@ -189,9 +189,20 @@ namespace nORM.Migration
         /// MG-1: Returns true only when the exception indicates the history table does not exist yet.
         /// Transient errors (connection drops, permission failures, deadlocks) are NOT matched and
         /// will propagate to the caller.
+        /// For SQLite, uses error code 1 (SQLITE_ERROR = generic schema error) combined with message
+        /// to disambiguate from other SQLITE_ERROR cases (syntax errors, missing columns, etc.).
+        /// The code check is locale-invariant; the message narrows to the specific sub-case.
+        /// False negatives (propagated exceptions) are preferable to false positives (silently
+        /// skipping history table creation).
         /// </summary>
-        private static bool IsTableNotFoundError(DbException ex) =>
-            ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
+        private static bool IsTableNotFoundError(DbException ex)
+        {
+            if (ex is Microsoft.Data.Sqlite.SqliteException sqliteEx)
+                return sqliteEx.SqliteErrorCode == 1 &&
+                       ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
+            // Fallback for other providers / future portability.
+            return ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
+        }
 
         /// <summary>
         /// Creates the migration history table if it does not already exist.
