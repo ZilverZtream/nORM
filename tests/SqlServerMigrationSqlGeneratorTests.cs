@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using nORM.Migration;
 using Xunit;
@@ -16,6 +17,8 @@ public class SqlServerMigrationSqlGeneratorTests
         foreach (var c in columns) t.Columns.Add(c);
         return t;
     }
+
+    private static readonly SqlServerMigrationSqlGenerator Gen = new();
 
     [Fact]
     public void CreateTable_WithPkColumn_EmitsPrimaryKeyConstraint()
@@ -96,5 +99,94 @@ public class SqlServerMigrationSqlGeneratorTests
         var sql = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
 
         Assert.Contains(sql.Up, s => s.Contains("DROP TABLE") && s.Contains("Users"));
+    }
+
+    // ─── PRV-1: Identifier escaping with square brackets ────────────────────
+
+    [Fact]
+    public void CreateTable_EscapesTableNameWithBracket()
+    {
+        var table = BuildTable("col]name",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false });
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = Gen.GenerateSql(diff);
+
+        // Embedded ] is escaped as ]]: [col]]name]
+        Assert.Contains("[col]]name]", sql.Up[0]);
+    }
+
+    [Fact]
+    public void CreateTable_EscapesColumnNameWithBracket()
+    {
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "co]l", ClrType = typeof(int).FullName!, IsNullable = false });
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = Gen.GenerateSql(diff);
+
+        Assert.Contains("[co]]l]", sql.Up[0]);
+    }
+
+    [Fact]
+    public void CreateIndex_EscapesIdentifiers()
+    {
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "Val", ClrType = typeof(string).FullName!, IsNullable = true, IndexName = "ix]val" });
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = Gen.GenerateSql(diff);
+
+        var indexStmt = sql.Up.First(s => s.StartsWith("CREATE INDEX"));
+        Assert.Contains("[ix]]val]", indexStmt);
+    }
+
+    // ─── MIG-1: NOT NULL + DefaultValue ──────────────────────────────────────
+
+    [Fact]
+    public void AddColumn_NotNull_WithDefaultValue_EmitsDefault()
+    {
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false });
+        var newCol = new ColumnSchema { Name = "Status", ClrType = typeof(int).FullName!, IsNullable = false, DefaultValue = "0" };
+        var diff = new SchemaDiff();
+        diff.AddedColumns.Add((table, newCol));
+
+        var sql = Gen.GenerateSql(diff);
+
+        Assert.Single(sql.Up);
+        Assert.Contains("NOT NULL DEFAULT 0", sql.Up[0]);
+    }
+
+    [Fact]
+    public void AddColumn_NotNull_WithoutDefaultValue_ThrowsInvalidOperationException()
+    {
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false });
+        var newCol = new ColumnSchema { Name = "Status", ClrType = typeof(int).FullName!, IsNullable = false };
+        var diff = new SchemaDiff();
+        diff.AddedColumns.Add((table, newCol));
+
+        var ex = Assert.Throws<InvalidOperationException>(() => Gen.GenerateSql(diff));
+        Assert.Contains("Status", ex.Message);
+        Assert.Contains("DefaultValue", ex.Message);
+    }
+
+    [Fact]
+    public void AddColumn_Nullable_DoesNotRequireDefaultValue()
+    {
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false });
+        var newCol = new ColumnSchema { Name = "Notes", ClrType = typeof(string).FullName!, IsNullable = true };
+        var diff = new SchemaDiff();
+        diff.AddedColumns.Add((table, newCol));
+
+        var sql = Gen.GenerateSql(diff);
+
+        Assert.Single(sql.Up);
+        Assert.DoesNotContain("DEFAULT", sql.Up[0]);
     }
 }

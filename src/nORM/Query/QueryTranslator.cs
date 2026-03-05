@@ -299,6 +299,13 @@ namespace nORM.Query
                 if (_expression == null) throw new ArgumentNullException(nameof(_expression));
                 if (_t._ctx == null) throw new InvalidOperationException("QueryTranslator not properly initialized");
                 if (_t._provider == null) throw new InvalidOperationException("Provider not set");
+                // QP-1: Guard here so sub-translators created by BuildExists/BuildIn throw when depth exceeded.
+                if (_t._recursionDepth >= _t._maxRecursionDepth)
+                    throw new NormQueryException(
+                        $"Query exceeds maximum translation depth of {_t._maxRecursionDepth}. " +
+                        $"This typically indicates overly complex nested subqueries. " +
+                        $"Consider simplifying the query or breaking it into multiple queries. " +
+                        $"You can also increase the limit via DbContextOptions.MaxRecursionDepth (current: {_t._maxRecursionDepth}, max: 200).");
                 var complexityInfo = _complexityAnalyzer.AnalyzeQuery(_expression, _t._ctx.Options);
                 if (complexityInfo.WarningMessages.Any())
                 {
@@ -637,7 +644,7 @@ namespace nORM.Query
                             info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                             _correlatedParams[param] = info;
                         }
-                        var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap);
+                        var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                         var visitor = FastExpressionVisitorPool.Get(in vctx);
                         var sql = visitor.Translate(arg);
                         foreach (var kvp in visitor.GetParameters())
@@ -663,7 +670,7 @@ namespace nORM.Query
                     info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                     _correlatedParams[param] = info;
                 }
-                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap);
+                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                 var valueSql = visitor.Translate(wf.ValueSelector.Body);
                 foreach (var kvp in visitor.GetParameters())
@@ -678,7 +685,7 @@ namespace nORM.Query
                         info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                         _correlatedParams[dParam] = info;
                     }
-                    var vctx2 = new VisitorContext(_ctx, _mapping, _provider, dParam, info.Alias, _correlatedParams, _compiledParams, _paramMap);
+                    var vctx2 = new VisitorContext(_ctx, _mapping, _provider, dParam, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                     var visitor2 = FastExpressionVisitorPool.Get(in vctx2);
                     var defSql = visitor2.Translate(wf.DefaultValueSelector.Body);
                     foreach (var kv in visitor2.GetParameters())
@@ -865,12 +872,12 @@ namespace nORM.Query
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
-            var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
+            var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
             var outerKeyVisitor = FastExpressionVisitorPool.Get(in vctxOuter);
             var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
             if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
                 _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
-            var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap);
+            var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
             var innerKeyVisitor = FastExpressionVisitorPool.Get(in vctxInner);
             var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
             foreach (var kvp in outerKeyVisitor.GetParameters())
@@ -903,12 +910,12 @@ namespace nORM.Query
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
-            var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap);
+            var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
             var outerKeyVisitor = FastExpressionVisitorPool.Get(in vctxOuter);
             var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
             if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
                 _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
-            var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap);
+            var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
             var innerKeyVisitor = FastExpressionVisitorPool.Get(in vctxInner);
             var innerKeySql = innerKeyVisitor.Translate(innerKeySelector.Body);
             foreach (var kvp in outerKeyVisitor.GetParameters())
@@ -1148,7 +1155,7 @@ namespace nORM.Query
                     if (!_correlatedParams.ContainsKey(filterParam))
                         _correlatedParams[filterParam] = (innerMapping, innerAlias);
 
-                    var vctxFilter = new VisitorContext(_ctx, innerMapping, _provider, filterParam, innerAlias, _correlatedParams, _compiledParams, _paramMap);
+                    var vctxFilter = new VisitorContext(_ctx, innerMapping, _provider, filterParam, innerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                     var filterVisitor = FastExpressionVisitorPool.Get(in vctxFilter);
                     var filterSql = filterVisitor.Translate(filterPredicate.Body);
 
@@ -1640,7 +1647,7 @@ namespace nORM.Query
             var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
+            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
             var visitor = FastExpressionVisitorPool.Get(in vctx);
             var columnSql = visitor.Translate(selectorLambda.Body);
             foreach (var kvp in visitor.GetParameters())
@@ -1671,7 +1678,7 @@ namespace nORM.Query
             var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
+            var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
             var visitor = FastExpressionVisitorPool.Get(in vctx2);
             var groupBySql = visitor.Translate(keySelectorLambda.Body);
             foreach (var kvp in visitor.GetParameters())
@@ -1770,7 +1777,7 @@ namespace nORM.Query
                             // Try to translate as regular expression
                             if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
                                 _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
-                            var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
+                            var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                             var visitor = FastExpressionVisitorPool.Get(in vctx);
                             var sql = visitor.Translate(arg);
                             builder = PooledStringBuilder.Rent();
@@ -1810,7 +1817,7 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
@@ -1828,7 +1835,7 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
@@ -1846,7 +1853,7 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
@@ -1864,7 +1871,7 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(selector.Body);
                             foreach (var kvp in visitor.GetParameters())
@@ -1891,7 +1898,7 @@ namespace nORM.Query
                 var alias = EscapeAlias("T" + _joinCounter);
                 if (!_correlatedParams.ContainsKey(param))
                     _correlatedParams[param] = (_mapping, alias);
-            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
+            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
             var visitor = FastExpressionVisitorPool.Get(in vctx);
             var columnSql = visitor.Translate(selector.Body);
             foreach (var kvp in visitor.GetParameters())
@@ -1924,7 +1931,7 @@ namespace nORM.Query
             var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap);
+            var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
             var visitor = FastExpressionVisitorPool.Get(in vctx2);
             var predicateSql = visitor.Translate(predicate.Body);
             foreach (var kvp in visitor.GetParameters())

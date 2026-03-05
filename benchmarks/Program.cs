@@ -48,9 +48,12 @@ namespace nORM.Benchmarks
             Console.WriteLine("• Bulk operations (naive, batched, idiomatic)");
             Console.WriteLine();
             Console.WriteLine("⚠️  This will take several minutes to complete.");
-            Console.WriteLine("Press any key to start, or Ctrl+C to cancel...");
-            Console.ReadKey();
-            Console.WriteLine();
+            if (!Console.IsInputRedirected)
+            {
+                Console.WriteLine("Press any key to start, or Ctrl+C to cancel...");
+                Console.ReadKey();
+                Console.WriteLine();
+            }
 
             try
             {
@@ -94,8 +97,11 @@ namespace nORM.Benchmarks
             }
 
             Console.WriteLine();
-            Console.WriteLine("Press any key to exit...");
-            Console.ReadKey();
+            if (!Console.IsInputRedirected)
+            {
+                Console.WriteLine("Press any key to exit...");
+                Console.ReadKey();
+            }
         }
 
         private static void ShowHelp()

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using nORM.Migration;
 using Xunit;
@@ -481,5 +482,94 @@ public class SqliteMigrationSqlGeneratorTests
                 new ColumnSchema { Name = "Notes",  ClrType = typeof(string).FullName!, IsNullable = true }
             }
         };
+
+    // ─── PRV-1: Identifier escaping with double-quotes ───────────────────────
+
+    [Fact]
+    public void CreateTable_EscapesTableNameWithDoubleQuote()
+    {
+        var table = new TableSchema
+        {
+            Name = "He\"llo",
+            Columns = { new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false } }
+        };
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Contains("\"He\"\"llo\"", sql.Up[0]);
+    }
+
+    [Fact]
+    public void CreateTable_EscapesColumnNameWithDoubleQuote()
+    {
+        var table = new TableSchema
+        {
+            Name = "T",
+            Columns = { new ColumnSchema { Name = "co\"l", ClrType = typeof(int).FullName!, IsNullable = false } }
+        };
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Contains("\"co\"\"l\"", sql.Up[0]);
+    }
+
+    // ─── MIG-1: NOT NULL + DefaultValue ──────────────────────────────────────
+
+    [Fact]
+    public void AddColumn_NotNull_WithDefaultValue_EmitsDefault()
+    {
+        var table = new TableSchema
+        {
+            Name = "T",
+            Columns = { new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false } }
+        };
+        var newCol = new ColumnSchema { Name = "Status", ClrType = typeof(int).FullName!, IsNullable = false, DefaultValue = "0" };
+        var diff = new SchemaDiff();
+        diff.AddedColumns.Add((table, newCol));
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Single(sql.Up);
+        Assert.Contains("NOT NULL DEFAULT 0", sql.Up[0]);
+    }
+
+    [Fact]
+    public void AddColumn_NotNull_WithoutDefaultValue_ThrowsInvalidOperationException()
+    {
+        var table = new TableSchema
+        {
+            Name = "T",
+            Columns = { new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false } }
+        };
+        var newCol = new ColumnSchema { Name = "Status", ClrType = typeof(int).FullName!, IsNullable = false };
+        var diff = new SchemaDiff();
+        diff.AddedColumns.Add((table, newCol));
+
+        var ex = Assert.Throws<InvalidOperationException>(() => new SqliteMigrationSqlGenerator().GenerateSql(diff));
+        Assert.Contains("Status", ex.Message);
+        Assert.Contains("DefaultValue", ex.Message);
+    }
+
+    [Fact]
+    public void AddColumn_Nullable_DoesNotRequireDefaultValue()
+    {
+        var table = new TableSchema
+        {
+            Name = "T",
+            Columns = { new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false } }
+        };
+        var newCol = new ColumnSchema { Name = "Notes", ClrType = typeof(string).FullName!, IsNullable = true };
+        var diff = new SchemaDiff();
+        diff.AddedColumns.Add((table, newCol));
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Single(sql.Up);
+        Assert.DoesNotContain("DEFAULT", sql.Up[0]);
+    }
 }
 

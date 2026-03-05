@@ -405,7 +405,7 @@ namespace nORM.Benchmarks
                     Id = reader.GetInt32(reader.GetOrdinal("Id")),
                     Name = reader.GetString(reader.GetOrdinal("Name")),
                     Email = reader.GetString(reader.GetOrdinal("Email")),
-                    CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                     IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
                     Age = reader.GetInt32(reader.GetOrdinal("Age")),
                     City = reader.GetString(reader.GetOrdinal("City")),
@@ -445,7 +445,7 @@ namespace nORM.Benchmarks
                     Id = reader.GetInt32(reader.GetOrdinal("Id")),
                     Name = reader.GetString(reader.GetOrdinal("Name")),
                     Email = reader.GetString(reader.GetOrdinal("Email")),
-                    CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                     IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
                     Age = reader.GetInt32(reader.GetOrdinal("Age")),
                     City = reader.GetString(reader.GetOrdinal("City")),
@@ -469,7 +469,7 @@ namespace nORM.Benchmarks
                     Id = reader.GetInt32(reader.GetOrdinal("Id")),
                     Name = reader.GetString(reader.GetOrdinal("Name")),
                     Email = reader.GetString(reader.GetOrdinal("Email")),
-                    CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                     IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
                     Age = reader.GetInt32(reader.GetOrdinal("Age")),
                     City = reader.GetString(reader.GetOrdinal("City")),
@@ -517,6 +517,40 @@ namespace nORM.Benchmarks
             return result.ToList();
         }
 
+        [Benchmark]
+        public async Task<List<BenchmarkUser>> Query_Complex_RawAdo()
+        {
+            const string sql = @"
+                SELECT * FROM BenchmarkUser
+                WHERE IsActive = 1 AND Age > @Age AND City = @City
+                ORDER BY Name
+                LIMIT 20 OFFSET 5";
+
+            using var command = _dapperConnection!.CreateCommand();
+            command.CommandText = sql;
+            command.Parameters.AddWithValue("@Age", 25);
+            command.Parameters.AddWithValue("@City", "New York");
+
+            using var reader = await command.ExecuteReaderAsync();
+            var users = new List<BenchmarkUser>();
+            while (await reader.ReadAsync())
+            {
+                users.Add(new BenchmarkUser
+                {
+                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                    Email = reader.GetString(reader.GetOrdinal("Email")),
+                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                    IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
+                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
+                    City = reader.GetString(reader.GetOrdinal("City")),
+                    Department = reader.GetString(reader.GetOrdinal("Department")),
+                    Salary = reader.GetDouble(reader.GetOrdinal("Salary"))
+                });
+            }
+            return users;
+        }
+
         // ========== COMPLEX QUERY (compiled/prepared) ==========
 
         [Benchmark(Description = "Query Complex EF Core (Compiled)")]
@@ -546,7 +580,7 @@ namespace nORM.Benchmarks
                     Id = reader.GetInt32(reader.GetOrdinal("Id")),
                     Name = reader.GetString(reader.GetOrdinal("Name")),
                     Email = reader.GetString(reader.GetOrdinal("Email")),
-                    CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                     IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
                     Age = reader.GetInt32(reader.GetOrdinal("Age")),
                     City = reader.GetString(reader.GetOrdinal("City")),
@@ -571,7 +605,7 @@ namespace nORM.Benchmarks
                     Id = reader.GetInt32(reader.GetOrdinal("Id")),
                     Name = reader.GetString(reader.GetOrdinal("Name")),
                     Email = reader.GetString(reader.GetOrdinal("Email")),
-                    CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                     IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
                     Age = reader.GetInt32(reader.GetOrdinal("Age")),
                     City = reader.GetString(reader.GetOrdinal("City")),
@@ -640,6 +674,14 @@ namespace nORM.Benchmarks
         [Benchmark]
         public Task<int> Count_Dapper()
             => _dapperConnection!.QuerySingleAsync<int>("SELECT COUNT(*) FROM BenchmarkUser WHERE IsActive = 1");
+
+        [Benchmark]
+        public async Task<int> Count_RawAdo()
+        {
+            using var command = _dapperConnection!.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM BenchmarkUser WHERE IsActive = 1";
+            return Convert.ToInt32(await command.ExecuteScalarAsync());
+        }
 
         // ========== BULK INSERTS: Naive / Batched / Idiomatic ==========
 
@@ -795,9 +837,13 @@ namespace nORM.Benchmarks
         [Benchmark(Description = "BulkInsert Batched - nORM Prepared")]
         public async Task BulkInsert_Batched_nORM_Prepared()
         {
-            await using var tx = await _nOrmConnection!.BeginTransactionAsync();
+            // Use nORM's Database.BeginTransactionAsync so ctx.CurrentTransaction is set.
+            // PrepareInsertAsync calls CreateCommand() which binds ctx.CurrentTransaction —
+            // starting the tx on the raw connection instead would leave CurrentTransaction null
+            // and each insert would auto-commit individually.
+            await using var tx = await _nOrmContext!.Database.BeginTransactionAsync();
 
-            // Prepare once, execute many times (Matches Dapper behavior)
+            // Prepare once, execute many times (matches BulkInsert_Batched_Dapper behavior)
             await using var preparedInsert = await _nOrmContext!.PrepareInsertAsync<BenchmarkUser>();
 
             for (int i = 1; i <= 100; i++)

@@ -21,6 +21,8 @@ internal readonly struct VisitorContext
     public readonly Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? Correlated;
     public readonly List<string>? CompiledParams;
     public readonly Dictionary<ParameterExpression, string>? ParamMap;
+    // QP-1: Thread outer translator's recursion depth so BuildExists/BuildIn can pass depth+1.
+    public readonly int RecursionDepth;
 
     public VisitorContext(
         DbContext context,
@@ -30,7 +32,8 @@ internal readonly struct VisitorContext
         string tableAlias,
         Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated,
         List<string>? compiledParams,
-        Dictionary<ParameterExpression, string>? paramMap)
+        Dictionary<ParameterExpression, string>? paramMap,
+        int recursionDepth = 0)
     {
         Context = context;
         Mapping = mapping;
@@ -40,6 +43,7 @@ internal readonly struct VisitorContext
         Correlated = correlated;
         CompiledParams = compiledParams;
         ParamMap = paramMap;
+        RecursionDepth = recursionDepth;
     }
 }
 

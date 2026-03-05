@@ -33,6 +33,14 @@ namespace nORM.Query
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
 
+            // MM-1: Composite-PK dependents are not supported; throw early rather than silently corrupting data.
+            var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
+            foreach (var (rel, map) in include.Path.Zip(pathMappings))
+                if (map.KeyColumns.Length > 1)
+                    throw new NotSupportedException(
+                        $"Include on '{map.Type.Name}' with a composite primary key is not yet supported. " +
+                        "Use a projected query or manual loading instead.");
+
             var firstRelation = include.Path[0];
 
             // Build lookup of parent entities by key to allow batching
@@ -54,8 +62,8 @@ namespace nORM.Query
             if (parentLookup.Count == 0)
                 return;
 
-            // Pre-compute mappings and materializers for the relations
-            var mappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
+            // Pre-compute mappings and materializers for the relations (reuse pathMappings computed in guard above)
+            var mappings = pathMappings;
             var materializers = mappings
                 .Select(m => _materializerFactory.CreateMaterializer(m, m.Type))
                 .ToArray();
@@ -110,6 +118,14 @@ namespace nORM.Query
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
 
+            // MM-1: Composite-PK dependents are not supported; throw early rather than silently corrupting data.
+            var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
+            foreach (var (rel, map) in include.Path.Zip(pathMappings))
+                if (map.KeyColumns.Length > 1)
+                    throw new NotSupportedException(
+                        $"Include on '{map.Type.Name}' with a composite primary key is not yet supported. " +
+                        "Use a projected query or manual loading instead.");
+
             var firstRelation = include.Path[0];
 
             var parentLookup = new Dictionary<object, List<object>>();
@@ -130,7 +146,8 @@ namespace nORM.Query
             if (parentLookup.Count == 0)
                 return;
 
-            var mappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
+            // Reuse pathMappings computed in guard above
+            var mappings = pathMappings;
             var syncMaterializers = mappings
                 .Select(m => _materializerFactory.CreateSyncMaterializer(m, m.Type))
                 .ToArray();
@@ -241,8 +258,9 @@ namespace nORM.Query
                       .Append(" WHERE ").Append(relation.ForeignKey.EscCol)
                       .Append(" IN ").Append(current).Append(';');
 
-                    var pkCol = map.KeyColumns[0].EscCol;
-                    current = $"(SELECT {pkCol} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current})";
+                    // MM-1: Include all key columns (composite PK support for multi-level traversal).
+                    var pkCols = string.Join(", ", map.KeyColumns.Select(k => k.EscCol));
+                    current = $"(SELECT {pkCols} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current})";
                 }
 
                 return sb.ToString().TrimEnd(';');
