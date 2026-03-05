@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO.Hashing;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
@@ -94,6 +95,11 @@ namespace nORM.Query
                 // Caching a plan for one and reusing it for the other causes incorrect query results.
                 // 1 = null constant, 0 = non-null constant.
                 AppendInt(node.Value is null ? 1 : 0);
+
+                // QP-1: Include actual value hash so same-shape queries with different literals
+                // get distinct cache entries and don't reuse stale parameter values.
+                if (node.Value is not null && node.Value is not IQueryable)
+                    AppendInt(node.Value.GetHashCode());
 
                 return base.VisitConstant(node);
             }
