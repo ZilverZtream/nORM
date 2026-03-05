@@ -55,6 +55,10 @@ namespace nORM.Migration
                 if (uniqueNonPkCols.Count > 0)
                     colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
 
+                // MG-1: Emit inline FOREIGN KEY constraints
+                foreach (var fk in table.ForeignKeys)
+                    colDefs.Add(BuildFkConstraintSql(fk));
+
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
                 // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
@@ -117,6 +121,9 @@ namespace nORM.Migration
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
                 if (uniqueNonPkCols.Count > 0)
                     colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                // MG-1: Restore FK constraints in Down recreation
+                foreach (var fk in table.ForeignKeys)
+                    colDefs.Add(BuildFkConstraintSql(fk));
                 down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
                 foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
                     down.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
@@ -149,6 +156,40 @@ namespace nORM.Migration
                 }
             }
 
+            // MG-1: FK constraint changes on existing SQLite tables require table recreation.
+            // Group by table name so each table is recreated only once even if multiple FKs change.
+            foreach (var tableGroup in diff.AddedForeignKeys
+                .GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = diff.AddedForeignKeys
+                    .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
+                // Up: recreate with the new FK set (table.ForeignKeys reflects post-diff state)
+                RecreateTable(up, table, table.Columns, null, table.ForeignKeys);
+                // Down: recreate without the newly added FKs
+                var addedNames = tableGroup.Select(x => x.ForeignKey.ConstraintName)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var oldFks = table.ForeignKeys
+                    .Where(fk => !addedNames.Contains(fk.ConstraintName)).ToList();
+                RecreateTable(down, table, table.Columns, null, oldFks);
+                needsUpFkPragma = true;
+                needsDownFkPragma = true;
+            }
+
+            foreach (var tableGroup in diff.DroppedForeignKeys
+                .GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = diff.DroppedForeignKeys
+                    .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
+                var droppedFks = tableGroup.Select(x => x.ForeignKey).ToList();
+                // Up: recreate without the dropped FKs (table.ForeignKeys already excludes them)
+                RecreateTable(up, table, table.Columns, null, table.ForeignKeys);
+                // Down: recreate with the dropped FKs restored
+                var restoredFks = table.ForeignKeys.Concat(droppedFks).ToList();
+                RecreateTable(down, table, table.Columns, null, restoredFks);
+                needsUpFkPragma = true;
+                needsDownFkPragma = true;
+            }
+
             // MG-2: Return PRAGMA statements in pre/post transaction segments so callers can
             // execute them outside the migration transaction (required by SQLite documentation).
             var preUp    = needsUpFkPragma   ? (IReadOnlyList<string>)new[] { "PRAGMA foreign_keys=off" } : null;
@@ -175,8 +216,10 @@ namespace nORM.Migration
         /// which causes PRAGMA foreign_keys=off/on to be emitted in the pre/post-transaction segments.
         /// MG-2: PRAGMA statements removed from this method to allow callers to place them
         /// outside the migration transaction.
+        /// MG-1: Accepts an optional explicit FK list; defaults to table.ForeignKeys when null.
         /// </summary>
-        private static void RecreateTable(List<string> stmts, TableSchema table, List<ColumnSchema> cols, Dictionary<string, ColumnSchema>? overrides)
+        private static void RecreateTable(List<string> stmts, TableSchema table, List<ColumnSchema> cols,
+            Dictionary<string, ColumnSchema>? overrides, IReadOnlyList<ForeignKeySchema>? fks = null)
         {
             // Apply overrides if supplied
             if (overrides != null)
@@ -198,6 +241,10 @@ namespace nORM.Migration
             if (uniqueNonPkCols.Count > 0)
                 colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
 
+            // MG-1: Emit inline FOREIGN KEY constraints (explicit list or fall back to table.ForeignKeys)
+            foreach (var fk in fks ?? table.ForeignKeys)
+                colDefs.Add(BuildFkConstraintSql(fk));
+
             // MG-2: No PRAGMA here — PRAGMA foreign_keys=off/on is returned in the pre/post transaction segments.
             var tempName = $"\"__temp__{table.Name.Replace("\"", "\"\"")}\"";
             stmts.Add($"CREATE TABLE {tempName} ({string.Join(", ", colDefs)})");
@@ -208,6 +255,21 @@ namespace nORM.Migration
             // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
             foreach (var col in cols.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
                 stmts.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
+        }
+
+        /// <summary>
+        /// MG-1: Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE statement.
+        /// </summary>
+        private static string BuildFkConstraintSql(ForeignKeySchema fk)
+        {
+            var depCols = string.Join(", ", fk.DependentColumns.Select(Esc));
+            var refCols = string.Join(", ", fk.PrincipalColumns.Select(Esc));
+            var sql = $"CONSTRAINT {Esc(fk.ConstraintName)} FOREIGN KEY ({depCols}) REFERENCES {Esc(fk.PrincipalTable)}({refCols})";
+            if (!string.Equals(fk.OnDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
+                sql += $" ON DELETE {fk.OnDelete}";
+            if (!string.Equals(fk.OnUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
+                sql += $" ON UPDATE {fk.OnUpdate}";
+            return sql;
         }
 
         private static string GetSqlType(ColumnSchema column)
