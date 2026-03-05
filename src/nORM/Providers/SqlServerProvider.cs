@@ -77,7 +77,10 @@ namespace nORM.Providers
 
             if (limitParameterName != null || offsetParameterName != null)
             {
-                if (!sb.ToString().Contains("ORDER BY")) sb.Append(" ORDER BY (SELECT NULL)");
+                // SG-1: Use case-insensitive comparison so that lower-case or mixed-case
+                // ORDER BY clauses (e.g. "order by name") are detected correctly and a
+                // duplicate ORDER BY is not appended.
+                if (!sb.ToString().Contains("ORDER BY", StringComparison.OrdinalIgnoreCase)) sb.Append(" ORDER BY (SELECT NULL)");
                 sb.Append(" OFFSET ");
                 sb.Append(offsetParameterName ?? "0");
                 sb.Append(" ROWS");

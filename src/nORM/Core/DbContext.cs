@@ -35,6 +35,9 @@ namespace nORM.Core
     public class DbContext : IDisposable, IAsyncDisposable
     {
         private readonly DbConnection _cn;
+        // TX-1/MG-1: When false, Dispose/DisposeAsync must NOT close or dispose the connection
+        // because it was passed in by the caller who retains ownership.
+        private readonly bool _ownsConnection;
         private readonly DatabaseProvider _p;
         private readonly ConcurrentDictionary<Type, TableMapping> _m = new();
         private readonly IExecutionStrategy _executionStrategy;
@@ -84,8 +87,15 @@ namespace nORM.Core
         /// <param name="p">The <see cref="DatabaseProvider"/> responsible for generating provider specific SQL.</param>
         /// <param name="options">Optional configuration controlling context behavior.</param>
         public DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options = null)
+            : this(cn, p, options, ownsConnection: true) { }
+
+        // TX-1/MG-1: Internal constructor that allows callers (e.g. migration runners) to pass an
+        // externally-owned connection. When ownsConnection is false, Dispose/DisposeAsync will NOT
+        // close or dispose the connection — the caller retains full ownership.
+        internal DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options, bool ownsConnection)
         {
             _cn = cn ?? throw new ArgumentNullException(nameof(cn));
+            _ownsConnection = ownsConnection;
             _p = p ?? throw new ArgumentNullException(nameof(p));
             Options = options ?? new DbContextOptions();
             Options.Validate();
@@ -2016,7 +2026,9 @@ namespace nORM.Core
                     }
                 }
 
-                _cn?.Dispose();
+                // TX-1/MG-1: Only dispose the connection when this context owns it.
+                if (_ownsConnection)
+                    _cn?.Dispose();
                 _disposed = true;
             }
         }
@@ -2108,7 +2120,8 @@ namespace nORM.Core
                 }
                 _providerInitLock?.Dispose();
                 await CleanupDisposablesAsync().ConfigureAwait(false);
-                if (_cn != null)
+                // TX-1/MG-1: Only dispose the connection when this context owns it.
+                if (_ownsConnection && _cn != null)
                     await _cn.DisposeAsync().ConfigureAwait(false);
                 _disposed = true;
             }
