@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Globalization;
 using System.Collections.Frozen;
 using nORM.Core;
+using nORM.Internal;
 using nORM.Mapping;
 using nORM.Providers;
 #nullable enable
@@ -684,17 +685,121 @@ namespace nORM.Query
         }
         private void BuildIn(Expression source, Expression value)
         {
+            // QP-1: Extract expression from closure-captured IQueryable.
+            if (TryGetConstantValue(source, out var srcConstValue) && srcConstValue is System.Linq.IQueryable iqSrc)
+                source = iqSrc.Expression!;
+
+            // QP-1: Compile-time null — ConstantExpression{null} OR Convert(null, T?) (UnaryExpression).
+            bool isNullValue = (value is ConstantExpression { Value: null })
+                || (value is UnaryExpression { NodeType: ExpressionType.Convert } ueNull
+                    && ueNull.Operand is ConstantExpression { Value: null });
+            if (isNullValue)
+            {
+                BuildNullExistsForContains(source);
+                return;
+            }
+
+            // QP-1: Build the IN (subquery) with a fresh correlated dict so inner lambda params
+            // get T0 regardless of what the outer _parameterMappings contains.
+            // Use a separate tempParams dict: QueryTranslator.Dispose() calls _parameterManager.Reset()
+            // which clears its Parameters dict — if shared with _params, collected params are lost.
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
-            // QP-1: Pass _recursionDepth + 1 so deeply nested Contains() subqueries respect the depth limit.
-            using var subTranslator = QueryTranslator.Create(_ctx, mapping, _params, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
+            var freshCorrelatedForIn = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+            var tempParams = new Dictionary<string, object>();
+            using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex,
+                freshCorrelatedForIn, new HashSet<string>(), _compiledParams, _paramMap, 0,
+                recursionDepth: _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
-            Visit(value);
+            // Copy collected params to outer _params BEFORE subTranslator.Dispose() clears tempParams.
+            foreach (var kvp in tempParams)
+                _params[kvp.Key] = kvp.Value;
+
+            // QP-1: SQL NULL IN (...) is UNKNOWN (not TRUE); emit null-safe OR pattern for nullable value types.
+            bool isNullable = !value.Type.IsValueType || Nullable.GetUnderlyingType(value.Type) != null;
+
+            if (!isNullable)
+            {
+                Visit(value);
+                _sql.Append(" IN (");
+                _sql.Append(subPlan.Sql);
+                _sql.Append(")");
+                return;
+            }
+
+            // Runtime nullable: (val IN (subq) OR (val IS NULL AND EXISTS(null-filtered subq)))
+            var valueSql = GetSql(value);
+            _sql.Append("(");
+            _sql.Append(valueSql);
             _sql.Append(" IN (");
             _sql.Append(subPlan.Sql);
+            _sql.Append(") OR (");
+            _sql.Append(valueSql);
+            _sql.Append(" IS NULL AND ");
+            BuildNullExistsForContains(source);
+            _sql.Append("))");
+        }
+
+        // QP-1: Emits EXISTS(SELECT ... FROM source WHERE col IS NULL).
+        // Uses a fresh correlated dict so the EXISTS translator starts clean with T0 for all params.
+        private void BuildNullExistsForContains(Expression source)
+        {
+            // Walk back through Select calls to find the entity-level query and selector.
+            LambdaExpression? innerSelector = null;
+            var cursor = source;
+            while (cursor is MethodCallExpression mce && mce.Method.Name == "Select")
+            {
+                innerSelector = StripQuotes(mce.Arguments[1]) as LambdaExpression;
+                cursor = mce.Arguments[0];
+            }
+
+            // Append a WHERE col IS NULL filter at the entity level.
+            Expression filteredSource;
+            Type entityType;
+            if (innerSelector == null)
+            {
+                // No Select: the source IS the entity query; filter entities where they are null.
+                entityType = GetElementType(source);
+                var p = Expression.Parameter(entityType, "__nc");
+                var isNull = Expression.Equal(p, Expression.Constant(null, entityType));
+                filteredSource = Expression.Call(typeof(Queryable), nameof(Queryable.Where),
+                    new[] { entityType }, source, Expression.Quote(Expression.Lambda(isNull, p)));
+            }
+            else
+            {
+                // Has Select: add a null-check on the projected column at the entity level.
+                // WhereTranslator does not increment _joinCounter, so innerSelector.Parameters[0]
+                // and cursor's lambda params all get T0 in the fresh-dict EXISTS translator.
+                entityType = innerSelector.Parameters[0].Type;
+                var nullCheck = Expression.Lambda(
+                    Expression.Equal(innerSelector.Body, Expression.Constant(null, innerSelector.ReturnType)),
+                    innerSelector.Parameters[0]);
+                filteredSource = Expression.Call(typeof(Queryable), nameof(Queryable.Where),
+                    new[] { entityType }, cursor, Expression.Quote(nullCheck));
+            }
+
+            // QP-1: Fresh correlated dict and separate tempParams so EXISTS translator never sees
+            // stale aliases, and Dispose() clearing its Parameters dict doesn't affect _params.
+            var freshCorrelated = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+            var rootType = GetRootElementType(filteredSource);
+            var mapping = _ctx.GetMapping(rootType);
+            var existsTempParams = new Dictionary<string, object>();
+            using var existsTranslator = QueryTranslator.Create(
+                _ctx, mapping, existsTempParams, _paramIndex,
+                freshCorrelated, new HashSet<string>(),
+                _compiledParams, _paramMap, 0,
+                recursionDepth: _recursionDepth + 1);
+            var existsPlan = existsTranslator.Translate(filteredSource);
+            _paramIndex = existsTranslator.ParameterIndex;
+            // Copy collected params to outer _params BEFORE existsTranslator.Dispose() clears existsTempParams.
+            foreach (var kvp in existsTempParams)
+                _params[kvp.Key] = kvp.Value;
+            _sql.Append("EXISTS(");
+            _sql.Append(existsPlan.Sql);
             _sql.Append(")");
         }
+
         private bool IsTranslatableMethod(MethodInfo method)
         {
             if (method.GetCustomAttribute<SqlFunctionAttribute>() != null)

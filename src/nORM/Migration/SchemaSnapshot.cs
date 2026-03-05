@@ -258,9 +258,8 @@ namespace nORM.Migration
                     {
                         // MIG-2: Index exists in both — check for definition changes
                         var (oldIsUnique, oldCols) = oldIndexes[name];
-                        var colsChanged = !oldCols.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-                            .SequenceEqual(cols.OrderBy(x => x, StringComparer.OrdinalIgnoreCase),
-                                StringComparer.OrdinalIgnoreCase);
+                        // MIG-1: Compare column lists in declared order; (A,B) and (B,A) are semantically distinct indexes.
+                        var colsChanged = !oldCols.SequenceEqual(cols, StringComparer.OrdinalIgnoreCase);
                         if (oldIsUnique != isUnique || colsChanged)
                         {
                             diff.DroppedIndexes.Add((newTable, name));

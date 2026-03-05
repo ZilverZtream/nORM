@@ -107,7 +107,9 @@ namespace nORM.Core
         public async ValueTask CommitAsync()
         {
             if (OwnsTransaction && Transaction != null)
-                await Transaction.CommitAsync(Token).ConfigureAwait(false);
+                // TX-1: Use CancellationToken.None — commit must not be aborted mid-flight.
+                // A cancelled commit leaves ambiguous DB state; always run to completion like RollbackAsync.
+                await Transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
         }
 
         /// <summary>

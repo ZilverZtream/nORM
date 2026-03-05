@@ -1040,7 +1040,8 @@ namespace nORM.Core
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            if (map.TimestampColumn != null && updated != batch.Count)
+            // SG-1: Skip matched-row concurrency check for providers using affected-row semantics (e.g. MySQL).
+            if (map.TimestampColumn != null && !Provider.UseAffectedRowsSemantics && updated != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
             // DATA INTEGRITY FIX (TASK 1): Removed AcceptChanges() calls
             // AcceptChanges must only be called after transaction commits successfully
@@ -1072,7 +1073,8 @@ namespace nORM.Core
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            if (map.TimestampColumn != null && deleted != batch.Count)
+            // SG-1: Skip matched-row concurrency check for providers using affected-row semantics (e.g. MySQL).
+            if (map.TimestampColumn != null && !Provider.UseAffectedRowsSemantics && deleted != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
             // DATA INTEGRITY FIX (TASK 1): Removed entity removal from ChangeTracker
             // This must only be done after transaction commits successfully

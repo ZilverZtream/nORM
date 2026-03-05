@@ -342,9 +342,10 @@ namespace nORM.Query
                 cmd.CommandText = plan.Sql;
                 var compiledParamsAsync = plan.CompiledParameters;
                 foreach (var p in plan.Parameters)
+                {
                     if (compiledParamsAsync == null || !compiledParamsAsync.Contains(p.Key))
                         cmd.AddOptimizedParam(p.Key, p.Value);
-
+                }
                 if (paramValues != null)
                 {
                     for (int i = 0; i < compiledParamsAsync!.Count; i++)

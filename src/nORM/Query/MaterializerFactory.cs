@@ -68,7 +68,9 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<(Type From, Type To), Func<object, object>> _conversionCache = new();
 
         private static bool IsSimpleType(Type type)
-            => _simpleTypeCache.GetOrAdd(type, static t => t.IsPrimitive || t == typeof(decimal) || t == typeof(string));
+            // QP-1: Include nullable primitives so projected subqueries (e.g. Select(x => x.NullableInt)) materialize correctly.
+            => _simpleTypeCache.GetOrAdd(type, static t => t.IsPrimitive || t == typeof(decimal) || t == typeof(string)
+                || (Nullable.GetUnderlyingType(t) is Type u && (u.IsPrimitive || u == typeof(decimal))));
 
         internal static (long Hits, long Misses, double HitRate) CacheStats
         {
