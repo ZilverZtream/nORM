@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -260,5 +261,131 @@ public class TemporalSchemaTests
         var method = typeof(DbContext).GetMethod("GetMapping",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         return (TableMapping)method.Invoke(ctx, new object[] { typeof(TemporalEntity) })!;
+    }
+
+    // ── S6-1: MySQL temporal trigger SQL must not use DELIMITER directives ───
+
+    /// <summary>
+    /// S6-1: The MySQL GenerateTemporalTriggersSql must NOT contain MySQL CLI DELIMITER
+    /// directives (e.g., "DELIMITER $$", "END$$", "DELIMITER ;") because these are
+    /// client-side directives that cannot be executed via DbCommand.ExecuteNonQueryAsync.
+    /// </summary>
+    [Fact]
+    public void MySql_TemporalTriggersSql_DoesNotContainDelimiterDirectives()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider()); // mapping is provider-agnostic
+
+        var triggerSql = provider.GenerateTemporalTriggersSql(mapping);
+
+        // Must NOT contain MySQL CLI DELIMITER directives
+        Assert.DoesNotContain("DELIMITER $$", triggerSql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("DELIMITER ;", triggerSql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("END$$", triggerSql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("$$", triggerSql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// S6-1: Each MySQL trigger (INSERT, UPDATE, DELETE) must appear as a separate
+    /// statement when split at the "-- DELIMITER" separator used by TemporalManager.
+    /// This verifies that the splitting mechanism produces exactly 3 CREATE TRIGGER statements.
+    /// </summary>
+    [Fact]
+    public void MySql_TemporalTriggersSql_SplitsIntoThreeSeparateCreateTriggerStatements()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var triggerSql = provider.GenerateTemporalTriggersSql(mapping);
+
+        // Split using the same logic as TemporalManager.ExecuteDdlAsync
+        var batchSeparators = new[]
+        {
+            "\n-- DELIMITER\n", "\r\n-- DELIMITER\r\n", "\r\n-- DELIMITER\n", "\n-- DELIMITER\r\n",
+            "-- DELIMITER"
+        };
+        var batches = triggerSql
+            .Split(batchSeparators, StringSplitOptions.RemoveEmptyEntries)
+            .Select(b => b.Trim())
+            .Where(b => b.Length > 0)
+            .ToList();
+
+        // Must produce exactly 3 CREATE TRIGGER statements
+        Assert.Equal(3, batches.Count);
+        Assert.All(batches, batch =>
+            Assert.True(batch.TrimStart().StartsWith("CREATE TRIGGER", StringComparison.OrdinalIgnoreCase),
+                $"Each batch must start with CREATE TRIGGER, but got: {batch.Substring(0, Math.Min(50, batch.Length))}"));
+    }
+
+    /// <summary>
+    /// S6-1: Each MySQL trigger statement produced by splitting at -- DELIMITER must
+    /// be a syntactically valid CREATE TRIGGER statement (starts with CREATE TRIGGER,
+    /// contains AFTER INSERT/UPDATE/DELETE, references the history table).
+    /// </summary>
+    [Fact]
+    public void MySql_TemporalTriggersSql_EachStatementIsValidCreateTrigger()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var triggerSql = provider.GenerateTemporalTriggersSql(mapping);
+
+        var batchSeparators = new[] { "-- DELIMITER" };
+        var batches = triggerSql
+            .Split(batchSeparators, StringSplitOptions.RemoveEmptyEntries)
+            .Select(b => b.Trim())
+            .Where(b => b.Length > 0)
+            .ToList();
+
+        // Verify each trigger contains the expected events
+        Assert.Contains(batches, b => b.Contains("AFTER INSERT", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(batches, b => b.Contains("AFTER UPDATE", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(batches, b => b.Contains("AFTER DELETE", StringComparison.OrdinalIgnoreCase));
+
+        // Verify all triggers reference the history table
+        Assert.All(batches, batch =>
+            Assert.Contains("_History", batch, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// S6-1: SQLite temporal triggers must be unaffected — they must still use the
+    /// same GO-less, single-statement-per-trigger format (SQLite uses semicolons not DELIMITER).
+    /// </summary>
+    [Fact]
+    public void SQLite_TemporalTriggers_UnaffectedByMySqlDelimiterFix()
+    {
+        var provider = new SqliteProvider();
+        var mapping = GetMapping(provider);
+
+        var triggerSql = provider.GenerateTemporalTriggersSql(mapping);
+
+        // SQLite triggers must NOT contain -- DELIMITER markers (those are MySQL-specific)
+        Assert.DoesNotContain("-- DELIMITER", triggerSql, StringComparison.OrdinalIgnoreCase);
+
+        // SQLite triggers must still contain AFTER INSERT/UPDATE/DELETE
+        Assert.Contains("AFTER INSERT ON", triggerSql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("AFTER UPDATE ON", triggerSql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("AFTER DELETE ON", triggerSql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// S6-1: SQL Server temporal triggers must be unaffected — they use GO batch separators
+    /// which TemporalManager.ExecuteDdlAsync already handles correctly.
+    /// </summary>
+    [Fact]
+    public void SqlServer_TemporalTriggers_UnaffectedByMySqlDelimiterFix()
+    {
+        var provider = new SqlServerProvider();
+        var mapping = GetMapping(new SqliteProvider());
+
+        var triggerSql = provider.GenerateTemporalTriggersSql(mapping);
+
+        // SQL Server triggers must NOT contain -- DELIMITER markers
+        Assert.DoesNotContain("-- DELIMITER", triggerSql, StringComparison.OrdinalIgnoreCase);
+
+        // SQL Server triggers must still contain AFTER INSERT/UPDATE/DELETE
+        Assert.Contains("AFTER INSERT", triggerSql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("AFTER UPDATE", triggerSql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("AFTER DELETE", triggerSql, StringComparison.OrdinalIgnoreCase);
     }
 }
