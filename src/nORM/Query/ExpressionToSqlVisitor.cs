@@ -349,7 +349,19 @@ namespace nORM.Query
             }
             if (TryGetConstantValue(node, out var value))
             {
-                AppendConstant(value, node.Type);
+                // Closure-captured variable: emit a compiled parameter so the live value is
+                // re-extracted from the expression tree on every plan-cache hit.  Baking the
+                // value into _params at translation time causes stale values to be used when
+                // the captured variable changes between calls that share the same cached plan.
+                //
+                // Use the current size of the SHARED _compiledParams list as the index so that
+                // parameter names are globally unique across all visitor instances within one
+                // query translation.  The "cp" prefix prevents collisions with inline-constant
+                // parameters which use the "p" prefix (visitor-local _paramIndex).
+                var paramName = $"{_provider.ParamPrefix}cp{_compiledParams.Count}";
+                _params[paramName] = DBNull.Value; // placeholder; actual value supplied at execution time
+                _compiledParams.Add(paramName);
+                _sql.Append(paramName);
                 return node;
             }
             if (node.Expression != null)

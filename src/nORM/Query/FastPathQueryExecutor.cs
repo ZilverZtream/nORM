@@ -227,7 +227,7 @@ namespace nORM.Query
                 sql = ApplyLimit(sql, takeCount.Value, ctx.Provider);
             }
             await ctx.EnsureConnectionAsync(default).ConfigureAwait(false);
-            await using var cmd = ctx.Connection.CreateCommand();
+            await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
             if (info.Value != null && info.Value != DBNull.Value)
             {
@@ -262,7 +262,7 @@ namespace nORM.Query
                 sql = ApplyLimit(sql, takeCount.Value, ctx.Provider);
             }
             await ctx.EnsureConnectionAsync(default).ConfigureAwait(false);
-            await using var cmd = ctx.Connection.CreateCommand();
+            await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
             var results = new List<T>();
             // PERFORMANCE FIX (TASK 12): Use generic materializer to avoid boxing
@@ -279,7 +279,7 @@ namespace nORM.Query
             var map = ctx.GetMapping(typeof(T));
             var sql = $"SELECT COUNT(*) FROM {map.EscTable}";
             await ctx.EnsureConnectionAsync(default).ConfigureAwait(false);
-            await using var cmd = ctx.Connection.CreateCommand();
+            await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
             var result = await cmd.ExecuteScalarAsync(default).ConfigureAwait(false);
             return (object)Convert.ToInt32(result);

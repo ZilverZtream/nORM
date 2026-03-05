@@ -379,7 +379,6 @@ END;";
             if (!entityList.Any()) return 0;
 
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
-            if (cols.Length == 0) return 0; // Nothing to insert.
 
             var totalInserted = 0;
 
@@ -387,42 +386,66 @@ END;";
             await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
-                // 2. Create ONE command and ONE set of parameters that will be reused.
-                await using var cmd = ctx.Connection.CreateCommand();
-                cmd.Transaction = transaction;
-                cmd.CommandText = BuildInsert(m); // Uses the cached single-row INSERT statement.
-
-                // Create parameter objects ONCE and add them to the command.
-                var parameters = new DbParameter[cols.Length];
-                for (int i = 0; i < cols.Length; i++)
+                if (cols.Length == 0)
                 {
-                    var p = cmd.CreateParameter();
-                    p.ParameterName = $"{ParamPrefix}{cols[i].PropName}";
-                    cmd.Parameters.Add(p);
-                    parameters[i] = p;
+                    // PRV-1: All columns are DB-generated — use DEFAULT VALUES syntax.
+                    // DEFAULT VALUES does not support batching so we loop per entity.
+                    await using var cmd = ctx.Connection.CreateCommand();
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = $"INSERT INTO {m.EscTable} DEFAULT VALUES";
+                    foreach (var _ in entityList)
+                        totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
-
-                // 3. Prepare the command ONCE before the loop.
-                await cmd.PrepareAsync(ct).ConfigureAwait(false);
-
-                // 4. Loop through each entity and execute the prepared command.
-                foreach (var entity in entityList)
+                else
                 {
-                    // 5. Simply update the values of the existing parameters. No new objects created.
+                    // 2. Create ONE command and ONE set of parameters that will be reused.
+                    await using var cmd = ctx.Connection.CreateCommand();
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = BuildInsert(m); // Uses the cached single-row INSERT statement.
+
+                    // Create parameter objects ONCE and add them to the command.
+                    var parameters = new DbParameter[cols.Length];
                     for (int i = 0; i < cols.Length; i++)
                     {
-                        parameters[i].Value = cols[i].Getter(entity) ?? DBNull.Value;
+                        var p = cmd.CreateParameter();
+                        p.ParameterName = $"{ParamPrefix}{cols[i].PropName}";
+                        cmd.Parameters.Add(p);
+                        parameters[i] = p;
                     }
 
-                    totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                    // 3. Prepare the command ONCE before the loop.
+                    await cmd.PrepareAsync(ct).ConfigureAwait(false);
+
+                    // 4. Loop through each entity and execute the prepared command.
+                    foreach (var entity in entityList)
+                    {
+                        // 5. Simply update the values of the existing parameters. No new objects created.
+                        for (int i = 0; i < cols.Length; i++)
+                        {
+                            parameters[i].Value = cols[i].Getter(entity) ?? DBNull.Value;
+                        }
+
+                        totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                    }
                 }
 
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception originalEx)
             {
-                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
-                throw;
+                // S5-1: Preserve the original exception if rollback itself fails.
+                try
+                {
+                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
+                }
+                catch (Exception rollbackEx)
+                {
+                    throw new AggregateException(
+                        "BulkInsert failed and rollback also failed. See inner exceptions for details.",
+                        originalEx, rollbackEx);
+                }
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
+                throw; // unreachable — satisfies compiler
             }
 
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
@@ -518,10 +541,21 @@ END;";
 
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception originalEx)
             {
-                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
-                throw;
+                // S5-1: Preserve the original exception if rollback itself fails.
+                try
+                {
+                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
+                }
+                catch (Exception rollbackEx)
+                {
+                    throw new AggregateException(
+                        "BulkUpdate failed and rollback also failed. See inner exceptions for details.",
+                        originalEx, rollbackEx);
+                }
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
+                throw; // unreachable — satisfies compiler
             }
 
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, totalUpdated, sw.Elapsed);
@@ -623,12 +657,23 @@ END;";
                 
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception originalEx)
             {
-                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
-                throw;
+                // S5-1: Preserve the original exception if rollback itself fails.
+                try
+                {
+                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
+                }
+                catch (Exception rollbackEx)
+                {
+                    throw new AggregateException(
+                        "BulkDelete failed and rollback also failed. See inner exceptions for details.",
+                        originalEx, rollbackEx);
+                }
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
+                throw; // unreachable — satisfies compiler
             }
-            
+
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
             return totalDeleted;
         }

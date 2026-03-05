@@ -519,7 +519,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             // Use PostgreSQL's multi-row VALUES syntax with RETURNING for identity columns
             var sql = BuildPostgresBatchInsertSql(mapping, cols, batch.Count);
             
-            await using var cmd = ctx.Connection.CreateCommand();
+            await using var cmd = ctx.CreateCommand();
             cmd.Transaction = transaction;
             cmd.CommandText = sql;
             cmd.CommandTimeout = 30;
@@ -606,7 +606,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             for (int i = 0; i < entityList.Count; i += batchSize)
             {
                 var batch = entityList.Skip(i).Take(batchSize).ToList();
-                await using var cmd = ctx.Connection.CreateCommand();
+                await using var cmd = ctx.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
                 var sb = _stringBuilderPool.Get();
@@ -689,7 +689,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             {
                 var batch = entityList.Skip(i).Take(batchSize).ToList();
                 var keys = batch.Select(e => keyCol.Getter(e)).ToArray();
-                await using var cmd = ctx.Connection.CreateCommand();
+                await using var cmd = ctx.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 var pName = $"{ParamPrefix}p0";
                 var p = cmd.CreateParameter();

@@ -362,6 +362,21 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Creates a <see cref="DbCommand"/> for the current connection and automatically
+        /// binds the active transaction so that every command participates in the ongoing
+        /// unit-of-work. Prefer this over <c>Connection.CreateCommand()</c> inside nORM
+        /// code so that transaction binding is never accidentally omitted.
+        /// </summary>
+        internal DbCommand CreateCommand()
+        {
+            var cmd = Connection.CreateCommand();
+            var tx = CurrentTransaction;
+            if (tx != null)
+                cmd.Transaction = tx;
+            return cmd;
+        }
+
+        /// <summary>
         /// Checks whether the database connection is healthy by executing a lightweight query.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
@@ -1406,12 +1421,17 @@ namespace nORM.Core
 
         private string BuildInsertBatch(TableMapping map, int startParamIndex)
         {
+            // INS-1: Only append identity retrieval when at least one key column is DB-generated.
+            // For natural-key entities the fragment is wasteful and potentially wrong across providers.
+            var identityFragment = map.KeyColumns.Any(k => k.IsDbGenerated)
+                ? _p.GetIdentityRetrievalString(map)
+                : string.Empty;
             var cols = map.InsertColumns;
             if (cols.Length == 0)
-                return $"INSERT INTO {map.EscTable} DEFAULT VALUES{_p.GetIdentityRetrievalString(map)}";
+                return $"INSERT INTO {map.EscTable} DEFAULT VALUES{identityFragment}";
             var colNames = string.Join(", ", cols.Select(c => c.EscCol));
             var paramNames = string.Join(", ", cols.Select((c, i) => $"{_p.ParamPrefix}p{startParamIndex + i}"));
-            return $"INSERT INTO {map.EscTable} ({colNames}) VALUES ({paramNames}){_p.GetIdentityRetrievalString(map)}";
+            return $"INSERT INTO {map.EscTable} ({colNames}) VALUES ({paramNames}){identityFragment}";
         }
 
         private string BuildUpdateBatch(TableMapping map, int startParamIndex)
@@ -1684,6 +1704,9 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = CommandPool.Get(ctx.Connection, sql);
+                // TX-1: Bind to active transaction so raw SQL reads participate in the unit-of-work.
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
                 var paramDict = ctx.AddParametersFast(cmd, parameters);
                 if (!NormValidator.IsSafeRawSql(sql, ctx.Provider))
@@ -1731,6 +1754,9 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = CommandPool.Get(ctx.Connection, sql);
+                // TX-1: Bind to active transaction so raw SQL reads participate in the unit-of-work.
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
                 var paramDict = ctx.AddParametersFast(cmd, parameters);
                 if (!NormValidator.IsSafeRawSql(sql, ctx.Provider))
@@ -1765,6 +1791,9 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
+                // TX-1: Bind to active transaction so stored procedure calls participate in the unit-of-work.
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandType = ctx._p.StoredProcedureCommandType;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
 
@@ -1818,6 +1847,9 @@ namespace nORM.Core
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             var sw = Stopwatch.StartNew();
             await using var cmd = CommandPool.Get(Connection, procedureName);
+            // TX-1: Bind to active transaction so stored procedure calls participate in the unit-of-work.
+            if (CurrentTransaction != null)
+                cmd.Transaction = CurrentTransaction;
             cmd.CommandType = _p.StoredProcedureCommandType;
             cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
 
@@ -1874,6 +1906,9 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
+                // TX-1: Bind to active transaction so stored procedure calls participate in the unit-of-work.
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandType = ctx._p.StoredProcedureCommandType;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
 
@@ -2023,7 +2058,7 @@ namespace nORM.Core
         {
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             var mapping = GetMapping(typeof(T));
-            var cmd = _cn.CreateCommand();
+            var cmd = CreateCommand();
             cmd.CommandText = _p.BuildInsert(mapping);
             cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText));
 

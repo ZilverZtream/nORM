@@ -77,10 +77,18 @@ namespace nORM.Migration
             foreach (var table in diff.DroppedTables)
             {
                 up.Add($"DROP TABLE [{table.Name}]");
-                // Down: recreate the table
-                var cols = table.Columns.Select(c =>
-                    $"[{c.Name}] {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
-                down.Add($"CREATE TABLE [{table.Name}] ({string.Join(", ", cols)})");
+                // Down: recreate the table with full constraint metadata
+                var colDefs = table.Columns.Select(c =>
+                    $"[{c.Name}] {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
+                if (pkCols.Count > 0)
+                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => $"[{c.Name}]"))})");
+                var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
+                if (uniqueNonPkCols.Count > 0)
+                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => $"[{c.Name}]"))})");
+                down.Add($"CREATE TABLE [{table.Name}] ({string.Join(", ", colDefs)})");
+                foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
+                    down.Add($"CREATE INDEX [{col.IndexName}] ON [{table.Name}] ([{col.Name}])");
             }
 
             // SD-8: Generate DROP COLUMN for columns removed in the new snapshot

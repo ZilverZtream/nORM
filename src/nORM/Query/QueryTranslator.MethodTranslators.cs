@@ -228,7 +228,11 @@ namespace nORM.Query
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
                     var sql = visitor.Translate(keySelector.Body);
-                    t._orderBy.Add((sql, !t._methodName.Contains("Descending")));
+                    // Use node.Method.Name instead of t._methodName: visiting the source expression
+                    // in t.Visit(node.Arguments[0]) above may have updated t._methodName to the last
+                    // method encountered in the source chain (e.g., "Where"), losing the "Descending"
+                    // marker.  node.Method.Name always refers to this OrderBy/OrderByDescending call.
+                    t._orderBy.Add((sql, !node.Method.Name.Contains("Descending")));
                     FastExpressionVisitorPool.Return(visitor);
                 }
                 return source;

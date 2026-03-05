@@ -662,7 +662,7 @@ namespace nORM.Query
             var children = new List<object>();
 
             _ctx.EnsureConnection();
-            using var cmd = _ctx.Connection.CreateCommand();
+            using var cmd = _ctx.CreateCommand();
 
             var sql = new System.Text.StringBuilder();
             sql.Append("SELECT * FROM ").Append(depQuery.TargetMapping.EscTable);
@@ -720,7 +720,7 @@ namespace nORM.Query
             var children = new List<object>();
 
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = _ctx.Connection.CreateCommand();
+            await using var cmd = _ctx.CreateCommand();
 
             // Build SQL: SELECT * FROM ChildTable WHERE ForeignKey IN (@p0, @p1, ...)
             var sql = new System.Text.StringBuilder();
