@@ -10,6 +10,50 @@ using nORM.Mapping;
 
 namespace nORM.Query
 {
+    /// <summary>
+    /// Holds query complexity metrics computed during expression tree translation.
+    /// These are gathered once during the LINQ-to-SQL translation pass and stored on
+    /// the <see cref="QueryPlan"/> so that timeout heuristics never need to re-scan the
+    /// generated SQL string.
+    /// </summary>
+    internal struct QueryComplexityMetrics
+    {
+        /// <summary>Number of JOIN / SelectMany / GroupJoin operations.</summary>
+        public int JoinCount;
+        /// <summary>True when a GROUP BY clause was produced.</summary>
+        public bool HasGroupBy;
+        /// <summary>True when an ORDER BY clause was produced.</summary>
+        public bool HasOrderBy;
+        /// <summary>Depth of nested subqueries (incremented per TranslateSubExpression call).</summary>
+        public int SubqueryDepth;
+        /// <summary>Number of WHERE predicates (each Where call = +1).</summary>
+        public int PredicateCount;
+        /// <summary>True when a DISTINCT was applied.</summary>
+        public bool HasDistinct;
+        /// <summary>True when an aggregate (Sum/Count/Min/Max/Average) was used.</summary>
+        public bool HasAggregates;
+
+        /// <summary>
+        /// Derives a scalar complexity score for use with
+        /// <see cref="nORM.Execution.AdaptiveTimeoutManager"/>.
+        /// The formula mirrors the SQL-string heuristic in DbContext.GetAdaptiveTimeout
+        /// but is computed from reliable tree-walk data instead of substring scanning.
+        /// </summary>
+        public int ToComplexityScore()
+        {
+            int score = 1;
+            score += JoinCount * 2;
+            if (HasGroupBy) score += 2;
+            if (HasOrderBy) score += 2;
+            score += SubqueryDepth * 2;
+            if (HasDistinct) score += 1;
+            if (HasAggregates) score += 1;
+            // Each predicate contributes a tiny amount
+            score += PredicateCount / 5;
+            return Math.Min(score, 50); // cap matches DbContext.GetAdaptiveTimeout
+        }
+    }
+
     internal sealed record QueryPlan(
         string Sql,
         IReadOnlyDictionary<string, object> Parameters,
@@ -31,7 +75,8 @@ namespace nORM.Query
         ExpressionFingerprint Fingerprint = default,
         int? Take = null,
         List<DependentQueryDefinition>? DependentQueries = null,
-        Func<object, object>? ClientProjection = null
+        Func<object, object>? ClientProjection = null,
+        QueryComplexityMetrics Complexity = default
     );
 
     internal sealed record IncludePlan(List<TableMapping.Relation> Path);

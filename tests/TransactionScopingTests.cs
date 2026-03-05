@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Transactions;
 using Microsoft.Data.Sqlite;
+using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
 using Xunit;
@@ -73,9 +74,17 @@ public class TransactionScopingTests
         // SQLite does not enlist connections into System.Transactions, so the rows will
         // actually be committed by the internal transaction; what matters is that
         // SaveChangesAsync completes without throwing InvalidOperationException.
+        //
+        // Gate E: Use BestEffort policy because SQLite does not support EnlistTransaction
+        // and the default FailFast policy would throw NormConfigurationException when
+        // enlistment fails. BestEffort matches the original behavior: log a warning and continue.
+        var options = new DbContextOptions
+        {
+            AmbientTransactionPolicy = AmbientTransactionEnlistmentPolicy.BestEffort
+        };
         using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
         {
-            await using var ctx = new DbContext(connection, provider);
+            await using var ctx = new DbContext(connection, provider, options);
             ctx.Add(new Item { Name = "scoped" });
             // Must not throw "Transaction cannot be null when creating a CommandScope."
             await ctx.SaveChangesAsync();

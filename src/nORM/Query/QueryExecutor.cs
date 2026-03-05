@@ -169,18 +169,18 @@ namespace nORM.Query
 
         public IList Materialize(QueryPlan plan, DbCommand cmd)
         {
+            // SYNC-OVER-ASYNC FIX: This method uses a truly synchronous code path throughout.
+            // Option A was chosen: use synchronous ADO.NET equivalents (ExecuteReader, Read())
+            // instead of their async counterparts, avoiding GetAwaiter().GetResult() entirely.
+            // This eliminates thread-pool starvation and deadlock risks in synchronisation contexts.
             using var command = cmd;
-            return _exceptionHandler.ExecuteWithExceptionHandling(() =>
+            return _exceptionHandler.ExecuteWithExceptionHandlingSync(() =>
             {
                 if (plan.GroupJoinInfo != null)
-                    return Task.FromResult(MaterializeGroupJoin(plan, command));
+                    return MaterializeGroupJoin(plan, command);
 
                 // PERFORMANCE OPTIMIZATION 15: Improved list capacity pre-sizing
-                // - SingleResult: capacity = 1
-                // - Take specified: use Take value
-                // - No Take: use heuristic (16 is typical small result set, avoids resize for most queries)
                 var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
-                // PERFORMANCE FIX (TASK 13): Use cached list factory instead of Activator.CreateInstance
                 var list = CreateList(plan.ElementType, capacity);
 
                 var trackable = !plan.NoTracking &&
@@ -195,12 +195,9 @@ namespace nORM.Query
 
                 using var reader = command.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
 
-                // PERFORMANCE FIX (TASK 14): Use sync materializer directly - no Task allocation at all!
+                // Use sync materializer — no Task allocation, no async state machine.
                 var syncMaterializer = plan.SyncMaterializer;
 
-                // PERFORMANCE FIX (TASK 19): Respect SingleResult flag to avoid materializing unnecessary rows.
-                // QP-1: Single/SingleOrDefault must read up to 2 rows to detect duplicate-row violations.
-                //        First/FirstOrDefault only need 1 row.
                 var maxRows = plan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
                 if (plan.SingleResult)
                 {
@@ -208,7 +205,6 @@ namespace nORM.Query
                     {
                         if (!reader.Read()) break;
                         var entity = syncMaterializer(reader);
-                        // Apply client-side projection if present (for untranslatable expressions)
                         if (plan.ClientProjection != null)
                         {
                             entity = plan.ClientProjection(entity);
@@ -222,7 +218,6 @@ namespace nORM.Query
                     while (reader.Read())
                     {
                         var entity = syncMaterializer(reader);
-                        // Apply client-side projection if present (for untranslatable expressions)
                         if (plan.ClientProjection != null)
                         {
                             entity = plan.ClientProjection(entity);
@@ -236,23 +231,20 @@ namespace nORM.Query
                 {
                     foreach (var include in plan.Includes)
                     {
-                        // SYNC-OVER-ASYNC PATTERN: This is intentional for the synchronous Materialize path
-                        // The async method uses ConfigureAwait(false) throughout to minimize deadlock risk
-                        // This pattern matches the overall design where synchronous APIs are provided for backward compatibility
-                        _includeProcessor.EagerLoadAsync(include, list, default, plan.NoTracking).GetAwaiter().GetResult();
+                        // Truly synchronous eager load — no GetAwaiter().GetResult().
+                        _includeProcessor.EagerLoad(include, list, plan.NoTracking);
                     }
                 }
 
-                // Execute dependent queries for nested collections (split query for projections)
+                // Execute dependent queries for nested collections (split query for projections).
                 if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
                 {
-                    // SYNC-OVER-ASYNC PATTERN: This is intentional for the synchronous Materialize path
-                    // The async method uses ConfigureAwait(false) throughout to minimize deadlock risk
-                    ExecuteDependentQueriesAsync(plan.DependentQueries, list, plan.NoTracking, default).GetAwaiter().GetResult();
+                    // Truly synchronous dependent query execution — no GetAwaiter().GetResult().
+                    ExecuteDependentQueries(plan.DependentQueries, list, plan.NoTracking);
                 }
 
-                return Task.FromResult(list);
-            }, "Materialize", new Dictionary<string, object> { ["Sql"] = command.CommandText }).GetAwaiter().GetResult();
+                return list;
+            }, "Materialize", new Dictionary<string, object> { ["Sql"] = command.CommandText });
         }
 
         /// <summary>
@@ -437,9 +429,12 @@ namespace nORM.Query
         {
             var info = plan.GroupJoinInfo!;
 
-            return _exceptionHandler.ExecuteWithExceptionHandling(() =>
+            // SYNC-OVER-ASYNC FIX (Option A): Use truly synchronous code path.
+            // Previously this called plan.Materializer(...).GetAwaiter().GetResult() which
+            // blocks a thread pool thread.  We now use plan.SyncMaterializer which is a
+            // genuine synchronous delegate — no async state machine involved.
+            return _exceptionHandler.ExecuteWithExceptionHandlingSync(() =>
             {
-                // PERFORMANCE FIX (TASK 13): Use cached list factory instead of Activator.CreateInstance
                 var resultList = CreateList(info.ResultType, 16);
 
                 var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
@@ -459,7 +454,8 @@ namespace nORM.Query
 
                 while (reader.Read())
                 {
-                    var outer = plan.Materializer(reader, default).GetAwaiter().GetResult();
+                    // Use sync materializer — no GetAwaiter().GetResult().
+                    var outer = plan.SyncMaterializer(reader);
                     var key = info.OuterKeySelector(outer) ?? DBNull.Value;
 
                     if (currentOuter == null || !Equals(currentKey, key))
@@ -498,7 +494,7 @@ namespace nORM.Query
                                 "Review your GroupJoin operation and ensure join keys are correct.");
                         }
 
-                        var inner = MaterializeEntity(reader, innerMap, outerColumnCount, default);
+                        var inner = MaterializeEntity(reader, innerMap, outerColumnCount);
                         if (trackInner)
                         {
                             var actualMap = _ctx.GetMapping(inner.GetType());
@@ -513,18 +509,18 @@ namespace nORM.Query
                 if (currentOuter != null)
                 {
                     var list = CreateListFromItems(info.InnerType, currentChildren);
-                    // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
                     var result = info.ResultSelector(currentOuter, list.Cast<object>());
                     resultList.Add(result);
                 }
 
-                // DISPOSAL RACE FIX: Removed redundant manual Dispose in catch block
-                // The command is already owned by the calling method (Materialize) via "using var command = cmd"
-                // Manual disposal here causes double-dispose which can mask original exceptions
-                return Task.FromResult(resultList);
-            }, "MaterializeGroupJoin", new Dictionary<string, object> { ["Sql"] = cmd.CommandText }).GetAwaiter().GetResult();
+                return resultList;
+            }, "MaterializeGroupJoin", new Dictionary<string, object> { ["Sql"] = cmd.CommandText });
 
-            static object MaterializeEntity(DbDataReader reader, TableMapping map, int offset, CancellationToken ct)
+            // SYNC-OVER-ASYNC FIX: MaterializeEntity now uses only synchronous ADO.NET.
+            // CompiledMaterializerStore materializers are registered as Func<DbDataReader, object>
+            // (truly synchronous); the async wrapper calls Task.FromResult so GetAwaiter().GetResult()
+            // would have been safe, but we access the typed sync delegate directly to be explicit.
+            static object MaterializeEntity(DbDataReader reader, TableMapping map, int offset)
             {
                 if (map.DiscriminatorColumn != null && map.TphMappings.Count > 0)
                 {
@@ -533,18 +529,11 @@ namespace nORM.Query
                     {
                         var disc = reader.GetValue(discIndex);
                         if (disc != null && map.TphMappings.TryGetValue(disc, out var derived))
-                            return MaterializeEntity(reader, derived, offset, ct);
+                            return MaterializeEntity(reader, derived, offset);
                     }
                 }
 
-                if (CompiledMaterializerStore.TryGet(map.Type, out var compiled) && offset == 0)
-                {
-                    return compiled(reader, ct).GetAwaiter().GetResult();
-                }
-
-                // PERFORMANCE FIX (TASK 9): Use MaterializerFactory instead of slow reflection
-                // MaterializerFactory creates compiled IL.Emit/Expression-based materializers
-                // that are 10-100x faster than reflection (read.Invoke, col.Setter)
+                // Use the synchronous materializer factory directly — no async wrapper.
                 var factory = new MaterializerFactory();
                 var materializer = factory.CreateSyncMaterializer(map, map.Type, startOffset: offset);
                 return materializer(reader);
@@ -552,7 +541,6 @@ namespace nORM.Query
 
             static IList CreateListFromItems(Type innerType, List<object> items)
             {
-                // PERFORMANCE: Reuse cached list factory to avoid Activator reflection per group
                 var list = CreateList(innerType, items.Count);
                 foreach (var item in items) list.Add(item);
                 return list;
@@ -617,6 +605,107 @@ namespace nORM.Query
                 // Phase 3: Stitch children to parents
                 StitchChildrenToParents(parents, allChildren, depQuery);
             }
+        }
+
+        /// <summary>
+        /// Truly synchronous variant of <see cref="ExecuteDependentQueriesAsync"/>.
+        /// Uses synchronous ADO.NET methods so no thread is blocked on async work.
+        /// </summary>
+        private void ExecuteDependentQueries(
+            List<DependentQueryDefinition> dependentQueries,
+            IList parents,
+            bool noTracking)
+        {
+            if (parents.Count == 0)
+                return;
+
+            foreach (var depQuery in dependentQueries)
+            {
+                var parentIds = new HashSet<object>();
+                foreach (var parent in parents.Cast<object>())
+                {
+                    var keyValue = depQuery.ParentKeyProperty.GetValue(parent);
+                    if (keyValue != null)
+                        parentIds.Add(keyValue);
+                }
+
+                if (parentIds.Count == 0)
+                {
+                    foreach (var parent in parents.Cast<object>())
+                        AssignEmptyCollection(parent, depQuery);
+                    continue;
+                }
+
+                var maxBatchSize = Math.Max(100, _ctx.Provider.MaxParameters - 100);
+                var allChildren = new List<object>();
+
+                var parentIdList = parentIds.ToList();
+                for (int i = 0; i < parentIdList.Count; i += maxBatchSize)
+                {
+                    var batchIds = parentIdList.Skip(i).Take(maxBatchSize).ToList();
+                    var batchChildren = FetchChildrenBatch(depQuery, batchIds, noTracking);
+                    allChildren.AddRange(batchChildren);
+                }
+
+                StitchChildrenToParents(parents, allChildren, depQuery);
+            }
+        }
+
+        /// <summary>
+        /// Truly synchronous variant of <see cref="FetchChildrenBatchAsync"/>.
+        /// </summary>
+        private List<object> FetchChildrenBatch(
+            DependentQueryDefinition depQuery,
+            List<object> parentIds,
+            bool noTracking)
+        {
+            var children = new List<object>();
+
+            _ctx.EnsureConnection();
+            using var cmd = _ctx.Connection.CreateCommand();
+
+            var sql = new System.Text.StringBuilder();
+            sql.Append("SELECT * FROM ").Append(depQuery.TargetMapping.EscTable);
+            sql.Append(" WHERE ").Append(depQuery.ForeignKeyColumn.EscCol);
+            sql.Append(" IN (");
+
+            for (int i = 0; i < parentIds.Count; i++)
+            {
+                if (i > 0) sql.Append(", ");
+                var paramName = $"{_ctx.Provider.ParamPrefix}p{i}";
+                sql.Append(paramName);
+                cmd.AddParam(paramName, parentIds[i]);
+            }
+
+            sql.Append(')');
+
+            cmd.CommandText = sql.ToString();
+            cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
+                AdaptiveTimeoutManager.OperationType.ComplexSelect,
+                cmd.CommandText).TotalSeconds;
+
+            using var reader = cmd.ExecuteReaderWithInterception(
+                _ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+
+            var syncMaterializer = new MaterializerFactory().CreateSyncMaterializer(
+                depQuery.TargetMapping,
+                depQuery.CollectionElementType);
+
+            while (reader.Read())
+            {
+                var child = syncMaterializer(reader);
+
+                if (!noTracking)
+                {
+                    var entry = _ctx.ChangeTracker.Track(child, EntityState.Unchanged, depQuery.TargetMapping);
+                    child = entry.Entity!;
+                    NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
+                }
+
+                children.Add(child);
+            }
+
+            return children;
         }
 
         /// <summary>

@@ -219,72 +219,92 @@ namespace nORM.Core
             }
             return _cn;
         }
-        internal TimeSpan GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType operationType, string? sql = null, int recordCount = 1)
+        /// <summary>
+        /// Computes an adaptive timeout for the given database operation. When a
+        /// <see cref="nORM.Query.QueryComplexityMetrics"/> value is supplied (from the
+        /// expression-tree translation pass) it is used directly and no SQL string
+        /// scanning is performed.  The SQL string fallback is retained for raw-SQL
+        /// code paths (stored procedures, navigation loaders, etc.) where no expression
+        /// tree exists.
+        /// </summary>
+        internal TimeSpan GetAdaptiveTimeout(
+            AdaptiveTimeoutManager.OperationType operationType,
+            string? sql = null,
+            int recordCount = 1,
+            nORM.Query.QueryComplexityMetrics? treeMetrics = null)
         {
-            // FIX (TASK 9): Enhanced query complexity estimation with better keyword weighting.
-            // This provides more accurate timeout predictions by analyzing query structure
-            // rather than just SQL length. The adaptive timeout manager uses this to learn
-            // which types of queries typically require longer execution times.
-            //
-            // PERFORMANCE FIX: Use case-insensitive comparisons instead of ToUpperInvariant()
-            // to avoid allocating a new string on every database operation.
-            //
-            // TIMEOUT CALCULATION FIX: Limit SQL scanning for very large queries to avoid performance issues
-            int baseComplexity = 1;
+            int baseComplexity;
 
-            if (!string.IsNullOrEmpty(sql))
+            // PREFERRED PATH: use expression-tree metrics computed during translation.
+            // This is exact, cheap, and immune to false positives from quoted identifiers
+            // or column names that happen to contain SQL keywords (e.g. group_by_column).
+            if (treeMetrics.HasValue)
             {
+                baseComplexity = treeMetrics.Value.ToComplexityScore();
+            }
+            else if (!string.IsNullOrEmpty(sql))
+            {
+                // FALLBACK PATH (raw SQL, stored procedures, navigation eager-loaders):
+                // scan the SQL string as before.  This path is used when no expression
+                // tree was walked (e.g. GetAdaptiveTimeout called with a raw SQL string).
+                //
                 // PERFORMANCE FIX: Skip detailed analysis for extremely large SQL (>100KB)
                 // Scanning multi-megabyte strings with Contains/IndexOf causes severe slowdown
-                // For large SQL, estimate complexity from length only
                 if (sql.Length > 102400) // 100KB threshold
                 {
-                    baseComplexity = 20 + Math.Min(30, sql.Length / 10000); // Scale with size, cap at 50
+                    baseComplexity = 20 + Math.Min(30, sql.Length / 10000);
                     Options.Logger?.LogDebug(
                         "Skipping detailed complexity analysis for large SQL ({Length} chars). Using length-based estimate: {Complexity}",
                         sql.Length, baseComplexity);
                 }
                 else
                 {
-                    // Base complexity from SQL length (normalized)
                     baseComplexity = 1 + (sql.Length / 100);
 
-                    // Enhanced complexity signals with improved weighting
-                    // OPTIMIZATION: Use StringComparison.OrdinalIgnoreCase to avoid allocating upperSql
-
-                    // High-cost operations (significant complexity increase)
                     int joinCount = CountOccurrences(sql, "JOIN", StringComparison.OrdinalIgnoreCase);
-                    if (joinCount > 0) baseComplexity += 2 * joinCount; // Multiple joins are expensive
+                    if (joinCount > 0) baseComplexity += 2 * joinCount;
 
-                    if (sql.Contains("UNION", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3; // Set operations are costly
+                    if (sql.Contains("UNION", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3;
                     if (sql.Contains("INTERSECT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3;
                     if (sql.Contains("EXCEPT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3;
 
-                    // Medium-cost operations
                     if (sql.Contains("GROUP BY", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
                     if (sql.Contains("HAVING", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
                     if (sql.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
 
-                    // Subqueries add significant complexity
-                    int subqueryCount = CountOccurrences(sql, "SELECT", StringComparison.OrdinalIgnoreCase) - 1; // Subtract main SELECT
+                    int subqueryCount = CountOccurrences(sql, "SELECT", StringComparison.OrdinalIgnoreCase) - 1;
                     if (subqueryCount > 0) baseComplexity += 2 * subqueryCount;
 
-                    // Other complexity indicators
                     if (sql.Contains("DISTINCT", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
-                    if (sql.Contains("CROSS JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3; // Cartesian products are very expensive
+                    if (sql.Contains("CROSS JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 3;
                     if (sql.Contains("LEFT JOIN", StringComparison.OrdinalIgnoreCase) || sql.Contains("RIGHT JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
                     if (sql.Contains("OUTER JOIN", StringComparison.OrdinalIgnoreCase)) baseComplexity += 1;
 
-                    // Window functions and CTEs
                     if (sql.Contains("OVER(", StringComparison.OrdinalIgnoreCase) || sql.Contains("OVER (", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
-                    if (sql.Contains("WITH", StringComparison.OrdinalIgnoreCase) && sql.Contains("AS(", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2; // CTE
+                    if (sql.Contains("WITH", StringComparison.OrdinalIgnoreCase) && sql.Contains("AS(", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
                 }
 
-                // Cap complexity to avoid extreme timeouts
                 baseComplexity = Math.Min(baseComplexity, 50);
+            }
+            else
+            {
+                // No metrics and no SQL: use baseline complexity of 1.
+                baseComplexity = 1;
             }
 
             return _timeoutManager.GetTimeoutForOperation(operationType, recordCount, baseComplexity);
+        }
+
+        /// <summary>
+        /// Overload used when a query plan with pre-computed complexity metrics is available.
+        /// The expression-tree metrics are used directly; no SQL string scanning is performed.
+        /// </summary>
+        internal TimeSpan GetAdaptiveTimeout(
+            AdaptiveTimeoutManager.OperationType operationType,
+            nORM.Query.QueryComplexityMetrics treeMetrics,
+            int recordCount = 1)
+        {
+            return GetAdaptiveTimeout(operationType, sql: null, recordCount, treeMetrics);
         }
 
         /// <summary>
@@ -419,6 +439,20 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Gate C: Normalizes a connection string so that identical connection strings expressed
+        /// with different key orderings or casing map to the same cache key. This eliminates
+        /// collisions caused by using GetHashCode() (32-bit) as the cache key component.
+        /// Normalization: split on ';', trim each pair, sort case-insensitively, rejoin.
+        /// </summary>
+        private static string NormalizeConnectionString(string? cs)
+        {
+            if (string.IsNullOrEmpty(cs)) return string.Empty;
+            return string.Join(";", cs.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Select(p => p.Trim())
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
         /// Validates a single identifier part (possibly delimited). A part is either:
         /// - A plain word (letters, digits, underscore, space)
         /// - A delimited identifier: [inner], "inner", or `inner` where inner contains only word chars
@@ -468,10 +502,13 @@ namespace nORM.Core
                 throw new ArgumentException("Table name cannot be null or empty.", nameof(tableName));
             if (!IsSafeIdentifier(tableName))
                 throw new NormUsageException("Invalid table name.");
-            // MM-1: Include provider type and connection string hash in the cache key so that
-            // two contexts pointing to different databases with the same table name each get
-            // their own independently-generated CLR type.
-            var cacheKey = $"{Provider.GetType().FullName}|{_cn.ConnectionString?.GetHashCode():X8}|{tableName}";
+            // Gate C fix: Use normalized full connection string instead of 32-bit hash to
+            // eliminate key collision risk. GetHashCode() is a 32-bit projection — two
+            // distinct connection strings can share the same hash, causing schema aliasing
+            // where queries against different databases return stale type definitions.
+            // Normalizing (sort key=value pairs, lowercase) also ensures that identical
+            // connection strings written in different key orders map to the same cache entry.
+            var cacheKey = $"{Provider.GetType().FullName}|{NormalizeConnectionString(_cn.ConnectionString)}|{tableName}";
             var lazyTask = _dynamicTypeCache.GetOrAdd(cacheKey,
                 _ => new Lazy<Task<Type>>(() => _typeGenerator.GenerateEntityTypeAsync(this.Connection, tableName)));
 
@@ -705,11 +742,16 @@ namespace nORM.Core
                 var deletedGroups = allGroups.Where(g => g.Key.State == EntityState.Deleted).ToList();
 
                 var sortedAddedMappings = TopologicalSortMappings(addedGroups.Select(g => g.Key.Mapping)).ToList();
+                // Gate D fix: Apply the same topological sort to modified groups so that FK
+                // constraints do not fire when a dependent row is updated before its principal.
+                // Inserts already follow principal-first order; updates must do the same.
+                var sortedModifiedMappings = TopologicalSortMappings(modifiedGroups.Select(g => g.Key.Mapping)).ToList();
                 var sortedDeletedMappings = TopologicalSortMappings(deletedGroups.Select(g => g.Key.Mapping)).Reverse().ToList();
 
                 var orderedAddedGroups = sortedAddedMappings.Select(m => addedGroups.First(g => g.Key.Mapping == m));
+                var orderedModifiedGroups = sortedModifiedMappings.Select(m => modifiedGroups.First(g => g.Key.Mapping == m));
                 var orderedDeletedGroups = sortedDeletedMappings.Select(m => deletedGroups.First(g => g.Key.Mapping == m));
-                var orderedGroups = orderedAddedGroups.Concat(modifiedGroups).Concat(orderedDeletedGroups);
+                var orderedGroups = orderedAddedGroups.Concat(orderedModifiedGroups).Concat(orderedDeletedGroups);
 
                 foreach (var group in orderedGroups)
                 {
@@ -1382,16 +1424,17 @@ namespace nORM.Core
             }
             cmd.SetParametersFast(span);
 
-            // PERFORMANCE FIX (TASK 7): Only allocate dictionary when logging is enabled
-            // This avoids allocating a Dictionary on every query when debug logging is disabled
-            if (Options.Logger?.IsEnabled(LogLevel.Debug) == true)
-            {
-                var dict = new Dictionary<string, object>(parameters.Length);
-                foreach (var (name, value) in span) dict[name] = value;
-                return dict;
-            }
+            // Gate B fix: Always populate the parameter dictionary so that ValidateRawSql
+            // receives accurate parameter metadata regardless of logging state.
+            // The dictionary is required for validation (not just logging) — decoupling the
+            // two concerns ensures parameterized queries are never incorrectly flagged by
+            // the validator when debug logging is disabled.
+            if (parameters.Length == 0)
+                return EmptyDictionary<string, object>.Instance;
 
-            return EmptyDictionary<string, object>.Instance;
+            var dict = new Dictionary<string, object>(parameters.Length);
+            foreach (var (name, value) in span) dict[name] = value;
+            return dict;
         }
 
         internal static class EmptyDictionary<TKey, TValue> where TKey : notnull

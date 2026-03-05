@@ -12,6 +12,34 @@ using Microsoft.Extensions.Logging;
 namespace nORM.Configuration
 {
     /// <summary>
+    /// Gate E: Controls what happens when the provider cannot enlist in an ambient
+    /// System.Transactions.TransactionScope. The default is <see cref="FailFast"/> so
+    /// that callers are alerted rather than silently committing outside the scope.
+    /// </summary>
+    public enum AmbientTransactionEnlistmentPolicy
+    {
+        /// <summary>
+        /// Throw <see cref="NormConfigurationException"/> when enlistment fails.
+        /// This is the safe default — it ensures callers know their operations are NOT
+        /// participating in the ambient scope and can choose how to handle it.
+        /// </summary>
+        FailFast,
+
+        /// <summary>
+        /// Log a warning and continue when enlistment fails. Operations will commit
+        /// independently of the ambient TransactionScope. Use when targeting providers
+        /// known to have limited ambient transaction support.
+        /// </summary>
+        BestEffort,
+
+        /// <summary>
+        /// Skip the EnlistTransaction call entirely. Use when the provider is known to
+        /// not support it and the overhead or warnings are undesirable.
+        /// </summary>
+        Ignore
+    }
+
+    /// <summary>
     /// Represents the configurable options for a <see cref="DbContext"/> instance.
     /// These settings control behavior such as command timeouts, logging, caching and
     /// how entities are tracked and filtered across the context.
@@ -203,6 +231,19 @@ namespace nORM.Configuration
         }
 
         internal bool IsTemporalVersioningEnabled => _temporalVersioningEnabled;
+
+        /// <summary>
+        /// Gate E: Gets or sets the policy applied when the ORM attempts to enlist the
+        /// database connection in an ambient <see cref="System.Transactions.TransactionScope"/>
+        /// but the provider throws during <c>EnlistTransaction()</c>.
+        /// Default is <see cref="AmbientTransactionEnlistmentPolicy.FailFast"/> — this is the
+        /// safest choice because it surfaces enlistment failures rather than silently committing
+        /// outside the scope. Change to <see cref="AmbientTransactionEnlistmentPolicy.BestEffort"/>
+        /// for providers with known enlistment limitations, or
+        /// <see cref="AmbientTransactionEnlistmentPolicy.Ignore"/> to skip enlistment entirely.
+        /// </summary>
+        public AmbientTransactionEnlistmentPolicy AmbientTransactionPolicy { get; set; }
+            = AmbientTransactionEnlistmentPolicy.FailFast;
 
         /// <summary>
         /// Gets a dictionary of global query filters keyed by entity type. Each entry

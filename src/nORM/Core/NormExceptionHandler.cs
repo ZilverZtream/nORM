@@ -36,6 +36,41 @@ namespace nORM.Core
         /// <param name="operationName">Human-readable name of the operation for logging.</param>
         /// <param name="context">Optional additional context values.</param>
         /// <returns>The result of the operation if successful.</returns>
+        /// <summary>
+        /// Truly synchronous overload — no async machinery involved.
+        /// Use this on the synchronous execution paths to avoid sync-over-async.
+        /// </summary>
+        public T ExecuteWithExceptionHandlingSync<T>(Func<T> operation, string operationName, Dictionary<string, object>? context = null)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                var result = operation();
+                _logger.LogInformation(
+                    "Operation {OperationName} completed successfully in {Duration}ms [CorrelationId: {CorrelationId}]",
+                    operationName, stopwatch.ElapsedMilliseconds, _correlationId);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                var enrichedContext = new Dictionary<string, object>(context ?? new Dictionary<string, object>())
+                {
+                    ["CorrelationId"] = _correlationId,
+                    ["Duration"] = stopwatch.ElapsedMilliseconds,
+                    ["Operation"] = operationName
+                };
+
+                var normException = EnrichException(ex, enrichedContext);
+
+                _logger.LogError(normException,
+                    "Operation {OperationName} failed after {Duration}ms [CorrelationId: {CorrelationId}]",
+                    operationName, stopwatch.ElapsedMilliseconds, _correlationId);
+
+                throw normException;
+            }
+        }
+
         public async Task<T> ExecuteWithExceptionHandling<T>(Func<Task<T>> operation, string operationName, Dictionary<string, object>? context = null)
         {
             var stopwatch = Stopwatch.StartNew();
