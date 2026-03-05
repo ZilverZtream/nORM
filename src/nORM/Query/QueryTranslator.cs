@@ -96,6 +96,9 @@ namespace nORM.Query
         private bool _isCacheable;
         private TimeSpan? _cacheExpiration;
         private DateTime? _asOfTimestamp;
+        // Complexity metrics accumulated during expression-tree visitation.
+        // These are used by GetAdaptiveTimeout instead of post-hoc SQL string scanning.
+        private QueryComplexityMetrics _complexityMetrics;
         // QP-1: Recursion depth limit is now read from DbContextOptions.MaxRecursionDepth (default 50).
         // This replaces the old hardcoded constant of 30. The effective limit is cached on the
         // QueryTranslator instance so that options changes mid-query have no effect.
@@ -206,6 +209,7 @@ namespace nORM.Query
                 _cacheExpiration = null;
                 _asOfTimestamp = null;
                 _detectedCollections = new List<PropertyInfo>();
+                _complexityMetrics = default;
                 // QP-1: Capture the configured recursion depth limit at Reset time
                 _maxRecursionDepth = ctx.Options.MaxRecursionDepth;
             }
@@ -240,6 +244,7 @@ namespace nORM.Query
                 _cacheExpiration = null;
                 _asOfTimestamp = null;
                 _detectedCollections = new List<PropertyInfo>();
+                _complexityMetrics = default;
             }
         }
         /// <summary>
@@ -303,6 +308,9 @@ namespace nORM.Query
                 var timeoutMultiplier = Math.Max(1.0, complexityInfo.EstimatedCost / 1000.0);
                 var adjustedTimeout = TimeSpan.FromMilliseconds(_t._ctx.Options.TimeoutConfiguration.BaseTimeout.TotalMilliseconds * timeoutMultiplier);
                 _t._estimatedTimeout = adjustedTimeout;
+                // Reset complexity metrics so they accumulate cleanly during the upcoming
+                // expression-tree walk in Generate().
+                _t._complexityMetrics = default;
                 return this;
             }
             public TranslationBuilder Setup()
@@ -530,7 +538,8 @@ namespace nORM.Query
                     _t._cacheExpiration,
                     Take: _t._take,
                     DependentQueries: dependentQueries,
-                    ClientProjection: _t._clientProjection
+                    ClientProjection: _t._clientProjection,
+                    Complexity: _t._complexityMetrics
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
@@ -717,6 +726,7 @@ namespace nORM.Query
                     _recursionDepth + 1, _maxRecursionDepth);
             }
 
+            _complexityMetrics.SubqueryDepth++;
             var subPlan = TranslateInSubContext(e, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out _);
             return subPlan.Sql;
         }
@@ -794,6 +804,43 @@ namespace nORM.Query
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             _methodName = node.Method.Name;
+            // Track complexity metrics from the expression tree as we walk it.
+            // This replaces post-hoc SQL string scanning in GetAdaptiveTimeout.
+            switch (_methodName)
+            {
+                case "Join":
+                case "GroupJoin":
+                case "SelectMany":
+                    _complexityMetrics.JoinCount++;
+                    break;
+                case "GroupBy":
+                    _complexityMetrics.HasGroupBy = true;
+                    break;
+                case "OrderBy":
+                case "OrderByDescending":
+                case "ThenBy":
+                case "ThenByDescending":
+                    _complexityMetrics.HasOrderBy = true;
+                    break;
+                case "Where":
+                    _complexityMetrics.PredicateCount++;
+                    break;
+                case "Distinct":
+                    _complexityMetrics.HasDistinct = true;
+                    break;
+                case "Sum":
+                case "Average":
+                case "Min":
+                case "Max":
+                case "Count":
+                case "LongCount":
+                case "InternalSumExpression":
+                case "InternalAverageExpression":
+                case "InternalMinExpression":
+                case "InternalMaxExpression":
+                    _complexityMetrics.HasAggregates = true;
+                    break;
+            }
             if (_methodTranslators.TryGetValue(_methodName, out var translator))
             {
                 return translator.Translate(this, node);

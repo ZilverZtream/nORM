@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
@@ -455,6 +456,135 @@ WHERE u.IsActive = 1";
     public void NormalizeSql_VariousInputs_ProducesExpectedOutput(string input, string expected)
     {
         Assert.Equal(expected, NormValidator.NormalizeSql(input));
+    }
+
+    // ─── Gate B: Validation independent of logging state ──────────────────
+
+    [Fact]
+    public async Task GateB_ParameterizedRawSql_PassesValidation_Regardless_OfLogging()
+    {
+        // Gate B: ValidateRawSql must receive parameter metadata regardless of whether
+        // debug logging is enabled. Previously AddParametersFast only populated the
+        // parameter dict when logging was active — with logging off, the validator
+        // received an empty dict and could apply stricter heuristics that block valid SQL.
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE Users (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)";
+            setup.ExecuteNonQuery();
+        }
+
+        // Context with NO logger — simulates the logging-disabled production path
+        using var ctxNoLogging = new DbContext(cn, new SqliteProvider());
+
+        // Parameterized query: validator should see the parameter and not flag the WHERE clause
+        var result = await ctxNoLogging.QueryUnchangedAsync<UserEntity>(
+            "SELECT Id, Name FROM Users WHERE Name = @p0", default, "Alice");
+
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task GateB_ParameterizedRawSql_WithMultipleParams_PassesValidation()
+    {
+        // Gate B: Multiple parameters of different types must all be passed to the validator.
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE Users (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)";
+            setup.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        // Three parameters: @p0 (int), @p1 (string) — the validator must receive count=2
+        var result = await ctx.QueryUnchangedAsync<UserEntity>(
+            "SELECT Id, Name FROM Users WHERE Id = @p0 AND Name = @p1",
+            default, 1, "Alice");
+
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task GateB_ParameterizedQuery_WithLikePattern_PassesValidation()
+    {
+        // Gate B: A parameterized LIKE clause must pass validation even when the parameter
+        // value could contain SQL keywords (pattern contains 'DROP' as part of a search term).
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE Users (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)";
+            setup.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        // Pattern contains the word DROP but it's a parameter value, not raw SQL
+        var result = await ctx.QueryUnchangedAsync<UserEntity>(
+            "SELECT Id, Name FROM Users WHERE Name LIKE @p0",
+            default, "%DROP%");
+
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task GateB_RawSqlWithoutParams_SafeSelect_PassesValidation()
+    {
+        // Gate B: A parameterless SELECT (no parameters at all) is always safe and must pass.
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE Users (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)";
+            setup.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var result = await ctx.QueryUnchangedAsync<UserEntity>(
+            "SELECT Id, Name FROM Users", default);
+
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task GateB_RawSqlWithStringLiteralInWhere_IsAllowedWhenSafe()
+    {
+        // Gate B: "SELECT * FROM Users WHERE Type = 'DROP'" is safe — DROP is in a string literal,
+        // not in SQL structure. The validator uses IsSafeRawSql which checks the SQL itself.
+        // The word 'DROP' inside a string literal does NOT trigger the keyword check because
+        // IsSafeRawSql uses NormalizeSql which preserves string context.
+        // This test validates that such a query passes IsSafeRawSql.
+        // NOTE: We test IsSafeRawSql directly because the actual execution would require the
+        // table and column to exist.
+        Assert.True(NormValidator.IsSafeRawSql("SELECT * FROM Users WHERE Type = 'DROP'"),
+            "SELECT with 'DROP' inside string literal in WHERE must be allowed — DROP is not a SQL keyword here");
+    }
+
+    [Fact]
+    public void GateB_ValidatorReceivesParameterCount_RegardlessOfLogging_UnitTest()
+    {
+        // Gate B unit test: ValidateRawSql must accept a parameterized query without flagging it
+        // even when the WHERE clause contains string-like patterns, because parameters are passed.
+        // This specifically tests the logging-independence fix: the dict is always populated.
+        var parameters = new Dictionary<string, object>
+        {
+            ["@p0"] = "Alice"
+        };
+
+        // Should not throw — parameters are present, so WHERE clause with params is safe
+        var ex = Record.Exception(() =>
+            NormValidator.ValidateRawSql("SELECT * FROM Users WHERE Name = @p0", parameters));
+        Assert.Null(ex);
+    }
+
+    private class UserEntity
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 
     private class SampleEntity

@@ -1,4 +1,9 @@
+using System;
+using System.Data;
 using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
 using nORM.Migration;
 using Xunit;
 
@@ -211,6 +216,72 @@ public class MigrationRoundTripTests
     }
 
     // ─── Snapshot diff: drop column ────────────────────────────────────────
+
+    // ─── Gate A integration: full lifecycle with closed-connection runner ─
+
+    [Fact]
+    public async Task GateA_FullLifecycle_ClosedConnection_HasPending_ApplyMigrations_HasPendingFalse()
+    {
+        // Gate A integration: verify that HasPendingMigrationsAsync works on a closed connection
+        // and that the full lifecycle (check → apply → check again) works correctly.
+        // This exercises the Gate A fix through realistic usage.
+        var assembly = typeof(SqliteMigrationRunnerTests).Assembly;
+        var cn = new SqliteConnection("Data Source=:memory:");
+        // Connection is CLOSED — each runner method must open it automatically.
+
+        try
+        {
+            await using var runner = new SqliteMigrationRunner(cn, assembly);
+
+            // Step 1: Check HasPending on closed connection — must auto-open and return true
+            Assert.Equal(ConnectionState.Closed, cn.State);
+            var hasPending = await runner.HasPendingMigrationsAsync();
+            Assert.True(hasPending, "Should have pending migrations before first apply");
+            Assert.Equal(ConnectionState.Open, cn.State);
+
+            // Step 2: GetPendingMigrations — already open, but method must handle that too
+            var pendingNames = await runner.GetPendingMigrationsAsync();
+            Assert.NotEmpty(pendingNames);
+
+            // Step 3: Apply all migrations
+            await runner.ApplyMigrationsAsync();
+
+            // Step 4: HasPending must now return false (all applied)
+            hasPending = await runner.HasPendingMigrationsAsync();
+            Assert.False(hasPending, "HasPendingMigrationsAsync must return false after applying all");
+
+            // Step 5: GetPendingMigrations must return empty array
+            var remaining = await runner.GetPendingMigrationsAsync();
+            Assert.Empty(remaining);
+        }
+        finally
+        {
+            await cn.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task GateA_FullLifecycle_OpenConnection_WorksIdentically()
+    {
+        // Gate A regression guard: the full lifecycle must also work when the connection
+        // is already open (no regression from the guard added for closed connections).
+        var assembly = typeof(SqliteMigrationRunnerTests).Assembly;
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();  // Pre-opened connection
+
+        await using var runner = new SqliteMigrationRunner(cn, assembly);
+
+        var hasBefore = await runner.HasPendingMigrationsAsync();
+        Assert.True(hasBefore);
+
+        await runner.ApplyMigrationsAsync();
+
+        var hasAfter = await runner.HasPendingMigrationsAsync();
+        Assert.False(hasAfter);
+
+        var pending = await runner.GetPendingMigrationsAsync();
+        Assert.Empty(pending);
+    }
 
     [Fact]
     public void SnapshotDiff_DroppedProperty_GeneratesTableRecreation()

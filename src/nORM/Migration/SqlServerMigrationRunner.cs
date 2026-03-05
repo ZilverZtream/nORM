@@ -78,6 +78,8 @@ namespace nORM.Migration
         /// <returns><c>true</c> if pending migrations exist; otherwise <c>false</c>.</returns>
         public async Task<bool> HasPendingMigrationsAsync(CancellationToken ct = default)
         {
+            if (_connection.State != System.Data.ConnectionState.Open)
+                await _connection.OpenAsync(ct).ConfigureAwait(false);
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
             var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
             return pending.Any();
@@ -90,6 +92,8 @@ namespace nORM.Migration
         /// <returns>An array containing the pending migration identifiers.</returns>
         public async Task<string[]> GetPendingMigrationsAsync(CancellationToken ct = default)
         {
+            if (_connection.State != System.Data.ConnectionState.Open)
+                await _connection.OpenAsync(ct).ConfigureAwait(false);
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
             var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
             return pending.Select(p => $"{p.Version}_{p.Name}").ToArray();

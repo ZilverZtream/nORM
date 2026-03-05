@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using nORM.Configuration;
 
 namespace nORM.Core
 {
@@ -54,14 +55,17 @@ namespace nORM.Core
             }
             else if (ambientTransaction != null && existingTransaction == null)
             {
-                // TX-1: When an ambient System.Transactions.Transaction exists but no explicit
-                // DbTransaction has been started, explicitly enlist the connection so that
-                // providers that have auto-enlist disabled (e.g. Enlist=False in connection string,
-                // or providers that never auto-enlist) are still correctly included in the
-                // TransactionScope and will roll back if the scope is disposed without Complete().
+                // TX-1 / Gate E: When an ambient System.Transactions.Transaction exists but no
+                // explicit DbTransaction has been started, attempt to enlist the connection so
+                // that providers are included in the TransactionScope and roll back correctly if
+                // the scope is disposed without Complete().
+                // Gate E: The enlistment failure policy is configurable via AmbientTransactionPolicy.
                 await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 var connection = context.Connection;
-                if (connection != null && connection.State == System.Data.ConnectionState.Open)
+                var policy = context.Options.AmbientTransactionPolicy;
+
+                if (connection != null && connection.State == System.Data.ConnectionState.Open
+                    && policy != AmbientTransactionEnlistmentPolicy.Ignore)
                 {
                     try
                     {
@@ -72,9 +76,18 @@ namespace nORM.Core
                     }
                     catch (Exception ex)
                     {
-                        // The provider does not support EnlistTransaction (e.g. some in-memory or
-                        // test-double implementations). Log a warning so developers are aware that
-                        // operations may commit outside the ambient scope.
+                        if (policy == AmbientTransactionEnlistmentPolicy.FailFast)
+                        {
+                            // Gate E: Surface enlistment failures so the caller knows their
+                            // operations are NOT participating in the ambient scope.
+                            throw new NormConfigurationException(
+                                "Provider does not support ambient transaction enlistment. " +
+                                "Set AmbientTransactionPolicy = BestEffort to suppress this error " +
+                                "or AmbientTransactionPolicy = Ignore to skip enlistment entirely. " +
+                                $"Provider error: {ex.Message}", ex);
+                        }
+
+                        // BestEffort: log warning and continue (operations may commit outside scope)
                         context.Options.Logger?.LogWarning(
                             "Could not enlist connection in ambient transaction {TransactionId}: {Message}. " +
                             "Operations may commit independently of the TransactionScope.",
