@@ -805,11 +805,14 @@ namespace nORM.Core
                     var state = group.Key.State;
                     await using var commandScope = new CommandScope(Connection, transaction);
 
+                    // SEC-MT: Include tenant param in per-entity count for Modified/Deleted so
+                    // batch sizing doesn't overflow MaxParameters on bounded providers.
+                    var tenantParamCount = (Options.TenantProvider != null && map.TenantColumn != null) ? 1 : 0;
                     var paramsPerEntity = state switch
                     {
-                        EntityState.Added => map.InsertColumns.Length,
-                        EntityState.Modified => map.UpdateColumns.Length + map.KeyColumns.Length + (map.TimestampColumn != null ? 1 : 0),
-                        EntityState.Deleted => map.KeyColumns.Length + (map.TimestampColumn != null ? 1 : 0),
+                        EntityState.Added    => map.InsertColumns.Length,
+                        EntityState.Modified => map.UpdateColumns.Length + map.KeyColumns.Length + (map.TimestampColumn != null ? 1 : 0) + tenantParamCount,
+                        EntityState.Deleted  => map.KeyColumns.Length + (map.TimestampColumn != null ? 1 : 0) + tenantParamCount,
                         _ => 0
                     };
                     var batchSize = CalculateBatchSize(entries.Count, paramsPerEntity);
@@ -956,6 +959,7 @@ namespace nORM.Core
             {
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, ct).ConfigureAwait(false);
                 int i = 0;
+                int keysAssigned = 0; // MAT-1: track actual key assignments
                 do
                 {
                     if (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -967,6 +971,7 @@ namespace nORM.Core
                             map.SetPrimaryKey(entity, newId);
                             // M2: Reindex the entity in the identity map now that it has a real PK
                             ChangeTracker.ReindexAfterInsert(entity, map);
+                            keysAssigned++; // MAT-1: only count successful assignments
                         }
                     }
                     // DATA INTEGRITY FIX (TASK 1): Removed AcceptChanges() call
@@ -974,6 +979,16 @@ namespace nORM.Core
                     i++;
                 }
                 while (await reader.NextResultAsync(ct).ConfigureAwait(false) && i < batch.Count);
+
+                // MAT-1: If DB returned fewer keys than entities, identity map is corrupt.
+                // Throwing here triggers the SaveChanges catch block → rollback.
+                if (keysAssigned != batch.Count)
+                    throw new InvalidOperationException(
+                        $"Generated key mismatch: expected {batch.Count} keys for inserted " +
+                        $"'{map.Type.Name}' entities but only {keysAssigned} were assigned. " +
+                        "Possible causes: trigger interference, driver quirk, or partial batch execution. " +
+                        "The transaction will be rolled back.");
+
                 return reader.RecordsAffected;
             }
 

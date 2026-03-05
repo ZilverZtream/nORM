@@ -570,31 +570,40 @@ namespace nORM.Query
                         _sql.Append("(1=0)");
                         return node;
                     }
-                    // PARAMETER LIMIT FIX: Use percentage-based buffer instead of fixed value
-                    // Reserve 20% of max parameters for other query parts (joins, WHERE, projections, etc.)
-                    // This is more robust than a fixed buffer of 10 which doesn't scale with query complexity
-                    var reservedBuffer = Math.Max(20, (int)(_provider.MaxParameters * 0.2));
-                    var remainingParams = _provider.MaxParameters - _paramIndex - reservedBuffer;
 
-                    if (remainingParams <= 0)
-                        throw new NormQueryException(
-                            $"Query complexity exceeds database parameter limit. " +
-                            $"Current parameters: {_paramIndex}, Maximum: {_provider.MaxParameters}, Reserved: {reservedBuffer}. " +
-                            $"Consider simplifying the query or using fewer items in IN clauses.");
+                    // QP-1: Separate nulls from non-nulls. SQL `col IN (NULL, @p1)` never matches
+                    // null rows — only `col IS NULL` does. Emit (col IN (...) OR col IS NULL) when needed.
+                    bool hasNulls = items.Any(x => x is null);
+                    var nonNullItems = hasNulls ? items.Where(x => x != null).ToList() : items;
 
-                    if (items.Count > remainingParams)
-                        throw new NormQueryException(
-                            $"IN clause with {items.Count} items exceeds remaining parameter budget of {remainingParams}. " +
-                            $"Current parameters: {_paramIndex}, Maximum: {_provider.MaxParameters}. " +
-                            $"Consider using a temporary table or reducing the number of items.");
-                    var maxBatchSize = Math.Max(1, Math.Min(1000, remainingParams));
-                    if (items.Count > maxBatchSize)
+                    // All-nulls case: emit col IS NULL with no parameters (IN () is invalid SQL).
+                    if (nonNullItems.Count == 0)
                     {
+                        Visit(valueExpr);
+                        _sql.Append(" IS NULL");
+                        return node;
+                    }
+
+                    // SQL-1: Exact accounting — _paramIndex already tracks all params added so far.
+                    // Nulls cost no parameters so use nonNullItems.Count for the budget check.
+                    var remainingParams = _provider.MaxParameters - _paramIndex;
+                    if (nonNullItems.Count > remainingParams)
+                        throw new NormQueryException(
+                            $"IN clause with {nonNullItems.Count} items exceeds remaining parameter budget " +
+                            $"({remainingParams} available, {_paramIndex} already used, limit {_provider.MaxParameters}). " +
+                            "Consider using a temporary table or reducing the number of items.");
+
+                    // Optimizer batching (1000 items per IN clause for DB plan efficiency).
+                    // This is decoupled from parameter limits.
+                    const int MaxInClauseItems = 1000;
+                    if (nonNullItems.Count > MaxInClauseItems)
+                    {
+                        if (hasNulls) _sql.Append("(");
                         _sql.Append("(");
-                        for (int batch = 0; batch < items.Count; batch += maxBatchSize)
+                        for (int batch = 0; batch < nonNullItems.Count; batch += MaxInClauseItems)
                         {
                             if (batch > 0) _sql.Append(" OR ");
-                            var batchItems = items.Skip(batch).Take(maxBatchSize);
+                            var batchItems = nonNullItems.Skip(batch).Take(MaxInClauseItems);
                             Visit(valueExpr);
                             _sql.Append(" IN (");
                             bool first = true;
@@ -608,18 +617,31 @@ namespace nORM.Query
                             _sql.Append(")");
                         }
                         _sql.Append(")");
+                        if (hasNulls)
+                        {
+                            _sql.Append(" OR ");
+                            Visit(valueExpr);
+                            _sql.Append(" IS NULL)");
+                        }
                     }
                     else
                     {
+                        if (hasNulls) _sql.Append("(");
                         Visit(valueExpr);
                         _sql.Append(" IN (");
-                        for (int i = 0; i < items.Count; i++)
+                        for (int i = 0; i < nonNullItems.Count; i++)
                         {
                             if (i > 0) _sql.Append(", ");
                             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _sql.AppendParameterizedValue(paramName, items[i], _paramSink);
+                            _sql.AppendParameterizedValue(paramName, nonNullItems[i], _paramSink);
                         }
                         _sql.Append(")");
+                        if (hasNulls)
+                        {
+                            _sql.Append(" OR ");
+                            Visit(valueExpr);
+                            _sql.Append(" IS NULL)");
+                        }
                     }
                     return node;
                 }
