@@ -1559,9 +1559,19 @@ namespace nORM.Query
                     // deterministic NormConfigurationException with an actionable message.
                     var propType = tenantCol.Prop.PropertyType;
                     object coercedTenantId;
-                    if (tenantId == null || propType.IsInstanceOfType(tenantId))
+                    if (tenantId == null)
                     {
-                        coercedTenantId = tenantId!;
+                        var isNullable = !propType.IsValueType || Nullable.GetUnderlyingType(propType) != null;
+                        if (!isNullable)
+                            throw new nORM.Core.NormConfigurationException(
+                                $"TenantProvider.GetCurrentTenantId() returned null but the tenant column " +
+                                $"'{tenantCol.PropName}' on entity '{entityType.Name}' has non-nullable type " +
+                                $"'{propType.FullName}'. Return a valid tenant ID or use a nullable column type.");
+                        coercedTenantId = null!;  // safe: propType is nullable reference or Nullable<T>
+                    }
+                    else if (propType.IsInstanceOfType(tenantId))
+                    {
+                        coercedTenantId = tenantId;
                     }
                     else
                     {
