@@ -279,6 +279,12 @@ namespace nORM.Core
         /// tracked by the context.
         /// </summary>
         public IEnumerable<EntityEntry> Entries => _entriesByReference.Values;
+
+        /// <summary>
+        /// Returns the tracked <see cref="EntityEntry"/> for the given entity instance, or null if not tracked.
+        /// </summary>
+        internal EntityEntry? GetEntryOrDefault(object entity) =>
+            _entriesByReference.TryGetValue(entity, out var entry) ? entry : null;
         /// <summary>
         /// Forces change detection for all entities that have been marked as dirty,
         /// updating their <see cref="EntityState"/> based on current property values.

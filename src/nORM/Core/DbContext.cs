@@ -1331,13 +1331,17 @@ namespace nORM.Core
                         _ => AdaptiveTimeoutManager.OperationType.Insert
                     };
                     cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(opType, cmd.CommandText));
-                    AddParametersOptimized(cmd, map, entity, operation);
+                    // CT-1: Pass the tracked snapshot token so the concurrency predicate uses the read-time value.
+                    var originalToken = ChangeTracker.GetEntryOrDefault(entity)?.OriginalToken;
+                    AddParametersOptimized(cmd, map, entity, operation, originalToken);
 
                     if (operation == WriteOperation.Insert && map.KeyColumns.Any(k => k.IsDbGenerated))
                     {
                         var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
                         if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
-                        if (ownsTransaction) await currentTransaction.CommitAsync(ct).ConfigureAwait(false);
+                        // TX-1: Use CancellationToken.None for commit — caller cancellation after the DB
+                        // has already committed can otherwise surface spurious exceptions and retry hazards.
+                        if (ownsTransaction) await currentTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
                         return 1;
                     }
                     var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
@@ -1346,7 +1350,8 @@ namespace nORM.Core
                     {
                         throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
                     }
-                    if (ownsTransaction) await currentTransaction.CommitAsync(ct).ConfigureAwait(false);
+                    // TX-1: Use CancellationToken.None for commit.
+                    if (ownsTransaction) await currentTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
                     return recordsAffected;
                 }
                 catch (Exception originalEx)
@@ -1406,11 +1411,13 @@ namespace nORM.Core
                 {
                     var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
                     if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
-                    await ownTransaction.CommitAsync(ct).ConfigureAwait(false);
+                    // TX-1: Use CancellationToken.None for commit.
+                    await ownTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
                     return 1;
                 }
                 var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-                await ownTransaction.CommitAsync(ct).ConfigureAwait(false);
+                // TX-1: Use CancellationToken.None for commit.
+                await ownTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
                 return recordsAffected;
             }
             catch (Exception originalEx)
@@ -1432,7 +1439,7 @@ namespace nORM.Core
             }
         }
 
-        private void AddParametersOptimized<T>(DbCommand cmd, TableMapping map, T entity, WriteOperation operation) where T : class
+        private void AddParametersOptimized<T>(DbCommand cmd, TableMapping map, T entity, WriteOperation operation, object? originalToken = null) where T : class
         {
             switch (operation)
             {
@@ -1446,14 +1453,23 @@ namespace nORM.Core
                     foreach (var col in map.KeyColumns)
                         cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
                     if (map.TimestampColumn != null)
-                        cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, map.TimestampColumn.Getter(entity));
+                    {
+                        // CT-1: Use the original snapshot token (not the current possibly-mutated property value)
+                        // to match the concurrency predicate parity of the batched SaveChanges path.
+                        var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
+                        cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue);
+                    }
                     break;
 
                 case WriteOperation.Delete:
                     foreach (var col in map.KeyColumns)
                         cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
                     if (map.TimestampColumn != null)
-                        cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, map.TimestampColumn.Getter(entity));
+                    {
+                        // CT-1: Use the original snapshot token.
+                        var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
+                        cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue);
+                    }
                     break;
             }
         }
