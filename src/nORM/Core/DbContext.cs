@@ -1062,9 +1062,37 @@ namespace nORM.Core
         {
             foreach (var entry in batch)
             {
+                var entity = entry.Entity ?? throw new InvalidOperationException("Entity is null");
+
+                // CT-1 (PK mutation): Detect if the primary key was mutated after tracking.
+                // Deleting with a mutated key would target the wrong row.
+                if (entry.OriginalKey != null && map.KeyColumns.Length > 0)
+                {
+                    object? currentKey;
+                    if (map.KeyColumns.Length == 1)
+                        currentKey = map.KeyColumns[0].Getter(entity);
+                    else
+                    {
+                        var vals = new object?[map.KeyColumns.Length];
+                        for (int i = 0; i < map.KeyColumns.Length; i++)
+                            vals[i] = map.KeyColumns[i].Getter(entity);
+                        currentKey = vals;
+                    }
+                    bool pkChanged;
+                    if (currentKey is object?[] currentArr && entry.OriginalKey is object?[] origArr)
+                        pkChanged = !currentArr.SequenceEqual(origArr);
+                    else
+                        pkChanged = !Equals(currentKey, entry.OriginalKey);
+                    if (pkChanged)
+                        throw new InvalidOperationException(
+                            $"Primary key mutation detected on entity '{map.Type.Name}'. " +
+                            "Primary keys cannot be changed after an entity is tracked. " +
+                            "Detach the entity, modify the key, then re-attach.");
+                }
+
                 sql.Append(BuildDeleteBatch(map, paramIndex)).Append(';');
                 paramIndex = AddParametersBatched(cmd, map,
-                    entry.Entity ?? throw new InvalidOperationException("Entity is null"),
+                    entity,
                     WriteOperation.Delete, paramIndex, entry.OriginalToken);
             }
             cmd.CommandText = sql.ToString();
@@ -1467,6 +1495,8 @@ namespace nORM.Core
                 whereParts.Add($"{col.EscCol}={_p.ParamPrefix}p{idx++}");
             if (map.TimestampColumn != null)
                 whereParts.Add($"{map.TimestampColumn.EscCol}={_p.ParamPrefix}p{idx++}");
+            if (Options.TenantProvider != null && map.TenantColumn != null)
+                whereParts.Add($"{map.TenantColumn.EscCol}={_p.ParamPrefix}p{idx++}");
             var where = string.Join(" AND ", whereParts);
             return $"UPDATE {map.EscTable} SET {setSb} WHERE {where}";
         }
@@ -1483,6 +1513,8 @@ namespace nORM.Core
                 whereParts.Add($"{col.EscCol}={_p.ParamPrefix}p{idx++}");
             if (map.TimestampColumn != null)
                 whereParts.Add($"{map.TimestampColumn.EscCol}={_p.ParamPrefix}p{idx++}");
+            if (Options.TenantProvider != null && map.TenantColumn != null)
+                whereParts.Add($"{map.TenantColumn.EscCol}={_p.ParamPrefix}p{idx++}");
             var where = string.Join(" AND ", whereParts);
             return $"DELETE FROM {map.EscTable} WHERE {where}";
         }
@@ -1508,6 +1540,8 @@ namespace nORM.Core
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddParam($"{_p.ParamPrefix}p{index++}", tokenValue);
                     }
+                    if (Options.TenantProvider != null && map.TenantColumn != null)
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", Options.TenantProvider.GetCurrentTenantId());
                     break;
                 case WriteOperation.Delete:
                     foreach (var col in map.KeyColumns)
@@ -1518,6 +1552,8 @@ namespace nORM.Core
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddParam($"{_p.ParamPrefix}p{index++}", tokenValue);
                     }
+                    if (Options.TenantProvider != null && map.TenantColumn != null)
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", Options.TenantProvider.GetCurrentTenantId());
                     break;
             }
             return index;

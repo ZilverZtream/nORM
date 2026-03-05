@@ -220,11 +220,15 @@ namespace nORM.Query
                         _hasher.Append(v);
                         break;
                     default:
-                        // Enum or unknown: best-effort fallback
+                        // Enum or unknown: stable fallback
                         if (value.GetType().IsEnum)
                             AppendInt(Convert.ToInt32(value));
                         else
-                            AppendInt(value.GetHashCode());
+                        {
+                            // QP-1: Use type name + ToString() for stable, collision-resistant fingerprint.
+                            AppendString(value.GetType().FullName ?? string.Empty);
+                            AppendString(value.ToString() ?? string.Empty);
+                        }
                         break;
                 }
             }
