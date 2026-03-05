@@ -1147,6 +1147,12 @@ namespace nORM.Query
             AppendUtf8(hasher, plan.Sql.AsSpan());
             AppendByte(hasher, (byte)'|');
             AppendUtf8(hasher, typeof(TResult).FullName!.AsSpan());
+            // PC-1: Include a stable database identity in the result cache key so that two
+            // contexts pointing to different databases with the same schema, query, and parameters
+            // do not share a cache entry and return data from the wrong database.
+            var dbIdentity = NormalizeConnectionStringForCacheKey(_ctx.Connection.ConnectionString);
+            AppendUtf8(hasher, "|DB:".AsSpan());
+            AppendUtf8(hasher, dbIdentity.AsSpan());
             var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             if (_ctx.Options.TenantProvider != null)
             {
@@ -1184,6 +1190,19 @@ namespace nORM.Query
             hasher.GetCurrentHash(hash);
             return Convert.ToHexString(hash);
         }
+        /// <summary>
+        /// PC-1: Normalizes a connection string for use as a cache key component.
+        /// Splits on ';', trims each pair, sorts case-insensitively, and rejoins so that
+        /// different orderings of the same connection string map to the same key.
+        /// </summary>
+        private static string NormalizeConnectionStringForCacheKey(string? cs)
+        {
+            if (string.IsNullOrEmpty(cs)) return string.Empty;
+            return string.Join(";", cs.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Select(p => p.Trim())
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase));
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void AppendUtf8(XxHash128 hasher, ReadOnlySpan<char> value)
         {

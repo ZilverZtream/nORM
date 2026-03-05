@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO.Hashing;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.ObjectPool;
 
@@ -91,6 +92,28 @@ namespace nORM.Query
             {
                 AppendGuid(node.Member.Module.ModuleVersionId);
                 AppendInt(node.Member.MetadataToken);
+
+                // QP-1: For closure captures (member access on a ConstantExpression), include
+                // whether the captured value is null as a bit in the fingerprint.
+                // This ensures that a cached plan for a non-null closure variable is not reused
+                // when the variable is later null (which requires IS NULL expansion in SQL).
+                if (node.Expression is ConstantExpression closure)
+                {
+                    try
+                    {
+                        object? capturedValue = closure.Value == null ? null :
+                            node.Member is FieldInfo fi ? fi.GetValue(closure.Value) :
+                            node.Member is PropertyInfo pi ? pi.GetValue(closure.Value) : null;
+                        // 1 = null, 0 = non-null. Different nullability → different plan shape.
+                        AppendInt(capturedValue is null ? 1 : 0);
+                    }
+                    catch
+                    {
+                        // If we can't read the value, conservatively treat it as potentially null.
+                        AppendInt(1);
+                    }
+                }
+
                 return base.VisitMember(node);
             }
 

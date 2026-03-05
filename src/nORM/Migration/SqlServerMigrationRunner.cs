@@ -44,7 +44,9 @@ namespace nORM.Migration
             _logger = logger;
             if (options != null && options.CommandInterceptors.Count > 0)
             {
-                _context = new DbContext(connection, new SqlServerProvider(), options);
+                // TX-1/MG-1: Pass ownsConnection=false so the context does NOT dispose the
+                // caller-supplied connection when the context itself is disposed.
+                _context = new DbContext(connection, new SqlServerProvider(), options, ownsConnection: false);
             }
         }
 
