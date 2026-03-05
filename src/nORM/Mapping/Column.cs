@@ -21,6 +21,8 @@ namespace nORM.Mapping
         public readonly PropertyInfo Prop;
         /// <summary>Name of the property on the CLR type.</summary>
         public readonly string PropName;
+        /// <summary>Plain (unescaped) column name.</summary>
+        public readonly string Name;
         /// <summary>Escaped column name suitable for inclusion in SQL statements.</summary>
         public readonly string EscCol;
         /// <summary>Indicates whether the column is part of the primary key.</summary>
@@ -59,6 +61,7 @@ namespace nORM.Mapping
 
             var fluentColName = fluentConfig?.ColumnNames.TryGetValue(info.Property, out var name) == true ? name : null;
             var colName = fluentColName ?? info.ColumnName ?? PropName;
+            Name = colName;
             EscCol = p.Escape(colName);
 
             IsKey = (fluentConfig?.KeyProperties.Contains(info.Property) ?? false) || info.IsKey;
@@ -107,6 +110,7 @@ namespace nORM.Mapping
 
             var fluentColName = fluentConfig?.ColumnNames.TryGetValue(pi, out var name) == true ? name : null;
             var colName = fluentColName ?? pi.GetCustomAttribute<ColumnAttribute>()?.Name ?? PropName;
+            Name = colName;
             EscCol = p.Escape(colName);
 
             IsKey = (fluentConfig?.KeyProperties.Contains(pi) ?? false) || pi.GetCustomAttribute<KeyAttribute>() != null;
@@ -149,6 +153,7 @@ namespace nORM.Mapping
             Prop = new ShadowPropertyInfo(name, clrType, declaringType);
             PropName = name;
             var colName = columnName ?? name;
+            Name = colName;
             EscCol = p.Escape(colName);
             IsKey = false;
             IsTimestamp = false;

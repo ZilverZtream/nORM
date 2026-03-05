@@ -46,6 +46,9 @@ namespace nORM.Providers
         /// </summary>
         public virtual string ParamPrefix => ParameterPrefixChar.ToString();
 
+        /// <summary>SQL literal for boolean true ("1" for SQLite/SQL Server/MySQL; PostgreSQL overrides to "TRUE").</summary>
+        public virtual string BooleanTrueLiteral => "1";
+
         /// <summary>
         /// Maximum length of a single SQL statement supported by the provider.
         /// </summary>
