@@ -374,14 +374,24 @@ namespace nORM.Providers
         protected async Task<int> ExecuteInsertBatch<T>(DbContext ctx, TableMapping m, List<T> batch, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
+            var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
+            // PRV-1: All columns are DB-generated — use DEFAULT VALUES per row (no batching possible).
+            if (cols.Count == 0)
+            {
+                var inserted = 0;
+                await using var cmd = ctx.CreateCommand();
+                cmd.CommandText = $"INSERT INTO {m.EscTable} DEFAULT VALUES";
+                for (int i = 0; i < batch.Count; i++)
+                    inserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                return inserted;
+            }
             var sb = _stringBuilderPool.Get();
             try
             {
-                var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
                 var colNames = string.Join(", ", cols.Select(c => c.EscCol));
                 sb.Append($"INSERT INTO {m.EscTable} ({colNames}) VALUES ");
 
-                await using var cmd = ctx.Connection.CreateCommand();
+                await using var cmd = ctx.CreateCommand();
                 var pIndex = 0;
                 for (int i = 0; i < batch.Count; i++)
                 {
@@ -442,7 +452,7 @@ namespace nORM.Providers
             {
                 foreach (var entity in entities)
                 {
-                    await using var cmd = ctx.Connection.CreateCommand();
+                    await using var cmd = ctx.CreateCommand();
                     cmd.Transaction = transaction;
                     cmd.CommandText = BuildUpdate(m);
                     foreach (var col in m.Columns.Where(c => !c.IsTimestamp)) cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
@@ -451,10 +461,21 @@ namespace nORM.Providers
                 }
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception originalEx)
             {
-                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
-                throw;
+                // S5-1: Preserve the original exception if rollback itself fails.
+                try
+                {
+                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
+                }
+                catch (Exception rollbackEx)
+                {
+                    throw new AggregateException(
+                        "BulkUpdate failed and rollback also failed. See inner exceptions for details.",
+                        originalEx, rollbackEx);
+                }
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
+                throw; // unreachable — satisfies compiler
             }
             ctx.Options.CacheProvider?.InvalidateTag(m.TableName);
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, totalUpdated, sw.Elapsed);
@@ -493,7 +514,7 @@ namespace nORM.Providers
                 for (int i = 0; i < entityList.Count; i += batchSize)
                 {
                     var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
-                    await using var cmd = ctx.Connection.CreateCommand();
+                    await using var cmd = ctx.CreateCommand();
                     cmd.Transaction = transaction;
                     cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
@@ -536,10 +557,21 @@ namespace nORM.Providers
 
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception originalEx)
             {
-                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
-                throw;
+                // S5-1: Preserve the original exception if rollback itself fails.
+                try
+                {
+                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
+                }
+                catch (Exception rollbackEx)
+                {
+                    throw new AggregateException(
+                        "BulkDelete failed and rollback also failed. See inner exceptions for details.",
+                        originalEx, rollbackEx);
+                }
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
+                throw; // unreachable — satisfies compiler
             }
 
             ctx.Options.CacheProvider?.InvalidateTag(m.TableName);
@@ -559,13 +591,18 @@ namespace nORM.Providers
         {
             return _sqlCache.GetOrAdd((m.Type, "INSERT"), _ => {
                 var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
+                // SQL-1/PERF-1: Only append identity retrieval when the key is DB-generated.
+                // For natural-key entities the fragment is wasteful and potentially wrong.
+                var identityFragment = m.KeyColumns.Any(k => k.IsDbGenerated)
+                    ? GetIdentityRetrievalString(m)
+                    : string.Empty;
                 if (cols.Length == 0)
                 {
-                    return $"INSERT INTO {m.EscTable} DEFAULT VALUES{GetIdentityRetrievalString(m)}";
+                    return $"INSERT INTO {m.EscTable} DEFAULT VALUES{identityFragment}";
                 }
                 var colNames = string.Join(", ", cols.Select(c => c.EscCol));
                 var valParams = string.Join(", ", cols.Select(c => ParamPrefix + c.PropName));
-                return $"INSERT INTO {m.EscTable} ({colNames}) VALUES ({valParams}){GetIdentityRetrievalString(m)}";
+                return $"INSERT INTO {m.EscTable} ({colNames}) VALUES ({valParams}){identityFragment}";
             });
         }
 

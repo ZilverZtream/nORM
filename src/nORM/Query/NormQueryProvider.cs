@@ -337,7 +337,7 @@ namespace nORM.Query
             Func<Task<TResult>> queryExecutorFactory = async () =>
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                await using var cmd = _ctx.Connection.CreateCommand();
+                await using var cmd = _ctx.CreateCommand();
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
                 var compiledParamsAsync = plan.CompiledParameters;
@@ -443,7 +443,7 @@ namespace nORM.Query
             Func<Task<TResult>> queryExecutorFactory = async () =>
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                await using var cmd = _ctx.Connection.CreateCommand();
+                await using var cmd = _ctx.CreateCommand();
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
                 foreach (var p in finalParameters) cmd.AddOptimizedParam(p.Key, p.Value);
@@ -518,7 +518,7 @@ namespace nORM.Query
             Func<Task<TResult>> queryExecutorFactory = async () =>
             {
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                await using var cmd = _ctx.Connection.CreateCommand();
+                await using var cmd = _ctx.CreateCommand();
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
 
@@ -820,7 +820,7 @@ namespace nORM.Query
         {
             var sw = Stopwatch.StartNew();
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = _ctx.Connection.CreateCommand();
+            await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             cmd.CommandText = sql;
             foreach (var p in parameters)
@@ -838,7 +838,7 @@ namespace nORM.Query
         {
             var sw = Stopwatch.StartNew();
             _ctx.EnsureConnection();
-            using var cmd = _ctx.Connection.CreateCommand();
+            using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             cmd.CommandText = sql;
             foreach (var p in parameters)
@@ -902,7 +902,7 @@ namespace nORM.Query
                 CacheExpiration: null
             );
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = _ctx.Connection.CreateCommand();
+            await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = sql;
             foreach (var p in parameters)
@@ -969,7 +969,7 @@ namespace nORM.Query
                 CacheExpiration: null
             );
             _ctx.EnsureConnection();
-            using var cmd = _ctx.Connection.CreateCommand();
+            using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = sql;
             foreach (var p in parameters)
@@ -1005,7 +1005,7 @@ namespace nORM.Query
             Func<TResult> queryExecutorFactory = () =>
             {
                 _ctx.EnsureConnection();
-                using var cmd = _ctx.Connection.CreateCommand();
+                using var cmd = _ctx.CreateCommand();
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
                 var compiledParamsSync = plan.CompiledParameters;
@@ -1263,7 +1263,7 @@ namespace nORM.Query
             _cudBuilder.ValidateCudPlan(plan.Sql);
             var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = _ctx.Connection.CreateCommand();
+            await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             var finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
             cmd.CommandText = finalSql;
@@ -1294,7 +1294,7 @@ namespace nORM.Query
             var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
             var (setClause, setParams) = _cudBuilder.BuildSetClause(mapping, set);
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = _ctx.Connection.CreateCommand();
+            await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             var finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
             cmd.CommandText = finalSql;
@@ -1324,7 +1324,7 @@ namespace nORM.Query
             var plan = GetPlan(expression, out _, out var paramValues);
             var sw = Stopwatch.StartNew();
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = _ctx.Connection.CreateCommand();
+            await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
             foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
@@ -1574,31 +1574,34 @@ namespace nORM.Query
             private readonly List<object?> _values = new();
             public IReadOnlyList<object?> Values => _values;
 
+            // Inline constants (ConstantExpression) are baked into the plan's static Parameters
+            // dictionary at translation time and are NOT in CompiledParameters.  We must not add
+            // their values here or the position mapping against CompiledParameters would be wrong.
+            // IQueryable roots are skipped because they are not SQL parameters.
             protected override Expression VisitConstant(ConstantExpression node)
             {
-                if (node.Value is IQueryable)
-                {
-                    return node;
-                }
-                _values.Add(node.Value ?? DBNull.Value);
-                return base.VisitConstant(node);
+                // Skip all constants - they are either IQueryable roots or values already baked
+                // into the plan's Parameters dictionary by AppendConstant during translation.
+                return node;
             }
 
             protected override Expression VisitMember(MemberExpression node)
             {
+                // Closure-captured variables (member access whose root resolves to a constant)
+                // are now emitted as compiled parameters by ExpressionToSqlVisitor.VisitMember.
+                // Extract the live value here so it can be bound at execution time.
                 if (QueryTranslator.TryGetConstantValue(node, out var value))
                 {
                     _values.Add(value ?? DBNull.Value);
-                    return node;
+                    return node; // early return: do NOT visit children (avoids double-counting)
                 }
                 return base.VisitMember(node);
             }
 
-            protected override Expression VisitParameter(ParameterExpression node)
-            {
-                _values.Add(DBNull.Value);
-                return base.VisitParameter(node);
-            }
+            // Lambda ParameterExpression nodes (e.g. 'x' in x => x.Value > 5) are column
+            // references, not SQL parameters.  Free ParameterExpressions used in compiled queries
+            // go through ExecuteCompiledAsync which bypasses this extractor entirely.
+            // Do NOT override VisitParameter - the base class default is correct (no-op).
         }
     }
 }

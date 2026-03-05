@@ -742,7 +742,7 @@ namespace nORM.Query
         private async Task<DateTime> GetTimestampForTagAsync(string tagName, CancellationToken ct = default)
         {
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = _ctx.Connection.CreateCommand();
+            await using var cmd = _ctx.CreateCommand();
             var pName = _provider.ParamPrefix + "p0";
             cmd.CommandText = $"SELECT Timestamp FROM __NormTemporalTags WHERE TagName = {pName}";
             cmd.AddParam(pName, tagName);
@@ -918,9 +918,15 @@ namespace nORM.Query
                 AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(innerKeyVisitor);
             JoinBuilder.SetupJoinProjection(null, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, outerKeySql);
+            // QP-1: Do NOT embed ORDER BY in the SQL string. Instead, insert the outer key as the
+            // first ORDER BY entry so that Build() generates exactly one ORDER BY clause.
+            // This prevents double ORDER BY when downstream .OrderBy() is chained, and ensures
+            // outer-key contiguity (needed for streaming group segmentation) is always first.
+            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, orderBy: null);
             _sql.Clear();
             _sql.Append(sql);
+            // Insert outer-key sort at the front of _orderBy so it is always first.
+            _orderBy.Insert(0, (outerKeySql, true));
             var outerType = outerKeySelector.Parameters[0].Type;
             var innerType = innerKeySelector.Parameters[0].Type;
             var resultType = resultSelector.Body.Type;

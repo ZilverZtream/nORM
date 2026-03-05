@@ -72,7 +72,7 @@ namespace nORM.Query
                 ct.ThrowIfCancellationRequested();
 
                 await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                await using var cmd = _ctx.Connection.CreateCommand();
+                await using var cmd = _ctx.CreateCommand();
 
                 var paramNames = new List<string>();
                 for (int i = 0; i < keyBatch.Length; i++)
@@ -144,7 +144,7 @@ namespace nORM.Query
             foreach (var keyBatch in keys.Chunk(maxPerBatch))
             {
                 _ctx.EnsureConnection();
-                using var cmd = _ctx.Connection.CreateCommand();
+                using var cmd = _ctx.CreateCommand();
 
                 var paramNames = new List<string>();
                 for (int i = 0; i < keyBatch.Length; i++)

@@ -390,7 +390,7 @@ namespace nORM.Navigation
         private static async Task<object?> ExecuteSingleQueryAsync(DbContext context, TableMapping mapping, Column foreignKey, object keyValue, Type entityType, CancellationToken ct)
         {
             await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            using var cmd = context.Connection.CreateCommand();
+            using var cmd = context.CreateCommand();
 
             var paramName = context.Provider.ParamPrefix + "fk";
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {foreignKey.EscCol} = {paramName}";

@@ -194,7 +194,7 @@ namespace nORM.Navigation
         {
             var mapping = _context.GetMapping(relation.DependentType);
             await _context.EnsureConnectionAsync(default).ConfigureAwait(false);
-            using var cmd = _context.Connection.CreateCommand();
+            using var cmd = _context.CreateCommand();
 
             var where = _context.Provider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, keys);
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";

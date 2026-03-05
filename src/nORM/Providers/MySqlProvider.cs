@@ -410,7 +410,7 @@ END;";
             var nonKeyCols = m.Columns.Where(c => !c.IsKey).ToList();
 
             var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetSqlType(c.Prop.PropertyType)}"));
-            await using (var cmd = ctx.Connection.CreateCommand())
+            await using (var cmd = ctx.CreateCommand())
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TEMPORARY TABLE {tempTableName} ({colDefs})";
@@ -422,7 +422,7 @@ END;";
 
             var setClause = string.Join(", ", nonKeyCols.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
             var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
-            await using (var cmd = ctx.Connection.CreateCommand())
+            await using (var cmd = ctx.CreateCommand())
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"UPDATE {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause} SET {setClause}";
@@ -467,7 +467,7 @@ END;";
             for (int i = 0; i < entityList.Count; i += batchSize)
             {
                 var batch = entityList.Skip(i).Take(batchSize).ToList();
-                await using var cmd = ctx.Connection.CreateCommand();
+                await using var cmd = ctx.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
                 var valueClauses = new List<string>();

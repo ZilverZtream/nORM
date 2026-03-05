@@ -460,7 +460,7 @@ END;";
             var nonKeyCols = m.Columns.Where(c => !c.IsKey).ToList();
 
             var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetSqlType(c.Prop.PropertyType)}"));
-            await using (var cmd = ctx.Connection.CreateCommand())
+            await using (var cmd = ctx.CreateCommand())
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TABLE {tempTableName} ({colDefs})";
@@ -471,7 +471,7 @@ END;";
 
             var setClause = string.Join(", ", nonKeyCols.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
             var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
-            await using (var cmd = ctx.Connection.CreateCommand())
+            await using (var cmd = ctx.CreateCommand())
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"UPDATE T1 SET {setClause} FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause}";
@@ -534,7 +534,7 @@ END;";
             var tempTableName = $"#BulkDelete_{Guid.NewGuid():N}";
             var keyColDefs = string.Join(", ", m.KeyColumns.Select(c => $"{c.EscCol} {GetSqlType(c.Prop.PropertyType)}"));
 
-            await using (var cmd = ctx.Connection.CreateCommand())
+            await using (var cmd = ctx.CreateCommand())
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"CREATE TABLE {tempTableName} ({keyColDefs})";
@@ -566,7 +566,7 @@ END;";
             }
 
             var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
-            await using (var cmd = ctx.Connection.CreateCommand())
+            await using (var cmd = ctx.CreateCommand())
             {
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 cmd.CommandText = $"DELETE T1 FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause}";

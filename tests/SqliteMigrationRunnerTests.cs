@@ -20,9 +20,9 @@ public class SqliteMigrationRunnerTests
         Assert.True(await runner.HasPendingMigrationsAsync());
 
         var pending = await runner.GetPendingMigrationsAsync();
-        // The test assembly contains 3 migration classes: the two declared in SqliteMigrationRunnerTests
-        // (v1, v2) and the one in MigrationHistoryFaultTests (v100).
-        Assert.Equal(new[] { "1_CreateBlogTable", "2_AddPostsTable", "100_CreateItemTable" }, pending);
+        // The test assembly contains 4 migration classes: the two declared in SqliteMigrationRunnerTests
+        // (v1, v2), the one in MigrationHistoryFaultTests (v100), and the one in MigrationWithDataTests (v200).
+        Assert.Equal(new[] { "1_CreateBlogTable", "2_AddPostsTable", "100_CreateItemTable", "200_CreateMwdTable" }, pending);
 
         await runner.ApplyMigrationsAsync();
 
@@ -39,7 +39,7 @@ public class SqliteMigrationRunnerTests
         {
             cmd.CommandText = "SELECT COUNT(*) FROM \"__NormMigrationsHistory\";";
             var count = Convert.ToInt64(await cmd.ExecuteScalarAsync());
-            Assert.Equal(3L, count);
+            Assert.Equal(4L, count);
         }
     }
 
