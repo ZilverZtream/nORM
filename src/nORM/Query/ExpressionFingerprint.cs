@@ -220,9 +220,22 @@ namespace nORM.Query
                         _hasher.Append(v);
                         break;
                     default:
-                        // Enum or unknown: stable fallback
                         if (value.GetType().IsEnum)
-                            AppendInt(Convert.ToInt32(value));
+                        {
+                            // QP/PC-1: Convert.ToInt32 overflows for long/ulong-backed enums outside Int32 range.
+                            // Use the underlying type to choose the correct serialization path.
+                            var underlying = Enum.GetUnderlyingType(value.GetType());
+                            var raw = Convert.ChangeType(value, underlying);
+                            if (raw is long lv)         AppendLong(lv);
+                            else if (raw is ulong ulv)  AppendLong((long)ulv);
+                            else if (raw is int iv)     AppendInt(iv);
+                            else if (raw is uint uiv)   AppendLong(uiv);
+                            else if (raw is short sv)   AppendInt(sv);
+                            else if (raw is ushort usv) AppendInt(usv);
+                            else if (raw is byte bv)    AppendInt(bv);
+                            else if (raw is sbyte sbv)  AppendInt(sbv);
+                            else                        AppendString(raw.ToString() ?? string.Empty);
+                        }
                         else
                         {
                             // QP-1: Use type name + ToString() for stable, collision-resistant fingerprint.
