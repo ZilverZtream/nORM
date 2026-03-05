@@ -83,8 +83,18 @@ namespace nORM.Query
 
             protected override Expression VisitConstant(ConstantExpression node)
             {
-                // Ignore constant value; base.VisitConstant does nothing
+                // Include the type in the fingerprint (used for parameter extraction).
                 AppendString(node.Type.FullName ?? string.Empty);
+
+                // QP-1 NULL SEMANTICS: Include whether the constant is null as a bit in the fingerprint.
+                // Without this, `x.NullableStr != null` and `x.NullableStr != "Alice"` produce the same
+                // fingerprint even though they generate completely different SQL shapes:
+                //   - != null  → IS NOT NULL  (handled by IsNullExpression in VisitBinary)
+                //   - != "Alice" → (col IS NULL OR col <> @p)  (handled by NeedsNullSafeExpansion)
+                // Caching a plan for one and reusing it for the other causes incorrect query results.
+                // 1 = null constant, 0 = non-null constant.
+                AppendInt(node.Value is null ? 1 : 0);
+
                 return base.VisitConstant(node);
             }
 
