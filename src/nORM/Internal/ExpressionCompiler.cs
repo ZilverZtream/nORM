@@ -76,20 +76,28 @@ namespace nORM.Internal
             where TContext : DbContext
             where T : class
         {
-            QueryPlan? cachedPlan = null;
-            IReadOnlyList<string>? paramNames = null;
+            // SG-1: Use per-context-shape cache so each distinct provider+mapping combination
+            // gets its own plan rather than reusing the first context's plan forever.
+            var plansByCtx = new ConcurrentDictionary<int, (QueryPlan Plan, IReadOnlyList<string> ParamNames)>();
 
             return async (ctx, value) =>
             {
-                if (cachedPlan == null)
+                int ctxKey = ctx.Provider.GetType().GetHashCode();
+                foreach (var m in ctx.GetAllMappings())
+                    ctxKey = HashCode.Combine(ctxKey, m.TableName, m.Type);
+
+                if (!plansByCtx.TryGetValue(ctxKey, out var entry))
                 {
                     var ctxParam = queryExpression.Parameters[0];
                     var body = new ParameterReplacer(ctxParam, Expression.Constant(ctx)).Visit(queryExpression.Body)!;
                     body = new QueryCallEvaluator().Visit(body)!;
-                    var provider = new NormQueryProvider(ctx);
-                    cachedPlan = provider.GetPlan(body, out _);
-                    paramNames = cachedPlan.CompiledParameters;
+                    var p = new NormQueryProvider(ctx).GetPlan(body, out _);
+                    entry = (p, p.CompiledParameters);
+                    plansByCtx[ctxKey] = entry;
                 }
+
+                var cachedPlan = entry.Plan;
+                var paramNames = entry.ParamNames;
 
                 // PERFORMANCE FIX: Use array instead of dictionary to avoid allocation
                 object?[] args;
@@ -103,21 +111,17 @@ namespace nORM.Internal
                         for (int i = 0; i < count; i++)
                             args[i] = tuple[i];
                     }
-                    else
+                    else if (args.Length == 1)
                     {
                         // Single parameter case - map value to first argument
-                        if (args.Length == 1)
-                        {
-                            args[0] = value;
-                        }
-                        else
-                        {
-                            // For multiple parameters without tuple, use value for all (rare case)
-                            for (int i = 0; i < paramNames.Count; i++)
-                            {
-                                args[i] = value;
-                            }
-                        }
+                        args[0] = value;
+                    }
+                    else
+                    {
+                        // PC-1: Multiple parameters require a ValueTuple; single non-tuple is ambiguous.
+                        throw new InvalidOperationException(
+                            $"Compiled query expects {paramNames.Count} parameters. " +
+                            "Pass values as a ValueTuple, e.g. (value1, value2).");
                     }
                 }
                 else

@@ -441,16 +441,24 @@ namespace nORM.Core
 
             if (mapping.KeyColumns.Length == 2)
             {
-                var v0 = mapping.KeyColumns[0].Getter(entity);
-                var v1 = mapping.KeyColumns[1].Getter(entity);
+                var col0 = mapping.KeyColumns[0]; var col1 = mapping.KeyColumns[1];
+                var v0 = col0.Getter(entity);     var v1 = col1.Getter(entity);
+                // CT-1: unassigned DB-generated composite key → treat as null (not yet in identity map)
+                if ((col0.IsDbGenerated && IsDefaultKeyValue(v0, col0.Prop.PropertyType)) ||
+                    (col1.IsDbGenerated && IsDefaultKeyValue(v1, col1.Prop.PropertyType)))
+                    return null;
                 return (v0, v1);
             }
 
             if (mapping.KeyColumns.Length == 3)
             {
-                var v0 = mapping.KeyColumns[0].Getter(entity);
-                var v1 = mapping.KeyColumns[1].Getter(entity);
-                var v2 = mapping.KeyColumns[2].Getter(entity);
+                var col0 = mapping.KeyColumns[0]; var col1 = mapping.KeyColumns[1]; var col2 = mapping.KeyColumns[2];
+                var v0 = col0.Getter(entity);     var v1 = col1.Getter(entity);     var v2 = col2.Getter(entity);
+                // CT-1: unassigned DB-generated composite key → treat as null (not yet in identity map)
+                if ((col0.IsDbGenerated && IsDefaultKeyValue(v0, col0.Prop.PropertyType)) ||
+                    (col1.IsDbGenerated && IsDefaultKeyValue(v1, col1.Prop.PropertyType)) ||
+                    (col2.IsDbGenerated && IsDefaultKeyValue(v2, col2.Prop.PropertyType)))
+                    return null;
                 return (v0, v1, v2);
             }
 
@@ -460,7 +468,12 @@ namespace nORM.Core
                 var values = new object?[mapping.KeyColumns.Length];
                 for (int i = 0; i < mapping.KeyColumns.Length; i++)
                 {
-                    values[i] = mapping.KeyColumns[i].Getter(entity);
+                    var col = mapping.KeyColumns[i];
+                    var v = col.Getter(entity);
+                    // CT-1: unassigned DB-generated key component → entity not yet in identity map
+                    if (col.IsDbGenerated && IsDefaultKeyValue(v, col.Prop.PropertyType))
+                        return null;
+                    values[i] = v;
                 }
                 return new CompositeKey(values);
             }
