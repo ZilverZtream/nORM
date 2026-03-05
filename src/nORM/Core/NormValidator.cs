@@ -517,12 +517,17 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// P1: Provider-aware SQL safety gate.
+        /// P1: Provider-aware SQL safety gate for query APIs (SELECT-only).
         /// Non-SQL-Server providers skip the TSQL AST parser (which produces false
-        /// negatives for dialect-specific syntax like SQLite PRAGMA) and rely solely
-        /// on the keyword denylist. SQL Server still uses the full AST allowlist path.
+        /// negatives for dialect-specific syntax like SQLite PRAGMA) and rely on
+        /// the keyword denylist PLUS a structural SELECT-only allowlist.
+        /// SQL Server still uses the full AST allowlist path.
         /// All providers run keyword checks against the NORMALIZED form to defeat
         /// comment-injection and whitespace-based obfuscation attacks.
+        ///
+        /// S2-1/S9-1: For query APIs the gate is not "not in denylist" but
+        /// "IS a SELECT statement". After denylist check, we verify the normalized
+        /// SQL actually starts with SELECT (or WITH ... SELECT for CTEs).
         /// </summary>
         internal static bool IsSafeRawSql(string sql, DatabaseProvider? provider = null)
         {
@@ -536,7 +541,14 @@ namespace nORM.Core
             if (!IsSafeByKeywords(normalized)) return false;
 
             // P1: skip expensive TSQL parse for non-SQL-Server providers
-            if (provider is not null && provider is not SqlServerProvider) return true;
+            if (provider is not null && provider is not SqlServerProvider)
+            {
+                // S2-1/S9-1: SELECT-only structural gate for non-SQL-Server providers.
+                // The denylist alone is insufficient — commands like ATTACH DATABASE,
+                // DETACH DATABASE, LOAD EXTENSION, USE are not in the denylist.
+                // Require the statement to actually BE a SELECT (or CTE starting with WITH).
+                return IsSelectStatement(normalized);
+            }
 
             // Feed the ORIGINAL sql to the TSQL parser (it handles its own syntax);
             // the keyword check above already caught any obfuscated keywords.
@@ -546,8 +558,8 @@ namespace nORM.Core
 
             if (errors != null && errors.Count > 0)
             {
-                // Parse failed (non-TSQL syntax) — keyword check already passed, allow it
-                return true;
+                // Parse failed (non-TSQL syntax) — apply SELECT-only structural gate
+                return IsSelectStatement(normalized);
             }
 
             var allowed = new HashSet<Type> { typeof(SelectStatement), typeof(SetVariableStatement) };
@@ -562,6 +574,65 @@ namespace nORM.Core
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// S2-1/S9-1: Returns true if the normalized SQL is a SELECT statement or a CTE
+        /// (WITH ... AS (...) SELECT ...). This is the structural SELECT-only gate used
+        /// for query APIs on non-SQL-Server providers.
+        /// </summary>
+        /// <param name="normalizedSql">Normalized SQL (lowercased, whitespace-collapsed, comment-stripped).</param>
+        private static bool IsSelectStatement(string normalizedSql)
+        {
+            if (normalizedSql.StartsWith("select ", StringComparison.Ordinal)) return true;
+            // Handle "select" with no trailing space (e.g., "select" at end of string — unlikely but safe to handle)
+            if (normalizedSql == "select") return true;
+
+            // Handle CTEs: WITH name AS (...) SELECT ...
+            if (normalizedSql.StartsWith("with ", StringComparison.Ordinal))
+            {
+                int idx = FindSelectAfterCte(normalizedSql);
+                return idx >= 0;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// S2-1/S9-1: Finds the position of SELECT after a CTE preamble.
+        /// Tracks parenthesis depth so nested parens inside the CTE body are skipped correctly.
+        /// Returns -1 if no SELECT is found after the CTE.
+        /// </summary>
+        private static int FindSelectAfterCte(string normalizedSql)
+        {
+            // We need to find "select " that appears outside of all parentheses after "with "
+            // Example: "with cte as (select * from t) select * from cte"
+            // Walk through tracking paren depth; when depth returns to 0 look for "select "
+            int depth = 0;
+            int len = normalizedSql.Length;
+
+            for (int i = 0; i < len; i++)
+            {
+                char c = normalizedSql[i];
+                if (c == '(')
+                {
+                    depth++;
+                }
+                else if (c == ')')
+                {
+                    if (depth > 0) depth--;
+                }
+                else if (depth == 0 && i + 7 <= len &&
+                         normalizedSql[i] == 's' && normalizedSql[i + 1] == 'e' &&
+                         normalizedSql[i + 2] == 'l' && normalizedSql[i + 3] == 'e' &&
+                         normalizedSql[i + 4] == 'c' && normalizedSql[i + 5] == 't' &&
+                         normalizedSql[i + 6] == ' ')
+                {
+                    // Verify this select is at start of a token (preceded by space or is at position 0)
+                    if (i == 0 || normalizedSql[i - 1] == ' ' || normalizedSql[i - 1] == ')')
+                        return i;
+                }
+            }
+            return -1;
         }
 
         /// <summary>
@@ -596,6 +667,20 @@ namespace nORM.Core
                 ContainsDeniedKeyword(normalizedSql, "reindex") ||
                 ContainsDeniedKeyword(normalizedSql, "analyze") ||
                 ContainsDeniedKeyword(normalizedSql, "call"))
+                return false;
+
+            // S2-1/S9-1: Defense-in-depth denylist additions for SQLite/MySQL side-effect commands
+            // not previously covered. These bypass the old denylist-only check.
+            // ATTACH DATABASE 'x.db' AS x — attaches external SQLite database
+            // DETACH DATABASE x — detaches external SQLite database
+            // LOAD EXTENSION 'evil.dll' — SQLite extension loading
+            // USE other_database — MySQL database switch
+            // IMPORT — various DB import commands
+            if (ContainsDeniedKeyword(normalizedSql, "attach") ||
+                ContainsDeniedKeyword(normalizedSql, "detach") ||
+                ContainsDeniedKeyword(normalizedSql, "load") ||
+                ContainsDeniedKeyword(normalizedSql, "import") ||
+                ContainsDeniedKeyword(normalizedSql, "use"))
                 return false;
 
             // Reject stacked queries — semicolon separating statements

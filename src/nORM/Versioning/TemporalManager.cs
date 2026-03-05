@@ -63,7 +63,19 @@ namespace nORM.Versioning
         {
             var handler = new NormExceptionHandler(NullLogger.Instance);
 
-            var batches = sql.Split(new[] { "\r\nGO\r\n", "\nGO\n", "\r\nGO\n", "\nGO\r\n", "\rGO\r", "\nGO\r" }, StringSplitOptions.RemoveEmptyEntries);
+            // S6-1: Split on both T-SQL GO batch separators and MySQL trigger delimiters.
+            // MySQL's CREATE TRIGGER ... BEGIN ... END blocks must be sent as individual
+            // DbCommand statements — the ADO.NET driver accepts BEGIN...END with internal
+            // semicolons in a single command, so we only need to separate multiple triggers.
+            // The "-- DELIMITER" marker is used by MySqlProvider.GenerateTemporalTriggersSql
+            // to separate individual CREATE TRIGGER statements.
+            var batchSeparators = new[]
+            {
+                "\r\nGO\r\n", "\nGO\n", "\r\nGO\n", "\nGO\r\n", "\rGO\r", "\nGO\r",
+                "\n-- DELIMITER\n", "\r\n-- DELIMITER\r\n", "\r\n-- DELIMITER\n", "\n-- DELIMITER\r\n",
+                "-- DELIMITER"
+            };
+            var batches = sql.Split(batchSeparators, StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var batch in batches)
             {

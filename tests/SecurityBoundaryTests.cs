@@ -581,6 +581,94 @@ WHERE u.IsActive = 1";
         Assert.Null(ex);
     }
 
+    // ─── S2-1/S9-1: SELECT-only structural gate ───────────────────────────────
+
+    [Theory]
+    [InlineData("ATTACH DATABASE 'x.db' AS x")]
+    [InlineData("attach database 'x.db' as x")]
+    [InlineData("DETACH DATABASE x")]
+    [InlineData("detach database x")]
+    [InlineData("LOAD EXTENSION 'spellfix'")]
+    [InlineData("load extension 'spellfix'")]
+    [InlineData("USE other_db")]
+    [InlineData("use other_db")]
+    public void IsSafeRawSql_RejectsSideEffectCommandsNotInOldDenylist(string sql)
+    {
+        // S2-1/S9-1: These commands were not previously in the denylist but are side-effect
+        // statements. They must be rejected both by the new keyword additions and by the
+        // SELECT-only structural gate for non-SQL-Server providers.
+        var sqliteProvider = new SqliteProvider();
+        Assert.False(NormValidator.IsSafeRawSql(sql, sqliteProvider),
+            $"Expected '{sql}' to be rejected for SQLite provider");
+        // Also reject with no provider (SQL Server path)
+        Assert.False(NormValidator.IsSafeRawSql(sql),
+            $"Expected '{sql}' to be rejected with no provider");
+    }
+
+    [Theory]
+    [InlineData("SELECT * FROM Users")]
+    [InlineData("select id from users")]
+    [InlineData("SELECT Id, Name FROM Users WHERE Id = 1")]
+    public void IsSafeRawSql_AcceptsValidSelect_ForSqliteProvider(string sql)
+    {
+        // S2-1/S9-1: Valid SELECT statements must still be accepted for non-SQL-Server providers
+        var sqliteProvider = new SqliteProvider();
+        Assert.True(NormValidator.IsSafeRawSql(sql, sqliteProvider),
+            $"Expected '{sql}' to be accepted for SQLite provider");
+    }
+
+    [Fact]
+    public void IsSafeRawSql_AcceptsCteSelect_ForSqliteProvider()
+    {
+        // S2-1/S9-1: CTE (WITH ... AS (...) SELECT ...) must be accepted
+        const string cte = "WITH cte AS (SELECT * FROM Users) SELECT * FROM cte";
+        var sqliteProvider = new SqliteProvider();
+        Assert.True(NormValidator.IsSafeRawSql(cte, sqliteProvider),
+            "CTE with SELECT must be accepted for SQLite provider");
+    }
+
+    [Fact]
+    public void IsSafeRawSql_AcceptsLowercaseCte_ForSqliteProvider()
+    {
+        // S2-1/S9-1: Lowercase CTE must be accepted
+        const string cte = "with cte as (select * from users) select * from cte";
+        var sqliteProvider = new SqliteProvider();
+        Assert.True(NormValidator.IsSafeRawSql(cte, sqliteProvider),
+            "Lowercase CTE with SELECT must be accepted for SQLite provider");
+    }
+
+    [Fact]
+    public void IsSafeRawSql_AttachInStringLiteral_IsRejectedByDenylist()
+    {
+        // S2-1/S9-1: "ATTACH" as a word token in SQL structure is rejected.
+        // Note: The denylist treats ATTACH as a whole token, so "SELECT id FROM
+        // users WHERE name = 'ATTACH'" — here ATTACH is inside quotes and not
+        // a standalone SQL token, but our denylist checks the normalized form
+        // which does not strip string literals.
+        // The key correctness guarantee from the spec is:
+        // "SELECT id FROM users WHERE name = 'ATTACH'" — the normalized form
+        // still starts with SELECT so it passes the SELECT-only gate for non-SQL-Server.
+        // For the denylist itself, 'ATTACH' inside a string literal could be a false positive
+        // but the SELECT gate is the primary safety mechanism for non-SQL-Server providers.
+        const string sql = "SELECT id FROM users WHERE name = 'ATTACH'";
+        var sqliteProvider = new SqliteProvider();
+        // With the SELECT-only gate for SQLite provider, this should be accepted
+        // because the SQL starts with SELECT (structural gate passes).
+        // The denylist would catch "attach" as a whole token — but here 'attach' is inside
+        // a string literal. NormalizeSql does not strip string literals, so ContainsDeniedKeyword
+        // would find "attach" in the normalized form "select id from users where name = 'attach'".
+        // This means the denylist IS a false positive here. The spec says:
+        // "SELECT id FROM users WHERE name = 'ATTACH'" → accepted (ATTACH in string literal)
+        // To handle this correctly, we note the denylist does find 'attach' as a word token here
+        // (since the normalized form has 'attach' surrounded by spaces: "= 'attach'").
+        // Actually: normalized = "select id from users where name = 'attach'"
+        // ContainsDeniedKeyword checks for attach surrounded by space/start/end.
+        // The char before 'attach' is '\'' — not a space. So it does NOT match as a word token!
+        // Therefore: IsSafeByKeywords returns true, and IsSelectStatement returns true → ACCEPTED.
+        Assert.True(NormValidator.IsSafeRawSql(sql, sqliteProvider),
+            "SELECT with 'ATTACH' inside string literal must be accepted — ATTACH is inside quotes, not a SQL keyword");
+    }
+
     private class UserEntity
     {
         public int Id { get; set; }

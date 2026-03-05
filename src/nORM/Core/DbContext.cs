@@ -745,6 +745,16 @@ namespace nORM.Core
             {
                 foreach (var interceptor in saveInterceptors)
                     await interceptor.SavingChangesAsync(this, changedEntries, ct).ConfigureAwait(false);
+
+                // S4-1: Recompute changedEntries AFTER interceptors run.
+                // Interceptors may call context.Add() or modify tracked entities during
+                // SavingChangesAsync. Re-reading the change tracker ensures those additions
+                // and modifications are included in the current save operation.
+                changedEntries = ChangeTracker.Entries
+                    .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                    .ToList();
+                if (changedEntries.Count == 0)
+                    return 0;
             }
 
             await using var transactionManager = await TransactionManager.CreateAsync(this, ct).ConfigureAwait(false);
@@ -837,10 +847,23 @@ namespace nORM.Core
                     }
                 }
             }
-            catch
+            catch (Exception originalEx)
             {
-                await transactionManager.RollbackAsync().ConfigureAwait(false);
-                throw;
+                // S5-1: Preserve the original exception if rollback itself fails.
+                // Without this guard, a rollback failure replaces originalEx entirely,
+                // making it impossible to diagnose the root write failure.
+                try
+                {
+                    await transactionManager.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception rollbackEx)
+                {
+                    throw new AggregateException(
+                        "SaveChanges failed and rollback also failed. See inner exceptions for details.",
+                        originalEx, rollbackEx);
+                }
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
+                throw; // unreachable — satisfies compiler
             }
 
             // C1: Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE the
@@ -1217,11 +1240,25 @@ namespace nORM.Core
                     if (ownsTransaction) await currentTransaction.CommitAsync(ct).ConfigureAwait(false);
                     return recordsAffected;
                 }
-                catch
+                catch (Exception originalEx)
                 {
-                    // Use CancellationToken.None so a cancelled caller token does not abort the rollback.
-                    if (ownsTransaction) await currentTransaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-                    throw;
+                    // S5-1: Preserve the original exception if rollback itself fails.
+                    if (ownsTransaction)
+                    {
+                        try
+                        {
+                            // Use CancellationToken.None so a cancelled caller token does not abort the rollback.
+                            await currentTransaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                        }
+                        catch (Exception rollbackEx)
+                        {
+                            throw new AggregateException(
+                                "Write operation failed and rollback also failed. See inner exceptions for details.",
+                                originalEx, rollbackEx);
+                        }
+                    }
+                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
+                    throw; // unreachable — satisfies compiler
                 }
             }
             finally
@@ -1267,11 +1304,22 @@ namespace nORM.Core
                 await ownTransaction.CommitAsync(ct).ConfigureAwait(false);
                 return recordsAffected;
             }
-            catch
+            catch (Exception originalEx)
             {
-                // Use CancellationToken.None so a cancelled caller token does not abort the rollback.
-                await ownTransaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-                throw;
+                // S5-1: Preserve the original exception if rollback itself fails.
+                try
+                {
+                    // Use CancellationToken.None so a cancelled caller token does not abort the rollback.
+                    await ownTransaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception rollbackEx)
+                {
+                    throw new AggregateException(
+                        "Fast insert failed and rollback also failed. See inner exceptions for details.",
+                        originalEx, rollbackEx);
+                }
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
+                throw; // unreachable — satisfies compiler
             }
         }
 
