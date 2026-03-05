@@ -365,4 +365,211 @@ public class TransactionLifecycleTests
         Assert.True(cn.TransactionWasDisposed[afterDelete - 1],
             "Transaction from DeleteAsync must be disposed after completion.");
     }
+
+    // ── TX-1: CurrentTransaction cleared after commit/rollback exception ─────
+
+    /// <summary>
+    /// TX-1: A transaction whose CommitAsync throws must still clear CurrentTransaction
+    /// so that a subsequent BeginTransactionAsync call does not see "transaction already active".
+    /// </summary>
+    [Fact]
+    public async Task AfterNormalCommit_CurrentTransaction_IsCleared()
+    {
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE TxLifecycleItem (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL DEFAULT '', Value INTEGER NOT NULL DEFAULT 0)";
+        await cmd.ExecuteNonQueryAsync();
+
+        var ctx = new DbContext(cn, new SqliteProvider());
+        await using var _ctx = ctx;
+
+        // Begin + commit normally
+        var tx = await ctx.Database.BeginTransactionAsync();
+        await tx.CommitAsync();
+
+        // TX-1: CurrentTransaction must be null after normal commit
+        Assert.Null(ctx.Database.CurrentTransaction);
+
+        // And BeginTransactionAsync must succeed (no "already active" error)
+        var tx2 = await ctx.Database.BeginTransactionAsync();
+        await tx2.RollbackAsync();
+        Assert.Null(ctx.Database.CurrentTransaction);
+    }
+
+    /// <summary>
+    /// TX-1: A transaction whose RollbackAsync completes normally must still clear CurrentTransaction.
+    /// </summary>
+    [Fact]
+    public async Task AfterNormalRollback_CurrentTransaction_IsCleared()
+    {
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE TxLifecycleItem (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL DEFAULT '', Value INTEGER NOT NULL DEFAULT 0)";
+        await cmd.ExecuteNonQueryAsync();
+
+        var ctx = new DbContext(cn, new SqliteProvider());
+        await using var _ctx = ctx;
+
+        var tx = await ctx.Database.BeginTransactionAsync();
+        await tx.RollbackAsync();
+
+        // TX-1: CurrentTransaction must be null after normal rollback
+        Assert.Null(ctx.Database.CurrentTransaction);
+
+        // And BeginTransactionAsync must succeed
+        var tx2 = await ctx.Database.BeginTransactionAsync();
+        await tx2.CommitAsync();
+        Assert.Null(ctx.Database.CurrentTransaction);
+    }
+
+    /// <summary>
+    /// TX-1: Tests that CommitAsync using try/finally properly clears CurrentTransaction even
+    /// when the DbContextTransaction.CommitAsync path wraps the underlying commit in try/finally.
+    /// Simulates the scenario by verifying multiple sequential transactions can be started.
+    /// </summary>
+    [Fact]
+    public async Task AfterCommit_SequentialTransactions_AllSucceed()
+    {
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE TxLifecycleItem (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL DEFAULT '', Value INTEGER NOT NULL DEFAULT 0)";
+        await cmd.ExecuteNonQueryAsync();
+
+        var ctx = new DbContext(cn, new SqliteProvider());
+        await using var _ctx = ctx;
+
+        // TX-1: Multiple sequential commit+begin cycles must all succeed without "already active" error
+        for (int i = 0; i < 5; i++)
+        {
+            var tx = await ctx.Database.BeginTransactionAsync();
+            Assert.NotNull(ctx.Database.CurrentTransaction);
+            await tx.CommitAsync();
+            Assert.Null(ctx.Database.CurrentTransaction);
+        }
+    }
+
+    /// <summary>
+    /// TX-1: Tests that RollbackAsync in try/finally correctly clears CurrentTransaction,
+    /// allowing subsequent BeginTransactionAsync calls to succeed.
+    /// </summary>
+    [Fact]
+    public async Task AfterRollback_SequentialTransactions_AllSucceed()
+    {
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE TxLifecycleItem (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL DEFAULT '', Value INTEGER NOT NULL DEFAULT 0)";
+        await cmd.ExecuteNonQueryAsync();
+
+        var ctx = new DbContext(cn, new SqliteProvider());
+        await using var _ctx = ctx;
+
+        // TX-1: Multiple sequential rollback+begin cycles must all succeed
+        for (int i = 0; i < 5; i++)
+        {
+            var tx = await ctx.Database.BeginTransactionAsync();
+            Assert.NotNull(ctx.Database.CurrentTransaction);
+            await tx.RollbackAsync();
+            Assert.Null(ctx.Database.CurrentTransaction);
+        }
+    }
+
+    /// <summary>
+    /// TX-1: Verifies that CommitAsync exception path correctly clears CurrentTransaction.
+    /// Uses a FailingTransaction wrapper that throws on CommitAsync.
+    /// </summary>
+    [Fact]
+    public async Task AfterCommitException_CurrentTransaction_IsCleared()
+    {
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+
+        var ctx = new DbContext(cn, new SqliteProvider());
+        await using var _ctx = ctx;
+
+        // Manually inject a DbContextTransaction wrapping a FailingTransaction
+        // to test the try/finally cleanup path on commit failure.
+        var innerTx = await cn.BeginTransactionAsync();
+        var failingTx = new FailingTransaction(innerTx);
+
+        // Set CurrentTransaction manually via reflection (simulating what BeginTransactionAsync does)
+        ctx.CurrentTransaction = failingTx;
+        Assert.NotNull(ctx.Database.CurrentTransaction);
+
+        var dbContextTx = new DbContextTransaction(failingTx, ctx);
+
+        // CommitAsync should throw, but CurrentTransaction must be cleared in finally
+        await Assert.ThrowsAsync<InvalidOperationException>(() => dbContextTx.CommitAsync());
+
+        // TX-1: Even after CommitAsync threw, CurrentTransaction must be null
+        Assert.Null(ctx.Database.CurrentTransaction);
+    }
+
+    /// <summary>
+    /// TX-1: Verifies that RollbackAsync exception path correctly clears CurrentTransaction.
+    /// </summary>
+    [Fact]
+    public async Task AfterRollbackException_CurrentTransaction_IsCleared()
+    {
+        await using var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+
+        var ctx = new DbContext(cn, new SqliteProvider());
+        await using var _ctx = ctx;
+
+        var innerTx = await cn.BeginTransactionAsync();
+        var failingTx = new FailingTransaction(innerTx);
+
+        ctx.CurrentTransaction = failingTx;
+        Assert.NotNull(ctx.Database.CurrentTransaction);
+
+        var dbContextTx = new DbContextTransaction(failingTx, ctx);
+
+        // RollbackAsync should throw, but CurrentTransaction must be cleared in finally
+        await Assert.ThrowsAsync<InvalidOperationException>(() => dbContextTx.RollbackAsync());
+
+        // TX-1: Even after RollbackAsync threw, CurrentTransaction must be null
+        Assert.Null(ctx.Database.CurrentTransaction);
+    }
+
+    /// <summary>
+    /// A DbTransaction wrapper that always throws InvalidOperationException on
+    /// CommitAsync and RollbackAsync to simulate network or server errors.
+    /// </summary>
+    private sealed class FailingTransaction : DbTransaction
+    {
+        private readonly DbTransaction _inner;
+
+        public FailingTransaction(DbTransaction inner)
+        {
+            _inner = inner;
+        }
+
+        protected override DbConnection DbConnection => _inner.Connection!;
+        public override System.Data.IsolationLevel IsolationLevel => _inner.IsolationLevel;
+
+        public override void Commit() => throw new InvalidOperationException("Simulated commit failure.");
+        public override void Rollback() => throw new InvalidOperationException("Simulated rollback failure.");
+
+        public override Task CommitAsync(CancellationToken cancellationToken = default)
+            => Task.FromException(new InvalidOperationException("Simulated commit failure."));
+
+        public override Task RollbackAsync(CancellationToken cancellationToken = default)
+            => Task.FromException(new InvalidOperationException("Simulated rollback failure."));
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
+
+        public override ValueTask DisposeAsync()
+        {
+            _inner.Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
 }

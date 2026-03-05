@@ -204,12 +204,21 @@ namespace nORM.Providers
 
         /// <summary>
         /// Generates SQL to create a simple temporal history table for SQLite.
+        /// MIG-1: Column types now use the same SQLite type mapping as the main table
+        /// (GetSqliteType) rather than forcing every column to TEXT. This ensures that the
+        /// history table schema mirrors the main table schema exactly (INTEGER for int/bool/long,
+        /// REAL for decimal/double/float, BLOB for byte[], TEXT for strings and everything else).
         /// </summary>
         /// <param name="mapping">The entity mapping being tracked.</param>
         /// <returns>DDL statement that creates the history table.</returns>
         public override string GenerateCreateHistoryTableSql(TableMapping mapping)
         {
-            var columns = string.Join(", ", mapping.Columns.Select(c => $"{Escape(c.PropName)} TEXT"));
+            var columns = string.Join(",\n                ", mapping.Columns.Select(c =>
+            {
+                var sqlType = GetSqliteType(c.Prop.PropertyType);
+                var nullability = IsNullableOrReferenceType(c.Prop.PropertyType) ? "" : " NOT NULL";
+                return $"{Escape(c.PropName)} {sqlType}{nullability}";
+            }));
             return @$"CREATE TABLE IF NOT EXISTS {Escape(mapping.TableName + "_History")} (
                 __VersionId INTEGER PRIMARY KEY AUTOINCREMENT,
                 __ValidFrom TEXT NOT NULL,
@@ -218,6 +227,13 @@ namespace nORM.Providers
                 {columns}
             );";
         }
+
+        /// <summary>
+        /// Returns true when the type can hold a SQL NULL value (reference types and Nullable&lt;T&gt;).
+        /// Used by <see cref="GenerateCreateHistoryTableSql"/> to decide NOT NULL constraints.
+        /// </summary>
+        private static bool IsNullableOrReferenceType(Type t) =>
+            !t.IsValueType || (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>));
 
         /// <summary>
         /// Generates trigger definitions that maintain the temporal history table.

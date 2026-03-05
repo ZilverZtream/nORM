@@ -290,4 +290,153 @@ public class NullSemanticsTests
         Assert.Equal(2, nullRows.Count);
         Assert.Equal(3, nonNullRows.Count);
     }
+
+    // ─── QP-1: nullable string != non-null constant includes NULL rows ─────
+
+    /// <summary>
+    /// QP-1: SQL 3VL issue — NULL &lt;&gt; 'Alice' = UNKNOWN (excluded by SQL), but
+    /// C# says null != "Alice" = true (should be included).
+    /// Fix: emit (col IS NULL OR col &lt;&gt; @p) for NotEqual with nullable column vs non-null constant.
+    /// </summary>
+    [Fact]
+    public async Task NullableString_NotEqual_NonNullConstant_IncludesNullRows()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        Insert(cn, null, null, 1);      // NullableStr = NULL → null != "Alice" is true in C# → INCLUDE
+        Insert(cn, null, "Bob", 2);     // NullableStr = "Bob" → "Bob" != "Alice" is true → INCLUDE
+        Insert(cn, null, "Alice", 3);   // NullableStr = "Alice" → "Alice" != "Alice" is false → EXCLUDE
+
+        var results = await ctx.Query<NullRow>().Where(x => x.NullableStr != "Alice").ToListAsync();
+        // Both NULL row and "Bob" row should be returned (null != "Alice" is true in C#)
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, r => r.NullableStr is null);
+        Assert.Contains(results, r => r.NullableStr == "Bob");
+    }
+
+    /// <summary>
+    /// QP-1 regression: nullable string == non-null constant should NOT include NULL rows.
+    /// C# says null == "Alice" = false, SQL NULL = 'Alice' = UNKNOWN (excluded) — both agree.
+    /// So Equal does NOT need expansion when right side is non-null.
+    /// </summary>
+    [Fact]
+    public async Task NullableString_Equal_NonNullConstant_ExcludesNullRows()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        Insert(cn, null, null, 1);      // NullableStr = NULL → null == "Alice" is false → EXCLUDE
+        Insert(cn, null, "Bob", 2);     // NullableStr = "Bob" → "Bob" == "Alice" is false → EXCLUDE
+        Insert(cn, null, "Alice", 3);   // NullableStr = "Alice" → "Alice" == "Alice" is true → INCLUDE
+
+        var results = await ctx.Query<NullRow>().Where(x => x.NullableStr == "Alice").ToListAsync();
+        Assert.Single(results);
+        Assert.Equal("Alice", results[0].NullableStr);
+    }
+
+    /// <summary>
+    /// QP-1: Same pattern for int? — nullable int != non-null constant must include NULL rows.
+    /// </summary>
+    [Fact]
+    public async Task NullableInt_NotEqual_NonNullConstant_IncludesNullRows()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        Insert(cn, null, null, 1);   // NullableInt = NULL → null != 42 is true in C# → INCLUDE
+        Insert(cn, 99, null, 2);     // NullableInt = 99 → 99 != 42 → INCLUDE
+        Insert(cn, 42, null, 3);     // NullableInt = 42 → 42 != 42 is false → EXCLUDE
+
+        var results = await ctx.Query<NullRow>().Where(x => x.NullableInt != 42).ToListAsync();
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, r => r.NullableInt is null);
+        Assert.Contains(results, r => r.NullableInt == 99);
+    }
+
+    /// <summary>
+    /// QP-1 regression: non-nullable column != constant should NOT expand to include IS NULL.
+    /// The column cannot be null so no expansion is needed.
+    /// </summary>
+    [Fact]
+    public async Task NonNullable_NotEqual_NoExpansion_ReturnsCorrectRows()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        Insert(cn, null, null, 10);    // NonNullableInt = 10 → 10 != 20 → INCLUDE
+        Insert(cn, null, null, 20);    // NonNullableInt = 20 → 20 != 20 → EXCLUDE
+        Insert(cn, null, null, 30);    // NonNullableInt = 30 → 30 != 20 → INCLUDE
+
+        var results = await ctx.Query<NullRow>().Where(x => x.NonNullableInt != 20).ToListAsync();
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.NotEqual(20, r.NonNullableInt));
+    }
+
+    /// <summary>
+    /// QP-1 regression guard: column-vs-column nullable != nullable still uses full 3-way expansion.
+    /// When BOTH sides could be null, the full (IS NOT NULL AND ... OR IS NULL AND ... OR IS NOT NULL AND IS NULL)
+    /// expansion is still needed to handle all null/non-null combinations correctly.
+    /// </summary>
+    [Fact]
+    public async Task NullableColumn_NotEqual_NullableColumn_StillExpandsCorrectly()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        // Reuse NullableInt and NullableB columns for column-vs-column test
+        Insert(cn, null, null, 1, null);          // both null → null != null is false → EXCLUDE
+        Insert(cn, 5, null, 2, 5);               // both same non-null → 5 != 5 is false → EXCLUDE
+        Insert(cn, 5, null, 3, 10);              // different non-null → 5 != 10 is true → INCLUDE
+        Insert(cn, null, null, 4, 7);            // left null, right non-null → null != 7 is true → INCLUDE
+        Insert(cn, 7, null, 5, null);            // left non-null, right null → 7 != null is true → INCLUDE
+
+        var results = await ctx.Query<NullRow>().Where(x => x.NullableInt != x.NullableB).ToListAsync();
+        Assert.Equal(3, results.Count);
+    }
+
+    // ─── Null semantics regression sweep (additional coverage) ─────────────
+
+    /// <summary>
+    /// nullable_col == null → IS NULL (already covered, regression guard)
+    /// </summary>
+    [Fact]
+    public async Task NullableString_EqualNull_RegressionGuard()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        Insert(cn, null, null, 1);
+        Insert(cn, null, "hello", 2);
+
+        var results = await ctx.Query<NullRow>().Where(x => x.NullableStr == null).ToListAsync();
+        Assert.Single(results);
+        Assert.Null(results[0].NullableStr);
+    }
+
+    /// <summary>
+    /// nullable_col != null → IS NOT NULL (already covered, regression guard)
+    /// </summary>
+    [Fact]
+    public async Task NullableString_NotEqualNull_RegressionGuard()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        Insert(cn, null, null, 1);
+        Insert(cn, null, "hello", 2);
+
+        var results = await ctx.Query<NullRow>().Where(x => x.NullableStr != null).ToListAsync();
+        Assert.Single(results);
+        Assert.Equal("hello", results[0].NullableStr);
+    }
+
+    /// <summary>
+    /// non_nullable_col == "literal" → plain = (no IS NULL branch)
+    /// </summary>
+    [Fact]
+    public async Task NonNullable_Equal_Literal_NoIsNullBranch()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        Insert(cn, null, null, 10);
+        Insert(cn, null, null, 20);
+
+        var results = await ctx.Query<NullRow>().Where(x => x.NonNullableInt == 10).ToListAsync();
+        Assert.Single(results);
+        Assert.Equal(10, results[0].NonNullableInt);
+    }
 }

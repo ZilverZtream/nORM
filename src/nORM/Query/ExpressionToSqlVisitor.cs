@@ -155,7 +155,7 @@ namespace nORM.Query
                 // For reference types (string, class): only expand when BOTH sides could be null
                 // at runtime (i.e., neither side is a known non-null constant or parameter).
                 // Comparing a string column to a literal "ABC" does not need expansion since "ABC" is never null.
-                if (NeedsNullSafeExpansion(node.Left, node.Right))
+                if (NeedsNullSafeExpansion(node.Left, node.Right, node.NodeType))
                 {
                     int ls = _sql.Length;
                     Visit(node.Left);
@@ -168,11 +168,23 @@ namespace nORM.Query
                     _sql.TruncateTo(rs);
 
                     if (node.NodeType == ExpressionType.Equal)
+                    {
                         _sql.Append($"({lf} = {rf} OR ({lf} IS NULL AND {rf} IS NULL))");
+                    }
                     else
-                        _sql.Append($"(({lf} IS NOT NULL AND {rf} IS NOT NULL AND {lf} <> {rf})" +
-                                    $" OR ({lf} IS NULL AND {rf} IS NOT NULL)" +
-                                    $" OR ({lf} IS NOT NULL AND {rf} IS NULL))");
+                    {
+                        // For NotEqual, use asymmetric simplified form when the right side is a
+                        // known non-null value (e.g. a literal or closure-captured non-null constant).
+                        // In that case, "rf IS NULL" can never happen, so the full 3-way expansion
+                        // reduces to: (lf IS NULL OR lf <> rf)
+                        bool rightCouldBeNull = CouldBeNull(node.Right);
+                        if (!rightCouldBeNull)
+                            _sql.Append($"({lf} IS NULL OR {lf} <> {rf})");
+                        else
+                            _sql.Append($"(({lf} IS NOT NULL AND {rf} IS NOT NULL AND {lf} <> {rf})" +
+                                        $" OR ({lf} IS NULL AND {rf} IS NOT NULL)" +
+                                        $" OR ({lf} IS NOT NULL AND {rf} IS NULL))");
+                    }
                     return node;
                 }
             }
@@ -236,25 +248,37 @@ namespace nORM.Query
         /// Determines whether an equality/inequality comparison between two expressions needs
         /// three-valued SQL logic (IS NULL expansion). The expansion is required when:
         /// - Either side is <c>Nullable&lt;T&gt;</c>, or
-        /// - Both sides are reference types that could be null in the database (not known non-null constants).
-        /// When one side is a known non-null constant or parameter value, plain = / &lt;&gt; is correct.
+        /// - For <c>Equal</c>: both sides are reference types that could be null (no change needed;
+        ///   <c>NULL = 'Alice'</c> is UNKNOWN in SQL and <c>null == "Alice"</c> is false in C#, so plain = is correct).
+        /// - For <c>NotEqual</c>: the LEFT side could be null (column reference) even when the right
+        ///   side is a known non-null constant. SQL 3-valued logic makes <c>NULL &lt;&gt; 'Alice'</c>
+        ///   UNKNOWN (excluded), but C# semantics say <c>null != "Alice"</c> is true (included).
+        ///   Fix: emit <c>(col IS NULL OR col &lt;&gt; @p)</c> whenever left could be null.
         /// </summary>
-        private static bool NeedsNullSafeExpansion(Expression left, Expression right)
+        private static bool NeedsNullSafeExpansion(Expression left, Expression right, ExpressionType nodeType = ExpressionType.Equal)
         {
             // Nullable<T> value types always need expansion (runtime null is possible on either side)
             if (IsNullableValueType(left.Type) || IsNullableValueType(right.Type))
                 return true;
 
-            // Reference types need expansion only when BOTH sides could carry a runtime null.
+            // Reference types: asymmetric rule for Equal vs NotEqual.
             // A "known non-null" side is one that is:
             //   - A non-null compile-time constant (ConstantExpression with non-null value)
             //   - A closure capture whose value we can verify is non-null at expression-build time
-            // In both cases there is no need for IS NULL expansion.
             if (!left.Type.IsValueType || !right.Type.IsValueType)
             {
                 bool leftCouldBeNull  = CouldBeNull(left);
                 bool rightCouldBeNull = CouldBeNull(right);
-                return leftCouldBeNull && rightCouldBeNull;
+
+                if (nodeType == ExpressionType.NotEqual)
+                    // For NotEqual: expand when EITHER side could be null.
+                    // Specifically, a nullable column vs a non-null constant still needs
+                    // (col IS NULL OR col <> @p) to preserve C# null != "literal" → true semantics.
+                    return leftCouldBeNull || rightCouldBeNull;
+                else
+                    // For Equal: expand only when BOTH sides could be null.
+                    // null == "Alice" is false in both SQL (UNKNOWN→false) and C#, so no expansion needed.
+                    return leftCouldBeNull && rightCouldBeNull;
             }
 
             return false;

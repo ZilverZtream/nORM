@@ -347,15 +347,21 @@ END;";
 
         /// <summary>
         /// Creates a transaction savepoint using SQL Server's <see cref="SqlTransaction.Save(string)"/> API.
+        /// PRV-1: Checks the CancellationToken before and after executing so that pre-cancelled
+        /// tokens correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">The transaction on which to create the savepoint.</param>
         /// <param name="name">Name of the savepoint.</param>
         /// <param name="ct">Cancellation token.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
+            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            ct.ThrowIfCancellationRequested();
+
             if (transaction is SqlTransaction sqlTransaction)
             {
                 sqlTransaction.Save(name);
+                ct.ThrowIfCancellationRequested();
                 return Task.CompletedTask;
             }
             throw new ArgumentException("Transaction must be a SqlTransaction.", nameof(transaction));
@@ -363,15 +369,21 @@ END;";
 
         /// <summary>
         /// Rolls back the transaction to the specified savepoint.
+        /// PRV-1: Checks the CancellationToken before and after executing so that pre-cancelled
+        /// tokens correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">The transaction containing the savepoint.</param>
         /// <param name="name">Name of the savepoint to roll back to.</param>
         /// <param name="ct">Cancellation token.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
+            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            ct.ThrowIfCancellationRequested();
+
             if (transaction is SqlTransaction sqlTransaction)
             {
                 sqlTransaction.Rollback(name);
+                ct.ThrowIfCancellationRequested();
                 return Task.CompletedTask;
             }
             throw new ArgumentException("Transaction must be a SqlTransaction.", nameof(transaction));

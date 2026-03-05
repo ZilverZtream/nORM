@@ -42,13 +42,24 @@ namespace nORM.Core
 
         /// <summary>
         /// Asynchronously commits the underlying transaction and disposes the wrapper.
+        /// TX-1: Uses try/finally so that CurrentTransaction is ALWAYS cleared even when
+        /// CommitAsync throws (e.g. network drop during commit acknowledgement). Without the
+        /// finally block a failed commit leaves the context's CurrentTransaction non-null, and
+        /// the next call to BeginTransactionAsync would throw "transaction already active".
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task CommitAsync(CancellationToken ct = default)
         {
-            if (_transaction != null)
-                await _transaction.CommitAsync(ct).ConfigureAwait(false);
-            await DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                if (_transaction != null)
+                    await _transaction.CommitAsync(ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                // Always clear — even if commit threw, the transaction is done (unknown state).
+                await DisposeAsync().ConfigureAwait(false);
+            }
         }
 
         /// <summary>
@@ -64,15 +75,25 @@ namespace nORM.Core
 
         /// <summary>
         /// Asynchronously rolls back the underlying transaction and disposes the wrapper.
+        /// TX-1: Uses try/finally so that CurrentTransaction is ALWAYS cleared even when
+        /// RollbackAsync throws. Without the finally block a failed rollback leaves the context's
+        /// CurrentTransaction non-null.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task RollbackAsync(CancellationToken ct = default)
         {
-            if (_transaction != null)
-                // Always use CancellationToken.None: a rollback must not be aborted even when
-                // the caller's token is already cancelled, otherwise the DB is left mid-transaction.
-                await _transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            await DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                if (_transaction != null)
+                    // Always use CancellationToken.None: a rollback must not be aborted even when
+                    // the caller's token is already cancelled, otherwise the DB is left mid-transaction.
+                    await _transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            finally
+            {
+                // Always clear — even if rollback threw, the transaction is done (unknown state).
+                await DisposeAsync().ConfigureAwait(false);
+            }
         }
 
         /// <summary>

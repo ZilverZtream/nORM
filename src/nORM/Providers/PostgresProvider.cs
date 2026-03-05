@@ -384,12 +384,17 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
 
         /// <summary>
         /// Creates a transaction savepoint using Npgsql's save or savepoint APIs if available.
+        /// PRV-1: Checks the CancellationToken before executing so that pre-cancelled tokens
+        /// correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">The transaction on which to create the savepoint.</param>
         /// <param name="name">Identifier for the savepoint.</param>
         /// <param name="ct">Cancellation token.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
+            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            ct.ThrowIfCancellationRequested();
+
             var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) }) ??
                              transaction.GetType().GetMethod("CreateSavepoint", new[] { typeof(string) });
             if (saveMethod != null)
@@ -397,6 +402,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 try
                 {
                     saveMethod.Invoke(transaction, new object[] { name });
+                    ct.ThrowIfCancellationRequested();
                     return Task.CompletedTask;
                 }
                 catch (System.Reflection.TargetInvocationException ex)
@@ -413,12 +419,17 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
 
         /// <summary>
         /// Rolls back a transaction to the specified savepoint.
+        /// PRV-1: Checks the CancellationToken before executing so that pre-cancelled tokens
+        /// correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">Transaction containing the savepoint.</param>
         /// <param name="name">Name of the savepoint to roll back to.</param>
         /// <param name="ct">Cancellation token.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
+            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            ct.ThrowIfCancellationRequested();
+
             var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) }) ??
                                  transaction.GetType().GetMethod("RollbackToSavepoint", new[] { typeof(string) });
             if (rollbackMethod != null)
@@ -426,6 +437,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 try
                 {
                     rollbackMethod.Invoke(transaction, new object[] { name });
+                    ct.ThrowIfCancellationRequested();
                     return Task.CompletedTask;
                 }
                 catch (System.Reflection.TargetInvocationException ex)
