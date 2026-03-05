@@ -718,7 +718,10 @@ namespace nORM.Providers
                 var whereCols = m.KeyColumns
                     .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}").ToList();
                 if (m.TimestampColumn != null)
-                    whereCols.Add($"{m.TimestampColumn.EscCol}={ParamPrefix}{m.TimestampColumn.PropName}");
+                {
+                    var tc = m.TimestampColumn;
+                    whereCols.Add($"({tc.EscCol}={ParamPrefix}{tc.PropName} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{tc.PropName} IS NULL))");
+                }
                 var where = string.Join(" AND ", whereCols);
 
                 return $"UPDATE {m.EscTable} SET {set} WHERE {where}";
@@ -738,7 +741,10 @@ namespace nORM.Providers
                 var whereCols = m.KeyColumns
                     .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}").ToList();
                 if (m.TimestampColumn != null)
-                    whereCols.Add($"{m.TimestampColumn.EscCol}={ParamPrefix}{m.TimestampColumn.PropName}");
+                {
+                    var tc = m.TimestampColumn;
+                    whereCols.Add($"({tc.EscCol}={ParamPrefix}{tc.PropName} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{tc.PropName} IS NULL))");
+                }
                 var where = string.Join(" AND ", whereCols);
 
                 return $"DELETE FROM {m.EscTable} WHERE {where}";

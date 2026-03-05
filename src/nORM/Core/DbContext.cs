@@ -1576,7 +1576,11 @@ namespace nORM.Core
             foreach (var col in map.KeyColumns)
                 whereParts.Add($"{col.EscCol}={_p.ParamPrefix}p{idx++}");
             if (map.TimestampColumn != null)
-                whereParts.Add($"{map.TimestampColumn.EscCol}={_p.ParamPrefix}p{idx++}");
+            {
+                var tc = map.TimestampColumn;
+                whereParts.Add($"({tc.EscCol}={_p.ParamPrefix}p{idx} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}p{idx} IS NULL))");
+                idx++;
+            }
             if (Options.TenantProvider != null && map.TenantColumn != null)
                 whereParts.Add($"{map.TenantColumn.EscCol}={_p.ParamPrefix}p{idx++}");
             var where = string.Join(" AND ", whereParts);
@@ -1594,7 +1598,11 @@ namespace nORM.Core
             foreach (var col in map.KeyColumns)
                 whereParts.Add($"{col.EscCol}={_p.ParamPrefix}p{idx++}");
             if (map.TimestampColumn != null)
-                whereParts.Add($"{map.TimestampColumn.EscCol}={_p.ParamPrefix}p{idx++}");
+            {
+                var tc = map.TimestampColumn;
+                whereParts.Add($"({tc.EscCol}={_p.ParamPrefix}p{idx} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}p{idx} IS NULL))");
+                idx++;
+            }
             if (Options.TenantProvider != null && map.TenantColumn != null)
                 whereParts.Add($"{map.TenantColumn.EscCol}={_p.ParamPrefix}p{idx++}");
             var where = string.Join(" AND ", whereParts);
@@ -1713,15 +1721,17 @@ namespace nORM.Core
         public Task<int> BulkInsertAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
-                NormValidator.ValidateBulkOperation(entities, "insert");
+                if (entities == null) throw new ArgumentNullException(nameof(entities));
+                var entityList = entities.ToList();                         // single enumeration
+                NormValidator.ValidateBulkOperation(entityList, "insert");
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var map = GetMapping(typeof(T));
-                foreach (var entity in entities)
+                foreach (var entity in entityList)
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
                     ValidateTenantContext(entity, map, WriteOperation.Insert);
                 }
-                return await _p.BulkInsertAsync(ctx, map, entities, token).ConfigureAwait(false);
+                return await _p.BulkInsertAsync(ctx, map, entityList, token).ConfigureAwait(false);
             }, ct);
 
         /// <summary>
@@ -1735,15 +1745,17 @@ namespace nORM.Core
         public Task<int> BulkUpdateAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
-                NormValidator.ValidateBulkOperation(entities, "update");
+                if (entities == null) throw new ArgumentNullException(nameof(entities));
+                var entityList = entities.ToList();                         // single enumeration
+                NormValidator.ValidateBulkOperation(entityList, "update");
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var map = GetMapping(typeof(T));
-                foreach (var entity in entities)
+                foreach (var entity in entityList)
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
                     ValidateTenantContext(entity, map, WriteOperation.Update);
                 }
-                return await _p.BulkUpdateAsync(ctx, map, entities, token).ConfigureAwait(false);
+                return await _p.BulkUpdateAsync(ctx, map, entityList, token).ConfigureAwait(false);
             }, ct);
 
         /// <summary>
@@ -1757,15 +1769,17 @@ namespace nORM.Core
         public Task<int> BulkDeleteAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
             => _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
-                NormValidator.ValidateBulkOperation(entities, "delete");
+                if (entities == null) throw new ArgumentNullException(nameof(entities));
+                var entityList = entities.ToList();                         // single enumeration
+                NormValidator.ValidateBulkOperation(entityList, "delete");
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var map = GetMapping(typeof(T));
-                foreach (var entity in entities)
+                foreach (var entity in entityList)
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
                     ValidateTenantContext(entity, map, WriteOperation.Delete);
                 }
-                return await _p.BulkDeleteAsync(ctx, map, entities, token).ConfigureAwait(false);
+                return await _p.BulkDeleteAsync(ctx, map, entityList, token).ConfigureAwait(false);
             }, ct);
         #endregion
 
