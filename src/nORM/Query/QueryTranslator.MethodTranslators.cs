@@ -127,7 +127,10 @@ namespace nORM.Query
                         info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
                         t._correlatedParams[param] = info;
                     }
-                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth);
+                    // QP-1: paramIndexStart = t._params.Count so that this predicate's visitor
+                    // does not reuse @p0/@p1 names already allocated by preceding predicates
+                    // (e.g. inner Where's compiled param and global-filter constant colliding).
+                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
                     if (isGrouping)
                     {
@@ -492,7 +495,7 @@ namespace nORM.Query
                     var alias = t.EscapeAlias("T" + t._joinCounter);
                     if (!t._correlatedParams.ContainsKey(param))
                         t._correlatedParams[param] = (t._mapping, alias);
-                    var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth);
+                    var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctxFS);
                     var sql = visitor.Translate(predicate.Body);
                     if (t._where.Length > 0) t._where.Append(" AND ");
@@ -534,7 +537,7 @@ namespace nORM.Query
                     var alias = t.EscapeAlias("T" + t._joinCounter);
                     if (!t._correlatedParams.ContainsKey(param))
                         t._correlatedParams[param] = (t._mapping, alias);
-                    var vctxLast = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth);
+                    var vctxLast = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctxLast);
                     var sql = visitor.Translate(lastPredicate.Body);
                     if (t._where.Length > 0) t._where.Append(" AND ");
@@ -592,7 +595,7 @@ namespace nORM.Query
                         info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
                         t._correlatedParams[param] = info;
                     }
-                    var vctxCount = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth);
+                    var vctxCount = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctxCount);
                     var sql = visitor.Translate(countPredicate.Body);
                     if (t._where.Length > 0) t._where.Append(" AND ");

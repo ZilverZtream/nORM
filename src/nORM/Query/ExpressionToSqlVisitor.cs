@@ -87,7 +87,10 @@ namespace nORM.Query
             if (context.ParamMap == null)
                 _ownedParamMap.Clear();
             _constParamMap.Clear();
-            _paramIndex = 0;
+            // QP-1: Start numbering from the caller-supplied offset so that a visitor
+            // sharing _compiledParams/_paramMap with a previous visitor does not reuse
+            // parameter names (e.g. both inner Where and global-filter Where getting @p0).
+            _paramIndex = context.ParamIndexStart;
             _suppressNullCheck = false;
             _recursionDepth = context.RecursionDepth;
             _memberParamMap.Clear();

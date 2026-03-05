@@ -180,7 +180,7 @@ namespace nORM.Core
                 _nonNotifyingEntries.TryRemove(entry, out _);
                 _dirtyNonNotifyingEntries.TryRemove(entry, out _);
                 _dirtyEntries.TryRemove(entry, out _);
-                var pk = GetPrimaryKeyValue(entity, entry.Mapping);
+                var pk = entry.OriginalKey ?? GetPrimaryKeyValue(entity, entry.Mapping);
                 if (pk != null && _entriesByKey.TryGetValue(entry.Mapping.Type, out var typeEntries))
                 {
                     typeEntries.TryRemove(pk, out _);

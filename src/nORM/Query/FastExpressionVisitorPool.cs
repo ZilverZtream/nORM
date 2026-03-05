@@ -23,6 +23,10 @@ internal readonly struct VisitorContext
     public readonly Dictionary<ParameterExpression, string>? ParamMap;
     // QP-1: Thread outer translator's recursion depth so BuildExists/BuildIn can pass depth+1.
     public readonly int RecursionDepth;
+    // QP-1: Initial _paramIndex value for this visitor. When multiple predicates share the
+    // same _compiledParams / _paramMap, each new visitor must start numbering its parameters
+    // AFTER all names already allocated by previous visitors to prevent @p0/@p1 collisions.
+    public readonly int ParamIndexStart;
 
     public VisitorContext(
         DbContext context,
@@ -33,7 +37,8 @@ internal readonly struct VisitorContext
         Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated,
         List<string>? compiledParams,
         Dictionary<ParameterExpression, string>? paramMap,
-        int recursionDepth = 0)
+        int recursionDepth = 0,
+        int paramIndexStart = 0)
     {
         Context = context;
         Mapping = mapping;
@@ -44,6 +49,7 @@ internal readonly struct VisitorContext
         CompiledParams = compiledParams;
         ParamMap = paramMap;
         RecursionDepth = recursionDepth;
+        ParamIndexStart = paramIndexStart;
     }
 }
 

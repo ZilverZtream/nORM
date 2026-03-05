@@ -106,7 +106,10 @@ namespace nORM.Versioning
         private static bool IsValidDdl(string ddl)
         {
             var lower = ddl.ToLowerInvariant();
-            return lower.StartsWith("create") || lower.StartsWith("alter") || lower.StartsWith("drop");
+            return lower.StartsWith("create")
+                || lower.StartsWith("alter")
+                || lower.StartsWith("drop")
+                || lower.StartsWith("if");   // SQL Server: IF OBJECT_ID(...) IS NULL CREATE TABLE
         }
     }
 }
