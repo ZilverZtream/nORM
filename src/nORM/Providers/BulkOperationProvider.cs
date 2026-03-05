@@ -67,7 +67,9 @@ namespace nORM.Providers
             {
                 try
                 {
-                    await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                    // Use CancellationToken.None so that a cancelled caller token does not
+                    // also cancel the rollback, leaving the transaction in an uncertain state.
+                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
                 }
                 catch (Exception rollbackEx)
                 {

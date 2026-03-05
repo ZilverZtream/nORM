@@ -206,7 +206,11 @@ namespace nORM.Migration
                     var oldCol = oldTable.Columns.FirstOrDefault(c => string.Equals(c.Name, col.Name, StringComparison.OrdinalIgnoreCase));
                     if (oldCol == null)
                         diff.AddedColumns.Add((newTable, col));
-                    else if (!string.Equals(oldCol.ClrType, col.ClrType, StringComparison.OrdinalIgnoreCase) || oldCol.IsNullable != col.IsNullable)
+                    else if (!string.Equals(oldCol.ClrType, col.ClrType, StringComparison.OrdinalIgnoreCase)
+                        || oldCol.IsNullable != col.IsNullable
+                        || oldCol.IsPrimaryKey != col.IsPrimaryKey
+                        || oldCol.IsUnique != col.IsUnique
+                        || !string.Equals(oldCol.IndexName, col.IndexName, StringComparison.OrdinalIgnoreCase))
                         diff.AlteredColumns.Add((newTable, col, oldCol));
                 }
 
@@ -268,11 +272,22 @@ namespace nORM.Migration
             var map = new Dictionary<string, (bool, string[])>(StringComparer.OrdinalIgnoreCase);
             foreach (var col in table.Columns)
             {
-                if (col.IndexName == null) continue;
-                if (!map.TryGetValue(col.IndexName, out var entry))
-                    entry = (col.IsUnique, Array.Empty<string>());
-                entry = (entry.Item1 || col.IsUnique, entry.Item2.Append(col.Name).ToArray());
-                map[col.IndexName] = entry;
+                // Include columns that have an explicit IndexName, or are unique/PK (implicit constraint).
+                // This ensures that changes to IsPrimaryKey or IsUnique flow through AddedIndexes/DroppedIndexes.
+                string? indexKey = col.IndexName;
+                if (indexKey == null)
+                {
+                    if (col.IsPrimaryKey)
+                        indexKey = $"__PK__{col.Name}";
+                    else if (col.IsUnique)
+                        indexKey = $"__UQ__{col.Name}";
+                    else
+                        continue;
+                }
+                if (!map.TryGetValue(indexKey, out var entry))
+                    entry = (col.IsUnique || col.IsPrimaryKey, Array.Empty<string>());
+                entry = (entry.Item1 || col.IsUnique || col.IsPrimaryKey, entry.Item2.Append(col.Name).ToArray());
+                map[indexKey] = entry;
             }
             return map;
         }

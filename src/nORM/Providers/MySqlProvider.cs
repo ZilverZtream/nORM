@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
@@ -373,7 +373,7 @@ END;";
                 {
                     try
                     {
-                        await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                        await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
                     }
                     catch (Exception rollbackEx)
                     {

@@ -434,4 +434,193 @@ public class SchemaSnapshotTests
         Assert.Empty(diff.DroppedIndexes.Where(ix => ix.IndexName == "IX_Blog_Title"));
         Assert.Empty(diff.AddedIndexes.Where(ix => ix.IndexName == "IX_Blog_Title"));
     }
+
+    // ─── Fix 2: SchemaDiffer detects PK/unique metadata changes ───────────
+
+    [Fact]
+    public void SchemaDiffer_DetectsAlteredColumn_WhenIsUniqueFlips()
+    {
+        // Column changes from non-unique to unique (no type or nullability change).
+        var oldTable = new TableSchema
+        {
+            Name = "Item",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Item" },
+                new ColumnSchema { Name = "Code",  ClrType = typeof(string).FullName!, IsNullable = false, IsUnique = false }
+            }
+        };
+        var newTable = new TableSchema
+        {
+            Name = "Item",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Item" },
+                new ColumnSchema { Name = "Code",  ClrType = typeof(string).FullName!, IsNullable = false, IsUnique = true } // IsUnique flipped
+            }
+        };
+
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { oldTable } },
+            new SchemaSnapshot { Tables = { newTable } });
+
+        Assert.Single(diff.AlteredColumns, ac => ac.NewColumn.Name == "Code");
+    }
+
+    [Fact]
+    public void SchemaDiffer_DetectsAlteredColumn_WhenIsPrimaryKeyFlips()
+    {
+        // Column promoted to PK (no type/nullability change).
+        var oldTable = new TableSchema
+        {
+            Name = "Widget",
+            Columns =
+            {
+                new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, IsNullable = false, IsPrimaryKey = false }
+            }
+        };
+        var newTable = new TableSchema
+        {
+            Name = "Widget",
+            Columns =
+            {
+                new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, IsNullable = false, IsPrimaryKey = true }
+            }
+        };
+
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { oldTable } },
+            new SchemaSnapshot { Tables = { newTable } });
+
+        Assert.Single(diff.AlteredColumns, ac => ac.NewColumn.Name == "Code");
+    }
+
+    [Fact]
+    public void SchemaDiffer_DetectsAlteredColumn_WhenIndexNameLost()
+    {
+        // Column loses its IndexName without any other change — should be detected.
+        var oldTable = new TableSchema
+        {
+            Name = "Post",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Post" },
+                new ColumnSchema { Name = "Slug",  ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "idx_Slug" }
+            }
+        };
+        var newTable = new TableSchema
+        {
+            Name = "Post",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Post" },
+                new ColumnSchema { Name = "Slug",  ClrType = typeof(string).FullName!, IsNullable = false, IndexName = null } // index removed
+            }
+        };
+
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { oldTable } },
+            new SchemaSnapshot { Tables = { newTable } });
+
+        Assert.Single(diff.AlteredColumns, ac => ac.NewColumn.Name == "Slug");
+    }
+
+    [Fact]
+    public void SchemaDiffer_DetectsAlteredColumn_WhenIndexNameAdded()
+    {
+        // Column gains an IndexName (becomes indexed) — should be detected.
+        var oldTable = new TableSchema
+        {
+            Name = "Post",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",   ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Post" },
+                new ColumnSchema { Name = "Title", ClrType = typeof(string).FullName!, IsNullable = false } // no index
+            }
+        };
+        var newTable = new TableSchema
+        {
+            Name = "Post",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",   ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Post" },
+                new ColumnSchema { Name = "Title", ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "idx_Post_Title" } // gained index
+            }
+        };
+
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { oldTable } },
+            new SchemaSnapshot { Tables = { newTable } });
+
+        Assert.Single(diff.AlteredColumns, ac => ac.NewColumn.Name == "Title");
+    }
+
+    [Fact]
+    public void SchemaDiffer_DetectsAllFourMetadataChanges_InOneDiff()
+    {
+        // All four change types combined: IsPrimaryKey, IsUnique, IndexName added, IndexName lost.
+        var oldTable = new TableSchema
+        {
+            Name = "Mixed",
+            Columns =
+            {
+                new ColumnSchema { Name = "A", ClrType = typeof(int).FullName!,    IsNullable = false, IsPrimaryKey = false },
+                new ColumnSchema { Name = "B", ClrType = typeof(string).FullName!, IsNullable = false, IsUnique = false },
+                new ColumnSchema { Name = "C", ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "idx_C" },
+                new ColumnSchema { Name = "D", ClrType = typeof(string).FullName!, IsNullable = false }
+            }
+        };
+        var newTable = new TableSchema
+        {
+            Name = "Mixed",
+            Columns =
+            {
+                new ColumnSchema { Name = "A", ClrType = typeof(int).FullName!,    IsNullable = false, IsPrimaryKey = true },  // PK gained
+                new ColumnSchema { Name = "B", ClrType = typeof(string).FullName!, IsNullable = false, IsUnique = true },       // unique gained
+                new ColumnSchema { Name = "C", ClrType = typeof(string).FullName!, IsNullable = false, IndexName = null },      // index lost
+                new ColumnSchema { Name = "D", ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "idx_D" }   // index gained
+            }
+        };
+
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { oldTable } },
+            new SchemaSnapshot { Tables = { newTable } });
+
+        Assert.Contains(diff.AlteredColumns, ac => ac.NewColumn.Name == "A");
+        Assert.Contains(diff.AlteredColumns, ac => ac.NewColumn.Name == "B");
+        Assert.Contains(diff.AlteredColumns, ac => ac.NewColumn.Name == "C");
+        Assert.Contains(diff.AlteredColumns, ac => ac.NewColumn.Name == "D");
+    }
+
+    [Fact]
+    public void SchemaDiffer_NoFalsePositive_WhenColumnUnchanged()
+    {
+        // An unchanged column must not appear in AlteredColumns.
+        var oldTable = new TableSchema
+        {
+            Name = "Stable",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",   ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Stable" },
+                new ColumnSchema { Name = "Name", ClrType = typeof(string).FullName!, IsNullable = false }
+            }
+        };
+        var newTable = new TableSchema
+        {
+            Name = "Stable",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",   ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Stable" },
+                new ColumnSchema { Name = "Name", ClrType = typeof(string).FullName!, IsNullable = false }
+            }
+        };
+
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { oldTable } },
+            new SchemaSnapshot { Tables = { newTable } });
+
+        Assert.Empty(diff.AlteredColumns);
+        Assert.Empty(diff.AddedColumns);
+        Assert.Empty(diff.DroppedColumns);
+    }
 }

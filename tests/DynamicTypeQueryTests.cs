@@ -184,6 +184,104 @@ public class DynamicTypeQueryTests
         Assert.DoesNotContain("price", props2);
     }
 
+    // ─── Fix 5: Schema-signature in cache key prevents stale types ────────
+
+    [Fact]
+    public void SchemaEvolution_NewContextAfterAddColumn_GetsNewTypeWithExtraColumn()
+    {
+        // Create DB with initial schema, query it, then add a column and query from a NEW context.
+        // The new context must get a type that includes the new column (not the stale cached type).
+        var dbName = $"fix5_evolve_{Guid.NewGuid():N}";
+
+        // Create initial table
+        var cn1 = new SqliteConnection($"Data Source={dbName};Mode=Memory;Cache=Shared");
+        cn1.Open();
+        using var initCmd = cn1.CreateCommand();
+        initCmd.CommandText = "CREATE TABLE Products (Id INTEGER PRIMARY KEY, Name TEXT)";
+        initCmd.ExecuteNonQuery();
+
+        // First context: query to get initial type
+        var ctx1 = new DbContext(cn1, new SqliteProvider());
+        var type1 = ctx1.Query("Products").ElementType;
+        var props1 = type1.GetProperties().Select(p => p.Name.ToLowerInvariant()).ToHashSet();
+
+        Assert.Contains("name", props1);
+        Assert.DoesNotContain("price", props1);
+
+        // Evolve schema: add a column
+        using var alterCmd = cn1.CreateCommand();
+        alterCmd.CommandText = "ALTER TABLE Products ADD COLUMN Price REAL";
+        alterCmd.ExecuteNonQuery();
+
+        // Second context (same DB, different context instance): must see new schema
+        var cn2 = new SqliteConnection($"Data Source={dbName};Mode=Memory;Cache=Shared");
+        cn2.Open();
+        var ctx2 = new DbContext(cn2, new SqliteProvider());
+        var type2 = ctx2.Query("Products").ElementType;
+        var props2 = type2.GetProperties().Select(p => p.Name.ToLowerInvariant()).ToHashSet();
+
+        // The new context must have the Price column
+        Assert.Contains("price", props2);
+        // The original type must NOT have the Price column (it came from the old schema)
+        Assert.DoesNotContain("price", props1);
+        // The two types must be distinct (schema changed)
+        Assert.NotSame(type1, type2);
+
+        ctx1.Dispose();
+        ctx2.Dispose();
+        cn1.Close();
+        cn2.Close();
+    }
+
+    [Fact]
+    public void SameSchemaQueriedTwice_ReturnsSameCachedType()
+    {
+        // Querying the same table twice from the same context must return the same cached type.
+        // (Schema signature is stable when schema is unchanged.)
+        var dbName = $"fix5_stable_{Guid.NewGuid():N}";
+        var cn = new SqliteConnection($"Data Source={dbName};Mode=Memory;Cache=Shared");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE Items (Id INTEGER PRIMARY KEY, Value TEXT)";
+        cmd.ExecuteNonQuery();
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var type1 = ctx.Query("Items").ElementType;
+        var type2 = ctx.Query("Items").ElementType;
+
+        Assert.Same(type1, type2);
+        cn.Close();
+    }
+
+    [Fact]
+    public void SchemaSignature_DifferentColumnSets_ProduceDifferentHashes()
+    {
+        // Verify that two databases with the same table name but different column sets
+        // produce different schema signatures (and thus distinct cached types).
+        var db1Name = $"fix5_sig_a_{Guid.NewGuid():N}";
+        var db2Name = $"fix5_sig_b_{Guid.NewGuid():N}";
+
+        var (cn1, ctx1) = CreateContextWithSchema(db1Name, new[] { "Id INTEGER PRIMARY KEY", "Alpha TEXT" });
+        var (cn2, ctx2) = CreateContextWithSchema(db2Name, new[] { "Id INTEGER PRIMARY KEY", "Beta TEXT" });
+
+        using var _cn1 = cn1;
+        using var _ctx1 = ctx1;
+        using var _cn2 = cn2;
+        using var _ctx2 = ctx2;
+
+        var type1 = ctx1.Query("Users").ElementType;
+        var type2 = ctx2.Query("Users").ElementType;
+
+        Assert.NotSame(type1, type2);
+
+        var props1 = type1.GetProperties().Select(p => p.Name.ToLowerInvariant()).ToHashSet();
+        var props2 = type2.GetProperties().Select(p => p.Name.ToLowerInvariant()).ToHashSet();
+        Assert.Contains("alpha", props1);
+        Assert.DoesNotContain("beta", props1);
+        Assert.Contains("beta", props2);
+        Assert.DoesNotContain("alpha", props2);
+    }
+
     [Fact]
     public void GateC_AdversarialHashCollision_NewKeyDistinguishesThem()
     {

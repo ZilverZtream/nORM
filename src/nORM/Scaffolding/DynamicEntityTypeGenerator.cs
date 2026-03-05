@@ -164,6 +164,37 @@ namespace nORM.Scaffolding
             return typeBuilder.CreateType()!;
         }
 
+        /// <summary>
+        /// Computes a stable hash string that represents the schema of the specified table.
+        /// The signature is derived from the ordered column names and their CLR types.
+        /// Including this in the dynamic-type cache key ensures that schema changes (added
+        /// columns, changed types) produce a new cache entry rather than returning a stale type.
+        ///
+        /// Note: the cache will accumulate entries as schemas evolve. Old entries become
+        /// unreachable (no live reference to the generated CLR Type) and are eligible for
+        /// eviction by the LRU cache policy.
+        /// </summary>
+        /// <param name="connection">Open database connection used to probe the schema.</param>
+        /// <param name="tableName">Possibly schema-qualified table name.</param>
+        /// <returns>A hex string fingerprint of the column name+type pairs in ordinal order.</returns>
+        public string ComputeSchemaSignature(DbConnection connection, string tableName)
+        {
+            if (connection.State != ConnectionState.Open)
+                connection.Open();
+            var (schemaName, bareTable) = SplitSchema(tableName);
+            var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
+            // Build a compact, order-sensitive string: "colname:typename,colname:typename,..."
+            var descriptor = string.Join(",", columns.Select(c => $"{c.ColumnName}:{c.PropertyType.FullName}"));
+            // FNV-1a 32-bit hash — fast, deterministic, no dependency on crypto
+            uint hash = 2166136261u;
+            foreach (char ch in descriptor)
+            {
+                hash ^= (byte)ch;
+                hash *= 16777619u;
+            }
+            return hash.ToString("x8");
+        }
+
         private static IEnumerable<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
         {
             var qualified = EscapeQualified(connection, schemaName, tableName);

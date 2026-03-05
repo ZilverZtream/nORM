@@ -69,20 +69,12 @@ namespace nORM.Migration
                     up.Add($"ALTER TABLE \"{table.Name}\" ADD COLUMN {colDef}");
                 }
 
+                // Down: undo the ADD COLUMN by recreating the table without those columns.
+                // Use RecreateTable so that PK/UNIQUE/INDEX constraints are preserved.
                 var remainingColumns = table.Columns
                     .Where(c => !addedColumnNames.Contains(c.Name))
-                    .ToArray();
-
-                var remainingDefs = remainingColumns
-                    .Select(c => $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
-                var remainingNames = remainingColumns.Select(c => $"\"{c.Name}\"").ToArray();
-
-                down.Add("PRAGMA foreign_keys=off");
-                down.Add($"CREATE TABLE \"__temp__{table.Name}\" ({string.Join(", ", remainingDefs)})");
-                down.Add($"INSERT INTO \"__temp__{table.Name}\" ({string.Join(", ", remainingNames)}) SELECT {string.Join(", ", remainingNames)} FROM \"{table.Name}\"");
-                down.Add($"DROP TABLE \"{table.Name}\"");
-                down.Add($"ALTER TABLE \"__temp__{table.Name}\" RENAME TO \"{table.Name}\"");
-                down.Add("PRAGMA foreign_keys=on");
+                    .ToList();
+                RecreateTable(down, table, remainingColumns, null);
             }
 
             // G2: SQLite does not support ALTER COLUMN; use the standard table-recreation workaround.
@@ -100,10 +92,18 @@ namespace nORM.Migration
             foreach (var table in diff.DroppedTables)
             {
                 up.Add($"DROP TABLE IF EXISTS \"{table.Name}\"");
-                // Down: recreate the table
-                var cols = table.Columns.Select(c =>
-                    $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
-                down.Add($"CREATE TABLE \"{table.Name}\" ({string.Join(", ", cols)})");
+                // Down: recreate the table with full constraint metadata
+                var colDefs = table.Columns.Select(c =>
+                    $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
+                if (pkCols.Count > 0)
+                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => $"\"{c.Name}\""))})");
+                var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
+                if (uniqueNonPkCols.Count > 0)
+                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => $"\"{c.Name}\""))})");
+                down.Add($"CREATE TABLE \"{table.Name}\" ({string.Join(", ", colDefs)})");
+                foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
+                    down.Add($"CREATE INDEX \"{col.IndexName}\" ON \"{table.Name}\" (\"{col.Name}\")");
             }
 
             // SD-8: Generate DROP COLUMN for columns removed in the new snapshot.
@@ -113,25 +113,18 @@ namespace nORM.Migration
             {
                 var newTable = diff.DroppedColumns.First(x => string.Equals(x.Table.Name, group.Key, StringComparison.OrdinalIgnoreCase)).Table;
                 var droppedColNames = group.Select(g => g.Column.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var droppedCols = group.Select(g => g.Column).ToList();
 
                 // The columns remaining in the new table (without the dropped ones)
                 var remainingCols = newTable.Columns
                     .Where(c => !droppedColNames.Contains(c.Name))
-                    .ToArray();
+                    .ToList();
 
-                var remainingDefs = remainingCols
-                    .Select(c => $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}");
-                var remainingNames = remainingCols.Select(c => $"\"{c.Name}\"").ToArray();
+                // Up: recreate table without dropped columns — use RecreateTable for full constraint preservation
+                RecreateTable(up, newTable, remainingCols, null);
 
-                up.Add("PRAGMA foreign_keys=off");
-                up.Add($"CREATE TABLE \"__temp__{newTable.Name}\" ({string.Join(", ", remainingDefs)})");
-                up.Add($"INSERT INTO \"__temp__{newTable.Name}\" ({string.Join(", ", remainingNames)}) SELECT {string.Join(", ", remainingNames)} FROM \"{newTable.Name}\"");
-                up.Add($"DROP TABLE \"{newTable.Name}\"");
-                up.Add($"ALTER TABLE \"__temp__{newTable.Name}\" RENAME TO \"{newTable.Name}\"");
-                up.Add("PRAGMA foreign_keys=on");
-
-                // Down: add the dropped columns back (SQLite ADD COLUMN)
-                foreach (var droppedCol in group.Select(g => g.Column))
+                // Down: add the dropped columns back (SQLite ADD COLUMN is forward-compatible)
+                foreach (var droppedCol in droppedCols)
                 {
                     var colDef = $"\"{droppedCol.Name}\" {GetSqlType(droppedCol)} {(droppedCol.IsNullable ? "NULL" : "NOT NULL")}";
                     down.Add($"ALTER TABLE \"{newTable.Name}\" ADD COLUMN {colDef}");
@@ -149,7 +142,26 @@ namespace nORM.Migration
         /// </summary>
         private static void AddRecreate(List<string> stmts, TableSchema table, Dictionary<string, ColumnSchema> overrides)
         {
-            var cols  = table.Columns.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
+            var cols = table.Columns.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
+            RecreateTable(stmts, table, cols, null);
+        }
+
+        /// <summary>
+        /// Emits the full SQLite table-recreation sequence: PRAGMA foreign_keys=off,
+        /// CREATE TABLE __temp__ (with PRIMARY KEY, UNIQUE, CREATE INDEX),
+        /// INSERT INTO __temp__ SELECT, DROP TABLE, RENAME TO, PRAGMA foreign_keys=on,
+        /// followed by any CREATE INDEX statements.
+        /// </summary>
+        /// <param name="stmts">List to append statements to.</param>
+        /// <param name="table">The original table (used for name and INSERT SELECT column list).</param>
+        /// <param name="cols">The effective column list for the recreated table (may differ from table.Columns for drop/alter paths).</param>
+        /// <param name="overrides">Optional per-column overrides (pass null if <paramref name="cols"/> is already the resolved list).</param>
+        private static void RecreateTable(List<string> stmts, TableSchema table, List<ColumnSchema> cols, Dictionary<string, ColumnSchema>? overrides)
+        {
+            // Apply overrides if supplied
+            if (overrides != null)
+                cols = cols.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
+
             var names = cols.Select(c => $"\"{c.Name}\"");
 
             // MIG-1: Build column definitions with full constraint metadata (same as AddedTables path)

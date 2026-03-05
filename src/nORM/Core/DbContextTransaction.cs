@@ -69,7 +69,9 @@ namespace nORM.Core
         public async Task RollbackAsync(CancellationToken ct = default)
         {
             if (_transaction != null)
-                await _transaction.RollbackAsync(ct).ConfigureAwait(false);
+                // Always use CancellationToken.None: a rollback must not be aborted even when
+                // the caller's token is already cancelled, otherwise the DB is left mid-transaction.
+                await _transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
             await DisposeAsync().ConfigureAwait(false);
         }
 
