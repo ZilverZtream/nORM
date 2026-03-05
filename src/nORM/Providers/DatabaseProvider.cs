@@ -120,6 +120,72 @@ namespace nORM.Providers
         public abstract string GenerateTemporalTriggersSql(TableMapping mapping);
 
         /// <summary>
+        /// TP-1/Finding-C: Returns provider-specific SQL to create the temporal tags table if it does not exist.
+        /// Default uses IF NOT EXISTS syntax with TEXT column types (SQLite/MySQL/Postgres).
+        /// SQL Server overrides this to use OBJECT_ID check and NVARCHAR/DATETIME2 types.
+        /// </summary>
+        public virtual string GetCreateTagsTableSql()
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $"CREATE TABLE IF NOT EXISTS {table} ({tagCol} TEXT NOT NULL, {tsCol} TEXT NOT NULL, PRIMARY KEY ({tagCol}))";
+        }
+
+        /// <summary>
+        /// TP-1/Finding-C: Returns provider-specific SQL to probe for the existence of a history table.
+        /// Default uses SELECT 1 … LIMIT 1 (SQLite/MySQL/Postgres).
+        /// SQL Server overrides this to use SELECT TOP 1.
+        /// </summary>
+        /// <param name="escapedHistoryTable">The already-escaped history table name.</param>
+        public virtual string GetHistoryTableExistsProbeSql(string escapedHistoryTable)
+            => $"SELECT 1 FROM {escapedHistoryTable} LIMIT 1";
+
+        /// <summary>
+        /// TP-1/Finding-D: Returns true when the DbException definitively indicates a table/object
+        /// does not exist (schema error), as opposed to a permission denied or connectivity error.
+        /// Only return true for definitive "object not found" schema errors so that operational
+        /// failures propagate rather than being silently swallowed.
+        /// </summary>
+        public virtual bool IsObjectNotFoundError(DbException ex)
+        {
+            // Default: message-based fallback for providers without typed exception support.
+            var msg = ex.Message;
+            return msg.Contains("no such table", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("doesn't exist", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("does not exist", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("relation", StringComparison.OrdinalIgnoreCase) && msg.Contains("does not exist", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// TP-1/Finding-A: Returns provider-specific SQL to look up a temporal tag's timestamp.
+        /// All identifiers are escaped using the provider's Escape method.
+        /// </summary>
+        /// <param name="paramName">The already-prefixed parameter name for the tag name value.</param>
+        public virtual string GetTagLookupSql(string paramName)
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $"SELECT {tsCol} FROM {table} WHERE {tagCol} = {paramName}";
+        }
+
+        /// <summary>
+        /// TP-1/Finding-A: Returns provider-specific SQL to insert a temporal tag record.
+        /// All identifiers are escaped using the provider's Escape method.
+        /// </summary>
+        /// <param name="pTagName">The already-prefixed parameter name for the tag name value.</param>
+        /// <param name="pTimestamp">The already-prefixed parameter name for the timestamp value.</param>
+        public virtual string GetCreateTagSql(string pTagName, string pTimestamp)
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $"INSERT INTO {table} ({tagCol}, {tsCol}) VALUES ({pTagName}, {pTimestamp})";
+        }
+
+        /// <summary>
         /// Character used to escape wildcards in patterns passed to SQL <c>LIKE</c> clauses.
         /// Defaults to a backslash but can be overridden by providers with different
         /// escaping semantics.

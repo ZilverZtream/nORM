@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using nORM.Core;
@@ -38,25 +39,32 @@ namespace nORM.Versioning
 
         private static async Task CreateTagsTableIfNotExistsAsync(DbContext context)
         {
-            var table = context.Provider.Escape("__NormTemporalTags");
-            var sql = $"CREATE TABLE IF NOT EXISTS {table} (TagName TEXT PRIMARY KEY, Timestamp TEXT NOT NULL);";
+            // TP-1/Finding-C: Use provider-specific DDL so that IF NOT EXISTS and column types
+            // are correct for each database (SQL Server requires OBJECT_ID check + NVARCHAR/DATETIME2).
+            var sql = context.Provider.GetCreateTagsTableSql();
             await ExecuteDdlAsync(context, sql).ConfigureAwait(false);
         }
 
         private static async Task<bool> HistoryTableExistsAsync(DbContext context, TableMapping mapping)
         {
             var historyTable = context.Provider.Escape(mapping.TableName + "_History");
+            // TP-1/Finding-C: Use provider-specific probe SQL (SQL Server needs TOP 1, not LIMIT 1).
+            var probeSql = context.Provider.GetHistoryTableExistsProbeSql(historyTable);
             try
             {
                 await using var cmd = (await context.EnsureConnectionAsync().ConfigureAwait(false)).CreateCommand();
-                cmd.CommandText = $"SELECT 1 FROM {historyTable} LIMIT 1";
+                cmd.CommandText = probeSql;
                 await cmd.ExecuteScalarAsync().ConfigureAwait(false);
                 return true;
             }
-            catch
+            catch (DbException dbEx) when (context.Provider.IsObjectNotFoundError(dbEx))
             {
+                // TP-1/Finding-D: Only treat definitive "table not found" schema errors as absence.
+                // Permission denied, transient connection faults, and syntax errors are NOT "table absent"
+                // — they must propagate so the caller sees a real failure, not a phantom DDL re-creation.
                 return false;
             }
+            // All other exceptions (non-DbException, permission errors, connectivity) propagate.
         }
 
         private static async Task ExecuteDdlAsync(DbContext context, string sql)
