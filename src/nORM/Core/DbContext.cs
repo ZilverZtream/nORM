@@ -904,13 +904,17 @@ namespace nORM.Core
                 throw; // unreachable — satisfies compiler
             }
 
-            // C1: Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE the
-            // try/catch block so an interceptor exception does not attempt to roll back an
-            // already-committed transaction.
+            // C1 / CT-1: Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE
+            // the try/catch block so an interceptor exception does not attempt to roll back an
+            // already-committed transaction. Use CancellationToken.None here: ct was replaced by
+            // transactionManager.Token (linked to caller token) at line 796, so a cancellation
+            // arriving between commit and this point would surface as OperationCanceledException
+            // even though the DB commit already succeeded. Post-commit notifications must always
+            // complete to avoid false-failure reports and duplicate-retry side effects.
             if (saveInterceptors.Count > 0)
             {
                 foreach (var interceptor in saveInterceptors)
-                    await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, ct).ConfigureAwait(false);
+                    await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, CancellationToken.None).ConfigureAwait(false);
             }
 
             var cache = Options.CacheProvider;
