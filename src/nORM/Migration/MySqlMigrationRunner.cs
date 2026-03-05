@@ -109,9 +109,29 @@ namespace nORM.Migration
                 .OrderBy(m => m.Version)
                 .ToList();
 
-            var appliedVersions = await GetAppliedMigrationVersionsAsync(ct).ConfigureAwait(false);
+            // MIG-1: Fail-fast on duplicate version numbers in assembly.
+            var duplicates = all.GroupBy(m => m.Version).Where(g => g.Count() > 1).ToList();
+            if (duplicates.Count > 0)
+            {
+                var desc = string.Join(", ", duplicates.Select(g =>
+                    $"v{g.Key}: [{string.Join(", ", g.Select(m => m.Name))}]"));
+                throw new InvalidOperationException(
+                    $"Duplicate migration versions detected: {desc}. " +
+                    "Each migration must have a unique Version.");
+            }
 
-            return all.Where(m => !appliedVersions.Contains(m.Version)).ToList();
+            var applied = await GetAppliedMigrationsAsync(ct).ConfigureAwait(false);
+
+            foreach (var m in all.Where(m => applied.TryGetValue(m.Version, out var name) &&
+                !string.Equals(name, m.Name, StringComparison.Ordinal)))
+            {
+                applied.TryGetValue(m.Version, out var recordedName);
+                throw new InvalidOperationException(
+                    $"Migration version {m.Version} name drift: recorded '{recordedName}', found '{m.Name}'. " +
+                    "Rename the migration class back to its original name or create a new migration version.");
+            }
+
+            return all.Where(m => !applied.ContainsKey(m.Version)).ToList();
         }
 
         /// <summary>
@@ -132,29 +152,29 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// Retrieves the set of migration versions that have already been applied to the database.
+        /// Retrieves the set of migration versions (and names) that have already been applied to the database.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
-        /// <returns>A set containing the version numbers of applied migrations.</returns>
-        private async Task<HashSet<long>> GetAppliedMigrationVersionsAsync(CancellationToken ct)
+        /// <returns>A dictionary mapping version numbers to migration names for applied migrations.</returns>
+        private async Task<Dictionary<long, string>> GetAppliedMigrationsAsync(CancellationToken ct)
         {
-            var versions = new HashSet<long>();
+            var applied = new Dictionary<long, string>();
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"SELECT `Version` FROM `{HistoryTableName}`";
+            cmd.CommandText = $"SELECT `Version`, `Name` FROM `{HistoryTableName}`";
             try
             {
                 await using var reader = await ExecuteReaderAsync(cmd, ct).ConfigureAwait(false);
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
-                    versions.Add(reader.GetInt64(0));
+                    applied[reader.GetInt64(0)] = reader.GetString(1);
                 }
             }
             catch (DbException ex) when (IsTableNotFoundError(ex))
             {
-                // MG-1: History table doesn't exist yet (first run) — return empty set.
+                // MG-1: History table doesn't exist yet (first run) — return empty dict.
                 // All other DbException (transient failures, permission errors, etc.) propagate.
             }
-            return versions;
+            return applied;
         }
 
         /// <summary>

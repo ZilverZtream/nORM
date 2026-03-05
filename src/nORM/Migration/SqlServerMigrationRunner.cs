@@ -115,14 +115,26 @@ namespace nORM.Migration
                 .OrderBy(m => m.Version)
                 .ToList();
 
+            // MIG-1: Fail-fast on duplicate version numbers in assembly.
+            var duplicates = all.GroupBy(m => m.Version).Where(g => g.Count() > 1).ToList();
+            if (duplicates.Count > 0)
+            {
+                var desc = string.Join(", ", duplicates.Select(g =>
+                    $"v{g.Key}: [{string.Join(", ", g.Select(m => m.Name))}]"));
+                throw new InvalidOperationException(
+                    $"Duplicate migration versions detected: {desc}. " +
+                    "Each migration must have a unique Version.");
+            }
+
             var applied = await GetAppliedMigrationsAsync(ct).ConfigureAwait(false);
 
             foreach (var m in all.Where(m => applied.TryGetValue(m.Version, out var name) &&
                 !string.Equals(name, m.Name, StringComparison.Ordinal)))
             {
                 applied.TryGetValue(m.Version, out var recordedName);
-                _logger?.LogWarning("Migration {Version} name drift: recorded '{Recorded}', found '{Current}'",
-                    m.Version, recordedName, m.Name);
+                throw new InvalidOperationException(
+                    $"Migration version {m.Version} name drift: recorded '{recordedName}', found '{m.Name}'. " +
+                    "Rename the migration class back to its original name or create a new migration version.");
             }
 
             return all.Where(m => !applied.ContainsKey(m.Version)).ToList();

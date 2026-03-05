@@ -1,40 +1,21 @@
 using System;
-using System.Collections.Generic;
-using System.Data.Common;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Logging;
 using nORM.Migration;
 using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>MIG-1: Verify migration runner logs a warning when a version's name drifts.</summary>
+/// <summary>MIG-1: Verify migration runner throws when a version's name drifts.</summary>
 public class MigrationDriftTests
 {
-    private sealed class TestLogger : ILogger
-    {
-        public readonly List<string> Warnings = new();
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Warning;
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
-            Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            if (logLevel >= LogLevel.Warning)
-                Warnings.Add(formatter(state, exception));
-        }
-    }
-
     [Fact]
-    public async Task GetPendingMigrations_LogsWarning_WhenNameDrifts()
+    public async Task GetPendingMigrations_Throws_WhenNameDrifts()
     {
         await using var cn = new SqliteConnection("Data Source=:memory:");
         await cn.OpenAsync();
 
         // Seed history: version=1, but with OLD name that doesn't match "CreateBlogTable"
-        // CreateBlogTable (v1) is already in the test assembly (SqliteMigrationRunnerTests)
         await using (var cmd = cn.CreateCommand())
         {
             cmd.CommandText = "CREATE TABLE \"__NormMigrationsHistory\" " +
@@ -48,20 +29,19 @@ public class MigrationDriftTests
             await cmd.ExecuteNonQueryAsync();
         }
 
-        var logger = new TestLogger();
         // Use SqliteMigrationRunnerTests's assembly which contains CreateBlogTable (v1, "CreateBlogTable")
-        var runner = new SqliteMigrationRunner(cn, typeof(SqliteMigrationRunnerTests).Assembly, logger: logger);
+        var runner = new SqliteMigrationRunner(cn, typeof(SqliteMigrationRunnerTests).Assembly);
 
-        await runner.GetPendingMigrationsAsync();
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runner.GetPendingMigrationsAsync());
 
-        // A drift warning should have been logged: history has "OldBlogMigration" but code has "CreateBlogTable"
-        Assert.NotEmpty(logger.Warnings);
-        Assert.Contains(logger.Warnings, w =>
-            w.Contains("1") || w.Contains("CreateBlogTable") || w.Contains("OldBlogMigration"));
+        Assert.Contains("name drift", ex.Message);
+        Assert.Contains("OldBlogMigration", ex.Message);
+        Assert.Contains("CreateBlogTable", ex.Message);
     }
 
     [Fact]
-    public async Task GetPendingMigrations_NoWarning_WhenNameMatches()
+    public async Task GetPendingMigrations_NoThrow_WhenNameMatches()
     {
         await using var cn = new SqliteConnection("Data Source=:memory:");
         await cn.OpenAsync();
@@ -79,12 +59,10 @@ public class MigrationDriftTests
             await cmd.ExecuteNonQueryAsync();
         }
 
-        var logger = new TestLogger();
-        var runner = new SqliteMigrationRunner(cn, typeof(SqliteMigrationRunnerTests).Assembly, logger: logger);
+        var runner = new SqliteMigrationRunner(cn, typeof(SqliteMigrationRunnerTests).Assembly);
 
-        await runner.GetPendingMigrationsAsync();
-
-        // No drift warning (name matches for v1)
-        Assert.Empty(logger.Warnings);
+        // No exception — name matches for v1
+        var pending = await runner.GetPendingMigrationsAsync();
+        Assert.NotNull(pending);
     }
 }
