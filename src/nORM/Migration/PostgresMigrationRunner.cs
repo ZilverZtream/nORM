@@ -68,7 +68,11 @@ namespace nORM.Migration
                 migration.Up(_connection, (DbTransaction)transaction);
                 await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
             }
-            await transaction.CommitAsync(ct).ConfigureAwait(false);
+            // PRV-1: Use CancellationToken.None — commit must not be aborted mid-flight.
+            // Cancellation during commit acknowledgment leaves ambiguous migration history state;
+            // callers would see a failure while DDL may already have committed, risking re-run
+            // of already-applied migrations on retry.
+            await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
         }
 
         /// <summary>

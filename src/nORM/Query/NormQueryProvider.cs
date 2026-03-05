@@ -1549,7 +1549,39 @@ namespace nORM.Query
                     var param = Expression.Parameter(entityType, "t");
                     var prop = Expression.Property(param, tenantCol.Prop.Name);
                     var tenantId = _ctx.Options.TenantProvider.GetCurrentTenantId();
-                    var constant = Expression.Constant(tenantId, tenantCol.Prop.PropertyType);
+                    // QP-1: Coerce the tenant ID to the mapped property type before building
+                    // the expression constant. If TenantProvider.GetCurrentTenantId() returns a
+                    // boxed long but the entity property is int (or any other cross-type mismatch),
+                    // Expression.Constant(tenantId, propertyType) would throw ArgumentException
+                    // before translation, crashing all tenant-scoped queries. Convert.ChangeType
+                    // handles common numeric widening/narrowing and string representations. If
+                    // conversion is genuinely impossible (e.g., string "abc" → int), throw a
+                    // deterministic NormConfigurationException with an actionable message.
+                    var propType = tenantCol.Prop.PropertyType;
+                    object coercedTenantId;
+                    if (tenantId == null || propType.IsInstanceOfType(tenantId))
+                    {
+                        coercedTenantId = tenantId!;
+                    }
+                    else
+                    {
+                        var underlyingType = Nullable.GetUnderlyingType(propType) ?? propType;
+                        try
+                        {
+                            coercedTenantId = Convert.ChangeType(tenantId, underlyingType,
+                                System.Globalization.CultureInfo.InvariantCulture);
+                        }
+                        catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
+                        {
+                            throw new nORM.Core.NormConfigurationException(
+                                $"TenantProvider.GetCurrentTenantId() returned a value of type " +
+                                $"'{tenantId.GetType().FullName}' which cannot be converted to the " +
+                                $"tenant column property type '{propType.FullName}' " +
+                                $"(column: '{tenantCol.PropName}', entity: '{entityType.Name}'). " +
+                                $"Ensure TenantProvider returns a compatible type or update the entity mapping.", ex);
+                        }
+                    }
+                    var constant = Expression.Constant(coercedTenantId, propType);
                     var body = Expression.Equal(prop, constant);
                     var lambda = Expression.Lambda(body, param);
                     expression = Expression.Call(
