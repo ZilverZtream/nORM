@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -405,7 +405,7 @@ END;";
             }
             catch
             {
-                await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
                 throw;
             }
 
@@ -504,7 +504,7 @@ END;";
             }
             catch
             {
-                await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
                 throw;
             }
 
@@ -609,7 +609,7 @@ END;";
             }
             catch
             {
-                await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
                 throw;
             }
             

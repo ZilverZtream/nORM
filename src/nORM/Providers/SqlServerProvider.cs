@@ -12,7 +12,6 @@ using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
 using Microsoft.Extensions.Logging;
-using System.Globalization;
 
 #nullable enable
 
@@ -183,18 +182,19 @@ namespace nORM.Providers
             => $"JSON_VALUE({columnName}, '{jsonPath}')";
 
         /// <summary>
-        /// Builds a <c>STRING_SPLIT</c> based containment clause for SQL Server.
+        /// Builds a parameterized <c>IN</c> clause for SQL Server using one parameter per value.
+        /// Previously this used STRING_SPLIT which broke for values containing commas and was
+        /// not type-safe. Per-parameter approach is correct for all value types and collection sizes.
+        /// Empty collections emit <c>(1=0)</c> — a never-true predicate — instead of invalid SQL.
         /// </summary>
-        /// <param name="cmd">Command to which the parameter is added.</param>
+        /// <param name="cmd">Command to which parameters are added.</param>
         /// <param name="columnName">Column to search within.</param>
         /// <param name="values">Values to test for membership.</param>
         /// <returns>SQL fragment implementing the containment test.</returns>
         public override string BuildContainsClause(DbCommand cmd, string columnName, IReadOnlyList<object?> values)
         {
-            var pName = ParamPrefix + "p0";
-            var joined = string.Join(",", values.Select(v => Convert.ToString(v, CultureInfo.InvariantCulture)));
-            cmd.AddParam(pName, joined);
-            return $"{columnName} IN (SELECT value FROM STRING_SPLIT({pName}, ','))";
+            // Delegate to the base implementation which uses per-value parameters and handles empty collections.
+            return base.BuildContainsClause(cmd, columnName, values);
         }
 
         /// <summary>

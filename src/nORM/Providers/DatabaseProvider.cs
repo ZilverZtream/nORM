@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -284,6 +284,10 @@ namespace nORM.Providers
         /// <returns>SQL fragment representing the <c>IN</c> clause.</returns>
         public virtual string BuildContainsClause(DbCommand cmd, string columnName, IReadOnlyList<object?> values)
         {
+            // Empty collection: IN () is not valid SQL. Emit a never-true predicate instead.
+            if (values.Count == 0)
+                return "(1=0)";
+
             var paramNames = new List<string>(values.Count);
             for (int i = 0; i < values.Count; i++)
             {
@@ -449,7 +453,7 @@ namespace nORM.Providers
             }
             catch
             {
-                await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
                 throw;
             }
             ctx.Options.CacheProvider?.InvalidateTag(m.TableName);
@@ -534,7 +538,7 @@ namespace nORM.Providers
             }
             catch
             {
-                await transaction.RollbackAsync(ct).ConfigureAwait(false);
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
                 throw;
             }
 

@@ -331,6 +331,127 @@ public class SqliteMigrationSqlGeneratorTests
         Assert.Contains(sql.Up, s => s.Contains("RENAME TO"));
     }
 
+    // ─── Fix 1: DroppedColumns up migration preserves constraints ─────────
+
+    [Fact]
+    public void DroppedColumn_NonKey_UpMigration_PreservesPrimaryKey()
+    {
+        // Drop a non-PK column; the remaining recreated table must still have PRIMARY KEY.
+        var table = new TableSchema
+        {
+            Name = "Order",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",     ClrType = typeof(int).FullName!,    IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Order" },
+                new ColumnSchema { Name = "Total",  ClrType = typeof(decimal).FullName!, IsNullable = false },
+                new ColumnSchema { Name = "Notes",  ClrType = typeof(string).FullName!, IsNullable = true }
+            }
+        };
+        var diff = new SchemaDiff();
+        diff.DroppedColumns.Add((table, table.Columns[2])); // drop Notes
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        var createStmt = sql.Up.First(s => s.StartsWith("CREATE TABLE") && s.Contains("__temp__"));
+        Assert.Contains("PRIMARY KEY", createStmt);
+        Assert.Contains("\"Id\"", createStmt);
+    }
+
+    [Fact]
+    public void DroppedColumn_NonKey_UpMigration_PreservesUniqueConstraint()
+    {
+        var table = new TableSchema
+        {
+            Name = "Customer",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!,    IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Customer" },
+                new ColumnSchema { Name = "Email", ClrType = typeof(string).FullName!, IsNullable = false, IsUnique = true },
+                new ColumnSchema { Name = "Phone", ClrType = typeof(string).FullName!, IsNullable = true }
+            }
+        };
+        var diff = new SchemaDiff();
+        diff.DroppedColumns.Add((table, table.Columns[2])); // drop Phone
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        var createStmt = sql.Up.First(s => s.StartsWith("CREATE TABLE") && s.Contains("__temp__"));
+        Assert.Contains("UNIQUE", createStmt);
+        Assert.Contains("\"Email\"", createStmt);
+    }
+
+    [Fact]
+    public void DroppedColumn_NonKey_UpMigration_PreservesNamedIndex()
+    {
+        var table = new TableSchema
+        {
+            Name = "Product",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",   ClrType = typeof(int).FullName!,    IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Product" },
+                new ColumnSchema { Name = "Sku",  ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "idx_Sku" },
+                new ColumnSchema { Name = "Tmp",  ClrType = typeof(string).FullName!, IsNullable = true }
+            }
+        };
+        var diff = new SchemaDiff();
+        diff.DroppedColumns.Add((table, table.Columns[2])); // drop Tmp
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Contains(sql.Up, s => s.StartsWith("CREATE INDEX") && s.Contains("idx_Sku"));
+    }
+
+    [Fact]
+    public void AddedColumn_DownMigration_RecreatesTableWithoutAddedColumn_AndPreservesConstraints()
+    {
+        // Down migration for an added column should recreate the table WITHOUT that column,
+        // while preserving all constraints of the remaining columns.
+        var table = new TableSchema
+        {
+            Name = "Blog",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id",      ClrType = typeof(int).FullName!,    IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Blog" },
+                new ColumnSchema { Name = "Title",   ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "idx_Title" },
+                new ColumnSchema { Name = "Summary", ClrType = typeof(string).FullName!, IsNullable = true } // this is the newly-added column
+            }
+        };
+        var diff = new SchemaDiff();
+        diff.AddedColumns.Add((table, table.Columns[2])); // Summary was added
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        // Up: should be a simple ALTER TABLE ADD COLUMN
+        Assert.Contains(sql.Up, s => s.Contains("ALTER TABLE") && s.Contains("ADD COLUMN") && s.Contains("Summary"));
+
+        // Down: should recreate WITHOUT Summary, WITH PK and index preserved
+        var downCreate = sql.Down.First(s => s.StartsWith("CREATE TABLE") && s.Contains("__temp__"));
+        Assert.DoesNotContain("Summary", downCreate);
+        Assert.Contains("PRIMARY KEY", downCreate);
+        // Named index on Title should be emitted as a separate CREATE INDEX
+        Assert.Contains(sql.Down, s => s.StartsWith("CREATE INDEX") && s.Contains("idx_Title"));
+        // Foreign key pragma wrapping
+        Assert.Contains(sql.Down, s => s == "PRAGMA foreign_keys=off");
+        Assert.Contains(sql.Down, s => s == "PRAGMA foreign_keys=on");
+    }
+
+    [Fact]
+    public void DroppedColumn_RoundTrip_OriginalSchemaConstraintsPreserved()
+    {
+        // End-to-end: table with PK+UNIQUE+INDEX → drop a non-key column →
+        // resulting up migration has all constraints intact.
+        var table = BuildFullyConstrainedTable();
+        var diff = new SchemaDiff();
+        diff.DroppedColumns.Add((table, table.Columns[3])); // drop Notes
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        var createStmt = sql.Up.First(s => s.StartsWith("CREATE TABLE") && s.Contains("__temp__"));
+        Assert.Contains("PRIMARY KEY", createStmt);
+        Assert.Contains("UNIQUE", createStmt);
+        Assert.Contains(sql.Up, s => s.StartsWith("CREATE INDEX") && s.Contains("idx_Name"));
+    }
+
     // ─── Helper ────────────────────────────────────────────────────────────
 
     /// <summary>Builds a table with PK, unique, named-index, and nullable columns.</summary>

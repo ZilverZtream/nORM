@@ -508,7 +508,15 @@ namespace nORM.Core
             // where queries against different databases return stale type definitions.
             // Normalizing (sort key=value pairs, lowercase) also ensures that identical
             // connection strings written in different key orders map to the same cache entry.
-            var cacheKey = $"{Provider.GetType().FullName}|{NormalizeConnectionString(_cn.ConnectionString)}|{tableName}";
+            //
+            // Schema-signature fix: Include a hash of the live column name+type pairs in the
+            // cache key. After a schema migration (new column added, column type changed), the
+            // same provider|connstring|table triple would return the stale generated CLR type.
+            // Including the schema signature means any schema change produces a new cache entry.
+            // Old entries become unreachable and are eligible for LRU eviction.
+            EnsureConnection();
+            var schemaSignature = _typeGenerator.ComputeSchemaSignature(_cn, tableName);
+            var cacheKey = $"{Provider.GetType().FullName}|{NormalizeConnectionString(_cn.ConnectionString)}|{tableName}|{schemaSignature}";
             var lazyTask = _dynamicTypeCache.GetOrAdd(cacheKey,
                 _ => new Lazy<Task<Type>>(() => _typeGenerator.GenerateEntityTypeAsync(this.Connection, tableName)));
 
@@ -1187,7 +1195,8 @@ namespace nORM.Core
             }
             catch
             {
-                if (ownsTransaction) await currentTransaction.RollbackAsync(ct).ConfigureAwait(false);
+                // Use CancellationToken.None so a cancelled caller token does not abort the rollback.
+                if (ownsTransaction) await currentTransaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
                 throw;
             }
         }
@@ -1230,7 +1239,8 @@ namespace nORM.Core
             }
             catch
             {
-                await ownTransaction.RollbackAsync(ct).ConfigureAwait(false);
+                // Use CancellationToken.None so a cancelled caller token does not abort the rollback.
+                await ownTransaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
                 throw;
             }
         }
