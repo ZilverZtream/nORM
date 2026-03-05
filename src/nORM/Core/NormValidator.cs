@@ -353,20 +353,60 @@ namespace nORM.Core
 
         /// <summary>
         /// Counts parameter markers in SQL string (@, $, :) to detect if parameterization is used.
+        /// Uses a mini SQL lexer to skip string literals, double-quoted identifiers, line comments,
+        /// and block comments so that @ inside 'user@example.com' is not counted.
         /// </summary>
         private static int CountParameterMarkers(string sql)
         {
             var count = 0;
-            for (int i = 0; i < sql.Length - 1; i++)
+            var i = 0;
+            while (i < sql.Length)
             {
                 var c = sql[i];
-                var next = sql[i + 1];
-
-                // Parameter marker followed by alphanumeric or underscore
-                if ((c == '@' || c == '$' || c == ':') && (char.IsLetterOrDigit(next) || next == '_'))
+                // Skip single-quoted literals ('...' with '' escape)
+                if (c == '\'')
+                {
+                    i++;
+                    while (i < sql.Length)
+                    {
+                        if (sql[i] == '\'') { i++; if (i < sql.Length && sql[i] == '\'') i++; else break; }
+                        else i++;
+                    }
+                    continue;
+                }
+                // Skip double-quoted identifiers ("..." with "" escape)
+                if (c == '"')
+                {
+                    i++;
+                    while (i < sql.Length)
+                    {
+                        if (sql[i] == '"') { i++; if (i < sql.Length && sql[i] == '"') i++; else break; }
+                        else i++;
+                    }
+                    continue;
+                }
+                // Skip line comments (-- to newline)
+                if (c == '-' && i + 1 < sql.Length && sql[i + 1] == '-')
+                {
+                    i += 2;
+                    while (i < sql.Length && sql[i] != '\n') i++;
+                    continue;
+                }
+                // Skip block comments (/* ... */)
+                if (c == '/' && i + 1 < sql.Length && sql[i + 1] == '*')
+                {
+                    i += 2;
+                    while (i < sql.Length - 1 && !(sql[i] == '*' && sql[i + 1] == '/')) i++;
+                    i += 2;
+                    continue;
+                }
+                // Count parameter markers outside quoted/comment regions
+                if ((c == '@' || c == '$' || c == ':') && i + 1 < sql.Length
+                    && (char.IsLetterOrDigit(sql[i + 1]) || sql[i + 1] == '_'))
                 {
                     count++;
                 }
+                i++;
             }
             return count;
         }

@@ -96,10 +96,10 @@ namespace nORM.Query
                 // 1 = null constant, 0 = non-null constant.
                 AppendInt(node.Value is null ? 1 : 0);
 
-                // QP-1: Include actual value hash so same-shape queries with different literals
-                // get distinct cache entries and don't reuse stale parameter values.
+                // QP-1: Include stable full-value bytes instead of GetHashCode() (32-bit, collision-prone).
+                // GetHashCode() on strings/longs/doubles loses bit precision and causes wrong-plan reuse.
                 if (node.Value is not null && node.Value is not IQueryable)
-                    AppendInt(node.Value.GetHashCode());
+                    AppendStableValue(node.Value);
 
                 return base.VisitConstant(node);
             }
@@ -172,6 +172,61 @@ namespace nORM.Query
                 Span<byte> data = stackalloc byte[4];
                 BinaryPrimitives.WriteInt32LittleEndian(data, value);
                 _hasher.Append(data);
+            }
+
+            private void AppendLong(long value)
+            {
+                Span<byte> data = stackalloc byte[8];
+                BinaryPrimitives.WriteInt64LittleEndian(data, value);
+                _hasher.Append(data);
+            }
+
+            // QP-1: Stable value hashing — emits full bytes for each type so two constants
+            // that differ only in high bits (e.g., longs with same low 32 bits) get distinct fingerprints.
+            private void AppendStableValue(object value)
+            {
+                switch (value)
+                {
+                    case string s:
+                        AppendString(s);
+                        break;
+                    case int v:    AppendInt(v); break;
+                    case uint v:   AppendInt((int)v); break;
+                    case short v:  AppendInt(v); break;
+                    case ushort v: AppendInt(v); break;
+                    case byte v:   AppendInt(v); break;
+                    case sbyte v:  AppendInt(v); break;
+                    case char v:   AppendInt(v); break;
+                    case bool v:   AppendInt(v ? 1 : 0); break;
+                    case long v:   AppendLong(v); break;
+                    case ulong v:  AppendLong((long)v); break;
+                    case float v:  AppendInt(BitConverter.SingleToInt32Bits(v)); break;
+                    case double v: AppendLong(BitConverter.DoubleToInt64Bits(v)); break;
+                    case decimal v:
+                        var bits = decimal.GetBits(v);
+                        AppendInt(bits[0]); AppendInt(bits[1]); AppendInt(bits[2]); AppendInt(bits[3]);
+                        break;
+                    case Guid v:   AppendGuid(v); break;
+                    case DateTime v:
+                        AppendLong(v.Ticks);
+                        AppendInt((int)v.Kind);
+                        break;
+                    case DateTimeOffset v:
+                        AppendLong(v.Ticks);
+                        AppendLong(v.Offset.Ticks);
+                        break;
+                    case byte[] v:
+                        AppendInt(v.Length);
+                        _hasher.Append(v);
+                        break;
+                    default:
+                        // Enum or unknown: best-effort fallback
+                        if (value.GetType().IsEnum)
+                            AppendInt(Convert.ToInt32(value));
+                        else
+                            AppendInt(value.GetHashCode());
+                        break;
+                }
             }
 
             private void AppendGuid(Guid value)
