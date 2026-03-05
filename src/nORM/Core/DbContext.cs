@@ -463,18 +463,38 @@ namespace nORM.Core
             return true;
         }
 
+        private static readonly HashSet<string> _sensitiveConnStringKeys = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "password", "pwd", "user password", "access token", "accesstoken", "token", "secret"
+        };
+
         /// <summary>
-        /// Gate C: Normalizes a connection string so that identical connection strings expressed
-        /// with different key orderings or casing map to the same cache key. This eliminates
-        /// collisions caused by using GetHashCode() (32-bit) as the cache key component.
-        /// Normalization: split on ';', trim each pair, sort case-insensitively, rejoin.
+        /// PC-1/SEC-1: Normalizes a connection string for use as a static cache key.
+        /// Uses DbConnectionStringBuilder for robust parsing (handles quoted semicolons, escaped
+        /// chars, reordered keys). Strips sensitive keys so credentials never appear in cache key
+        /// memory (coredump / diagnostic exposure risk). Keys are sorted case-insensitively so
+        /// identical strings with different orderings map to the same cache key.
         /// </summary>
         private static string NormalizeConnectionString(string? cs)
         {
             if (string.IsNullOrEmpty(cs)) return string.Empty;
-            return string.Join(";", cs.Split(';', StringSplitOptions.RemoveEmptyEntries)
-                .Select(p => p.Trim())
-                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase));
+            try
+            {
+                var builder = new DbConnectionStringBuilder { ConnectionString = cs };
+                return string.Join(";",
+                    builder.Keys.Cast<string>()
+                        .Where(k => !_sensitiveConnStringKeys.Contains(k))
+                        .OrderBy(k => k, StringComparer.OrdinalIgnoreCase)
+                        .Select(k => $"{k}={builder[k]}"));
+            }
+            catch (ArgumentException)
+            {
+                // Malformed connection string: fall back to opaque hash so we never
+                // return credentials in the key.
+                return Convert.ToHexString(
+                    System.Security.Cryptography.SHA256.HashData(
+                        System.Text.Encoding.UTF8.GetBytes(cs)));
+            }
         }
 
         /// <summary>
