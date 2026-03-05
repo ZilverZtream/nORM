@@ -24,6 +24,9 @@ namespace nORM.Migration
             { typeof(Guid).FullName!, "UUID" }
         };
 
+        // PRV-1: Escape PostgreSQL identifiers to prevent SQL injection via identifier names.
+        private static string Esc(string id) => $"\"{id.Replace("\"", "\"\"")}\"";
+
         /// <summary>
         /// Produces PostgreSQL-compatible SQL statements to transition between schema versions.
         /// </summary>
@@ -37,66 +40,84 @@ namespace nORM.Migration
             foreach (var table in diff.AddedTables)
             {
                 var colDefs = table.Columns.Select(c =>
-                    $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
 
                 // MIG-1: Emit PRIMARY KEY constraint for PK columns
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
-                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => $"\"{c.Name}\""))})");
+                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
 
                 // MIG-1: Emit UNIQUE constraint for unique non-PK columns
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
                 if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => $"\"{c.Name}\""))})");
+                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
 
-                up.Add($"CREATE TABLE \"{table.Name}\" ({string.Join(", ", colDefs)})");
+                up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
                 // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
                 foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    up.Add($"CREATE INDEX \"{col.IndexName}\" ON \"{table.Name}\" (\"{col.Name}\")");
+                    up.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
 
-                down.Add($"DROP TABLE \"{table.Name}\"");
+                down.Add($"DROP TABLE {Esc(table.Name)}");
             }
 
             foreach (var (table, column) in diff.AddedColumns)
             {
-                var colDef = $"\"{column.Name}\" {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
-                up.Add($"ALTER TABLE \"{table.Name}\" ADD COLUMN {colDef}");
-                down.Add($"ALTER TABLE \"{table.Name}\" DROP COLUMN \"{column.Name}\"");
+                // MIG-1: NOT NULL column without a DefaultValue cannot be added to a populated table.
+                if (!column.IsNullable && column.DefaultValue == null)
+                    throw new InvalidOperationException(
+                        $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
+                        "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
+
+                var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {column.DefaultValue}";
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {nullPart}";
+                up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
+                down.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
             }
 
+            // SG-1: PostgreSQL requires separate ALTER COLUMN statements for type and nullability changes.
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
-                var newDef = $"\"{newCol.Name}\" {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}";
-                up.Add($"ALTER TABLE \"{table.Name}\" ALTER COLUMN {newDef}");
-                var oldDef = $"\"{oldCol.Name}\" {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}";
-                down.Add($"ALTER TABLE \"{table.Name}\" ALTER COLUMN {oldDef}");
+                if (!string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal))
+                    up.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} TYPE {GetSqlType(newCol)}");
+                if (oldCol.IsNullable != newCol.IsNullable)
+                    up.Add(newCol.IsNullable
+                        ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} DROP NOT NULL"
+                        : $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} SET NOT NULL");
+
+                // Down: reverse type and nullability changes
+                if (!string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal))
+                    down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} TYPE {GetSqlType(oldCol)}");
+                if (oldCol.IsNullable != newCol.IsNullable)
+                    down.Add(oldCol.IsNullable
+                        ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} DROP NOT NULL"
+                        : $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} SET NOT NULL");
             }
 
             // SD-8: Generate DROP TABLE for tables removed in the new snapshot
             foreach (var table in diff.DroppedTables)
             {
-                up.Add($"DROP TABLE \"{table.Name}\"");
+                up.Add($"DROP TABLE {Esc(table.Name)}");
                 // Down: recreate the table with full constraint metadata
                 var colDefs = table.Columns.Select(c =>
-                    $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
-                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => $"\"{c.Name}\""))})");
+                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
                 if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => $"\"{c.Name}\""))})");
-                down.Add($"CREATE TABLE \"{table.Name}\" ({string.Join(", ", colDefs)})");
+                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
                 foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    down.Add($"CREATE INDEX \"{col.IndexName}\" ON \"{table.Name}\" (\"{col.Name}\")");
+                    down.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
             }
 
             // SD-8: Generate DROP COLUMN for columns removed in the new snapshot
             foreach (var (table, column) in diff.DroppedColumns)
             {
-                up.Add($"ALTER TABLE \"{table.Name}\" DROP COLUMN \"{column.Name}\"");
-                var colDef = $"\"{column.Name}\" {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
-                down.Add($"ALTER TABLE \"{table.Name}\" ADD COLUMN {colDef}");
+                up.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
+                down.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
             }
 
             return new MigrationSqlStatements(up, down);

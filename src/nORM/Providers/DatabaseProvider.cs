@@ -447,7 +447,10 @@ namespace nORM.Providers
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var totalUpdated = 0;
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+            // TX-1: Respect ambient CurrentTransaction; only create a new transaction if none is active.
+            bool ownedTx = ctx.CurrentTransaction == null;
+            DbTransaction transaction = ctx.CurrentTransaction
+                ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 foreach (var entity in entities)
@@ -459,23 +462,30 @@ namespace nORM.Providers
                     if (m.TimestampColumn != null) cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                     totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
-                await transaction.CommitAsync(ct).ConfigureAwait(false);
+                if (ownedTx) await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {
                 // S5-1: Preserve the original exception if rollback itself fails.
-                try
+                if (ownedTx)
                 {
-                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
-                }
-                catch (Exception rollbackEx)
-                {
-                    throw new AggregateException(
-                        "BulkUpdate failed and rollback also failed. See inner exceptions for details.",
-                        originalEx, rollbackEx);
+                    try
+                    {
+                        await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
+                    }
+                    catch (Exception rollbackEx)
+                    {
+                        throw new AggregateException(
+                            "BulkUpdate failed and rollback also failed. See inner exceptions for details.",
+                            originalEx, rollbackEx);
+                    }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
                 throw; // unreachable — satisfies compiler
+            }
+            finally
+            {
+                if (ownedTx) await transaction.DisposeAsync().ConfigureAwait(false);
             }
             ctx.Options.CacheProvider?.InvalidateTag(m.TableName);
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, totalUpdated, sw.Elapsed);
@@ -508,7 +518,10 @@ namespace nORM.Providers
                 batchSize = Math.Min(batchSize, maxBatchByParams);
             }
 
-            await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+            // TX-1: Respect ambient CurrentTransaction; only create a new transaction if none is active.
+            bool ownedTx = ctx.CurrentTransaction == null;
+            DbTransaction transaction = ctx.CurrentTransaction
+                ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 for (int i = 0; i < entityList.Count; i += batchSize)
@@ -555,23 +568,30 @@ namespace nORM.Providers
                     totalDeleted += deleted;
                 }
 
-                await transaction.CommitAsync(ct).ConfigureAwait(false);
+                if (ownedTx) await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {
                 // S5-1: Preserve the original exception if rollback itself fails.
-                try
+                if (ownedTx)
                 {
-                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
-                }
-                catch (Exception rollbackEx)
-                {
-                    throw new AggregateException(
-                        "BulkDelete failed and rollback also failed. See inner exceptions for details.",
-                        originalEx, rollbackEx);
+                    try
+                    {
+                        await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
+                    }
+                    catch (Exception rollbackEx)
+                    {
+                        throw new AggregateException(
+                            "BulkDelete failed and rollback also failed. See inner exceptions for details.",
+                            originalEx, rollbackEx);
+                    }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
                 throw; // unreachable — satisfies compiler
+            }
+            finally
+            {
+                if (ownedTx) await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
             ctx.Options.CacheProvider?.InvalidateTag(m.TableName);

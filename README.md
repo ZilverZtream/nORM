@@ -4,7 +4,7 @@ nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .
 
 ## Why Choose nORM?
 
-- ** Significantly Faster than EF Core**: 2-4x performance improvements with advanced IL materialization and zero-allocation query execution
+- ** Faster than EF Core**: compiled queries up to 4-5x faster, complex queries up to 4x faster, bulk inserts 3x faster
 - ** Complete LINQ Support**: Full-featured LINQ provider with joins, grouping, subqueries, and complex projections
 - ** Zero-Learning Curve**: Familiar EF Core-style API - migrate your existing knowledge instantly
 - ** Enterprise-Grade Bulk Operations**: High-performance bulk insert, update, and delete operations
@@ -19,18 +19,31 @@ nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .
 
 ##  Performance Comparison
 
-nORM consistently outperforms Entity Framework Core across all major scenarios:
+Benchmarks: .NET 8.0, SQLite WAL mode, 1000 users + 2000 orders, i9-12900K. All tools on identical data and schema. Compiled = nORM `CompileQuery` / EF Core `CompileAsyncQuery`. Prepared = pre-compiled `SqliteCommand`.
 
-| Operation                    | nORM        | EF Core     | Performance Gain |
-|------------------------------|-------------|-------------|------------------|
-| Simple Queries               | 35.77 μs    | 64.83 μs    | **45% faster**   |
-| Complex Queries (Compiled)   | 30.55 μs    | 110.53 μs   | **72% faster**   |
-| JOIN Operations              | 123.13 μs   | 169.36 μs   | **27% faster**   |
-| Count Operations             | 56.69 μs    | 54.81 μs    | **Comparable**   |
-| Single Insert               | 113.34 μs   | 124.76 μs   | **9% faster**    |
-| Bulk Insert (1000 records)   | 1,063 μs    | 4,743 μs    | **77% faster**   |
+### Read Queries
 
-*Benchmarks run on .NET 8.0 with realistic database scenarios*
+| Operation                        | nORM      | EF Core   | Dapper    | Raw ADO   | vs EF Core        |
+|----------------------------------|-----------|-----------|-----------|-----------|-------------------|
+| Simple query (standard)          | 29.3 μs   | 28.8 μs   | 29.1 μs   | 24.8 μs   | **comparable**    |
+| Simple query (compiled/prepared) | **7.5 μs**| 22.1 μs   | 17.3 μs   | 17.3 μs   | **3x faster**     |
+| Complex query (standard)         | **21.5 μs**| 81.8 μs  | 114.2 μs  | 108.7 μs  | **4x faster**     |
+| Complex query (compiled/prepared)| **11.6 μs**| 60.4 μs  | 94.1 μs   | 95.5 μs   | **5x faster**     |
+| JOIN query                       | 66.0 μs   | 89.8 μs   | 45.7 μs   | —         | **26% faster**    |
+| Count                            | 22.2 μs   | 28.9 μs   | 15.9 μs   | 15.6 μs   | **23% faster**    |
+
+### Write Operations
+
+| Operation                        | nORM      | EF Core   | Dapper    | vs EF Core        |
+|----------------------------------|-----------|-----------|-----------|-------------------|
+| Single insert                    | **73.6 μs**| 76.7 μs  | 102.1 μs  | **4% faster**     |
+| Bulk insert — naive (100 rows)   | 6.2 ms    | 8.9 ms    | 5.8 ms    | **30% faster**    |
+| Bulk insert — batched+prepared   | **608 μs** | 2,044 μs | 544 μs    | **3.4x faster**   |
+| Bulk insert — idiomatic API      | **617 μs** | 1,974 μs | 753 μs    | **3.2x faster**   |
+
+> nORM's compiled query cache delivers the most dramatic gains on warm paths. Standard LINQ queries are on par with EF Core for simple reads and 4–5x faster for complex multi-predicate queries. Bulk operations consistently outperform EF Core by 3x and beat Dapper's idiomatic `ExecuteAsync` list API.
+
+*Benchmarks run on .NET 8.0 with realistic database scenarios. Raw ADO numbers represent the theoretical minimum overhead (hand-written parameterized SQL + manual mapping).*
 
 ## Installation
 

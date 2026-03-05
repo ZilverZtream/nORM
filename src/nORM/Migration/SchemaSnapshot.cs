@@ -44,6 +44,8 @@ namespace nORM.Migration
         public bool IsUnique { get; set; }
         /// <summary>G1: Non-null means the column is covered by a named index.</summary>
         public string? IndexName { get; set; }
+        /// <summary>SQL literal default value for ADD COLUMN NOT NULL migrations (e.g. "''" or "0").</summary>
+        public string? DefaultValue { get; set; }
     }
 
     /// <summary>

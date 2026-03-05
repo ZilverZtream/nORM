@@ -127,7 +127,7 @@ namespace nORM.Query
                         info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
                         t._correlatedParams[param] = info;
                     }
-                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
+                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
                     if (isGrouping)
                     {
@@ -225,7 +225,7 @@ namespace nORM.Query
                         info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
                         t._correlatedParams[param] = info;
                     }
-                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
+                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
                     var sql = visitor.Translate(keySelector.Body);
                     // Use node.Method.Name instead of t._methodName: visiting the source expression
@@ -492,7 +492,7 @@ namespace nORM.Query
                     var alias = t.EscapeAlias("T" + t._joinCounter);
                     if (!t._correlatedParams.ContainsKey(param))
                         t._correlatedParams[param] = (t._mapping, alias);
-                    var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap);
+                    var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth);
                     var visitor = FastExpressionVisitorPool.Get(in vctxFS);
                     var sql = visitor.Translate(predicate.Body);
                     if (t._where.Length > 0) t._where.Append(" AND ");
@@ -534,7 +534,7 @@ namespace nORM.Query
                     var alias = t.EscapeAlias("T" + t._joinCounter);
                     if (!t._correlatedParams.ContainsKey(param))
                         t._correlatedParams[param] = (t._mapping, alias);
-                    var vctxLast = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap);
+                    var vctxLast = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth);
                     var visitor = FastExpressionVisitorPool.Get(in vctxLast);
                     var sql = visitor.Translate(lastPredicate.Body);
                     if (t._where.Length > 0) t._where.Append(" AND ");
@@ -592,7 +592,7 @@ namespace nORM.Query
                         info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
                         t._correlatedParams[param] = info;
                     }
-                    var vctxCount = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap);
+                    var vctxCount = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth);
                     var visitor = FastExpressionVisitorPool.Get(in vctxCount);
                     var sql = visitor.Translate(countPredicate.Body);
                     if (t._where.Length > 0) t._where.Append(" AND ");
@@ -779,10 +779,25 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                if (node.Arguments.Count > 1)
+                // Support both instance calls (source.Include(lambda)) and
+                // static/extension calls (Include(source, lambda)).
+                Expression source;
+                Expression? rawLambda;
+                if (node.Object != null)
                 {
-                    var includeExpr = node.Arguments[1];
-                    if (includeExpr is LambdaExpression includeLambda)
+                    source = node.Object;
+                    rawLambda = node.Arguments.Count > 0 ? node.Arguments[0] : null;
+                }
+                else
+                {
+                    source = node.Arguments[0];
+                    rawLambda = node.Arguments.Count > 1 ? node.Arguments[1] : null;
+                }
+
+                if (rawLambda != null)
+                {
+                    var includeLambda = rawLambda is UnaryExpression qu ? qu.Operand as LambdaExpression : rawLambda as LambdaExpression;
+                    if (includeLambda != null)
                     {
                         var member = includeLambda.Body is UnaryExpression unary ?
                                      (MemberExpression)unary.Operand :
@@ -790,12 +805,18 @@ namespace nORM.Query
                         var propName = member.Member.Name;
                         if (t._mapping.Relations.TryGetValue(propName, out var relation))
                         {
+                            // MM-1: Guard against composite-PK dependents early at translation time.
+                            var depMap = t._ctx.GetMapping(relation.DependentType);
+                            if (depMap.KeyColumns.Length > 1)
+                                throw new NotSupportedException(
+                                    $"Include on '{depMap.Type.Name}' with a composite primary key is not yet supported. " +
+                                    "Use a projected query or manual loading instead.");
                             t._includes.Add(new IncludePlan(new List<TableMapping.Relation> { relation }));
                             t.TrackMapping(relation.DependentType);
                         }
                     }
                 }
-                return t.Visit(node.Arguments[0]);
+                return t.Visit(source);
             }
         }
 

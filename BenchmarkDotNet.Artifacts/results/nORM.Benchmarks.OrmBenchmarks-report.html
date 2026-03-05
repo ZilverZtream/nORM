@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>nORM.Benchmarks.OrmBenchmarks-20260305-100020</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.13.12, Windows 11 (10.0.26100.4351)
+12th Gen Intel Core i9-12900K, 1 CPU, 24 logical and 16 physical cores
+.NET SDK 10.0.200-preview.0.26103.119
+  [Host]     : .NET 8.0.23 (8.0.2325.60607), X64 RyuJIT AVX2
+  DefaultJob : .NET 8.0.23 (8.0.2325.60607), X64 RyuJIT AVX2
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method                               </th><th>Mean  </th><th>Error</th><th>StdDev</th><th>Median</th><th>Rank</th><th>Gen0</th><th>Gen1</th><th>Allocated</th>
+</tr>
+</thead><tbody><tr><td>&#39;Query Simple nORM (Compiled)&#39;</td><td>7.526 &mu;s</td><td>0.0443 &mu;s</td><td>0.0393 &mu;s</td><td>7.519 &mu;s</td><td>1</td><td>0.2823</td><td>-</td><td>4472 B</td>
+</tr><tr><td>&#39;Query Complex nORM (Compiled)&#39;</td><td>11.570 &mu;s</td><td>0.0364 &mu;s</td><td>0.0304 &mu;s</td><td>11.577 &mu;s</td><td>2</td><td>0.3052</td><td>-</td><td>4976 B</td>
+</tr><tr><td>Count_RawAdo</td><td>15.563 &mu;s</td><td>0.1508 &mu;s</td><td>0.1336 &mu;s</td><td>15.535 &mu;s</td><td>3</td><td>0.0305</td><td>-</td><td>808 B</td>
+</tr><tr><td>Count_Dapper</td><td>15.912 &mu;s</td><td>0.1226 &mu;s</td><td>0.1024 &mu;s</td><td>15.883 &mu;s</td><td>4</td><td>0.0610</td><td>-</td><td>1096 B</td>
+</tr><tr><td>&#39;Query Simple Raw ADO (Prepared)&#39;</td><td>17.316 &mu;s</td><td>0.3439 &mu;s</td><td>0.8501 &mu;s</td><td>17.022 &mu;s</td><td>5</td><td>0.3662</td><td>-</td><td>6024 B</td>
+</tr><tr><td>&#39;Query Simple Dapper (Prepared)&#39;</td><td>18.448 &mu;s</td><td>0.7750 &mu;s</td><td>2.1603 &mu;s</td><td>17.798 &mu;s</td><td>6</td><td>0.3662</td><td>-</td><td>6024 B</td>
+</tr><tr><td>Query_Complex_nORM</td><td>21.485 &mu;s</td><td>0.2584 &mu;s</td><td>0.2158 &mu;s</td><td>21.409 &mu;s</td><td>7</td><td>0.7324</td><td>-</td><td>11499 B</td>
+</tr><tr><td>&#39;Query Simple EF Core (Compiled)&#39;</td><td>22.077 &mu;s</td><td>0.0923 &mu;s</td><td>0.0818 &mu;s</td><td>22.077 &mu;s</td><td>8</td><td>0.5188</td><td>-</td><td>8264 B</td>
+</tr><tr><td>Count_nORM</td><td>22.179 &mu;s</td><td>0.1852 &mu;s</td><td>0.1641 &mu;s</td><td>22.149 &mu;s</td><td>8</td><td>0.5493</td><td>-</td><td>8770 B</td>
+</tr><tr><td>Query_Simple_RawAdo</td><td>24.824 &mu;s</td><td>0.0740 &mu;s</td><td>0.0656 &mu;s</td><td>24.810 &mu;s</td><td>9</td><td>0.3967</td><td>-</td><td>6240 B</td>
+</tr><tr><td>Query_Simple_EfCore</td><td>28.834 &mu;s</td><td>0.3858 &mu;s</td><td>0.3609 &mu;s</td><td>28.909 &mu;s</td><td>10</td><td>0.7324</td><td>-</td><td>12832 B</td>
+</tr><tr><td>Count_EfCore</td><td>28.901 &mu;s</td><td>0.5663 &mu;s</td><td>0.6295 &mu;s</td><td>28.809 &mu;s</td><td>10</td><td>0.2441</td><td>-</td><td>4744 B</td>
+</tr><tr><td>Query_Simple_Dapper</td><td>29.091 &mu;s</td><td>0.5726 &mu;s</td><td>0.8212 &mu;s</td><td>28.818 &mu;s</td><td>10</td><td>0.4272</td><td>-</td><td>6920 B</td>
+</tr><tr><td>Query_Simple_nORM</td><td>29.276 &mu;s</td><td>0.3482 &mu;s</td><td>0.3087 &mu;s</td><td>29.173 &mu;s</td><td>10</td><td>0.6714</td><td>-</td><td>11465 B</td>
+</tr><tr><td>Query_Join_Dapper</td><td>45.682 &mu;s</td><td>0.9050 &mu;s</td><td>1.9089 &mu;s</td><td>45.172 &mu;s</td><td>11</td><td>0.9155</td><td>-</td><td>14776 B</td>
+</tr><tr><td>&#39;Query Complex EF Core (Compiled)&#39;</td><td>60.403 &mu;s</td><td>0.8839 &mu;s</td><td>0.9457 &mu;s</td><td>60.026 &mu;s</td><td>12</td><td>0.9155</td><td>-</td><td>14648 B</td>
+</tr><tr><td>Query_Join_nORM</td><td>66.014 &mu;s</td><td>1.0851 &mu;s</td><td>1.0150 &mu;s</td><td>65.648 &mu;s</td><td>13</td><td>1.7090</td><td>-</td><td>29752 B</td>
+</tr><tr><td>Insert_Single_nORM</td><td>73.598 &mu;s</td><td>1.3431 &mu;s</td><td>1.6986 &mu;s</td><td>73.121 &mu;s</td><td>14</td><td>-</td><td>-</td><td>6676 B</td>
+</tr><tr><td>Insert_Single_EfCore</td><td>76.730 &mu;s</td><td>1.8531 &mu;s</td><td>5.3761 &mu;s</td><td>75.932 &mu;s</td><td>15</td><td>0.9766</td><td>-</td><td>15840 B</td>
+</tr><tr><td>Query_Complex_EfCore</td><td>81.807 &mu;s</td><td>1.6295 &mu;s</td><td>3.9972 &mu;s</td><td>80.130 &mu;s</td><td>16</td><td>1.4648</td><td>-</td><td>23352 B</td>
+</tr><tr><td>Query_Join_EfCore</td><td>89.806 &mu;s</td><td>1.1306 &mu;s</td><td>1.0022 &mu;s</td><td>89.819 &mu;s</td><td>17</td><td>3.4180</td><td>-</td><td>57066 B</td>
+</tr><tr><td>&#39;Query Complex Dapper (Prepared)&#39;</td><td>94.092 &mu;s</td><td>0.3292 &mu;s</td><td>0.2919 &mu;s</td><td>94.062 &mu;s</td><td>18</td><td>0.6104</td><td>-</td><td>10312 B</td>
+</tr><tr><td>&#39;Query Complex Raw ADO (Prepared)&#39;</td><td>95.544 &mu;s</td><td>0.5261 &mu;s</td><td>0.4664 &mu;s</td><td>95.504 &mu;s</td><td>19</td><td>0.6104</td><td>-</td><td>10312 B</td>
+</tr><tr><td>Query_Join_nORM_Compiled</td><td>97.503 &mu;s</td><td>4.1029 &mu;s</td><td>11.3005 &mu;s</td><td>92.546 &mu;s</td><td>19</td><td>2.0752</td><td>0.1221</td><td>33568 B</td>
+</tr><tr><td>Insert_Single_Dapper</td><td>102.113 &mu;s</td><td>2.0052 &mu;s</td><td>2.8110 &mu;s</td><td>101.684 &mu;s</td><td>20</td><td>0.2441</td><td>-</td><td>4816 B</td>
+</tr><tr><td>Insert_Single_RawAdo</td><td>103.812 &mu;s</td><td>2.0648 &mu;s</td><td>4.6606 &mu;s</td><td>103.054 &mu;s</td><td>20</td><td>0.1221</td><td>-</td><td>2240 B</td>
+</tr><tr><td>Query_Complex_RawAdo</td><td>108.673 &mu;s</td><td>0.8535 &mu;s</td><td>0.7984 &mu;s</td><td>108.815 &mu;s</td><td>21</td><td>0.6104</td><td>-</td><td>11016 B</td>
+</tr><tr><td>Query_Complex_Dapper</td><td>114.197 &mu;s</td><td>0.9895 &mu;s</td><td>0.8263 &mu;s</td><td>114.080 &mu;s</td><td>22</td><td>0.8545</td><td>-</td><td>13528 B</td>
+</tr><tr><td>&#39;BulkInsert Batched - Dapper prepared&#39;</td><td>544.103 &mu;s</td><td>7.9886 &mu;s</td><td>7.4726 &mu;s</td><td>544.020 &mu;s</td><td>23</td><td>6.8359</td><td>-</td><td>118457 B</td>
+</tr><tr><td>&#39;BulkInsert Batched - nORM Prepared&#39;</td><td>608.091 &mu;s</td><td>2.9310 &mu;s</td><td>2.2884 &mu;s</td><td>608.528 &mu;s</td><td>24</td><td>12.6953</td><td>-</td><td>200968 B</td>
+</tr><tr><td>&#39;BulkInsert Idiomatic - nORM BulkInsert&#39;</td><td>616.747 &mu;s</td><td>12.0400 &mu;s</td><td>16.0731 &mu;s</td><td>613.050 &mu;s</td><td>24</td><td>15.6250</td><td>-</td><td>258665 B</td>
+</tr><tr><td>&#39;BulkInsert Idiomatic - Dapper list in Tx&#39;</td><td>752.975 &mu;s</td><td>11.9366 &mu;s</td><td>10.5815 &mu;s</td><td>752.944 &mu;s</td><td>25</td><td>25.3906</td><td>1.9531</td><td>419161 B</td>
+</tr><tr><td>&#39;BulkInsert Batched - nORM Tx + per row&#39;</td><td>1,157.283 &mu;s</td><td>14.4831 &mu;s</td><td>12.8389 &mu;s</td><td>1,156.808 &mu;s</td><td>26</td><td>31.2500</td><td>3.9063</td><td>547415 B</td>
+</tr><tr><td>&#39;BulkInsert Idiomatic - EF AddRange&#39;</td><td>1,973.908 &mu;s</td><td>33.8333 &mu;s</td><td>29.9924 &mu;s</td><td>1,966.144 &mu;s</td><td>27</td><td>78.1250</td><td>31.2500</td><td>1331341 B</td>
+</tr><tr><td>&#39;BulkInsert Batched - EF SaveChanges in Tx&#39;</td><td>2,044.102 &mu;s</td><td>31.6652 &mu;s</td><td>29.6197 &mu;s</td><td>2,041.454 &mu;s</td><td>28</td><td>78.1250</td><td>31.2500</td><td>1332486 B</td>
+</tr><tr><td>&#39;BulkInsert Naive - Dapper per row&#39;</td><td>5,840.490 &mu;s</td><td>109.9842 &mu;s</td><td>91.8418 &mu;s</td><td>5,866.764 &mu;s</td><td>29</td><td>31.2500</td><td>-</td><td>493525 B</td>
+</tr><tr><td>&#39;BulkInsert Naive - nORM per row&#39;</td><td>6,215.017 &mu;s</td><td>123.8446 &mu;s</td><td>296.7238 &mu;s</td><td>6,128.362 &mu;s</td><td>30</td><td>31.2500</td><td>-</td><td>678574 B</td>
+</tr><tr><td>&#39;BulkInsert Naive - EF per row&#39;</td><td>8,872.043 &mu;s</td><td>174.8873 &mu;s</td><td>221.1764 &mu;s</td><td>8,858.944 &mu;s</td><td>31</td><td>250.0000</td><td>31.2500</td><td>4234573 B</td>
+</tr></tbody></table>
+</body>
+</html>

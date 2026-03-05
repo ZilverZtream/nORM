@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -24,6 +24,9 @@ namespace nORM.Migration
             { typeof(Guid).FullName!, "TEXT" }
         };
 
+        // PRV-1: Escape SQLite identifiers to prevent SQL injection via identifier names.
+        private static string Esc(string id) => $"\"{id.Replace("\"", "\"\"")}\"";
+
         /// <summary>
         /// Creates SQLite SQL statements for the operations described by the schema diff.
         /// MG-2: PRAGMA foreign_keys=off/on are returned in PreTransactionUp/Down and PostTransactionUp/Down
@@ -40,25 +43,25 @@ namespace nORM.Migration
             foreach (var table in diff.AddedTables)
             {
                 var colDefs = table.Columns.Select(c =>
-                    $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
 
                 // MIG-1: Emit PRIMARY KEY constraint for PK columns
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
-                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => $"\"{c.Name}\""))})");
+                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
 
                 // MIG-1: Emit UNIQUE constraint for unique non-PK columns
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
                 if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => $"\"{c.Name}\""))})");
+                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
 
-                up.Add($"CREATE TABLE \"{table.Name}\" ({string.Join(", ", colDefs)})");
+                up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
                 // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
                 foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    up.Add($"CREATE INDEX \"{col.IndexName}\" ON \"{table.Name}\" (\"{col.Name}\")");
+                    up.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
 
-                down.Add($"DROP TABLE IF EXISTS \"{table.Name}\"");
+                down.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
             }
 
             foreach (var group in diff.AddedColumns.GroupBy(x => x.Table))
@@ -68,8 +71,15 @@ namespace nORM.Migration
 
                 foreach (var (_, column) in group)
                 {
-                    var colDef = $"\"{column.Name}\" {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
-                    up.Add($"ALTER TABLE \"{table.Name}\" ADD COLUMN {colDef}");
+                    // MIG-1: NOT NULL column without a DefaultValue cannot be added to a populated table.
+                    if (!column.IsNullable && column.DefaultValue == null)
+                        throw new InvalidOperationException(
+                            $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
+                            "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
+
+                    var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {column.DefaultValue}";
+                    var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {nullPart}";
+                    up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
                 }
 
                 // Down: undo the ADD COLUMN by recreating the table without those columns.
@@ -97,19 +107,19 @@ namespace nORM.Migration
             // SD-8: Generate DROP TABLE for tables removed in the new snapshot
             foreach (var table in diff.DroppedTables)
             {
-                up.Add($"DROP TABLE IF EXISTS \"{table.Name}\"");
+                up.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
                 // Down: recreate the table with full constraint metadata
                 var colDefs = table.Columns.Select(c =>
-                    $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
-                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => $"\"{c.Name}\""))})");
+                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
                 if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => $"\"{c.Name}\""))})");
-                down.Add($"CREATE TABLE \"{table.Name}\" ({string.Join(", ", colDefs)})");
+                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
                 foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    down.Add($"CREATE INDEX \"{col.IndexName}\" ON \"{table.Name}\" (\"{col.Name}\")");
+                    down.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
             }
 
             // SD-8: Generate DROP COLUMN for columns removed in the new snapshot.
@@ -134,8 +144,8 @@ namespace nORM.Migration
                 // Down: add the dropped columns back (SQLite ADD COLUMN is forward-compatible)
                 foreach (var droppedCol in droppedCols)
                 {
-                    var colDef = $"\"{droppedCol.Name}\" {GetSqlType(droppedCol)} {(droppedCol.IsNullable ? "NULL" : "NOT NULL")}";
-                    down.Add($"ALTER TABLE \"{newTable.Name}\" ADD COLUMN {colDef}");
+                    var colDef = $"{Esc(droppedCol.Name)} {GetSqlType(droppedCol)} {(droppedCol.IsNullable ? "NULL" : "NOT NULL")}";
+                    down.Add($"ALTER TABLE {Esc(newTable.Name)} ADD COLUMN {colDef}");
                 }
             }
 
@@ -172,31 +182,32 @@ namespace nORM.Migration
             if (overrides != null)
                 cols = cols.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
 
-            var names = cols.Select(c => $"\"{c.Name}\"");
+            var names = cols.Select(c => Esc(c.Name));
 
             // MIG-1: Build column definitions with full constraint metadata (same as AddedTables path)
             var colDefs = cols.Select(c =>
-                $"\"{c.Name}\" {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
 
             // MIG-1: Emit PRIMARY KEY constraint for PK columns
             var pkCols = cols.Where(c => c.IsPrimaryKey).ToList();
             if (pkCols.Count > 0)
-                colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => $"\"{c.Name}\""))})");
+                colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
 
             // MIG-1: Emit UNIQUE constraint for unique non-PK columns
             var uniqueNonPkCols = cols.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
             if (uniqueNonPkCols.Count > 0)
-                colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => $"\"{c.Name}\""))})");
+                colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
 
             // MG-2: No PRAGMA here — PRAGMA foreign_keys=off/on is returned in the pre/post transaction segments.
-            stmts.Add($"CREATE TABLE \"__temp__{table.Name}\" ({string.Join(", ", colDefs)})");
-            stmts.Add($"INSERT INTO \"__temp__{table.Name}\" SELECT {string.Join(", ", names)} FROM \"{table.Name}\"");
-            stmts.Add($"DROP TABLE \"{table.Name}\"");
-            stmts.Add($"ALTER TABLE \"__temp__{table.Name}\" RENAME TO \"{table.Name}\"");
+            var tempName = $"\"__temp__{table.Name.Replace("\"", "\"\"")}\"";
+            stmts.Add($"CREATE TABLE {tempName} ({string.Join(", ", colDefs)})");
+            stmts.Add($"INSERT INTO {tempName} SELECT {string.Join(", ", names)} FROM {Esc(table.Name)}");
+            stmts.Add($"DROP TABLE {Esc(table.Name)}");
+            stmts.Add($"ALTER TABLE {tempName} RENAME TO {Esc(table.Name)}");
 
             // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
             foreach (var col in cols.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                stmts.Add($"CREATE INDEX \"{col.IndexName}\" ON \"{table.Name}\" (\"{col.Name}\")");
+                stmts.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
         }
 
         private static string GetSqlType(ColumnSchema column)

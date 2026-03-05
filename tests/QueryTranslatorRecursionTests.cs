@@ -146,4 +146,49 @@ public class QueryTranslatorRecursionTests : TestBase
         options.MaxRecursionDepth = 50; // restore default
         Assert.Equal(50, options.MaxRecursionDepth);
     }
+
+    // ─── QP-1: Recursion via BuildExists (Any() subquery path) ────────────
+
+    [Fact]
+    public void Any_inside_Where_routes_through_BuildExists_and_is_translated()
+    {
+        // BuildExists creates a sub-translator — verifies basic translation succeeds.
+        var setup = CreateProvider(ProviderKind.Sqlite);
+        using var connection = setup.Connection;
+        var provider = setup.Provider;
+
+        var (sql, _, _) = TranslateQuery<Item, Item>(
+            q => q.Where(x => q.Any(y => y.Id == x.Id)),
+            connection, provider);
+        Assert.Contains("EXISTS", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Deeply_nested_Any_inside_Where_exceeds_depth_limit()
+    {
+        // QP-1: Each nested Any() creates a sub-translator via BuildExists at depth+1.
+        // With MaxRecursionDepth=2, three levels of Any() should exceed the limit.
+        var options = new DbContextOptions { MaxRecursionDepth = 2 };
+        var setup = CreateProvider(ProviderKind.Sqlite);
+        using var connection = setup.Connection;
+        using var ctx = new DbContext(connection, setup.Provider, options);
+
+        // Build query: outer.Any(a => inner.Any(b => inner.Any(c => c.Id == a.Id)))
+        // Each Any goes through BuildExists, incrementing depth by 1.
+        var inner = ctx.Query<Item>();
+        var query = inner.Where(x =>
+            inner.Any(a =>
+                inner.Any(b =>
+                    inner.Any(c => c.Id == x.Id))));
+
+        var expr = query.Expression;
+        var translatorType = typeof(DbContext).Assembly.GetType("nORM.Query.QueryTranslator", true)!;
+        var translator = Activator.CreateInstance(translatorType, ctx)!;
+
+        // With MaxRecursionDepth=2, this should throw NormQueryException due to depth exceeded.
+        var ex = Assert.Throws<System.Reflection.TargetInvocationException>(() =>
+            translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { expr }));
+        Assert.IsType<NormQueryException>(ex.InnerException);
+        Assert.Contains("MaxRecursionDepth", ex.InnerException!.Message);
+    }
 }

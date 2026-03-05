@@ -31,6 +31,8 @@ namespace nORM.Query
         private List<string> _compiledParams = null!;
         private Dictionary<ParameterExpression, string> _paramMap = null!;
         private bool _suppressNullCheck = false;
+        // QP-1: Outer translator's recursion depth so BuildExists/BuildIn pass depth+1 to sub-translators.
+        private int _recursionDepth = 0;
         private const int _constParamMapLimit = 1024;
         private readonly Dictionary<ConstKey, string> _constParamMap = new();
         private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
@@ -86,6 +88,7 @@ namespace nORM.Query
             _constParamMap.Clear();
             _paramIndex = 0;
             _suppressNullCheck = false;
+            _recursionDepth = context.RecursionDepth;
             _memberParamMap.Clear();
             _groupingKeys.Clear();
         }
@@ -109,6 +112,7 @@ namespace nORM.Query
             _parameter = null!;
             _tableAlias = string.Empty;
             _suppressNullCheck = false;
+            _recursionDepth = 0;
             _constParamMap.Clear();
             _memberParamMap.Clear();
             _groupingKeys.Clear();
@@ -492,7 +496,7 @@ namespace nORM.Query
                             if (node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression countSelector)
                             {
                                 var info = _parameterMappings[cp];
-                                var vctx = new VisitorContext(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
+                                var vctx = new VisitorContext(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap, _recursionDepth);
                                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                                 var predSql = visitor.Translate(countSelector.Body);
                                 foreach (var kvp in visitor.GetParameters())
@@ -517,7 +521,7 @@ namespace nORM.Query
                             if (selector != null)
                             {
                                 var info = _parameterMappings[gp];
-                                var vctx = new VisitorContext(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap);
+                                var vctx = new VisitorContext(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap, _recursionDepth);
                                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                                 var colSql = visitor.Translate(selector.Body);
                                 foreach (var kvp in visitor.GetParameters())
@@ -670,7 +674,8 @@ namespace nORM.Query
             }
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
-            using var subTranslator = QueryTranslator.Create(_ctx, mapping, _params, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count);
+            // QP-1: Pass _recursionDepth + 1 so deeply nested Any()/All() subqueries respect the depth limit.
+            using var subTranslator = QueryTranslator.Create(_ctx, mapping, _params, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
             _sql.Append(negate ? "NOT EXISTS(" : "EXISTS(");
@@ -681,7 +686,8 @@ namespace nORM.Query
         {
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
-            using var subTranslator = QueryTranslator.Create(_ctx, mapping, _params, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count);
+            // QP-1: Pass _recursionDepth + 1 so deeply nested Contains() subqueries respect the depth limit.
+            using var subTranslator = QueryTranslator.Create(_ctx, mapping, _params, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
             Visit(value);
