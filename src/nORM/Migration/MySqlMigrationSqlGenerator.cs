@@ -54,6 +54,10 @@ namespace nORM.Migration
                 if (uniqueNonPkCols.Count > 0)
                     colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
 
+                // MG-1: Emit inline FOREIGN KEY constraints
+                foreach (var fk in table.ForeignKeys)
+                    colDefs.Add(BuildFkConstraintSql(fk));
+
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
                 // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
@@ -98,6 +102,9 @@ namespace nORM.Migration
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
                 if (uniqueNonPkCols.Count > 0)
                     colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                // MG-1: Restore FK constraints in Down recreation
+                foreach (var fk in table.ForeignKeys)
+                    colDefs.Add(BuildFkConstraintSql(fk));
                 down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
                 foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
                     down.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
@@ -109,6 +116,21 @@ namespace nORM.Migration
                 up.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
+            }
+
+            // MG-1: Add FK constraints to existing tables
+            foreach (var (table, fk) in diff.AddedForeignKeys)
+            {
+                up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
+                // MySQL uses DROP FOREIGN KEY (not DROP CONSTRAINT) for FK removal
+                down.Add($"ALTER TABLE {Esc(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
+            }
+
+            // MG-1: Drop FK constraints from existing tables
+            foreach (var (table, fk) in diff.DroppedForeignKeys)
+            {
+                up.Add($"ALTER TABLE {Esc(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
+                down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
             }
 
             return new MigrationSqlStatements(up, down);
@@ -123,5 +145,20 @@ namespace nORM.Migration
         /// <returns>The corresponding MySQL data type.</returns>
         private static string GetSqlType(ColumnSchema column)
             => TypeMap.TryGetValue(column.ClrType, out var sql) ? sql : "LONGTEXT";
+
+        /// <summary>
+        /// MG-1: Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.
+        /// </summary>
+        private static string BuildFkConstraintSql(ForeignKeySchema fk)
+        {
+            var depCols = string.Join(", ", fk.DependentColumns.Select(Esc));
+            var refCols = string.Join(", ", fk.PrincipalColumns.Select(Esc));
+            var sql = $"CONSTRAINT {Esc(fk.ConstraintName)} FOREIGN KEY ({depCols}) REFERENCES {Esc(fk.PrincipalTable)}({refCols})";
+            if (!string.Equals(fk.OnDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
+                sql += $" ON DELETE {fk.OnDelete}";
+            if (!string.Equals(fk.OnUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
+                sql += $" ON UPDATE {fk.OnUpdate}";
+            return sql;
+        }
     }
 }

@@ -17,7 +17,7 @@ namespace nORM.Migration
     }
 
     /// <summary>
-    /// Describes the schema of a single table including its columns.
+    /// Describes the schema of a single table including its columns and foreign keys.
     /// </summary>
     public class TableSchema
     {
@@ -25,6 +25,33 @@ namespace nORM.Migration
         public string Name { get; set; } = string.Empty;
         /// <summary>Columns defined on the table.</summary>
         public List<ColumnSchema> Columns { get; set; } = new();
+        /// <summary>MG-1: Foreign key constraints defined on this table.</summary>
+        public List<ForeignKeySchema> ForeignKeys { get; set; } = new();
+    }
+
+    /// <summary>
+    /// MG-1: Describes a foreign key constraint between a dependent (child) table and a principal (parent) table.
+    /// </summary>
+    public class ForeignKeySchema
+    {
+        /// <summary>Name of the constraint (e.g. "FK_Post_Blog_BlogId").</summary>
+        public string ConstraintName { get; set; } = string.Empty;
+        /// <summary>Columns on the dependent (child) table that hold the FK values. Order is significant.</summary>
+        public string[] DependentColumns { get; set; } = Array.Empty<string>();
+        /// <summary>The principal (parent) table being referenced.</summary>
+        public string PrincipalTable { get; set; } = string.Empty;
+        /// <summary>Columns on the principal table being referenced (usually the PK). Order matches DependentColumns.</summary>
+        public string[] PrincipalColumns { get; set; } = Array.Empty<string>();
+        /// <summary>
+        /// Referential action on DELETE (NO ACTION, CASCADE, SET NULL, RESTRICT).
+        /// "NO ACTION" is the default and causes no ON DELETE clause to be emitted.
+        /// </summary>
+        public string OnDelete { get; set; } = "NO ACTION";
+        /// <summary>
+        /// Referential action on UPDATE (NO ACTION, CASCADE, SET NULL, RESTRICT).
+        /// "NO ACTION" is the default and causes no ON UPDATE clause to be emitted.
+        /// </summary>
+        public string OnUpdate { get; set; } = "NO ACTION";
     }
 
     /// <summary>
@@ -194,11 +221,16 @@ namespace nORM.Migration
         public List<TableSchema> DroppedTables { get; } = new();
         /// <summary>SD-8: Columns that exist in the old snapshot but not in the new for a given table (dropped columns).</summary>
         public List<(TableSchema Table, ColumnSchema Column)> DroppedColumns { get; } = new();
+        /// <summary>MG-1: FK constraints present in the new snapshot but not the old for an existing table.</summary>
+        public List<(TableSchema Table, ForeignKeySchema ForeignKey)> AddedForeignKeys { get; } = new();
+        /// <summary>MG-1: FK constraints present in the old snapshot but not the new for an existing table.</summary>
+        public List<(TableSchema Table, ForeignKeySchema ForeignKey)> DroppedForeignKeys { get; } = new();
 
         /// <summary>Indicates whether the diff contains any schema changes.</summary>
         public bool HasChanges => AddedTables.Count > 0 || AddedColumns.Count > 0 || AlteredColumns.Count > 0
             || AddedIndexes.Count > 0 || DroppedIndexes.Count > 0
-            || DroppedTables.Count > 0 || DroppedColumns.Count > 0;
+            || DroppedTables.Count > 0 || DroppedColumns.Count > 0
+            || AddedForeignKeys.Count > 0 || DroppedForeignKeys.Count > 0;
     }
 
     /// <summary>
@@ -273,6 +305,29 @@ namespace nORM.Migration
                     if (!newIndexes.ContainsKey(name))
                         diff.DroppedIndexes.Add((newTable, name));
                 }
+
+                // MG-1: Detect FK constraint changes — add/drop/alter foreign keys
+                var oldFks = BuildFkMap(oldTable);
+                var newFks = BuildFkMap(newTable);
+
+                foreach (var (name, newFk) in newFks)
+                {
+                    if (!oldFks.TryGetValue(name, out var oldFk))
+                    {
+                        diff.AddedForeignKeys.Add((newTable, newFk));
+                    }
+                    else if (!FkEqual(oldFk, newFk))
+                    {
+                        // Definition changed: drop old, add new
+                        diff.DroppedForeignKeys.Add((newTable, oldFk));
+                        diff.AddedForeignKeys.Add((newTable, newFk));
+                    }
+                }
+                foreach (var (name, oldFk) in oldFks)
+                {
+                    if (!newFks.ContainsKey(name))
+                        diff.DroppedForeignKeys.Add((newTable, oldFk));
+                }
             }
 
             // SD-8: Detect dropped tables — tables present in old but not in new
@@ -284,6 +339,27 @@ namespace nORM.Migration
 
             return diff;
         }
+
+        /// <summary>
+        /// MG-1: Builds a name-keyed map of FK constraints for a table.
+        /// </summary>
+        private static Dictionary<string, ForeignKeySchema> BuildFkMap(TableSchema table) =>
+            table.ForeignKeys.ToDictionary(fk => fk.ConstraintName, StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// MG-1: Returns true when two FK schemas represent the same constraint definition.
+        /// Column order within each array is significant.
+        /// </summary>
+        private static bool FkEqual(ForeignKeySchema a, ForeignKeySchema b) =>
+            string.Equals(a.PrincipalTable, b.PrincipalTable, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(a.OnDelete, b.OnDelete, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(a.OnUpdate, b.OnUpdate, StringComparison.OrdinalIgnoreCase) &&
+            a.DependentColumns.Length == b.DependentColumns.Length &&
+            a.DependentColumns.Zip(b.DependentColumns, (x, y) =>
+                string.Equals(x, y, StringComparison.OrdinalIgnoreCase)).All(eq => eq) &&
+            a.PrincipalColumns.Length == b.PrincipalColumns.Length &&
+            a.PrincipalColumns.Zip(b.PrincipalColumns, (x, y) =>
+                string.Equals(x, y, StringComparison.OrdinalIgnoreCase)).All(eq => eq);
 
         /// <summary>
         /// G1: Builds a map of index name → (IsUnique, column names[]) from the columns of a table.

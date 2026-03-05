@@ -911,10 +911,29 @@ namespace nORM.Core
             // arriving between commit and this point would surface as OperationCanceledException
             // even though the DB commit already succeeded. Post-commit notifications must always
             // complete to avoid false-failure reports and duplicate-retry side effects.
+            //
+            // CT-1: Post-commit interceptors are best-effort notifications; they must never surface
+            // as a false SaveChanges failure after the DB commit already succeeded. Each interceptor
+            // is wrapped individually so that one failure does not prevent subsequent interceptors
+            // from running. Failures are logged and suppressed — the caller always receives the
+            // committed row count from this code path.
             if (saveInterceptors.Count > 0)
             {
                 foreach (var interceptor in saveInterceptors)
-                    await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, CancellationToken.None).ConfigureAwait(false);
+                {
+                    try
+                    {
+                        await interceptor.SavedChangesAsync(this, changedEntries, totalAffected, CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch (Exception interceptorEx)
+                    {
+                        Options.Logger?.LogWarning(interceptorEx,
+                            "Interceptor {InterceptorType}.SavedChangesAsync threw after a successful commit. " +
+                            "The database changes are committed. The interceptor exception is logged and suppressed " +
+                            "to prevent false failure reports and duplicate-retry side effects.",
+                            interceptor.GetType().Name);
+                    }
+                }
             }
 
             var cache = Options.CacheProvider;
