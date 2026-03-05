@@ -76,15 +76,43 @@ namespace nORM.Internal
             where TContext : DbContext
             where T : class
         {
-            // SG-1: Use per-context-shape cache so each distinct provider+mapping combination
-            // gets its own plan rather than reusing the first context's plan forever.
-            var plansByCtx = new ConcurrentDictionary<int, (QueryPlan Plan, IReadOnlyList<string> ParamNames)>();
+            // SG-1/QP-1/SEC-1: Use per-context-shape cache keyed by a collision-resistant string
+            // that encodes provider type, mappings, tenant ID, and global filter expressions.
+            // Using a string key avoids the 32-bit HashCode.Combine collisions that occur when
+            // two filter lambdas differ only by a constant value (e.g. TenantKey==1 vs TenantKey==2).
+            var plansByCtx = new ConcurrentDictionary<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames)>();
 
             return async (ctx, value) =>
             {
-                int ctxKey = ctx.Provider.GetType().GetHashCode();
+                // Build a deterministic, collision-resistant cache key from all query-shape dimensions.
+                var keyBuilder = new System.Text.StringBuilder();
+                keyBuilder.Append(ctx.Provider.GetType().FullName);
+                keyBuilder.Append('|');
                 foreach (var m in ctx.GetAllMappings())
-                    ctxKey = HashCode.Combine(ctxKey, m.TableName, m.Type);
+                {
+                    keyBuilder.Append(m.TableName);
+                    keyBuilder.Append(',');
+                    keyBuilder.Append(m.Type.FullName);
+                    keyBuilder.Append(';');
+                }
+                keyBuilder.Append('|');
+                // QP-1/SEC-1: Include tenant dimension so plans are not reused across tenant contexts.
+                var tenantId = ctx.Options.TenantProvider?.GetCurrentTenantId();
+                keyBuilder.Append(tenantId?.ToString() ?? "");
+                keyBuilder.Append('|');
+                // QP-1/SEC-1: Include global filter expressions (their ToString() embeds constant values)
+                // so contexts with different filters always get distinct plan cache entries.
+                if (ctx.Options.GlobalFilters.Count > 0)
+                {
+                    foreach (var kvp in ctx.Options.GlobalFilters)
+                        foreach (var filterExpr in kvp.Value)
+                        {
+                            keyBuilder.Append(filterExpr.ToString());
+                            keyBuilder.Append(';');
+                        }
+                }
+                string ctxKey = keyBuilder.ToString();
+
 
                 if (!plansByCtx.TryGetValue(ctxKey, out var entry))
                 {
