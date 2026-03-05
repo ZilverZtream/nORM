@@ -102,7 +102,9 @@ public class MigrationSqlGenerationTests
         var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
 
         Assert.Contains(sql.Up, s => s.Contains("ALTER TABLE") && s.Contains("ADD") && s.Contains("\"Tags\""));
-        Assert.Contains(sql.Down, s => s.Contains("PRAGMA foreign_keys=off"));
+        // MG-2: PRAGMA is in PreTransactionDown, not in the main Down list.
+        Assert.NotNull(sql.PreTransactionDown);
+        Assert.Contains(sql.PreTransactionDown!, s => s.Contains("PRAGMA foreign_keys=off"));
     }
 
     [Fact]
@@ -155,7 +157,8 @@ public class MigrationSqlGenerationTests
         var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
 
         // Down should also use table recreation (to revert nullability)
-        Assert.Contains(sql.Down, s => s.StartsWith("CREATE TABLE") || s.StartsWith("PRAGMA foreign_keys=off"));
+        // MG-2: PRAGMA is now in PreTransactionDown, not in the main Down list.
+        Assert.Contains(sql.Down, s => s.StartsWith("CREATE TABLE"));
     }
 
     [Fact]

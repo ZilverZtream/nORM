@@ -94,8 +94,13 @@ namespace nORM.Migration
 
                 foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
                 {
-                    if (!prop.CanRead || !prop.CanWrite)
+                    // MM-1: A property must be readable to be a column.
+                    if (!prop.CanRead)
                         continue;
+                    // MM-1: The old `!prop.CanWrite` check was wrong — it excluded init-only and
+                    // read-only properties that legitimately map to DB columns. The correct
+                    // exclusion criterion is the property's TYPE (navigation vs scalar), not
+                    // its writability. The navigation-property filters below handle exclusion.
                     if (prop.GetCustomAttribute<NotMappedAttribute>() != null)
                         continue;
                     // MG-1: Exclude collection/enumerable navigation properties (e.g. List<Post>, ICollection<T>)
@@ -105,6 +110,22 @@ namespace nORM.Migration
                     // MG-1: Exclude reference navigation properties (class types that are not mappable scalars)
                     if (!IsMappableType(prop.PropertyType))
                         continue;
+                    // MM-1: Exclude computed properties with no backing column — these are get-only
+                    // properties that have no setter AND no init accessor, meaning they are pure
+                    // expressions (e.g., public string FullName => FirstName + " " + LastName).
+                    // Properties with init-only setters DO have a SetMethod (IsInitOnly = true) and
+                    // are legitimate columns, so we must NOT exclude them here.
+                    if (!prop.CanWrite)
+                    {
+                        // Check if it's an init-only property (has a set accessor marked IsInitOnly)
+                        var setter = prop.GetSetMethod(nonPublic: true);
+                        bool isInitOnly = setter != null &&
+                            setter.ReturnParameter.GetRequiredCustomModifiers()
+                                .Contains(typeof(System.Runtime.CompilerServices.IsExternalInit));
+                        // If no setter at all (not even init-only), it's a computed/expression property — exclude it
+                        if (!isInitOnly && setter == null)
+                            continue;
+                    }
 
                     var colAttr = prop.GetCustomAttribute<ColumnAttribute>();
                     var clr = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;

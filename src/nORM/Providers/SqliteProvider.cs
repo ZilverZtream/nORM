@@ -21,7 +21,7 @@ namespace nORM.Providers
     /// Lightweight provider implementation targeting SQLite databases.
     /// Provides SQL generation and initialization routines specific to SQLite's feature set.
     /// </summary>
-    public sealed class SqliteProvider : DatabaseProvider
+    public class SqliteProvider : DatabaseProvider
     {
         /// <summary>
         /// Maximum length of a single SQL statement supported by SQLite.

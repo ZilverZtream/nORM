@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -26,13 +26,16 @@ namespace nORM.Migration
 
         /// <summary>
         /// Creates SQLite SQL statements for the operations described by the schema diff.
+        /// MG-2: PRAGMA foreign_keys=off/on are returned in PreTransactionUp/Down and PostTransactionUp/Down
+        /// segments so callers can execute them outside the migration transaction. The Up/Down lists
+        /// contain only transactional DDL statements (no PRAGMA).
         /// </summary>
-        /// <param name="diff">The set of schema changes to be applied.</param>
-        /// <returns>The statements needed to apply and rollback the changes.</returns>
         public MigrationSqlStatements GenerateSql(SchemaDiff diff)
         {
             var up = new List<string>();
             var down = new List<string>();
+            bool needsUpFkPragma = false;
+            bool needsDownFkPragma = false;
 
             foreach (var table in diff.AddedTables)
             {
@@ -70,11 +73,12 @@ namespace nORM.Migration
                 }
 
                 // Down: undo the ADD COLUMN by recreating the table without those columns.
-                // Use RecreateTable so that PK/UNIQUE/INDEX constraints are preserved.
+                // MG-2: RecreateTable no longer emits PRAGMA inline.
                 var remainingColumns = table.Columns
                     .Where(c => !addedColumnNames.Contains(c.Name))
                     .ToList();
                 RecreateTable(down, table, remainingColumns, null);
+                needsDownFkPragma = true;
             }
 
             // G2: SQLite does not support ALTER COLUMN; use the standard table-recreation workaround.
@@ -86,6 +90,8 @@ namespace nORM.Migration
 
                 AddRecreate(up,   table, alteredMap);
                 AddRecreate(down, table, oldAlteredMap);
+                needsUpFkPragma = true;
+                needsDownFkPragma = true;
             }
 
             // SD-8: Generate DROP TABLE for tables removed in the new snapshot
@@ -121,7 +127,9 @@ namespace nORM.Migration
                     .ToList();
 
                 // Up: recreate table without dropped columns — use RecreateTable for full constraint preservation
+                // MG-2: RecreateTable no longer emits PRAGMA inline.
                 RecreateTable(up, newTable, remainingCols, null);
+                needsUpFkPragma = true;
 
                 // Down: add the dropped columns back (SQLite ADD COLUMN is forward-compatible)
                 foreach (var droppedCol in droppedCols)
@@ -131,14 +139,19 @@ namespace nORM.Migration
                 }
             }
 
-            return new MigrationSqlStatements(up, down);
+            // MG-2: Return PRAGMA statements in pre/post transaction segments so callers can
+            // execute them outside the migration transaction (required by SQLite documentation).
+            var preUp    = needsUpFkPragma   ? (IReadOnlyList<string>)new[] { "PRAGMA foreign_keys=off" } : null;
+            var postUp   = needsUpFkPragma   ? (IReadOnlyList<string>)new[] { "PRAGMA foreign_keys=on" }  : null;
+            var preDown  = needsDownFkPragma ? (IReadOnlyList<string>)new[] { "PRAGMA foreign_keys=off" } : null;
+            var postDown = needsDownFkPragma ? (IReadOnlyList<string>)new[] { "PRAGMA foreign_keys=on" }  : null;
+
+            return new MigrationSqlStatements(up, down, preUp, postUp, preDown, postDown);
         }
 
         /// <summary>
-        /// G2: Generates the SQLite table-recreation sequence (PRAGMA off, CREATE temp, INSERT,
-        /// DROP original, RENAME temp, PRAGMA on) required to change an existing column definition.
-        /// MIG-1: Now emits full schema including PRIMARY KEY, UNIQUE, and CREATE INDEX constraints,
-        /// identical to the AddedTables path, so constraints are preserved through ALTER operations.
+        /// G2: Generates the SQLite table-recreation DDL sequence for changed columns.
+        /// MIG-1: Now emits full schema including PRIMARY KEY, UNIQUE, and CREATE INDEX constraints.
         /// </summary>
         private static void AddRecreate(List<string> stmts, TableSchema table, Dictionary<string, ColumnSchema> overrides)
         {
@@ -147,15 +160,12 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// Emits the full SQLite table-recreation sequence: PRAGMA foreign_keys=off,
-        /// CREATE TABLE __temp__ (with PRIMARY KEY, UNIQUE, CREATE INDEX),
-        /// INSERT INTO __temp__ SELECT, DROP TABLE, RENAME TO, PRAGMA foreign_keys=on,
-        /// followed by any CREATE INDEX statements.
+        /// Emits the SQLite table-recreation DDL sequence (CREATE temp, INSERT, DROP, RENAME)
+        /// WITHOUT PRAGMA statements. The caller is responsible for setting needsUpFkPragma/needsDownFkPragma
+        /// which causes PRAGMA foreign_keys=off/on to be emitted in the pre/post-transaction segments.
+        /// MG-2: PRAGMA statements removed from this method to allow callers to place them
+        /// outside the migration transaction.
         /// </summary>
-        /// <param name="stmts">List to append statements to.</param>
-        /// <param name="table">The original table (used for name and INSERT SELECT column list).</param>
-        /// <param name="cols">The effective column list for the recreated table (may differ from table.Columns for drop/alter paths).</param>
-        /// <param name="overrides">Optional per-column overrides (pass null if <paramref name="cols"/> is already the resolved list).</param>
         private static void RecreateTable(List<string> stmts, TableSchema table, List<ColumnSchema> cols, Dictionary<string, ColumnSchema>? overrides)
         {
             // Apply overrides if supplied
@@ -178,25 +188,17 @@ namespace nORM.Migration
             if (uniqueNonPkCols.Count > 0)
                 colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => $"\"{c.Name}\""))})");
 
-            stmts.Add("PRAGMA foreign_keys=off");
+            // MG-2: No PRAGMA here — PRAGMA foreign_keys=off/on is returned in the pre/post transaction segments.
             stmts.Add($"CREATE TABLE \"__temp__{table.Name}\" ({string.Join(", ", colDefs)})");
             stmts.Add($"INSERT INTO \"__temp__{table.Name}\" SELECT {string.Join(", ", names)} FROM \"{table.Name}\"");
             stmts.Add($"DROP TABLE \"{table.Name}\"");
             stmts.Add($"ALTER TABLE \"__temp__{table.Name}\" RENAME TO \"{table.Name}\"");
-            stmts.Add("PRAGMA foreign_keys=on");
 
             // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
             foreach (var col in cols.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
                 stmts.Add($"CREATE INDEX \"{col.IndexName}\" ON \"{table.Name}\" (\"{col.Name}\")");
         }
 
-        /// <summary>
-        /// Converts the supplied <see cref="ColumnSchema"/> into a SQLite column type. When
-        /// an exact mapping is not found, the method defaults to <c>TEXT</c>, which can store
-        /// arbitrary data.
-        /// </summary>
-        /// <param name="column">The column definition to map.</param>
-        /// <returns>The SQLite data type as a string.</returns>
         private static string GetSqlType(ColumnSchema column)
             => TypeMap.TryGetValue(column.ClrType, out var sql) ? sql : "TEXT";
     }

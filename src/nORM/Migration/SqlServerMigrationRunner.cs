@@ -163,11 +163,28 @@ namespace nORM.Migration
                     applied[reader.GetInt64(0)] = reader.GetString(1);
                 }
             }
-            catch (DbException)
+            catch (DbException ex) when (IsTableNotFoundError(ex))
             {
-                // History table probably doesn't exist yet, return empty dict.
+                // MG-1: History table doesn't exist yet (first run) — return empty dict.
+                // All other DbException (transient failures, permission errors, etc.) propagate.
             }
             return applied;
+        }
+
+        /// <summary>
+        /// MG-1: Returns true only when the exception indicates the history table does not exist yet.
+        /// SQL Server error 208 = "Invalid object name" (table/view not found).
+        /// Transient errors (connection drops, permission failures, deadlocks) are NOT matched and
+        /// will propagate to the caller.
+        /// </summary>
+        private static bool IsTableNotFoundError(DbException ex)
+        {
+            // Check by error number when the exception exposes it (Microsoft.Data.SqlClient.SqlException)
+            var numberProp = ex.GetType().GetProperty("Number");
+            if (numberProp != null && numberProp.GetValue(ex) is int number && number == 208)
+                return true;
+            // Fallback: check the message text
+            return ex.Message.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

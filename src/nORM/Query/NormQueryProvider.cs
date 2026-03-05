@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -177,9 +177,9 @@ namespace nORM.Query
                 return ExecuteCountSync<TResult>(countSql, countParameters);
             }
 
-            if (TryGetSimpleQuery(expression, out var sql, out var parameters))
+            if (TryGetSimpleQuery(expression, out var sql, out var parameters, out var simpleMethodName))
             {
-                return ExecuteSimpleSync<TResult>(sql, parameters);
+                return ExecuteSimpleSync<TResult>(sql, parameters, simpleMethodName);
             }
             // THREAD STARVATION FIX: Use true synchronous execution path
             return ExecuteInternalSync<TResult>(expression);
@@ -199,9 +199,9 @@ namespace nORM.Query
             if (TryExecuteFastPath<TResult>(expression, out var fastResult))
                 return fastResult;
             // Original execution path
-            if (TryGetSimpleQuery(expression, out var sql, out var parameters))
+            if (TryGetSimpleQuery(expression, out var sql, out var parameters, out var simpleMethodName))
             {
-                Func<CancellationToken, Task<TResult>> factory = token => ExecuteSimpleAsync<TResult>(sql, parameters, token);
+                Func<CancellationToken, Task<TResult>> factory = token => ExecuteSimpleAsync<TResult>(sql, parameters, simpleMethodName, token);
                 return _ctx.Options.RetryPolicy != null
                     ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => factory(token), ct)
                     : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => factory(token), ct);
@@ -620,10 +620,11 @@ namespace nORM.Query
                 return await queryExecutorFactory().ConfigureAwait(false);
             }
         }
-        private bool TryGetSimpleQuery(Expression expr, out string sql, out Dictionary<string, object> parameters)
+        private bool TryGetSimpleQuery(Expression expr, out string sql, out Dictionary<string, object> parameters, out string? resultMethodName)
         {
             sql = string.Empty;
             parameters = new Dictionary<string, object>();
+            resultMethodName = null;
             if (_ctx.Options.GlobalFilters.Count > 0 || _ctx.Options.TenantProvider != null)
                 return false;
             // Traverse to find root query and optional Where predicate
@@ -640,6 +641,7 @@ namespace nORM.Query
                 }
                 else if (mc.Method.Name is nameof(Queryable.First) or nameof(Queryable.FirstOrDefault))
                 {
+                    resultMethodName = mc.Method.Name; // QP-1: preserve First vs FirstOrDefault
                     current = mc.Arguments[0];
                 }
                 else if (mc.Method.Name is nameof(Queryable.Single) or nameof(Queryable.SingleOrDefault))
@@ -850,7 +852,7 @@ namespace nORM.Query
             return ConvertScalarResult<TResult>(scalar);
         }
 
-        private async Task<TResult> ExecuteSimpleAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
+        private async Task<TResult> ExecuteSimpleAsync<TResult>(string sql, Dictionary<string, object> parameters, string? requestedMethodName, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
             Type resultType = typeof(TResult);
@@ -911,10 +913,13 @@ namespace nORM.Query
             {
                 return (TResult)list;
             }
-            // PERFORMANCE FIX: Direct list access instead of Cast<object>().First()
-            return list.Count > 0 ? (TResult)list[0]! : default!;
+            // QP-1: Preserve First vs FirstOrDefault semantics on the fast path.
+            if (list.Count > 0) return (TResult)list[0]!;
+            if (requestedMethodName == nameof(Queryable.First))
+                throw new InvalidOperationException("Sequence contains no elements");
+            return default!;
         }
-        private TResult ExecuteSimpleSync<TResult>(string sql, Dictionary<string, object> parameters)
+        private TResult ExecuteSimpleSync<TResult>(string sql, Dictionary<string, object> parameters, string? requestedMethodName = null)
         {
             var sw = Stopwatch.StartNew();
             Type resultType = typeof(TResult);
@@ -975,8 +980,11 @@ namespace nORM.Query
             {
                 return (TResult)list;
             }
-            // PERFORMANCE FIX: Direct list access instead of Cast<object>().First()
-            return list.Count > 0 ? (TResult)list[0]! : default!;
+            // QP-1: Preserve First vs FirstOrDefault semantics on the fast path.
+            if (list.Count > 0) return (TResult)list[0]!;
+            if (requestedMethodName == nameof(Queryable.First))
+                throw new InvalidOperationException("Sequence contains no elements");
+            return default!;
         }
 
         /// <summary>

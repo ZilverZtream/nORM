@@ -161,11 +161,30 @@ namespace nORM.Migration
                     applied[reader.GetInt64(0)] = reader.GetString(1);
                 }
             }
-            catch (DbException)
+            catch (DbException ex) when (IsTableNotFoundError(ex))
             {
-                // History table probably doesn't exist yet, return empty dict.
+                // MG-1: History table doesn't exist yet (first run) — return empty dict.
+                // All other DbException (transient failures, permission errors, etc.) propagate.
             }
             return applied;
+        }
+
+        /// <summary>
+        /// MG-1: Returns true only when the exception indicates the history table does not exist yet.
+        /// PostgreSQL SqlState 42P01 = "undefined_table".
+        /// Transient errors (connection drops, permission failures, deadlocks) are NOT matched and
+        /// will propagate to the caller.
+        /// </summary>
+        private static bool IsTableNotFoundError(DbException ex)
+        {
+            // Check SqlState when the exception exposes it (Npgsql.PostgresException)
+            var sqlStateProp = ex.GetType().GetProperty("SqlState");
+            if (sqlStateProp != null && sqlStateProp.GetValue(ex) is string sqlState
+                && string.Equals(sqlState, "42P01", StringComparison.Ordinal))
+                return true;
+            // Fallback: check the message text for common patterns
+            return ex.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase)
+                || ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
