@@ -81,6 +81,12 @@ namespace nORM.Providers
         }
         
         /// <summary>
+        /// SG-1: MySQL returns affected (changed) rows, not matched rows.
+        /// This causes false-positive concurrency exceptions on same-value updates.
+        /// </summary>
+        internal override bool UseAffectedRowsSemantics => true;
+
+        /// <summary>
         /// Returns a SQL fragment that retrieves the last auto-incremented identity value.
         /// </summary>
         public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT LAST_INSERT_ID();";
@@ -342,7 +348,10 @@ END;";
             var bulkCopyType = Type.GetType("MySqlConnector.MySqlBulkCopy, MySqlConnector");
             if (bulkCopyType != null && ctx.Connection.GetType().FullName == "MySqlConnector.MySqlConnection")
             {
-                await using var transaction = await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                // PRV-1: Respect ambient CurrentTransaction; only create a new one if none is active.
+                bool ownedTx = ctx.CurrentTransaction == null;
+                DbTransaction transaction = ctx.CurrentTransaction
+                    ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
                 try
                 {
                     dynamic bulkCopy = Activator.CreateInstance(bulkCopyType, ctx.Connection)!;
@@ -365,21 +374,22 @@ END;";
                         BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                     }
 
-                    await transaction.CommitAsync(ct).ConfigureAwait(false);
+                    if (ownedTx) await transaction.CommitAsync(ct).ConfigureAwait(false);
                     ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
                     return totalInserted;
                 }
                 catch (Exception ex)
                 {
-                    try
+                    if (ownedTx)
                     {
-                        await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); // Use None so cancelled caller token does not abort rollback
-                    }
-                    catch (Exception rollbackEx)
-                    {
-                        throw new AggregateException(ex, rollbackEx);
+                        try { await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); }
+                        catch (Exception rollbackEx) { throw new AggregateException(ex, rollbackEx); }
                     }
                     throw;
+                }
+                finally
+                {
+                    if (ownedTx) await transaction.DisposeAsync().ConfigureAwait(false);
                 }
             }
 

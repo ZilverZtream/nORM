@@ -165,6 +165,12 @@ namespace nORM.Providers
         public virtual string GetConcatSql(string left, string right) => $"CONCAT({left}, {right})";
 
         /// <summary>
+        /// SG-1: Returns true when the driver reports affected (changed) rows rather than matched rows.
+        /// Affected-row semantics cause false-positive concurrency exceptions on same-value updates.
+        /// </summary>
+        internal virtual bool UseAffectedRowsSemantics => false;
+
+        /// <summary>
         /// Ensures the provided connection is open before executing provider operations.
         /// </summary>
         /// <param name="connection">The connection to validate.</param>
