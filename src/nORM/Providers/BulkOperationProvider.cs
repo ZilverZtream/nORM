@@ -33,8 +33,11 @@ namespace nORM.Providers
                 entityList.Take(100), mapping, operationKey, entityList.Count);
 
             var total = 0;
-            await using var transaction = await ctx.Connection
-                .BeginTransactionAsync(ct).ConfigureAwait(false);
+            // T2: Reuse caller's transaction when one is already open on this context.
+            bool ownedTx = ctx.CurrentTransaction == null;
+            DbTransaction? transaction = ownedTx
+                ? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false)
+                : ctx.CurrentTransaction;
             try
             {
                 for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
@@ -55,27 +58,37 @@ namespace nORM.Providers
                         }
                     }
                     var batchSw = Stopwatch.StartNew();
-                    total += await batchAction(batch, transaction, ct).ConfigureAwait(false);
+                    total += await batchAction(batch, transaction!, ct).ConfigureAwait(false);
                     batchSw.Stop();
                     BatchSizer.RecordBatchPerformance(
                         operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                 }
 
-                await transaction.CommitAsync(ct).ConfigureAwait(false);
+                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // does not cause a spurious OperationCanceledException for already-committed data.
+                if (ownedTx) await transaction!.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                try
+                if (ownedTx)
                 {
-                    // Use CancellationToken.None so that a cancelled caller token does not
-                    // also cancel the rollback, leaving the transaction in an uncertain state.
-                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-                }
-                catch (Exception rollbackEx)
-                {
-                    throw new AggregateException(ex, rollbackEx);
+                    try
+                    {
+                        // Use CancellationToken.None so that a cancelled caller token does not
+                        // also cancel the rollback, leaving the transaction in an uncertain state.
+                        await transaction!.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch (Exception rollbackEx)
+                    {
+                        throw new AggregateException(ex, rollbackEx);
+                    }
                 }
                 throw;
+            }
+            finally
+            {
+                if (ownedTx && transaction != null)
+                    await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
             return total;

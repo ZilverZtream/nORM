@@ -441,7 +441,9 @@ END;";
                     }
                 }
 
-                if (ownedTx) await transaction.CommitAsync(ct).ConfigureAwait(false);
+                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // does not cause a spurious OperationCanceledException for already-committed data.
+                if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {
@@ -561,7 +563,9 @@ END;";
                     await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                if (ownedTx) await transaction.CommitAsync(ct).ConfigureAwait(false);
+                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // does not cause a spurious OperationCanceledException for already-committed data.
+                if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {
@@ -687,7 +691,9 @@ END;";
                     }
                 }
 
-                if (ownedTx) await transaction.CommitAsync(ct).ConfigureAwait(false);
+                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // does not cause a spurious OperationCanceledException for already-committed data.
+                if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {

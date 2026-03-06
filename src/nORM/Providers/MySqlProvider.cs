@@ -374,7 +374,9 @@ END;";
                         BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                     }
 
-                    if (ownedTx) await transaction.CommitAsync(ct).ConfigureAwait(false);
+                    // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                    // does not cause a spurious OperationCanceledException for already-committed data.
+                    if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
                     ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
                     return totalInserted;
                 }
