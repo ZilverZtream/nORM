@@ -180,7 +180,12 @@ namespace nORM.Core
                 _nonNotifyingEntries.TryRemove(entry, out _);
                 _dirtyNonNotifyingEntries.TryRemove(entry, out _);
                 _dirtyEntries.TryRemove(entry, out _);
-                var pk = entry.OriginalKey ?? GetPrimaryKeyValue(entity, entry.Mapping);
+                // CT-1: EntityEntry.OriginalKey stores composite keys as object?[] (CaptureKey shape),
+                // but _entriesByKey is keyed by tuples/(CompositeKey) (GetPrimaryKeyValue shape).
+                // Convert OriginalKey to the lookup shape; fall back to reading current PK when null.
+                var pk = entry.OriginalKey != null
+                    ? ToLookupKey(entry.OriginalKey, entry.Mapping)
+                    : GetPrimaryKeyValue(entity, entry.Mapping);
                 if (pk != null && _entriesByKey.TryGetValue(entry.Mapping.Type, out var typeEntries))
                 {
                     typeEntries.TryRemove(pk, out _);
@@ -192,6 +197,19 @@ namespace nORM.Core
                     CascadeDelete(entity, entry.Mapping);
                 }
             }
+        }
+
+        // CT-1: EntityEntry.CaptureKey returns object?[] for composite keys, but _entriesByKey
+        // uses the same shape as GetPrimaryKeyValue (ValueTuple for 2/3 keys, CompositeKey for >3).
+        // This method converts from the array shape to the dictionary-compatible shape.
+        private static object? ToLookupKey(object? originalKey, TableMapping mapping)
+        {
+            if (originalKey == null) return null;
+            if (mapping.KeyColumns.Length <= 1) return originalKey; // single key — same shape
+            if (originalKey is not object?[] arr) return originalKey; // already in lookup shape
+            if (arr.Length == 2) return (arr[0], arr[1]);
+            if (arr.Length == 3) return (arr[0], arr[1], arr[2]);
+            return new CompositeKey(arr);
         }
 
         /// <summary>
