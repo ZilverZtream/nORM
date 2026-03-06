@@ -757,6 +757,15 @@ namespace nORM.Core
             var maxRetries = policy?.MaxRetries ?? 1;
             var baseDelay = policy?.BaseDelay ?? TimeSpan.Zero;
             var rand = Random.Shared;
+
+            // TX-2: Retrying under a non-owned transaction replays writes inside an external
+            // transaction whose rollback path is a no-op here, risking duplicate effects.
+            // If an explicit or ambient transaction controls the scope, execute exactly once.
+            var hasExternalTransaction = CurrentTransaction != null
+                || System.Transactions.Transaction.Current != null;
+            if (hasExternalTransaction)
+                return await SaveChangesInternalAsync(detectChanges, ct).ConfigureAwait(false);
+
             for (var attempt = 0; ; attempt++)
             {
                 var commitAttempted = false;
@@ -899,20 +908,24 @@ namespace nORM.Core
                 onCommitAttempted?.Invoke();
                 await transactionManager.CommitAsync().ConfigureAwait(false);
 
-                // DATA INTEGRITY FIX (TASK 1): Accept changes only after successful commit
-                // This ensures entities are not marked as Unchanged if transaction fails
-                foreach (var entry in changedEntries)
+                // TX-1: Only accept tracker state when we own the transaction and commit succeeded.
+                // For external/ambient transactions the caller controls durability; accepting
+                // state here would diverge the tracker from the DB if the caller later rolls back.
+                if (transactionManager.OwnsTransaction)
                 {
-                    if (entry.State == EntityState.Deleted)
+                    foreach (var entry in changedEntries)
                     {
-                        // Remove deleted entities from the ChangeTracker
-                        if (entry.Entity is { } entityToRemove)
-                            ChangeTracker.Remove(entityToRemove, true);
-                    }
-                    else
-                    {
-                        // Mark Added/Modified entities as Unchanged
-                        entry.AcceptChanges();
+                        if (entry.State == EntityState.Deleted)
+                        {
+                            // Remove deleted entities from the ChangeTracker
+                            if (entry.Entity is { } entityToRemove)
+                                ChangeTracker.Remove(entityToRemove, true);
+                        }
+                        else
+                        {
+                            // Mark Added/Modified entities as Unchanged
+                            entry.AcceptChanges();
+                        }
                     }
                 }
             }

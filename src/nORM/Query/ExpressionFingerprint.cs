@@ -57,6 +57,10 @@ namespace nORM.Query
         public bool Equals(ExpressionFingerprint other) => _low == other._low && _high == other._high;
         public override bool Equals(object? obj) => obj is ExpressionFingerprint fp && Equals(fp);
         public override int GetHashCode() => HashCode.Combine(_low, _high);
+        // QP-1: Without this override, string concatenation (used in _simpleSqlCache keys) calls
+        // the default struct ToString() which returns the type name for every instance, collapsing
+        // all distinct fingerprints into the same key and causing wrong SQL to be reused.
+        public override string ToString() => $"{_low:x16}{_high:x16}";
 
         private sealed class FingerprintVisitor : ExpressionVisitor
         {
