@@ -195,7 +195,11 @@ namespace nORM.Migration
         private static SchemaSnapshot BuildFromMappings(IEnumerable<TableMapping> mappings)
         {
             var snapshot = new SchemaSnapshot();
-            foreach (var map in mappings)
+            var allMappings = mappings as IReadOnlyList<TableMapping> ?? mappings.ToList();
+
+            // Pass 1: build all TableSchema objects, indexed by CLR type.
+            var tableByType = new Dictionary<Type, TableSchema>();
+            foreach (var map in allMappings)
             {
                 var table = new TableSchema { Name = map.TableName };
                 foreach (var col in map.Columns)
@@ -214,7 +218,27 @@ namespace nORM.Migration
                     });
                 }
                 snapshot.Tables.Add(table);
+                tableByType[map.Type] = table;
             }
+
+            // Pass 2: add FK constraints from principal Relations to the dependent TableSchema.
+            foreach (var map in allMappings)
+            {
+                foreach (var (_, rel) in map.Relations)
+                {
+                    if (!tableByType.TryGetValue(rel.DependentType, out var depTable)) continue;
+                    depTable.ForeignKeys.Add(new ForeignKeySchema
+                    {
+                        ConstraintName   = $"FK_{depTable.Name}_{map.TableName}_{rel.ForeignKey.Name}",
+                        DependentColumns = new[] { rel.ForeignKey.Name },
+                        PrincipalTable   = map.TableName,
+                        PrincipalColumns = new[] { rel.PrincipalKey.Name },
+                        OnDelete         = rel.CascadeDelete ? "CASCADE" : "NO ACTION",
+                        OnUpdate         = "NO ACTION",
+                    });
+                }
+            }
+
             return snapshot;
         }
 

@@ -713,10 +713,13 @@ namespace nORM.Providers
         /// <returns>An <c>UPDATE</c> SQL statement.</returns>
         public string BuildUpdate(TableMapping m)
         {
+            if (m.UpdateColumns.Length == 0)
+                throw new NormConfigurationException(
+                    $"Entity '{m.Type.Name}' has no mutable columns to update. Add at least one non-key, non-timestamp property.");
+
             return _sqlCache.GetOrAdd((m.Type, "UPDATE"), _ =>
             {
-                var set = string.Join(", ", m.Columns
-                    .Where(c => !c.IsKey && !c.IsTimestamp)
+                var set = string.Join(", ", m.UpdateColumns
                     .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}"));
 
                 var whereCols = m.KeyColumns

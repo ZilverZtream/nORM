@@ -379,27 +379,74 @@ namespace nORM.Query
                 var isScalar = _t._isAggregate && _t._groupBy.Count == 0;
                 if (isScalar)
                 {
-                    // PERFORMANCE FIX (TASK 14): Provide scalar-specific sync and async materializers
-                    syncMaterializer = static (DbDataReader r) =>
+                    var aggMethod = (_expression as MethodCallExpression)?.Method;
+                    var aggMethodName = aggMethod?.Name ?? string.Empty;
+                    // Count/LongCount always return non-null integer — keep the fast path.
+                    if (aggMethodName is "Count" or "LongCount")
                     {
-                        if (r.Read())
+                        syncMaterializer = static (DbDataReader r) =>
                         {
-                            var v = r.GetValue(0);
-                            return v is long l ? (object)l : Convert.ToInt64(v);
-                        }
-                        return 0L;
-                    };
+                            if (r.Read())
+                            {
+                                var v = r.GetValue(0);
+                                return v is long l ? (object)l : Convert.ToInt64(v);
+                            }
+                            return 0L;
+                        };
+                        materializer = static async (DbDataReader r, CancellationToken ct) =>
+                        {
+                            if (await r.ReadAsync(ct).ConfigureAwait(false))
+                            {
+                                var v = r.GetValue(0);
+                                return v is long l ? (object)l : Convert.ToInt64(v);
+                            }
+                            return 0L;
+                        };
+                        // materializerType already set to int above; leave it.
+                    }
+                    else
+                    {
+                        // Type-aware materializer for Sum/Average/Min/Max.
+                        var scalarReturnType = aggMethod?.ReturnType ?? typeof(long);
+                        var underlyingType = Nullable.GetUnderlyingType(scalarReturnType) ?? scalarReturnType;
+                        var isNullableReturn = Nullable.GetUnderlyingType(scalarReturnType) != null;
+                        var isSum = aggMethodName == "Sum";
 
-                    materializer = static async (DbDataReader r, CancellationToken ct) =>
-                    {
-                        if (await r.ReadAsync(ct).ConfigureAwait(false))
+                        object ReadScalarValue(object dbValue)
                         {
-                            var v = r.GetValue(0);
-                            return v is long l ? (object)l : Convert.ToInt64(v);
+                            try { return Convert.ChangeType(dbValue, underlyingType); }
+                            catch { return dbValue; }
                         }
-                        return 0L;
-                    };
-                    materializerType = typeof(long);
+
+                        object HandleNull()
+                        {
+                            if (isNullableReturn) return null!;
+                            if (isSum) return Convert.ChangeType(0, underlyingType);
+                            throw new InvalidOperationException("Sequence contains no elements");
+                        }
+
+                        syncMaterializer = (DbDataReader r) =>
+                        {
+                            if (r.Read())
+                            {
+                                var v = r.GetValue(0);
+                                if (v == null || v is DBNull) return HandleNull();
+                                return ReadScalarValue(v);
+                            }
+                            return HandleNull();
+                        };
+                        materializer = async (DbDataReader r, CancellationToken ct) =>
+                        {
+                            if (await r.ReadAsync(ct).ConfigureAwait(false))
+                            {
+                                var v = r.GetValue(0);
+                                if (v == null || v is DBNull) return HandleNull();
+                                return ReadScalarValue(v);
+                            }
+                            return HandleNull();
+                        };
+                        materializerType = scalarReturnType;
+                    }
                 }
 
                 if (_t._sql.Length == 0)
@@ -1893,26 +1940,29 @@ namespace nORM.Query
 
             Visit(sourceQuery);
 
-            if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression selector)
+            if (node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression selector)
             {
                 var param = selector.Parameters[0];
                 var alias = EscapeAlias("T" + _joinCounter);
                 if (!_correlatedParams.ContainsKey(param))
                     _correlatedParams[param] = (_mapping, alias);
-            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
-            var visitor = FastExpressionVisitorPool.Get(in vctx);
-            var columnSql = visitor.Translate(selector.Body);
-            foreach (var kvp in visitor.GetParameters())
-                AddParameter(kvp.Key, kvp.Value);
-            FastExpressionVisitorPool.Return(visitor);
+                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                var visitor = FastExpressionVisitorPool.Get(in vctx);
+                var columnSql = visitor.Translate(selector.Body);
+                foreach (var kvp in visitor.GetParameters())
+                    AddParameter(kvp.Key, kvp.Value);
+                FastExpressionVisitorPool.Return(visitor);
                 _isAggregate = true;
                 _sql.Clear();
 
                 var sqlFunction = node.Method.Name.ToUpperInvariant();
                 if (sqlFunction == "AVERAGE") sqlFunction = "AVG";
 
+                // Build complete SELECT ... FROM ... so the sql-length guard in Generate()
+                // correctly skips the default SELECT/FROM assembly block.
                 _sql.AppendSelect(ReadOnlySpan<char>.Empty);
                 _sql.AppendAggregateFunction(sqlFunction, columnSql);
+                _sql.AppendFragment(" FROM ").Append(_mapping.EscTable).Append(' ').Append(alias);
             }
 
             return node;
