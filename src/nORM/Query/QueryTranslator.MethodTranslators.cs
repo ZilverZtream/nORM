@@ -266,6 +266,7 @@ namespace nORM.Query
                 }
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int take))
                 {
+                    if (take < 0) throw new ArgumentOutOfRangeException(nameof(take), take, "Take count must be non-negative.");
                     var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                     t._params[pName] = take;
                     t._take = take;
@@ -299,6 +300,7 @@ namespace nORM.Query
                 }
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int skip))
                 {
+                    if (skip < 0) throw new ArgumentOutOfRangeException(nameof(skip), skip, "Skip count must be non-negative.");
                     var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                     t._params[pName] = skip;
                     t._skip = skip;

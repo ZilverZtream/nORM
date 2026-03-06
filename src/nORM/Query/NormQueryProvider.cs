@@ -364,7 +364,13 @@ namespace nORM.Query
                 {
                     var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
                     _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
-                    if (scalarResult == null || scalarResult is DBNull) return default(TResult)!;
+                    if (scalarResult == null || scalarResult is DBNull)
+                    {
+                        if (plan.MethodName is "Min" or "Max" or "Average" &&
+                            typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
+                            throw new InvalidOperationException("Sequence contains no elements");
+                        return default(TResult)!;
+                    }
                     // PERFORMANCE FIX: Use ConvertScalarResult to avoid boxing for value types
                     result = ConvertScalarResult<TResult>(scalarResult)!;
                 }
@@ -457,7 +463,13 @@ namespace nORM.Query
                 {
                     var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
                     _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
-                    if (scalarResult == null || scalarResult is DBNull) return default!;
+                    if (scalarResult == null || scalarResult is DBNull)
+                    {
+                        if (plan.MethodName is "Min" or "Max" or "Average" &&
+                            typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
+                            throw new InvalidOperationException("Sequence contains no elements");
+                        return default!;
+                    }
                     // PERFORMANCE FIX: Use ConvertScalarResult to avoid boxing for value types
                     result = ConvertScalarResult<TResult>(scalarResult)!;
                 }
@@ -563,7 +575,13 @@ namespace nORM.Query
                 {
                     var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
                     // Logging skipped for perf in scalar
-                    if (scalarResult == null || scalarResult is DBNull) return default!;
+                    if (scalarResult == null || scalarResult is DBNull)
+                    {
+                        if (plan.MethodName is "Min" or "Max" or "Average" &&
+                            typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
+                            throw new InvalidOperationException("Sequence contains no elements");
+                        return default!;
+                    }
                     result = ConvertScalarResult<TResult>(scalarResult)!;
                 }
                 else
@@ -1033,7 +1051,13 @@ namespace nORM.Query
                 {
                     var scalarResult = cmd.ExecuteScalarWithInterception(_ctx);
                     _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
-                    if (scalarResult == null || scalarResult is DBNull) return default(TResult)!;
+                    if (scalarResult == null || scalarResult is DBNull)
+                    {
+                        if (plan.MethodName is "Min" or "Max" or "Average" &&
+                            typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
+                            throw new InvalidOperationException("Sequence contains no elements");
+                        return default(TResult)!;
+                    }
                     result = ConvertScalarResult<TResult>(scalarResult)!;
                 }
                 else
@@ -1217,15 +1241,21 @@ namespace nORM.Query
         private static string NormalizeConnectionStringForCacheKey(string? cs)
         {
             if (string.IsNullOrEmpty(cs)) return string.Empty;
-            return string.Join(";", cs.Split(';', StringSplitOptions.RemoveEmptyEntries)
-                .Select(p => p.Trim())
-                .Where(p =>
-                {
-                    var eq = p.IndexOf('=');
-                    if (eq <= 0) return true;
-                    return !_sensitiveConnectionStringKeys.Contains(p[..eq].Trim());
-                })
-                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase));
+            try
+            {
+                var builder = new DbConnectionStringBuilder { ConnectionString = cs };
+                return string.Join(";",
+                    builder.Keys.Cast<string>()
+                        .Where(k => !_sensitiveConnectionStringKeys.Contains(k))
+                        .OrderBy(k => k, StringComparer.OrdinalIgnoreCase)
+                        .Select(k => $"{k}={builder[k]}"));
+            }
+            catch (ArgumentException)
+            {
+                return Convert.ToHexString(
+                    System.Security.Cryptography.SHA256.HashData(
+                        System.Text.Encoding.UTF8.GetBytes(cs)));
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

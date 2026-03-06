@@ -20,7 +20,7 @@ namespace nORM.Execution
             {
                 return await operation(_ctx, ct).ConfigureAwait(false);
             }
-            catch (DbException ex)
+            catch (DbException ex) when (ex is not NormConfigurationException)
             {
                 throw new NormException(ex.Message, null, null, ex);
             }
