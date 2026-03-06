@@ -214,17 +214,56 @@ namespace nORM.Providers
                && ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
+        /// P-1: Introspects live column definitions via PRAGMA table_info.
+        /// Returns empty list when the table does not yet exist.
+        /// </summary>
+        public override async Task<IReadOnlyList<LiveColumnInfo>> IntrospectTableColumnsAsync(
+            DbConnection conn, string tableName, CancellationToken ct = default)
+        {
+            var result = new List<LiveColumnInfo>();
+            try
+            {
+                await using var cmd = conn.CreateCommand();
+                // PRAGMA table_info columns: cid[0], name[1], type[2], notnull[3], dflt_value[4], pk[5]
+                var bare = tableName.Trim('"');
+                cmd.CommandText = $"PRAGMA table_info(\"{bare.Replace("\"", "\"\"")}\")";
+                await using var rdr = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                while (await rdr.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    var name = rdr.GetString(1);
+                    var sqlType = rdr.GetString(2);
+                    var notNull = rdr.GetInt32(3) != 0;
+                    result.Add(new LiveColumnInfo(name, string.IsNullOrEmpty(sqlType) ? "TEXT" : sqlType, !notNull));
+                }
+            }
+            catch (DbException dbEx) when (IsObjectNotFoundError(dbEx))
+            {
+                // Table does not exist yet — return empty list so caller falls back to CLR defaults.
+            }
+            return result;
+        }
+
+        /// <summary>
         /// MIG-1: Column types now use the same SQLite type mapping as the main table
         /// (GetSqliteType) rather than forcing every column to TEXT. This ensures that the
         /// history table schema mirrors the main table schema exactly (INTEGER for int/bool/long,
         /// REAL for decimal/double/float, BLOB for byte[], TEXT for strings and everything else).
+        /// P-1: When liveColumns are supplied, prefer live SQL types/nullability over CLR defaults.
         /// </summary>
         /// <param name="mapping">The entity mapping being tracked.</param>
+        /// <param name="liveColumns">Live column info from the main table, or null to use CLR defaults.</param>
         /// <returns>DDL statement that creates the history table.</returns>
-        public override string GenerateCreateHistoryTableSql(TableMapping mapping)
+        public override string GenerateCreateHistoryTableSql(
+            TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
         {
+            var liveMap = liveColumns?
+                .ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase)
+                ?? new Dictionary<string, LiveColumnInfo>(0);
+
             var columns = string.Join(",\n                ", mapping.Columns.Select(c =>
             {
+                if (liveMap.TryGetValue(c.PropName, out var live))
+                    return $"{Escape(c.PropName)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
                 var sqlType = GetSqliteType(c.Prop.PropertyType);
                 var nullability = IsNullableOrReferenceType(c.Prop.PropertyType) ? "" : " NOT NULL";
                 return $"{Escape(c.PropName)} {sqlType}{nullability}";

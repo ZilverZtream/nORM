@@ -150,12 +150,57 @@ namespace nORM.Providers
             => $"JSON_UNQUOTE(JSON_EXTRACT({columnName}, '{jsonPath}'))";
 
         /// <summary>
-        /// Generates the SQL statement to create the temporal history table for an entity.
+        /// P-1: Introspects live column definitions via INFORMATION_SCHEMA.COLUMNS.
+        /// Uses COLUMN_TYPE which already includes precision/length (e.g. decimal(10,4)).
+        /// Returns empty list when the table does not yet exist.
         /// </summary>
-        public override string GenerateCreateHistoryTableSql(TableMapping mapping)
+        public override async Task<IReadOnlyList<LiveColumnInfo>> IntrospectTableColumnsAsync(
+            DbConnection conn, string tableName, CancellationToken ct = default)
+        {
+            var result = new List<LiveColumnInfo>();
+            try
+            {
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = @t AND TABLE_SCHEMA = DATABASE()
+ORDER BY ORDINAL_POSITION";
+                var p = cmd.CreateParameter(); p.ParameterName = "@t"; p.Value = tableName; cmd.Parameters.Add(p);
+                await using var rdr = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                while (await rdr.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    var name = rdr.GetString(0);
+                    var sqlType = rdr.GetString(1);
+                    var isNullable = rdr.GetString(2).Equals("YES", StringComparison.OrdinalIgnoreCase);
+                    result.Add(new LiveColumnInfo(name, sqlType, isNullable));
+                }
+            }
+            catch (DbException dbEx) when (IsObjectNotFoundError(dbEx))
+            {
+                // Table does not exist yet — return empty list.
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Generates the SQL statement to create the temporal history table for an entity.
+        /// P-1: When liveColumns are supplied, column types are taken from the live DB schema.
+        /// </summary>
+        public override string GenerateCreateHistoryTableSql(
+            TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
         {
             var historyTable = Escape(mapping.TableName + "_History");
-            var columns = string.Join(",\n    ", mapping.Columns.Select(c => $"{Escape(c.PropName)} {GetSqlType(c.Prop.PropertyType)}"));
+            var liveMap = liveColumns?
+                .ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase)
+                ?? new Dictionary<string, LiveColumnInfo>(0);
+
+            var columns = string.Join(",\n    ", mapping.Columns.Select(c =>
+            {
+                if (liveMap.TryGetValue(c.PropName, out var live))
+                    return $"{Escape(c.PropName)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
+                return $"{Escape(c.PropName)} {GetSqlType(c.Prop.PropertyType)}";
+            }));
 
             return $@"
 CREATE TABLE {historyTable} (

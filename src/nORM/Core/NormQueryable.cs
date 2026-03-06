@@ -22,9 +22,15 @@ namespace nORM.Core
         /// <param name="ctx">The <see cref="DbContext"/> that provides access to the database.</param>
         /// <returns>An <see cref="IQueryable{T}"/> to compose and execute queries.</returns>
         public static IQueryable<T> Query<T>(this DbContext ctx) where T : class
-            => typeof(T).GetConstructor(Type.EmptyTypes) != null
+        {
+            // M-1: Register T as a query-root entity so IsMapped returns true for it.
+            // DTO projection types (.Select(x => new Dto{...})) are never registered here
+            // and therefore will not be tracked by the ChangeTracker.
+            ctx.RegisterEntityType(typeof(T));
+            return typeof(T).GetConstructor(Type.EmptyTypes) != null
                 ? (IQueryable<T>)Activator.CreateInstance(typeof(NormQueryableImpl<>).MakeGenericType(typeof(T)), ctx)!
                 : new NormQueryableImplUnconstrained<T>(ctx);
+        }
     }
 
     /// <summary>
