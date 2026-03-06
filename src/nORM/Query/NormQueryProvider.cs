@@ -823,16 +823,21 @@ namespace nORM.Query
                 if (!map.ColumnsByName.TryGetValue(me.Member.Name, out var column))
                     return false;
 
+                if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var constValue))
+                    return false;
+
+                if (constValue == null)
+                {
+                    // Null comparison must use IS NULL, not = NULL (which is always UNKNOWN in SQL)
+                    whereClause = $" WHERE {column.EscCol} IS NULL";
+                    return true;
+                }
+
                 var paramName = _ctx.Provider.ParamPrefix + "p0";
                 whereClause = $" WHERE {column.EscCol} = {paramName}";
 
                 if (populateParameters)
-                {
-                    if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
-                        return false;
-
-                    parameters[paramName] = value!;
-                }
+                    parameters[paramName] = constValue!;
 
                 return true;
             }
@@ -1389,7 +1394,8 @@ namespace nORM.Query
             var trackable = !plan.NoTracking &&
                              plan.ElementType.IsClass &&
                              !plan.ElementType.Name.StartsWith("<>") &&
-                             plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
+                             plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
+                             _ctx.IsMapped(plan.ElementType);   // M-1: only mapped entity roots
             if (trackable)
                 _ctx.GetMapping(plan.ElementType);
             var count = 0;

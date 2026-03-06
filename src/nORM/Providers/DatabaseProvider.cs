@@ -109,11 +109,34 @@ namespace nORM.Providers
         public abstract string TranslateJsonPathAccess(string columnName, string jsonPath);
 
         /// <summary>
+        /// P-1: Describes a column as it actually exists in the live database.
+        /// Used by <see cref="IntrospectTableColumnsAsync"/> and
+        /// <see cref="GenerateCreateHistoryTableSql"/> to match history-table column
+        /// types to the main table rather than deriving them from CLR defaults.
+        /// </summary>
+        public record LiveColumnInfo(string Name, string SqlType, bool IsNullable);
+
+        /// <summary>
+        /// P-1: Introspects the live column definitions for the named table.
+        /// Returns an empty list when the table does not yet exist, allowing callers
+        /// to fall back to CLR-default type mapping.
+        /// Providers override this to use their native schema-inspection facilities.
+        /// </summary>
+        public virtual Task<IReadOnlyList<LiveColumnInfo>> IntrospectTableColumnsAsync(
+            DbConnection conn, string tableName, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<LiveColumnInfo>>(Array.Empty<LiveColumnInfo>());
+
+        /// <summary>
         /// Generates the SQL required to create a history table for temporal table support.
+        /// When <paramref name="liveColumns"/> is supplied, column types are taken from the live
+        /// DB schema rather than derived from CLR property types, ensuring the history table
+        /// mirrors any custom precision/length settings on the main table.
         /// </summary>
         /// <param name="mapping">The table mapping representing the entity.</param>
+        /// <param name="liveColumns">Live column info from the main table, or null to use CLR defaults.</param>
         /// <returns>The SQL statement that creates the history table.</returns>
-        public abstract string GenerateCreateHistoryTableSql(TableMapping mapping);
+        public abstract string GenerateCreateHistoryTableSql(
+            TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null);
 
         /// <summary>
         /// Generates the SQL required to create triggers for maintaining the temporal history table.

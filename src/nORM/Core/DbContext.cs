@@ -433,6 +433,29 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// M-1: Tracks types that were used as query roots via ctx.Query&lt;T&gt;().
+        /// These are "real" entity types, as opposed to DTO projection result types.
+        /// Thread-safe via ConcurrentDictionary (used as a set).
+        /// </summary>
+        private readonly ConcurrentDictionary<Type, byte> _entityQueryRoots = new();
+
+        /// <summary>
+        /// M-1: Registers a type as a query-root entity (called by Query&lt;T&gt; extension).
+        /// Ensures that directly-queried entities are considered "mapped" by IsMapped.
+        /// </summary>
+        internal void RegisterEntityType(Type t) => _entityQueryRoots.TryAdd(t, 0);
+
+        /// <summary>
+        /// M-1: Returns true when the type is a known entity root — either explicitly
+        /// registered with the ModelBuilder OR used as a direct query root via Query&lt;T&gt;.
+        /// DTO projection results (from .Select(x => new Dto {...})) are never query roots
+        /// and will NOT be tracked, preventing ChangeTracker pollution.
+        /// </summary>
+        internal bool IsMapped(Type t) =>
+            _modelBuilder.GetConfiguredEntityTypes().Contains(t) ||
+            _entityQueryRoots.ContainsKey(t);
+
+        /// <summary>
         /// SG-1: Hardened identifier validation that strips optional delimiters and validates
         /// the inner content against a strict allowlist. This prevents SQL injection via
         /// crafted identifiers like "[foo]; DROP TABLE Users--" that previously passed

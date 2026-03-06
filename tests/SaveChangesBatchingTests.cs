@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Threading;
@@ -33,7 +34,7 @@ public class SaveChangesBatchingTests
         public override string? TranslateFunction(string name, Type declaringType, params string[] args) => null;
         public override string TranslateJsonPathAccess(string columnName, string jsonPath) => $"json_extract({columnName}, '{jsonPath}')";
 
-        public override string GenerateCreateHistoryTableSql(TableMapping mapping) => throw new NotImplementedException();
+        public override string GenerateCreateHistoryTableSql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null) => throw new NotImplementedException();
         public override string GenerateTemporalTriggersSql(TableMapping mapping) => throw new NotImplementedException();
 
         protected override void ValidateConnection(DbConnection connection)

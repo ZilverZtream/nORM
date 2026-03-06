@@ -7,6 +7,8 @@ using System.Data.Common;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -183,16 +185,13 @@ namespace nORM.Scaffolding
                 connection.Open();
             var (schemaName, bareTable) = SplitSchema(tableName);
             var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
-            // Build a compact, order-sensitive string: "colname:typename,colname:typename,..."
-            var descriptor = string.Join(",", columns.Select(c => $"{c.ColumnName}:{c.PropertyType.FullName}"));
-            // FNV-1a 32-bit hash — fast, deterministic, no dependency on crypto
-            uint hash = 2166136261u;
-            foreach (char ch in descriptor)
-            {
-                hash ^= (byte)ch;
-                hash *= 16777619u;
-            }
-            return hash.ToString("x8");
+            // C-1: Include IsNullable and IsPrimaryKey in descriptor so different nullability/key
+            // configs produce different signatures. Use SHA-256 truncated to 16 bytes (32-char hex)
+            // to eliminate the 32-bit FNV-1a collision risk.
+            var descriptor = string.Join(",", columns.Select(c =>
+                $"{c.ColumnName}:{c.PropertyType.FullName}:{(c.IsKey ? "PK" : "C")}:{(IsNullableType(c.PropertyType) ? "N" : "NN")}"));
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(descriptor));
+            return Convert.ToHexString(hash[..16]);
         }
 
         private static IEnumerable<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
@@ -281,6 +280,9 @@ namespace nORM.Scaffolding
 
             return type;
         }
+
+        private static bool IsNullableType(Type t) =>
+            !t.IsValueType || (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>));
 
         private static string ToPascalCase(string name)
         {

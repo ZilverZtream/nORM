@@ -29,7 +29,13 @@ namespace nORM.Versioning
                 if (await HistoryTableExistsAsync(context, mapping).ConfigureAwait(false))
                     continue;
 
-                var createHistoryTableSql = provider.GenerateCreateHistoryTableSql(mapping);
+                // P-1: Introspect live column types before generating history DDL so that
+                // custom precision/length on main-table columns is mirrored in history table.
+                var conn = await context.EnsureConnectionAsync().ConfigureAwait(false);
+                var liveColumns = await provider
+                    .IntrospectTableColumnsAsync(conn, mapping.TableName)
+                    .ConfigureAwait(false);
+                var createHistoryTableSql = provider.GenerateCreateHistoryTableSql(mapping, liveColumns);
                 await ExecuteDdlAsync(context, createHistoryTableSql).ConfigureAwait(false);
 
                 var createTriggersSql = provider.GenerateTemporalTriggersSql(mapping);

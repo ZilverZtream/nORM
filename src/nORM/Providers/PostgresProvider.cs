@@ -271,14 +271,75 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// P-1: Introspects live column definitions via information_schema.columns.
+        /// Reconstructs full type strings including numeric precision/scale and character length.
+        /// Returns empty list when the table does not yet exist.
+        /// </summary>
+        public override async Task<IReadOnlyList<LiveColumnInfo>> IntrospectTableColumnsAsync(
+            DbConnection conn, string tableName, CancellationToken ct = default)
+        {
+            var result = new List<LiveColumnInfo>();
+            try
+            {
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+SELECT column_name, data_type, character_maximum_length,
+       numeric_precision, numeric_scale, is_nullable
+FROM information_schema.columns
+WHERE table_name = @t AND table_schema = 'public'
+ORDER BY ordinal_position";
+                var p = cmd.CreateParameter(); p.ParameterName = "@t"; p.Value = tableName; cmd.Parameters.Add(p);
+                await using var rdr = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                while (await rdr.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    var name = rdr.GetString(0);
+                    var dataType = rdr.GetString(1).ToLowerInvariant();
+                    var charMax = rdr.IsDBNull(2) ? (int?)null : rdr.GetInt32(2);
+                    var numPrec = rdr.IsDBNull(3) ? (int?)null : rdr.GetInt32(3);
+                    var numScale = rdr.IsDBNull(4) ? (int?)null : rdr.GetInt32(4);
+                    var isNullable = rdr.GetString(5).Equals("YES", StringComparison.OrdinalIgnoreCase);
+
+                    var sqlType = dataType switch
+                    {
+                        "character varying" or "varchar" =>
+                            charMax.HasValue ? $"varchar({charMax})" : "text",
+                        "character" or "char" =>
+                            charMax.HasValue ? $"char({charMax})" : "char",
+                        "numeric" or "decimal" =>
+                            (numPrec.HasValue && numScale.HasValue) ? $"numeric({numPrec},{numScale})" : "numeric",
+                        _ => dataType
+                    };
+                    result.Add(new LiveColumnInfo(name, sqlType, isNullable));
+                }
+            }
+            catch (DbException dbEx) when (IsObjectNotFoundError(dbEx))
+            {
+                // Table does not exist yet — return empty list.
+            }
+            return result;
+        }
+
+        /// <summary>
         /// Generates the SQL definition for the temporal history table corresponding to the entity mapping.
+        /// P-1: When liveColumns are supplied, column types are taken from the live DB schema.
         /// </summary>
         /// <param name="mapping">The entity mapping to create history storage for.</param>
+        /// <param name="liveColumns">Live column info from the main table, or null to use CLR defaults.</param>
         /// <returns>DDL statement that creates the history table.</returns>
-        public override string GenerateCreateHistoryTableSql(TableMapping mapping)
+        public override string GenerateCreateHistoryTableSql(
+            TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
         {
             var historyTable = Escape(mapping.TableName + "_History");
-            var columns = string.Join(",\n    ", mapping.Columns.Select(c => $"{Escape(c.PropName)} {GetPostgresType(c.Prop.PropertyType)}"));
+            var liveMap = liveColumns?
+                .ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase)
+                ?? new Dictionary<string, LiveColumnInfo>(0);
+
+            var columns = string.Join(",\n    ", mapping.Columns.Select(c =>
+            {
+                if (liveMap.TryGetValue(c.PropName, out var live))
+                    return $"{Escape(c.PropName)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
+                return $"{Escape(c.PropName)} {GetPostgresType(c.Prop.PropertyType)}";
+            }));
 
             return $@"
 CREATE TABLE {historyTable} (

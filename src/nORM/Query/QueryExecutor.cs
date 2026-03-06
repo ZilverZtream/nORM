@@ -98,7 +98,8 @@ namespace nORM.Query
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
                                  !plan.ElementType.Name.StartsWith("<>") &&
-                                 plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
+                                 plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
+                                 _ctx.IsMapped(plan.ElementType);   // M-1: only mapped entity roots
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
@@ -186,7 +187,8 @@ namespace nORM.Query
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
                                  !plan.ElementType.Name.StartsWith("<>") &&
-                                 plan.ElementType.GetConstructor(Type.EmptyTypes) != null;
+                                 plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
+                                 _ctx.IsMapped(plan.ElementType);   // M-1: only mapped entity roots
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
