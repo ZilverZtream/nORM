@@ -85,6 +85,20 @@ namespace nORM.Migration
                 up.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {newDef}");
                 var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}";
                 down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {oldDef}");
+
+                // M1: Emit DEFAULT constraint changes when DefaultValue differs.
+                if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
+                {
+                    // Drop the old default constraint (if any) by finding it via system metadata.
+                    up.Add($"DECLARE @__df_{table.Name}_{newCol.Name} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{table.Name}') AND COL_NAME(parent_column_id,column_id)='{newCol.Name}') IF @__df_{table.Name}_{newCol.Name} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+@__df_{table.Name}_{newCol.Name}+']')");
+                    if (newCol.DefaultValue != null)
+                        up.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{newCol.Name}")} DEFAULT ({newCol.DefaultValue}) FOR {Esc(newCol.Name)}");
+
+                    // Down: restore the old default.
+                    down.Add($"DECLARE @__df_{table.Name}_{oldCol.Name} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{table.Name}') AND COL_NAME(parent_column_id,column_id)='{oldCol.Name}') IF @__df_{table.Name}_{oldCol.Name} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+@__df_{table.Name}_{oldCol.Name}+']')");
+                    if (oldCol.DefaultValue != null)
+                        down.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{oldCol.Name}")} DEFAULT ({oldCol.DefaultValue}) FOR {Esc(oldCol.Name)}");
+                }
             }
 
             // SD-8: Generate DROP TABLE for tables removed in the new snapshot

@@ -83,9 +83,12 @@ namespace nORM.Migration
 
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
-                var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}";
+                // M1: Include DEFAULT in MODIFY COLUMN — MySQL replaces the full column definition.
+                var newDefault = newCol.DefaultValue != null ? $" DEFAULT {newCol.DefaultValue}" : "";
+                var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}{newDefault}";
                 up.Add($"ALTER TABLE {Esc(table.Name)} MODIFY COLUMN {newDef}");
-                var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}";
+                var oldDefault = oldCol.DefaultValue != null ? $" DEFAULT {oldCol.DefaultValue}" : "";
+                var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}{oldDefault}";
                 down.Add($"ALTER TABLE {Esc(table.Name)} MODIFY COLUMN {oldDef}");
             }
 

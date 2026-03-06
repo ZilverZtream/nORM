@@ -315,7 +315,8 @@ namespace nORM.Migration
                         || oldCol.IsNullable != col.IsNullable
                         || oldCol.IsPrimaryKey != col.IsPrimaryKey
                         || oldCol.IsUnique != col.IsUnique
-                        || !string.Equals(oldCol.IndexName, col.IndexName, StringComparison.OrdinalIgnoreCase))
+                        || !string.Equals(oldCol.IndexName, col.IndexName, StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(oldCol.DefaultValue, col.DefaultValue, StringComparison.Ordinal))  // M1: detect DEFAULT changes
                         diff.AlteredColumns.Add((newTable, col, oldCol));
                 }
 

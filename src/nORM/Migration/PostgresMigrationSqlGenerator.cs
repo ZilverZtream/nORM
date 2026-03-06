@@ -89,6 +89,12 @@ namespace nORM.Migration
                         ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} DROP NOT NULL"
                         : $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} SET NOT NULL");
 
+                // M1: Emit DEFAULT changes as separate SET DEFAULT / DROP DEFAULT statements.
+                if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
+                    up.Add(newCol.DefaultValue != null
+                        ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} SET DEFAULT {newCol.DefaultValue}"
+                        : $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} DROP DEFAULT");
+
                 // Down: reverse type and nullability changes
                 if (!string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal))
                     down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} TYPE {GetSqlType(oldCol)}");
@@ -96,6 +102,12 @@ namespace nORM.Migration
                     down.Add(oldCol.IsNullable
                         ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} DROP NOT NULL"
                         : $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} SET NOT NULL");
+
+                // M1: Down — restore old DEFAULT.
+                if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
+                    down.Add(oldCol.DefaultValue != null
+                        ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} SET DEFAULT {oldCol.DefaultValue}"
+                        : $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} DROP DEFAULT");
             }
 
             // SD-8: Generate DROP TABLE for tables removed in the new snapshot

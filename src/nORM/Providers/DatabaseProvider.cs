@@ -537,7 +537,9 @@ namespace nORM.Providers
                     if (m.TimestampColumn != null) cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                     totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
-                if (ownedTx) await transaction.CommitAsync(ct).ConfigureAwait(false);
+                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // does not cause a spurious OperationCanceledException for already-committed data.
+                if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {
@@ -643,7 +645,9 @@ namespace nORM.Providers
                     totalDeleted += deleted;
                 }
 
-                if (ownedTx) await transaction.CommitAsync(ct).ConfigureAwait(false);
+                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // does not cause a spurious OperationCanceledException for already-committed data.
+                if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {
