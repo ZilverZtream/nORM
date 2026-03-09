@@ -1891,15 +1891,44 @@ namespace nORM.Core
                 
                 // Get or create mapping for type T - this supports both mapped entities and ad-hoc types
                 var mapping = ctx.GetMapping(typeof(T));
-                
-                // Create fast compiled materializer using MaterializerFactory
-                var factory = new global::nORM.Query.MaterializerFactory();
-                var materializer = factory.CreateSyncMaterializer(mapping, typeof(T));
+
+                // M-1: Build a name→ordinal map from the actual reader schema so columns
+                // are always read by name, not by position. The old CreateSyncMaterializer
+                // path assigned column i to mapping column i; raw SQL returning columns in a
+                // different order than the entity mapping would silently populate the wrong
+                // properties (e.g. Name←→Code swap when both are the same CLR type).
+                var fieldCount = reader.FieldCount;
+                var nameToOrdinal = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < fieldCount; i++)
+                    nameToOrdinal[reader.GetName(i)] = i;
+
+                // Resolve each mapping column to its reader ordinal; missing columns throw
+                // immediately so callers get a clear diagnostic instead of default-value silencing.
+                var colOrdinals = new (global::nORM.Mapping.Column Col, int Ordinal)[mapping.Columns.Length];
+                for (int i = 0; i < mapping.Columns.Length; i++)
+                {
+                    var col = mapping.Columns[i];
+                    if (!nameToOrdinal.TryGetValue(col.Name, out var ordinal))
+                        throw new InvalidOperationException(
+                            $"Column '{col.Name}' expected by {typeof(T).Name} is not present in the raw SQL result. " +
+                            "Include all mapped columns in the SELECT list, or use column aliases that match property names.");
+                    colOrdinals[i] = (col, ordinal);
+                }
 
                 while (await reader.ReadAsync(token).ConfigureAwait(false))
                 {
-                    var item = (T)materializer(reader);
-                    list.Add(item);
+                    var instance = Activator.CreateInstance<T>();
+                    foreach (var (col, ordinal) in colOrdinals)
+                    {
+                        if (reader.IsDBNull(ordinal)) continue;
+                        var raw = reader.GetValue(ordinal);
+                        // Coerce provider-specific types (e.g. SQLite returns long for INTEGER columns).
+                        var propType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
+                        if (raw.GetType() != propType)
+                            raw = propType.IsEnum ? Enum.ToObject(propType, raw) : Convert.ChangeType(raw, propType);
+                        col.Setter(instance, raw);
+                    }
+                    list.Add(instance);
                 }
 
                 ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
