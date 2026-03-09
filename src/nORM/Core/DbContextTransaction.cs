@@ -34,10 +34,16 @@ namespace nORM.Core
         /// instance. After calling this method the transaction can no longer be used
         /// and the context's current transaction reference is cleared.
         /// </summary>
+        /// <summary>
+        /// T-1: try/finally guarantees Dispose() (and therefore ClearTransaction) always
+        /// runs even when Commit() throws. Without the finally block, an exception during
+        /// commit leaves CurrentTransaction non-null and poisons the context for any
+        /// subsequent BeginTransactionAsync call.
+        /// </summary>
         public void Commit()
         {
-            _transaction?.Commit();
-            Dispose();
+            try { _transaction?.Commit(); }
+            finally { Dispose(); }
         }
 
         /// <summary>
@@ -67,10 +73,14 @@ namespace nORM.Core
         /// instance. Any changes made within the transaction are undone and the
         /// context is returned to a non-transactional state.
         /// </summary>
+        /// <summary>
+        /// T-1: try/finally mirrors CommitAsync — Dispose always clears CurrentTransaction
+        /// even when Rollback() throws.
+        /// </summary>
         public void Rollback()
         {
-            _transaction?.Rollback();
-            Dispose();
+            try { _transaction?.Rollback(); }
+            finally { Dispose(); }
         }
 
         /// <summary>

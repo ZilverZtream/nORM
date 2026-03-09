@@ -58,17 +58,35 @@ namespace nORM.Migration
             var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
             if (!pending.Any()) return;
 
-            await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+            // P-1: MySQL DDL (ALTER TABLE, CREATE TABLE, DROP TABLE, etc.) implicitly auto-commits,
+            // so a single wrapping transaction cannot roll back schema changes on failure. If migration
+            // N+1 fails, the wrapping rollback reverts only the history INSERT for migration N (not the
+            // DDL itself), leaving the schema advanced but history behind — causing replay on next run.
+            //
+            // Fix: run each migration in its own per-step transaction. The history INSERT is committed
+            // atomically with the step's end-of-step marker. If a later migration fails:
+            //   - Earlier migrations: DDL committed + history recorded (safe to skip on rerun)
+            //   - Failed migration:   DDL may have partially committed; history NOT recorded (rerun applies it)
+            // This matches MySQL's actual DDL semantics: best-effort atomicity per migration step.
             foreach (var migration in pending)
             {
-                migration.Up(_connection, (DbTransaction)transaction);
-                await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
+                await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    migration.Up(_connection, (DbTransaction)transaction);
+                    await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
+                    // PRV-1: CancellationToken.None — commit must not be aborted mid-flight.
+                    await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Attempt rollback; DDL may have already auto-committed (no-op for those statements).
+                    // Suppress rollback exceptions so the original failure is the one that propagates.
+                    try { await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); }
+                    catch { /* DDL auto-commit makes rollback a no-op; suppress to surface root cause */ }
+                    throw;
+                }
             }
-            // PRV-1: Use CancellationToken.None — commit must not be aborted mid-flight.
-            // Cancellation during commit acknowledgment leaves ambiguous migration history state;
-            // callers would see a failure while DDL may already have committed, risking re-run
-            // of already-applied migrations on retry.
-            await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
         }
 
         /// <summary>
