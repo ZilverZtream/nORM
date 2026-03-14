@@ -38,6 +38,27 @@ namespace nORM.Core
         /// <returns>An enumerator that iterates through the query results.</returns>
         public IEnumerator<T> GetEnumerator() => Provider.Execute<IEnumerable<T>>(Expression).GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        /// <summary>
+        /// Returns the SQL that would be generated for this query without executing it.
+        /// Useful for debugging and tests that inspect query shape.
+        /// </summary>
+        public override string ToString()
+        {
+            if (Provider is NormQueryProvider qp)
+            {
+                try
+                {
+                    var plan = qp.GetPlan(Expression, out _, out _);
+                    return plan.Sql;
+                }
+                catch
+                {
+                    // Fall through to default if translation fails (e.g. unsupported expression).
+                }
+            }
+            return base.ToString() ?? string.Empty;
+        }
     }
 }
 

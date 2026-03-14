@@ -90,6 +90,27 @@ namespace nORM.SourceGenerators
                 .OrderBy(p => p.Name)
                 .ToList();
 
+            // M1/SG1 fix: collect (ordinalVarName, columnName) pairs first so we can emit
+            // reader.GetOrdinal("ColumnName") lookups instead of hardcoded positional indices.
+            // This makes the generated materializer correct regardless of column order in the result set.
+            var ordinalEntries = new List<(string VarName, string ColName)>();
+            foreach (var prop in props)
+            {
+                if (IsOwnedType(prop.Type))
+                {
+                    var ownedType = (INamedTypeSymbol)prop.Type;
+                    var ownedProps = ownedType.GetMembers().OfType<IPropertySymbol>()
+                        .Where(p => !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
+                        .OrderBy(p => p.Name);
+                    foreach (var op in ownedProps)
+                        ordinalEntries.Add(($"__ord_{prop.Name}_{op.Name}", $"{prop.Name}_{op.Name}"));
+                }
+                else
+                {
+                    ordinalEntries.Add(($"__ord_{prop.Name}", prop.Name));
+                }
+            }
+
             var sb = new StringBuilder();
             sb.AppendLine("using System;");
             sb.AppendLine("using System.Data.Common;");
@@ -103,7 +124,13 @@ namespace nORM.SourceGenerators
             sb.AppendLine($"        CompiledMaterializerStore.Add<{typeName}>(reader =>");
             sb.AppendLine("        {");
             sb.AppendLine($"            var entity = new {typeName}();");
-            var colIndex = 0;
+
+            // Emit ordinal resolution — name-based, correct for any column order
+            foreach (var (varName, colName) in ordinalEntries)
+                sb.AppendLine($"            int {varName} = reader.GetOrdinal(\"{colName}\");");
+
+            // Emit property assignments using resolved ordinals
+            var entryIndex = 0;
             foreach (var prop in props)
             {
                 if (IsOwnedType(prop.Type))
@@ -111,49 +138,54 @@ namespace nORM.SourceGenerators
                     var ownedType = (INamedTypeSymbol)prop.Type;
                     var ownedProps = ownedType.GetMembers().OfType<IPropertySymbol>()
                         .Where(p => !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
-                        .OrderBy(p => p.Name);
+                        .OrderBy(p => p.Name)
+                        .ToList();
                     foreach (var op in ownedProps)
-                    {
-                        sb.AppendLine(BuildOwnedAssignmentExpression(prop, op, ownedType, colIndex++));
-                    }
+                        sb.AppendLine(BuildOwnedAssignmentExpression(prop, op, ownedType, ordinalEntries[entryIndex++].VarName));
                 }
                 else
                 {
-                    sb.AppendLine(BuildAssignmentExpression(prop, colIndex++));
+                    sb.AppendLine(BuildAssignmentExpression(prop, ordinalEntries[entryIndex++].VarName));
                 }
             }
+
             sb.AppendLine("            return entity;");
             sb.AppendLine("        });");
             sb.AppendLine("    }");
             sb.AppendLine("}");
 
-            context.AddSource($"{simpleName}_Materializer.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
+            // SG2 fix: use fully-qualified type name as hint to avoid collisions when two classes
+            // share the same simple name but live in different namespaces.
+            var hintName = ns != null
+                ? $"{ns.Replace(".", "_")}_{simpleName}_Materializer.g.cs"
+                : $"{simpleName}_Materializer.g.cs";
+            context.AddSource(hintName, SourceText.From(sb.ToString(), Encoding.UTF8));
         }
 
-        private static string BuildAssignmentExpression(IPropertySymbol prop, int index)
+        private static string BuildAssignmentExpression(IPropertySymbol prop, string ordVar)
         {
-            var read = GetReaderExpression(prop.Type, index);
+            var read = GetReaderExpression(prop.Type, ordVar);
             var needsNullCheck = prop.Type.IsReferenceType || prop.NullableAnnotation == NullableAnnotation.Annotated;
             return needsNullCheck
-                ? $"            if (!reader.IsDBNull({index})) entity.{prop.Name} = {read};"
+                ? $"            if (!reader.IsDBNull({ordVar})) entity.{prop.Name} = {read};"
                 : $"            entity.{prop.Name} = {read};";
         }
 
         private static bool IsOwnedType(ITypeSymbol type)
             => type.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == "nORM.Mapping.OwnedAttribute");
 
-        private static string BuildOwnedAssignmentExpression(IPropertySymbol owner, IPropertySymbol ownedProp, INamedTypeSymbol ownedType, int index)
+        private static string BuildOwnedAssignmentExpression(IPropertySymbol owner, IPropertySymbol ownedProp, INamedTypeSymbol ownedType, string ordVar)
         {
-            var read = GetReaderExpression(ownedProp.Type, index);
+            var read = GetReaderExpression(ownedProp.Type, ordVar);
             var needsNullCheck = ownedProp.Type.IsReferenceType || ownedProp.NullableAnnotation == NullableAnnotation.Annotated;
             var ownedTypeName = ownedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var ensureOwner = $"if (entity.{owner.Name} == null) entity.{owner.Name} = new {ownedTypeName}(); ";
             return needsNullCheck
-                ? $"            if (!reader.IsDBNull({index})) {{ {ensureOwner}entity.{owner.Name}.{ownedProp.Name} = {read}; }}"
+                ? $"            if (!reader.IsDBNull({ordVar})) {{ {ensureOwner}entity.{owner.Name}.{ownedProp.Name} = {read}; }}"
                 : $"            {ensureOwner}entity.{owner.Name}.{ownedProp.Name} = {read};";
         }
 
-        private static string GetReaderExpression(ITypeSymbol type, int index)
+        private static string GetReaderExpression(ITypeSymbol type, string ordVar)
         {
             if (type is INamedTypeSymbol named && named.IsGenericType && named.ConstructedFrom.SpecialType == SpecialType.System_Nullable_T)
             {
@@ -163,7 +195,7 @@ namespace nORM.SourceGenerators
             if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
             {
                 var underlying = enumType.EnumUnderlyingType!;
-                var underlyingExpr = GetReaderExpression(underlying, index);
+                var underlyingExpr = GetReaderExpression(underlying, ordVar);
                 var enumName = enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
                 return $"({enumName}){underlyingExpr}";
             }
@@ -171,24 +203,24 @@ namespace nORM.SourceGenerators
             var typeName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             switch (type.SpecialType)
             {
-                case SpecialType.System_Boolean: return $"reader.GetBoolean({index})";
-                case SpecialType.System_Byte: return $"reader.GetByte({index})";
-                case SpecialType.System_Int16: return $"reader.GetInt16({index})";
-                case SpecialType.System_Int32: return $"reader.GetInt32({index})";
-                case SpecialType.System_Int64: return $"reader.GetInt64({index})";
-                case SpecialType.System_Single: return $"reader.GetFloat({index})";
-                case SpecialType.System_Double: return $"reader.GetDouble({index})";
-                case SpecialType.System_Decimal: return $"reader.GetDecimal({index})";
-                case SpecialType.System_DateTime: return $"reader.GetDateTime({index})";
-                case SpecialType.System_String: return $"reader.GetString({index})";
+                case SpecialType.System_Boolean: return $"reader.GetBoolean({ordVar})";
+                case SpecialType.System_Byte: return $"reader.GetByte({ordVar})";
+                case SpecialType.System_Int16: return $"reader.GetInt16({ordVar})";
+                case SpecialType.System_Int32: return $"reader.GetInt32({ordVar})";
+                case SpecialType.System_Int64: return $"reader.GetInt64({ordVar})";
+                case SpecialType.System_Single: return $"reader.GetFloat({ordVar})";
+                case SpecialType.System_Double: return $"reader.GetDouble({ordVar})";
+                case SpecialType.System_Decimal: return $"reader.GetDecimal({ordVar})";
+                case SpecialType.System_DateTime: return $"reader.GetDateTime({ordVar})";
+                case SpecialType.System_String: return $"reader.GetString({ordVar})";
             }
 
             if (typeName == "global::System.Guid")
-                return $"reader.GetGuid({index})";
+                return $"reader.GetGuid({ordVar})";
             if (typeName == "global::System.Byte[]")
-                return $"reader.GetFieldValue<byte[]>({index})";
+                return $"reader.GetFieldValue<byte[]>({ordVar})";
 
-            return $"reader.GetFieldValue<{typeName}>({index})";
+            return $"reader.GetFieldValue<{typeName}>({ordVar})";
         }
 
         private void GenerateQuery(IMethodSymbol method, string sql, GeneratorExecutionContext context)
@@ -238,7 +270,7 @@ namespace nORM.SourceGenerators
             sb.AppendLine($"        var materializer = CompiledMaterializerStore.Get<{entityTypeName}>();");
             sb.AppendLine($"        var list = new System.Collections.Generic.List<{entityTypeName}>();");
             var ctArg = ctParam ?? "System.Threading.CancellationToken.None";
-            sb.AppendLine($"        await using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SequentialAccess, {ctArg}).ConfigureAwait(false);");
+            sb.AppendLine($"        await using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.Default, {ctArg}).ConfigureAwait(false);");
             sb.AppendLine($"        while (await reader.ReadAsync({ctArg}).ConfigureAwait(false))");
             sb.AppendLine("        {");
             sb.AppendLine($"            list.Add(await materializer(reader, {ctArg}).ConfigureAwait(false));");

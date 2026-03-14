@@ -51,7 +51,11 @@ public class MaterializerSourceGenerator : ISourceGenerator
                 continue;
 
             var source = GenerateMaterializerCode(classSymbol);
-            var fileName = $"{classSymbol.Name}Materializer.g.cs";
+            // SG2 fix: qualify hint name with namespace to avoid collisions for same-named classes
+            var nsPrefix = classSymbol.ContainingNamespace.IsGlobalNamespace
+                ? ""
+                : classSymbol.ContainingNamespace.ToDisplayString().Replace(".", "_") + "_";
+            var fileName = $"{nsPrefix}{classSymbol.Name}Materializer.g.cs";
             context.AddSource(fileName, source);
         }
 
@@ -78,31 +82,36 @@ public class MaterializerSourceGenerator : ISourceGenerator
         sb.AppendLine($"        public static {className} Materialize(DbDataReader reader)");
         sb.AppendLine("        {");
         sb.AppendLine($"            var entity = new {className}();");
-        
+
+        // M1/SG1 fix: resolve column ordinals by name so column order in the result set doesn't matter.
+        for (int i = 0; i < properties.Count; i++)
+            sb.AppendLine($"            int __ord_{properties[i].Name} = reader.GetOrdinal(\"{properties[i].Name}\");");
+
         for (int i = 0; i < properties.Count; i++)
         {
             var prop = properties[i];
             var propType = prop.Type;
             var isNullable = propType.CanBeReferencedByName && propType.Name.StartsWith("Nullable");
             var underlyingType = isNullable ? ((INamedTypeSymbol)propType).TypeArguments[0] : propType;
-            
-            sb.AppendLine($"            if (!reader.IsDBNull({i}))");
+            var ordVar = $"__ord_{prop.Name}";
+
+            sb.AppendLine($"            if (!reader.IsDBNull({ordVar}))");
             sb.AppendLine("            {");
-            
+
             var readerMethod = GetReaderMethod(underlyingType);
             if (readerMethod != null)
             {
-                sb.AppendLine($"                entity.{prop.Name} = reader.{readerMethod}({i});");
+                sb.AppendLine($"                entity.{prop.Name} = reader.{readerMethod}({ordVar});");
             }
             else
             {
-                sb.AppendLine($"                var value = reader.GetValue({i});");
+                sb.AppendLine($"                var value = reader.GetValue({ordVar});");
                 sb.AppendLine($"                entity.{prop.Name} = ({propType.ToDisplayString()})Convert.ChangeType(value, typeof({underlyingType.ToDisplayString()}));");
             }
-            
+
             sb.AppendLine("            }");
         }
-        
+
         sb.AppendLine("            return entity;");
         sb.AppendLine("        }");
         sb.AppendLine("    }");
