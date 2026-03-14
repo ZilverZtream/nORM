@@ -935,9 +935,9 @@ namespace nORM.Query
                 AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(innerKeyVisitor);
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
+            // PERF: Build directly into _sql to avoid intermediate string allocation
             _sql.Clear();
-            _sql.Append(sql);
+            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
             return node;
         }
         private Expression HandleGroupJoin(MethodCallExpression node)
@@ -977,9 +977,9 @@ namespace nORM.Query
             // first ORDER BY entry so that Build() generates exactly one ORDER BY clause.
             // This prevents double ORDER BY when downstream .OrderBy() is chained, and ensures
             // outer-key contiguity (needed for streaming group segmentation) is always first.
-            var sql = JoinBuilder.BuildJoinClause(_projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, orderBy: null);
+            // PERF: Build directly into _sql to avoid intermediate string allocation
             _sql.Clear();
-            _sql.Append(sql);
+            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, orderBy: null);
             // Insert outer-key sort at the front of _orderBy so it is always first.
             _orderBy.Insert(0, (outerKeySql, true));
             var outerType = outerKeySelector.Parameters[0].Type;
@@ -1133,68 +1133,72 @@ namespace nORM.Query
                 }
                 var effectiveProjection = composedProjection ?? _projection;
 
-                using var joinSql = new OptimizedSqlBuilder(256);
+                // PERF: Build directly into _sql to avoid intermediate OptimizedSqlBuilder + ToSqlString() copy
+                _sql.Clear();
+                _sql.AppendSelect(ReadOnlySpan<char>.Empty);
+                bool wroteColumns = false;
+
                 if (effectiveProjection?.Body is NewExpression newExpr)
                 {
                     var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
-                    if (neededColumns.Count == 0)
+                    if (neededColumns.Count > 0)
                     {
-                        var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                        var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                        joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                        joinSql.AppendJoin(", ", outerCols.Concat(innerCols));
-                        joinSql.Append(' ');
-                    }
-                    else
-                    {
-                        joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                        joinSql.AppendJoin(", ", neededColumns);
-                        joinSql.Append(' ');
+                        for (int i = 0; i < neededColumns.Count; i++)
+                        {
+                            if (i > 0) _sql.Append(", ");
+                            _sql.Append(neededColumns[i]);
+                        }
+                        wroteColumns = true;
                     }
                 }
                 else if (resultSelector == null)
                 {
-                    var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                    joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                    joinSql.AppendJoin(", ", innerCols);
-                    joinSql.Append(' ');
+                    // No result selector — select only inner columns
+                    for (int i = 0; i < innerMapping.Columns.Length; i++)
+                    {
+                        if (i > 0) _sql.Append(", ");
+                        _sql.Append(innerAlias).Append('.').Append(innerMapping.Columns[i].EscCol);
+                    }
+                    wroteColumns = true;
                 }
-                else
+                else if (resultSelector.Body is System.Linq.Expressions.NewExpression resultNewExpr)
                 {
-                    // Try to extract only the columns needed by the result selector
-                    if (resultSelector.Body is System.Linq.Expressions.NewExpression resultNewExpr)
+                    var neededCols = JoinBuilder.ExtractNeededColumns(resultNewExpr, outerMapping, innerMapping, outerAlias, innerAlias);
+                    if (neededCols.Count > 0)
                     {
-                        var neededCols = JoinBuilder.ExtractNeededColumns(resultNewExpr, outerMapping, innerMapping, outerAlias, innerAlias);
-                        if (neededCols.Count > 0)
+                        for (int i = 0; i < neededCols.Count; i++)
                         {
-                            joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                            joinSql.AppendJoin(", ", neededCols);
-                            joinSql.Append(' ');
+                            if (i > 0) _sql.Append(", ");
+                            _sql.Append(neededCols[i]);
                         }
-                        else
-                        {
-                            var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                            var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                            joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                            joinSql.AppendJoin(", ", outerCols.Concat(innerCols));
-                            joinSql.Append(' ');
-                        }
-                    }
-                    else
-                    {
-                        var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                        var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
-                        joinSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                        joinSql.AppendJoin(", ", outerCols.Concat(innerCols));
-                        joinSql.Append(' ');
+                        wroteColumns = true;
                     }
                 }
-                joinSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
+
+                if (!wroteColumns)
+                {
+                    // Fallback: select all columns from both tables without LINQ/string interpolation
+                    bool first = true;
+                    for (int i = 0; i < outerMapping.Columns.Length; i++)
+                    {
+                        if (!first) _sql.Append(", ");
+                        _sql.Append(outerAlias).Append('.').Append(outerMapping.Columns[i].EscCol);
+                        first = false;
+                    }
+                    for (int i = 0; i < innerMapping.Columns.Length; i++)
+                    {
+                        if (!first) _sql.Append(", ");
+                        _sql.Append(innerAlias).Append('.').Append(innerMapping.Columns[i].EscCol);
+                        first = false;
+                    }
+                }
+
+                _sql.Append(' ');
+                _sql.Append("FROM ").Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
                 var joinType = useLeftJoin ? "LEFT JOIN" : "INNER JOIN";
-                joinSql.Append($"{joinType} {innerMapping.EscTable} {innerAlias} ");
-                joinSql.Append($"ON {outerAlias}.{relation.PrincipalKey.EscCol} = {innerAlias}.{relation.ForeignKey.EscCol}");
-                _sql.Clear();
-                _sql.Append(joinSql.ToSqlString());
+                _sql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
+                _sql.Append("ON ").Append(outerAlias).Append('.').Append(relation.PrincipalKey.EscCol)
+                    .Append(" = ").Append(innerAlias).Append('.').Append(relation.ForeignKey.EscCol);
 
                 // Apply filter predicate if present
                 if (filterPredicate != null)

@@ -75,19 +75,23 @@ namespace nORM.Providers
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
             EnsureValidParameterName(offsetParameterName, nameof(offsetParameterName));
 
-            if (limitParameterName != null || offsetParameterName != null)
+            bool hasLimit = limitParameterName != null || limit.HasValue;
+            bool hasOffset = offsetParameterName != null || offset.HasValue;
+            if (hasLimit || hasOffset)
             {
                 // SG-1: Use case-insensitive comparison so that lower-case or mixed-case
                 // ORDER BY clauses (e.g. "order by name") are detected correctly and a
                 // duplicate ORDER BY is not appended.
                 if (!sb.ToString().Contains("ORDER BY", StringComparison.OrdinalIgnoreCase)) sb.Append(" ORDER BY (SELECT NULL)");
                 sb.Append(" OFFSET ");
-                sb.Append(offsetParameterName ?? "0");
+                if (offsetParameterName != null) sb.Append(offsetParameterName);
+                else if (offset.HasValue) sb.Append(offset.Value);
+                else sb.Append("0");
                 sb.Append(" ROWS");
                 if (limitParameterName != null)
-                {
                     sb.Append(" FETCH NEXT ").Append(limitParameterName).Append(" ROWS ONLY");
-                }
+                else if (limit.HasValue)
+                    sb.Append(" FETCH NEXT ").Append(limit.Value).Append(" ROWS ONLY");
             }
         }
         

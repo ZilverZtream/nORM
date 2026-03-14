@@ -157,6 +157,14 @@ namespace nORM.Query
                     return node;
                 }
 
+                // PERF: Inline boolean literals (true/false) as SQL literals instead of parameterizing.
+                // Parameterized booleans (WHERE col = @p0 with @p0=1) deprive the query planner of
+                // column selectivity statistics, causing suboptimal index selection (e.g., choosing a
+                // 70%-selective IsActive index over a 12%-selective City index).
+                // Emitting the literal (WHERE col = 1) lets the planner use ANALYZE statistics.
+                if (TryInlineBoolLiteral(node))
+                    return node;
+
                 // Q1: Nullable column-vs-column comparison needs three-valued logic.
                 // A plain = or <> is incorrect when either side can be NULL at runtime.
                 // For Nullable<T> value types: always expand (runtime null possible).
@@ -177,7 +185,7 @@ namespace nORM.Query
 
                     if (node.NodeType == ExpressionType.Equal)
                     {
-                        _sql.Append($"({lf} = {rf} OR ({lf} IS NULL AND {rf} IS NULL))");
+                        _sql.Append(_provider.NullSafeEqual(lf, rf));
                     }
                     else
                     {
@@ -189,9 +197,7 @@ namespace nORM.Query
                         if (!rightCouldBeNull)
                             _sql.Append($"({lf} IS NULL OR {lf} <> {rf})");
                         else
-                            _sql.Append($"(({lf} IS NOT NULL AND {rf} IS NOT NULL AND {lf} <> {rf})" +
-                                        $" OR ({lf} IS NULL AND {rf} IS NOT NULL)" +
-                                        $" OR ({lf} IS NOT NULL AND {rf} IS NULL))");
+                            _sql.Append(_provider.NullSafeNotEqual(lf, rf));
                     }
                     return node;
                 }
@@ -214,6 +220,52 @@ namespace nORM.Query
             Visit(node.Right);
             _sql.Append(")");
             return node;
+        }
+
+        /// <summary>
+        /// Checks if an expression is a compile-time boolean constant (true/false).
+        /// Handles ConstantExpression and Convert(ConstantExpression) wrappers.
+        /// </summary>
+        private static bool TryGetBoolConstant(Expression expr, out bool value)
+        {
+            if (expr is ConstantExpression { Value: bool b })
+            {
+                value = b;
+                return true;
+            }
+            if (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } ue)
+                return TryGetBoolConstant(ue.Operand, out value);
+            value = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Optimizes boolean literal comparisons by emitting SQL literals instead of parameters.
+        /// Returns true if the optimization was applied (caller should return node immediately).
+        /// </summary>
+        private bool TryInlineBoolLiteral(BinaryExpression node)
+        {
+            if (TryGetBoolConstant(node.Left, out bool boolVal))
+            {
+                EmitBoolComparison(node.Right, boolVal, node.NodeType);
+                return true;
+            }
+            if (TryGetBoolConstant(node.Right, out boolVal))
+            {
+                EmitBoolComparison(node.Left, boolVal, node.NodeType);
+                return true;
+            }
+            return false;
+        }
+
+        private void EmitBoolComparison(Expression memberSide, bool boolVal, ExpressionType op)
+        {
+            var literal = boolVal ? _provider.BooleanTrueLiteral : "0";
+            _sql.Append("(");
+            Visit(memberSide);
+            _sql.Append(op == ExpressionType.Equal ? " = " : " <> ");
+            _sql.Append(literal);
+            _sql.Append(")");
         }
 
         private static bool IsNullExpression(Expression e)

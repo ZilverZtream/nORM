@@ -34,24 +34,47 @@ namespace nORM.Query
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
         // PERFORMANCE FIX: Cache GetElementType results to avoid repeated reflection
         private static readonly ConcurrentDictionary<Type, Type> _elementTypeCache = new();
+        // PERF: Singleton MaterializerFactory — only wraps static caches, no instance state
+        private static readonly MaterializerFactory _sharedMaterializerFactory = new();
         // PERFORMANCE FIX: Cache constructor existence checks
         private static readonly ConcurrentDictionary<Type, bool> _constrainedQueryableCache = new();
+        // PERF: Cache compiled queryable factory delegates to avoid Activator.CreateInstance on every LINQ chain step
+        private static readonly ConcurrentDictionary<Type, Func<IQueryProvider, Expression, IQueryable>> _queryableFactoryCache = new();
         private static long _totalPlanSize;
         private static int _planSizeSamples;
+        // C1: track live provider count so timers can be stopped when all providers are disposed.
+        private static int _activeProviderCount;
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
         private readonly ConcurrentDictionary<string, string> _simpleSqlCache = new();
+        /// <summary>PERF: Dedicated count SQL cache with ValueTuple keys to avoid string.Concat allocation per count call.</summary>
+        private readonly ConcurrentDictionary<(Type ElementType, string PredicateKey), (string Sql, bool NeedsParam)> _countSqlCache = new();
+        /// <summary>PERF: Pooled prepared commands for parameterless count queries (keyed by SQL).</summary>
+        private readonly ConcurrentDictionary<string, DbCommand> _pooledCountCommands = new();
         public NormQueryProvider(DbContext ctx)
         {
             _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
             _includeProcessor = new IncludeProcessor(ctx);
             _executor = new QueryExecutor(ctx, _includeProcessor);
             _cudBuilder = new BulkCudBuilder(ctx);
+            // C1: restart timers if they were stopped when a new provider is created.
+            if (Interlocked.Increment(ref _activeProviderCount) == 1)
+            {
+                _planCacheMonitor.Change(TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+                _cacheLockCleanupTimer.Change(TimeSpan.FromHours(1), TimeSpan.FromHours(1));
+            }
         }
         public void Dispose()
         {
-            // Instance-level disposables if any
+            // C1: stop background timers when the last provider is disposed so the process
+            // can undergo deterministic teardown (e.g. in test runs / hosting teardown).
+            if (Interlocked.Decrement(ref _activeProviderCount) <= 0)
+            {
+                Volatile.Write(ref _activeProviderCount, 0);
+                _planCacheMonitor.Change(Timeout.Infinite, Timeout.Infinite);
+                _cacheLockCleanupTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            }
         }
         public IQueryable CreateQuery(Expression expression)
         {
@@ -69,19 +92,30 @@ namespace nORM.Query
         }
         private IQueryable CreateQueryInternal(Type elementType, Expression expression)
         {
-            // Check if the type can satisfy the 'new()' constraint
-            if (CanUseConstrainedQueryable(elementType))
+            // PERF: Use cached compiled factory instead of Activator.CreateInstance on every LINQ chain step.
+            // Each .Where/.Take/.OrderBy calls CreateQuery, so this is on a very hot path.
+            var factory = _queryableFactoryCache.GetOrAdd(elementType, static t =>
             {
-                // Use the constrained version for regular entity types
-                var constrainedQueryableType = typeof(NormQueryableImpl<>).MakeGenericType(elementType);
-                return (IQueryable)Activator.CreateInstance(constrainedQueryableType, new object[] { this, expression })!;
-            }
-            else
-            {
-                // Use the unconstrained version for anonymous types and other types without parameterless constructors
-                var unconstrainedQueryableType = typeof(NormQueryableImplUnconstrained<>).MakeGenericType(elementType);
-                return (IQueryable)Activator.CreateInstance(unconstrainedQueryableType, new object[] { this, expression })!;
-            }
+                bool constrained = _constrainedQueryableCache.GetOrAdd(t, static t2 =>
+                {
+                    if (!t2.IsClass) return false;
+                    if (t2.Name.StartsWith("<>")) return false;
+                    return t2.GetConstructor(Type.EmptyTypes) != null;
+                });
+
+                var queryableType = constrained
+                    ? typeof(NormQueryableImpl<>).MakeGenericType(t)
+                    : typeof(NormQueryableImplUnconstrained<>).MakeGenericType(t);
+
+                var ctor = queryableType.GetConstructor(new[] { typeof(IQueryProvider), typeof(Expression) })!;
+                var providerParam = System.Linq.Expressions.Expression.Parameter(typeof(IQueryProvider), "p");
+                var exprParam = System.Linq.Expressions.Expression.Parameter(typeof(Expression), "e");
+                var newExpr = System.Linq.Expressions.Expression.New(ctor, providerParam, exprParam);
+                var cast = System.Linq.Expressions.Expression.Convert(newExpr, typeof(IQueryable));
+                return System.Linq.Expressions.Expression.Lambda<Func<IQueryProvider, Expression, IQueryable>>(cast, providerParam, exprParam).Compile();
+            });
+
+            return factory(this, expression);
         }
         /// <summary>
         /// PERFORMANCE FIX: Cached check for whether a type can use constrained queryable.
@@ -193,26 +227,24 @@ namespace nORM.Query
         {
             if (TryGetCountQuery(expression, out var countSql, out var countParameters))
             {
-                Func<CancellationToken, Task<TResult>> factory = token => ExecuteCountAsync<TResult>(countSql, countParameters, token);
-                return _ctx.Options.RetryPolicy != null
-                    ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => factory(token), ct)
-                    : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => factory(token), ct);
+                if (_ctx.Options.RetryPolicy != null)
+                    return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteCountAsync<TResult>(countSql, countParameters, token), ct);
+                return ExecuteCountAsync<TResult>(countSql, countParameters, ct);
             }
 
             // Fast path – bypass translator for recognized simple patterns
             if (TryExecuteFastPath<TResult>(expression, ct, out var fastResult))
                 return fastResult;
-            // Original execution path
+            // Simple query path (slightly higher overhead than fast path but handles more patterns)
             if (TryGetSimpleQuery(expression, out var sql, out var parameters, out var simpleMethodName))
             {
-                Func<CancellationToken, Task<TResult>> factory = token => ExecuteSimpleAsync<TResult>(sql, parameters, simpleMethodName, token);
-                return _ctx.Options.RetryPolicy != null
-                    ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => factory(token), ct)
-                    : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => factory(token), ct);
+                if (_ctx.Options.RetryPolicy != null)
+                    return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteSimpleAsync<TResult>(sql, parameters, simpleMethodName, token), ct);
+                return ExecuteSimpleAsync<TResult>(sql, parameters, simpleMethodName, ct);
             }
-            return _ctx.Options.RetryPolicy != null
-               ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteInternalAsync<TResult>(expression, token), ct)
-               : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteInternalAsync<TResult>(expression, token), ct);
+            if (_ctx.Options.RetryPolicy != null)
+                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteInternalAsync<TResult>(expression, token), ct);
+            return ExecuteInternalAsync<TResult>(expression, ct);
         }
         /// <summary>
         /// Executes a translated <c>DELETE</c> query asynchronously.
@@ -222,15 +254,15 @@ namespace nORM.Query
         /// <returns>A task containing the number of rows affected.</returns>
         public Task<int> ExecuteDeleteAsync(Expression expression, CancellationToken ct)
         {
-            return _ctx.Options.RetryPolicy != null
-                ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteDeleteInternalAsync(expression, token), ct)
-                : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteDeleteInternalAsync(expression, token), ct);
+            if (_ctx.Options.RetryPolicy != null)
+                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteDeleteInternalAsync(expression, token), ct);
+            return ExecuteDeleteInternalAsync(expression, ct);
         }
         public Task<int> ExecuteUpdateAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
         {
-            return _ctx.Options.RetryPolicy != null
-                ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteUpdateInternalAsync(expression, set, token), ct)
-                : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteUpdateInternalAsync(expression, set, token), ct);
+            if (_ctx.Options.RetryPolicy != null)
+                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteUpdateInternalAsync(expression, set, token), ct);
+            return ExecuteUpdateInternalAsync(expression, set, ct);
         }
         /// <summary>
         /// PERFORMANCE FIX: Fast path execution using cached delegates instead of reflection.
@@ -277,10 +309,22 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERFORMANCE FIX: Efficiently converts Task&lt;object&gt; to Task&lt;TResult&gt; without boxing for value types.
-        /// Uses type-specific casting to avoid Convert.ChangeType overhead.
+        /// PERF: Efficiently converts Task&lt;object&gt; to Task&lt;TResult&gt;.
+        /// Avoids async state machine allocation when the task is already completed.
         /// </summary>
-        private static async Task<TResult> CastTaskResult<TResult>(Task<object> task)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Task<TResult> CastTaskResult<TResult>(Task<object> task)
+        {
+            // PERF: If the task is already completed (common for cached/fast queries),
+            // skip the async state machine entirely.
+            if (task.IsCompletedSuccessfully)
+            {
+                return Task.FromResult(ConvertScalarResult<TResult>(task.Result));
+            }
+            return CastTaskResultAsync<TResult>(task);
+        }
+
+        private static async Task<TResult> CastTaskResultAsync<TResult>(Task<object> task)
         {
             var result = await task.ConfigureAwait(false);
             return ConvertScalarResult<TResult>(result);
@@ -328,350 +372,937 @@ namespace nORM.Query
             // Fallback for other types (still better than ChangeType for common cases above)
             return (TResult)Convert.ChangeType(result, underlyingType)!;
         }
-        private async Task<TResult> ExecuteInternalAsync<TResult>(Expression expression, CancellationToken ct)
+        private Task<TResult> ExecuteInternalAsync<TResult>(Expression expression, CancellationToken ct)
         {
-            var sw = Stopwatch.StartNew();
+            // PERF: Only allocate Stopwatch when logger is active
+            var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
-            IReadOnlyDictionary<string, object>? parameterDictionary = null;
-            IReadOnlyDictionary<string, object> GetParameterDictionary()
+            // PERF: For cached queries, use the closure-based path (rare).
+            // For non-cached queries (common), return task directly — no async state machine needed.
+            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
-                parameterDictionary ??= EnsureParameterDictionary(plan, paramValues);
-                return parameterDictionary;
+                return ExecuteInternalCachedAsync<TResult>(plan, paramValues, sw, ct);
             }
-            Func<Task<TResult>> queryExecutorFactory = async () =>
+            return ExecuteQueryFromPlanAsync<TResult>(plan, paramValues, sw, ct);
+        }
+
+        private async Task<TResult> ExecuteInternalCachedAsync<TResult>(QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
+        {
+            var parameterDictionary = EnsureParameterDictionary(plan, paramValues);
+            Func<Task<TResult>> queryExecutorFactory = () => ExecuteQueryFromPlanAsync<TResult>(plan, paramValues, sw, ct);
+            var cacheKey = BuildCacheKeyWithValues<TResult>(plan, parameterDictionary);
+            var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
+            return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
+        }
+        /// <summary>
+        /// PERF: Non-async entry point — does synchronous command setup when connection is ready,
+        /// then dispatches to the appropriate async materializer. Avoids one async state machine
+        /// allocation on the hot path.
+        /// </summary>
+        private Task<TResult> ExecuteQueryFromPlanAsync<TResult>(QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
+        {
+            // PERF: Check if connection is ready without awaiting
+            var ensureTask = _ctx.EnsureConnectionAsync(ct);
+            if (!ensureTask.IsCompletedSuccessfully)
+                return ExecuteQueryFromPlanSlowAsync<TResult>(ensureTask, plan, paramValues, sw, ct);
+
+            // Synchronous command setup — no async state machine needed
+            var cmd = _ctx.CreateCommand();
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+            cmd.CommandText = plan.Sql;
+            BindPlanParameters(cmd, plan, paramValues);
+
+            // PERF: Dispatch directly to materializer — avoids wrapping in another async method
+            if (plan.IsScalar)
             {
-                await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                await using var cmd = _ctx.CreateCommand();
-                cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
-                cmd.CommandText = plan.Sql;
-                var compiledParamsAsync = plan.CompiledParameters;
+                // PERF: Sync scalar for providers without true async I/O (SQLite)
+                if (_ctx.Provider.PrefersSyncExecution)
+                    return ExecuteScalarPlanSync<TResult>(plan, cmd, sw);
+                return ExecuteScalarPlanAsync<TResult>(plan, cmd, sw, ct);
+            }
+
+            // PERF: For providers that don't support true async I/O (SQLite), use fully synchronous
+            // materialization to eliminate per-row ReadAsync state machine overhead (~50ns × N rows).
+            if (_ctx.Provider.PrefersSyncExecution)
+                return ExecuteListPlanSyncWrapped<TResult>(plan, cmd, sw);
+
+            if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
+                return (Task<TResult>)(object)ExecuteObjectListPlanAsync(plan, cmd, sw, ct);
+
+            return ExecuteListPlanAsync<TResult>(plan, cmd, sw, ct);
+        }
+
+        /// <summary>PERF: Slow path — connection needs initialization.</summary>
+        private async Task<TResult> ExecuteQueryFromPlanSlowAsync<TResult>(Task<System.Data.Common.DbConnection> ensureTask, QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
+        {
+            await ensureTask.ConfigureAwait(false);
+            var cmd = _ctx.CreateCommand();
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+            cmd.CommandText = plan.Sql;
+            BindPlanParameters(cmd, plan, paramValues);
+
+            if (plan.IsScalar)
+                return await ExecuteScalarPlanAsync<TResult>(plan, cmd, sw, ct).ConfigureAwait(false);
+
+            if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
+                return (TResult)(object)await ExecuteObjectListPlanAsync(plan, cmd, sw, ct).ConfigureAwait(false);
+
+            return await ExecuteListPlanAsync<TResult>(plan, cmd, sw, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>PERF: Extracted parameter binding to share between fast and slow paths.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void BindPlanParameters(DbCommand cmd, QueryPlan plan, IReadOnlyList<object?>? paramValues)
+        {
+            var compiledParams = plan.CompiledParameters;
+            if (compiledParams.Count == 0)
+            {
+                foreach (var p in plan.Parameters)
+                    cmd.AddOptimizedParam(p.Key, p.Value);
+            }
+            else
+            {
+                if (!_compiledParamSets.TryGetValue(plan, out var compiledSet))
+                {
+                    compiledSet = new HashSet<string>(compiledParams, StringComparer.Ordinal);
+                    _compiledParamSets.TryAdd(plan, compiledSet);
+                }
                 foreach (var p in plan.Parameters)
                 {
-                    if (compiledParamsAsync == null || !compiledParamsAsync.Contains(p.Key))
+                    if (!compiledSet.Contains(p.Key))
                         cmd.AddOptimizedParam(p.Key, p.Value);
                 }
                 if (paramValues != null)
                 {
-                    for (int i = 0; i < compiledParamsAsync!.Count; i++)
-                    {
-                        var name = compiledParamsAsync[i];
-                        var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
-                        cmd.AddOptimizedParam(name, value);
-                    }
+                    var count = Math.Min(compiledParams.Count, paramValues.Count);
+                    for (int i = 0; i < count; i++)
+                        cmd.AddOptimizedParam(compiledParams[i], paramValues[i] ?? DBNull.Value);
                 }
-                object? result;
-                if (plan.IsScalar)
-                {
-                    var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
-                    if (scalarResult == null || scalarResult is DBNull)
-                    {
-                        if (plan.MethodName is "Min" or "Max" or "Average" &&
-                            typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
-                            throw new InvalidOperationException("Sequence contains no elements");
-                        return default(TResult)!;
-                    }
-                    // PERFORMANCE FIX: Use ConvertScalarResult to avoid boxing for value types
-                    result = ConvertScalarResult<TResult>(scalarResult)!;
-                }
-                else
-                {
-                    var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw.Elapsed, list.Count);
-                    if (plan.SingleResult)
-                    {
-                        // PERFORMANCE FIX: Direct list access instead of Cast<object>().First()
-                        // Avoids unnecessary IEnumerable cast and LINQ iterator allocation
-                        result = plan.MethodName switch
-                        {
-                            "First" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
-                            "FirstOrDefault" => list.Count > 0 ? list[0] : null,
-                            "Single" => list.Count == 1 ? list[0] : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
-                            "SingleOrDefault" => list.Count == 0 ? null : list.Count == 1 ? list[0] : throw new InvalidOperationException("Sequence contains more than one element"),
-                            "ElementAt" => list.Count > 0 ? list[0] : throw new ArgumentOutOfRangeException("index"),
-                            "ElementAtOrDefault" => list.Count > 0 ? list[0] : null,
-                            "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
-                            "LastOrDefault" => list.Count > 0 ? list[0] : null,
-                            _ => list
-                        };
-                    }
-                    else
-                    {
-                        // PERFORMANCE FIX: Optimized Covariance Handling
-                        if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
-                        {
-                            // Manual copy is 2-3x faster than LINQ Cast<object>().ToList()
-                            var countList = nonGenericList.Count;
-                            var covariantList = new List<object>(countList);
-                            for (int i = 0; i < countList; i++)
-                            {
-                                covariantList.Add(nonGenericList[i]!);
-                            }
-                            result = covariantList;
-                        }
-                        else
-                        {
-                            result = list;
-                        }
-                    }
-                }
-                return (TResult)result!;
-            };
-            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
+            }
+        }
+
+        /// <summary>PERF: Scalar materialization path.</summary>
+        private async Task<TResult> ExecuteScalarPlanAsync<TResult>(QueryPlan plan, DbCommand cmd, Stopwatch? sw, CancellationToken ct)
+        {
+            await using var command = cmd;
+            var scalarResult = await command.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
+            sw?.Stop();
+            _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, scalarResult == null || scalarResult is DBNull ? 0 : 1);
+            if (scalarResult == null || scalarResult is DBNull)
             {
-                var cacheKey = BuildCacheKeyWithValues<TResult>(plan, GetParameterDictionary());
-                var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
-                return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
+                if (plan.MethodName is "Min" or "Max" or "Average" &&
+                    typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
+                    throw new InvalidOperationException("Sequence contains no elements");
+                return default(TResult)!;
+            }
+            return ConvertScalarResult<TResult>(scalarResult)!;
+        }
+
+        /// <summary>PERF: Fully synchronous scalar path for providers without true async I/O.</summary>
+        private Task<TResult> ExecuteScalarPlanSync<TResult>(QueryPlan plan, DbCommand cmd, Stopwatch? sw)
+        {
+            using var command = cmd;
+            var scalarResult = command.ExecuteScalarWithInterception(_ctx);
+            sw?.Stop();
+            _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, scalarResult == null || scalarResult is DBNull ? 0 : 1);
+            if (scalarResult == null || scalarResult is DBNull)
+            {
+                if (plan.MethodName is "Min" or "Max" or "Average" &&
+                    typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
+                    throw new InvalidOperationException("Sequence contains no elements");
+                return Task.FromResult(default(TResult)!);
+            }
+            return Task.FromResult(ConvertScalarResult<TResult>(scalarResult)!);
+        }
+
+        /// <summary>PERF: List&lt;object&gt; materialization path — avoids covariant copy.</summary>
+        private async Task<List<object>> ExecuteObjectListPlanAsync(QueryPlan plan, DbCommand cmd, Stopwatch? sw, CancellationToken ct)
+        {
+            var objectList = await _executor.MaterializeAsObjectListAsync(plan, cmd, ct).ConfigureAwait(false);
+            sw?.Stop();
+            _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, objectList.Count);
+            return objectList;
+        }
+
+        /// <summary>
+        /// PERF: Fully synchronous materialization wrapped in Task.FromResult.
+        /// Eliminates async state machine overhead for providers without true async I/O (SQLite).
+        /// Saves ~50-100ns per Read() call → ~1-4μs for typical result sets.
+        /// </summary>
+        private Task<TResult> ExecuteListPlanSyncWrapped<TResult>(QueryPlan plan, DbCommand cmd, Stopwatch? sw)
+        {
+            var list = _executor.Materialize(plan, cmd);
+            sw?.Stop();
+            _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, list.Count);
+
+            object? result;
+            if (plan.SingleResult)
+            {
+                result = plan.MethodName switch
+                {
+                    "First" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                    "FirstOrDefault" => list.Count > 0 ? list[0] : null,
+                    "Single" => list.Count == 1 ? list[0] : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
+                    "SingleOrDefault" => list.Count == 0 ? null : list.Count == 1 ? list[0] : throw new InvalidOperationException("Sequence contains more than one element"),
+                    "ElementAt" => list.Count > 0 ? list[0] : throw new ArgumentOutOfRangeException("index"),
+                    "ElementAtOrDefault" => list.Count > 0 ? list[0] : null,
+                    "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                    "LastOrDefault" => list.Count > 0 ? list[0] : null,
+                    _ => list
+                };
             }
             else
             {
-                return await queryExecutorFactory().ConfigureAwait(false);
+                if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
+                {
+                    var countList = nonGenericList.Count;
+                    var covariantList = new List<object>(countList);
+                    for (int i = 0; i < countList; i++)
+                        covariantList.Add(nonGenericList[i]!);
+                    result = covariantList;
+                }
+                else
+                {
+                    result = list;
+                }
             }
+            return Task.FromResult((TResult)result!);
         }
+
+        /// <summary>PERF: Typed list materialization path.</summary>
+        private async Task<TResult> ExecuteListPlanAsync<TResult>(QueryPlan plan, DbCommand cmd, Stopwatch? sw, CancellationToken ct)
+        {
+            var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
+            sw?.Stop();
+            _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, list.Count);
+
+            object? result;
+            if (plan.SingleResult)
+            {
+                result = plan.MethodName switch
+                {
+                    "First" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                    "FirstOrDefault" => list.Count > 0 ? list[0] : null,
+                    "Single" => list.Count == 1 ? list[0] : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
+                    "SingleOrDefault" => list.Count == 0 ? null : list.Count == 1 ? list[0] : throw new InvalidOperationException("Sequence contains more than one element"),
+                    "ElementAt" => list.Count > 0 ? list[0] : throw new ArgumentOutOfRangeException("index"),
+                    "ElementAtOrDefault" => list.Count > 0 ? list[0] : null,
+                    "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                    "LastOrDefault" => list.Count > 0 ? list[0] : null,
+                    _ => list
+                };
+            }
+            else
+            {
+                if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
+                {
+                    var countList = nonGenericList.Count;
+                    var covariantList = new List<object>(countList);
+                    for (int i = 0; i < countList; i++)
+                        covariantList.Add(nonGenericList[i]!);
+                    result = covariantList;
+                }
+                else
+                {
+                    result = list;
+                }
+            }
+            return (TResult)result!;
+        }
+
         // INTERNAL API: Optimized version that accepts array of values instead of Dictionary
         internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, object?[] parameterValues, CancellationToken ct)
         {
-            return _ctx.Options.RetryPolicy != null
-                ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteCompiledInternalArrayAsync<TResult>(plan, parameterValues, token), ct)
-                : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteCompiledInternalArrayAsync<TResult>(plan, parameterValues, token), ct);
+            if (_ctx.Options.RetryPolicy != null)
+                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteCompiledInternalArrayAsync<TResult>(plan, parameterValues, token), ct);
+            return ExecuteCompiledInternalArrayAsync<TResult>(plan, parameterValues, ct);
+        }
+
+        // PERF: Overload that accepts pre-computed compiledParamSet + fixedParams to avoid:
+        // 1. Expensive QueryPlan.GetHashCode() in _compiledParamSets ConcurrentDictionary on every call
+        //    (QueryPlan is a sealed record with 20+ properties — auto-generated GetHashCode costs ~200ns)
+        // 2. HashSet.Contains per parameter on every call (fixed params pre-filtered at compile time)
+        internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, object?[] parameterValues, HashSet<string> compiledParamSet, KeyValuePair<string, object>[]? fixedParams, CancellationToken ct)
+        {
+            if (_ctx.Options.RetryPolicy != null)
+                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteCompiledPreparedAsync<TResult>(plan, parameterValues, compiledParamSet, fixedParams, token), ct);
+            return ExecuteCompiledPreparedAsync<TResult>(plan, parameterValues, compiledParamSet, fixedParams, ct);
         }
 
         internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
         {
-            return _ctx.Options.RetryPolicy != null
-                ? new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteCompiledInternalAsync<TResult>(plan, parameters, token), ct)
-                : new DefaultExecutionStrategy(_ctx).ExecuteAsync((_, token) => ExecuteCompiledInternalAsync<TResult>(plan, parameters, token), ct);
+            if (_ctx.Options.RetryPolicy != null)
+                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteCompiledInternalAsync<TResult>(plan, parameters, token), ct);
+            return ExecuteCompiledInternalAsync<TResult>(plan, parameters, ct);
         }
         private async Task<TResult> ExecuteCompiledInternalAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
         {
-            var sw = Stopwatch.StartNew();
             // Merge template parameters from the plan with the live execution values
             var finalParameters = new Dictionary<string, object>(plan.Parameters);
             foreach (var p in parameters)
             {
                 finalParameters[p.Key] = p.Value;
             }
-            Func<Task<TResult>> queryExecutorFactory = async () =>
-            {
-                await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                await using var cmd = _ctx.CreateCommand();
-                cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
-                cmd.CommandText = plan.Sql;
-                foreach (var p in finalParameters) cmd.AddOptimizedParam(p.Key, p.Value);
-                object? result;
-                if (plan.IsScalar)
-                {
-                    var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
-                    if (scalarResult == null || scalarResult is DBNull)
-                    {
-                        if (plan.MethodName is "Min" or "Max" or "Average" &&
-                            typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
-                            throw new InvalidOperationException("Sequence contains no elements");
-                        return default!;
-                    }
-                    // PERFORMANCE FIX: Use ConvertScalarResult to avoid boxing for value types
-                    result = ConvertScalarResult<TResult>(scalarResult)!;
-                }
-                else
-                {
-                    var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw.Elapsed, list.Count);
-                    if (plan.SingleResult)
-                    {
-                        // PERFORMANCE FIX: Direct list access instead of Cast<object>().First()
-                        result = plan.MethodName switch
-                        {
-                            "First" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
-                            "FirstOrDefault" => list.Count > 0 ? list[0] : null,
-                            "Single" => list.Count == 1 ? list[0] : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
-                            "SingleOrDefault" => list.Count == 0 ? null : list.Count == 1 ? list[0] : throw new InvalidOperationException("Sequence contains more than one element"),
-                            "ElementAt" => list.Count > 0 ? list[0] : throw new ArgumentOutOfRangeException("index"),
-                            "ElementAtOrDefault" => list.Count > 0 ? list[0] : null,
-                            "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
-                            "LastOrDefault" => list.Count > 0 ? list[0] : null,
-                            _ => list
-                        };
-                    }
-                    else
-                    {
-                        // PERFORMANCE FIX: Optimized Covariance Handling
-                        if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
-                        {
-                            // Manual copy is 2-3x faster than LINQ Cast<object>().ToList()
-                            var countList = nonGenericList.Count;
-                            var covariantList = new List<object>(countList);
-                            for (int i = 0; i < countList; i++)
-                            {
-                                covariantList.Add(nonGenericList[i]!);
-                            }
-                            result = covariantList;
-                        }
-                        else
-                        {
-                            result = list;
-                        }
-                    }
-                }
-                return (TResult)result!;
-            };
+            // PERF: For cached queries (rare), use closure-based path.
+            // For non-cached queries (common), inline execution directly to avoid closure allocation.
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
+                var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
+                Func<Task<TResult>> queryExecutorFactory = () => ExecuteCompiledDictAsync<TResult>(plan, finalParameters, sw, ct);
                 var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, finalParameters);
                 var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
                 return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
             }
             else
             {
-                return await queryExecutorFactory().ConfigureAwait(false);
+                var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
+                return await ExecuteCompiledDictAsync<TResult>(plan, finalParameters, sw, ct).ConfigureAwait(false);
             }
         }
-
-        private async Task<TResult> ExecuteCompiledInternalArrayAsync<TResult>(QueryPlan plan, object?[] parameterValues, CancellationToken ct)
+        /// <summary>
+        /// PERF: Extracted from lambda to avoid closure allocation on every compiled query call.
+        /// </summary>
+        private async Task<TResult> ExecuteCompiledDictAsync<TResult>(QueryPlan plan, Dictionary<string, object> finalParameters, Stopwatch? sw, CancellationToken ct)
         {
-            // This method replaces the dictionary merge with direct array access
-            var sw = Stopwatch.StartNew();
-
-            Func<Task<TResult>> queryExecutorFactory = async () =>
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
+            await using var cmd = _ctx.CreateCommand();
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+            cmd.CommandText = plan.Sql;
+            foreach (var p in finalParameters) cmd.AddOptimizedParam(p.Key, p.Value);
+            object? result;
+            if (plan.IsScalar)
             {
-                await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                await using var cmd = _ctx.CreateCommand();
-                cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
-                cmd.CommandText = plan.Sql;
-
-                // 1. Add static parameters from plan (constants)
-                // BUG FIX: Skip parameters that will be provided as dynamic values
-                foreach (var p in plan.Parameters)
+                var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
+                _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw?.Elapsed ?? default, scalarResult == null || scalarResult is DBNull ? 0 : 1);
+                if (scalarResult == null || scalarResult is DBNull)
                 {
-                    // Check if this parameter is reserved for a dynamic value
-                    bool isDynamic = false;
-                    for (int i = 0; i < plan.CompiledParameters.Count; i++)
-                    {
-                        // Use Ordinal comparison for parameter names
-                        if (string.Equals(plan.CompiledParameters[i], p.Key, StringComparison.Ordinal))
-                        {
-                            isDynamic = true;
-                            break;
-                        }
-                    }
-
-                    // Only add if it's NOT a dynamic parameter (prevents duplicates)
-                    if (!isDynamic)
-                    {
-                        cmd.AddOptimizedParam(p.Key, p.Value);
-                    }
+                    if (plan.MethodName is "Min" or "Max" or "Average" &&
+                        typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
+                        throw new InvalidOperationException("Sequence contains no elements");
+                    return default!;
                 }
-
-                // 2. Add dynamic parameters from array
-                // The ExpressionCompiler guarantees that parameterValues match CompiledParameters order
-                var count = Math.Min(plan.CompiledParameters.Count, parameterValues.Length);
-                for (int i = 0; i < count; i++)
-                {
-                    cmd.AddOptimizedParam(plan.CompiledParameters[i], parameterValues[i] ?? DBNull.Value);
-                }
-
-                object? result;
-                if (plan.IsScalar)
-                {
-                    var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
-                    // Logging skipped for perf in scalar
-                    if (scalarResult == null || scalarResult is DBNull)
-                    {
-                        if (plan.MethodName is "Min" or "Max" or "Average" &&
-                            typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
-                            throw new InvalidOperationException("Sequence contains no elements");
-                        return default!;
-                    }
-                    result = ConvertScalarResult<TResult>(scalarResult)!;
-                }
-                else
-                {
-                    var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw.Elapsed, list.Count);
-
-                    if (plan.SingleResult)
-                    {
-                        result = plan.MethodName switch
-                        {
-                            "First" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
-                            "FirstOrDefault" => list.Count > 0 ? list[0] : null,
-                            "Single" => list.Count == 1 ? list[0] : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
-                            "SingleOrDefault" => list.Count == 0 ? null : list.Count == 1 ? list[0] : throw new InvalidOperationException("Sequence contains more than one element"),
-                            "ElementAt" => list.Count > 0 ? list[0] : throw new ArgumentOutOfRangeException("index"),
-                            "ElementAtOrDefault" => list.Count > 0 ? list[0] : null,
-                            "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
-                            "LastOrDefault" => list.Count > 0 ? list[0] : null,
-                            _ => list
-                        };
-                    }
-                    else
-                    {
-                        // PERFORMANCE FIX: Optimized Covariance Handling
-                        if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
-                        {
-                            // Manual copy is 2-3x faster than LINQ Cast<object>().ToList()
-                            var countList = nonGenericList.Count;
-                            var covariantList = new List<object>(countList);
-                            for (int i = 0; i < countList; i++)
-                            {
-                                covariantList.Add(nonGenericList[i]!);
-                            }
-                            result = covariantList;
-                        }
-                        else
-                        {
-                            result = list;
-                        }
-                    }
-                }
-                return (TResult)result!;
-            };
-
-            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
-            {
-                // For caching, we construct a dictionary only if needed (rare path)
-                var dict = new Dictionary<string, object>(plan.Parameters);
-                for (int i = 0; i < plan.CompiledParameters.Count && i < parameterValues.Length; i++)
-                    dict[plan.CompiledParameters[i]] = parameterValues[i] ?? DBNull.Value;
-
-                var cacheKey = BuildCacheKeyWithValues<TResult>(plan, dict);
-                var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
-                return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
+                result = ConvertScalarResult<TResult>(scalarResult)!;
             }
             else
             {
-                return await queryExecutorFactory().ConfigureAwait(false);
+                // PERF: When TResult is List<object>, materialize directly to avoid covariant copy
+                if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
+                {
+                    var objectList = await _executor.MaterializeAsObjectListAsync(plan, cmd, ct).ConfigureAwait(false);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw?.Elapsed ?? default, objectList.Count);
+                    return (TResult)(object)objectList;
+                }
+
+                var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
+                _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw?.Elapsed ?? default, list.Count);
+                if (plan.SingleResult)
+                {
+                    result = plan.MethodName switch
+                    {
+                        "First" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                        "FirstOrDefault" => list.Count > 0 ? list[0] : null,
+                        "Single" => list.Count == 1 ? list[0] : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
+                        "SingleOrDefault" => list.Count == 0 ? null : list.Count == 1 ? list[0] : throw new InvalidOperationException("Sequence contains more than one element"),
+                        "ElementAt" => list.Count > 0 ? list[0] : throw new ArgumentOutOfRangeException("index"),
+                        "ElementAtOrDefault" => list.Count > 0 ? list[0] : null,
+                        "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                        "LastOrDefault" => list.Count > 0 ? list[0] : null,
+                        _ => list
+                    };
+                }
+                else
+                {
+                    if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
+                    {
+                        var countList = nonGenericList.Count;
+                        var covariantList = new List<object>(countList);
+                        for (int i = 0; i < countList; i++)
+                            covariantList.Add(nonGenericList[i]!);
+                        result = covariantList;
+                    }
+                    else
+                    {
+                        result = list;
+                    }
+                }
             }
+            return (TResult)result!;
+        }
+
+        /// <summary>PERF: Cached HashSets for compiled parameter name lookups (O(1) vs O(N)).</summary>
+        private static readonly ConcurrentDictionary<QueryPlan, HashSet<string>> _compiledParamSets = new();
+
+        private Task<TResult> ExecuteCompiledInternalArrayAsync<TResult>(QueryPlan plan, object?[] parameterValues, CancellationToken ct)
+        {
+            // PERF: For the caching path (rare), use async method.
+            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
+            {
+                return ExecuteCompiledInternalArrayCachedAsync<TResult>(plan, parameterValues, ct);
+            }
+
+            // PERF: Build command synchronously, then delegate to materialization.
+            // This avoids an async state machine for the command setup work.
+            var cmd = _ctx.CreateCommand();
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+            cmd.CommandText = plan.Sql;
+
+            var compiledParams = plan.CompiledParameters;
+            if (compiledParams.Count == 0)
+            {
+                foreach (var p in plan.Parameters)
+                    cmd.AddOptimizedParam(p.Key, p.Value);
+            }
+            else
+            {
+                if (!_compiledParamSets.TryGetValue(plan, out var compiledSet))
+                {
+                    compiledSet = new HashSet<string>(compiledParams, StringComparer.Ordinal);
+                    _compiledParamSets.TryAdd(plan, compiledSet);
+                }
+
+                foreach (var p in plan.Parameters)
+                {
+                    if (!compiledSet.Contains(p.Key))
+                        cmd.AddOptimizedParam(p.Key, p.Value);
+                }
+            }
+
+            var count = Math.Min(compiledParams.Count, parameterValues.Length);
+            for (int i = 0; i < count; i++)
+            {
+                cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
+            }
+
+            // PERF: Dispatch directly to materialization — avoids wrapping in another async method.
+            // MaterializeAsObjectListAsync/MaterializeAsync handle cmd disposal via 'await using'.
+            if (!plan.IsScalar && typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
+            {
+                return (Task<TResult>)(object)_executor.MaterializeAsObjectListAsync(plan, cmd, ct);
+            }
+
+            return ExecuteCompiledMaterializeAsync<TResult>(plan, cmd, ct);
+        }
+
+        /// <summary>
+        /// PERF: Optimized compiled query execution that accepts pre-computed compiledParamSet and fixedParams.
+        /// Avoids: (1) _compiledParamSets ConcurrentDictionary lookup (QueryPlan.GetHashCode on every call),
+        /// (2) HashSet.Contains per param (fixed params pre-filtered at compile time).
+        /// Routes through the same execution path as non-compiled queries for consistent JIT optimization.
+        /// </summary>
+        private Task<TResult> ExecuteCompiledPreparedAsync<TResult>(QueryPlan plan, object?[] parameterValues, HashSet<string> compiledParamSet, KeyValuePair<string, object>[]? fixedParams, CancellationToken ct)
+        {
+            // PERF: For the caching path (rare), fall back to standard compiled path.
+            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
+                return ExecuteCompiledInternalArrayCachedAsync<TResult>(plan, parameterValues, ct);
+
+            // PERF: Ensure connection is ready (fast no-op when already open).
+            // This matches the non-compiled path to ensure identical behavior.
+            var ensureTask = _ctx.EnsureConnectionAsync(ct);
+            if (!ensureTask.IsCompletedSuccessfully)
+                return ExecuteCompiledPreparedSlowAsync<TResult>(ensureTask, plan, parameterValues, fixedParams, ct);
+
+            // Synchronous command setup — same as non-compiled ExecuteQueryFromPlanAsync
+            var cmd = _ctx.CreateCommand();
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+            cmd.CommandText = plan.Sql;
+            BindCompiledParameters(cmd, plan, parameterValues, fixedParams);
+
+            // PERF: Dispatch directly to the same materializer methods used by non-compiled queries.
+            if (plan.IsScalar)
+                return ExecuteScalarPlanAsync<TResult>(plan, cmd, null, ct);
+            // PERF: Sync materialization for providers without true async I/O
+            if (_ctx.Provider.PrefersSyncExecution)
+                return ExecuteListPlanSyncWrapped<TResult>(plan, cmd, null);
+            if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
+                return (Task<TResult>)(object)ExecuteObjectListPlanAsync(plan, cmd, null, ct);
+            return ExecuteListPlanAsync<TResult>(plan, cmd, null, ct);
+        }
+
+        private async Task<TResult> ExecuteCompiledPreparedSlowAsync<TResult>(Task<DbConnection> ensureTask, QueryPlan plan, object?[] parameterValues, KeyValuePair<string, object>[]? fixedParams, CancellationToken ct)
+        {
+            await ensureTask.ConfigureAwait(false);
+            var cmd = _ctx.CreateCommand();
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+            cmd.CommandText = plan.Sql;
+            BindCompiledParameters(cmd, plan, parameterValues, fixedParams);
+
+            if (plan.IsScalar)
+                return await ExecuteScalarPlanAsync<TResult>(plan, cmd, null, ct).ConfigureAwait(false);
+            if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
+                return (TResult)(object)await ExecuteObjectListPlanAsync(plan, cmd, null, ct).ConfigureAwait(false);
+            return await ExecuteListPlanAsync<TResult>(plan, cmd, null, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// PERF: Inline parameter binding for compiled queries with pre-computed fixed params.
+        /// When fixedParams is non-null, iterates a pre-filtered array instead of the full
+        /// Parameters dictionary with HashSet lookups. Saves ~5 HashSet.Contains per call.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void BindCompiledParameters(DbCommand cmd, QueryPlan plan, object?[] parameterValues, KeyValuePair<string, object>[]? fixedParams)
+        {
+            var compiledParams = plan.CompiledParameters;
+            if (fixedParams != null)
+            {
+                // Fast path: pre-computed fixed params — no HashSet lookup needed
+                for (int i = 0; i < fixedParams.Length; i++)
+                    cmd.AddOptimizedParam(fixedParams[i].Key, fixedParams[i].Value);
+            }
+            else
+            {
+                // Fallback: no compiled params, just add all parameters
+                foreach (var p in plan.Parameters)
+                    cmd.AddOptimizedParam(p.Key, p.Value);
+            }
+
+            var count = Math.Min(compiledParams.Count, parameterValues.Length);
+            for (int i = 0; i < count; i++)
+                cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
+        }
+
+        /// <summary>
+        /// PERF: Compiled query execution with command pooling. The DbCommand is created once
+        /// (with Prepare()) and reused across calls — only parameter values are updated.
+        /// This eliminates per-call costs of: DbCommand allocation (~0.5μs), DbParameter creation
+        /// (~0.3μs per param), and SQL compilation via sqlite3_prepare_v2 (~2-5μs).
+        /// Falls back to standard path for retry policies, caching, and first-call initialization.
+        /// </summary>
+        internal Task<TResult> ExecuteCompiledPooledAsync<TResult>(
+            QueryPlan plan, object?[] parameterValues,
+            KeyValuePair<string, object>[]? fixedParams,
+            CompiledQueryState state, CancellationToken ct)
+        {
+            // Fall back to standard path for retry policies and caching
+            if (_ctx.Options.RetryPolicy != null)
+                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy)
+                    .ExecuteAsync((_, token) => ExecuteCompiledPooledInternalAsync<TResult>(plan, parameterValues, fixedParams, state, token), ct);
+
+            return ExecuteCompiledPooledInternalAsync<TResult>(plan, parameterValues, fixedParams, state, ct);
+        }
+
+        private Task<TResult> ExecuteCompiledPooledInternalAsync<TResult>(
+            QueryPlan plan, object?[] parameterValues,
+            KeyValuePair<string, object>[]? fixedParams,
+            CompiledQueryState state, CancellationToken ct)
+        {
+            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
+                return ExecuteCompiledInternalArrayCachedAsync<TResult>(plan, parameterValues, ct);
+
+            var ensureTask = _ctx.EnsureConnectionAsync(ct);
+            if (!ensureTask.IsCompletedSuccessfully)
+                return ExecuteCompiledPooledSlowAsync<TResult>(ensureTask, plan, parameterValues, fixedParams, state, ct);
+
+            // Get or create the pooled command
+            var cmd = state.PooledCommand;
+            if (cmd == null)
+            {
+                cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
+            }
+
+            // PERF: Only update compiled parameter values — fixed params are already set
+            UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
+
+            // PERF: Inline materialization — command is NOT disposed (pooled for reuse)
+            if (plan.IsScalar)
+                return ExecutePooledScalarAsync<TResult>(plan, cmd, ct);
+            // PERF: Sync materialization for providers without true async I/O
+            if (_ctx.Provider.PrefersSyncExecution)
+                return ExecutePooledListSync<TResult>(plan, cmd);
+            // Handle List<object> covariant case (e.g., join queries returning anonymous types)
+            if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
+                return (Task<TResult>)(object)ExecutePooledObjectListAsync(plan, cmd, ct);
+            return ExecutePooledListAsync<TResult>(plan, cmd, ct);
+        }
+
+        private async Task<TResult> ExecuteCompiledPooledSlowAsync<TResult>(
+            Task<DbConnection> ensureTask, QueryPlan plan, object?[] parameterValues,
+            KeyValuePair<string, object>[]? fixedParams,
+            CompiledQueryState state, CancellationToken ct)
+        {
+            await ensureTask.ConfigureAwait(false);
+            var cmd = state.PooledCommand;
+            if (cmd == null)
+                cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
+            UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
+            if (plan.IsScalar)
+                return await ExecutePooledScalarAsync<TResult>(plan, cmd, ct).ConfigureAwait(false);
+            return await ExecutePooledListAsync<TResult>(plan, cmd, ct).ConfigureAwait(false);
+        }
+
+        private DbCommand CreateAndPreparePooledCommand(
+            QueryPlan plan, KeyValuePair<string, object>[]? fixedParams, CompiledQueryState state)
+        {
+            var cmd = _ctx.CreateCommand();
+            cmd.CommandText = plan.Sql;
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+
+            // Pre-create fixed parameters (values never change)
+            int fixedCount = 0;
+            if (fixedParams != null)
+            {
+                for (int i = 0; i < fixedParams.Length; i++)
+                {
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = fixedParams[i].Key;
+                    p.Value = fixedParams[i].Value;
+                    // Set DbType from value for optimal binding
+                    if (fixedParams[i].Value is int) p.DbType = DbType.Int32;
+                    else if (fixedParams[i].Value is string s) { p.DbType = DbType.String; p.Size = s.Length <= 4000 ? s.Length : -1; }
+                    else if (fixedParams[i].Value is long) p.DbType = DbType.Int64;
+                    else if (fixedParams[i].Value is bool) p.DbType = DbType.Boolean;
+                    cmd.Parameters.Add(p);
+                }
+                fixedCount = fixedParams.Length;
+            }
+            else
+            {
+                // No compiled params — add all plan parameters
+                foreach (var kvp in plan.Parameters)
+                {
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = kvp.Key;
+                    p.Value = kvp.Value;
+                    cmd.Parameters.Add(p);
+                    fixedCount++;
+                }
+            }
+
+            // Pre-create compiled parameter slots (values updated per call)
+            for (int i = 0; i < plan.CompiledParameters.Count; i++)
+            {
+                var p = cmd.CreateParameter();
+                p.ParameterName = plan.CompiledParameters[i];
+                p.Value = DBNull.Value;
+                cmd.Parameters.Add(p);
+            }
+
+            // Prepare the command — compiles SQL once, subsequent executions skip sqlite3_prepare_v2
+            try { cmd.Prepare(); } catch { /* Prepare() is optional — some providers don't support it */ }
+
+            state.PooledCommand = cmd;
+            state.FixedParamCount = fixedCount;
+            return cmd;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void UpdateCompiledParameterValues(
+            DbCommand cmd, IReadOnlyList<string> compiledParams,
+            object?[] parameterValues, int fixedParamCount)
+        {
+            var count = Math.Min(compiledParams.Count, parameterValues.Length);
+            for (int i = 0; i < count; i++)
+                cmd.Parameters[fixedParamCount + i].Value = parameterValues[i] ?? DBNull.Value;
+        }
+
+        /// <summary>
+        /// PERF: Fully synchronous materialization for pooled commands.
+        /// Eliminates async state machine overhead for providers like SQLite that lack true async I/O.
+        /// The command is NOT disposed (pooled for reuse). Only the reader is disposed.
+        /// </summary>
+        private Task<TResult> ExecutePooledListSync<TResult>(QueryPlan plan, DbCommand cmd)
+        {
+            var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
+            var list = _executor.CreateListForType(plan.ElementType, capacity);
+            var materializer = plan.SyncMaterializer;
+
+            using var reader = cmd.ExecuteReaderWithInterception(_ctx, CommandBehavior.SingleResult);
+
+            if (plan.SingleResult)
+            {
+                var maxRows = plan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
+                for (int row = 0; row < maxRows; row++)
+                {
+                    if (!reader.Read()) break;
+                    list.Add(materializer(reader));
+                }
+            }
+            else
+            {
+                while (reader.Read())
+                    list.Add(materializer(reader));
+            }
+
+            if (plan.SingleResult)
+                return Task.FromResult((TResult)HandleSingleResult(plan, list));
+
+            // Handle List<object> covariant case (e.g., join queries returning anonymous types)
+            if (typeof(TResult) == typeof(List<object>) && list is System.Collections.IList nonGenericList && list.GetType() != typeof(List<object>))
+            {
+                var countList = nonGenericList.Count;
+                var covariantList = new List<object>(countList);
+                for (int i = 0; i < countList; i++)
+                    covariantList.Add(nonGenericList[i]!);
+                return Task.FromResult((TResult)(object)covariantList);
+            }
+
+            return Task.FromResult((TResult)(object)list);
+        }
+
+        /// <summary>
+        /// PERF: Optimized compiled query path using fresh commands with sync materialization.
+        /// Microsoft.Data.Sqlite internally caches prepared statements, so pooled DbCommand reuse
+        /// adds overhead (sqlite3_reset, internal state management) without saving SQL compilation.
+        /// Fresh commands avoid this overhead and match the non-compiled execution path's performance.
+        /// </summary>
+        private Task<TResult> ExecuteCompiledFreshSync<TResult>(
+            QueryPlan plan, object?[] parameterValues,
+            KeyValuePair<string, object>[]? fixedParams)
+        {
+            using var cmd = _ctx.CreateCommand();
+            cmd.CommandText = plan.Sql;
+
+            // Bind fixed parameters (constants from the compiled expression)
+            if (fixedParams != null)
+            {
+                for (int i = 0; i < fixedParams.Length; i++)
+                    cmd.AddOptimizedParam(fixedParams[i].Key, fixedParams[i].Value);
+            }
+            else
+            {
+                // No compiled params — add all plan parameters
+                foreach (var kvp in plan.Parameters)
+                    cmd.AddOptimizedParam(kvp.Key, kvp.Value);
+            }
+
+            // Bind compiled parameters (values from the caller)
+            var compiledParams = plan.CompiledParameters;
+            var count = Math.Min(compiledParams.Count, parameterValues.Length);
+            for (int i = 0; i < count; i++)
+                cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
+
+            // Sync materialization — no async state machine overhead
+            var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
+            var list = _executor.CreateListForType(plan.ElementType, capacity);
+            var materializer = plan.SyncMaterializer;
+
+            using var reader = cmd.ExecuteReaderWithInterception(_ctx, CommandBehavior.SingleResult);
+
+            if (plan.SingleResult)
+            {
+                var maxRows = plan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
+                for (int row = 0; row < maxRows; row++)
+                {
+                    if (!reader.Read()) break;
+                    list.Add(materializer(reader));
+                }
+                return Task.FromResult((TResult)HandleSingleResult(plan, list));
+            }
+
+            while (reader.Read())
+                list.Add(materializer(reader));
+
+            // Handle List<object> covariant case
+            if (typeof(TResult) == typeof(List<object>) && list is System.Collections.IList nonGenericList && list.GetType() != typeof(List<object>))
+            {
+                var countList = nonGenericList.Count;
+                var covariantList = new List<object>(countList);
+                for (int i = 0; i < countList; i++)
+                    covariantList.Add(nonGenericList[i]!);
+                return Task.FromResult((TResult)(object)covariantList);
+            }
+
+            return Task.FromResult((TResult)(object)list);
+        }
+
+        /// <summary>PERF: Inline list materialization for pooled commands (not disposed).</summary>
+        private async Task<TResult> ExecutePooledListAsync<TResult>(QueryPlan plan, DbCommand cmd, CancellationToken ct)
+        {
+            var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
+            var list = _executor.CreateListForType(plan.ElementType, capacity);
+            var materializer = plan.SyncMaterializer;
+
+            // Use interception-aware reader for correctness
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(
+                _ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
+
+            if (plan.SingleResult)
+            {
+                var maxRows = plan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
+                for (int row = 0; row < maxRows; row++)
+                {
+                    if (!await reader.ReadAsync(ct).ConfigureAwait(false)) break;
+                    list.Add(materializer(reader));
+                }
+            }
+            else
+            {
+                while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                    list.Add(materializer(reader));
+            }
+
+            if (plan.SingleResult)
+            {
+                return (TResult)HandleSingleResult(plan, list);
+            }
+            return (TResult)(object)list;
+        }
+
+        /// <summary>PERF: Materialization into List&lt;object&gt; for pooled commands (handles covariant anonymous types).</summary>
+        private async Task<List<object>> ExecutePooledObjectListAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
+        {
+            var capacity = plan.Take ?? 16;
+            var list = new List<object>(capacity);
+            var materializer = plan.SyncMaterializer;
+
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(
+                _ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
+
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                list.Add(materializer(reader));
+
+            return list;
+        }
+
+        /// <summary>PERF: Inline scalar execution for pooled commands (not disposed).</summary>
+        private async Task<TResult> ExecutePooledScalarAsync<TResult>(QueryPlan plan, DbCommand cmd, CancellationToken ct)
+        {
+            var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
+            if (scalarResult == null || scalarResult is DBNull)
+            {
+                if (plan.MethodName is "Min" or "Max" or "Average" &&
+                    typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
+                    throw new InvalidOperationException("Sequence contains no elements");
+                return default(TResult)!;
+            }
+            return ConvertScalarResult<TResult>(scalarResult)!;
+        }
+
+        private static object HandleSingleResult(QueryPlan plan, IList list)
+        {
+            return plan.MethodName switch
+            {
+                "First" => list.Count > 0 ? list[0]! : throw new InvalidOperationException("Sequence contains no elements"),
+                "FirstOrDefault" => list.Count > 0 ? list[0]! : null!,
+                "Single" => list.Count == 1 ? list[0]! : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
+                "SingleOrDefault" => list.Count == 0 ? null! : list.Count == 1 ? list[0]! : throw new InvalidOperationException("Sequence contains more than one element"),
+                "ElementAt" => list.Count > 0 ? list[0]! : throw new ArgumentOutOfRangeException("index"),
+                "ElementAtOrDefault" => list.Count > 0 ? list[0]! : null!,
+                "Last" => list.Count > 0 ? list[0]! : throw new InvalidOperationException("Sequence contains no elements"),
+                "LastOrDefault" => list.Count > 0 ? list[0]! : null!,
+                _ => list
+            };
+        }
+
+        private async Task<TResult> ExecuteCompiledMaterializeAsync<TResult>(QueryPlan plan, DbCommand cmd, CancellationToken ct)
+        {
+            object? result;
+            if (plan.IsScalar)
+            {
+                var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
+                if (scalarResult == null || scalarResult is DBNull)
+                {
+                    if (plan.MethodName is "Min" or "Max" or "Average" &&
+                        typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
+                        throw new InvalidOperationException("Sequence contains no elements");
+                    return default!;
+                }
+                result = ConvertScalarResult<TResult>(scalarResult)!;
+            }
+            else
+            {
+                // PERF: When TResult is List<object> but plan.ElementType is a concrete type,
+                // materialize directly into List<object> to avoid creating List<ConcreteType>
+                // then copying all elements to a new List<object> (covariant copy).
+                if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
+                {
+                    var objectList = await _executor.MaterializeAsObjectListAsync(plan, cmd, ct).ConfigureAwait(false);
+                    return (TResult)(object)objectList;
+                }
+
+                var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
+
+                if (plan.SingleResult)
+                {
+                    result = plan.MethodName switch
+                    {
+                        "First" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                        "FirstOrDefault" => list.Count > 0 ? list[0] : null,
+                        "Single" => list.Count == 1 ? list[0] : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
+                        "SingleOrDefault" => list.Count == 0 ? null : list.Count == 1 ? list[0] : throw new InvalidOperationException("Sequence contains more than one element"),
+                        "ElementAt" => list.Count > 0 ? list[0] : throw new ArgumentOutOfRangeException("index"),
+                        "ElementAtOrDefault" => list.Count > 0 ? list[0] : null,
+                        "Last" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                        "LastOrDefault" => list.Count > 0 ? list[0] : null,
+                        _ => list
+                    };
+                }
+                else
+                {
+                    if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
+                    {
+                        var countList = nonGenericList.Count;
+                        var covariantList = new List<object>(countList);
+                        for (int i2 = 0; i2 < countList; i2++)
+                            covariantList.Add(nonGenericList[i2]!);
+                        result = covariantList;
+                    }
+                    else
+                    {
+                        result = list;
+                    }
+                }
+            }
+            return (TResult)result!;
+        }
+
+        private async Task<TResult> ExecuteCompiledInternalArrayCachedAsync<TResult>(QueryPlan plan, object?[] parameterValues, CancellationToken ct)
+        {
+            var dict = new Dictionary<string, object>(plan.Parameters);
+            for (int i = 0; i < plan.CompiledParameters.Count && i < parameterValues.Length; i++)
+                dict[plan.CompiledParameters[i]] = parameterValues[i] ?? DBNull.Value;
+
+            var cacheKey = BuildCacheKeyWithValues<TResult>(plan, dict);
+            var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
+            return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration,
+                () => ExecuteCompiledInternalArrayAsync<TResult>(plan, parameterValues, ct), ct).ConfigureAwait(false);
         }
         private bool TryGetSimpleQuery(Expression expr, out string sql, out Dictionary<string, object> parameters, out string? resultMethodName)
         {
             sql = string.Empty;
-            parameters = new Dictionary<string, object>();
+            parameters = _emptyParams;
             resultMethodName = null;
             if (_ctx.Options.GlobalFilters.Count > 0 || _ctx.Options.TenantProvider != null)
                 return false;
             // Traverse to find root query and optional Where predicate
             MethodCallExpression? whereCall = null;
             Expression current = expr;
-            // Unwrap result operators like First/Single
-            while (current is MethodCallExpression mc && mc.Method.DeclaringType == typeof(Queryable))
+            // Unwrap result operators like First/Single/Take and skip AsNoTracking
+            while (current is MethodCallExpression mc)
             {
-                if (mc.Method.Name == nameof(Queryable.Where))
+                if (mc.Method.DeclaringType == typeof(Queryable))
                 {
-                    if (whereCall != null) return false; // only support single Where
-                    whereCall = mc;
-                    current = mc.Arguments[0];
+                    if (mc.Method.Name == nameof(Queryable.Where))
+                    {
+                        if (whereCall != null) return false; // only support single Where
+                        whereCall = mc;
+                        current = mc.Arguments[0];
+                    }
+                    else if (mc.Method.Name is nameof(Queryable.First) or nameof(Queryable.FirstOrDefault))
+                    {
+                        resultMethodName = mc.Method.Name;
+                        current = mc.Arguments[0];
+                    }
+                    else if (mc.Method.Name is nameof(Queryable.Take))
+                    {
+                        // PERF: Accept Take so queries like .Where(...).Take(10) hit simple path
+                        // Reject non-constant or negative Take values so validation falls through
+                        if (mc.Arguments[1] is not ConstantExpression takeConst || takeConst.Value is not int tv || tv < 0)
+                            return false;
+                        current = mc.Arguments[0];
+                    }
+                    else if (mc.Method.Name is nameof(Queryable.Single) or nameof(Queryable.SingleOrDefault))
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        return false;
+                    }
                 }
-                else if (mc.Method.Name is nameof(Queryable.First) or nameof(Queryable.FirstOrDefault))
+                else if (mc.Method.Name == "AsNoTracking" && mc.Arguments.Count >= 1)
                 {
-                    resultMethodName = mc.Method.Name; // QP-1: preserve First vs FirstOrDefault
+                    // PERF: Skip AsNoTracking (nORM-specific method, not on Queryable)
                     current = mc.Arguments[0];
-                }
-                else if (mc.Method.Name is nameof(Queryable.Single) or nameof(Queryable.SingleOrDefault))
-                {
-                    // QP-1: Single/SingleOrDefault need TAKE 2 and cardinality checking.
-                    // Bypass the simple fast path so the full translator handles them correctly.
-                    return false;
                 }
                 else
                 {
@@ -682,7 +1313,23 @@ namespace nORM.Query
                 return false;
             var elementType = GetElementType(constant);
             var map = _ctx.GetMapping(elementType);
-            var cacheKey = ExpressionFingerprint.Compute(expr) + ":" + elementType.FullName;
+            // PERF: Use structural key instead of full ToString() to avoid string allocation.
+            // For simple predicates (member == value), the member name is sufficient.
+            string whereKey;
+            if (whereCall == null)
+                whereKey = "";
+            else
+            {
+                var wLambda = StripQuotes(whereCall.Arguments[1]) as LambdaExpression;
+                if (wLambda == null) return false;
+                if (wLambda.Body is MemberExpression wm)
+                    whereKey = wm.Member.Name;
+                else if (wLambda.Body is BinaryExpression wb && wb.Left is MemberExpression wbm)
+                    whereKey = wbm.Member.Name;
+                else
+                    whereKey = wLambda.Body.ToString(); // fallback for complex predicates
+            }
+            var cacheKey = string.Concat("SIMPLE:", elementType.FullName, ":", resultMethodName ?? "", ":", whereKey);
             if (!_simpleSqlCache.TryGetValue(cacheKey, out var cachedSql))
             {
                 // PERFORMANCE FIX: Use string interpolation instead of StringBuilder for small queries
@@ -714,7 +1361,7 @@ namespace nORM.Query
                         // DynamicInvoke is 100x slower and poses RCE risks
                         if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
                             return false;
-                        parameters[paramName] = value!;
+                        parameters = new Dictionary<string, object>(1) { [paramName] = value! };
                     }
                 }
 
@@ -736,19 +1383,99 @@ namespace nORM.Query
                     if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
                         return false;
                     var paramName = _ctx.Provider.ParamPrefix + "p0";
-                    // PERFORMANCE & SECURITY FIX: Use ExpressionValueExtractor instead of Compile().DynamicInvoke()
                     if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
                         return false;
-                    parameters[paramName] = value!;
+                    parameters = new Dictionary<string, object>(1) { [paramName] = value! };
                 }
             }
+            return true;
+        }
+
+        // PERF: Reusable empty dictionary to avoid allocation when count has no parameters
+        private static readonly Dictionary<string, object> _emptyParams = new();
+        // PERF: Cached empty includes list and table name lists for simple query path
+        private static readonly List<IncludePlan> _emptyIncludes = new();
+        private static readonly ConcurrentDictionary<string, List<string>> _simpleQueryTableCache = new();
+
+        /// <summary>
+        /// PERF: Direct count path that works on the source expression directly,
+        /// bypassing the need to wrap in Expression.Call(Queryable.Count) and re-parse.
+        /// Saves one MethodCallExpression + Type[] allocation per count call.
+        /// </summary>
+        internal bool TryDirectCountAsync(Expression sourceExpression, CancellationToken ct, out Task<int> result)
+        {
+            result = default!;
+            if (_ctx.Options.GlobalFilters.Count > 0 || _ctx.Options.TenantProvider != null)
+                return false;
+
+            // Unwrap the source expression to find the root and optional Where predicate
+            Expression source = sourceExpression;
+            LambdaExpression? predicate = null;
+
+            // Unwrap Where
+            if (source is MethodCallExpression whereCall && whereCall.Method.DeclaringType == typeof(Queryable) && whereCall.Method.Name == nameof(Queryable.Where))
+            {
+                predicate = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
+                source = whereCall.Arguments[0];
+            }
+
+            // Unwrap AsNoTracking and similar passthrough methods
+            while (source is MethodCallExpression m && m.Arguments.Count == 1 &&
+                   m.Method.Name is "AsNoTracking" or "AsTracking")
+                source = m.Arguments[0];
+
+            if (source is not ConstantExpression constant)
+                return false;
+
+            var elementType = GetElementType(constant);
+            var map = _ctx.GetMapping(elementType);
+
+            // PERF: Use structural key instead of string.Concat to avoid string allocation per count call.
+            string predicateKey;
+            if (predicate == null)
+                predicateKey = "";
+            else if (predicate.Body is MemberExpression pm)
+                predicateKey = pm.Member.Name; // interned by CLR, no alloc
+            else if (predicate.Body is BinaryExpression pb && pb.Left is MemberExpression pbm)
+                predicateKey = pbm.Member.Name; // just member name, skip NodeType.ToString()
+            else
+                return false; // Complex predicates fall back to normal path
+
+            var cacheKey = (elementType, predicateKey);
+            Dictionary<string, object> parameters = _emptyParams;
+
+            if (!_countSqlCache.TryGetValue(cacheKey, out var cached))
+            {
+                string whereClause = string.Empty;
+                if (predicate != null)
+                {
+                    if (!TryBuildCountWhereClause(predicate, map, ref parameters, out whereClause, populateParameters: true))
+                        return false;
+                }
+                var sql2 = $"SELECT COUNT(*) FROM {map.EscTable}{whereClause}";
+                bool needsParam = !ReferenceEquals(parameters, _emptyParams);
+                _countSqlCache[cacheKey] = (sql2, needsParam);
+                cached = (sql2, needsParam);
+            }
+            else if (predicate != null && cached.NeedsParam)
+            {
+                // Only re-extract parameter value when the predicate actually uses a parameter
+                if (!TryBuildCountWhereClause(predicate, map, ref parameters, out _, populateParameters: true))
+                    return false;
+            }
+            var sql = cached.Sql;
+
+            if (_ctx.Options.RetryPolicy != null)
+                result = new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteCountAsync<int>(sql, parameters, token), ct);
+            else
+                result = ExecuteCountAsync<int>(sql, parameters, ct);
             return true;
         }
 
         private bool TryGetCountQuery(Expression expr, out string sql, out Dictionary<string, object> parameters)
         {
             sql = string.Empty;
-            parameters = new Dictionary<string, object>();
+            parameters = _emptyParams;
 
             if (_ctx.Options.GlobalFilters.Count > 0 || _ctx.Options.TenantProvider != null)
                 return false;
@@ -776,36 +1503,55 @@ namespace nORM.Query
                 return false;
 
             var elementType = GetElementType(constant);
-            var map = _ctx.GetMapping(elementType);
-            var cacheKey = ExpressionFingerprint.Compute(expr) + ":" + elementType.FullName + ":COUNT";
+            // PERF: Use structural hash instead of predicate.Body.ToString() to avoid
+            // string allocation on every count call. For simple predicates (bool member,
+            // equality), the member name is sufficient as a cache key.
+            string predicateKey;
+            if (predicate == null)
+                predicateKey = "";
+            else if (predicate.Body is MemberExpression pm)
+                predicateKey = pm.Member.Name;
+            else if (predicate.Body is BinaryExpression pb && pb.Left is MemberExpression pbm)
+                predicateKey = string.Concat(pbm.Member.Name, "=", pb.NodeType.ToString());
+            else
+                predicateKey = predicate.Body.ToString(); // fallback for complex predicates
 
-            if (!_simpleSqlCache.TryGetValue(cacheKey, out var cachedSql))
+            // PERF: Use ValueTuple key to avoid string.Concat allocation per count call
+            var countCacheKey = (elementType, predicateKey);
+
+            if (_countSqlCache.TryGetValue(countCacheKey, out var cached))
             {
-                string whereClause = string.Empty;
-
-                if (predicate != null)
+                sql = cached.Sql;
+                if (cached.NeedsParam && predicate != null)
                 {
-                    if (!TryBuildCountWhereClause(predicate, map, parameters, out whereClause, populateParameters: true))
+                    // PERF: Only call GetMapping when actually needed for parameter extraction
+                    var map2 = _ctx.GetMapping(elementType);
+                    if (!TryBuildCountWhereClause(predicate, map2, ref parameters, out _, populateParameters: true))
                         return false;
                 }
-
-                sql = $"SELECT COUNT(*) FROM {map.EscTable}{whereClause}";
-                _simpleSqlCache[cacheKey] = sql;
                 return true;
             }
 
-            sql = cachedSql!;
-
-            if (predicate != null)
             {
-                if (!TryBuildCountWhereClause(predicate, map, parameters, out _, populateParameters: true))
-                    return false;
-            }
+                // First-time path: must call GetMapping for SQL generation
+                var map = _ctx.GetMapping(elementType);
+                string whereClause = string.Empty;
+                bool needsParam = false;
 
-            return true;
+                if (predicate != null)
+                {
+                    if (!TryBuildCountWhereClause(predicate, map, ref parameters, out whereClause, populateParameters: true))
+                        return false;
+                    needsParam = !ReferenceEquals(parameters, _emptyParams);
+                }
+
+                sql = $"SELECT COUNT(*) FROM {map.EscTable}{whereClause}";
+                _countSqlCache[countCacheKey] = (sql, needsParam);
+                return true;
+            }
         }
 
-        private bool TryBuildCountWhereClause(LambdaExpression lambda, TableMapping map, Dictionary<string, object> parameters, out string whereClause, bool populateParameters)
+        private bool TryBuildCountWhereClause(LambdaExpression lambda, TableMapping map, ref Dictionary<string, object> parameters, out string whereClause, bool populateParameters)
         {
             whereClause = string.Empty;
 
@@ -828,7 +1574,6 @@ namespace nORM.Query
 
                 if (constValue == null)
                 {
-                    // Null comparison must use IS NULL, not = NULL (which is always UNKNOWN in SQL)
                     whereClause = $" WHERE {column.EscCol} IS NULL";
                     return true;
                 }
@@ -837,14 +1582,111 @@ namespace nORM.Query
                 whereClause = $" WHERE {column.EscCol} = {paramName}";
 
                 if (populateParameters)
+                {
+                    // PERF: Only allocate a new dictionary when we actually need to add parameters
+                    if (ReferenceEquals(parameters, _emptyParams))
+                        parameters = new Dictionary<string, object>(1);
                     parameters[paramName] = constValue!;
+                }
 
                 return true;
             }
 
             return false;
         }
-        private async Task<TResult> ExecuteCountAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
+        private Task<TResult> ExecuteCountAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
+        {
+            // PERF: Split into fast (no logger) and slow (with logger) paths.
+            // The fast path avoids Stopwatch allocation and logger null checks.
+            if (_ctx.Options.Logger != null)
+                return ExecuteCountSlowAsync<TResult>(sql, parameters, ct);
+            return ExecuteCountFastAsync<TResult>(sql, parameters, ct);
+        }
+
+        private Task<TResult> ExecuteCountFastAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
+        {
+            // PERF: Non-async entry point — avoids state machine when connection is already open.
+            var ensureTask = _ctx.EnsureConnectionAsync(ct);
+            if (!ensureTask.IsCompletedSuccessfully)
+                return ExecuteCountFastSlowAsync<TResult>(ensureTask, sql, parameters, ct);
+
+            // PERF: For providers without true async I/O (SQLite), use pooled prepared command
+            // for parameterless count queries to eliminate per-call command creation/disposal.
+            if (_ctx.Provider.PrefersSyncExecution && ReferenceEquals(parameters, _emptyParams))
+            {
+                if (!_pooledCountCommands.TryGetValue(sql, out var pooledCmd))
+                {
+                    pooledCmd = _ctx.CreateCommand();
+                    pooledCmd.CommandText = sql;
+                    try { pooledCmd.Prepare(); } catch { }
+                    _pooledCountCommands[sql] = pooledCmd;
+                }
+                var scalar = pooledCmd.ExecuteScalarWithInterception(_ctx);
+                if (scalar == null || scalar is DBNull)
+                    return Task.FromResult(default(TResult)!);
+                return Task.FromResult(ConvertScalarResult<TResult>(scalar));
+            }
+
+            var cmd = _ctx.CreateCommand();
+            cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+            cmd.CommandText = sql;
+            foreach (var p in parameters)
+                cmd.AddOptimizedParam(p.Key, p.Value);
+
+            // PERF: For providers without true async I/O (SQLite), use sync ExecuteScalar directly
+            // to avoid the ValueTask/Task wrapper overhead from ExecuteScalarAsync.
+            if (_ctx.Provider.PrefersSyncExecution)
+            {
+                var scalar = cmd.ExecuteScalarWithInterception(_ctx);
+                cmd.Dispose();
+                if (scalar == null || scalar is DBNull)
+                    return Task.FromResult(default(TResult)!);
+                return Task.FromResult(ConvertScalarResult<TResult>(scalar));
+            }
+
+            var scalarTask = cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct);
+            if (scalarTask.IsCompletedSuccessfully)
+            {
+                var scalar = scalarTask.Result;
+                cmd.Dispose();
+                if (scalar == null || scalar is DBNull)
+                    return Task.FromResult(default(TResult)!);
+                return Task.FromResult(ConvertScalarResult<TResult>(scalar));
+            }
+            return ExecuteCountFinalizeAsync<TResult>(scalarTask, cmd);
+        }
+
+        private async Task<TResult> ExecuteCountFastSlowAsync<TResult>(Task<System.Data.Common.DbConnection> ensureTask, string sql, Dictionary<string, object> parameters, CancellationToken ct)
+        {
+            await ensureTask.ConfigureAwait(false);
+            await using var cmd = _ctx.CreateCommand();
+            cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+            cmd.CommandText = sql;
+            foreach (var p in parameters)
+                cmd.AddOptimizedParam(p.Key, p.Value);
+
+            var scalar = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
+            if (scalar == null || scalar is DBNull)
+                return default!;
+            return ConvertScalarResult<TResult>(scalar);
+        }
+
+        private async Task<TResult> ExecuteCountFinalizeAsync<TResult>(Task<object?> scalarTask, DbCommand cmd)
+        {
+            try
+            {
+                var scalar = await scalarTask.ConfigureAwait(false);
+                if (scalar == null || scalar is DBNull)
+                    return default!;
+                return ConvertScalarResult<TResult>(scalar);
+            }
+            finally
+            {
+                cmd.Dispose();
+            }
+        }
+
+        private async Task<TResult> ExecuteCountSlowAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
@@ -864,7 +1706,7 @@ namespace nORM.Query
 
         private TResult ExecuteCountSync<TResult>(string sql, Dictionary<string, object> parameters)
         {
-            var sw = Stopwatch.StartNew();
+            var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             _ctx.EnsureConnection();
             using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
@@ -873,7 +1715,8 @@ namespace nORM.Query
                 cmd.AddOptimizedParam(p.Key, p.Value);
 
             var scalar = cmd.ExecuteScalarWithInterception(_ctx);
-            _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, scalar == null || scalar is DBNull ? 0 : 1);
+            if (sw != null)
+                _ctx.Options.Logger?.LogQuery(sql, parameters, sw?.Elapsed ?? default, scalar == null || scalar is DBNull ? 0 : 1);
             if (scalar == null || scalar is DBNull)
                 return default!;
 
@@ -882,7 +1725,7 @@ namespace nORM.Query
 
         private async Task<TResult> ExecuteSimpleAsync<TResult>(string sql, Dictionary<string, object> parameters, string? requestedMethodName, CancellationToken ct)
         {
-            var sw = Stopwatch.StartNew();
+            var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             Type resultType = typeof(TResult);
             bool returnsList = false;
             Type elementType;
@@ -905,10 +1748,9 @@ namespace nORM.Query
             }
             var mapping = _ctx.GetMapping(elementType);
 
-            // PERFORMANCE FIX (TASK 14): Create both sync and async materializers
-            var factory = new MaterializerFactory();
-            var materializer = factory.CreateMaterializer(mapping, elementType);
-            var syncMaterializer = factory.CreateSyncMaterializer(mapping, elementType);
+            // PERF: Use singleton MaterializerFactory (it only wraps static caches)
+            var materializer = _sharedMaterializerFactory.CreateMaterializer(mapping, elementType);
+            var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(mapping, elementType);
 
             var plan = new QueryPlan(
                 sql,
@@ -921,9 +1763,9 @@ namespace nORM.Query
                 SingleResult: !returnsList,
                 NoTracking: false,
                 MethodName: returnsList ? "ToList" : nameof(Queryable.FirstOrDefault),
-                Includes: new List<IncludePlan>(),
+                Includes: _emptyIncludes,
                 GroupJoinInfo: null,
-                Tables: new List<string> { mapping.TableName },
+                Tables: _simpleQueryTableCache.GetOrAdd(mapping.TableName, static t => new List<string>(1) { t }),
                 SplitQuery: false,
                 CommandTimeout: _ctx.Options.TimeoutConfiguration.BaseTimeout,
                 IsCacheable: false,
@@ -936,7 +1778,7 @@ namespace nORM.Query
             foreach (var p in parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
             var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
-            _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, list.Count);
+            _ctx.Options.Logger?.LogQuery(sql, parameters, sw?.Elapsed ?? default, list.Count);
             if (returnsList)
             {
                 return (TResult)list;
@@ -949,7 +1791,7 @@ namespace nORM.Query
         }
         private TResult ExecuteSimpleSync<TResult>(string sql, Dictionary<string, object> parameters, string? requestedMethodName = null)
         {
-            var sw = Stopwatch.StartNew();
+            var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             Type resultType = typeof(TResult);
             bool returnsList = false;
             Type elementType;
@@ -972,10 +1814,9 @@ namespace nORM.Query
             }
             var mapping = _ctx.GetMapping(elementType);
 
-            // PERFORMANCE FIX (TASK 14): Create both sync and async materializers
-            var factory = new MaterializerFactory();
-            var materializer = factory.CreateMaterializer(mapping, elementType);
-            var syncMaterializer = factory.CreateSyncMaterializer(mapping, elementType);
+            // PERF: Use singleton MaterializerFactory (it only wraps static caches)
+            var materializer = _sharedMaterializerFactory.CreateMaterializer(mapping, elementType);
+            var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(mapping, elementType);
 
             var plan = new QueryPlan(
                 sql,
@@ -988,9 +1829,9 @@ namespace nORM.Query
                 SingleResult: !returnsList,
                 NoTracking: false,
                 MethodName: returnsList ? "ToList" : nameof(Queryable.FirstOrDefault),
-                Includes: new List<IncludePlan>(),
+                Includes: _emptyIncludes,
                 GroupJoinInfo: null,
-                Tables: new List<string> { mapping.TableName },
+                Tables: _simpleQueryTableCache.GetOrAdd(mapping.TableName, static t => new List<string>(1) { t }),
                 SplitQuery: false,
                 CommandTimeout: _ctx.Options.TimeoutConfiguration.BaseTimeout,
                 IsCacheable: false,
@@ -1003,7 +1844,7 @@ namespace nORM.Query
             foreach (var p in parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
             var list = _executor.Materialize(plan, cmd);
-            _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, list.Count);
+            _ctx.Options.Logger?.LogQuery(sql, parameters, sw?.Elapsed ?? default, list.Count);
             if (returnsList)
             {
                 return (TResult)list;
@@ -1021,7 +1862,7 @@ namespace nORM.Query
         /// </summary>
         private TResult ExecuteInternalSync<TResult>(Expression expression)
         {
-            var sw = Stopwatch.StartNew();
+            var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             IReadOnlyDictionary<string, object>? parameterDictionary = null;
             IReadOnlyDictionary<string, object> GetParameterDictionary()
@@ -1055,7 +1896,7 @@ namespace nORM.Query
                 if (plan.IsScalar)
                 {
                     var scalarResult = cmd.ExecuteScalarWithInterception(_ctx);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw.Elapsed, scalarResult == null || scalarResult is DBNull ? 0 : 1);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw?.Elapsed ?? default, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                     if (scalarResult == null || scalarResult is DBNull)
                     {
                         if (plan.MethodName is "Min" or "Max" or "Average" &&
@@ -1068,7 +1909,7 @@ namespace nORM.Query
                 else
                 {
                     var list = _executor.Materialize(plan, cmd);
-                    _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw.Elapsed, list.Count);
+                    _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw?.Elapsed ?? default, list.Count);
                     if (plan.SingleResult)
                     {
                         result = plan.MethodName switch
@@ -1331,7 +2172,7 @@ namespace nORM.Query
                 }
             }
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
-            _ctx.Options.Logger?.LogQuery(finalSql, EnsureParameterDictionary(plan, paramValues), sw.Elapsed, affected);
+            _ctx.Options.Logger?.LogQuery(finalSql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, affected);
             return affected;
         }
         private async Task<int> ExecuteUpdateInternalAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
@@ -1367,7 +2208,7 @@ namespace nORM.Query
             foreach (var p in setParams)
                 allParams[p.Key] = p.Value;
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
-            _ctx.Options.Logger?.LogQuery(finalSql, allParams, sw.Elapsed, affected);
+            _ctx.Options.Logger?.LogQuery(finalSql, allParams, sw?.Elapsed ?? default, affected);
             return affected;
         }
         public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
@@ -1402,7 +2243,7 @@ namespace nORM.Query
             await using var reader = await cmd
                 .ExecuteReaderWithInterceptionAsync(
                     _ctx,
-                    CommandBehavior.SequentialAccess | CommandBehavior.SingleResult,
+                    CommandBehavior.SingleResult,
                     ct)
                 .ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -1418,7 +2259,7 @@ namespace nORM.Query
                 count++;
                 yield return entity;
             }
-            _ctx.Options.Logger?.LogQuery(plan.Sql, EnsureParameterDictionary(plan, paramValues), sw.Elapsed, count);
+            _ctx.Options.Logger?.LogQuery(plan.Sql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, count);
         }
         /// <summary>
         /// PERFORMANCE FIX: Returns the cached plan and binds parameters separately.
@@ -1429,23 +2270,14 @@ namespace nORM.Query
             filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(UnwrapQueryExpression(filtered));
             var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
-            // PERFORMANCE FIX: Use Type.GetHashCode() directly instead of caching it
-            // Type.GetHashCode() is intrinsic and cached by runtime, dictionary lookup is slower
-            // PC-9: Compute a stable mapping signature hash so that two DbContext instances
-            // with the same provider and CLR type but different ToTable mappings produce
-            // separate cache entries.  XOR is order-independent but sufficient here because
-            // TableName+Type combinations are unique per context.
-            int mappingHash = 0;
-            foreach (var mapping in _ctx.GetAllMappings())
-                mappingHash = HashCode.Combine(mappingHash, mapping.TableName, mapping.Type);
+            // PERF: Use cached mapping hash instead of recomputing on every query
+            int mappingHash = _ctx.GetMappingHash();
 
+            // PERF: Batch all 5 extends into a single hash operation (saves 4 XxHash128 calls)
             var fingerprint = ExpressionFingerprint
                 .Compute(filtered)
-                .Extend(tenantHash)
-                .Extend(elementType.GetHashCode())
-                .Extend(filtered.Type.GetHashCode())
-                .Extend(_ctx.Provider.GetType().GetHashCode())   // Q2/S1/R1: isolate plan cache per provider type
-                .Extend(mappingHash);                            // PC-9: isolate plan cache per mapping configuration
+                .Extend(tenantHash, elementType.GetHashCode(), filtered.Type.GetHashCode(),
+                        _ctx.Provider.GetType().GetHashCode(), mappingHash);
 
             if (_planCache.TryGet(fingerprint, out var cached))
             {
@@ -1488,17 +2320,21 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// Returns ONLY the extracted values, no Dictionary allocation
+        /// Returns ONLY the extracted values, no Dictionary allocation.
+        /// PERF: Reuses a thread-local extractor to avoid allocating a new visitor + List per query.
         /// </summary>
+        [ThreadStatic] private static ParameterValueExtractor? t_extractor;
         private IReadOnlyList<object?>? ExtractParameterValues(Expression expression, QueryPlan plan)
         {
             if (plan.CompiledParameters.Count == 0)
                 return null;
 
-            var extractor = new ParameterValueExtractor();
+            var extractor = t_extractor ??= new ParameterValueExtractor();
+            extractor.Reset();
             extractor.Visit(expression);
-            
-            return extractor.Values;
+
+            // Copy values to a new list since the extractor will be reused
+            return extractor.GetValuesCopy();
         }
 
         private IReadOnlyDictionary<string, object> EnsureParameterDictionary(QueryPlan plan, IReadOnlyList<object?>? parameterValues)
@@ -1539,6 +2375,12 @@ namespace nORM.Query
         }
         private Expression ApplyGlobalFilters(Expression expression)
         {
+            // PERF: Skip the entire recursive walk when no global filters or tenant provider exist.
+            // The recursion allocates new expression nodes (ToArray + Update) on every node even
+            // when there are no filters to apply.
+            if (_ctx.Options.GlobalFilters.Count == 0 && _ctx.Options.TenantProvider == null)
+                return expression;
+
             if (expression is MethodCallExpression mc &&
                 !typeof(IQueryable).IsAssignableFrom(expression.Type) &&
                 mc.Arguments.Count > 0)
@@ -1667,12 +2509,15 @@ namespace nORM.Query
         private sealed class ParameterValueExtractor : ExpressionVisitor
         {
             private readonly List<object?> _values = new();
-            public IReadOnlyList<object?> Values => _values;
 
-            // Inline constants (ConstantExpression) are baked into the plan's static Parameters
-            // dictionary at translation time and are NOT in CompiledParameters.  We must not add
-            // their values here or the position mapping against CompiledParameters would be wrong.
-            // IQueryable roots are skipped because they are not SQL parameters.
+            public void Reset() => _values.Clear();
+
+            /// <summary>
+            /// Returns a copy of extracted values (caller owns the array).
+            /// Uses array for less overhead than List when count is small.
+            /// </summary>
+            public object?[] GetValuesCopy() => _values.ToArray();
+
             protected override Expression VisitConstant(ConstantExpression node)
             {
                 // Skip all constants - they are either IQueryable roots or values already baked
@@ -1692,11 +2537,6 @@ namespace nORM.Query
                 }
                 return base.VisitMember(node);
             }
-
-            // Lambda ParameterExpression nodes (e.g. 'x' in x => x.Value > 5) are column
-            // references, not SQL parameters.  Free ParameterExpressions used in compiled queries
-            // go through ExecuteCompiledAsync which bypasses this extractor entirely.
-            // Do NOT override VisitParameter - the base class default is correct (no-op).
         }
     }
 }

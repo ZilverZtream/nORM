@@ -55,10 +55,16 @@ namespace nORM.Core
         {
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
+                // PERF: Try direct count path first — avoids Expression.Call + Type[] allocation
+                // + re-parsing the Count expression in TryGetCountQuery
+                if (normProvider.TryDirectCountAsync(source.Expression, ct, out var directResult))
+                    return directResult;
+
+                // Fallback to expression-based path for complex predicates / global filters
                 var countExpression = Expression.Call(
-                    typeof(Queryable), 
-                    nameof(Queryable.Count), 
-                    new[] { typeof(T) }, 
+                    typeof(Queryable),
+                    nameof(Queryable.Count),
+                    new[] { typeof(T) },
                     source.Expression);
                 return normProvider.ExecuteAsync<int>(countExpression, ct);
             }

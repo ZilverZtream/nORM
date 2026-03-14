@@ -149,6 +149,88 @@ namespace nORM.Query
                 return;
             }
 
+            if (type == typeof(DateOnly))
+            {
+                p.DbType = System.Data.DbType.Date;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(TimeOnly))
+            {
+                p.DbType = System.Data.DbType.Time;
+                p.Value = ((TimeOnly)v).ToTimeSpan();
+                return;
+            }
+
+            if (type == typeof(DateTimeOffset))
+            {
+                p.DbType = System.Data.DbType.DateTimeOffset;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(TimeSpan))
+            {
+                p.DbType = System.Data.DbType.Time;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(char))
+            {
+                p.DbType = System.Data.DbType.StringFixedLength;
+                p.Value = v.ToString();
+                return;
+            }
+
+            if (type == typeof(uint))
+            {
+                p.DbType = System.Data.DbType.UInt32;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(ulong))
+            {
+                p.DbType = System.Data.DbType.UInt64;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(sbyte))
+            {
+                p.DbType = System.Data.DbType.SByte;
+                p.Value = v;
+                return;
+            }
+
+            if (type == typeof(ushort))
+            {
+                p.DbType = System.Data.DbType.UInt16;
+                p.Value = v;
+                return;
+            }
+
+            // Enum: convert to underlying integral type for cross-provider consistency.
+            // Without this, raw enum values hit the driver with no DbType hint which causes
+            // provider-dependent coercion failures (P2).
+            if (type.IsEnum)
+            {
+                var underlyingType = Enum.GetUnderlyingType(type);
+                var converted = Convert.ChangeType(v, underlyingType);
+                if (underlyingType == typeof(int))        p.DbType = System.Data.DbType.Int32;
+                else if (underlyingType == typeof(long))  p.DbType = System.Data.DbType.Int64;
+                else if (underlyingType == typeof(short)) p.DbType = System.Data.DbType.Int16;
+                else if (underlyingType == typeof(byte))  p.DbType = System.Data.DbType.Byte;
+                else if (underlyingType == typeof(uint))  p.DbType = System.Data.DbType.UInt32;
+                else if (underlyingType == typeof(ulong)) p.DbType = System.Data.DbType.UInt64;
+                else if (underlyingType == typeof(sbyte)) p.DbType = System.Data.DbType.SByte;
+                else if (underlyingType == typeof(ushort)) p.DbType = System.Data.DbType.UInt16;
+                p.Value = converted;
+                return;
+            }
+
             // Default fallback
             p.Value = v;
         }

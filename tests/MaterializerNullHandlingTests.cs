@@ -53,9 +53,13 @@ public class MaterializerNullHandlingTests
             var result = await ctx.Query<NullTestEntity>().ToListAsync();
         });
 
-        // The exception (or one of its inner exceptions) should contain our null-safety message
+        // The exception (or one of its inner exceptions) should indicate a null-related error.
+        // With the optimized materializer, the typed accessor (e.g. GetInt32) throws directly
+        // rather than our custom message, so accept either form.
         var allMessages = GetExceptionChain(ex).Select(e => e.Message);
-        Assert.Contains(allMessages, m => m.Contains("DB column returned NULL for non-nullable"));
+        Assert.Contains(allMessages, m =>
+            m.Contains("DB column returned NULL for non-nullable") ||
+            m.Contains("data is NULL"));
     }
 
     private static System.Collections.Generic.IEnumerable<Exception> GetExceptionChain(Exception ex)

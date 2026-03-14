@@ -201,9 +201,10 @@ public class InsertKeyCardinalityTests
     // ─── Provider-matrix: identity retrieval string tests ─────────────────
 
     [Fact]
-    public void IdentityRetrieval_Sqlite_ContainsLastInsertRowid()
+    public void IdentityRetrieval_Sqlite_ContainsIdentityRetrieval()
     {
         var provider = new SqliteProvider();
+        // With null mapping (no key columns), falls back to last_insert_rowid
         var retrieval = provider.GetIdentityRetrievalString(null!);
         Assert.Contains("last_insert_rowid()", retrieval, StringComparison.OrdinalIgnoreCase);
     }

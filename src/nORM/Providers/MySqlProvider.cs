@@ -68,15 +68,21 @@ namespace nORM.Providers
             // ignore the offset. MySQL requires a limit value when an offset is specified,
             // so when only an offset is provided we use the maximum unsigned BIGINT value
             // to effectively indicate "no limit".
-            if (limitParameterName != null || offsetParameterName != null)
+            bool hasLimit = limitParameterName != null || limit.HasValue;
+            bool hasOffset = offsetParameterName != null || offset.HasValue;
+            if (hasLimit || hasOffset)
             {
                 sb.Append(" LIMIT ");
-                if (offsetParameterName != null)
+                if (hasOffset)
                 {
-                    sb.Append(offsetParameterName).Append(", ");
+                    if (offsetParameterName != null) sb.Append(offsetParameterName);
+                    else sb.Append(offset!.Value);
+                    sb.Append(", ");
                 }
 
-                sb.Append(limitParameterName ?? "18446744073709551615");
+                if (limitParameterName != null) sb.Append(limitParameterName);
+                else if (limit.HasValue) sb.Append(limit.Value);
+                else sb.Append("18446744073709551615");
             }
         }
         

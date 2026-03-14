@@ -47,6 +47,14 @@ namespace nORM.Providers
         /// </summary>
         public override int MaxParameters => 32_767;
 
+        /// <summary>PostgreSQL supports <c>IS NOT DISTINCT FROM</c> for index-friendly null-safe equality.</summary>
+        public override string NullSafeEqual(string left, string right)
+            => $"{left} IS NOT DISTINCT FROM {right}";
+
+        /// <summary>PostgreSQL supports <c>IS DISTINCT FROM</c> for index-friendly null-safe inequality.</summary>
+        public override string NullSafeNotEqual(string left, string right)
+            => $"{left} IS DISTINCT FROM {right}";
+
         /// <inheritdoc />
         /// SG-1/PR-1/SEC-1: Double embedded double-quote characters to prevent SQL injection via identifiers.
         /// Handles schema-qualified identifiers (schema.table) by escaping each part separately.
@@ -69,9 +77,13 @@ namespace nORM.Providers
 
             if (limitParameterName != null)
                 sb.Append(" LIMIT ").Append(limitParameterName);
+            else if (limit.HasValue)
+                sb.Append(" LIMIT ").Append(limit.Value);
 
             if (offsetParameterName != null)
                 sb.Append(" OFFSET ").Append(offsetParameterName);
+            else if (offset.HasValue)
+                sb.Append(" OFFSET ").Append(offset.Value);
         }
         
         /// <summary>

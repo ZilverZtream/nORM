@@ -39,6 +39,12 @@ namespace nORM.Query
         // Activator.CreateInstance is slow - using compiled Expression delegates instead
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Func<int, IList>> _listFactoryCache = new();
 
+        /// <summary>
+        /// PERF: Singleton MaterializerFactory — wraps only static caches, no instance state.
+        /// Eliminates heap allocation per dependent/group-join query.
+        /// </summary>
+        private static readonly MaterializerFactory _sharedMaterializerFactory = new();
+
         public QueryExecutor(DbContext ctx, IncludeProcessor includeProcessor, ILogger<QueryExecutor>? logger = null)
         {
             _ctx = ctx;
@@ -54,6 +60,9 @@ namespace nORM.Query
         /// <param name="elementType">The element type for the list.</param>
         /// <param name="capacity">The initial capacity.</param>
         /// <returns>A new list instance.</returns>
+        /// <summary>Public-facing wrapper for use by NormQueryProvider's pooled command path.</summary>
+        internal IList CreateListForType(Type elementType, int capacity) => CreateList(elementType, capacity);
+
         private static IList CreateList(Type elementType, int capacity)
         {
             var factory = _listFactoryCache.GetOrAdd(elementType, t =>
@@ -79,10 +88,66 @@ namespace nORM.Query
         /// <param name="cmd">Prepared database command.</param>
         /// <param name="ct">Token used to cancel the operation.</param>
         /// <returns>A list containing the materialized entities.</returns>
+        /// <summary>
+        /// PERF: Overload that materializes directly into List&lt;object&gt; to avoid covariant copy
+        /// when the caller needs List&lt;object&gt; but the plan's ElementType is a concrete type.
+        /// </summary>
+        public async Task<List<object>> MaterializeAsObjectListAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
+        {
+            await using var command = cmd;
+            try
+            {
+                var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
+                var list = new List<object>(capacity);
+
+                var trackable = !plan.NoTracking &&
+                                 plan.ElementType.IsClass &&
+                                 !plan.ElementType.Name.StartsWith("<>") &&
+                                 plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
+                                 _ctx.IsMapped(plan.ElementType);
+
+                TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
+                bool isReadOnly = IsReadOnlyQuery();
+
+                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
+                    .ConfigureAwait(false);
+
+                var syncMaterializer = plan.SyncMaterializer;
+
+                while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var entity = syncMaterializer(reader);
+                    if (plan.ClientProjection != null)
+                        entity = plan.ClientProjection(entity);
+                    entity = ProcessEntity(entity, trackable, entityMap, isReadOnly);
+                    list.Add(entity);
+                }
+
+                if (plan.SplitQuery)
+                {
+                    // Convert to IList for EagerLoadAsync compatibility
+                    IList iList = list;
+                    foreach (var include in plan.Includes)
+                        await _includeProcessor.EagerLoadAsync(include, iList, ct, plan.NoTracking).ConfigureAwait(false);
+                }
+
+                return list;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "MaterializeAsObjectListAsync failed for SQL: {Sql}", cmd.CommandText);
+                throw;
+            }
+        }
+
         public async Task<IList> MaterializeAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
             await using var command = cmd;
-            return await _exceptionHandler.ExecuteWithExceptionHandling(async () =>
+            // PERF: Inline exception handling instead of wrapping in ExecuteWithExceptionHandling.
+            // The wrapper allocates: Func<Task<T>> delegate, Stopwatch.StartNew(), Dictionary,
+            // and calls LogInformation on EVERY successful query — all pure overhead on the hot path.
+            try
             {
                 if (plan.GroupJoinInfo != null)
                     return await MaterializeGroupJoinAsync(plan, command, ct).ConfigureAwait(false);
@@ -165,17 +230,18 @@ namespace nORM.Query
                 }
 
                 return list;
-            }, "MaterializeAsync", new Dictionary<string, object> { ["Sql"] = command.CommandText }).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "MaterializeAsync failed for SQL: {Sql}", command.CommandText);
+                throw;
+            }
         }
 
         public IList Materialize(QueryPlan plan, DbCommand cmd)
         {
-            // SYNC-OVER-ASYNC FIX: This method uses a truly synchronous code path throughout.
-            // Option A was chosen: use synchronous ADO.NET equivalents (ExecuteReader, Read())
-            // instead of their async counterparts, avoiding GetAwaiter().GetResult() entirely.
-            // This eliminates thread-pool starvation and deadlock risks in synchronisation contexts.
             using var command = cmd;
-            return _exceptionHandler.ExecuteWithExceptionHandlingSync(() =>
+            try
             {
                 if (plan.GroupJoinInfo != null)
                     return MaterializeGroupJoin(plan, command);
@@ -246,7 +312,12 @@ namespace nORM.Query
                 }
 
                 return list;
-            }, "Materialize", new Dictionary<string, object> { ["Sql"] = command.CommandText });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Materialize failed for SQL: {Sql}", command.CommandText);
+                throw;
+            }
         }
 
         /// <summary>
@@ -413,7 +484,7 @@ namespace nORM.Query
                 // PERFORMANCE FIX (TASK 9): Use MaterializerFactory instead of slow reflection
                 // MaterializerFactory creates compiled IL.Emit/Expression-based materializers
                 // that are 10-100x faster than reflection (read.Invoke, col.Setter)
-                var factory = new MaterializerFactory();
+                var factory = _sharedMaterializerFactory;
                 var materializer = factory.CreateSyncMaterializer(map, map.Type, startOffset: offset);
                 return materializer(reader);
             }
@@ -536,7 +607,7 @@ namespace nORM.Query
                 }
 
                 // Use the synchronous materializer factory directly — no async wrapper.
-                var factory = new MaterializerFactory();
+                var factory = _sharedMaterializerFactory;
                 var materializer = factory.CreateSyncMaterializer(map, map.Type, startOffset: offset);
                 return materializer(reader);
             }
@@ -689,7 +760,7 @@ namespace nORM.Query
             using var reader = cmd.ExecuteReaderWithInterception(
                 _ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
 
-            var syncMaterializer = new MaterializerFactory().CreateSyncMaterializer(
+            var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(
                 depQuery.TargetMapping,
                 depQuery.CollectionElementType);
 
@@ -749,7 +820,7 @@ namespace nORM.Query
                 _ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
 
             // Materialize children
-            var materializer = new MaterializerFactory().CreateMaterializer(
+            var materializer = _sharedMaterializerFactory.CreateMaterializer(
                 depQuery.TargetMapping,
                 depQuery.CollectionElementType);
 

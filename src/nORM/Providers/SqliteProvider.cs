@@ -24,6 +24,26 @@ namespace nORM.Providers
     public class SqliteProvider : DatabaseProvider
     {
         /// <summary>
+        /// SQLite has no true async I/O — all async methods are synchronous wrappers.
+        /// Using sync calls eliminates ~50-100ns of async state machine overhead per Read().
+        /// </summary>
+        public override bool PrefersSyncExecution => true;
+
+        /// <summary>
+        /// SQLite's <c>IS</c> operator provides null-safe equality with index support.
+        /// <c>col IS @p</c> is equivalent to <c>col = @p OR (col IS NULL AND @p IS NULL)</c>
+        /// but allows the query planner to use column indexes efficiently.
+        /// </summary>
+        public override string NullSafeEqual(string left, string right)
+            => $"{left} IS {right}";
+
+        /// <summary>
+        /// SQLite's <c>IS NOT</c> operator for null-safe inequality with index support.
+        /// </summary>
+        public override string NullSafeNotEqual(string left, string right)
+            => $"{left} IS NOT {right}";
+
+        /// <summary>
         /// Maximum length of a single SQL statement supported by SQLite.
         /// </summary>
         public override int MaxSqlLength => 1_000_000;
@@ -115,14 +135,20 @@ namespace nORM.Providers
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
             EnsureValidParameterName(offsetParameterName, nameof(offsetParameterName));
 
+            // PERF: Inline literal LIMIT/OFFSET values directly in SQL when no parameter name is provided.
+            // Parameterized LIMIT prevents SQLite's planner from using cardinality estimates.
             if (limitParameterName != null)
                 sb.Append(" LIMIT ").Append(limitParameterName);
-            else if (offsetParameterName != null)
+            else if (limit.HasValue)
+                sb.Append(" LIMIT ").Append(limit.Value);
+            else if (offsetParameterName != null || offset.HasValue)
                 // SQLite requires LIMIT when OFFSET is used; -1 means unlimited
                 sb.Append(" LIMIT -1");
 
             if (offsetParameterName != null)
                 sb.Append(" OFFSET ").Append(offsetParameterName);
+            else if (offset.HasValue)
+                sb.Append(" OFFSET ").Append(offset.Value);
         }
         
         /// <summary>
@@ -130,7 +156,14 @@ namespace nORM.Providers
         /// </summary>
         /// <param name="m">The mapping for which the identity is retrieved.</param>
         /// <returns>SQL fragment to append to the insert command.</returns>
-        public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT last_insert_rowid();";
+        public override string GetIdentityRetrievalString(TableMapping m)
+        {
+            // PERF: Use RETURNING clause (SQLite 3.35+) for single-statement identity retrieval.
+            // This is faster than "; SELECT last_insert_rowid();" because SQLite
+            // executes one statement instead of two (no separate query plan/parse step).
+            var keyCol = m?.KeyColumns?.FirstOrDefault(c => c.IsDbGenerated);
+            return keyCol != null ? $" RETURNING {keyCol.EscCol}" : "; SELECT last_insert_rowid();";
+        }
         
         /// <summary>
         /// Creates a SQLite parameter with the given name and value.
@@ -423,9 +456,9 @@ END;";
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
-            var sw = Stopwatch.StartNew();
             var entityList = entities as ICollection<T> ?? entities.ToList();
-            if (!entityList.Any()) return 0;
+            if (entityList.Count == 0) return 0;
+            var sw = ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
 
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
 
@@ -452,7 +485,9 @@ END;";
                     // 2. Create ONE command and ONE set of parameters that will be reused.
                     await using var cmd = ctx.Connection.CreateCommand();
                     cmd.Transaction = transaction;
-                    cmd.CommandText = BuildInsert(m); // Uses the cached single-row INSERT statement.
+                    // PERF: Use INSERT without RETURNING — bulk path uses ExecuteNonQuery
+                    // and doesn't hydrate generated keys, so RETURNING output is wasted work.
+                    cmd.CommandText = BuildInsert(m, hydrateGeneratedKeys: false);
 
                     // Create parameter objects ONCE and add them to the command.
                     var parameters = new DbParameter[cols.Length];
@@ -508,7 +543,7 @@ END;";
                 if (ownedTx) await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
-            ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
+            ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw?.Elapsed ?? default);
             return totalInserted;
         }
         

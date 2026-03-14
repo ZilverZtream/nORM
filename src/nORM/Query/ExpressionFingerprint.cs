@@ -54,6 +54,26 @@ namespace nORM.Query
             return new ExpressionFingerprint(low, high);
         }
 
+        /// <summary>
+        /// PERF: Batch-extend with 5 int values in a single hash operation.
+        /// Eliminates 4 intermediate XxHash128.Hash calls compared to 5 sequential Extend() calls.
+        /// </summary>
+        public ExpressionFingerprint Extend(int v1, int v2, int v3, int v4, int v5)
+        {
+            Span<byte> buffer = stackalloc byte[36]; // 16 (fingerprint) + 5×4 (ints)
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer[..8], _low);
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer[8..16], _high);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer[16..], v1);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer[20..], v2);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer[24..], v3);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer[28..], v4);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer[32..], v5);
+            var hash = XxHash128.Hash(buffer);
+            var low = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(0, 8));
+            var high = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(8, 8));
+            return new ExpressionFingerprint(low, high);
+        }
+
         public bool Equals(ExpressionFingerprint other) => _low == other._low && _high == other._high;
         public override bool Equals(object? obj) => obj is ExpressionFingerprint fp && Equals(fp);
         public override int GetHashCode() => HashCode.Combine(_low, _high);
@@ -81,15 +101,18 @@ namespace nORM.Query
                     return null;
 
                 AppendInt((int)node.NodeType);
-                AppendString(node.Type.FullName ?? string.Empty);
+                // PERF: Use TypeHandle (pointer-based identity) instead of FullName (UTF-8 encoding).
+                // TypeHandle.Value is unique per type within a process and costs 8 bytes vs 40-200 bytes
+                // for FullName encoding. For a join query with 25 nodes, this saves ~2.5KB of UTF-8 work.
+                AppendLong(node.Type.TypeHandle.Value.ToInt64());
 
                 return base.Visit(node);
             }
 
             protected override Expression VisitConstant(ConstantExpression node)
             {
-                // Include the type in the fingerprint (used for parameter extraction).
-                AppendString(node.Type.FullName ?? string.Empty);
+                // PERF: Use TypeHandle instead of FullName for type identity
+                AppendLong(node.Type.TypeHandle.Value.ToInt64());
 
                 // QP-1 NULL SEMANTICS: Include whether the constant is null as a bit in the fingerprint.
                 // Without this, `x.NullableStr != null` and `x.NullableStr != "Alice"` produce the same
@@ -110,8 +133,11 @@ namespace nORM.Query
 
             protected override Expression VisitMember(MemberExpression node)
             {
-                AppendGuid(node.Member.Module.ModuleVersionId);
+                // PERF: Use MetadataToken + declaring type handle instead of MVID (16 bytes).
+                // MetadataToken is unique within a module, and the type handle distinguishes modules.
                 AppendInt(node.Member.MetadataToken);
+                if (node.Member.DeclaringType != null)
+                    AppendLong(node.Member.DeclaringType.TypeHandle.Value.ToInt64());
 
                 // QP-1: For closure captures (member access on a ConstantExpression), include
                 // whether the captured value is null as a bit in the fingerprint.
@@ -139,8 +165,10 @@ namespace nORM.Query
 
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
-                AppendGuid(node.Method.Module.ModuleVersionId);
+                // PERF: Use MetadataToken + declaring type handle instead of MVID
                 AppendInt(node.Method.MetadataToken);
+                if (node.Method.DeclaringType != null)
+                    AppendLong(node.Method.DeclaringType.TypeHandle.Value.ToInt64());
                 AppendInt(node.Arguments.Count);
                 return base.VisitMethodCall(node);
             }
@@ -153,7 +181,8 @@ namespace nORM.Query
                     _parameters[node] = id;
                 }
                 AppendInt(id);
-                AppendString(node.Type.FullName ?? string.Empty);
+                // PERF: Use TypeHandle instead of FullName
+                AppendLong(node.Type.TypeHandle.Value.ToInt64());
                 return base.VisitParameter(node);
             }
 

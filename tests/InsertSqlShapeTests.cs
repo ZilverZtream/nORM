@@ -93,7 +93,11 @@ public class InsertSqlShapeTests
         var mapping = GetMapping<IdentityItem>(ctx);
         var sql = ctx.Provider.BuildInsert(mapping);
 
-        Assert.Contains("last_insert_rowid", sql, StringComparison.OrdinalIgnoreCase);
+        // SQLite uses RETURNING clause for identity retrieval (or last_insert_rowid fallback)
+        Assert.True(
+            sql.Contains("RETURNING", StringComparison.OrdinalIgnoreCase) ||
+            sql.Contains("last_insert_rowid", StringComparison.OrdinalIgnoreCase),
+            $"Expected identity retrieval SQL, got: {sql}");
     }
 
     /// <summary>

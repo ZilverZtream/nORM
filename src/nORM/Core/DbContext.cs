@@ -42,6 +42,14 @@ namespace nORM.Core
         private readonly ConcurrentDictionary<Type, TableMapping> _m = new();
         /// <summary>Per-context fast-path SQL template cache. Keyed by entity type; stores provider+model-specific SELECT templates.</summary>
         internal readonly ConcurrentDictionary<Type, string> FastPathSqlCache = new();
+        /// <summary>
+        /// PERF: Cached NormQueryProvider for this context. Avoids creating IncludeProcessor,
+        /// QueryExecutor, and BulkCudBuilder (3 heap allocations) on every Query&lt;T&gt;() call.
+        /// </summary>
+        private Query.NormQueryProvider? _cachedQueryProvider;
+        /// <summary>PERF: Cached mapping hash for plan cache fingerprinting. Computed lazily once per context.</summary>
+        private int _mappingHashCached;
+        private volatile bool _mappingHashComputed;
         private readonly IExecutionStrategy _executionStrategy;
         private readonly AdaptiveTimeoutManager _timeoutManager;
         private readonly ModelBuilder _modelBuilder;
@@ -60,6 +68,8 @@ namespace nORM.Core
         private readonly object _providerInitSyncLock = new object(); // For synchronous initialization to avoid deadlock
         private readonly Lazy<Task>? _temporalInit;
         private DbTransaction? _currentTransaction; // Access via Interlocked.* only
+        // PERF: ConcurrentDictionary eliminates lock contention on the insert fast path.
+        private readonly ConcurrentDictionary<(Type EntityType, bool HydrateGeneratedKeys), PreparedInsertCommand> _preparedInsertCache = new();
         private bool _disposed;
 
         /// <summary>
@@ -180,13 +190,19 @@ namespace nORM.Core
                 }
             }
         }
-        /// <summary>
-        /// Ensures that the underlying <see cref="DbConnection"/> is open and that the
-        /// provider has performed any required initialization.
-        /// </summary>
-        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
-        /// <returns>The open <see cref="DbConnection"/> instance.</returns>
-        internal async Task<DbConnection> EnsureConnectionAsync(CancellationToken ct = default)
+        // PERF: Cached completed task to avoid allocation on the hot path
+        private Task<DbConnection>? _ensureConnectionCompletedTask;
+
+        internal Task<DbConnection> EnsureConnectionAsync(CancellationToken ct = default)
+        {
+            // PERF: Fast path — connection already open, provider initialized, no temporal init.
+            // Returns a cached Task to avoid async state machine allocation entirely.
+            if (_cn.State == ConnectionState.Open && _providerInitialized && _temporalInit == null)
+                return _ensureConnectionCompletedTask ??= Task.FromResult(_cn);
+            return EnsureConnectionSlowAsync(ct);
+        }
+
+        private async Task<DbConnection> EnsureConnectionSlowAsync(CancellationToken ct)
         {
             if (_cn.State != ConnectionState.Open)
                 await _cn.OpenAsync(ct).ConfigureAwait(false);
@@ -210,6 +226,8 @@ namespace nORM.Core
             {
                 await _temporalInit.Value.ConfigureAwait(false);
             }
+            // Cache for future fast-path returns
+            _ensureConnectionCompletedTask = Task.FromResult(_cn);
             return _cn;
         }
         internal DbConnection EnsureConnection()
@@ -369,6 +387,14 @@ namespace nORM.Core
         /// unit-of-work. Prefer this over <c>Connection.CreateCommand()</c> inside nORM
         /// code so that transaction binding is never accidentally omitted.
         /// </summary>
+        /// <summary>
+        /// PERF: Returns a cached NormQueryProvider for this context, avoiding 4 heap allocations per query.
+        /// </summary>
+        internal Query.NormQueryProvider GetQueryProvider()
+        {
+            return _cachedQueryProvider ??= new Query.NormQueryProvider(this);
+        }
+
         internal DbCommand CreateCommand()
         {
             var cmd = Connection.CreateCommand();
@@ -430,6 +456,21 @@ namespace nORM.Core
         {
             foreach (var type in _modelBuilder.GetConfiguredEntityTypes())
                 yield return GetMapping(type);
+        }
+
+        /// <summary>
+        /// PERF: Returns a stable hash of all entity type → table name mappings.
+        /// Computed once and cached for the lifetime of the context.
+        /// </summary>
+        internal int GetMappingHash()
+        {
+            if (_mappingHashComputed) return _mappingHashCached;
+            int h = 0;
+            foreach (var mapping in GetAllMappings())
+                h = HashCode.Combine(h, mapping.TableName, mapping.Type);
+            _mappingHashCached = h;
+            _mappingHashComputed = true;
+            return h;
         }
 
         /// <summary>
@@ -1250,7 +1291,55 @@ namespace nORM.Core
         /// <param name="ct">Cancellation token for the operation.</param>
         /// <returns>The number of affected rows.</returns>
         public Task<int> InsertAsync<T>(T entity, CancellationToken ct = default) where T : class
-            => InsertAsync(entity, null, ct);
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            // PERF: Fast-path for the common case: no transaction, no retry policy, no tenant, cached prepared command.
+            // This avoids 4 async state machine allocations by inlining the entire chain.
+            var map = GetMapping(typeof(T));
+            var tx = Database.CurrentTransaction;
+            if (tx == null && Options.TenantProvider == null && Options.RetryPolicy == null
+                && System.Transactions.Transaction.Current == null)
+            {
+                var key = (map.Type, true);
+                if (_preparedInsertCache.TryGetValue(key, out var prepared)
+                    && ReferenceEquals(prepared.BoundTransaction, null))
+                {
+                    // PERF: Skip EnableLazyLoading on insert fast path.
+                    // Entities being inserted don't need lazy loading proxies — they're being
+                    // written to DB, not read from it. Saves ~2-5µs ConditionalWeakTable + reflection.
+                    return prepared.ExecuteAsync(entity, ct);
+                }
+            }
+            return InsertAsyncSlow(entity, map, tx, ct);
+        }
+
+        private async Task<int> InsertAsyncSlow<T>(T entity, TableMapping map, DbTransaction? tx, CancellationToken ct) where T : class
+        {
+            ValidateTenantContext(entity, map, WriteOperation.Insert);
+            var ambientTransaction = tx == null ? System.Transactions.Transaction.Current : null;
+            if (tx != null)
+            {
+                var prepared = await GetOrCreatePreparedInsertCommandAsync(map, tx, true, ct).ConfigureAwait(false);
+                NavigationPropertyExtensions.EnableLazyLoading(entity, this);
+                return await prepared.ExecuteAsync(entity, ct).ConfigureAwait(false);
+            }
+            if (ambientTransaction != null)
+            {
+                await using var ambientScope = await TransactionManager.CreateAsync(this, ct).ConfigureAwait(false);
+                var prepared = await GetOrCreatePreparedInsertCommandAsync(map, null, true, ct).ConfigureAwait(false);
+                NavigationPropertyExtensions.EnableLazyLoading(entity, this);
+                return await prepared.ExecuteAsync(entity, ambientScope.Token).ConfigureAwait(false);
+            }
+            if (Options.RetryPolicy == null)
+            {
+                var prepared = await GetOrCreatePreparedInsertCommandAsync(map, null, true, ct).ConfigureAwait(false);
+                NavigationPropertyExtensions.EnableLazyLoading(entity, this);
+                return await prepared.ExecuteAsync(entity, ct).ConfigureAwait(false);
+            }
+            NavigationPropertyExtensions.EnableLazyLoading(entity, this);
+            return await _executionStrategy.ExecuteAsync((ctx, token) =>
+                WriteWithTransactionAsync(entity, map, WriteOperation.Insert, null, token, ownsTransaction: true), ct).ConfigureAwait(false);
+        }
 
         /// <summary>
         /// Inserts the specified entity within the provided transaction scope.
@@ -1317,15 +1406,34 @@ namespace nORM.Core
             var map = GetMapping(typeof(T));
             ValidateTenantContext(entity, map, operation);
             var tx = transaction ?? Database.CurrentTransaction;
+            var ambientTransaction = tx == null ? System.Transactions.Transaction.Current : null;
 
-            if (operation == WriteOperation.Insert && Options.RetryPolicy == null && tx == null)
+            if (operation == WriteOperation.Insert)
             {
-                return await ExecuteFastInsert(entity, map, ct, null).ConfigureAwait(false);
+                if (tx != null)
+                    return await ExecuteFastInsert(entity, map, ct, tx).ConfigureAwait(false);
+
+                if (ambientTransaction != null)
+                {
+                    await using var ambientScope = await TransactionManager.CreateAsync(this, ct).ConfigureAwait(false);
+                    return await ExecuteFastInsert(entity, map, ambientScope.Token, null).ConfigureAwait(false);
+                }
+
+                if (Options.RetryPolicy == null)
+                    return await ExecuteFastInsert(entity, map, ct, null).ConfigureAwait(false);
             }
+
             if (tx != null)
             {
                 return await WriteWithTransactionAsync(entity, map, operation, tx, ct, ownsTransaction: false).ConfigureAwait(false);
             }
+
+            if (ambientTransaction != null)
+            {
+                await using var ambientScope = await TransactionManager.CreateAsync(this, ct).ConfigureAwait(false);
+                return await ExecuteWriteCommandAsync(entity, map, operation, null, ambientScope.Token).ConfigureAwait(false);
+            }
+
             return await _executionStrategy.ExecuteAsync((ctx, token) =>
                 WriteWithTransactionAsync(entity, map, operation, null, token, ownsTransaction: true), ct).ConfigureAwait(false);
         }
@@ -1350,68 +1458,30 @@ namespace nORM.Core
 
             try
             {
-                await using var commandScope = new CommandScope(Connection, currentTransaction);
-                try
+                var recordsAffected = await ExecuteWriteCommandAsync(entity, map, operation, currentTransaction, ct).ConfigureAwait(false);
+                if (ownsTransaction)
+                    await currentTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+                return recordsAffected;
+            }
+            catch (Exception originalEx)
+            {
+                // S5-1: Preserve the original exception if rollback itself fails.
+                if (ownsTransaction)
                 {
-                    await using var cmd = commandScope.CreateCommand();
-                    cmd.CommandText = operation switch
+                    try
                     {
-                        WriteOperation.Insert => _p.BuildInsert(map),
-                        WriteOperation.Update => _p.BuildUpdate(map),
-                        WriteOperation.Delete => _p.BuildDelete(map),
-                        _ => throw new ArgumentOutOfRangeException(nameof(operation))
-                    };
-                    var opType = operation switch
-                    {
-                        WriteOperation.Insert => AdaptiveTimeoutManager.OperationType.Insert,
-                        WriteOperation.Update => AdaptiveTimeoutManager.OperationType.Update,
-                        WriteOperation.Delete => AdaptiveTimeoutManager.OperationType.Delete,
-                        _ => AdaptiveTimeoutManager.OperationType.Insert
-                    };
-                    cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(opType, cmd.CommandText));
-                    // CT-1: Pass the tracked snapshot token so the concurrency predicate uses the read-time value.
-                    var originalToken = ChangeTracker.GetEntryOrDefault(entity)?.OriginalToken;
-                    AddParametersOptimized(cmd, map, entity, operation, originalToken);
-
-                    if (operation == WriteOperation.Insert && map.KeyColumns.Any(k => k.IsDbGenerated))
-                    {
-                        var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
-                        if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
-                        // TX-1: Use CancellationToken.None for commit — caller cancellation after the DB
-                        // has already committed can otherwise surface spurious exceptions and retry hazards.
-                        if (ownsTransaction) await currentTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
-                        return 1;
+                        // Use CancellationToken.None so a cancelled caller token does not abort the rollback.
+                        await currentTransaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
                     }
-                    var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-                    if ((operation is WriteOperation.Update or WriteOperation.Delete) &&
-                        map.TimestampColumn != null && recordsAffected == 0)
+                    catch (Exception rollbackEx)
                     {
-                        throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+                        throw new AggregateException(
+                            "Write operation failed and rollback also failed. See inner exceptions for details.",
+                            originalEx, rollbackEx);
                     }
-                    // TX-1: Use CancellationToken.None for commit.
-                    if (ownsTransaction) await currentTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
-                    return recordsAffected;
                 }
-                catch (Exception originalEx)
-                {
-                    // S5-1: Preserve the original exception if rollback itself fails.
-                    if (ownsTransaction)
-                    {
-                        try
-                        {
-                            // Use CancellationToken.None so a cancelled caller token does not abort the rollback.
-                            await currentTransaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-                        }
-                        catch (Exception rollbackEx)
-                        {
-                            throw new AggregateException(
-                                "Write operation failed and rollback also failed. See inner exceptions for details.",
-                                originalEx, rollbackEx);
-                        }
-                    }
-                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                    throw; // unreachable — satisfies compiler
-                }
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
+                throw; // unreachable — satisfies compiler
             }
             finally
             {
@@ -1422,59 +1492,50 @@ namespace nORM.Core
         }
         private async Task<int> ExecuteFastInsert<T>(T entity, TableMapping map, CancellationToken ct, DbTransaction? transaction) where T : class
         {
-            if (transaction != null)
-            {
-                return await WriteWithTransactionAsync(entity, map, WriteOperation.Insert, transaction, ct, ownsTransaction: false).ConfigureAwait(false);
-            }
+            var preparedInsert = await GetOrCreatePreparedInsertCommandAsync(
+                map, transaction, hydrateGeneratedKeys: true, ct).ConfigureAwait(false);
+            return await preparedInsert.ExecuteAsync(entity, ct).ConfigureAwait(false);
+        }
+
+        private async Task<int> ExecuteWriteCommandAsync<T>(
+            T entity,
+            TableMapping map,
+            WriteOperation operation,
+            DbTransaction? transaction,
+            CancellationToken ct) where T : class
+        {
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
-            await using var ownTransaction = await _cn.BeginTransactionAsync(ct).ConfigureAwait(false);
-            await using var commandScope = new CommandScope(_cn, ownTransaction);
-            try
+            await using var commandScope = new CommandScope(Connection, transaction);
+            await using var cmd = commandScope.CreateCommand();
+            cmd.CommandText = operation switch
             {
-                await using var cmd = commandScope.CreateCommand();
-                cmd.CommandText = _p.BuildInsert(map);
-                cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText));
-                foreach (var col in map.Columns)
-                {
-                    if (!col.IsDbGenerated)
-                    {
-                        var value = col.Getter(entity) ?? DBNull.Value;
-                        cmd.AddParam(_p.ParamPrefix + col.PropName, value);
-                    }
-                }
+                WriteOperation.Insert => _p.BuildInsert(map),
+                WriteOperation.Update => _p.BuildUpdate(map),
+                WriteOperation.Delete => _p.BuildDelete(map),
+                _ => throw new ArgumentOutOfRangeException(nameof(operation))
+            };
+            // PERF: Simple INSERT/UPDATE/DELETE have no JOINs/subqueries — use base timeout
+            // to avoid SQL string scanning in GetAdaptiveTimeout.
+            cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+            var originalToken = ChangeTracker.GetEntryOrDefault(entity)?.OriginalToken;
+            AddParametersOptimized(cmd, map, entity, operation, originalToken);
 
-                // No unconditional Prepare() here either.
-
-                if (map.KeyColumns.Any(k => k.IsDbGenerated))
-                {
-                    var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
-                    if (newId != null && newId != DBNull.Value) map.SetPrimaryKey(entity, newId);
-                    // TX-1: Use CancellationToken.None for commit.
-                    await ownTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
-                    return 1;
-                }
-                var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-                // TX-1: Use CancellationToken.None for commit.
-                await ownTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
-                return recordsAffected;
-            }
-            catch (Exception originalEx)
+            if (operation == WriteOperation.Insert && map.KeyColumns.Any(k => k.IsDbGenerated))
             {
-                // S5-1: Preserve the original exception if rollback itself fails.
-                try
-                {
-                    // Use CancellationToken.None so a cancelled caller token does not abort the rollback.
-                    await ownTransaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-                }
-                catch (Exception rollbackEx)
-                {
-                    throw new AggregateException(
-                        "Fast insert failed and rollback also failed. See inner exceptions for details.",
-                        originalEx, rollbackEx);
-                }
-                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable — satisfies compiler
+                var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                if (newId != null && newId != DBNull.Value)
+                    map.SetPrimaryKey(entity, newId);
+                return 1;
             }
+
+            var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+            if ((operation is WriteOperation.Update or WriteOperation.Delete) &&
+                map.TimestampColumn != null && recordsAffected == 0)
+            {
+                throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+            }
+
+            return recordsAffected;
         }
 
         private void AddParametersOptimized<T>(DbCommand cmd, TableMapping map, T entity, WriteOperation operation, object? originalToken = null) where T : class
@@ -1925,7 +1986,7 @@ namespace nORM.Core
                         // Coerce provider-specific types (e.g. SQLite returns long for INTEGER columns).
                         var propType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
                         if (raw.GetType() != propType)
-                            raw = propType.IsEnum ? Enum.ToObject(propType, raw) : Convert.ChangeType(raw, propType);
+                            raw = CoerceRawValue(raw, propType);
                         col.Setter(instance, raw);
                     }
                     list.Add(instance);
@@ -1935,6 +1996,61 @@ namespace nORM.Core
                 cmd.Parameters.Clear();
                 return list;
             }, ct);
+
+        /// <summary>
+        /// Coerces a provider-returned raw value to the target CLR property type.
+        /// Handles types that Convert.ChangeType does not support:
+        /// Guid (from string/bytes), DateOnly, TimeOnly, DateTimeOffset, TimeSpan,
+        /// char, and enum types. Falls back to Convert.ChangeType for all others.
+        /// </summary>
+        private static object CoerceRawValue(object raw, Type propType)
+        {
+            if (propType.IsEnum) return Enum.ToObject(propType, raw);
+
+            if (propType == typeof(Guid))
+            {
+                if (raw is string s)   return Guid.Parse(s);
+                if (raw is byte[] b && b.Length == 16) return new Guid(b);
+            }
+
+            if (propType == typeof(DateOnly))
+            {
+                if (raw is DateTime dt)       return DateOnly.FromDateTime(dt);
+                if (raw is DateTimeOffset dto) return DateOnly.FromDateTime(dto.DateTime);
+                if (raw is string s)          return DateOnly.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            if (propType == typeof(TimeOnly))
+            {
+                if (raw is TimeSpan ts) return TimeOnly.FromTimeSpan(ts);
+                if (raw is DateTime dt) return TimeOnly.FromDateTime(dt);
+                if (raw is long l)      return TimeOnly.FromTimeSpan(TimeSpan.FromTicks(l));
+                if (raw is string s)
+                {
+                    if (TimeSpan.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, out var ts2))
+                        return TimeOnly.FromTimeSpan(ts2);
+                    return TimeOnly.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+                }
+            }
+
+            if (propType == typeof(DateTimeOffset))
+            {
+                if (raw is DateTime dt) return new DateTimeOffset(dt);
+                if (raw is string s)    return DateTimeOffset.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+                if (raw is long l)      return DateTimeOffset.FromUnixTimeMilliseconds(l);
+            }
+
+            if (propType == typeof(TimeSpan))
+            {
+                if (raw is long l)   return TimeSpan.FromTicks(l);
+                if (raw is string s) return TimeSpan.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            if (propType == typeof(char) && raw is string str && str.Length > 0)
+                return str[0];
+
+            return Convert.ChangeType(raw, propType, System.Globalization.CultureInfo.InvariantCulture);
+        }
 
         /// <summary>
         /// Executes a raw SQL query and materializes the results into instances of
@@ -2244,6 +2360,9 @@ namespace nORM.Core
         /// </summary>
         /// <typeparam name="T">The entity type to prepare the insert for.</typeparam>
         /// <param name="ct">Cancellation token for the operation.</param>
+        /// <param name="hydrateGeneratedKeys">
+        /// When <c>false</c>, uses a plain <c>INSERT</c> shape and skips generated-key backfill.
+        /// </param>
         /// <returns>A <see cref="PreparedOperation{T}"/> that can be executed multiple times.</returns>
         /// <remarks>
         /// Example usage:
@@ -2255,26 +2374,105 @@ namespace nORM.Core
         /// }
         /// </code>
         /// </remarks>
-        public async Task<PreparedOperation<T>> PrepareInsertAsync<T>(CancellationToken ct = default) where T : class
+        public async Task<PreparedOperation<T>> PrepareInsertAsync<T>(
+            CancellationToken ct = default,
+            bool hydrateGeneratedKeys = true) where T : class
         {
-            await EnsureConnectionAsync(ct).ConfigureAwait(false);
             var mapping = GetMapping(typeof(T));
-            var cmd = CreateCommand();
-            cmd.CommandText = _p.BuildInsert(mapping);
-            cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText));
-
-            // Pre-create parameters for all insert columns
-            foreach (var col in mapping.InsertColumns)
+            if (Database.CurrentTransaction == null && System.Transactions.Transaction.Current != null)
             {
-                var p = cmd.CreateParameter();
-                p.ParameterName = _p.ParamPrefix + col.PropName;
-                cmd.Parameters.Add(p);
+                await using var ambientScope = await TransactionManager.CreateAsync(this, ct).ConfigureAwait(false);
             }
 
-            // Prepare the command at the database level
-            await cmd.PrepareAsync(ct).ConfigureAwait(false);
+            var transaction = Database.CurrentTransaction;
+            var preparedInsert = await CreatePreparedInsertCommandAsync(
+                mapping, transaction, hydrateGeneratedKeys, ct).ConfigureAwait(false);
+            return new PreparedOperation<T>(preparedInsert);
+        }
 
-            return new PreparedOperation<T>(cmd, mapping, this);
+        private async Task<PreparedInsertCommand> GetOrCreatePreparedInsertCommandAsync(
+            TableMapping mapping,
+            DbTransaction? transaction,
+            bool hydrateGeneratedKeys,
+            CancellationToken ct)
+        {
+            var key = (mapping.Type, hydrateGeneratedKeys);
+
+            if (_preparedInsertCache.TryGetValue(key, out var cached))
+            {
+                if (ReferenceEquals(cached.BoundTransaction, transaction))
+                    return cached;
+
+                _preparedInsertCache.TryRemove(key, out _);
+                await cached.DisposeAsync().ConfigureAwait(false);
+            }
+
+            var created = await CreatePreparedInsertCommandAsync(
+                mapping, transaction, hydrateGeneratedKeys, ct).ConfigureAwait(false);
+
+            _preparedInsertCache[key] = created;
+
+            return created;
+        }
+
+        private async Task<PreparedInsertCommand> CreatePreparedInsertCommandAsync(
+            TableMapping mapping,
+            DbTransaction? transaction,
+            bool hydrateGeneratedKeys,
+            CancellationToken ct)
+        {
+            await EnsureConnectionAsync(ct).ConfigureAwait(false);
+            var cmd = Connection.CreateCommand();
+            try
+            {
+                if (transaction != null)
+                    cmd.Transaction = transaction;
+
+                cmd.CommandText = _p.BuildInsert(mapping, hydrateGeneratedKeys);
+                cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+
+                foreach (var col in mapping.InsertColumns)
+                {
+                    var parameter = cmd.CreateParameter();
+                    parameter.ParameterName = _p.ParamPrefix + col.PropName;
+                    cmd.Parameters.Add(parameter);
+                }
+
+                try
+                {
+                    await cmd.PrepareAsync(ct).ConfigureAwait(false);
+                }
+                catch (NotSupportedException)
+                {
+                    // Some providers expose command reuse but not explicit preparation.
+                }
+
+                return new PreparedInsertCommand(cmd, mapping, this, hydrateGeneratedKeys, transaction);
+            }
+            catch
+            {
+                await cmd.DisposeAsync().ConfigureAwait(false);
+                throw;
+            }
+        }
+
+        private List<PreparedInsertCommand> DrainPreparedInsertCache()
+        {
+            var commands = _preparedInsertCache.Values.ToList();
+            _preparedInsertCache.Clear();
+            return commands;
+        }
+
+        private void DisposePreparedInsertCache()
+        {
+            foreach (var command in DrainPreparedInsertCache())
+                command.Dispose();
+        }
+
+        private async Task DisposePreparedInsertCacheAsync()
+        {
+            foreach (var command in DrainPreparedInsertCache())
+                await command.DisposeAsync().ConfigureAwait(false);
         }
         #endregion
 
@@ -2298,6 +2496,7 @@ namespace nORM.Core
                     waitHandle.Dispose();
                 }
                 _providerInitLock?.Dispose();
+                DisposePreparedInsertCache();
 
                 // DEADLOCK FIX (TASK 5): Copy disposables to local list inside lock, then dispose outside lock
                 // This prevents deadlock if a disposable's Dispose() method tries to access DbContext or acquire locks
@@ -2423,6 +2622,7 @@ namespace nORM.Core
                     waitHandle.Dispose();
                 }
                 _providerInitLock?.Dispose();
+                await DisposePreparedInsertCacheAsync().ConfigureAwait(false);
                 await CleanupDisposablesAsync().ConfigureAwait(false);
                 // TX-1/MG-1: Only dispose the connection when this context owns it.
                 if (_ownsConnection && _cn != null)
@@ -2458,27 +2658,56 @@ namespace nORM.Core
     /// <typeparam name="T">The entity type this operation works with.</typeparam>
     public sealed class PreparedOperation<T> : IAsyncDisposable where T : class
     {
-        private readonly DbCommand _command;
-        private readonly TableMapping _mapping;
-        private readonly DbContext _context;
-        // OPTIMIZATION: Cache parameter objects and their corresponding column accessors
-        // to avoid dictionary lookups (O(N) or O(1)) inside the tight execution loop.
-        private readonly (DbParameter Parameter, Mapping.Column Column)[] _bindings;
-        private bool _disposed;
+        private readonly PreparedInsertCommand _command;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PreparedOperation{T}"/> class.
         /// </summary>
         /// <param name="command">The prepared database command.</param>
-        /// <param name="mapping">The table mapping for the entity type.</param>
-        /// <param name="context">The database context that created this operation.</param>
-        internal PreparedOperation(DbCommand command, TableMapping mapping, DbContext context)
+        internal PreparedOperation(PreparedInsertCommand command)
+        {
+            _command = command ?? throw new ArgumentNullException(nameof(command));
+        }
+
+        /// <summary>
+        /// Executes the prepared operation for the specified entity. Parameter values
+        /// are updated from the entity properties and the command is executed.
+        /// </summary>
+        /// <param name="entity">The entity to insert.</param>
+        /// <param name="ct">Cancellation token for the operation.</param>
+        /// <returns>The number of rows affected.</returns>
+        public Task<int> ExecuteAsync(T entity, CancellationToken ct = default)
+            => _command.ExecuteAsync(entity, ct);
+
+        /// <summary>
+        /// Releases all resources used by this prepared operation.
+        /// </summary>
+        public ValueTask DisposeAsync()
+            => _command.DisposeAsync();
+    }
+
+    internal sealed class PreparedInsertCommand : IDisposable, IAsyncDisposable
+    {
+        private readonly DbCommand _command;
+        private readonly TableMapping _mapping;
+        private readonly DbContext _context;
+        private readonly (DbParameter Parameter, Mapping.Column Column)[] _bindings;
+        private readonly bool _hydrateGeneratedKeys;
+        private bool _disposed;
+
+        internal PreparedInsertCommand(
+            DbCommand command,
+            TableMapping mapping,
+            DbContext context,
+            bool hydrateGeneratedKeys,
+            DbTransaction? boundTransaction)
         {
             _command = command ?? throw new ArgumentNullException(nameof(command));
             _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
             _context = context ?? throw new ArgumentNullException(nameof(context));
+            BoundTransaction = boundTransaction;
+            _hydrateGeneratedKeys = hydrateGeneratedKeys && _mapping.KeyColumns.Any(k => k.IsDbGenerated);
 
-            // Pre-calculate bindings
             var insertCols = _mapping.InsertColumns;
             _bindings = new (DbParameter, Mapping.Column)[insertCols.Length];
             var prefix = _context.Provider.ParamPrefix;
@@ -2491,57 +2720,58 @@ namespace nORM.Core
             }
         }
 
-        /// <summary>
-        /// Executes the prepared operation for the specified entity. Parameter values
-        /// are updated from the entity properties and the command is executed.
-        /// </summary>
-        /// <param name="entity">The entity to insert.</param>
-        /// <param name="ct">Cancellation token for the operation.</param>
-        /// <returns>The number of rows affected.</returns>
-        public async Task<int> ExecuteAsync(T entity, CancellationToken ct = default)
+        internal DbTransaction? BoundTransaction { get; }
+
+        internal Task<int> ExecuteAsync(object entity, CancellationToken ct = default)
         {
             if (_disposed)
-                throw new ObjectDisposedException(nameof(PreparedOperation<T>));
+                throw new ObjectDisposedException(nameof(PreparedInsertCommand));
             if (entity == null)
                 throw new ArgumentNullException(nameof(entity));
 
-            // Update parameter values using cached bindings (Array iteration is faster than Dictionary lookup)
-            var bindings = _bindings; // Local copy for elimination of bounds checks (potentially)
+            var bindings = _bindings;
             for (int i = 0; i < bindings.Length; i++)
             {
                 var (param, col) = bindings[i];
-                var value = col.Getter(entity);
-                param.Value = value ?? DBNull.Value;
+                param.Value = col.Getter(entity) ?? DBNull.Value;
             }
 
-            // Execute the command
-            if (_mapping.KeyColumns.Any(k => k.IsDbGenerated))
+            if (_hydrateGeneratedKeys)
             {
-                // For tables with db-generated keys, use ExecuteScalar to get the new ID
-                var newId = await _command.ExecuteScalarWithInterceptionAsync(_context, ct).ConfigureAwait(false);
-                if (newId != null && newId != DBNull.Value)
-                {
-                    _mapping.SetPrimaryKey(entity, newId);
-                }
-                return 1;
+                // PERF: Separate async method only for hydrate path to avoid state machine
+                // allocation on the non-hydrate fast path.
+                return ExecuteWithHydrateAsync(entity, ct);
             }
-            else
-            {
-                // For tables without db-generated keys, use ExecuteNonQuery
-                return await _command.ExecuteNonQueryWithInterceptionAsync(_context, ct).ConfigureAwait(false);
-            }
+
+            // PERF: Return task directly — no async state machine needed since all
+            // work above is synchronous (parameter binding via compiled delegates).
+            return _command.ExecuteNonQueryWithInterceptionAsync(_context, ct);
         }
 
-        /// <summary>
-        /// Releases all resources used by this prepared operation.
-        /// </summary>
+        private async Task<int> ExecuteWithHydrateAsync(object entity, CancellationToken ct)
+        {
+            var newId = await _command.ExecuteScalarWithInterceptionAsync(_context, ct).ConfigureAwait(false);
+            if (newId != null && newId != DBNull.Value)
+                _mapping.SetPrimaryKey(entity, newId);
+            return 1;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _command.Dispose();
+            _disposed = true;
+        }
+
         public async ValueTask DisposeAsync()
         {
-            if (!_disposed)
-            {
-                await _command.DisposeAsync().ConfigureAwait(false);
-                _disposed = true;
-            }
+            if (_disposed)
+                return;
+
+            await _command.DisposeAsync().ConfigureAwait(false);
+            _disposed = true;
         }
     }
 }

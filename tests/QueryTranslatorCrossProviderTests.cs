@@ -111,13 +111,11 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var (sql, parameters, _) = TranslateQuery<Product, Product>(q => q.Take(5), connection, provider);
         var sb = new OptimizedSqlBuilder();
         sb.Append(BaseSelect(provider));
-        var paramName = provider.ParamPrefix + "p0";
-        provider.ApplyPaging(sb, 5, null, paramName, null);
+        // PERF: Literal Take values are now inlined directly in SQL (no parameter)
+        provider.ApplyPaging(sb, 5, null, null, null);
         var expected = sb.ToSqlString();
         Assert.Equal(expected, sql);
-        var param = Assert.Single(parameters);
-        Assert.Equal(paramName, param.Key);
-        Assert.Equal(5, param.Value);
+        Assert.Empty(parameters);
     }
 
     [Theory]
@@ -130,13 +128,11 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var (sql, parameters, _) = TranslateQuery<Product, Product>(q => q.Skip(10), connection, provider);
         var sb = new OptimizedSqlBuilder();
         sb.Append(BaseSelect(provider));
-        var paramName = provider.ParamPrefix + "p0";
-        provider.ApplyPaging(sb, null, 10, null, paramName);
+        // PERF: Literal Skip values are now inlined directly in SQL (no parameter)
+        provider.ApplyPaging(sb, null, 10, null, null);
         var expected = sb.ToSqlString();
         Assert.Equal(expected, sql);
-        var param = Assert.Single(parameters);
-        Assert.Equal(paramName, param.Key);
-        Assert.Equal(10, param.Value);
+        Assert.Empty(parameters);
     }
 
     [Theory]
@@ -150,14 +146,11 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var t0 = provider.Escape("T0");
         var sb = new OptimizedSqlBuilder();
         sb.Append(BaseSelect(provider, true)).Append(" ORDER BY ").Append(t0).Append('.').Append(provider.Escape("Id")).Append(" ASC");
-        var offsetParam = provider.ParamPrefix + "p0";
-        var limitParam = provider.ParamPrefix + "p1";
-        provider.ApplyPaging(sb, 10, 20, limitParam, offsetParam);
+        // PERF: Literal Skip/Take values are now inlined directly in SQL (no parameters)
+        provider.ApplyPaging(sb, 10, 20, null, null);
         var expected = sb.ToSqlString();
         Assert.Equal(expected, sql);
-        Assert.Equal(2, parameters.Count);
-        Assert.Equal(20, parameters[offsetParam]);
-        Assert.Equal(10, parameters[limitParam]);
+        Assert.Empty(parameters);
     }
 
     [Theory]
