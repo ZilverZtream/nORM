@@ -21,13 +21,19 @@ namespace nORM.Internal
         /// <param name="ctx">The current <see cref="DbContext"/>.</param>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>The number of rows affected.</returns>
-        public static async Task<int> ExecuteNonQueryWithInterceptionAsync(this DbCommand command, DbContext ctx, CancellationToken ct)
+        public static Task<int> ExecuteNonQueryWithInterceptionAsync(this DbCommand command, DbContext ctx, CancellationToken ct)
         {
             var interceptors = ctx.Options.CommandInterceptors;
             if (interceptors.Count == 0)
             {
-                return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                // PERF: Return the task directly — avoids async state machine allocation
+                return command.ExecuteNonQueryAsync(ct);
             }
+            return ExecuteNonQueryWithInterceptionSlowAsync(command, ctx, interceptors, ct);
+        }
+
+        private static async Task<int> ExecuteNonQueryWithInterceptionSlowAsync(DbCommand command, DbContext ctx, System.Collections.Generic.IList<IDbCommandInterceptor> interceptors, CancellationToken ct)
+        {
 
             foreach (var interceptor in interceptors)
             {
@@ -118,13 +124,19 @@ namespace nORM.Internal
         /// <param name="ctx">The current <see cref="DbContext"/>.</param>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>The scalar result returned by the command.</returns>
-        public static async Task<object?> ExecuteScalarWithInterceptionAsync(this DbCommand command, DbContext ctx, CancellationToken ct)
+        public static Task<object?> ExecuteScalarWithInterceptionAsync(this DbCommand command, DbContext ctx, CancellationToken ct)
         {
             var interceptors = ctx.Options.CommandInterceptors;
             if (interceptors.Count == 0)
             {
-                return await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+                // PERF: Return the task directly — avoids async state machine allocation
+                return command.ExecuteScalarAsync(ct);
             }
+            return ExecuteScalarWithInterceptionSlowAsync(command, ctx, interceptors, ct);
+        }
+
+        private static async Task<object?> ExecuteScalarWithInterceptionSlowAsync(DbCommand command, DbContext ctx, System.Collections.Generic.IList<IDbCommandInterceptor> interceptors, CancellationToken ct)
+        {
 
             foreach (var interceptor in interceptors)
             {
@@ -216,13 +228,19 @@ namespace nORM.Internal
         /// <param name="behavior">Reader behavior flags.</param>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>The resulting <see cref="DbDataReader"/>.</returns>
-        public static async Task<DbDataReader> ExecuteReaderWithInterceptionAsync(this DbCommand command, DbContext ctx, CommandBehavior behavior, CancellationToken ct)
+        public static Task<DbDataReader> ExecuteReaderWithInterceptionAsync(this DbCommand command, DbContext ctx, CommandBehavior behavior, CancellationToken ct)
         {
             var interceptors = ctx.Options.CommandInterceptors;
             if (interceptors.Count == 0)
             {
-                return await command.ExecuteReaderAsync(behavior, ct).ConfigureAwait(false);
+                // PERF: Return the task directly — avoids async state machine allocation
+                return command.ExecuteReaderAsync(behavior, ct);
             }
+            return ExecuteReaderWithInterceptionSlowAsync(command, ctx, interceptors, behavior, ct);
+        }
+
+        private static async Task<DbDataReader> ExecuteReaderWithInterceptionSlowAsync(DbCommand command, DbContext ctx, System.Collections.Generic.IList<IDbCommandInterceptor> interceptors, CommandBehavior behavior, CancellationToken ct)
+        {
 
             foreach (var interceptor in interceptors)
             {

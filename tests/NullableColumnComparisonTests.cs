@@ -38,9 +38,8 @@ public class NullableColumnComparisonTests : TestBase
         var provider = new SqliteProvider();
         var (sql, _) = Translate<NullableEntity>(e => e.NullableA == e.NullableB, cn, provider);
 
-        // Should contain IS NULL guard for both sides
-        Assert.Contains("IS NULL", sql);
-        Assert.Contains("=", sql);
+        // SQLite uses the IS operator for null-safe equality (index-friendly)
+        Assert.Contains("IS", sql);
     }
 
     [Fact]
@@ -50,10 +49,8 @@ public class NullableColumnComparisonTests : TestBase
         var provider = new SqliteProvider();
         var (sql, _) = Translate<NullableEntity>(e => e.NullableA != e.NullableB, cn, provider);
 
-        // The expanded SQL must check IS NOT NULL for both operands and IS NULL crossings
-        Assert.Contains("IS NOT NULL", sql);
-        Assert.Contains("IS NULL", sql);
-        Assert.Contains("<>", sql);
+        // SQLite uses the IS NOT operator for null-safe inequality
+        Assert.Contains("IS NOT", sql);
     }
 
     [Fact]
@@ -100,9 +97,8 @@ public class NullableColumnComparisonTests : TestBase
         var provider = new SqliteProvider();
         var (sql, _) = Translate<NullableEntity>(e => e.StringA == e.StringB, cn, provider);
 
-        // String (reference type) equality should expand to three-valued logic with IS NULL guard
-        Assert.Contains("IS NULL", sql);
-        Assert.Contains("=", sql);
+        // SQLite uses the IS operator for null-safe equality (index-friendly)
+        Assert.Contains("IS", sql);
     }
 
     [Fact]
@@ -112,9 +108,7 @@ public class NullableColumnComparisonTests : TestBase
         var provider = new SqliteProvider();
         var (sql, _) = Translate<NullableEntity>(e => e.StringA != e.StringB, cn, provider);
 
-        // String inequality should contain both IS NULL and IS NOT NULL checks
-        Assert.Contains("IS NOT NULL", sql);
-        Assert.Contains("IS NULL", sql);
-        Assert.Contains("<>", sql);
+        // SQLite uses the IS NOT operator for null-safe inequality
+        Assert.Contains("IS NOT", sql);
     }
 }

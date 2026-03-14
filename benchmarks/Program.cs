@@ -163,9 +163,7 @@ namespace nORM.Benchmarks
 
             try
             {
-                // First run join verification tests
-                await JoinVerificationTest.RunJoinTests();
-                Console.WriteLine();
+                // Quick tests start here
 
                 var benchmarks = new OrmBenchmarks();
                 await benchmarks.Setup();

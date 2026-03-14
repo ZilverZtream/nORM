@@ -1102,33 +1102,55 @@ namespace nORM.Query
                 Expression.Assign(entityVar, Expression.New(targetType))
             };
 
+            // PERF: Use NullabilityInfoContext to detect non-nullable reference types (NRT).
+            // This lets us skip IsDBNull for non-nullable strings etc., saving ~47ns per call.
+            NullabilityInfoContext? nullabilityCtx = null;
+            try { nullabilityCtx = new NullabilityInfoContext(); } catch { /* edge-case fallback */ }
+
             for (int i = 0; i < columns.Length; i++)
             {
                 var column = columns[i];
                 var propType = column.Prop.PropertyType;
-                var isNullCheck = Expression.Call(readerParam, Methods.IsDbNull, Expression.Constant(i + startOffset));
                 var getValue = GetOptimizedReaderCall(readerParam, propType, i + startOffset);
                 var setProperty = Expression.Call(entityVar, column.Prop.GetSetMethod()!, getValue);
 
-                Expression conditionalSet;
-                // MAP-4: For non-nullable value types, throw when DB returns NULL rather than silently defaulting.
-                bool isNonNullableValueType = propType.IsValueType && Nullable.GetUnderlyingType(propType) == null;
-                if (isNonNullableValueType)
+                bool skipIsDbNull;
+                if (propType.IsValueType)
                 {
-                    // Throw when null is encountered for a non-nullable value-type property
-                    var throwExpr = Expression.Throw(
-                        Expression.New(
-                            typeof(InvalidOperationException).GetConstructor(new[] { typeof(string) })!,
-                            Expression.Constant(
-                                $"DB column returned NULL for non-nullable property '{column.Prop.Name}' " +
-                                $"of type '{propType.Name}'. Mark the property as nullable or fix the data source.")));
-                    conditionalSet = Expression.IfThenElse(Expression.Not(isNullCheck), setProperty, throwExpr);
+                    // Non-nullable value type: skip IsDBNull
+                    skipIsDbNull = Nullable.GetUnderlyingType(propType) == null;
+                }
+                else if (nullabilityCtx != null)
+                {
+                    // Reference type: skip IsDBNull if NRT metadata says non-nullable
+                    try
+                    {
+                        var nullabilityInfo = nullabilityCtx.Create(column.Prop);
+                        skipIsDbNull = nullabilityInfo.WriteState == NullabilityState.NotNull;
+                    }
+                    catch
+                    {
+                        skipIsDbNull = false; // fallback: keep IsDBNull check
+                    }
                 }
                 else
                 {
-                    conditionalSet = Expression.IfThen(Expression.Not(isNullCheck), setProperty);
+                    skipIsDbNull = false;
                 }
-                expressions.Add(conditionalSet);
+
+                if (skipIsDbNull)
+                {
+                    // PERF: Skip IsDBNull check for non-nullable types.
+                    // The DB schema should have NOT NULL constraint matching the C# type.
+                    // If the DB unexpectedly returns NULL, the typed accessor will throw —
+                    // which is correct for a schema violation.
+                    expressions.Add(setProperty);
+                }
+                else
+                {
+                    var isNullCheck = Expression.Call(readerParam, Methods.IsDbNull, Expression.Constant(i + startOffset));
+                    expressions.Add(Expression.IfThen(Expression.Not(isNullCheck), setProperty));
+                }
             }
 
             expressions.Add(Expression.Convert(entityVar, typeof(object)));
@@ -1144,7 +1166,8 @@ namespace nORM.Query
             {
                 materializer(reader);
             }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("DB column returned NULL for non-nullable"))
+            catch (Exception ex) when (
+                ex is InvalidOperationException || ex is InvalidCastException)
             {
                 // MAP-4: Expected during validation — the validation reader purposely sends DBNull to
                 // every column to test the structural correctness of the materializer.  A NULL-for-non-nullable

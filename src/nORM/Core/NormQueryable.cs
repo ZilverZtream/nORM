@@ -16,6 +16,12 @@ namespace nORM.Core
     public static class NormQueryable
     {
         /// <summary>
+        /// PERF: Cached factory delegates per entity type to avoid GetConstructor + Activator.CreateInstance
+        /// reflection on every Query&lt;T&gt;() call. Saves ~2 allocations and reflection per call.
+        /// </summary>
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Func<DbContext, object>> _queryFactoryCache = new();
+
+        /// <summary>
         /// Creates a queryable source for the specified entity type backed by the provided context.
         /// </summary>
         /// <typeparam name="T">The entity type to query.</typeparam>
@@ -24,12 +30,24 @@ namespace nORM.Core
         public static IQueryable<T> Query<T>(this DbContext ctx) where T : class
         {
             // M-1: Register T as a query-root entity so IsMapped returns true for it.
-            // DTO projection types (.Select(x => new Dto{...})) are never registered here
-            // and therefore will not be tracked by the ChangeTracker.
             ctx.RegisterEntityType(typeof(T));
-            return typeof(T).GetConstructor(Type.EmptyTypes) != null
-                ? (IQueryable<T>)Activator.CreateInstance(typeof(NormQueryableImpl<>).MakeGenericType(typeof(T)), ctx)!
-                : new NormQueryableImplUnconstrained<T>(ctx);
+            var factory = _queryFactoryCache.GetOrAdd(typeof(T), static t =>
+            {
+                if (t.GetConstructor(Type.EmptyTypes) != null)
+                {
+                    var implType = typeof(NormQueryableImpl<>).MakeGenericType(t);
+                    var ctor = implType.GetConstructor(new[] { typeof(DbContext) })!;
+                    var ctxParam = System.Linq.Expressions.Expression.Parameter(typeof(DbContext), "ctx");
+                    var newExpr = System.Linq.Expressions.Expression.New(ctor, ctxParam);
+                    var lambda = System.Linq.Expressions.Expression.Lambda<Func<DbContext, object>>(newExpr, ctxParam);
+                    return lambda.Compile();
+                }
+                else
+                {
+                    return static ctx => new NormQueryableImplUnconstrained<T>(ctx);
+                }
+            });
+            return (IQueryable<T>)factory(ctx);
         }
     }
 

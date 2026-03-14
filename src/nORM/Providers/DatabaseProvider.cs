@@ -50,6 +50,30 @@ namespace nORM.Providers
         public virtual string BooleanTrueLiteral => "1";
 
         /// <summary>
+        /// Indicates whether this provider should prefer synchronous Read/ExecuteReader calls
+        /// within async methods. True for providers like SQLite that don't support true async I/O,
+        /// where async wrappers add pure overhead (~50-100ns per call).
+        /// </summary>
+        public virtual bool PrefersSyncExecution => false;
+
+        /// <summary>
+        /// Generates a null-safe equality expression: TRUE when both sides are equal OR both are NULL.
+        /// Providers can override for more efficient syntax (e.g., SQLite's <c>IS</c> operator).
+        /// The default uses the portable OR-based expansion.
+        /// </summary>
+        public virtual string NullSafeEqual(string left, string right)
+            => $"({left} = {right} OR ({left} IS NULL AND {right} IS NULL))";
+
+        /// <summary>
+        /// Generates a null-safe inequality expression: TRUE when sides differ, including NULL vs non-NULL.
+        /// Default: portable three-way expansion for full NULL correctness.
+        /// </summary>
+        public virtual string NullSafeNotEqual(string left, string right)
+            => $"(({left} IS NOT NULL AND {right} IS NOT NULL AND {left} <> {right})" +
+               $" OR ({left} IS NULL AND {right} IS NOT NULL)" +
+               $" OR ({left} IS NOT NULL AND {right} IS NULL))";
+
+        /// <summary>
         /// Maximum length of a single SQL statement supported by the provider.
         /// </summary>
         public virtual int MaxSqlLength => int.MaxValue;
@@ -708,14 +732,17 @@ namespace nORM.Providers
         /// mapping, caching the generated SQL for future use.
         /// </summary>
         /// <param name="m">The table mapping describing the entity.</param>
+        /// <param name="hydrateGeneratedKeys">
+        /// When <c>true</c>, append provider-specific identity retrieval so callers can hydrate generated keys.
+        /// </param>
         /// <returns>An <c>INSERT</c> statement ready for parameter substitution.</returns>
-        public string BuildInsert(TableMapping m)
+        public string BuildInsert(TableMapping m, bool hydrateGeneratedKeys = true)
         {
-            return _sqlCache.GetOrAdd((m.Type, "INSERT"), _ => {
+            var includeIdentityRetrieval = hydrateGeneratedKeys && m.KeyColumns.Any(k => k.IsDbGenerated);
+            var cacheKey = includeIdentityRetrieval ? "INSERT" : "INSERT_PLAIN";
+            return _sqlCache.GetOrAdd((m.Type, cacheKey), _ => {
                 var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
-                // SQL-1/PERF-1: Only append identity retrieval when the key is DB-generated.
-                // For natural-key entities the fragment is wasteful and potentially wrong.
-                var identityFragment = m.KeyColumns.Any(k => k.IsDbGenerated)
+                var identityFragment = includeIdentityRetrieval
                     ? GetIdentityRetrievalString(m)
                     : string.Empty;
                 if (cols.Length == 0)

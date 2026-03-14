@@ -83,6 +83,16 @@ namespace nORM.Query
             return this;
         }
 
+        public OptimizedSqlBuilder Append(int value)
+        {
+            Span<char> buf = stackalloc char[11]; // max int digits + sign
+            if (value.TryFormat(buf, out int written))
+                Append(buf.Slice(0, written));
+            else
+                Append(value.ToString());
+            return this;
+        }
+
         /// <summary>
         /// Appends a pre-constructed SQL fragment to the builder.
         /// </summary>

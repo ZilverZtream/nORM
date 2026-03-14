@@ -26,14 +26,38 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<Type, TryExecuteDelegate> _cachedExecutors = new();
 
         /// <summary>
+        /// PERF: Singleton MaterializerFactory — it only wraps static caches, no instance state.
+        /// Eliminates one heap allocation per fast-path query.
+        /// </summary>
+        private static readonly MaterializerFactory _materializer = new();
+
+        /// <summary>
+        /// PERF: Cached sync materializer delegates per entity type.
+        /// Eliminates MaterializerFactory lookup on every query.
+        /// </summary>
+        private static readonly ConcurrentDictionary<Type, Delegate> _syncMaterializerCache = new();
+
+        /// <summary>
+        /// PERF: Cached full SQL strings (SELECT + WHERE + LIMIT) for fast-path queries.
+        /// Uses ValueTuple key to avoid string.Concat allocation on every call.
+        /// </summary>
+        private static readonly ConcurrentDictionary<(string TypeName, string Property, string WhereKind, int? TakeCount), string> _fullSqlCache = new();
+
+        /// <summary>
+        /// PERF: Cache whether a type is eligible for fast-path execution (class with parameterless ctor).
+        /// Avoids GetConstructor reflection call on every query for types that fail the check (e.g. anonymous types from joins).
+        /// </summary>
+        private static readonly ConcurrentDictionary<Type, bool> _eligibleTypeCache = new();
+
+        /// <summary>
         /// Non-generic entry point that uses cached delegates to avoid reflection overhead.
         /// </summary>
         public static bool TryExecuteNonGeneric(Type elementType, Expression expr, DbContext ctx, CancellationToken ct, out Task<object> result)
         {
             result = default!;
 
-            // Fast check: element type must be a class with parameterless constructor
-            if (!elementType.IsClass || elementType.GetConstructor(Type.EmptyTypes) == null)
+            // PERF: Cached check — avoids GetConstructor reflection on every call for ineligible types
+            if (!_eligibleTypeCache.GetOrAdd(elementType, static t => t.IsClass && t.GetConstructor(Type.EmptyTypes) != null))
                 return false;
 
             var executor = _cachedExecutors.GetOrAdd(elementType, t =>
@@ -114,6 +138,9 @@ namespace nORM.Query
                     return false;
                 expr = takeCall.Arguments[0];
             }
+            // PERF: Unwrap AsNoTracking between Take and Where so that
+            // queries like .Where(...).AsNoTracking().Take(10) hit the fast path.
+            expr = Unwrap(expr);
             if (expr is not MethodCallExpression whereCall || whereCall.Method.Name != nameof(Queryable.Where))
                 return false;
             if (Unwrap(whereCall.Arguments[0]) is not ConstantExpression)
@@ -176,6 +203,18 @@ namespace nORM.Query
             }
             return e;
         }
+        /// <summary>
+        /// PERF: Returns a cached sync materializer delegate for the given entity type.
+        /// </summary>
+        private static Func<System.Data.Common.DbDataReader, T> GetSyncMaterializer<T>(DbContext ctx) where T : class
+        {
+            return (Func<System.Data.Common.DbDataReader, T>)_syncMaterializerCache.GetOrAdd(typeof(T), t =>
+            {
+                var map = ctx.GetMapping(t);
+                return (Delegate)_materializer.CreateSyncMaterializer<T>(map);
+            });
+        }
+
         private static string GetSqlTemplate<T>(DbContext ctx) where T : class
         {
             var type = typeof(T);
@@ -199,65 +238,93 @@ namespace nORM.Query
             }
         }
         /// <summary>
-        /// PERFORMANCE FIX (TASK 14): Wrapper to avoid ContinueWith closure allocation.
-        /// Returns Task&lt;object&gt; directly instead of using ContinueWith.
+        /// PERF: Non-async entry point — does SQL lookup and command setup synchronously,
+        /// then dispatches to async materialization. Avoids one async state machine allocation.
         /// </summary>
-        private static async Task<object> ExecuteSimpleWhereAsObject<T>(DbContext ctx, WhereInfo info, int? takeCount, CancellationToken ct) where T : class, new()
-        {
-            var results = await ExecuteSimpleWhere<T>(ctx, info, takeCount, ct).ConfigureAwait(false);
-            return results;
-        }
-
-        private static async Task<List<T>> ExecuteSimpleWhere<T>(DbContext ctx, WhereInfo info, int? takeCount, CancellationToken ct) where T : class, new()
+        private static Task<object> ExecuteSimpleWhereAsObject<T>(DbContext ctx, WhereInfo info, int? takeCount, CancellationToken ct) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));
             if (!map.ColumnsByName.TryGetValue(info.Property, out var column))
                 throw new InvalidOperationException("Fast path failed - unknown column");
-            string sql = GetSqlTemplate<T>(ctx);
-            if (info.Value == null || info.Value == DBNull.Value)
+
+            // PERF: Cache full SQL (SELECT + WHERE + LIMIT) using ValueTuple key to avoid string allocation
+            bool isNull = info.Value == null || info.Value == DBNull.Value;
+            bool isBoolTrue = !isNull && info.Value is bool bv2 && bv2;
+            string whereKind = isNull ? "N" : isBoolTrue ? "B" : "P";
+            var cacheKey = (typeof(T).Name, info.Property, whereKind, takeCount);
+
+            if (!_fullSqlCache.TryGetValue(cacheKey, out var sql))
             {
-                sql += $" WHERE {column.EscCol} IS NULL";
+                sql = GetSqlTemplate<T>(ctx);
+                if (isNull)
+                    sql += $" WHERE {column.EscCol} IS NULL";
+                else if (isBoolTrue)
+                    sql += $" WHERE {column.EscCol} = {ctx.Provider.BooleanTrueLiteral}";
+                else
+                    sql += $" WHERE {column.EscCol} = {ctx.Provider.ParamPrefix}p0";
+                if (takeCount.HasValue)
+                    sql = ApplyLimit(sql, takeCount.Value, ctx.Provider);
+                _fullSqlCache[cacheKey] = sql;
             }
-            else if (info.Value is bool boolVal && boolVal)
-            {
-                sql += $" WHERE {column.EscCol} = {ctx.Provider.BooleanTrueLiteral}";
-            }
-            else
-            {
-                sql += $" WHERE {column.EscCol} = {ctx.Provider.ParamPrefix}p0";
-            }
-            if (takeCount.HasValue)
-            {
-                sql = ApplyLimit(sql, takeCount.Value, ctx.Provider);
-            }
-            await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
+
+            // PERF: Skip EnsureConnectionAsync await when connection is already ready
+            var ensureTask = ctx.EnsureConnectionAsync(ct);
+            if (!ensureTask.IsCompletedSuccessfully)
+                return ExecuteSimpleWhereSlowAsync<T>(ensureTask, ctx, sql, info, isNull, isBoolTrue, takeCount, ct);
+
+            var cmd = ctx.CreateCommand();
+            cmd.CommandText = sql;
+            if (!isNull && !isBoolTrue)
+                cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
+
+            // PERF: Sync materialization for providers without true async I/O
+            if (ctx.Provider.PrefersSyncExecution)
+                return ExecuteSimpleWhereMaterializeSync<T>(cmd, ctx, takeCount);
+
+            return ExecuteSimpleWhereMaterializeAsync<T>(cmd, ctx, takeCount, ct);
+        }
+
+        private static async Task<object> ExecuteSimpleWhereSlowAsync<T>(Task<System.Data.Common.DbConnection> ensureTask, DbContext ctx, string sql, WhereInfo info, bool isNull, bool isBoolTrue, int? takeCount, CancellationToken ct) where T : class, new()
+        {
+            await ensureTask.ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
-            if (info.Value != null && info.Value != DBNull.Value && !(info.Value is bool bv && bv))
-            {
-                cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value);
-            }
-            var results = new List<T>();
-            // PERFORMANCE FIX (TASK 12): Use generic materializer to avoid boxing
-            var materializer = new MaterializerFactory().CreateSyncMaterializer<T>(map);
+            if (!isNull && !isBoolTrue)
+                cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
+            var results = new List<T>(takeCount ?? 16);
+            var materializer = GetSyncMaterializer<T>(ctx);
             await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
-            {
                 results.Add(materializer(reader));
-            }
-            return results;
-        }
-        /// <summary>
-        /// PERFORMANCE FIX (TASK 14): Wrapper to avoid ContinueWith closure allocation.
-        /// Returns Task&lt;object&gt; directly instead of using ContinueWith.
-        /// </summary>
-        private static async Task<object> ExecuteSimpleTakeAsObject<T>(DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
-        {
-            var results = await ExecuteSimpleTake<T>(ctx, takeCount, ct).ConfigureAwait(false);
             return results;
         }
 
-        private static async Task<List<T>> ExecuteSimpleTake<T>(DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
+        /// <summary>PERF: Fully sync materialization — no async state machine overhead for SQLite.</summary>
+        private static Task<object> ExecuteSimpleWhereMaterializeSync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount) where T : class, new()
+        {
+            var results = new List<T>(takeCount ?? 16);
+            var materializer = GetSyncMaterializer<T>(ctx);
+            using var command = cmd;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                results.Add(materializer(reader));
+            return Task.FromResult<object>(results);
+        }
+
+        private static async Task<object> ExecuteSimpleWhereMaterializeAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
+        {
+            var results = new List<T>(takeCount ?? 16);
+            var materializer = GetSyncMaterializer<T>(ctx);
+            await using var command = cmd;
+            await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                results.Add(materializer(reader));
+            return results;
+        }
+        /// <summary>
+        /// PERF: Single async method — eliminates the extra async state machine from wrapper approach.
+        /// </summary>
+        private static async Task<object> ExecuteSimpleTakeAsObject<T>(DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));
             string sql = GetSqlTemplate<T>(ctx);
@@ -269,8 +336,7 @@ namespace nORM.Query
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
             var results = new List<T>();
-            // PERFORMANCE FIX (TASK 12): Use generic materializer to avoid boxing
-            var materializer = new MaterializerFactory().CreateSyncMaterializer<T>(map);
+            var materializer = GetSyncMaterializer<T>(ctx);
             await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {

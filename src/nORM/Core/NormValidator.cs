@@ -91,6 +91,18 @@ namespace nORM.Core
         private static PropertyInfo[] GetCachedProperties(Type type)
             => PropertyCache.GetOrAdd(type, t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance));
 
+        /// <summary>
+        /// PERF: Cache of properties whose declared type could contain entity graph references.
+        /// Excludes value types and strings, avoiding ~90% of GetValue reflection calls
+        /// for typical flat entities (e.g., BenchmarkUser with int/string/DateTime/bool/double).
+        /// </summary>
+        private static readonly ConcurrentDictionary<Type, PropertyInfo[]> NavigablePropertyCache = new();
+        private static PropertyInfo[] GetNavigableProperties(Type type)
+            => NavigablePropertyCache.GetOrAdd(type, t =>
+                t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(p => p.CanRead && p.PropertyType.IsClass && p.PropertyType != typeof(string) && p.PropertyType != typeof(byte[]))
+                    .ToArray());
+
         private static void ValidateEntityGraph(object rootEntity, HashSet<object> visited, string rootPath)
         {
             var stack = new Stack<(object Entity, int Depth, string Path)>();
@@ -130,24 +142,21 @@ namespace nORM.Core
                 if (!visited.Add(entity))
                     continue;
 
-                var properties = GetCachedProperties(entity.GetType());
+                // PERF: Only inspect properties whose declared type is a reference type
+                // (excluding string/byte[]). For flat entities with only value-type + string
+                // properties, this array is empty — skipping all GetValue reflection calls.
+                var properties = GetNavigableProperties(entity.GetType());
 
                 foreach (var prop in properties)
                 {
-                    if (!prop.CanRead) continue;
-
                     var value = prop.GetValue(entity);
                     if (value == null) continue;
 
                     var propPath = $"{path}.{prop.Name}";
-                    var valueType = value.GetType();
 
                     // Push all non-null class values to stack for validation
                     // IEnumerable check will happen when item is popped
-                    if (valueType.IsClass && valueType != typeof(string))
-                    {
-                        stack.Push((value, depth + 1, propPath));
-                    }
+                    stack.Push((value, depth + 1, propPath));
                 }
             }
         }

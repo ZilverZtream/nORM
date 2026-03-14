@@ -142,6 +142,11 @@ namespace nORM.Query
                     target.Append($"({sql})");
                     foreach (var kvp in visitor.GetParameters())
                         t._params[kvp.Key] = kvp.Value;
+                    // QP-1: Sync ParameterManager.Index with _params.Count so that subsequent
+                    // translators (Take, Skip) don't reuse parameter names already allocated
+                    // by the visitor (e.g. both WHERE and LIMIT producing @p0).
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
                     FastExpressionVisitorPool.Return(visitor);
                 }
                 return source;
@@ -267,10 +272,11 @@ namespace nORM.Query
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int take))
                 {
                     if (take < 0) throw new ArgumentOutOfRangeException(nameof(take), take, "Take count must be non-negative.");
-                    var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
-                    t._params[pName] = take;
+                    // PERF: Inline literal Take values directly in SQL instead of parameterizing.
+                    // Parameterized LIMIT (@p0) prevents SQLite's planner from using ANALYZE statistics
+                    // to estimate result cardinality. Literal LIMIT (20) lets the planner optimize.
                     t._take = take;
-                    t._takeParam = pName;
+                    t._takeParam = null;
                 }
                 return source;
             }
@@ -301,10 +307,9 @@ namespace nORM.Query
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int skip))
                 {
                     if (skip < 0) throw new ArgumentOutOfRangeException(nameof(skip), skip, "Skip count must be non-negative.");
-                    var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
-                    t._params[pName] = skip;
+                    // PERF: Inline literal Skip values directly in SQL (same rationale as Take).
                     t._skip = skip;
-                    t._skipParam = pName;
+                    t._skipParam = null;
                 }
                 return source;
             }
@@ -504,6 +509,8 @@ namespace nORM.Query
                     t._where.Append($"({sql})");
                     foreach (var kvp in visitor.GetParameters())
                         t._params[kvp.Key] = kvp.Value;
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
                     FastExpressionVisitorPool.Return(visitor);
                 }
                 // QP-1: Single/SingleOrDefault must fetch 2 rows so the caller can detect duplicates.
@@ -546,6 +553,8 @@ namespace nORM.Query
                     t._where.Append($"({sql})");
                     foreach (var kvp in visitor.GetParameters())
                         t._params[kvp.Key] = kvp.Value;
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
                     FastExpressionVisitorPool.Return(visitor);
                 }
                 var terminalMethodLast = t._methodName;
@@ -604,6 +613,8 @@ namespace nORM.Query
                     t._where.Append($"({sql})");
                     foreach (var kvp in visitor.GetParameters())
                         t._params[kvp.Key] = kvp.Value;
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
                     FastExpressionVisitorPool.Return(visitor);
                 }
                 var newArgs = new[] { source }.Concat(node.Arguments.Skip(1));

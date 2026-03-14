@@ -122,6 +122,7 @@ namespace nORM.Benchmarks
             = Norm.CompileQuery<nORM.Core.DbContext, int, object>((ctx, amount) =>
                 ctx.Query<BenchmarkUser>()
                     .Join(ctx.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new { u.Name, o.Amount, o.ProductName })
+                    .AsNoTracking()
                     .Where(x => x.Amount > amount)
                     .Take(50));
 
@@ -843,8 +844,8 @@ namespace nORM.Benchmarks
             // and each insert would auto-commit individually.
             await using var tx = await _nOrmContext!.Database.BeginTransactionAsync();
 
-            // Prepare once, execute many times (matches BulkInsert_Batched_Dapper behavior)
-            await using var preparedInsert = await _nOrmContext!.PrepareInsertAsync<BenchmarkUser>();
+            // Throughput path: benchmark command reuse without per-row identity backfill.
+            await using var preparedInsert = await _nOrmContext!.PrepareInsertAsync<BenchmarkUser>(hydrateGeneratedKeys: false);
 
             for (int i = 1; i <= 100; i++)
             {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
@@ -12,6 +13,17 @@ using nORM.Query;
 
 namespace nORM.Internal
 {
+    /// <summary>
+    /// Holds pooled command state for a compiled query. The command is created once (with Prepare())
+    /// and reused across calls — only parameter values are updated. This eliminates per-call costs
+    /// of DbCommand creation, DbParameter allocation, and SQL compilation (sqlite3_prepare_v2).
+    /// </summary>
+    internal sealed class CompiledQueryState
+    {
+        public DbCommand? PooledCommand;
+        public int FixedParamCount;
+    }
+
     internal static class ExpressionCompiler
     {
         private static readonly ConcurrentDictionary<ExpressionFingerprint, Delegate> _compiledDelegateCache = new();
@@ -78,75 +90,97 @@ namespace nORM.Internal
         {
             // SG-1/QP-1/SEC-1: Use per-context-shape cache keyed by a collision-resistant string
             // that encodes provider type, mappings, tenant ID, and global filter expressions.
-            // Using a string key avoids the 32-bit HashCode.Combine collisions that occur when
-            // two filter lambdas differ only by a constant value (e.g. TenantKey==1 vs TenantKey==2).
-            var plansByCtx = new ConcurrentDictionary<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames)>();
+            var plansByCtx = new ConcurrentDictionary<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams)>();
+            string? cachedCtxKey = null;
+            DbContext? cachedCtxKeyOwner = null;
+            (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams) cachedEntry = default;
+            bool hasCachedEntry = false;
+            object?[]? singleArgArray = null;
+            object?[]? tupleArgArray = null;
+            var pooledState = new CompiledQueryState();
+            // PERF: Cache the sync materializer delegate.
+            Func<System.Data.Common.DbDataReader, object>? cachedMaterializer = null;
 
-            return async (ctx, value) =>
+            return (ctx, value) =>
             {
-                // Build a deterministic, collision-resistant cache key from all query-shape dimensions.
-                var keyBuilder = new System.Text.StringBuilder();
-                keyBuilder.Append(ctx.Provider.GetType().FullName);
-                keyBuilder.Append('|');
-                foreach (var m in ctx.GetAllMappings())
+                // PERF: Fast path — same context as last call (common in benchmarks and real apps).
+                if (!hasCachedEntry || !ReferenceEquals(cachedCtxKeyOwner, ctx))
                 {
-                    keyBuilder.Append(m.TableName);
-                    keyBuilder.Append(',');
-                    keyBuilder.Append(m.Type.FullName);
-                    keyBuilder.Append(';');
-                }
-                keyBuilder.Append('|');
-                // QP-1/SEC-1: Include tenant dimension so plans are not reused across tenant contexts.
-                var tenantId = ctx.Options.TenantProvider?.GetCurrentTenantId();
-                keyBuilder.Append(tenantId?.ToString() ?? "");
-                keyBuilder.Append('|');
-                // QP-1/SEC-1: Include global filter expressions (their ToString() embeds constant values)
-                // so contexts with different filters always get distinct plan cache entries.
-                if (ctx.Options.GlobalFilters.Count > 0)
-                {
-                    foreach (var kvp in ctx.Options.GlobalFilters)
-                        foreach (var filterExpr in kvp.Value)
-                        {
-                            keyBuilder.Append(filterExpr.ToString());
-                            keyBuilder.Append(';');
-                        }
-                }
-                string ctxKey = keyBuilder.ToString();
-
-
-                if (!plansByCtx.TryGetValue(ctxKey, out var entry))
-                {
-                    var ctxParam = queryExpression.Parameters[0];
-                    var body = new ParameterReplacer(ctxParam, Expression.Constant(ctx)).Visit(queryExpression.Body)!;
-                    body = new QueryCallEvaluator().Visit(body)!;
-                    var p = new NormQueryProvider(ctx).GetPlan(body, out _);
-                    entry = (p, p.CompiledParameters);
-                    plansByCtx[ctxKey] = entry;
-                }
-
-                var cachedPlan = entry.Plan;
-                var paramNames = entry.ParamNames;
-
-                // PERFORMANCE FIX: Use array instead of dictionary to avoid allocation
-                object?[] args;
-
-                if (paramNames != null && paramNames.Count > 0)
-                {
-                    args = new object?[paramNames.Count];
-                    if (value is System.Runtime.CompilerServices.ITuple tuple)
+                    if (pooledState.PooledCommand != null)
                     {
-                        var count = Math.Min(tuple.Length, paramNames.Count);
-                        for (int i = 0; i < count; i++)
-                            args[i] = tuple[i];
+                        try { pooledState.PooledCommand.Dispose(); } catch { }
+                        pooledState.PooledCommand = null;
                     }
-                    else if (args.Length == 1)
+                    string ctxKey;
+                    if (ReferenceEquals(cachedCtxKeyOwner, ctx) && cachedCtxKey != null)
                     {
-                        // Single parameter case - map value to first argument
-                        args[0] = value;
+                        ctxKey = cachedCtxKey;
                     }
                     else
                     {
-                        // PC-1: Multiple parameters require a ValueTuple; single non-tuple is ambiguous.
+                        var tenantId = ctx.Options.TenantProvider?.GetCurrentTenantId();
+                        ctxKey = string.Concat(
+                            ctx.Provider.GetType().FullName, "|",
+                            ctx.GetMappingHash().ToString(), "|",
+                            tenantId?.ToString() ?? "", "|",
+                            ctx.Options.GlobalFilters.Count > 0
+                                ? string.Join(";", ctx.Options.GlobalFilters.SelectMany(kvp => kvp.Value.Select(f => f.ToString())))
+                                : "");
+                        cachedCtxKey = ctxKey;
+                        cachedCtxKeyOwner = ctx;
+                    }
+
+                    if (!plansByCtx.TryGetValue(ctxKey, out var entry))
+                    {
+                        var ctxParam = queryExpression.Parameters[0];
+                        var body = new ParameterReplacer(ctxParam, Expression.Constant(ctx)).Visit(queryExpression.Body)!;
+                        body = new QueryCallEvaluator().Visit(body)!;
+                        var p = ctx.GetQueryProvider().GetPlan(body, out _, out _);
+                        var paramSet = new HashSet<string>(p.CompiledParameters, StringComparer.Ordinal);
+                        KeyValuePair<string, object>[]? fixedParams = null;
+                        if (paramSet.Count > 0)
+                        {
+                            var fpList = new List<KeyValuePair<string, object>>();
+                            foreach (var kvp in p.Parameters)
+                            {
+                                if (!paramSet.Contains(kvp.Key))
+                                    fpList.Add(kvp);
+                            }
+                            fixedParams = fpList.ToArray();
+                        }
+                        entry = (p, p.CompiledParameters, paramSet, fixedParams);
+                        plansByCtx[ctxKey] = entry;
+                    }
+                    cachedEntry = entry;
+                    hasCachedEntry = true;
+                    cachedMaterializer = cachedEntry.Plan.SyncMaterializer;
+                }
+
+                var cachedPlan = cachedEntry.Plan;
+                var paramNames = cachedEntry.ParamNames;
+
+                // PERF: Reuse single-element array for the common single-param case
+                object?[] args;
+                if (paramNames != null && paramNames.Count > 0)
+                {
+                    if (value is System.Runtime.CompilerServices.ITuple tuple)
+                    {
+                        if (tupleArgArray == null || tupleArgArray.Length != paramNames.Count)
+                            tupleArgArray = new object?[paramNames.Count];
+                        var count = Math.Min(tuple.Length, paramNames.Count);
+                        for (int i = 0; i < count; i++)
+                            tupleArgArray[i] = tuple[i];
+                        args = tupleArgArray;
+                    }
+                    else if (paramNames.Count == 1)
+                    {
+                        if (singleArgArray == null)
+                            singleArgArray = new object?[1];
+                        singleArgArray[0] = value;
+                        args = singleArgArray;
+                    }
+                    else
+                    {
                         throw new InvalidOperationException(
                             $"Compiled query expects {paramNames.Count} parameters. " +
                             "Pass values as a ValueTuple, e.g. (value1, value2).");
@@ -157,9 +191,96 @@ namespace nORM.Internal
                     args = Array.Empty<object?>();
                 }
 
-                var execProvider = new NormQueryProvider(ctx);
-                // Call the optimized array overload
-                return await execProvider.ExecuteCompiledAsync<List<T>>(cachedPlan, args, default).ConfigureAwait(false);
+                // PERF: Inline pooled sync execution for providers without true async I/O (SQLite).
+                // Bypasses the entire NormQueryProvider call chain (RetryPolicy, CacheProvider,
+                // EnsureConnectionAsync, IsScalar dispatch) by inlining command reuse + sync read.
+                // Pooled commands avoid per-call DbCommand/DbParameter allocation and SQL compilation.
+                if (cachedPlan != null &&
+                    ctx.Provider.PrefersSyncExecution &&
+                    ctx.Options.RetryPolicy == null &&
+                    ctx.Options.CacheProvider == null &&
+                    ctx.Options.CommandInterceptors.Count == 0 &&
+                    !cachedPlan.IsScalar)
+                {
+                    // Get or create the pooled command (created once, reused across calls)
+                    var cmd = pooledState.PooledCommand;
+                    if (cmd == null)
+                    {
+                        cmd = ctx.CreateCommand();
+                        cmd.CommandText = cachedPlan.Sql;
+                        var fixedParams = cachedEntry.FixedParams;
+                        int fixedCount = 0;
+                        if (fixedParams != null)
+                        {
+                            for (int i = 0; i < fixedParams.Length; i++)
+                            {
+                                var p = cmd.CreateParameter();
+                                p.ParameterName = fixedParams[i].Key;
+                                p.Value = fixedParams[i].Value;
+                                cmd.Parameters.Add(p);
+                            }
+                            fixedCount = fixedParams.Length;
+                        }
+                        else
+                        {
+                            foreach (var kvp in cachedPlan.Parameters)
+                            {
+                                var p = cmd.CreateParameter();
+                                p.ParameterName = kvp.Key;
+                                p.Value = kvp.Value;
+                                cmd.Parameters.Add(p);
+                                fixedCount++;
+                            }
+                        }
+                        // Pre-create compiled parameter slots
+                        var compiledParams2 = cachedPlan.CompiledParameters;
+                        for (int i = 0; i < compiledParams2.Count; i++)
+                        {
+                            var p = cmd.CreateParameter();
+                            p.ParameterName = compiledParams2[i];
+                            p.Value = DBNull.Value;
+                            cmd.Parameters.Add(p);
+                        }
+                        try { cmd.Prepare(); } catch { }
+                        pooledState.PooledCommand = cmd;
+                        pooledState.FixedParamCount = fixedCount;
+                    }
+
+                    // Update compiled parameter values (only these change per call)
+                    var compiledParams = cachedPlan.CompiledParameters;
+                    var compiledCount = Math.Min(compiledParams.Count, args.Length);
+                    var fixedParamCount = pooledState.FixedParamCount;
+                    for (int i = 0; i < compiledCount; i++)
+                        cmd.Parameters[fixedParamCount + i].Value = args[i] ?? DBNull.Value;
+
+                    // Direct sync materialization — zero async overhead, command NOT disposed
+                    var materializer = cachedMaterializer!;
+                    var capacity = cachedPlan.SingleResult ? 1 : (cachedPlan.Take ?? 16);
+                    var list = new List<T>(capacity);
+
+                    using var reader = cmd.ExecuteReader();
+
+                    if (cachedPlan.SingleResult)
+                    {
+                        var maxRows = cachedPlan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
+                        for (int row = 0; row < maxRows; row++)
+                        {
+                            if (!reader.Read()) break;
+                            list.Add((T)materializer(reader));
+                        }
+                    }
+                    else
+                    {
+                        while (reader.Read())
+                            list.Add((T)materializer(reader));
+                    }
+
+                    return Task.FromResult(list);
+                }
+
+                // Standard path for async providers or when advanced features are enabled
+                return ctx.GetQueryProvider().ExecuteCompiledPooledAsync<List<T>>(
+                    cachedPlan!, args, cachedEntry.FixedParams, pooledState, default);
             };
         }
 
