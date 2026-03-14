@@ -54,6 +54,18 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// S1: Redacts single-quoted string literals from SQL before it is written to logs,
+        /// preventing sensitive literal values from appearing in log sinks.
+        /// Identifiers, parameter placeholders (@p0), and SQL keywords are preserved.
+        /// </summary>
+        private static string RedactSqlForLogging(string sql)
+        {
+            if (string.IsNullOrEmpty(sql)) return sql;
+            // Replace every 'literal' (including escaped '' sequences) with '[redacted]'.
+            return Regex.Replace(sql, @"'(?:[^']|'')*'", "'[redacted]'");
+        }
+
+        /// <summary>
         /// PERFORMANCE FIX (TASK 13): Creates a list using a cached compiled delegate instead of Activator.CreateInstance.
         /// This is 10-50x faster on hot paths.
         /// </summary>
@@ -136,7 +148,7 @@ namespace nORM.Query
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "MaterializeAsObjectListAsync failed for SQL: {Sql}", cmd.CommandText);
+                _logger.LogError(ex, "MaterializeAsObjectListAsync failed for SQL: {Sql}", RedactSqlForLogging(cmd.CommandText));
                 throw;
             }
         }
@@ -233,7 +245,7 @@ namespace nORM.Query
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "MaterializeAsync failed for SQL: {Sql}", command.CommandText);
+                _logger.LogError(ex, "MaterializeAsync failed for SQL: {Sql}", RedactSqlForLogging(command.CommandText));
                 throw;
             }
         }
@@ -315,7 +327,7 @@ namespace nORM.Query
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Materialize failed for SQL: {Sql}", command.CommandText);
+                _logger.LogError(ex, "Materialize failed for SQL: {Sql}", RedactSqlForLogging(command.CommandText));
                 throw;
             }
         }
