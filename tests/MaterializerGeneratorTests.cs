@@ -36,6 +36,22 @@ namespace nORM.Tests
         public MatAddress Address { get; set; } = new();
     }
 
+    // SG2 fix verification: two classes with the same name in different namespaces.
+    // If SG2 is broken (hint-name collision), this file will not compile.
+}
+
+namespace nORM.Tests.Ns2
+{
+    [nORM.SourceGeneration.GenerateMaterializer]
+    internal class Materialized   // same simple name as nORM.Tests.Materialized — must not collide
+    {
+        public int Id { get; set; }
+        public string Tag { get; set; } = string.Empty;
+    }
+}
+
+namespace nORM.Tests
+{
     public class MaterializerGeneratorTests
     {
         [Fact]

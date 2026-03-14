@@ -136,7 +136,9 @@ namespace nORM.Internal
         }
 
         /// <summary>
-        /// Adds or returns existing value. The factory runs only if missing/expired.
+        /// Adds or returns existing value. The factory runs at most once per key even under concurrent misses.
+        /// C1 fix: uses a write-lock double-check pattern so that racing threads serialize on the write lock;
+        /// the first thread runs the factory and inserts the value, subsequent threads find it in the cache.
         /// </summary>
         public TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
         {
@@ -144,9 +146,53 @@ namespace nORM.Internal
             if (TryGet(key, out var existing))
                 return existing;
 
-            var created = valueFactory(key); // compute outside lock
-            Set(key, created);
-            return created;
+            _lock.EnterWriteLock();
+            try
+            {
+                // Double-check inside write lock: a racing thread may have inserted while we waited.
+                if (_cache.TryGetValue(key, out var node) && !IsExpired(node.Value))
+                {
+                    Interlocked.Increment(ref _hits);
+                    return node.Value.Value;
+                }
+
+                var created = valueFactory(key);
+
+                // Inline the Set logic — cannot call Set() because it re-acquires the write lock.
+                var nowUtc = DateTimeOffset.UtcNow;
+                var item = new CacheItem(key, created, nowUtc, null, nowUtc.UtcDateTime.Ticks);
+                var newNode = new LinkedListNode<CacheItem>(item);
+                if (_cache.TryGetValue(key, out var stale) && stale.List != null)
+                    _lruList.Remove(stale);
+                _cache[key] = newNode;
+                _lruList.AddFirst(newNode);
+
+                if (_lruList.Count > _maxSize)
+                {
+                    var sampleWindow = Math.Min(100, Math.Max(20, _maxSize / 10));
+                    LinkedListNode<CacheItem>? oldestNode = null;
+                    long oldestTicks = long.MaxValue;
+                    var cur = _lruList.Last;
+                    for (int i = 0; i < sampleWindow && cur != null; i++)
+                    {
+                        var ticks = Interlocked.Read(ref cur.Value.LastAccessedTicks);
+                        if (ticks < oldestTicks) { oldestTicks = ticks; oldestNode = cur; }
+                        cur = cur.Previous;
+                    }
+                    if (oldestNode == null) oldestNode = _lruList.Last;
+                    if (oldestNode != null)
+                    {
+                        _lruList.Remove(oldestNode);
+                        _cache.TryRemove(oldestNode.Value.Key, out _);
+                    }
+                }
+
+                return created;
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
         }
 
         /// <summary>
