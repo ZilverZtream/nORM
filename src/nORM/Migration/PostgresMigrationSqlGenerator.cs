@@ -166,6 +166,19 @@ namespace nORM.Migration
         private static string GetSqlType(ColumnSchema column)
             => TypeMap.TryGetValue(column.ClrType, out var sql) ? sql : "TEXT";
 
+        // M1/X1: Allowlist for FK referential action tokens.
+        private static readonly HashSet<string> _validFkActions =
+            new(StringComparer.OrdinalIgnoreCase) { "NO ACTION", "CASCADE", "SET NULL", "RESTRICT", "SET DEFAULT" };
+
+        private static string ValidateFkAction(string action, string constraintName)
+        {
+            if (!_validFkActions.Contains(action))
+                throw new ArgumentException(
+                    $"Invalid FK referential action '{action}' in constraint '{constraintName}'. " +
+                    "Allowed values: NO ACTION, CASCADE, SET NULL, RESTRICT, SET DEFAULT.");
+            return action;
+        }
+
         /// <summary>
         /// MG-1: Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.
         /// </summary>
@@ -173,11 +186,13 @@ namespace nORM.Migration
         {
             var depCols = string.Join(", ", fk.DependentColumns.Select(Esc));
             var refCols = string.Join(", ", fk.PrincipalColumns.Select(Esc));
+            var onDelete = ValidateFkAction(fk.OnDelete, fk.ConstraintName);
+            var onUpdate = ValidateFkAction(fk.OnUpdate, fk.ConstraintName);
             var sql = $"CONSTRAINT {Esc(fk.ConstraintName)} FOREIGN KEY ({depCols}) REFERENCES {Esc(fk.PrincipalTable)}({refCols})";
-            if (!string.Equals(fk.OnDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
-                sql += $" ON DELETE {fk.OnDelete}";
-            if (!string.Equals(fk.OnUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
-                sql += $" ON UPDATE {fk.OnUpdate}";
+            if (!string.Equals(onDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
+                sql += $" ON DELETE {onDelete}";
+            if (!string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
+                sql += $" ON UPDATE {onUpdate}";
             return sql;
         }
     }

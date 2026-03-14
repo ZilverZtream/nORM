@@ -161,6 +161,13 @@ namespace nORM.Migration
             foreach (var tableGroup in diff.AddedForeignKeys
                 .GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
             {
+                // M1/X1: Validate FK actions for each newly added FK before any DDL is emitted.
+                foreach (var (_, addedFk) in tableGroup)
+                {
+                    ValidateFkAction(addedFk.OnDelete, addedFk.ConstraintName);
+                    ValidateFkAction(addedFk.OnUpdate, addedFk.ConstraintName);
+                }
+
                 var table = diff.AddedForeignKeys
                     .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
                 // Up: recreate with the new FK set (table.ForeignKeys reflects post-diff state)
@@ -257,6 +264,21 @@ namespace nORM.Migration
                 stmts.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
         }
 
+        // M1/X1: Allowlist for FK referential action tokens. Free-form strings are not safe
+        // to interpolate into DDL; an attacker-controlled OnDelete/OnUpdate could inject
+        // arbitrary SQL into migration scripts.
+        private static readonly HashSet<string> _validFkActions =
+            new(StringComparer.OrdinalIgnoreCase) { "NO ACTION", "CASCADE", "SET NULL", "RESTRICT", "SET DEFAULT" };
+
+        private static string ValidateFkAction(string action, string constraintName)
+        {
+            if (!_validFkActions.Contains(action))
+                throw new ArgumentException(
+                    $"Invalid FK referential action '{action}' in constraint '{constraintName}'. " +
+                    "Allowed values: NO ACTION, CASCADE, SET NULL, RESTRICT, SET DEFAULT.");
+            return action;
+        }
+
         /// <summary>
         /// MG-1: Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE statement.
         /// </summary>
@@ -264,11 +286,13 @@ namespace nORM.Migration
         {
             var depCols = string.Join(", ", fk.DependentColumns.Select(Esc));
             var refCols = string.Join(", ", fk.PrincipalColumns.Select(Esc));
+            var onDelete = ValidateFkAction(fk.OnDelete, fk.ConstraintName);
+            var onUpdate = ValidateFkAction(fk.OnUpdate, fk.ConstraintName);
             var sql = $"CONSTRAINT {Esc(fk.ConstraintName)} FOREIGN KEY ({depCols}) REFERENCES {Esc(fk.PrincipalTable)}({refCols})";
-            if (!string.Equals(fk.OnDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
-                sql += $" ON DELETE {fk.OnDelete}";
-            if (!string.Equals(fk.OnUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
-                sql += $" ON UPDATE {fk.OnUpdate}";
+            if (!string.Equals(onDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
+                sql += $" ON DELETE {onDelete}";
+            if (!string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
+                sql += $" ON UPDATE {onUpdate}";
             return sql;
         }
 
