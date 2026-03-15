@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Core;
@@ -112,7 +114,9 @@ namespace nORM.Internal
         {
             // SG-1/QP-1/SEC-1: Use per-context-shape cache keyed by a collision-resistant string
             // that encodes provider type, mappings, tenant ID, and global filter expressions.
-            var plansByCtx = new ConcurrentDictionary<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams)>();
+            // C1 fix: cap at 256 entries via ConcurrentLruCache so long-lived processes with many
+            // distinct tenant/filter/provider/model combinations don't grow this dictionary without bound.
+            var plansByCtx = new ConcurrentLruCache<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams)>(256);
             string? cachedCtxKey = null;
             DbContext? cachedCtxKeyOwner = null;
             (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams) cachedEntry = default;
@@ -147,23 +151,34 @@ namespace nORM.Internal
                     else
                     {
                         var tenantId = ctx.Options.TenantProvider?.GetCurrentTenantId();
+                        // SG1/X1 fix: use GetFilterKey() instead of f.ToString().
+                        // f.ToString() is shape-only — same string regardless of captured closure value.
+                        // ExpressionFingerprint alone also misses closure values: it hashes the closure
+                        // object reference (whose ToString() is the type name), not the actual field values.
+                        // GetFilterKey() combines the shape fingerprint with a recursive extraction of all
+                        // closure-accessed field values so two lambdas with the same shape but different
+                        // captured values (e.g., tenantId=1 vs tenantId=2) produce distinct cache keys.
                         ctxKey = string.Concat(
                             ctx.Provider.GetType().FullName, "|",
                             ctx.GetMappingHash().ToString(), "|",
                             tenantId?.ToString() ?? "", "|",
                             ctx.Options.GlobalFilters.Count > 0
-                                ? string.Join(";", ctx.Options.GlobalFilters.SelectMany(kvp => kvp.Value.Select(f => f.ToString())))
+                                ? string.Join(";", ctx.Options.GlobalFilters.SelectMany(kvp => kvp.Value.Select(GetFilterKey)))
                                 : "");
                         cachedCtxKey = ctxKey;
                         cachedCtxKeyOwner = ctx;
                     }
 
-                    if (!plansByCtx.TryGetValue(ctxKey, out var entry))
+                    // C1 fix: use GetOrAdd on the LRU cache so evicted entries are re-computed on
+                    // demand and concurrent misses serialize through the factory (at most once per key).
+                    var capturedCtx = ctx;
+                    var capturedExpr = queryExpression;
+                    var entry = plansByCtx.GetOrAdd(ctxKey, __ =>
                     {
-                        var ctxParam = queryExpression.Parameters[0];
-                        var body = new ParameterReplacer(ctxParam, Expression.Constant(ctx)).Visit(queryExpression.Body)!;
+                        var ctxParam = capturedExpr.Parameters[0];
+                        var body = new ParameterReplacer(ctxParam, Expression.Constant(capturedCtx)).Visit(capturedExpr.Body)!;
                         body = new QueryCallEvaluator().Visit(body)!;
-                        var p = ctx.GetQueryProvider().GetPlan(body, out _, out _);
+                        var p = capturedCtx.GetQueryProvider().GetPlan(body, out _, out _);
                         var paramSet = new HashSet<string>(p.CompiledParameters, StringComparer.Ordinal);
                         KeyValuePair<string, object>[]? fixedParams = null;
                         if (paramSet.Count > 0)
@@ -176,9 +191,8 @@ namespace nORM.Internal
                             }
                             fixedParams = fpList.ToArray();
                         }
-                        entry = (p, p.CompiledParameters, paramSet, fixedParams);
-                        plansByCtx[ctxKey] = entry;
-                    }
+                        return (p, p.CompiledParameters, paramSet, fixedParams);
+                    });
                     cachedEntry = entry;
                     hasCachedEntry = true;
                     cachedMaterializer = cachedEntry.Plan.SyncMaterializer;
@@ -324,6 +338,69 @@ namespace nORM.Internal
                 return ctx.GetQueryProvider().ExecuteCompiledPooledAsync<List<T>>(
                     cachedPlan!, args, cachedEntry.FixedParams, state, default);
             };
+        }
+
+        /// <summary>
+        /// SG1/X1 fix: builds a cache key for a global filter expression that captures both
+        /// expression shape and closure-captured runtime values.
+        ///
+        /// f.ToString() is shape-only (same string regardless of captured value).
+        /// ExpressionFingerprint alone misses closure values because the captured closure object's
+        /// AppendStableValue fallback uses value.ToString() which returns the type name, not field values.
+        /// This method appends actual field values read via reflection so that two lambdas with the
+        /// same structure but different captured variables (e.g. tenantId=1 vs tenantId=2) get
+        /// distinct keys.
+        /// </summary>
+        internal static string GetFilterKey(LambdaExpression filter)
+        {
+            var shapeKey = ExpressionFingerprint.Compute(filter).ToString();
+            var sb = new StringBuilder();
+            AppendClosureValues(filter.Body, sb);
+            return sb.Length == 0 ? shapeKey : string.Concat(shapeKey, "|CV:", sb.ToString());
+        }
+
+        private static void AppendClosureValues(Expression expr, StringBuilder sb)
+        {
+            // Closure field access pattern: member access on a constant (compiler-generated closure).
+            // Reading the field gives the actual captured runtime value.
+            if (expr is MemberExpression me && me.Expression is ConstantExpression ce)
+            {
+                try
+                {
+                    object? val = me.Member is FieldInfo fi ? fi.GetValue(ce.Value) :
+                                  me.Member is PropertyInfo pi ? pi.GetValue(ce.Value) : null;
+                    sb.Append(val?.ToString() ?? "null");
+                    sb.Append(';');
+                }
+                catch { /* ignore reflection failures — treats the value as stable */ }
+                return; // Don't recurse further into this constant node
+            }
+
+            switch (expr)
+            {
+                case BinaryExpression bin:
+                    AppendClosureValues(bin.Left, sb);
+                    AppendClosureValues(bin.Right, sb);
+                    break;
+                case UnaryExpression u:
+                    AppendClosureValues(u.Operand, sb);
+                    break;
+                case MethodCallExpression mc:
+                    if (mc.Object != null) AppendClosureValues(mc.Object, sb);
+                    foreach (var a in mc.Arguments) AppendClosureValues(a, sb);
+                    break;
+                case LambdaExpression lam:
+                    AppendClosureValues(lam.Body, sb);
+                    break;
+                case ConditionalExpression cond:
+                    AppendClosureValues(cond.Test, sb);
+                    AppendClosureValues(cond.IfTrue, sb);
+                    AppendClosureValues(cond.IfFalse, sb);
+                    break;
+                case MemberExpression mem:
+                    if (mem.Expression != null) AppendClosureValues(mem.Expression, sb);
+                    break;
+            }
         }
 
         internal static object? Evaluate(Expression expression)

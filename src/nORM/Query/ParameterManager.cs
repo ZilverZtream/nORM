@@ -77,9 +77,11 @@ namespace nORM.Query
             {
                 p.DbType = System.Data.DbType.String;
                 p.Value = v;
-                // PERFORMANCE OPTIMIZATION 4: Set size hint for strings to avoid provider guessing
-                if (v is string str && str.Length <= 4000)
-                    p.Size = str.Length;
+                // P1 fix: always set Size to the actual string length so that a prior assignment
+                // of a shorter string does not leave a stale smaller Size that truncates this value
+                // on a reused DbParameter. Setting Size=str.Length rather than 0 avoids drivers
+                // that interpret Size=0 as "bind empty string" (e.g. Microsoft.Data.Sqlite).
+                if (v is string str) p.Size = str.Length;
                 return;
             }
 
