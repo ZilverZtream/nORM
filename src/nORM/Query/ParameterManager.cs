@@ -49,9 +49,13 @@ namespace nORM.Query
         internal static void AssignValue(DbParameter p, object? v)
         {
             // PERFORMANCE OPTIMIZATION 2: Fast null check first (most common nullable scenario)
+            // P1 fix: also reset DbType and Size so stale metadata from a previous non-null
+            // value does not carry over when a reused DbParameter is assigned null.
             if (v is null)
             {
                 p.Value = DBNull.Value;
+                p.DbType = System.Data.DbType.Object;
+                p.Size = 0;
                 return;
             }
 

@@ -67,6 +67,11 @@ namespace nORM.Query
         }
         public void Dispose()
         {
+            // C2 fix: dispose all pooled count commands to release handle/resource pressure.
+            foreach (var cmd in _pooledCountCommands.Values)
+                try { cmd.Dispose(); } catch { }
+            _pooledCountCommands.Clear();
+
             // C1: stop background timers when the last provider is disposed so the process
             // can undergo deterministic teardown (e.g. in test runs / hosting teardown).
             if (Interlocked.Decrement(ref _activeProviderCount) <= 0)
@@ -997,8 +1002,10 @@ namespace nORM.Query
             object?[] parameterValues, int fixedParamCount)
         {
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
+            // P1 fix: call AssignValue (not direct .Value assignment) so that DbType and Size
+            // are reset when the value is null, preventing stale metadata carry-over.
             for (int i = 0; i < count; i++)
-                cmd.Parameters[fixedParamCount + i].Value = parameterValues[i] ?? DBNull.Value;
+                ParameterAssign.AssignValue(cmd.Parameters[fixedParamCount + i], parameterValues[i]);
         }
 
         /// <summary>
@@ -1637,6 +1644,10 @@ namespace nORM.Query
                     try { pooledCmd.Prepare(); } catch { }
                     _pooledCountCommands[sql] = pooledCmd;
                 }
+                // C1 fix: rebind CurrentTransaction on every use — CreateCommand() only binds
+                // the transaction at creation time; reuse across transaction changes would run
+                // the count against a stale (or null) transaction binding.
+                pooledCmd.Transaction = _ctx.CurrentTransaction;
                 var scalar = pooledCmd.ExecuteScalarWithInterception(_ctx);
                 if (scalar == null || scalar is DBNull)
                     return Task.FromResult(default(TResult)!);

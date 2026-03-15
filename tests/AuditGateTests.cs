@@ -318,6 +318,193 @@ public class Gate35To40Tests
 // ══════════════════════════════════════════════════════════════════════════════
 // Gate 4.0 → 4.5 : C1 cache factory idempotence, cancellation matrix, migration retry
 // ══════════════════════════════════════════════════════════════════════════════
+// Gate 3.6 → 4.0 : P1 (null param metadata), C1 (COUNT tx rebind), C2 (disposal)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// Gate 3.6 → 4.0 tests:
+///  - P1: Reused DbParameter gets DbType/Size reset on null (no stale metadata carry-over).
+///  - C1: COUNT pooled command rebinds CurrentTransaction on each use.
+///  - C2: _pooledCountCommands is disposed when provider is disposed.
+/// </summary>
+public class Gate36To40Tests
+{
+    // ── P1: Null-after-nonNull on reused compiled-query parameter resets DbType/Size ──
+
+    [Fact]
+    public async Task P1_CompiledQuery_NullAfterNonNull_ReturnsCorrectResults()
+    {
+        // P1 guard: compiled query with nullable string param.
+        // First call: non-null value (sets DbType = String on the prepared DbParameter).
+        // Second call: null value — must reset DbType/Size so the query returns IS-NULL rows.
+        // Third call: non-null again — must return the non-null row (no stale null state).
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText =
+                "CREATE TABLE P1_TBL (Id INTEGER PRIMARY KEY, Name TEXT);" +
+                "INSERT INTO P1_TBL VALUES (1, 'Alice');" +
+                "INSERT INTO P1_TBL VALUES (2, NULL);";
+            setup.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var compiled = Norm.CompileQuery((DbContext c, string? name) =>
+            c.Query<P1Entity>().Where(e => e.Name == name));
+
+        // Call 1: non-null — must get exactly Alice
+        var r1 = await compiled(ctx, "Alice");
+        Assert.Single(r1);
+        Assert.Equal(1, r1[0].Id);
+
+        // Call 2: null — must get the null-name row (Id=2)
+        // Before fix: stale DbType=String/Size=5 would cause wrong predicate
+        var r2 = await compiled(ctx, null);
+        Assert.Single(r2);
+        Assert.Equal(2, r2[0].Id);
+
+        // Call 3: non-null again — must return Alice (no stale null metadata)
+        var r3 = await compiled(ctx, "Alice");
+        Assert.Single(r3);
+        Assert.Equal(1, r3[0].Id);
+    }
+
+    [Fact]
+    public async Task P1_CompiledQuery_NonNullAfterNull_ReturnsCorrectResults()
+    {
+        // Reverse order: null first (sets DbType=Object), then non-null, then null again.
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText =
+                "CREATE TABLE P1_TBL (Id INTEGER PRIMARY KEY, Name TEXT);" +
+                "INSERT INTO P1_TBL VALUES (1, 'Bob');" +
+                "INSERT INTO P1_TBL VALUES (2, NULL);";
+            setup.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var compiled = Norm.CompileQuery((DbContext c, string? name) =>
+            c.Query<P1Entity>().Where(e => e.Name == name));
+
+        var rNull = await compiled(ctx, null);
+        Assert.Single(rNull); Assert.Equal(2, rNull[0].Id);
+
+        var rNonNull = await compiled(ctx, "Bob");
+        Assert.Single(rNonNull); Assert.Equal(1, rNonNull[0].Id);
+
+        var rNull2 = await compiled(ctx, null);
+        Assert.Single(rNull2); Assert.Equal(2, rNull2[0].Id);
+    }
+
+    // ── C1: COUNT pooled command rebinds transaction on each use ─────────────────────
+
+    [Fact]
+    public async Task C1_CountFastPath_RebindsTransaction_DoesNotThrow()
+    {
+        // C1 guard: Microsoft.Data.Sqlite throws if cmd.Transaction is null/stale while an
+        // explicit transaction is active on the connection. The C1 fix rebinds
+        // pooledCmd.Transaction = _ctx.CurrentTransaction before every execution, preventing
+        // "ExecuteReader requires the command to have a transaction" errors.
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText = "CREATE TABLE C1_TBL (Id INTEGER PRIMARY KEY, Name TEXT);" +
+                                "INSERT INTO C1_TBL VALUES (1, 'x');";
+            setup.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        // First COUNT — populates _pooledCountCommands with cmd.Transaction = null.
+        var count1 = await ctx.Query<C1Entity>().CountAsync();
+        Assert.Equal(1, count1);
+
+        // Begin a transaction through the context so CurrentTransaction is set.
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+
+        // C1 fix: second COUNT must rebind pooledCmd.Transaction to the active tx.
+        // Without fix: cmd.Transaction is still null → SQLite driver throws
+        // "ExecuteReader requires the command to have a transaction".
+        var count2 = await ctx.Query<C1Entity>().CountAsync();
+        Assert.Equal(1, count2);
+
+        await tx.RollbackAsync();
+
+        // After rollback, transaction is gone; COUNT must work again with null tx.
+        var count3 = await ctx.Query<C1Entity>().CountAsync();
+        Assert.Equal(1, count3);
+    }
+
+    // ── C2: Pooled count commands are disposed when provider is disposed ──────────────
+
+    [Fact]
+    public async Task C2_PooledCountCommands_AreDisposed_OnProviderDispose()
+    {
+        // C2 guard: warm the COUNT pool, then dispose the context.
+        // Before fix: _pooledCountCommands held alive DbCommands forever (resource leak).
+        // After fix: Dispose() iterates and disposes all pooled commands without throwing.
+        // We verify: (a) Dispose() does not throw; (b) a fresh context on a new connection
+        // can run COUNT without interference from previously disposed commands.
+        using var cn1 = new SqliteConnection("Data Source=:memory:");
+        cn1.Open();
+        using (var setup = cn1.CreateCommand())
+        {
+            setup.CommandText =
+                "CREATE TABLE C2_TBL (Id INTEGER PRIMARY KEY, Name TEXT);" +
+                "INSERT INTO C2_TBL VALUES (1, 'x');";
+            setup.ExecuteNonQuery();
+        }
+
+        // Warm the pool (populates _pooledCountCommands) then dispose.
+        // DbContext(cn, provider) takes ownership so ctx.Dispose() will close cn1.
+        var ctx = new DbContext(cn1, new SqliteProvider());
+        var count = await ctx.Query<C2Entity>().CountAsync();
+        Assert.Equal(1, count);
+        var ex = Record.Exception(() => ctx.Dispose()); // C2 fix: must not throw
+        Assert.Null(ex);
+
+        // Independent connection confirms the fix did not corrupt any global state.
+        using var cn2 = new SqliteConnection("Data Source=:memory:");
+        cn2.Open();
+        using (var setup2 = cn2.CreateCommand())
+        {
+            setup2.CommandText =
+                "CREATE TABLE C2_TBL (Id INTEGER PRIMARY KEY, Name TEXT);" +
+                "INSERT INTO C2_TBL VALUES (1, 'y');";
+            setup2.ExecuteNonQuery();
+        }
+        using var ctx2 = new DbContext(cn2, new SqliteProvider());
+        var count2 = await ctx2.Query<C2Entity>().CountAsync();
+        Assert.Equal(1, count2);
+    }
+}
+
+[Table("P1_TBL")]
+file class P1Entity
+{
+    [Key] public int Id { get; set; }
+    public string? Name { get; set; }
+}
+
+[Table("C1_TBL")]
+file class C1Entity
+{
+    [Key] public int Id { get; set; }
+    public string? Name { get; set; }
+}
+
+[Table("C2_TBL")]
+file class C2Entity
+{
+    [Key] public int Id { get; set; }
+    public string? Name { get; set; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 
 public class Gate40To45Tests
 {
