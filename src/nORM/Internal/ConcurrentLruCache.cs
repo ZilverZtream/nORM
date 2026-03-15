@@ -265,6 +265,11 @@ namespace nORM.Internal
         }
 
         /// <summary>
+        /// Gets the current number of items in the cache.
+        /// </summary>
+        public int Count => _cache.Count;
+
+        /// <summary>
         /// Gets the total number of cache hits.
         /// </summary>
         public long Hits => Interlocked.Read(ref _hits);
