@@ -250,7 +250,8 @@ namespace nORM.Query
             // PERF: Cache full SQL (SELECT + WHERE + LIMIT) using ValueTuple key to avoid string allocation
             bool isNull = info.Value == null || info.Value == DBNull.Value;
             bool isBoolTrue = !isNull && info.Value is bool bv2 && bv2;
-            string whereKind = isNull ? "N" : isBoolTrue ? "B" : "P";
+            bool isBoolFalse = !isNull && info.Value is bool bv3 && !bv3;
+            string whereKind = isNull ? "N" : isBoolTrue ? "BT" : isBoolFalse ? "BF" : "P";
             var cacheKey = (typeof(T).Name, info.Property, whereKind, takeCount);
 
             if (!_fullSqlCache.TryGetValue(cacheKey, out var sql))
@@ -260,6 +261,8 @@ namespace nORM.Query
                     sql += $" WHERE {column.EscCol} IS NULL";
                 else if (isBoolTrue)
                     sql += $" WHERE {column.EscCol} = {ctx.Provider.BooleanTrueLiteral}";
+                else if (isBoolFalse)
+                    sql += $" WHERE {column.EscCol} = {ctx.Provider.BooleanFalseLiteral}";
                 else
                     sql += $" WHERE {column.EscCol} = {ctx.Provider.ParamPrefix}p0";
                 if (takeCount.HasValue)
@@ -270,12 +273,12 @@ namespace nORM.Query
             // PERF: Skip EnsureConnectionAsync await when connection is already ready
             var ensureTask = ctx.EnsureConnectionAsync(ct);
             if (!ensureTask.IsCompletedSuccessfully)
-                return ExecuteSimpleWhereSlowAsync<T>(ensureTask, ctx, sql, info, isNull, isBoolTrue, takeCount, ct);
+                return ExecuteSimpleWhereSlowAsync<T>(ensureTask, ctx, sql, info, isNull, isBoolTrue, isBoolFalse, takeCount, ct);
 
             var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-            if (!isNull && !isBoolTrue)
+            if (!isNull && !isBoolTrue && !isBoolFalse)
                 cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
 
             // PERF: Sync materialization for providers without true async I/O
@@ -285,13 +288,13 @@ namespace nORM.Query
             return ExecuteSimpleWhereMaterializeAsync<T>(cmd, ctx, takeCount, ct);
         }
 
-        private static async Task<object> ExecuteSimpleWhereSlowAsync<T>(Task<System.Data.Common.DbConnection> ensureTask, DbContext ctx, string sql, WhereInfo info, bool isNull, bool isBoolTrue, int? takeCount, CancellationToken ct) where T : class, new()
+        private static async Task<object> ExecuteSimpleWhereSlowAsync<T>(Task<System.Data.Common.DbConnection> ensureTask, DbContext ctx, string sql, WhereInfo info, bool isNull, bool isBoolTrue, bool isBoolFalse, int? takeCount, CancellationToken ct) where T : class, new()
         {
             await ensureTask.ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-            if (!isNull && !isBoolTrue)
+            if (!isNull && !isBoolTrue && !isBoolFalse)
                 cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
             var results = new List<T>(takeCount ?? 16);
             var materializer = GetSyncMaterializer<T>(ctx);

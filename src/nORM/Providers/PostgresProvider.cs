@@ -42,6 +42,13 @@ namespace nORM.Providers
         /// </summary>
         public override int MaxSqlLength => int.MaxValue;
 
+        /// <inheritdoc />
+        /// PostgreSQL requires "true"/"false" literals; "1"/"0" cause type errors in boolean comparisons.
+        public override string BooleanTrueLiteral => "true";
+
+        /// <inheritdoc />
+        public override string BooleanFalseLiteral => "false";
+
         /// <summary>
         /// Maximum number of parameters permitted in a prepared statement.
         /// </summary>
@@ -166,7 +173,7 @@ namespace nORM.Providers
         /// NOT supported: JSONPath filter expressions like "items[*]", "items[?(@.active)]"
         ///
         /// PERFORMANCE FIX (TASK 20): Use pooled StringBuilder instead of LINQ + string.Join.
-        /// Manual parsing with zero allocations for path segment extraction.
+        /// Pools the StringBuilder to reduce allocations; sb.ToString() still allocates for the returned string.
         /// </remarks>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
         {

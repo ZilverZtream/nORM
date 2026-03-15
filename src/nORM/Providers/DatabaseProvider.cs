@@ -46,8 +46,11 @@ namespace nORM.Providers
         /// </summary>
         public virtual string ParamPrefix => ParameterPrefixChar.ToString();
 
-        /// <summary>SQL literal for boolean true ("1" for SQLite/SQL Server/MySQL; PostgreSQL overrides to "TRUE").</summary>
+        /// <summary>SQL literal for boolean true ("1" for SQLite/SQL Server/MySQL; PostgreSQL overrides to "true").</summary>
         public virtual string BooleanTrueLiteral => "1";
+
+        /// <summary>SQL literal for boolean false ("0" for SQLite/SQL Server/MySQL; PostgreSQL overrides to "false").</summary>
+        public virtual string BooleanFalseLiteral => "0";
 
         /// <summary>
         /// Indicates whether this provider should prefer synchronous Read/ExecuteReader calls
