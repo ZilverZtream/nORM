@@ -15,7 +15,9 @@ namespace nORM.Core
     {
         private readonly DbTransaction? _transaction;
         private readonly DbContext _context;
-        private bool _completed;
+        // C1 fix: int field + Interlocked.CompareExchange so concurrent Commit/Dispose calls
+        // never both observe _completed==false and proceed to double-dispose the transaction.
+        private int _completed; // 0 = not yet completed, 1 = completed
 
         internal DbContextTransaction(DbTransaction? transaction, DbContext context)
         {
@@ -108,12 +110,12 @@ namespace nORM.Core
 
         /// <summary>
         /// Disposes the transaction and clears it from the owning <see cref="DbContext"/>.
+        /// C1 fix: Interlocked.CompareExchange ensures only one concurrent caller proceeds.
         /// </summary>
         public void Dispose()
         {
-            if (!_completed)
+            if (Interlocked.CompareExchange(ref _completed, 1, 0) == 0)
             {
-                _completed = true;
                 _transaction?.Dispose();
                 if (_transaction != null)
                     _context.ClearTransaction(_transaction);
@@ -122,13 +124,13 @@ namespace nORM.Core
 
         /// <summary>
         /// Asynchronously disposes the transaction and clears it from the context.
+        /// C1 fix: same atomic gate as Dispose().
         /// </summary>
         /// <returns>A task representing the dispose operation.</returns>
         public async ValueTask DisposeAsync()
         {
-            if (!_completed)
+            if (Interlocked.CompareExchange(ref _completed, 1, 0) == 0)
             {
-                _completed = true;
                 if (_transaction != null)
                     await _transaction.DisposeAsync().ConfigureAwait(false);
                 if (_transaction != null)
