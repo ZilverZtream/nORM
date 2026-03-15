@@ -892,26 +892,27 @@ namespace nORM.Query
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteCompiledPooledSlowAsync<TResult>(ensureTask, plan, parameterValues, fixedParams, state, ct);
 
-            // Get or create the pooled command
-            var cmd = state.PooledCommand;
-            if (cmd == null)
-            {
+            // Q1 fix: dequeue from pool (or create new if pool is empty)
+            if (!state.CommandPool.TryDequeue(out var cmd))
                 cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
-            }
 
             // PERF: Only update compiled parameter values — fixed params are already set
             UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
 
-            // PERF: Inline materialization — command is NOT disposed (pooled for reuse)
+            // PERF: Inline materialization — command returned to pool after use
             if (plan.IsScalar)
-                return ExecutePooledScalarAsync<TResult>(plan, cmd, ct);
+                return ReturnCommandToPool(state.CommandPool, cmd, ExecutePooledScalarAsync<TResult>(plan, cmd, ct));
             // PERF: Sync materialization for providers without true async I/O
             if (_ctx.Provider.PrefersSyncExecution)
-                return ExecutePooledListSync<TResult>(plan, cmd);
-            // Handle List<object> covariant case (e.g., join queries returning anonymous types)
+            {
+                var result = ExecutePooledListSync<TResult>(plan, cmd);
+                state.CommandPool.Enqueue(cmd);
+                return result;
+            }
+            // Handle List<object> covariant case
             if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
-                return (Task<TResult>)(object)ExecutePooledObjectListAsync(plan, cmd, ct);
-            return ExecutePooledListAsync<TResult>(plan, cmd, ct);
+                return (Task<TResult>)(object)ReturnCommandToPool(state.CommandPool, cmd, ExecutePooledObjectListAsync(plan, cmd, ct));
+            return ReturnCommandToPool(state.CommandPool, cmd, ExecutePooledListAsync<TResult>(plan, cmd, ct));
         }
 
         private async Task<TResult> ExecuteCompiledPooledSlowAsync<TResult>(
@@ -920,13 +921,20 @@ namespace nORM.Query
             CompiledQueryState state, CancellationToken ct)
         {
             await ensureTask.ConfigureAwait(false);
-            var cmd = state.PooledCommand;
-            if (cmd == null)
+            // Q1 fix: dequeue from pool or create
+            if (!state.CommandPool.TryDequeue(out var cmd))
                 cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
             UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
-            if (plan.IsScalar)
-                return await ExecutePooledScalarAsync<TResult>(plan, cmd, ct).ConfigureAwait(false);
-            return await ExecutePooledListAsync<TResult>(plan, cmd, ct).ConfigureAwait(false);
+            try
+            {
+                if (plan.IsScalar)
+                    return await ExecutePooledScalarAsync<TResult>(plan, cmd, ct).ConfigureAwait(false);
+                return await ExecutePooledListAsync<TResult>(plan, cmd, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                state.CommandPool.Enqueue(cmd);
+            }
         }
 
         private DbCommand CreateAndPreparePooledCommand(
@@ -979,7 +987,6 @@ namespace nORM.Query
             // Prepare the command — compiles SQL once, subsequent executions skip sqlite3_prepare_v2
             try { cmd.Prepare(); } catch { /* Prepare() is optional — some providers don't support it */ }
 
-            state.PooledCommand = cmd;
             state.FixedParamCount = fixedCount;
             return cmd;
         }
@@ -1036,6 +1043,15 @@ namespace nORM.Query
             }
 
             return Task.FromResult((TResult)(object)list);
+        }
+
+        /// <summary>Q1 fix: awaits work then returns the command to the pool.</summary>
+        private static async Task<TResult> ReturnCommandToPool<TResult>(
+            System.Collections.Concurrent.ConcurrentQueue<System.Data.Common.DbCommand> pool,
+            System.Data.Common.DbCommand cmd, Task<TResult> work)
+        {
+            try { return await work.ConfigureAwait(false); }
+            finally { pool.Enqueue(cmd); }
         }
 
         /// <summary>
