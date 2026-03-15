@@ -20,7 +20,9 @@ namespace nORM.Internal
     /// </summary>
     internal sealed class CompiledQueryState
     {
-        public DbCommand? PooledCommand;
+        // Q1 fix: pool of prepared commands — concurrent callers each dequeue their own command.
+        // Sequential callers (common case) reuse the same command from the pool with zero contention.
+        public readonly System.Collections.Concurrent.ConcurrentQueue<System.Data.Common.DbCommand> CommandPool = new();
         public int FixedParamCount;
     }
 
@@ -95,9 +97,20 @@ namespace nORM.Internal
             DbContext? cachedCtxKeyOwner = null;
             (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams) cachedEntry = default;
             bool hasCachedEntry = false;
-            object?[]? singleArgArray = null;
-            object?[]? tupleArgArray = null;
-            var pooledState = new CompiledQueryState();
+            // Q1/4.0-4.5 fix: per-context pooled state using ConditionalWeakTable.
+            // Each DbContext gets its own CompiledQueryState (and CommandPool). This prevents
+            // cross-connection command contamination when the same compiled delegate is called
+            // from concurrent tasks each holding their own DbContext. Commands are bound to a
+            // specific DbConnection; sharing across connections causes InvalidOperationException.
+            // ConditionalWeakTable provides automatic GC-tracked lifetime: when a context is
+            // collected after Dispose, its pooled commands are released automatically.
+            var stateByCtx = new System.Runtime.CompilerServices.ConditionalWeakTable<DbContext, CompiledQueryState>();
+            // PERF: Single-slot fast-path cache for same-context repeated calls (common case).
+            // The fast-path vars are NOT synchronized — concurrent different-context callers
+            // may race on them, causing a stale cache miss. That is safe: the only consequence
+            // is a ConditionalWeakTable lookup instead of a direct field read (no correctness impact).
+            DbContext? fastCtxOwner = null;
+            CompiledQueryState? fastCtxState = null;
             // PERF: Cache the sync materializer delegate.
             Func<System.Data.Common.DbDataReader, object>? cachedMaterializer = null;
 
@@ -106,11 +119,6 @@ namespace nORM.Internal
                 // PERF: Fast path — same context as last call (common in benchmarks and real apps).
                 if (!hasCachedEntry || !ReferenceEquals(cachedCtxKeyOwner, ctx))
                 {
-                    if (pooledState.PooledCommand != null)
-                    {
-                        try { pooledState.PooledCommand.Dispose(); } catch { }
-                        pooledState.PooledCommand = null;
-                    }
                     string ctxKey;
                     if (ReferenceEquals(cachedCtxKeyOwner, ctx) && cachedCtxKey != null)
                     {
@@ -165,19 +173,15 @@ namespace nORM.Internal
                 {
                     if (value is System.Runtime.CompilerServices.ITuple tuple)
                     {
-                        if (tupleArgArray == null || tupleArgArray.Length != paramNames.Count)
-                            tupleArgArray = new object?[paramNames.Count];
+                        var arr = new object?[paramNames.Count];
                         var count = Math.Min(tuple.Length, paramNames.Count);
                         for (int i = 0; i < count; i++)
-                            tupleArgArray[i] = tuple[i];
-                        args = tupleArgArray;
+                            arr[i] = tuple[i];
+                        args = arr;
                     }
                     else if (paramNames.Count == 1)
                     {
-                        if (singleArgArray == null)
-                            singleArgArray = new object?[1];
-                        singleArgArray[0] = value;
-                        args = singleArgArray;
+                        args = new object?[] { (object?)value };
                     }
                     else
                     {
@@ -191,6 +195,19 @@ namespace nORM.Internal
                     args = Array.Empty<object?>();
                 }
 
+                // Resolve per-context pooled state (fast-path: same ctx as last call).
+                CompiledQueryState state;
+                if (ReferenceEquals(fastCtxOwner, ctx) && fastCtxState != null)
+                {
+                    state = fastCtxState;
+                }
+                else
+                {
+                    state = stateByCtx.GetOrCreateValue(ctx);
+                    fastCtxOwner = ctx;
+                    fastCtxState = state;
+                }
+
                 // PERF: Inline pooled sync execution for providers without true async I/O (SQLite).
                 // Bypasses the entire NormQueryProvider call chain (RetryPolicy, CacheProvider,
                 // EnsureConnectionAsync, IsScalar dispatch) by inlining command reuse + sync read.
@@ -202,9 +219,8 @@ namespace nORM.Internal
                     ctx.Options.CommandInterceptors.Count == 0 &&
                     !cachedPlan.IsScalar)
                 {
-                    // Get or create the pooled command (created once, reused across calls)
-                    var cmd = pooledState.PooledCommand;
-                    if (cmd == null)
+                    // Q1 fix: dequeue a prepared command from the per-context pool, or create new
+                    if (!state.CommandPool.TryDequeue(out var cmd))
                     {
                         cmd = ctx.CreateCommand();
                         cmd.CommandText = cachedPlan.Sql;
@@ -232,7 +248,6 @@ namespace nORM.Internal
                                 fixedCount++;
                             }
                         }
-                        // Pre-create compiled parameter slots
                         var compiledParams2 = cachedPlan.CompiledParameters;
                         for (int i = 0; i < compiledParams2.Count; i++)
                         {
@@ -242,37 +257,42 @@ namespace nORM.Internal
                             cmd.Parameters.Add(p);
                         }
                         try { cmd.Prepare(); } catch { }
-                        pooledState.PooledCommand = cmd;
-                        pooledState.FixedParamCount = fixedCount;
+                        state.FixedParamCount = fixedCount;
                     }
 
                     // Update compiled parameter values (only these change per call)
                     var compiledParams = cachedPlan.CompiledParameters;
                     var compiledCount = Math.Min(compiledParams.Count, args.Length);
-                    var fixedParamCount = pooledState.FixedParamCount;
+                    var fixedParamCount = state.FixedParamCount;
                     for (int i = 0; i < compiledCount; i++)
                         cmd.Parameters[fixedParamCount + i].Value = args[i] ?? DBNull.Value;
 
-                    // Direct sync materialization — zero async overhead, command NOT disposed
                     var materializer = cachedMaterializer!;
                     var capacity = cachedPlan.SingleResult ? 1 : (cachedPlan.Take ?? 16);
                     var list = new List<T>(capacity);
 
-                    using var reader = cmd.ExecuteReader();
-
-                    if (cachedPlan.SingleResult)
+                    try
                     {
-                        var maxRows = cachedPlan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
-                        for (int row = 0; row < maxRows; row++)
+                        using var reader = cmd.ExecuteReader();
+                        if (cachedPlan.SingleResult)
                         {
-                            if (!reader.Read()) break;
-                            list.Add((T)materializer(reader));
+                            var maxRows = cachedPlan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
+                            for (int row = 0; row < maxRows; row++)
+                            {
+                                if (!reader.Read()) break;
+                                list.Add((T)materializer(reader));
+                            }
+                        }
+                        else
+                        {
+                            while (reader.Read())
+                                list.Add((T)materializer(reader));
                         }
                     }
-                    else
+                    finally
                     {
-                        while (reader.Read())
-                            list.Add((T)materializer(reader));
+                        // Return command to per-context pool for next caller on this context
+                        state.CommandPool.Enqueue(cmd);
                     }
 
                     return Task.FromResult(list);
@@ -280,7 +300,7 @@ namespace nORM.Internal
 
                 // Standard path for async providers or when advanced features are enabled
                 return ctx.GetQueryProvider().ExecuteCompiledPooledAsync<List<T>>(
-                    cachedPlan!, args, cachedEntry.FixedParams, pooledState, default);
+                    cachedPlan!, args, cachedEntry.FixedParams, state, default);
             };
         }
 

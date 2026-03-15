@@ -274,6 +274,7 @@ namespace nORM.Query
 
             var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
+            cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             if (!isNull && !isBoolTrue)
                 cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
 
@@ -289,6 +290,7 @@ namespace nORM.Query
             await ensureTask.ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
+            cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             if (!isNull && !isBoolTrue)
                 cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
             var results = new List<T>(takeCount ?? 16);
@@ -335,6 +337,7 @@ namespace nORM.Query
             await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
+            cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             var results = new List<T>();
             var materializer = GetSyncMaterializer<T>(ctx);
             await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
@@ -351,6 +354,7 @@ namespace nORM.Query
             await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
+            cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
             return (object)Convert.ToInt32(result);
         }
