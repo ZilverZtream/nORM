@@ -27,6 +27,9 @@ namespace nORM.Migration
         // Escape SQL Server identifiers to prevent SQL injection via identifier names.
         private static string Esc(string id) => $"[{id.Replace("]", "]]")}]";
 
+        // Escape a value interpolated inside a SQL single-quoted string literal.
+        private static string EscLiteral(string s) => s.Replace("'", "''");
+
         /// <summary>
         /// Generates SQL Server specific statements for applying the provided schema changes.
         /// </summary>
@@ -90,12 +93,12 @@ namespace nORM.Migration
                 if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
                 {
                     // Drop the old default constraint (if any) by finding it via system metadata.
-                    up.Add($"DECLARE @__df_{table.Name}_{newCol.Name} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{table.Name}') AND COL_NAME(parent_column_id,column_id)='{newCol.Name}') IF @__df_{table.Name}_{newCol.Name} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+@__df_{table.Name}_{newCol.Name}+']')");
+                    up.Add($"DECLARE @__df_{table.Name}_{newCol.Name} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_column_id,column_id)='{EscLiteral(newCol.Name)}') IF @__df_{table.Name}_{newCol.Name} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+@__df_{table.Name}_{newCol.Name}+']')");
                     if (newCol.DefaultValue != null)
                         up.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{newCol.Name}")} DEFAULT ({newCol.DefaultValue}) FOR {Esc(newCol.Name)}");
 
                     // Down: restore the old default.
-                    down.Add($"DECLARE @__df_{table.Name}_{oldCol.Name} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{table.Name}') AND COL_NAME(parent_column_id,column_id)='{oldCol.Name}') IF @__df_{table.Name}_{oldCol.Name} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+@__df_{table.Name}_{oldCol.Name}+']')");
+                    down.Add($"DECLARE @__df_{table.Name}_{oldCol.Name} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_column_id,column_id)='{EscLiteral(oldCol.Name)}') IF @__df_{table.Name}_{oldCol.Name} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+@__df_{table.Name}_{oldCol.Name}+']')");
                     if (oldCol.DefaultValue != null)
                         down.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{oldCol.Name}")} DEFAULT ({oldCol.DefaultValue}) FOR {Esc(oldCol.Name)}");
                 }
