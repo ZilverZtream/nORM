@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
@@ -246,11 +247,15 @@ namespace nORM.Internal
                 // Bypasses the entire NormQueryProvider call chain (RetryPolicy, CacheProvider,
                 // EnsureConnectionAsync, IsScalar dispatch) by inlining command reuse + sync read.
                 // Pooled commands avoid per-call DbCommand/DbParameter allocation and SQL compilation.
+                // T1 fix: guard on Connection.State == Open — closed connection falls through to the
+                // standard path which calls EnsureConnectionAsync before executing.
+                // SG1 fix: interceptors guard removed — the fast path now routes through
+                // ExecuteReaderWithInterception so interceptors are honoured.
                 if (cachedPlan != null &&
                     ctx.Provider.PrefersSyncExecution &&
                     ctx.Options.RetryPolicy == null &&
                     ctx.Options.CacheProvider == null &&
-                    ctx.Options.CommandInterceptors.Count == 0 &&
+                    ctx.Connection.State == ConnectionState.Open &&
                     !cachedPlan.IsScalar)
                 {
                     // Q1 fix: dequeue a prepared command from the per-context pool, or create new
@@ -266,7 +271,9 @@ namespace nORM.Internal
                             {
                                 var p = cmd.CreateParameter();
                                 p.ParameterName = fixedParams[i].Key;
-                                p.Value = fixedParams[i].Value;
+                                // P1 fix: use AssignValue so DbType/Size/Precision are set
+                                // correctly for enum, DateOnly, TimeOnly, Guid etc.
+                                ParameterAssign.AssignValue(p, fixedParams[i].Value);
                                 cmd.Parameters.Add(p);
                             }
                             fixedCount = fixedParams.Length;
@@ -277,7 +284,9 @@ namespace nORM.Internal
                             {
                                 var p = cmd.CreateParameter();
                                 p.ParameterName = kvp.Key;
-                                p.Value = kvp.Value;
+                                // P1 fix: use AssignValue so DbType/Size/Precision are set
+                                // correctly for enum, DateOnly, TimeOnly, Guid etc.
+                                ParameterAssign.AssignValue(p, kvp.Value);
                                 cmd.Parameters.Add(p);
                                 fixedCount++;
                             }
@@ -309,7 +318,13 @@ namespace nORM.Internal
 
                     try
                     {
-                        using var reader = cmd.ExecuteReader();
+                        // SG1 fix: rebind transaction on every use — the transaction may have
+                        // changed since the command was created/last-used (or the command is
+                        // dequeued from the pool with a stale/null transaction reference).
+                        cmd.Transaction = ctx.CurrentTransaction;
+                        // SG1 fix: route through ExecuteReaderWithInterception so registered
+                        // CommandInterceptors are invoked even on the pooled sync fast path.
+                        using var reader = cmd.ExecuteReaderWithInterception(ctx, CommandBehavior.Default);
                         if (cachedPlan.SingleResult)
                         {
                             var maxRows = cachedPlan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
