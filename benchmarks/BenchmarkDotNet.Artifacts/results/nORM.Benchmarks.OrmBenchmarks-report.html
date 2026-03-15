@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>nORM.Benchmarks.OrmBenchmarks-20260314-174259</title>
+<title>nORM.Benchmarks.OrmBenchmarks-20260315-090250</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -24,44 +24,44 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.26100.4351)
 <table>
 <thead><tr><th>Method                               </th><th>Mean </th><th>Error</th><th>StdDev</th><th>Rank</th><th>Gen0</th><th>Gen1</th><th>Allocated</th>
 </tr>
-</thead><tbody><tr><td>Count_RawAdo</td><td>15.35 &mu;s</td><td>0.110 &mu;s</td><td>0.103 &mu;s</td><td>1</td><td>0.0458</td><td>-</td><td>808 B</td>
-</tr><tr><td>&#39;Query Simple Dapper (Prepared)&#39;</td><td>15.37 &mu;s</td><td>0.071 &mu;s</td><td>0.063 &mu;s</td><td>1</td><td>0.3662</td><td>-</td><td>6024 B</td>
-</tr><tr><td>&#39;Query Simple Raw ADO (Prepared)&#39;</td><td>15.76 &mu;s</td><td>0.109 &mu;s</td><td>0.102 &mu;s</td><td>2</td><td>0.3662</td><td>-</td><td>6024 B</td>
-</tr><tr><td>Count_Dapper</td><td>15.89 &mu;s</td><td>0.136 &mu;s</td><td>0.127 &mu;s</td><td>2</td><td>0.0610</td><td>-</td><td>1096 B</td>
-</tr><tr><td>&#39;Query Simple nORM (Compiled)&#39;</td><td>16.23 &mu;s</td><td>0.075 &mu;s</td><td>0.070 &mu;s</td><td>3</td><td>0.2747</td><td>-</td><td>4384 B</td>
-</tr><tr><td>Count_nORM</td><td>16.29 &mu;s</td><td>0.150 &mu;s</td><td>0.133 &mu;s</td><td>3</td><td>0.0916</td><td>-</td><td>1904 B</td>
-</tr><tr><td>&#39;Query Simple EF Core (Compiled)&#39;</td><td>20.56 &mu;s</td><td>0.174 &mu;s</td><td>0.163 &mu;s</td><td>4</td><td>0.5188</td><td>-</td><td>8264 B</td>
-</tr><tr><td>Query_Simple_nORM</td><td>21.74 &mu;s</td><td>0.148 &mu;s</td><td>0.131 &mu;s</td><td>5</td><td>0.4272</td><td>-</td><td>6816 B</td>
-</tr><tr><td>Query_Simple_RawAdo</td><td>22.50 &mu;s</td><td>0.150 &mu;s</td><td>0.141 &mu;s</td><td>6</td><td>0.3967</td><td>-</td><td>6248 B</td>
-</tr><tr><td>Query_Simple_EfCore</td><td>25.69 &mu;s</td><td>0.287 &mu;s</td><td>0.254 &mu;s</td><td>7</td><td>0.7324</td><td>-</td><td>12832 B</td>
-</tr><tr><td>Query_Simple_Dapper</td><td>25.87 &mu;s</td><td>0.151 &mu;s</td><td>0.141 &mu;s</td><td>7</td><td>0.4272</td><td>-</td><td>6912 B</td>
-</tr><tr><td>Count_EfCore</td><td>27.38 &mu;s</td><td>0.169 &mu;s</td><td>0.150 &mu;s</td><td>8</td><td>0.2441</td><td>-</td><td>4744 B</td>
-</tr><tr><td>Query_Join_nORM_Compiled</td><td>39.75 &mu;s</td><td>0.323 &mu;s</td><td>0.302 &mu;s</td><td>9</td><td>0.9155</td><td>-</td><td>14512 B</td>
-</tr><tr><td>Insert_Single_nORM</td><td>40.16 &mu;s</td><td>0.693 &mu;s</td><td>0.614 &mu;s</td><td>9</td><td>0.0610</td><td>-</td><td>1480 B</td>
-</tr><tr><td>Query_Join_Dapper</td><td>42.12 &mu;s</td><td>0.842 &mu;s</td><td>1.124 &mu;s</td><td>10</td><td>0.9155</td><td>-</td><td>14776 B</td>
-</tr><tr><td>Insert_Single_Dapper</td><td>50.01 &mu;s</td><td>0.837 &mu;s</td><td>0.930 &mu;s</td><td>11</td><td>0.3052</td><td>-</td><td>4816 B</td>
-</tr><tr><td>Query_Join_nORM</td><td>50.42 &mu;s</td><td>0.242 &mu;s</td><td>0.202 &mu;s</td><td>11</td><td>1.3428</td><td>-</td><td>22632 B</td>
-</tr><tr><td>Insert_Single_RawAdo</td><td>51.87 &mu;s</td><td>0.635 &mu;s</td><td>0.531 &mu;s</td><td>12</td><td>0.1221</td><td>-</td><td>2240 B</td>
-</tr><tr><td>&#39;Query Complex EF Core (Compiled)&#39;</td><td>56.39 &mu;s</td><td>0.251 &mu;s</td><td>0.235 &mu;s</td><td>13</td><td>0.9155</td><td>-</td><td>14648 B</td>
-</tr><tr><td>Insert_Single_EfCore</td><td>63.06 &mu;s</td><td>1.432 &mu;s</td><td>4.221 &mu;s</td><td>14</td><td>0.9766</td><td>-</td><td>15840 B</td>
-</tr><tr><td>Query_Complex_nORM</td><td>66.12 &mu;s</td><td>0.625 &mu;s</td><td>0.585 &mu;s</td><td>14</td><td>0.9766</td><td>-</td><td>18416 B</td>
-</tr><tr><td>Query_Complex_EfCore</td><td>76.40 &mu;s</td><td>0.660 &mu;s</td><td>0.617 &mu;s</td><td>15</td><td>1.4648</td><td>-</td><td>23664 B</td>
-</tr><tr><td>Query_Join_EfCore</td><td>83.74 &mu;s</td><td>1.629 &mu;s</td><td>1.600 &mu;s</td><td>16</td><td>3.4180</td><td>-</td><td>56922 B</td>
-</tr><tr><td>&#39;Query Complex Dapper (Prepared)&#39;</td><td>89.14 &mu;s</td><td>0.248 &mu;s</td><td>0.207 &mu;s</td><td>17</td><td>0.6104</td><td>-</td><td>10312 B</td>
-</tr><tr><td>&#39;Query Complex Raw ADO (Prepared)&#39;</td><td>89.59 &mu;s</td><td>0.382 &mu;s</td><td>0.358 &mu;s</td><td>17</td><td>0.6104</td><td>-</td><td>10312 B</td>
-</tr><tr><td>&#39;Query Complex nORM (Compiled)&#39;</td><td>91.00 &mu;s</td><td>0.272 &mu;s</td><td>0.255 &mu;s</td><td>18</td><td>0.4883</td><td>-</td><td>8464 B</td>
-</tr><tr><td>Query_Complex_RawAdo</td><td>100.83 &mu;s</td><td>0.239 &mu;s</td><td>0.223 &mu;s</td><td>19</td><td>0.6104</td><td>-</td><td>11016 B</td>
-</tr><tr><td>Query_Complex_Dapper</td><td>107.69 &mu;s</td><td>0.478 &mu;s</td><td>0.424 &mu;s</td><td>20</td><td>0.8545</td><td>-</td><td>13528 B</td>
-</tr><tr><td>&#39;BulkInsert Idiomatic - nORM BulkInsert&#39;</td><td>489.20 &mu;s</td><td>4.489 &mu;s</td><td>4.199 &mu;s</td><td>21</td><td>8.7891</td><td>-</td><td>149649 B</td>
-</tr><tr><td>&#39;BulkInsert Batched - nORM Prepared&#39;</td><td>491.02 &mu;s</td><td>8.869 &mu;s</td><td>7.863 &mu;s</td><td>21</td><td>7.8125</td><td>-</td><td>132009 B</td>
-</tr><tr><td>&#39;BulkInsert Batched - Dapper prepared&#39;</td><td>537.24 &mu;s</td><td>10.271 &mu;s</td><td>11.828 &mu;s</td><td>22</td><td>6.8359</td><td>-</td><td>118457 B</td>
-</tr><tr><td>&#39;BulkInsert Idiomatic - Dapper list in Tx&#39;</td><td>670.50 &mu;s</td><td>5.322 &mu;s</td><td>4.978 &mu;s</td><td>23</td><td>26.3672</td><td>1.9531</td><td>419161 B</td>
-</tr><tr><td>&#39;BulkInsert Batched - nORM Tx + per row&#39;</td><td>934.74 &mu;s</td><td>6.970 &mu;s</td><td>6.520 &mu;s</td><td>24</td><td>19.5313</td><td>1.9531</td><td>319940 B</td>
-</tr><tr><td>&#39;BulkInsert Idiomatic - EF AddRange&#39;</td><td>1,880.39 &mu;s</td><td>27.944 &mu;s</td><td>26.139 &mu;s</td><td>25</td><td>78.1250</td><td>31.2500</td><td>1331341 B</td>
-</tr><tr><td>&#39;BulkInsert Batched - EF SaveChanges in Tx&#39;</td><td>1,922.40 &mu;s</td><td>24.374 &mu;s</td><td>22.800 &mu;s</td><td>26</td><td>78.1250</td><td>31.2500</td><td>1332480 B</td>
-</tr><tr><td>&#39;BulkInsert Naive - nORM per row&#39;</td><td>4,585.93 &mu;s</td><td>81.586 &mu;s</td><td>103.180 &mu;s</td><td>27</td><td>7.8125</td><td>-</td><td>158406 B</td>
-</tr><tr><td>&#39;BulkInsert Naive - Dapper per row&#39;</td><td>5,286.61 &mu;s</td><td>73.958 &mu;s</td><td>57.742 &mu;s</td><td>28</td><td>31.2500</td><td>-</td><td>493526 B</td>
-</tr><tr><td>&#39;BulkInsert Naive - EF per row&#39;</td><td>7,860.30 &mu;s</td><td>91.935 &mu;s</td><td>81.498 &mu;s</td><td>29</td><td>250.0000</td><td>31.2500</td><td>4234573 B</td>
+</thead><tbody><tr><td>Insert_Single_Dapper</td><td>NA</td><td>NA</td><td>NA</td><td>?</td><td>NA</td><td>NA</td><td>NA</td>
+</tr><tr><td>Insert_Single_RawAdo</td><td>NA</td><td>NA</td><td>NA</td><td>?</td><td>NA</td><td>NA</td><td>NA</td>
+</tr><tr><td>Query_Simple_EfCore</td><td>NA</td><td>NA</td><td>NA</td><td>?</td><td>NA</td><td>NA</td><td>NA</td>
+</tr><tr><td>Count_nORM</td><td>13.19 &mu;s</td><td>0.156 &mu;s</td><td>0.139 &mu;s</td><td>1</td><td>0.0916</td><td>-</td><td>1560 B</td>
+</tr><tr><td>Count_RawAdo</td><td>14.94 &mu;s</td><td>0.083 &mu;s</td><td>0.069 &mu;s</td><td>2</td><td>0.0458</td><td>-</td><td>808 B</td>
+</tr><tr><td>&#39;Query Simple nORM (Compiled)&#39;</td><td>14.97 &mu;s</td><td>0.090 &mu;s</td><td>0.084 &mu;s</td><td>2</td><td>0.2747</td><td>-</td><td>4424 B</td>
+</tr><tr><td>Count_Dapper</td><td>15.47 &mu;s</td><td>0.190 &mu;s</td><td>0.178 &mu;s</td><td>3</td><td>0.0610</td><td>-</td><td>1096 B</td>
+</tr><tr><td>&#39;Query Simple Dapper (Prepared)&#39;</td><td>16.19 &mu;s</td><td>0.103 &mu;s</td><td>0.097 &mu;s</td><td>4</td><td>0.3662</td><td>-</td><td>6024 B</td>
+</tr><tr><td>&#39;Query Simple Raw ADO (Prepared)&#39;</td><td>16.40 &mu;s</td><td>0.326 &mu;s</td><td>0.423 &mu;s</td><td>4</td><td>0.3662</td><td>-</td><td>6024 B</td>
+</tr><tr><td>Query_Simple_nORM</td><td>20.63 &mu;s</td><td>0.271 &mu;s</td><td>0.253 &mu;s</td><td>5</td><td>0.4272</td><td>-</td><td>6816 B</td>
+</tr><tr><td>&#39;Query Simple EF Core (Compiled)&#39;</td><td>21.36 &mu;s</td><td>0.162 &mu;s</td><td>0.152 &mu;s</td><td>6</td><td>0.5188</td><td>-</td><td>8264 B</td>
+</tr><tr><td>Query_Simple_RawAdo</td><td>23.26 &mu;s</td><td>0.243 &mu;s</td><td>0.227 &mu;s</td><td>7</td><td>0.3967</td><td>-</td><td>6248 B</td>
+</tr><tr><td>Query_Simple_Dapper</td><td>26.91 &mu;s</td><td>0.204 &mu;s</td><td>0.191 &mu;s</td><td>8</td><td>0.4272</td><td>-</td><td>6920 B</td>
+</tr><tr><td>Count_EfCore</td><td>27.19 &mu;s</td><td>0.272 &mu;s</td><td>0.254 &mu;s</td><td>8</td><td>0.2441</td><td>-</td><td>4744 B</td>
+</tr><tr><td>Query_Join_nORM_Compiled</td><td>39.37 &mu;s</td><td>0.393 &mu;s</td><td>0.368 &mu;s</td><td>9</td><td>0.9155</td><td>-</td><td>14544 B</td>
+</tr><tr><td>Query_Join_Dapper</td><td>41.75 &mu;s</td><td>0.410 &mu;s</td><td>0.384 &mu;s</td><td>10</td><td>0.9155</td><td>-</td><td>14776 B</td>
+</tr><tr><td>Insert_Single_nORM</td><td>44.08 &mu;s</td><td>0.877 &mu;s</td><td>0.778 &mu;s</td><td>11</td><td>0.0610</td><td>-</td><td>1480 B</td>
+</tr><tr><td>Query_Join_nORM</td><td>53.07 &mu;s</td><td>1.002 &mu;s</td><td>0.782 &mu;s</td><td>12</td><td>1.2207</td><td>-</td><td>22632 B</td>
+</tr><tr><td>&#39;Query Complex EF Core (Compiled)&#39;</td><td>57.71 &mu;s</td><td>0.679 &mu;s</td><td>0.754 &mu;s</td><td>13</td><td>0.8545</td><td>-</td><td>14640 B</td>
+</tr><tr><td>Insert_Single_EfCore</td><td>60.11 &mu;s</td><td>1.068 &mu;s</td><td>0.999 &mu;s</td><td>14</td><td>0.9766</td><td>-</td><td>15840 B</td>
+</tr><tr><td>Query_Complex_nORM</td><td>62.32 &mu;s</td><td>0.550 &mu;s</td><td>0.459 &mu;s</td><td>15</td><td>0.9766</td><td>-</td><td>18136 B</td>
+</tr><tr><td>Query_Complex_EfCore</td><td>75.01 &mu;s</td><td>0.861 &mu;s</td><td>0.805 &mu;s</td><td>16</td><td>1.4648</td><td>-</td><td>23464 B</td>
+</tr><tr><td>Query_Join_EfCore</td><td>85.59 &mu;s</td><td>0.852 &mu;s</td><td>0.755 &mu;s</td><td>17</td><td>3.4180</td><td>-</td><td>56921 B</td>
+</tr><tr><td>&#39;Query Complex nORM (Compiled)&#39;</td><td>89.94 &mu;s</td><td>1.273 &mu;s</td><td>1.191 &mu;s</td><td>18</td><td>0.4883</td><td>-</td><td>8504 B</td>
+</tr><tr><td>&#39;Query Complex Raw ADO (Prepared)&#39;</td><td>91.38 &mu;s</td><td>0.848 &mu;s</td><td>0.793 &mu;s</td><td>18</td><td>0.6104</td><td>-</td><td>10312 B</td>
+</tr><tr><td>&#39;Query Complex Dapper (Prepared)&#39;</td><td>92.21 &mu;s</td><td>1.375 &mu;s</td><td>1.219 &mu;s</td><td>18</td><td>0.6104</td><td>-</td><td>10312 B</td>
+</tr><tr><td>Query_Complex_RawAdo</td><td>103.34 &mu;s</td><td>1.322 &mu;s</td><td>1.104 &mu;s</td><td>19</td><td>0.6104</td><td>-</td><td>11016 B</td>
+</tr><tr><td>Query_Complex_Dapper</td><td>109.53 &mu;s</td><td>1.484 &mu;s</td><td>1.388 &mu;s</td><td>20</td><td>0.8545</td><td>-</td><td>13528 B</td>
+</tr><tr><td>&#39;BulkInsert Batched - nORM Prepared&#39;</td><td>652.39 &mu;s</td><td>11.720 &mu;s</td><td>10.963 &mu;s</td><td>21</td><td>7.8125</td><td>-</td><td>132009 B</td>
+</tr><tr><td>&#39;BulkInsert Idiomatic - nORM BulkInsert&#39;</td><td>665.50 &mu;s</td><td>10.758 &mu;s</td><td>10.063 &mu;s</td><td>21</td><td>8.7891</td><td>-</td><td>149648 B</td>
+</tr><tr><td>&#39;BulkInsert Batched - Dapper prepared&#39;</td><td>674.15 &mu;s</td><td>12.727 &mu;s</td><td>14.146 &mu;s</td><td>21</td><td>6.8359</td><td>-</td><td>118457 B</td>
+</tr><tr><td>&#39;BulkInsert Idiomatic - Dapper list in Tx&#39;</td><td>816.21 &mu;s</td><td>15.706 &mu;s</td><td>18.696 &mu;s</td><td>22</td><td>25.3906</td><td>1.9531</td><td>419161 B</td>
+</tr><tr><td>&#39;BulkInsert Batched - nORM Tx + per row&#39;</td><td>1,058.14 &mu;s</td><td>19.538 &mu;s</td><td>20.905 &mu;s</td><td>23</td><td>19.5313</td><td>1.9531</td><td>319940 B</td>
+</tr><tr><td>&#39;BulkInsert Idiomatic - EF AddRange&#39;</td><td>2,031.58 &mu;s</td><td>40.199 &mu;s</td><td>64.914 &mu;s</td><td>24</td><td>78.1250</td><td>31.2500</td><td>1331342 B</td>
+</tr><tr><td>&#39;BulkInsert Batched - EF SaveChanges in Tx&#39;</td><td>2,105.57 &mu;s</td><td>41.812 &mu;s</td><td>89.106 &mu;s</td><td>25</td><td>78.1250</td><td>31.2500</td><td>1332485 B</td>
+</tr><tr><td>&#39;BulkInsert Naive - nORM per row&#39;</td><td>4,340.20 &mu;s</td><td>63.600 &mu;s</td><td>59.491 &mu;s</td><td>26</td><td>7.8125</td><td>-</td><td>158406 B</td>
+</tr><tr><td>&#39;BulkInsert Naive - EF per row&#39;</td><td>7,642.89 &mu;s</td><td>77.187 &mu;s</td><td>72.201 &mu;s</td><td>27</td><td>250.0000</td><td>31.2500</td><td>4234576 B</td>
+</tr><tr><td>&#39;BulkInsert Naive - Dapper per row&#39;</td><td>9,269.42 &mu;s</td><td>183.317 &mu;s</td><td>211.109 &mu;s</td><td>28</td><td>31.2500</td><td>-</td><td>493542 B</td>
 </tr></tbody></table>
 </body>
 </html>

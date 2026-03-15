@@ -471,9 +471,16 @@ namespace nORM.Core
             // No need to dispose connection pools - we rely on ADO.NET provider pooling now.
             // Connections are disposed by callers, which returns them to the provider pool.
 
-            // Only dispose semaphores after the health check task has been given a chance to complete
-            _failoverSemaphore.Dispose();
-            _healthCheckSemaphore.Dispose();
+            // T1 fix: only dispose semaphores when the health task has actually terminated.
+            // If the task is still running (timed out above), it holds references to both
+            // semaphores and will call Release() in its finally block — disposing them here
+            // would produce ObjectDisposedException in the still-running background code.
+            // SemaphoreSlim is a tiny managed object; GC handles it safely in the rare timeout path.
+            if (_healthCheckTask.IsCompleted)
+            {
+                _failoverSemaphore.Dispose();
+                _healthCheckSemaphore.Dispose();
+            }
         }
     }
 }
