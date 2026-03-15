@@ -20,11 +20,11 @@ namespace nORM.Navigation
     public sealed class BatchedNavigationLoader : IDisposable
     {
         private readonly DbContext _context;
-        private readonly Dictionary<(Type EntityType, string PropertyName), List<(object Entity, TaskCompletionSource<object> Tcs)>> _pendingLoads = new();
+        private readonly Dictionary<(Type EntityType, string PropertyName), List<(object Entity, TaskCompletionSource<object> Tcs, CancellationToken Ct)>> _pendingLoads = new();
         private Timer? _batchTimer;
         private int _processing;
         private readonly SemaphoreSlim _batchSemaphore = new(1, 1);
-        private readonly object _syncLock = new object(); // For synchronous operations to avoid deadlock
+        private readonly object _syncLock = new object();
         private const int BatchDelayMs = 10;
 
         /// <summary>
@@ -64,10 +64,10 @@ namespace nORM.Navigation
             {
                 if (!_pendingLoads.TryGetValue(key, out var list))
                 {
-                    list = new List<(object, TaskCompletionSource<object>)>();
+                    list = new List<(object, TaskCompletionSource<object>, CancellationToken)>();
                     _pendingLoads[key] = list;
                 }
-                list.Add((entity, tcs));
+                list.Add((entity, tcs, ct));
 
                 // PERFORMANCE: Only schedule timer when first item is added
                 // Check _batchTimer first to avoid unnecessary count calculation
@@ -94,7 +94,7 @@ namespace nORM.Navigation
                 _batchTimer = new Timer(TimerTick, null, BatchDelayMs, Timeout.Infinite);
             }
 
-            return (List<object>)await tcs.Task.ConfigureAwait(false);
+            return (List<object>)await tcs.Task.WaitAsync(ct).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -126,7 +126,7 @@ namespace nORM.Navigation
 
             try
             {
-                var batches = new Dictionary<(Type, string), List<(object, TaskCompletionSource<object>)>>(_pendingLoads);
+                var batches = new Dictionary<(Type, string), List<(object Entity, TaskCompletionSource<object> Tcs, CancellationToken Ct)>>(_pendingLoads);
                 _pendingLoads.Clear();
 
                 // PERFORMANCE: Dispose timer after processing batch (reactive approach)
@@ -148,13 +148,23 @@ namespace nORM.Navigation
         }
 
         private async Task LoadNavigationBatchAsync(Type entityType, string propertyName,
-            List<(object Entity, TaskCompletionSource<object> Tcs)> entities)
+            List<(object Entity, TaskCompletionSource<object> Tcs, CancellationToken Ct)> entities)
         {
+            var activeCts = entities.Select(e => e.Ct).Where(t => t.CanBeCanceled).ToArray();
+            using var linkedCts = activeCts.Length > 0
+                ? CancellationTokenSource.CreateLinkedTokenSource(activeCts)
+                : null;
+            var ct = linkedCts?.Token ?? CancellationToken.None;
+
             try
             {
                 var mapping = _context.GetMapping(entityType);
                 if (!mapping.Relations.TryGetValue(propertyName, out var relation))
+                {
+                    foreach (var (_, tcs, _) in entities)
+                        tcs.SetResult(new List<object>());
                     return;
+                }
 
                 var keys = entities.Select(e => relation.PrincipalKey.Getter(e.Entity))
                                    .Where(k => k != null)
@@ -162,13 +172,17 @@ namespace nORM.Navigation
                                    .ToList();
 
                 if (!keys.Any())
+                {
+                    foreach (var (_, tcs, _) in entities)
+                        tcs.SetResult(new List<object>());
                     return;
+                }
 
-                var relatedData = await LoadRelatedDataBatch(relation, keys).ConfigureAwait(false);
+                var relatedData = await LoadRelatedDataBatch(relation, keys, ct).ConfigureAwait(false);
                 var grouped = relatedData.GroupBy(relation.ForeignKey.Getter)
                                          .ToDictionary(g => g.Key!, g => g.ToList());
 
-                foreach (var (entity, tcs) in entities)
+                foreach (var (entity, tcs, _) in entities)
                 {
                     var key = relation.PrincipalKey.Getter(entity);
                     var related = grouped.TryGetValue(key!, out var list) ? list : new List<object>();
@@ -177,7 +191,7 @@ namespace nORM.Navigation
             }
             catch (Exception ex)
             {
-                foreach (var (_, tcs) in entities)
+                foreach (var (_, tcs, _) in entities)
                     tcs.SetException(ex);
             }
         }
@@ -189,11 +203,12 @@ namespace nORM.Navigation
         /// </summary>
         /// <param name="relation">Metadata describing the relationship being loaded.</param>
         /// <param name="keys">The set of principal key values to retrieve related entities for.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>A list containing the materialized dependent entities.</returns>
-        private async Task<List<object>> LoadRelatedDataBatch(TableMapping.Relation relation, List<object?> keys)
+        private async Task<List<object>> LoadRelatedDataBatch(TableMapping.Relation relation, List<object?> keys, CancellationToken ct)
         {
             var mapping = _context.GetMapping(relation.DependentType);
-            await _context.EnsureConnectionAsync(default).ConfigureAwait(false);
+            await _context.EnsureConnectionAsync(ct).ConfigureAwait(false);
             using var cmd = _context.CreateCommand();
 
             var where = _context.Provider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, keys);
@@ -205,10 +220,10 @@ namespace nORM.Navigation
             var materializer = translator.CreateMaterializer(mapping, relation.DependentType);
             var results = new List<object>();
 
-            using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, default).ConfigureAwait(false);
-            while (await reader.ReadAsync(default).ConfigureAwait(false))
+            using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct).ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
-                var entity = await materializer(reader, default).ConfigureAwait(false);
+                var entity = await materializer(reader, ct).ConfigureAwait(false);
                 var entry = _context.ChangeTracker.Track(entity, EntityState.Unchanged, mapping);
                 entity = entry.Entity!;
                 NavigationPropertyExtensions._navigationContexts.GetValue(entity, _ => new NavigationContext(_context, relation.DependentType));
@@ -225,8 +240,6 @@ namespace nORM.Navigation
         /// <param name="entity">The entity whose pending navigation loads should be cleared.</param>
         internal void RemovePendingLoadsForEntity(object entity)
         {
-            // FIXED: Use regular lock instead of SemaphoreSlim.Wait() to avoid deadlock
-            // in synchronous contexts (ASP.NET, UI threads with synchronization context)
             lock (_syncLock)
             {
                 foreach (var key in _pendingLoads.Keys.ToList())
