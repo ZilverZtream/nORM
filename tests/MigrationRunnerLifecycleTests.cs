@@ -10,7 +10,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// MIG-6: Verifies that migration runners implement IAsyncDisposable/IDisposable
+/// Verifies that migration runners implement IAsyncDisposable/IDisposable
 /// and that disposal completes without exception and releases the internal context.
 /// </summary>
 public class MigrationRunnerLifecycleTests
@@ -85,7 +85,7 @@ public class MigrationRunnerLifecycleTests
     [Fact]
     public async Task SqliteMigrationRunner_ClosedConnection_OpensAutomaticallyOnApply()
     {
-        // MIG-1: Runner must open a closed connection before calling BeginTransactionAsync.
+        // Runner must open a closed connection before calling BeginTransactionAsync.
         // Create a connection but do NOT open it.
         var cn = new SqliteConnection("Data Source=:memory:");
         // Connection is closed (State == Closed) at this point
@@ -108,7 +108,7 @@ public class MigrationRunnerLifecycleTests
     [Fact]
     public async Task SqliteMigrationRunner_OpenConnection_DoesNotThrowOnApply()
     {
-        // MIG-1: Runner must also work fine when connection is already open (no double-open).
+        // Runner must also work fine when connection is already open (no double-open).
         await using var cn = new SqliteConnection("Data Source=:memory:");
         await cn.OpenAsync();
 

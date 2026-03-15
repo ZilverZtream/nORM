@@ -42,7 +42,7 @@ namespace nORM.Migration
             _logger = logger;
             if (options != null && options.CommandInterceptors.Count > 0)
             {
-                // TX-1/MG-1: Pass ownsConnection=false so the context does NOT dispose the
+                // Pass ownsConnection=false so the context does NOT dispose the
                 // caller-supplied connection when the context itself is disposed.
                 _context = new DbContext(connection, new SqliteProvider(), options, ownsConnection: false);
             }
@@ -56,7 +56,7 @@ namespace nORM.Migration
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
         {
-            // MIG-1: Ensure the connection is open before calling BeginTransactionAsync
+            // Ensure the connection is open before calling BeginTransactionAsync.
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
 
@@ -70,7 +70,7 @@ namespace nORM.Migration
                 migration.Up(_connection, (DbTransaction)transaction);
                 await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
             }
-            // PRV-1: Use CancellationToken.None — commit must not be aborted mid-flight.
+            // Use CancellationToken.None — commit must not be aborted mid-flight.
             // Cancellation during commit acknowledgment leaves ambiguous migration history state;
             // callers would see a failure while DDL may already have committed, risking re-run
             // of already-applied migrations on retry.
@@ -121,7 +121,7 @@ namespace nORM.Migration
                 .OrderBy(m => m.Version)
                 .ToList();
 
-            // MIG-1: Fail-fast on duplicate version numbers in assembly.
+            // Fail-fast on duplicate version numbers in assembly.
             var duplicates = all.GroupBy(m => m.Version).Where(g => g.Count() > 1).ToList();
             if (duplicates.Count > 0)
             {

@@ -38,7 +38,7 @@ namespace nORM.Migration
             _migrationsAssembly = migrationsAssembly;
             if (options != null && options.CommandInterceptors.Count > 0)
             {
-                // TX-1/MG-1: Pass ownsConnection=false so the context does NOT dispose the
+                // Pass ownsConnection=false so the context does NOT dispose the
                 // caller-supplied connection when the context itself is disposed.
                 _context = new DbContext(connection, new MySqlProvider(new GenericParameterFactory(connection)), options, ownsConnection: false);
             }
@@ -50,7 +50,7 @@ namespace nORM.Migration
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
         {
-            // MIG-1: Ensure the connection is open before calling BeginTransactionAsync
+            // Ensure the connection is open before calling BeginTransactionAsync.
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
 
@@ -58,12 +58,12 @@ namespace nORM.Migration
             var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
             if (!pending.Any()) return;
 
-            // P-1: MySQL DDL (ALTER TABLE, CREATE TABLE, DROP TABLE, etc.) implicitly auto-commits,
+            // MySQL DDL (ALTER TABLE, CREATE TABLE, DROP TABLE, etc.) implicitly auto-commits,
             // so a single wrapping transaction cannot roll back schema changes on failure. If migration
             // N+1 fails, the wrapping rollback reverts only the history INSERT for migration N (not the
             // DDL itself), leaving the schema advanced but history behind — causing replay on next run.
             //
-            // Fix: run each migration in its own per-step transaction. The history INSERT is committed
+            // Each migration runs in its own per-step transaction. The history INSERT is committed
             // atomically with the step's end-of-step marker. If a later migration fails:
             //   - Earlier migrations: DDL committed + history recorded (safe to skip on rerun)
             //   - Failed migration:   DDL may have partially committed; history NOT recorded (rerun applies it)
@@ -75,7 +75,7 @@ namespace nORM.Migration
                 {
                     migration.Up(_connection, (DbTransaction)transaction);
                     await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
-                    // PRV-1: CancellationToken.None — commit must not be aborted mid-flight.
+                    // CancellationToken.None — commit must not be aborted mid-flight.
                     await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
                 }
                 catch
@@ -131,7 +131,7 @@ namespace nORM.Migration
                 .OrderBy(m => m.Version)
                 .ToList();
 
-            // MIG-1: Fail-fast on duplicate version numbers in assembly.
+            // Fail-fast on duplicate version numbers in assembly.
             var duplicates = all.GroupBy(m => m.Version).Where(g => g.Count() > 1).ToList();
             if (duplicates.Count > 0)
             {

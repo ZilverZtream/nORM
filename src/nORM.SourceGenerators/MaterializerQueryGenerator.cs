@@ -90,7 +90,7 @@ namespace nORM.SourceGenerators
                 .OrderBy(p => p.Name)
                 .ToList();
 
-            // M1/SG1 fix: collect (ordinalVarName, columnName) pairs first so we can emit
+            // Collect (ordinalVarName, columnName) pairs first so we can emit
             // reader.GetOrdinal("ColumnName") lookups instead of hardcoded positional indices.
             // This makes the generated materializer correct regardless of column order in the result set.
             var ordinalEntries = new List<(string VarName, string ColName)>();

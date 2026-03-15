@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// CT-1: Validates that the concurrency token (RowVersion) used in UPDATE/DELETE WHERE clauses
+/// Validates that the concurrency token (RowVersion) used in UPDATE/DELETE WHERE clauses
 /// comes from the original snapshot captured at attach time, not from the current (possibly mutated)
 /// entity property value.
 /// </summary>

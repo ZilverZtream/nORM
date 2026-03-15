@@ -9,12 +9,12 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// MG-1: Verifies FK constraint awareness in SchemaDiff computation and SQL generation
+/// Verifies FK constraint awareness in SchemaDiff computation and SQL generation
 /// across all four migration SQL generators.
 /// </summary>
 public class MigrationFkTests
 {
-    // ── Helpers ──────────────────────────────────────────────────────────────
+ // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static ForeignKeySchema MakeFk(string constraint, string[] depCols, string principalTable,
         string[]? refCols = null, string onDelete = "NO ACTION", string onUpdate = "NO ACTION") =>
@@ -40,11 +40,11 @@ public class MigrationFkTests
             ForeignKeys = fks?.ToList() ?? new List<ForeignKeySchema>()
         };
 
-    // ── SchemaDiffer FK detection tests ──────────────────────────────────────
+ // ── SchemaDiffer FK detection tests ──────────────────────────────────────
 
-    /// <summary>
-    /// MG-1: A new FK on an existing table must appear in AddedForeignKeys.
-    /// </summary>
+ /// <summary>
+ /// A new FK on an existing table must appear in AddedForeignKeys.
+ /// </summary>
     [Fact]
     public void Diff_NewFkOnExistingTable_AppearsInAddedForeignKeys()
     {
@@ -59,9 +59,9 @@ public class MigrationFkTests
         Assert.Empty(diff.DroppedForeignKeys);
     }
 
-    /// <summary>
-    /// MG-1: A removed FK on an existing table must appear in DroppedForeignKeys.
-    /// </summary>
+ /// <summary>
+ /// A removed FK on an existing table must appear in DroppedForeignKeys.
+ /// </summary>
     [Fact]
     public void Diff_RemovedFkOnExistingTable_AppearsInDroppedForeignKeys()
     {
@@ -76,10 +76,10 @@ public class MigrationFkTests
         Assert.Equal("FK_Child_Parent_FkCol", diff.DroppedForeignKeys[0].ForeignKey.ConstraintName);
     }
 
-    /// <summary>
-    /// MG-1: When an FK changes (e.g. OnDelete changes), it must appear in both
-    /// DroppedForeignKeys (old definition) and AddedForeignKeys (new definition).
-    /// </summary>
+ /// <summary>
+ /// When an FK changes (e.g. OnDelete changes), it must appear in both
+ /// DroppedForeignKeys (old definition) and AddedForeignKeys (new definition).
+ /// </summary>
     [Fact]
     public void Diff_AlteredFk_AppearsInBothDroppedAndAdded()
     {
@@ -96,9 +96,9 @@ public class MigrationFkTests
         Assert.Equal("NO ACTION", diff.DroppedForeignKeys[0].ForeignKey.OnDelete);
     }
 
-    /// <summary>
-    /// MG-1: A diff with only FK changes must report HasChanges = true.
-    /// </summary>
+ /// <summary>
+ /// A diff with only FK changes must report HasChanges = true.
+ /// </summary>
     [Fact]
     public void Diff_FkOnlyChange_HasChanges_IsTrue()
     {
@@ -111,9 +111,9 @@ public class MigrationFkTests
         Assert.True(diff.HasChanges);
     }
 
-    /// <summary>
-    /// MG-1: Unchanged FKs must not appear in AddedForeignKeys or DroppedForeignKeys.
-    /// </summary>
+ /// <summary>
+ /// Unchanged FKs must not appear in AddedForeignKeys or DroppedForeignKeys.
+ /// </summary>
     [Fact]
     public void Diff_UnchangedFk_DoesNotAppearInDiff()
     {
@@ -127,11 +127,11 @@ public class MigrationFkTests
         Assert.Empty(diff.DroppedForeignKeys);
     }
 
-    // ── CREATE TABLE inline FK tests (all 4 generators) ──────────────────────
+ // ── CREATE TABLE inline FK tests (all 4 generators) ──────────────────────
 
-    /// <summary>
-    /// MG-1: SQLite CREATE TABLE for a new table with an FK must include the inline CONSTRAINT … FOREIGN KEY clause.
-    /// </summary>
+ /// <summary>
+ /// SQLite CREATE TABLE for a new table with an FK must include the inline CONSTRAINT … FOREIGN KEY clause.
+ /// </summary>
     [Fact]
     public void Sqlite_CreateTable_InlinesForeignKey()
     {
@@ -149,9 +149,9 @@ public class MigrationFkTests
         Assert.Contains("REFERENCES \"Blog\"", sql.Up[0]);
     }
 
-    /// <summary>
-    /// MG-1: SQL Server CREATE TABLE for a new table with an FK must include the inline CONSTRAINT … FOREIGN KEY clause.
-    /// </summary>
+ /// <summary>
+ /// SQL Server CREATE TABLE for a new table with an FK must include the inline CONSTRAINT … FOREIGN KEY clause.
+ /// </summary>
     [Fact]
     public void SqlServer_CreateTable_InlinesForeignKey()
     {
@@ -169,9 +169,9 @@ public class MigrationFkTests
         Assert.Contains("REFERENCES [Blog]", sql.Up[0]);
     }
 
-    /// <summary>
-    /// MG-1: MySQL CREATE TABLE for a new table with an FK must include the inline CONSTRAINT … FOREIGN KEY clause.
-    /// </summary>
+ /// <summary>
+ /// MySQL CREATE TABLE for a new table with an FK must include the inline CONSTRAINT … FOREIGN KEY clause.
+ /// </summary>
     [Fact]
     public void MySql_CreateTable_InlinesForeignKey()
     {
@@ -189,9 +189,9 @@ public class MigrationFkTests
         Assert.Contains("REFERENCES `Blog`", sql.Up[0]);
     }
 
-    /// <summary>
-    /// MG-1: Postgres CREATE TABLE for a new table with an FK must include the inline CONSTRAINT … FOREIGN KEY clause.
-    /// </summary>
+ /// <summary>
+ /// Postgres CREATE TABLE for a new table with an FK must include the inline CONSTRAINT … FOREIGN KEY clause.
+ /// </summary>
     [Fact]
     public void Postgres_CreateTable_InlinesForeignKey()
     {
@@ -209,11 +209,11 @@ public class MigrationFkTests
         Assert.Contains("REFERENCES \"Blog\"", sql.Up[0]);
     }
 
-    // ── ON DELETE / ON UPDATE clause tests ───────────────────────────────────
+ // ── ON DELETE / ON UPDATE clause tests ───────────────────────────────────
 
-    /// <summary>
-    /// MG-1: ON DELETE CASCADE must appear in the FK constraint SQL when set.
-    /// </summary>
+ /// <summary>
+ /// ON DELETE CASCADE must appear in the FK constraint SQL when set.
+ /// </summary>
     [Fact]
     public void SqlServer_CreateTable_FkWithCascade_EmitsCascadeClause()
     {
@@ -228,9 +228,9 @@ public class MigrationFkTests
         Assert.Contains("ON DELETE CASCADE", sql.Up[0]);
     }
 
-    /// <summary>
-    /// MG-1: NO ACTION (default) must NOT emit an ON DELETE clause (reduces noise).
-    /// </summary>
+ /// <summary>
+ /// NO ACTION (default) must NOT emit an ON DELETE clause (reduces noise).
+ /// </summary>
     [Fact]
     public void SqlServer_CreateTable_FkNoAction_NoOnDeleteClause()
     {
@@ -245,12 +245,12 @@ public class MigrationFkTests
         Assert.DoesNotContain("ON DELETE", sql.Up[0]);
     }
 
-    // ── ALTER TABLE ADD / DROP FK tests ──────────────────────────────────────
+ // ── ALTER TABLE ADD / DROP FK tests ──────────────────────────────────────
 
-    /// <summary>
-    /// MG-1: SQL Server AddedForeignKeys → ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY;
-    /// Down → ALTER TABLE … DROP CONSTRAINT.
-    /// </summary>
+ /// <summary>
+ /// SQL Server AddedForeignKeys → ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY;
+ /// Down → ALTER TABLE … DROP CONSTRAINT.
+ /// </summary>
     [Fact]
     public void SqlServer_AddFk_EmitsAlterTableAdd_DownDropsConstraint()
     {
@@ -269,10 +269,10 @@ public class MigrationFkTests
         Assert.Contains("ALTER TABLE [Post] DROP CONSTRAINT [FK_Post_Blog_BlogId]", sql.Down[0]);
     }
 
-    /// <summary>
-    /// MG-1: SQL Server DroppedForeignKeys → ALTER TABLE … DROP CONSTRAINT;
-    /// Down → ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY.
-    /// </summary>
+ /// <summary>
+ /// SQL Server DroppedForeignKeys → ALTER TABLE … DROP CONSTRAINT;
+ /// Down → ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY.
+ /// </summary>
     [Fact]
     public void SqlServer_DropFk_EmitsAlterTableDrop_DownAddsConstraint()
     {
@@ -291,9 +291,9 @@ public class MigrationFkTests
         Assert.Contains("CONSTRAINT [FK_Post_Blog_BlogId]", sql.Down[0]);
     }
 
-    /// <summary>
-    /// MG-1: MySQL uses DROP FOREIGN KEY (not DROP CONSTRAINT) for FK removal.
-    /// </summary>
+ /// <summary>
+ /// MySQL uses DROP FOREIGN KEY (not DROP CONSTRAINT) for FK removal.
+ /// </summary>
     [Fact]
     public void MySql_DropFk_EmitsDropForeignKey()
     {
@@ -307,14 +307,14 @@ public class MigrationFkTests
 
         Assert.Single(sql.Up);
         Assert.Contains("DROP FOREIGN KEY `FK_Post_Blog_BlogId`", sql.Up[0]);
-        // Down must use ADD CONSTRAINT syntax
+ // Down must use ADD CONSTRAINT syntax
         Assert.Single(sql.Down);
         Assert.Contains("ADD CONSTRAINT", sql.Down[0]);
     }
 
-    /// <summary>
-    /// MG-1: MySQL AddedForeignKeys Down path must use DROP FOREIGN KEY.
-    /// </summary>
+ /// <summary>
+ /// MySQL AddedForeignKeys Down path must use DROP FOREIGN KEY.
+ /// </summary>
     [Fact]
     public void MySql_AddFk_Down_EmitsDropForeignKey()
     {
@@ -330,9 +330,9 @@ public class MigrationFkTests
         Assert.Contains("DROP FOREIGN KEY `FK_Post_Blog_BlogId`", sql.Down[0]);
     }
 
-    /// <summary>
-    /// MG-1: Postgres uses DROP CONSTRAINT (same as SQL Server).
-    /// </summary>
+ /// <summary>
+ /// Postgres uses DROP CONSTRAINT (same as SQL Server).
+ /// </summary>
     [Fact]
     public void Postgres_DropFk_EmitsDropConstraint()
     {
@@ -348,10 +348,10 @@ public class MigrationFkTests
         Assert.Contains("DROP CONSTRAINT \"FK_Post_Blog_BlogId\"", sql.Up[0]);
     }
 
-    /// <summary>
-    /// MG-1: SQLite AddedForeignKeys must use table recreation (CREATE temp + INSERT + DROP + RENAME).
-    /// PRAGMA foreign_keys=off/on must appear in pre/post transaction segments.
-    /// </summary>
+ /// <summary>
+ /// SQLite AddedForeignKeys must use table recreation (CREATE temp + INSERT + DROP + RENAME).
+ /// PRAGMA foreign_keys=off/on must appear in pre/post transaction segments.
+ /// </summary>
     [Fact]
     public void Sqlite_AddFk_UsesTableRecreation_WithPragmaInPrePost()
     {
@@ -363,13 +363,13 @@ public class MigrationFkTests
         var gen = new SqliteMigrationSqlGenerator();
         var sql = gen.GenerateSql(diff);
 
-        // Must use table recreation sequence
+ // Must use table recreation sequence
         Assert.Contains(sql.Up, s => s.StartsWith("CREATE TABLE \"__temp__Post\""));
         Assert.Contains(sql.Up, s => s.StartsWith("INSERT INTO"));
         Assert.Contains(sql.Up, s => s == "DROP TABLE \"Post\"");
         Assert.Contains(sql.Up, s => s.Contains("RENAME TO \"Post\""));
 
-        // PRAGMA must be in pre/post segments, NOT inline in Up/Down
+ // PRAGMA must be in pre/post segments, NOT inline in Up/Down
         Assert.DoesNotContain(sql.Up, s => s.Contains("PRAGMA"));
         Assert.NotNull(sql.PreTransactionUp);
         Assert.Contains("PRAGMA foreign_keys=off", sql.PreTransactionUp!);
@@ -377,11 +377,11 @@ public class MigrationFkTests
         Assert.Contains("PRAGMA foreign_keys=on", sql.PostTransactionUp!);
     }
 
-    // ── DroppedTables Down recreation includes FKs ───────────────────────────
+ // ── DroppedTables Down recreation includes FKs ───────────────────────────
 
-    /// <summary>
-    /// MG-1: When a table with FKs is dropped, the Down recreation must include the FK constraints.
-    /// </summary>
+ /// <summary>
+ /// When a table with FKs is dropped, the Down recreation must include the FK constraints.
+ /// </summary>
     [Fact]
     public void SqlServer_DroppedTable_Down_IncludesForeignKey()
     {
@@ -393,15 +393,15 @@ public class MigrationFkTests
         var gen = new SqlServerMigrationSqlGenerator();
         var sql = gen.GenerateSql(diff);
 
-        // Down must recreate with the FK
+ // Down must recreate with the FK
         Assert.Single(sql.Down);
         Assert.Contains("CONSTRAINT [FK_Post_Blog_BlogId]", sql.Down[0]);
         Assert.Contains("FOREIGN KEY", sql.Down[0]);
     }
 
-    /// <summary>
-    /// MG-1: SQLite dropped table Down recreation must include inline FK constraints.
-    /// </summary>
+ /// <summary>
+ /// SQLite dropped table Down recreation must include inline FK constraints.
+ /// </summary>
     [Fact]
     public void Sqlite_DroppedTable_Down_IncludesForeignKey()
     {

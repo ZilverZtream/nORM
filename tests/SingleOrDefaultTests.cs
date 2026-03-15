@@ -9,7 +9,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-1: Verifies that Single/SingleOrDefault correctly detect multiple matching rows.
+/// Verifies that Single/SingleOrDefault correctly detect multiple matching rows.
 /// Previously both used TAKE 1, so duplicate-row detection was impossible.
 /// Fix: Single/SingleOrDefault now use TAKE 2 so the caller can detect the second row.
 ///

@@ -50,14 +50,14 @@ namespace nORM.Core
         public EntityState State { get; internal set; }
 
         /// <summary>
-        /// CT-1: Stores the original concurrency token (timestamp/rowversion) value captured at
+        /// Stores the original concurrency token (timestamp/rowversion) value captured at
         /// attach time. Used in UPDATE and DELETE WHERE clauses to ensure the correct snapshot
         /// value is compared, even if the entity's property has been mutated before SaveChanges.
         /// </summary>
         internal object? OriginalToken { get; set; }
 
         /// <summary>
-        /// CT-1 (PK mutation): Stores the primary key value captured at attach/track time.
+        /// Stores the primary key value captured at attach/track time.
         /// Used by SaveChanges to detect PK mutations before issuing UPDATE statements.
         /// </summary>
         internal object? OriginalKey { get; set; }
@@ -73,7 +73,7 @@ namespace nORM.Core
             _markDirty = markDirty;
             _isInitialized = false;
 
-            // CT-1 (PK mutation): Capture original PK at attach time so mutations can be detected.
+            // Capture original PK at attach time so mutations can be detected.
             OriginalKey = CaptureKey(entity, mapping);
 
             // PERFORMANCE: Only initialize immediately if not lazy
@@ -115,7 +115,7 @@ namespace nORM.Core
 
             _nonKeyColumns = _mapping.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
 
-            // CT-1: Capture original timestamp value so UPDATE/DELETE can use the snapshot value
+            // Capture original timestamp value so UPDATE/DELETE can use the snapshot value
             // rather than the potentially-mutated current value of the entity property.
             var tsCol = _mapping.TimestampColumn;
             if (tsCol != null && Entity != null)
@@ -283,13 +283,13 @@ namespace nORM.Core
             CaptureOriginalValues();
             State = EntityState.Unchanged;
             _hasNotifiedChange = false;
-            // CT-1: Refresh the original token so future saves use the latest DB value
+            // Refresh the original token so future saves use the latest DB value.
             var tsCol = _mapping.TimestampColumn;
             if (tsCol != null && Entity != null)
                 OriginalToken = tsCol.Getter(Entity);
-            // CT-1 (PK mutation): Refresh the tracked original key so that a DB-generated key
-            // assigned after INSERT is accepted as the new "original" and does not trigger
-            // a false-positive PK-mutation error on the next UPDATE.
+            // Refresh the tracked original key so that a DB-generated key assigned after INSERT
+            // is accepted as the new "original" and does not trigger a false-positive
+            // PK-mutation error on the next UPDATE.
             if (Entity != null)
                 OriginalKey = CaptureKey(Entity, _mapping);
         }

@@ -17,7 +17,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// MAT-1: Verifies that ExecuteInsertBatch validates the number of generated keys returned
+/// Verifies that ExecuteInsertBatch validates the number of generated keys returned
 /// by the database equals the number of entities in the batch.
 /// </summary>
 public class InsertKeyCardinalityTests
@@ -41,12 +41,12 @@ public class InsertKeyCardinalityTests
         return (cn, new DbContext(cn, new SqliteProvider(), options));
     }
 
-    // ─── Fake DbDataReader returning exactly N result sets ────────────────
+ // ─── Fake DbDataReader returning exactly N result sets ────────────────
 
-    /// <summary>
-    /// Fake reader that simulates a database returning only <paramref name="keysToReturn"/> result sets
-    /// (each with a single row containing the row ID). Used to test the MAT-1 cardinality guard.
-    /// </summary>
+ /// <summary>
+ /// Fake reader that simulates a database returning only <paramref name="keysToReturn"/> result sets
+ /// (each with a single row containing the row ID). Used to test the cardinality guard.
+ /// </summary>
     private sealed class PartialKeyReader : DbDataReader
     {
         private readonly int _keysToReturn;
@@ -75,7 +75,7 @@ public class InsertKeyCardinalityTests
         public override object GetValue(int ordinal) => (long)(_resultSetIdx + 1);
         public override long GetInt64(int ordinal) => (long)(_resultSetIdx + 1);
 
-        // Minimal abstract members
+ // Minimal abstract members
         public override bool Read() => throw new NotSupportedException();
         public override bool NextResult() => throw new NotSupportedException();
         public override void Close() { }
@@ -108,7 +108,7 @@ public class InsertKeyCardinalityTests
         public override IEnumerator GetEnumerator() => throw new NotImplementedException();
     }
 
-    // ─── Command interceptor that returns a PartialKeyReader ──────────────
+ // ─── Command interceptor that returns a PartialKeyReader ──────────────
 
     private sealed class ShortKeyReturnInterceptor : IDbCommandInterceptor
     {
@@ -118,7 +118,7 @@ public class InsertKeyCardinalityTests
 
         public Task<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, DbContext context, CancellationToken ct)
         {
-            // Only intercept INSERT commands
+ // Only intercept INSERT commands
             if (command.CommandText.Contains("INSERT", StringComparison.OrdinalIgnoreCase))
                 return Task.FromResult(InterceptionResult<DbDataReader>.SuppressWithResult(new PartialKeyReader(_keysToReturn)));
             return Task.FromResult(InterceptionResult<DbDataReader>.Continue());
@@ -138,12 +138,12 @@ public class InsertKeyCardinalityTests
             => Task.CompletedTask;
     }
 
-    // ─── Execution tests ───────────────────────────────────────────────────
+ // ─── Execution tests ───────────────────────────────────────────────────
 
     [Fact]
     public async Task BatchInsert_CorrectKeyReturn_Succeeds()
     {
-        // Normal SQLite batch insert of 2 entities must succeed and assign real PKs.
+ // Normal SQLite batch insert of 2 entities must succeed and assign real PKs.
         var (cn, ctx) = CreateContext();
         using var _cn = cn;
         using var _ctx = ctx;
@@ -160,8 +160,8 @@ public class InsertKeyCardinalityTests
     [Fact]
     public async Task BatchInsert_ShortKeyReturn_ThrowsInvalidOperation()
     {
-        // When the DB returns fewer result sets than entities, the cardinality guard
-        // throws InvalidOperationException describing the mismatch.
+ // When the DB returns fewer result sets than entities, the cardinality guard
+ // throws InvalidOperationException describing the mismatch.
         var options = new DbContextOptions();
         options.CommandInterceptors.Add(new ShortKeyReturnInterceptor(keysToReturn: 1));
 
@@ -182,7 +182,7 @@ public class InsertKeyCardinalityTests
     [Fact]
     public async Task BatchInsert_EmptyResultSet_ThrowsInvalidOperation()
     {
-        // When ReadAsync returns false for every result set, keysAssigned=0 != batch.Count.
+ // When ReadAsync returns false for every result set, keysAssigned=0 != batch.Count.
         var options = new DbContextOptions();
         options.CommandInterceptors.Add(new ShortKeyReturnInterceptor(keysToReturn: 0));
 
@@ -198,13 +198,13 @@ public class InsertKeyCardinalityTests
         Assert.Contains("Generated key mismatch", ex.Message);
     }
 
-    // ─── Provider-matrix: identity retrieval string tests ─────────────────
+ // ─── Provider-matrix: identity retrieval string tests ─────────────────
 
     [Fact]
     public void IdentityRetrieval_Sqlite_ContainsIdentityRetrieval()
     {
         var provider = new SqliteProvider();
-        // With null mapping (no key columns), falls back to last_insert_rowid
+ // With null mapping (no key columns), falls back to last_insert_rowid
         var retrieval = provider.GetIdentityRetrievalString(null!);
         Assert.Contains("last_insert_rowid()", retrieval, StringComparison.OrdinalIgnoreCase);
     }

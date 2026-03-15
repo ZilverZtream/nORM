@@ -12,18 +12,18 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// PRV-1: Verifies that migration runners use CancellationToken.None for CommitAsync so that
-/// a caller cancellation arriving during the commit acknowledgment window does NOT produce
-/// an ambiguous "failed but maybe committed" state.
-///
-/// Strategy: wrap the connection/transaction to capture the token actually passed to CommitAsync.
-/// We also include a passthrough-command wrapper (same pattern as TransactionLifecycleTests)
-/// to satisfy SQLite's internal cast of DbTransaction → SqliteTransaction.
-/// </summary>
+//<summary>
+//Verifies that migration runners use CancellationToken.None for CommitAsync so that
+//a caller cancellation arriving during the commit acknowledgment window does NOT produce
+//an ambiguous "failed but maybe committed" state.
+//
+//Strategy: wrap the connection/transaction to capture the token actually passed to CommitAsync.
+//We also include a passthrough-command wrapper (same pattern as TransactionLifecycleTests)
+//to satisfy SQLite's internal cast of DbTransaction → SqliteTransaction.
+//</summary>
 public class MigrationCommitCancellationTests
 {
-    // ── Token-observing connection + transaction + command wrappers ───────────
+ // ── Token-observing connection + transaction + command wrappers ───────────
 
     private sealed class TokenCapturingConnection : DbConnection
     {
@@ -73,7 +73,7 @@ public class MigrationCommitCancellationTests
 
         internal void RecordCommitToken(CancellationToken ct) => CapturedCommitToken = ct;
 
-        // ── CapturingTransaction ──────────────────────────────────────────────
+ // ── CapturingTransaction ──────────────────────────────────────────────
 
         internal sealed class CapturingTransaction : DbTransaction
         {
@@ -94,7 +94,7 @@ public class MigrationCommitCancellationTests
             public override async Task CommitAsync(CancellationToken ct = default)
             {
                 _owner.RecordCommitToken(ct);
-                // Always delegate with None so the actual commit can't be aborted.
+ // Always delegate with None so the actual commit can't be aborted.
                 await Inner.CommitAsync(CancellationToken.None);
             }
 
@@ -107,7 +107,7 @@ public class MigrationCommitCancellationTests
             public override ValueTask DisposeAsync() => Inner.DisposeAsync();
         }
 
-        // ── CapturingCommand — unwraps CapturingTransaction to SqliteTransaction ─
+ // ── CapturingCommand — unwraps CapturingTransaction to SqliteTransaction ─
 
         private sealed class CapturingCommand : DbCommand
         {
@@ -160,8 +160,8 @@ public class MigrationCommitCancellationTests
                 get => _inner.Transaction;
                 set
                 {
-                    // PRV-1 test: unwrap CapturingTransaction → inner SqliteTransaction so that
-                    // SqliteCommand accepts it (it rejects non-SqliteTransaction types).
+ // test: unwrap CapturingTransaction → inner SqliteTransaction so that
+ // SqliteCommand accepts it (it rejects non-SqliteTransaction types).
                     _inner.Transaction = value is CapturingTransaction ct ? ct.Inner : (SqliteTransaction?)value;
                 }
             }
@@ -193,13 +193,13 @@ public class MigrationCommitCancellationTests
         }
     }
 
-    // ── Tests ─────────────────────────────────────────────────────────────────
+ // ── Tests ─────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// PRV-1: SqliteMigrationRunner.CommitAsync must be called with CancellationToken.None,
-    /// not the caller-supplied token. This prevents ambiguous history state when a caller
-    /// times out or cancels near the commit boundary.
-    /// </summary>
+ //<summary>
+ //SqliteMigrationRunner.CommitAsync must be called with CancellationToken.None,
+ //not the caller-supplied token. This prevents ambiguous history state when a caller
+ //times out or cancels near the commit boundary.
+ //</summary>
     [Fact]
     public async Task SqliteMigrationRunner_CommitAsync_UsesNoneToken()
     {
@@ -209,14 +209,14 @@ public class MigrationCommitCancellationTests
         var runner = new SqliteMigrationRunner(conn, typeof(MigrationHistoryFaultTests).Assembly);
         await runner.ApplyMigrationsAsync(CancellationToken.None);
 
-        // PRV-1: The token captured at CommitAsync must be the non-cancelable sentinel.
+ // The token captured at CommitAsync must be the non-cancelable sentinel.
         Assert.NotNull(conn.CapturedCommitToken);
         Assert.Equal(CancellationToken.None, conn.CapturedCommitToken!.Value);
     }
 
-    /// <summary>
-    /// PRV-1: Migrations apply cleanly with a non-canceled token and the commit token is None.
-    /// </summary>
+ //<summary>
+ //Migrations apply cleanly with a non-canceled token and the commit token is None.
+ //</summary>
     [Fact]
     public async Task SqliteMigrationRunner_ApplyMigrations_CompletesSuccessfully_AndUsesNoneForCommit()
     {
@@ -226,11 +226,11 @@ public class MigrationCommitCancellationTests
         var runner = new SqliteMigrationRunner(conn, typeof(MigrationHistoryFaultTests).Assembly);
         await runner.ApplyMigrationsAsync();
 
-        // Migrations applied without error.
+ // Migrations applied without error.
         var pending = await runner.GetPendingMigrationsAsync();
         Assert.Empty(pending);
 
-        // Commit used the non-cancelable token.
+ // Commit used the non-cancelable token.
         Assert.Equal(CancellationToken.None, conn.CapturedCommitToken!.Value);
     }
 }

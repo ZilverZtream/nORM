@@ -5,9 +5,9 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// Tests for MySqlMigrationSqlGenerator covering PRV-1 and MIG-1 findings.
-/// </summary>
+//<summary>
+//Tests for MySqlMigrationSqlGenerator covering and findings.
+//</summary>
 public class MySqlMigrationSqlGeneratorTests
 {
     private static TableSchema BuildTable(string name, params ColumnSchema[] columns)
@@ -19,7 +19,7 @@ public class MySqlMigrationSqlGeneratorTests
 
     private static readonly MySqlMigrationSqlGenerator Gen = new();
 
-    // ─── PRV-1: Identifier escaping with backtick ────────────────────────────
+ // ─── Identifier escaping with backtick ────────────────────────────
 
     [Fact]
     public void CreateTable_EscapesTableNameWithBacktick()
@@ -31,7 +31,7 @@ public class MySqlMigrationSqlGeneratorTests
 
         var sql = Gen.GenerateSql(diff);
 
-        // The escaped table name should double the embedded backtick: `He``llo`
+ // The escaped table name should double the embedded backtick: `He``llo`
         Assert.Contains("`He``llo`", sql.Up[0]);
     }
 
@@ -62,7 +62,7 @@ public class MySqlMigrationSqlGeneratorTests
         Assert.Contains("`ix``val`", indexStmt);
     }
 
-    // ─── MIG-1: NOT NULL + DefaultValue ──────────────────────────────────────
+ // ─── NOT NULL + DefaultValue ──────────────────────────────────────
 
     [Fact]
     public void AddColumn_NotNull_WithDefaultValue_EmitsDefault()

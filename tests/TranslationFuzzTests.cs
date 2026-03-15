@@ -14,7 +14,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Gate 4.5+: Theory-based translation fuzz tests.
+/// Theory-based translation fuzz tests.
 /// Generates 80+ cases across CLR types × query operations × SQL shapes.
 /// All execution tests use SQLite :memory: for correctness verification.
 /// </summary>

@@ -240,7 +240,7 @@ public class ChangeTrackingEdgeCaseTests
         Assert.True(entries.Count >= 0); // entity may or may not remain in tracker
     }
 
-    // ─── SQL-1: Empty UPDATE SET guard ────────────────────────────────────
+    // ─── Empty UPDATE SET guard ────────────────────────────────────
 
     /// <summary>
     /// An entity with only [Key] + [Timestamp] has no mutable UpdateColumns.
@@ -294,7 +294,7 @@ public class ChangeTrackingEdgeCaseTests
     public async Task SaveChanges_KeyTimestampOnly_ThrowsWithClearMessage()
     {
         // Entity has only [Key] + [Timestamp] — no mutable columns — update is invalid SQL.
-        // SQL-1: Must throw NormConfigurationException with actionable message.
+        // Must throw NormConfigurationException with actionable message.
         var (cn, ctx) = CreateContextForTable(
             "CREATE TABLE KeyTimestampOnly (Id INTEGER PRIMARY KEY, RowVersion BLOB NOT NULL DEFAULT '')");
         using var _cn = cn;
@@ -313,7 +313,7 @@ public class ChangeTrackingEdgeCaseTests
         var entity = new KeyTimestampOnlyEntity { Id = 1, RowVersion = new byte[] { 0x01 } };
         ctx.Update(entity);
 
-        // SQL-1: BuildUpdateBatch must detect UpdateColumns.Length == 0 and throw
+        // BuildUpdateBatch must detect UpdateColumns.Length == 0 and throw
         var ex = await Assert.ThrowsAsync<NormConfigurationException>(
             () => ctx.SaveChangesAsync(detectChanges: false));
         Assert.Contains("no mutable columns", ex.Message, StringComparison.OrdinalIgnoreCase);

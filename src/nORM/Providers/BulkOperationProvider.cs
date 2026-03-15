@@ -33,7 +33,7 @@ namespace nORM.Providers
                 entityList.Take(100), mapping, operationKey, entityList.Count);
 
             var total = 0;
-            // T2: Reuse caller's transaction when one is already open on this context.
+            // Reuse caller's transaction when one is already open on this context.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction? transaction = ownedTx
                 ? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false)
@@ -64,7 +64,7 @@ namespace nORM.Providers
                         operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                 }
 
-                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // Use CancellationToken.None so a cancelled caller token after a successful commit
                 // does not cause a spurious OperationCanceledException for already-committed data.
                 if (ownedTx) await transaction!.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }

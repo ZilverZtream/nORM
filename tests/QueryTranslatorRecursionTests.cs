@@ -8,9 +8,9 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// Tests for QueryTranslator recursion depth limiting and the QP-1 configurable MaxRecursionDepth.
-/// </summary>
+//<summary>
+//Tests for QueryTranslator recursion depth limiting and the configurable MaxRecursionDepth.
+//</summary>
 public class QueryTranslatorRecursionTests : TestBase
 {
     private class Item
@@ -24,7 +24,7 @@ public class QueryTranslatorRecursionTests : TestBase
         return source.Union(BuildNestedUnion(source, depth - 1));
     }
 
-    // ─── Original regression test ─────────────────────────────────────────
+ // ─── Original regression test ─────────────────────────────────────────
 
     [Fact]
     public void Deeply_nested_unions_throw()
@@ -38,18 +38,18 @@ public class QueryTranslatorRecursionTests : TestBase
         Assert.IsType<NormQueryException>(ex.InnerException);
     }
 
-    // ─── QP-1: Default limit = 50, error message mentions MaxRecursionDepth ─
+ // ─── Default limit = 50, error message mentions MaxRecursionDepth ─
 
     [Fact]
     public void Default_limit_is_50_not_30()
     {
-        // QP-1: Default MaxRecursionDepth is now 50 (raised from 30).
-        // Depth 28 should succeed without throwing.
+ // Default MaxRecursionDepth is now 50 (raised from 30).
+ // Depth 28 should succeed without throwing.
         var setup = CreateProvider(ProviderKind.Sqlite);
         using var connection = setup.Connection;
         var provider = setup.Provider;
 
-        // Should NOT throw — depth 28 is below both old (30) and new (50) limits
+ // Should NOT throw — depth 28 is below both old (30) and new (50) limits
         var (sql, _, _) = TranslateQuery<Item, Item>(q => BuildNestedUnion(q, 28), connection, provider);
         Assert.NotEmpty(sql);
     }
@@ -57,8 +57,8 @@ public class QueryTranslatorRecursionTests : TestBase
     [Fact]
     public void Depth_31_ExceedsOldLimit_ButSucceedsWithNewDefault50()
     {
-        // QP-1: Depth 31 exceeded the old hardcoded limit of 30, but new default is 50.
-        // This should now succeed.
+ // Depth 31 exceeded the old hardcoded limit of 30, but new default is 50.
+ // This should now succeed.
         var setup = CreateProvider(ProviderKind.Sqlite);
         using var connection = setup.Connection;
         var provider = setup.Provider;
@@ -70,7 +70,7 @@ public class QueryTranslatorRecursionTests : TestBase
     [Fact]
     public void Default_depth_51_throws_NormQueryException()
     {
-        // QP-1: Depth 51 exceeds the new default limit of 50.
+ // Depth 51 exceeds the new default limit of 50.
         var setup = CreateProvider(ProviderKind.Sqlite);
         using var connection = setup.Connection;
         var provider = setup.Provider;
@@ -78,23 +78,23 @@ public class QueryTranslatorRecursionTests : TestBase
         var ex = Assert.Throws<TargetInvocationException>(() =>
             TranslateQuery<Item, Item>(q => BuildNestedUnion(q, 51), connection, provider));
         var inner = Assert.IsType<NormQueryException>(ex.InnerException);
-        // QP-1: Error message must mention MaxRecursionDepth so users know how to fix it
+ // Error message must mention MaxRecursionDepth so users know how to fix it
         Assert.Contains("MaxRecursionDepth", inner.Message);
         Assert.Contains("50", inner.Message);
     }
 
-    // ─── QP-1: Configurable MaxRecursionDepth via DbContextOptions ────────
+ // ─── Configurable MaxRecursionDepth via DbContextOptions ────────
 
     [Fact]
     public void Custom_MaxRecursionDepth_60_Allows_Depth55()
     {
-        // QP-1: Configure MaxRecursionDepth = 60 → depth 55 should succeed.
+ // Configure MaxRecursionDepth = 60 → depth 55 should succeed.
         var options = new DbContextOptions { MaxRecursionDepth = 60 };
         var setup = CreateProvider(ProviderKind.Sqlite);
         using var connection = setup.Connection;
         using var ctx = new DbContext(connection, setup.Provider, options);
 
-        // Build the query manually using the custom-options context
+ // Build the query manually using the custom-options context
         var query = BuildNestedUnion(ctx.Query<Item>(), 55);
         var expr = query.Expression;
         var translatorType = typeof(DbContext).Assembly.GetType("nORM.Query.QueryTranslator", true)!;
@@ -107,7 +107,7 @@ public class QueryTranslatorRecursionTests : TestBase
     [Fact]
     public void Custom_MaxRecursionDepth_60_Rejects_Depth65()
     {
-        // QP-1: Configure MaxRecursionDepth = 60 → depth 65 should throw.
+ // Configure MaxRecursionDepth = 60 → depth 65 should throw.
         var options = new DbContextOptions { MaxRecursionDepth = 60 };
         var setup = CreateProvider(ProviderKind.Sqlite);
         using var connection = setup.Connection;
@@ -128,7 +128,7 @@ public class QueryTranslatorRecursionTests : TestBase
     [Fact]
     public void MaxRecursionDepth_OutOfRange_Throws_ArgumentOutOfRangeException()
     {
-        // QP-1: MaxRecursionDepth must be between 1 and 200.
+ // MaxRecursionDepth must be between 1 and 200.
         var options = new DbContextOptions();
         Assert.Throws<ArgumentOutOfRangeException>(() => options.MaxRecursionDepth = 0);
         Assert.Throws<ArgumentOutOfRangeException>(() => options.MaxRecursionDepth = 201);
@@ -137,7 +137,7 @@ public class QueryTranslatorRecursionTests : TestBase
     [Fact]
     public void MaxRecursionDepth_Valid_Boundary_Values()
     {
-        // QP-1: Values at the valid boundary should be accepted.
+ // Values at the valid boundary should be accepted.
         var options = new DbContextOptions();
         options.MaxRecursionDepth = 1;
         Assert.Equal(1, options.MaxRecursionDepth);
@@ -147,12 +147,12 @@ public class QueryTranslatorRecursionTests : TestBase
         Assert.Equal(50, options.MaxRecursionDepth);
     }
 
-    // ─── QP-1: Recursion via BuildExists (Any() subquery path) ────────────
+ // ─── Recursion via BuildExists (Any() subquery path) ────────────
 
     [Fact]
     public void Any_inside_Where_routes_through_BuildExists_and_is_translated()
     {
-        // BuildExists creates a sub-translator — verifies basic translation succeeds.
+ // BuildExists creates a sub-translator — verifies basic translation succeeds.
         var setup = CreateProvider(ProviderKind.Sqlite);
         using var connection = setup.Connection;
         var provider = setup.Provider;
@@ -166,15 +166,15 @@ public class QueryTranslatorRecursionTests : TestBase
     [Fact]
     public void Deeply_nested_Any_inside_Where_exceeds_depth_limit()
     {
-        // QP-1: Each nested Any() creates a sub-translator via BuildExists at depth+1.
-        // With MaxRecursionDepth=2, three levels of Any() should exceed the limit.
+ // Each nested Any() creates a sub-translator via BuildExists at depth+1.
+ // With MaxRecursionDepth=2, three levels of Any() should exceed the limit.
         var options = new DbContextOptions { MaxRecursionDepth = 2 };
         var setup = CreateProvider(ProviderKind.Sqlite);
         using var connection = setup.Connection;
         using var ctx = new DbContext(connection, setup.Provider, options);
 
-        // Build query: outer.Any(a => inner.Any(b => inner.Any(c => c.Id == a.Id)))
-        // Each Any goes through BuildExists, incrementing depth by 1.
+ // Build query: outer.Any(a => inner.Any(b => inner.Any(c => c.Id == a.Id)))
+ // Each Any goes through BuildExists, incrementing depth by 1.
         var inner = ctx.Query<Item>();
         var query = inner.Where(x =>
             inner.Any(a =>
@@ -185,7 +185,7 @@ public class QueryTranslatorRecursionTests : TestBase
         var translatorType = typeof(DbContext).Assembly.GetType("nORM.Query.QueryTranslator", true)!;
         var translator = Activator.CreateInstance(translatorType, ctx)!;
 
-        // With MaxRecursionDepth=2, this should throw NormQueryException due to depth exceeded.
+ // With MaxRecursionDepth=2, this should throw NormQueryException due to depth exceeded.
         var ex = Assert.Throws<System.Reflection.TargetInvocationException>(() =>
             translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { expr }));
         Assert.IsType<NormQueryException>(ex.InnerException);

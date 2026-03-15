@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-1: Verifies that the query plan cache correctly handles null-semantics stability.
+/// Verifies that the query plan cache correctly handles null-semantics stability.
 /// When a closure-captured variable changes from non-null to null (or vice versa) between
 /// two executions of the same query object, the re-execution must use the appropriate SQL
 /// shape (IS NULL expansion vs. plain =) rather than returning a stale cached plan.
@@ -56,12 +56,12 @@ public class PlanCacheNullSemanticsTests
         cmd.ExecuteNonQuery();
     }
 
-    // ─── QP-1: Closure var starts non-null, then becomes null ─────────────
+    // ─── Closure var starts non-null, then becomes null ─────────────
 
     [Fact]
     public async Task ClosureVariable_NonNullThenNull_ReturnsCorrectRowsBothTimes()
     {
-        // QP-1: Cache the plan with a non-null closure value, then re-execute with null.
+        // Cache the plan with a non-null closure value, then re-execute with null.
         // The re-execution must use IS NULL semantics and return the null row.
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
@@ -82,12 +82,12 @@ public class PlanCacheNullSemanticsTests
         Assert.Null(q2[0].Name);
     }
 
-    // ─── QP-1: Closure var starts null, then becomes non-null ─────────────
+    // ─── Closure var starts null, then becomes non-null ─────────────
 
     [Fact]
     public async Task ClosureVariable_NullThenNonNull_ReturnsCorrectRowsBothTimes()
     {
-        // QP-1: Cache the plan with a null closure value, then re-execute with non-null.
+        // Cache the plan with a null closure value, then re-execute with non-null.
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
 
@@ -107,7 +107,7 @@ public class PlanCacheNullSemanticsTests
         Assert.Equal("Bob", q2[0].Name);
     }
 
-    // ─── QP-1: null literal in expression → IS NULL (not closure) ─────────
+    // ─── null literal in expression → IS NULL (not closure) ─────────
 
     [Fact]
     public async Task NullLiteral_InExpression_UsesIsNull()
@@ -124,7 +124,7 @@ public class PlanCacheNullSemanticsTests
         Assert.Null(results[0].Name);
     }
 
-    // ─── QP-1: Non-null string literal → plain = (no unnecessary expansion) ─
+    // ─── Non-null string literal → plain = (no unnecessary expansion) ─
 
     [Fact]
     public async Task StringLiteral_InExpression_UsesPlainEquals()
@@ -144,7 +144,7 @@ public class PlanCacheNullSemanticsTests
         Assert.Equal("Dave", results[0].Name);
     }
 
-    // ─── QP-1: Nullable int? closure — null then non-null ─────────────────
+    // ─── Nullable int? closure — null then non-null ─────────────────
 
     [Fact]
     public async Task NullableIntClosure_NullThenNonNull_ReturnsCorrectRows()
@@ -169,7 +169,7 @@ public class PlanCacheNullSemanticsTests
         Assert.Equal(10, q2[0].Value);
     }
 
-    // ─── QP-1: Different closure instances, same shape ─────────────────────
+    // ─── Different closure instances, same shape ─────────────────────
 
     [Fact]
     public async Task TwoSeparateQueries_SameClosure_NullAndNonNull_BothCorrect()

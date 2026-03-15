@@ -53,10 +53,9 @@ namespace nORM.Query
                     }
                     break;
 
-                // SECURITY FIX: Method calls are explicitly NOT supported.
-                // Previous implementations allowed MethodCallExpression which could execute
-                // arbitrary user code via Compile().DynamicInvoke() - a critical RCE vulnerability.
-                // Method calls should be translated to SQL (e.g., string.Contains -> LIKE) or rejected.
+                // Method calls are explicitly NOT supported. Allowing MethodCallExpression
+                // would enable arbitrary user code execution via Compile().DynamicInvoke().
+                // Method calls must be translated to SQL (e.g., string.Contains -> LIKE) or rejected.
             }
 
             value = null;

@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// MIG-1: Verify that duplicate version numbers and name drift cause fail-fast exceptions.
+/// Verify that duplicate version numbers and name drift cause fail-fast exceptions.
 /// Uses dynamically-built assemblies to avoid polluting the main test assembly with
 /// conflicting migration types.
 /// </summary>

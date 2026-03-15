@@ -22,7 +22,7 @@ namespace nORM.Tests
             Assert.True(NormValidator.IsSafeRawSql(safeSql));
         }
 
-        // SEC-1: DML statements must be rejected
+        // DML statements must be rejected
 
         [Theory]
         [InlineData("DELETE FROM Users WHERE Id = 1")]
@@ -52,7 +52,7 @@ namespace nORM.Tests
             Assert.False(NormValidator.IsSafeRawSql("DELETE FROM Users"));
         }
 
-        // X1: Side-effect commands must be blocked by the keyword denylist
+        // Side-effect commands must be blocked by the keyword denylist
         [Theory]
         [InlineData("PRAGMA foreign_keys = ON")]
         [InlineData("VACUUM")]

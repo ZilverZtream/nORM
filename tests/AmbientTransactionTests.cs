@@ -13,7 +13,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// TX-1: Tests that ambient System.Transactions.TransactionScope is correctly handled.
+/// Tests that ambient System.Transactions.TransactionScope is correctly handled.
 /// SQLite with Microsoft.Data.Sqlite supports ambient transactions (enlistment) when
 /// Enlist=True is in the connection string (this is the default for SqliteConnection).
 ///
@@ -66,7 +66,7 @@ public class AmbientTransactionTests
     [Fact]
     public void SQLite_Connection_EnlistTransaction_WithAmbientScope_DoesNotThrow()
     {
-        // TX-1: The TransactionManager calls connection.EnlistTransaction() when an ambient
+        // The TransactionManager calls connection.EnlistTransaction() when an ambient
         // transaction is present. This should not throw for a standard SqliteConnection.
         var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -93,12 +93,12 @@ public class AmbientTransactionTests
         cn.Dispose();
     }
 
-    // ─── TX-1: TransactionManager calls EnsureConnectionAsync in ambient case ─
+    // ─── TransactionManager calls EnsureConnectionAsync in ambient case ─
 
     [Fact]
     public async Task SaveChanges_WithAmbientTransactionScope_DoesNotThrow()
     {
-        // TX-1: When a TransactionScope is active, TransactionManager should explicitly
+        // When a TransactionScope is active, TransactionManager should explicitly
         // call connection.EnlistTransaction(). If the provider supports it, operations
         // are enrolled in the scope. If not, operations proceed and the provider gracefully
         // catches and logs the enlistment failure.
@@ -132,12 +132,12 @@ public class AmbientTransactionTests
         }
     }
 
-    // ─── TX-1: Write outside scope is always visible ──────────────────────
+    // ─── Write outside scope is always visible ──────────────────────
 
     [Fact]
     public async Task Write_OutsideTransactionScope_IsAlwaysVisible()
     {
-        // TX-1: Writes that happen outside any TransactionScope commit immediately
+        // Writes that happen outside any TransactionScope commit immediately
         // and should always be visible regardless of any ambient transaction behavior.
         var (cn, ctx) = CreateContext();
         using var _cn = cn;
@@ -150,12 +150,12 @@ public class AmbientTransactionTests
         Assert.Equal(1L, count);
     }
 
-    // ─── TX-1: Explicit BeginTransactionAsync inside ambient scope ─────────
+    // ─── Explicit BeginTransactionAsync inside ambient scope ─────────
 
     [Fact]
     public async Task ExplicitTransaction_WorksCorrectly()
     {
-        // TX-1: An explicit BeginTransactionAsync should work correctly.
+        // An explicit BeginTransactionAsync should work correctly.
         // The existing transaction wins (TransactionManager.OwnsTransaction = false when there's
         // an existing DbTransaction via Database.BeginTransactionAsync).
         var (cn, ctx) = CreateContext();
@@ -176,12 +176,12 @@ public class AmbientTransactionTests
         Assert.Equal(1L, count);
     }
 
-    // ─── TX-1: SaveChanges with no ambient scope works normally ───────────
+    // ─── SaveChanges with no ambient scope works normally ───────────
 
     [Fact]
     public async Task SaveChanges_NoAmbientScope_WorksNormally()
     {
-        // TX-1: Without any ambient transaction, the TransactionManager owns its own transaction
+        // Without any ambient transaction, the TransactionManager owns its own transaction
         // (ownsTransaction = true) and everything works as before.
         var (cn, ctx) = CreateContext();
         using var _cn = cn;

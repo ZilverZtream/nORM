@@ -32,15 +32,15 @@ namespace nORM.Query
         private List<string> _compiledParams = null!;
         private Dictionary<ParameterExpression, string> _paramMap = null!;
         private bool _suppressNullCheck = false;
-        // QP-1: Outer translator's recursion depth so BuildExists/BuildIn pass depth+1 to sub-translators.
+        // Outer translator's recursion depth so BuildExists/BuildIn pass depth+1 to sub-translators.
         private int _recursionDepth = 0;
         private const int _constParamMapLimit = 1024;
         private readonly Dictionary<ConstKey, string> _constParamMap = new();
         private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
         private static readonly Expression _emptyExpression = Expression.Empty();
         private readonly Dictionary<ParameterExpression, string> _groupingKeys = new();
-        // REFACTOR (TASK 16): Consolidated string method translation. Removed redundant _translators dictionary.
-        // All string methods (Contains, StartsWith, EndsWith) are now handled via _fastMethodHandlers for better performance.
+        // String methods (Contains, StartsWith, EndsWith) are handled via _fastMethodHandlers
+        // for better performance, avoiding a redundant _translators dictionary lookup.
         private static readonly Dictionary<MethodInfo, Action<ExpressionToSqlVisitor, MethodCallExpression>> _fastMethodHandlers =
             new()
             {
@@ -87,9 +87,9 @@ namespace nORM.Query
             if (context.ParamMap == null)
                 _ownedParamMap.Clear();
             _constParamMap.Clear();
-            // QP-1: Start numbering from the caller-supplied offset so that a visitor
-            // sharing _compiledParams/_paramMap with a previous visitor does not reuse
-            // parameter names (e.g. both inner Where and global-filter Where getting @p0).
+            // Start numbering from the caller-supplied offset so that a visitor sharing
+            // _compiledParams/_paramMap with a previous visitor does not reuse parameter names
+            // (e.g. both inner Where and global-filter Where getting @p0).
             _paramIndex = context.ParamIndexStart;
             _suppressNullCheck = false;
             _recursionDepth = context.RecursionDepth;
@@ -157,7 +157,7 @@ namespace nORM.Query
                     return node;
                 }
 
-                // PERF: Inline boolean literals (true/false) as SQL literals instead of parameterizing.
+                // Inline boolean literals (true/false) as SQL literals instead of parameterizing.
                 // Parameterized booleans (WHERE col = @p0 with @p0=1) deprive the query planner of
                 // column selectivity statistics, causing suboptimal index selection (e.g., choosing a
                 // 70%-selective IsActive index over a 12%-selective City index).
@@ -522,7 +522,7 @@ namespace nORM.Query
                     throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "JSONPath argument in Json.Value must be a constant string."));
                 }
             }
-            // REFACTOR (TASK 16): Removed redundant _translators check. String methods handled by _fastMethodHandlers.
+            // String methods are handled by _fastMethodHandlers (see above).
             if (node.Method.DeclaringType == typeof(string))
             {
                 var strArgs = new List<string>();
@@ -626,8 +626,8 @@ namespace nORM.Query
                         return node;
                     }
 
-                    // QP-1: Separate nulls from non-nulls. SQL `col IN (NULL, @p1)` never matches
-                    // null rows — only `col IS NULL` does. Emit (col IN (...) OR col IS NULL) when needed.
+                    // Separate nulls from non-nulls: SQL `col IN (NULL, @p1)` never matches null
+                    // rows — only `col IS NULL` does. Emit (col IN (...) OR col IS NULL) when needed.
                     bool hasNulls = items.Any(x => x is null);
                     var nonNullItems = hasNulls ? items.Where(x => x != null).ToList() : items;
 
@@ -639,8 +639,8 @@ namespace nORM.Query
                         return node;
                     }
 
-                    // SQL-1: Exact accounting — _paramIndex already tracks all params added so far.
-                    // Nulls cost no parameters so use nonNullItems.Count for the budget check.
+                    // Exact accounting: _paramIndex tracks all params added so far.
+                    // Nulls cost no parameters, so use nonNullItems.Count for the budget check.
                     var remainingParams = _provider.MaxParameters - _paramIndex;
                     if (nonNullItems.Count > remainingParams)
                         throw new NormQueryException(
@@ -752,7 +752,7 @@ namespace nORM.Query
             }
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
-            // QP-1: Pass _recursionDepth + 1 so deeply nested Any()/All() subqueries respect the depth limit.
+            // Pass _recursionDepth + 1 so deeply nested Any()/All() subqueries respect the depth limit.
             using var subTranslator = QueryTranslator.Create(_ctx, mapping, _params, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
@@ -762,11 +762,11 @@ namespace nORM.Query
         }
         private void BuildIn(Expression source, Expression value)
         {
-            // QP-1: Extract expression from closure-captured IQueryable.
+            // Extract expression from closure-captured IQueryable.
             if (TryGetConstantValue(source, out var srcConstValue) && srcConstValue is System.Linq.IQueryable iqSrc)
                 source = iqSrc.Expression!;
 
-            // QP-1: Compile-time null — ConstantExpression{null} OR Convert(null, T?) (UnaryExpression).
+            // Compile-time null: ConstantExpression{null} OR Convert(null, T?) (UnaryExpression).
             bool isNullValue = (value is ConstantExpression { Value: null })
                 || (value is UnaryExpression { NodeType: ExpressionType.Convert } ueNull
                     && ueNull.Operand is ConstantExpression { Value: null });
@@ -776,10 +776,10 @@ namespace nORM.Query
                 return;
             }
 
-            // QP-1: Build the IN (subquery) with a fresh correlated dict so inner lambda params
-            // get T0 regardless of what the outer _parameterMappings contains.
-            // Use a separate tempParams dict: QueryTranslator.Dispose() calls _parameterManager.Reset()
-            // which clears its Parameters dict — if shared with _params, collected params are lost.
+            // Build the IN (subquery) with a fresh correlated dict so inner lambda params get T0
+            // regardless of what the outer _parameterMappings contains.
+            // Use a separate tempParams dict: QueryTranslator.Dispose() clears its Parameters dict —
+            // if shared with _params, collected params are lost.
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
             var freshCorrelatedForIn = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
@@ -793,7 +793,7 @@ namespace nORM.Query
             foreach (var kvp in tempParams)
                 _params[kvp.Key] = kvp.Value;
 
-            // QP-1: SQL NULL IN (...) is UNKNOWN (not TRUE); emit null-safe OR pattern for nullable value types.
+            // SQL NULL IN (...) is UNKNOWN (not TRUE); emit null-safe OR pattern for nullable value types.
             bool isNullable = !value.Type.IsValueType || Nullable.GetUnderlyingType(value.Type) != null;
 
             if (!isNullable)
@@ -818,7 +818,7 @@ namespace nORM.Query
             _sql.Append("))");
         }
 
-        // QP-1: Emits EXISTS(SELECT ... FROM source WHERE col IS NULL).
+        // Emits EXISTS(SELECT ... FROM source WHERE col IS NULL).
         // Uses a fresh correlated dict so the EXISTS translator starts clean with T0 for all params.
         private void BuildNullExistsForContains(Expression source)
         {
@@ -856,7 +856,7 @@ namespace nORM.Query
                     new[] { entityType }, cursor, Expression.Quote(nullCheck));
             }
 
-            // QP-1: Fresh correlated dict and separate tempParams so EXISTS translator never sees
+            // Fresh correlated dict and separate tempParams so EXISTS translator never sees
             // stale aliases, and Dispose() clearing its Parameters dict doesn't affect _params.
             var freshCorrelated = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
             var rootType = GetRootElementType(filteredSource);
@@ -1047,8 +1047,7 @@ namespace nORM.Query
             return segment;
         }
         /// <summary>
-        /// REFACTOR (TASK 19): Use shared ExpressionValueExtractor utility.
-        /// Eliminates duplicate logic and ensures consistent behavior across the codebase.
+        /// Delegates to the shared ExpressionValueExtractor utility for consistent behavior.
         /// </summary>
         private static bool TryGetConstantValue(Expression e, out object? value, HashSet<Expression>? visited = null)
             => ExpressionValueExtractor.TryGetConstantValue(e, out value, visited);
@@ -1133,9 +1132,8 @@ namespace nORM.Query
                 visitor._sql.Append($" ESCAPE '{escChar}'");
             }
         }
-        // REFACTOR (TASK 16): Removed redundant IMethodTranslator interface and translator classes.
-        // ContainsTranslator, StartsWithTranslator, and EndsWithTranslator were duplicate logic.
-        // String methods are now exclusively handled by _fastMethodHandlers for better performance.
+        // ContainsTranslator, StartsWithTranslator, and EndsWithTranslator were consolidated into
+        // _fastMethodHandlers. String methods are exclusively handled there.
 
         /// <summary>
         /// Directs the visitor to use the provided dictionary for parameter

@@ -10,15 +10,15 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// Tests for PRV-1: Bulk insert must handle entities where all columns are DB-generated.
-/// </summary>
+//<summary>
+//Tests for Bulk insert must handle entities where all columns are DB-generated.
+//</summary>
 public class BulkInsertAllGeneratedTests
 {
-    /// <summary>
-    /// Entity where every column is DB-generated (only a single auto-increment PK).
-    /// Inserting such an entity requires DEFAULT VALUES syntax.
-    /// </summary>
+ //<summary>
+ //Entity where every column is DB-generated (only a single auto-increment PK).
+ //Inserting such an entity requires DEFAULT VALUES syntax.
+ //</summary>
     [Table("AutoOnlyItem")]
     private class AutoOnlyItem
     {
@@ -27,9 +27,9 @@ public class BulkInsertAllGeneratedTests
         public int Id { get; set; }
     }
 
-    /// <summary>
-    /// Entity with payload columns — standard bulk insert path.
-    /// </summary>
+ //<summary>
+ //Entity with payload columns — standard bulk insert path.
+ //</summary>
     [Table("PayloadItem")]
     private class PayloadItem
     {
@@ -65,10 +65,10 @@ public class BulkInsertAllGeneratedTests
         return (cn, new DbContext(cn, new SqliteProvider()));
     }
 
-    /// <summary>
-    /// PRV-1: Bulk insert of 3 all-generated-column entities must succeed and insert
-    /// 3 rows, each with an auto-generated PK.
-    /// </summary>
+ //<summary>
+ //Bulk insert of 3 all-generated-column entities must succeed and insert
+ //3 rows, each with an auto-generated PK.
+ //</summary>
     [Fact]
     public async Task BulkInsert_AllGeneratedColumns_InsertsRowsWithDefaultValues()
     {
@@ -79,16 +79,16 @@ public class BulkInsertAllGeneratedTests
         var entities = Enumerable.Range(0, 3).Select(_ => new AutoOnlyItem()).ToList();
         var inserted = await ctx.BulkInsertAsync(entities);
 
-        // 3 rows should have been inserted.
+ // 3 rows should have been inserted.
         Assert.Equal(3, inserted);
 
-        // Verify 3 rows exist in the database.
+ // Verify 3 rows exist in the database.
         using var cmd = cn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM AutoOnlyItem";
         var count = (long)cmd.ExecuteScalar()!;
         Assert.Equal(3L, count);
 
-        // Verify all PKs are positive (auto-generated).
+ // Verify all PKs are positive (auto-generated).
         cmd.CommandText = "SELECT Id FROM AutoOnlyItem ORDER BY Id";
         using var reader = cmd.ExecuteReader();
         var ids = new System.Collections.Generic.List<long>();
@@ -97,13 +97,13 @@ public class BulkInsertAllGeneratedTests
 
         Assert.Equal(3, ids.Count);
         Assert.All(ids, id => Assert.True(id > 0, $"Expected positive auto-generated PK but got {id}"));
-        // All PKs must be distinct.
+ // All PKs must be distinct.
         Assert.Equal(ids.Count, ids.Distinct().Count());
     }
 
-    /// <summary>
-    /// PRV-1 regression: Entity with payload columns (the normal path) still works correctly.
-    /// </summary>
+ //<summary>
+ //regression: Entity with payload columns (the normal path) still works correctly.
+ //</summary>
     [Fact]
     public async Task BulkInsert_MixedColumns_NormalPath()
     {
@@ -118,7 +118,7 @@ public class BulkInsertAllGeneratedTests
         var inserted = await ctx.BulkInsertAsync(items);
         Assert.Equal(5, inserted);
 
-        // Verify all rows are present with correct values.
+ // Verify all rows are present with correct values.
         using var cmd = cn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM PayloadItem";
         var count = (long)cmd.ExecuteScalar()!;

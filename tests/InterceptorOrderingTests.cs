@@ -14,7 +14,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// C1: Verifies that <c>SavedChangesAsync</c> fires AFTER the transaction has been committed,
+/// Verifies that <c>SavedChangesAsync</c> fires AFTER the transaction has been committed,
 /// meaning the interceptor can observe the inserted row in a separate connection.
 /// </summary>
 public class InterceptorOrderingTests

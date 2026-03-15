@@ -42,9 +42,8 @@ namespace nORM.Providers
         /// <param name="id">The identifier to escape (e.g., "table" or "schema.table").</param>
         /// <returns>The escaped identifier (e.g., "[table]" or "[schema].[table]").</returns>
         /// <remarks>
-        /// BUG FIX (TASK 17): Properly escape multi-part identifiers.
-        /// Previously "schema.table" became "[schema.table]" (invalid SQL).
-        /// Now it correctly becomes "[schema].[table]".
+        /// Properly escapes multi-part identifiers.
+        /// "schema.table" becomes "[schema].[table]", not "[schema.table]".
         /// </remarks>
         public override string Escape(string id)
         {
@@ -79,7 +78,7 @@ namespace nORM.Providers
             bool hasOffset = offsetParameterName != null || offset.HasValue;
             if (hasLimit || hasOffset)
             {
-                // SG-1: Use case-insensitive comparison so that lower-case or mixed-case
+                // Use case-insensitive comparison so that lower-case or mixed-case
                 // ORDER BY clauses (e.g. "order by name") are detected correctly and a
                 // duplicate ORDER BY is not appended.
                 if (!sb.ToString().Contains("ORDER BY", StringComparison.OrdinalIgnoreCase)) sb.Append(" ORDER BY (SELECT NULL)");
@@ -205,8 +204,8 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// TP-1/Finding-C: SQL Server does not support CREATE TABLE IF NOT EXISTS.
-        /// Use OBJECT_ID check to create the tags table only when absent.
+        /// SQL Server does not support CREATE TABLE IF NOT EXISTS.
+        /// Uses an OBJECT_ID check to create the tags table only when absent.
         /// Uses NVARCHAR (not TEXT) and DATETIME2 (not TEXT) for correct SQL Server types.
         /// </summary>
         public override string GetCreateTagsTableSql()
@@ -218,20 +217,20 @@ CREATE TABLE [__NormTemporalTags] ({tagCol} NVARCHAR(450) NOT NULL, {tsCol} DATE
         }
 
         /// <summary>
-        /// TP-1/Finding-C: SQL Server uses SELECT TOP 1, not LIMIT 1.
+        /// SQL Server uses SELECT TOP 1, not LIMIT 1.
         /// </summary>
         public override string GetHistoryTableExistsProbeSql(string escapedHistoryTable)
             => $"SELECT TOP 1 1 FROM {escapedHistoryTable}";
 
         /// <summary>
-        /// TP-1/Finding-D: SQL Server error 208 = "Invalid object name" = object/table does not exist.
+        /// SQL Server error 208 = "Invalid object name" = object/table does not exist.
         /// This is a definitive schema error, not a permission or connectivity failure.
         /// </summary>
         public override bool IsObjectNotFoundError(DbException ex)
             => ex is SqlException sqlEx && sqlEx.Number == 208;
 
         /// <summary>
-        /// P-1: Introspects live column definitions via INFORMATION_SCHEMA.COLUMNS.
+        /// Introspects live column definitions via INFORMATION_SCHEMA.COLUMNS.
         /// Reconstructs full type strings including precision/scale/length.
         /// Returns empty list when the table does not yet exist.
         /// </summary>
@@ -279,7 +278,7 @@ ORDER BY c.ORDINAL_POSITION";
 
         /// <summary>
         /// Generates SQL to create a history table used for temporal tracking.
-        /// P-1: When liveColumns are supplied, column types are taken from the live DB schema.
+        /// When liveColumns are supplied, column types are taken from the live DB schema.
         /// </summary>
         /// <param name="mapping">The mapping describing the entity table.</param>
         /// <param name="liveColumns">Live column info from the main table, or null to use CLR defaults.</param>
@@ -414,7 +413,7 @@ END;";
 
         /// <summary>
         /// Creates a transaction savepoint using SQL Server's <see cref="SqlTransaction.Save(string)"/> API.
-        /// PRV-1: Checks the CancellationToken before and after executing so that pre-cancelled
+        /// Checks the CancellationToken before and after executing so that pre-cancelled
         /// tokens correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">The transaction on which to create the savepoint.</param>
@@ -422,7 +421,7 @@ END;";
         /// <param name="ct">Cancellation token.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             if (transaction is SqlTransaction sqlTransaction)
@@ -436,7 +435,7 @@ END;";
 
         /// <summary>
         /// Rolls back the transaction to the specified savepoint.
-        /// PRV-1: Checks the CancellationToken before and after executing so that pre-cancelled
+        /// Checks the CancellationToken before and after executing so that pre-cancelled
         /// tokens correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">The transaction containing the savepoint.</param>
@@ -444,7 +443,7 @@ END;";
         /// <param name="ct">Cancellation token.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             if (transaction is SqlTransaction sqlTransaction)
@@ -809,8 +808,7 @@ END;";
 
             /// <summary>
             /// Returns a <see cref="DataTable"/> describing the column metadata for this reader.
-            /// BUG FIX (TASK 25): Implemented GetSchemaTable to support SqlBulkCopy scenarios
-            /// that rely on schema information.
+            /// Implemented to support SqlBulkCopy scenarios that rely on schema information.
             /// </summary>
             public DataTable? GetSchemaTable()
             {
@@ -864,7 +862,7 @@ END;";
 
             /// <summary>
             /// Reads a stream of bytes from the specified column.
-            /// BUG FIX (TASK 21): Implemented GetBytes to support bulk copying entities with byte[] properties.
+            /// Supports bulk copying entities with byte[] properties.
             /// </summary>
             public long GetBytes(int i, long fieldOffset, byte[]? buffer, int bufferoffset, int length)
             {
@@ -899,7 +897,7 @@ END;";
 
             /// <summary>
             /// Reads a stream of characters from the specified column.
-            /// BUG FIX (TASK 21): Implemented GetChars to support bulk copying entities with char[] or string properties.
+            /// Supports bulk copying entities with char[] or string properties.
             /// </summary>
             public long GetChars(int i, long fieldoffset, char[]? buffer, int bufferoffset, int length)
             {
@@ -910,8 +908,8 @@ END;";
                 if (value == null || value == DBNull.Value)
                     return 0;
 
-                // PERFORMANCE FIX (TASK 19): Use string.CopyTo to avoid allocating char[] for entire string.
-                // Previously called ToCharArray() which allocates even if SqlBulkCopy only needs a small chunk.
+                // Use string.CopyTo to avoid allocating char[] for entire string.
+                // ToCharArray() allocates even if SqlBulkCopy only needs a small chunk.
                 if (value is string str)
                 {
                     // If buffer is null, return the total length of the string

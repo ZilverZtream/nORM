@@ -12,7 +12,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-1: Verifies that local-collection Contains handles null elements correctly.
+/// Verifies that local-collection Contains handles null elements correctly.
 /// SQL `col IN (NULL, @p1)` never matches null rows; only `col IS NULL` does.
 /// Fix: emit (col IN (...) OR col IS NULL) when the local collection contains nulls.
 /// </summary>

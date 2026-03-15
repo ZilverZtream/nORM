@@ -8,7 +8,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-1: Verifies that same-shape queries with different literal constant values produce
+/// Verifies that same-shape queries with different literal constant values produce
 /// distinct cache entries and return correct rows instead of reusing stale parameter values.
 /// </summary>
 public class PlanCacheLiteralVarianceTests

@@ -9,14 +9,14 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// PRV-1 + SG-1: Verifies that BulkInsertAsync respects ambient transactions (ownedTx guard),
-/// and that UseAffectedRowsSemantics is correct for MySqlProvider.
-///
-/// Note: The ownedTx integration tests use SQLite because MySqlConnector is unavailable
-/// in this environment. SQLite's BulkInsertAsync already uses the ownedTx guard pattern.
-/// The UseAffectedRowsSemantics assertion validates the PRV-1/SG-1 override exists on MySqlProvider.
-/// </summary>
+//<summary>
+//+ Verifies that BulkInsertAsync respects ambient transactions (ownedTx guard),
+//and that UseAffectedRowsSemantics is correct for MySqlProvider.
+//
+//Note: The ownedTx integration tests use SQLite because MySqlConnector is unavailable
+//in this environment. SQLite's BulkInsertAsync already uses the ownedTx guard pattern.
+//The UseAffectedRowsSemantics assertion validates the override exists on MySqlProvider.
+//</summary>
 public class MysqlBulkTransactionIsolationTests
 {
     [Table("MysqlBulkItem")]
@@ -44,23 +44,23 @@ public class MysqlBulkTransactionIsolationTests
         return System.Convert.ToInt64(cmd.ExecuteScalar());
     }
 
-    // ─── SG-1/PRV-1: UseAffectedRowsSemantics property ───────────────────
+ // ─── UseAffectedRowsSemantics property ───────────────────
 
     [Fact]
     public void MySqlProvider_UseAffectedRowsSemantics_IsTrue()
     {
-        // PRV-1 + SG-1: MySqlProvider must declare affected-row semantics.
+ // + MySqlProvider must declare affected-row semantics.
         var provider = new MySqlProvider(new SqliteParameterFactory());
         Assert.True(provider.UseAffectedRowsSemantics);
     }
 
-    // ─── PRV-1: BulkInsertAsync without outer tx commits on success ───────
+ // ─── BulkInsertAsync without outer tx commits on success ───────
 
     [Fact]
     public async Task BulkInsertAsync_NoOuterTransaction_CommitsRows()
     {
-        // PRV-1 non-regression: when no outer transaction is active, BulkInsertAsync
-        // creates its own transaction (ownedTx=true) and commits it.
+ // non-regression: when no outer transaction is active, BulkInsertAsync
+ // creates its own transaction (ownedTx=true) and commits it.
         var (cn, ctx) = CreateContext();
         using var _cn = cn;
         using var _ctx = ctx;
@@ -76,18 +76,18 @@ public class MysqlBulkTransactionIsolationTests
         Assert.Equal(2L, CountRows(cn));
     }
 
-    // ─── PRV-1: BulkInsertAsync inside outer tx respects rollback ─────────
+ // ─── BulkInsertAsync inside outer tx respects rollback ─────────
 
     [Fact]
     public async Task BulkInsertAsync_WhenOuterTxRolledBack_RowsAbsent()
     {
-        // PRV-1: BulkInsertAsync must participate in an outer transaction.
-        // When the outer tx rolls back, inserted rows must disappear.
+ // BulkInsertAsync must participate in an outer transaction.
+ // When the outer tx rolls back, inserted rows must disappear.
         var (cn, ctx) = CreateContext();
         using var _cn = cn;
         using var _ctx = ctx;
 
-        // Begin outer transaction via the context facade
+ // Begin outer transaction via the context facade
         await using var outerTx = await ctx.Database.BeginTransactionAsync();
 
         var items = new[]
@@ -98,7 +98,7 @@ public class MysqlBulkTransactionIsolationTests
 
         await ctx.BulkInsertAsync(items);
 
-        // Roll back the outer transaction — rows must not be visible
+ // Roll back the outer transaction — rows must not be visible
         await outerTx.RollbackAsync();
 
         Assert.Equal(0L, CountRows(cn));
@@ -107,7 +107,7 @@ public class MysqlBulkTransactionIsolationTests
     [Fact]
     public async Task BulkInsertAsync_WhenOuterTxCommitted_RowsPresent()
     {
-        // PRV-1 non-regression: BulkInsertAsync inside a committed outer tx keeps rows.
+ // non-regression: BulkInsertAsync inside a committed outer tx keeps rows.
         var (cn, ctx) = CreateContext();
         using var _cn = cn;
         using var _ctx = ctx;
@@ -128,21 +128,21 @@ public class MysqlBulkTransactionIsolationTests
     [Fact]
     public async Task BulkInsertAsync_MixedInSaveChanges_RolledBackTogether()
     {
-        // PRV-1: BulkInsertAsync and SaveChangesAsync must share the same outer transaction.
+ // BulkInsertAsync and SaveChangesAsync must share the same outer transaction.
         var (cn, ctx) = CreateContext();
         using var _cn = cn;
         using var _ctx = ctx;
 
         await using var outerTx = await ctx.Database.BeginTransactionAsync();
 
-        // Insert via SaveChangesAsync
+ // Insert via SaveChangesAsync
         ctx.Add(new MysqlBulkItem { Id = 30, Name = "Zeta" });
         await ctx.SaveChangesAsync();
 
-        // Insert via BulkInsertAsync
+ // Insert via BulkInsertAsync
         await ctx.BulkInsertAsync(new[] { new MysqlBulkItem { Id = 31, Name = "Eta" } });
 
-        // Roll back everything
+ // Roll back everything
         await outerTx.RollbackAsync();
 
         Assert.Equal(0L, CountRows(cn));

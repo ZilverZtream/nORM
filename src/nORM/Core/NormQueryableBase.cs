@@ -21,7 +21,7 @@ namespace nORM.Core
         protected NormQueryableBase(DbContext ctx)
         {
             Expression = Expression.Constant(this);
-            // PERF: Reuse cached NormQueryProvider instead of creating new one per Query<T>() call.
+            // Reuse cached NormQueryProvider instead of creating new one per Query<T>() call.
             // Saves 4 heap allocations (provider, executor, include processor, CUD builder).
             Provider = ctx.GetQueryProvider();
         }

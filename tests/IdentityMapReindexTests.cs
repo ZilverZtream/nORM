@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// M2: Verifies that after SaveChangesAsync assigns a DB-generated identity key to an entity,
+/// Verifies that after SaveChangesAsync assigns a DB-generated identity key to an entity,
 /// the entity is correctly re-indexed in the identity map so that subsequent Attach calls do
 /// not create a duplicate ChangeTracker entry.
 /// </summary>

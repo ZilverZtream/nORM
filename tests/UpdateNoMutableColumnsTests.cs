@@ -13,7 +13,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// CT-1: Verifies that UpdateAsync (single-entity) and SaveChanges (batch) both throw
+/// Verifies that UpdateAsync (single-entity) and SaveChanges (batch) both throw
 /// NormConfigurationException for entities that have no mutable columns (key-only, or
 /// key + concurrency-token-only). Also ensures a normal entity with one mutable column works.
 /// </summary>

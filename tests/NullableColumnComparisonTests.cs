@@ -8,7 +8,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Q1: Verifies that nullable column-vs-column comparisons expand to three-valued SQL logic
+/// Verifies that nullable column-vs-column comparisons expand to three-valued SQL logic
 /// (IS NULL guards), while non-nullable column comparisons use a plain operator.
 /// </summary>
 public class NullableColumnComparisonTests : TestBase

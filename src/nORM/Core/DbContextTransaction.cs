@@ -15,7 +15,7 @@ namespace nORM.Core
     {
         private readonly DbTransaction? _transaction;
         private readonly DbContext _context;
-        // C1 fix: int field + Interlocked.CompareExchange so concurrent Commit/Dispose calls
+        // int field + Interlocked.CompareExchange so concurrent Commit/Dispose calls
         // never both observe _completed==false and proceed to double-dispose the transaction.
         private int _completed; // 0 = not yet completed, 1 = completed
 
@@ -50,7 +50,7 @@ namespace nORM.Core
 
         /// <summary>
         /// Asynchronously commits the underlying transaction and disposes the wrapper.
-        /// TX-1: Uses try/finally so that CurrentTransaction is ALWAYS cleared even when
+        /// Uses try/finally so that CurrentTransaction is ALWAYS cleared even when
         /// CommitAsync throws (e.g. network drop during commit acknowledgement). Without the
         /// finally block a failed commit leaves the context's CurrentTransaction non-null, and
         /// the next call to BeginTransactionAsync would throw "transaction already active".
@@ -74,10 +74,7 @@ namespace nORM.Core
         /// Rolls back the underlying database transaction and disposes this wrapper
         /// instance. Any changes made within the transaction are undone and the
         /// context is returned to a non-transactional state.
-        /// </summary>
-        /// <summary>
-        /// T-1: try/finally mirrors CommitAsync — Dispose always clears CurrentTransaction
-        /// even when Rollback() throws.
+        /// Uses try/finally so that CurrentTransaction is always cleared even when Rollback throws.
         /// </summary>
         public void Rollback()
         {
@@ -87,7 +84,7 @@ namespace nORM.Core
 
         /// <summary>
         /// Asynchronously rolls back the underlying transaction and disposes the wrapper.
-        /// TX-1: Uses try/finally so that CurrentTransaction is ALWAYS cleared even when
+        /// Uses try/finally so that CurrentTransaction is ALWAYS cleared even when
         /// RollbackAsync throws. Without the finally block a failed rollback leaves the context's
         /// CurrentTransaction non-null.
         /// </summary>
@@ -110,7 +107,7 @@ namespace nORM.Core
 
         /// <summary>
         /// Disposes the transaction and clears it from the owning <see cref="DbContext"/>.
-        /// C1 fix: Interlocked.CompareExchange ensures only one concurrent caller proceeds.
+        /// Interlocked.CompareExchange ensures only one concurrent caller proceeds.
         /// </summary>
         public void Dispose()
         {
@@ -124,7 +121,7 @@ namespace nORM.Core
 
         /// <summary>
         /// Asynchronously disposes the transaction and clears it from the context.
-        /// C1 fix: same atomic gate as Dispose().
+        /// Uses the same atomic gate as Dispose() to prevent double-dispose.
         /// </summary>
         /// <returns>A task representing the dispose operation.</returns>
         public async ValueTask DisposeAsync()

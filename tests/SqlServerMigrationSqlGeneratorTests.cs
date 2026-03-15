@@ -6,7 +6,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// MIG-1: Validates that SqlServerMigrationSqlGenerator emits PRIMARY KEY, UNIQUE,
+/// Validates that SqlServerMigrationSqlGenerator emits PRIMARY KEY, UNIQUE,
 /// and CREATE INDEX DDL statements when table creation includes such columns.
 /// </summary>
 public class SqlServerMigrationSqlGeneratorTests
@@ -101,7 +101,7 @@ public class SqlServerMigrationSqlGeneratorTests
         Assert.Contains(sql.Up, s => s.Contains("DROP TABLE") && s.Contains("Users"));
     }
 
-    // ─── PRV-1: Identifier escaping with square brackets ────────────────────
+    // ─── Identifier escaping with square brackets ────────────────────
 
     [Fact]
     public void CreateTable_EscapesTableNameWithBracket()
@@ -144,7 +144,7 @@ public class SqlServerMigrationSqlGeneratorTests
         Assert.Contains("[ix]]val]", indexStmt);
     }
 
-    // ─── MIG-1: NOT NULL + DefaultValue ──────────────────────────────────────
+    // ─── NOT NULL + DefaultValue ──────────────────────────────────────
 
     [Fact]
     public void AddColumn_NotNull_WithDefaultValue_EmitsDefault()

@@ -8,7 +8,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>PRV-1: Translation-only cross-provider tests for compiled queries and SQL generation.</summary>
+/// <summary>Translation-only cross-provider tests for compiled queries and SQL generation.</summary>
 public class CompiledQueryProviderMatrixTests : TestBase
 {
     private class Product

@@ -16,7 +16,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-1: Verifies that the tenant filter expression builder coerces the runtime type of
+/// Verifies that the tenant filter expression builder coerces the runtime type of
 /// TenantProvider.GetCurrentTenantId() to the mapped property type before building the
 /// Expression.Constant. Without coercion, a type mismatch (e.g. long vs int) throws
 /// ArgumentException before any SQL is generated, crashing all tenant-scoped queries.
@@ -102,7 +102,7 @@ public class TenantTypeMismatchTests
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// QP-1: TenantProvider returns boxed long; entity tenant property is int.
+    /// TenantProvider returns boxed long; entity tenant property is int.
     /// Without type coercion this throws ArgumentException in expression construction.
     /// With the fix, the query must execute successfully (result may be empty).
     /// </summary>
@@ -118,14 +118,14 @@ public class TenantTypeMismatchTests
         cmd.CommandText = "INSERT INTO TtmIntItem (Id, Name, TenantId) VALUES (1, 'Alice', 42)";
         await cmd.ExecuteNonQueryAsync();
 
-        // QP-1: Must not throw ArgumentException during expression construction.
+        // Must not throw ArgumentException during expression construction.
         var results = ctx.Query<IntTenantItem>().ToList();
         Assert.Single(results);
         Assert.Equal("Alice", results[0].Name);
     }
 
     /// <summary>
-    /// QP-1: TenantProvider returns string "7"; entity tenant property is int.
+    /// TenantProvider returns string "7"; entity tenant property is int.
     /// String-to-int coercion via Convert.ChangeType should work for parseable values.
     /// </summary>
     [Fact]
@@ -144,7 +144,7 @@ public class TenantTypeMismatchTests
     }
 
     /// <summary>
-    /// QP-1: Matching types (int provider, int column) must still work normally — regression guard.
+    /// Matching types (int provider, int column) must still work normally — regression guard.
     /// </summary>
     [Fact]
     public async Task TenantFilter_MatchingTypes_WorksAsNormal()
@@ -164,7 +164,7 @@ public class TenantTypeMismatchTests
     }
 
     /// <summary>
-    /// QP-1: String "abc" cannot be converted to int; must throw NormConfigurationException
+    /// String "abc" cannot be converted to int; must throw NormConfigurationException
     /// with an actionable message, NOT a raw ArgumentException from expression construction.
     /// </summary>
     [Fact]

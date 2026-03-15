@@ -12,9 +12,9 @@ using System.Linq;
 namespace nORM.Tests;
 
 /// <summary>
-/// MAP-4: Verifies that materializing a DB NULL into a non-nullable value type member
+/// Verifies that materializing a DB NULL into a non-nullable value type member
 /// throws rather than silently defaulting to 0/false/etc.
-/// MM-2: Verifies that enum and Nullable&lt;TEnum&gt; properties are correctly materialized
+/// Verifies that enum and Nullable&lt;TEnum&gt; properties are correctly materialized
 /// from integer DB values via the reflection fallback path.
 /// </summary>
 public class MaterializerNullHandlingTests
@@ -92,7 +92,7 @@ public class MaterializerNullHandlingTests
         Assert.Equal(42, results[0].NonNullableInt);
     }
 
-    // MM-2: Enum conversion tests
+    // Enum conversion tests
 
     private enum TestStatus { Active = 1, Inactive = 2, Pending = 3 }
 
@@ -107,7 +107,7 @@ public class MaterializerNullHandlingTests
     [Fact]
     public async Task Query_EnumProperty_ConvertsIntToEnum()
     {
-        // MM-2: An int DB value must be correctly converted to an enum type
+        // An int DB value must be correctly converted to an enum type
         await using var cn = new SqliteConnection("Data Source=:memory:");
         await cn.OpenAsync();
         await using (var setup = cn.CreateCommand())
@@ -128,7 +128,7 @@ public class MaterializerNullHandlingTests
     [Fact]
     public async Task Query_NullableEnumProperty_WithDbNull_ReturnsNull()
     {
-        // MM-2: A DB NULL for Nullable<TEnum> must return null, not throw
+        // A DB NULL for Nullable<TEnum> must return null, not throw
         await using var cn = new SqliteConnection("Data Source=:memory:");
         await cn.OpenAsync();
         await using (var setup = cn.CreateCommand())

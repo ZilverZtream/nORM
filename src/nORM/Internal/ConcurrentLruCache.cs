@@ -15,8 +15,7 @@ namespace nORM.Internal
     {
         private readonly ConcurrentDictionary<TKey, LinkedListNode<CacheItem>> _cache = new();
         private readonly LinkedList<CacheItem> _lruList = new();
-        // PERFORMANCE FIX (TASK 2): Use ReaderWriterLockSlim for better read concurrency
-        // Multiple readers can access the LRU list simultaneously, while writes are exclusive
+        // ReaderWriterLockSlim allows multiple concurrent readers while writes are exclusive
         private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.NoRecursion);
 
         private int _maxSize;
@@ -24,9 +23,9 @@ namespace nORM.Internal
         private long _hits;
         private long _misses;
 
-        // PERFORMANCE FIX (TASK 6): Lazy LRU using timestamps instead of list manipulation
-        // Update LastAccessed with Interlocked (no lock required), defer structural promotion
-        // This allows true lock-free reads while maintaining approximate LRU semantics
+        // Lazy LRU uses timestamps instead of list manipulation: update LastAccessed with
+        // Interlocked (no lock required) and defer structural promotion, allowing true
+        // lock-free reads while maintaining approximate LRU semantics.
 
         /// <summary>
         /// Initializes a new concurrent LRU cache.
@@ -94,8 +93,8 @@ namespace nORM.Internal
         /// <returns><c>true</c> if the value was found in the cache; otherwise <c>false</c>.</returns>
         public bool TryGet(TKey key, out TValue value)
         {
-            // PERFORMANCE FIX (TASK 6): Lock-free read path with Interlocked timestamp update
-            // This allows thousands of concurrent reads without blocking
+            // Lock-free read path with Interlocked timestamp update allows
+            // thousands of concurrent reads without blocking
             if (_cache.TryGetValue(key, out var node))
             {
                 var item = node.Value;
@@ -103,8 +102,8 @@ namespace nORM.Internal
                 // Check expiration without locking
                 if (!IsExpired(item))
                 {
-                    // PERFORMANCE FIX (TASK 6): Update LastAccessed using Interlocked (no lock!)
-                    // Convert DateTime to long ticks for atomic update
+                    // Update LastAccessed using Interlocked (no lock required);
+                    // convert DateTime to long ticks for atomic update.
                     var nowTicks = DateTime.UtcNow.Ticks;
                     Interlocked.Exchange(ref item.LastAccessedTicks, nowTicks);
 
@@ -137,7 +136,7 @@ namespace nORM.Internal
 
         /// <summary>
         /// Adds or returns existing value. The factory runs at most once per key even under concurrent misses.
-        /// C1 fix: uses a write-lock double-check pattern so that racing threads serialize on the write lock;
+        /// Uses a write-lock double-check pattern so that racing threads serialize on the write lock;
         /// the first thread runs the factory and inserts the value, subsequent threads find it in the cache.
         /// </summary>
         public TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
@@ -221,9 +220,9 @@ namespace nORM.Internal
                     _lruList.AddFirst(newNode);
                 }
 
-                // PERFORMANCE FIX (TASK 3): Sample tail portion to choose eviction candidate
-                // LRU CACHE EVICTION FIX: Scale sample window with cache size for better hit rate
-                // Fixed window of 20 is insufficient for large caches (only 2% of 1000-entry cache)
+                // Sample the tail portion to choose an eviction candidate; scale the window
+                // with cache size for better hit rate (a fixed window of 20 covers only 2%
+                // of a 1000-entry cache).
                 if (_lruList.Count > _maxSize)
                 {
                     // Sample 10% of cache entries with min=20, max=100 for balanced performance
@@ -305,8 +304,8 @@ namespace nORM.Internal
         /// <para><strong>Value</strong>: The cached value.</para>
         /// <para><strong>Created</strong>: Timestamp indicating when the entry was created.</para>
         /// <para><strong>TtlOverride</strong>: Optional TTL overriding the cache's default.</para>
-        /// <para><strong>LastAccessedTicks</strong>: Mutable field storing last access time as ticks. Updated via Interlocked for lock-free reads.
-        /// PERFORMANCE FIX (TASK 6): This allows updating access time without acquiring write locks.</para>
+        /// <para><strong>LastAccessedTicks</strong>: Mutable field storing last access time as ticks. Updated via Interlocked for lock-free reads,
+        /// allowing access time to be updated without acquiring write locks.</para>
         /// </remarks>
         private sealed class CacheItem
         {

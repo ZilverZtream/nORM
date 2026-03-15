@@ -12,7 +12,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Tests for TX-1: Raw SQL query APIs must respect the active DbContext transaction.
+/// Tests for Raw SQL query APIs must respect the active DbContext transaction.
 /// </summary>
 public class TransactionIsolationTests
 {
@@ -38,7 +38,7 @@ public class TransactionIsolationTests
     }
 
     /// <summary>
-    /// TX-1: Within an active explicit transaction, rows written via SaveChangesAsync
+    /// Within an active explicit transaction, rows written via SaveChangesAsync
     /// must be visible to QueryUnchangedAsync on the same connection / same transaction.
     /// </summary>
     [Fact]
@@ -62,7 +62,7 @@ public class TransactionIsolationTests
     }
 
     /// <summary>
-    /// TX-1: A separate connection (outside the transaction) must NOT see rows that
+    /// A separate connection (outside the transaction) must NOT see rows that
     /// have been written but not yet committed.
     /// Note: SQLite in WAL mode uses snapshot isolation; uncommitted writes on one
     /// connection are never visible to a separate connection regardless of transaction state.
@@ -98,7 +98,7 @@ public class TransactionIsolationTests
     }
 
     /// <summary>
-    /// TX-1: Structural test — after BeginTransactionAsync, the DbCommand created inside
+    /// Structural test — after BeginTransactionAsync, the DbCommand created inside
     /// QueryUnchangedAsync must have its Transaction property bound to the active transaction.
     /// We verify this indirectly: write a row in a transaction, read it back via
     /// QueryUnchangedAsync (which will fail if Transaction is not bound on SQLite WAL),

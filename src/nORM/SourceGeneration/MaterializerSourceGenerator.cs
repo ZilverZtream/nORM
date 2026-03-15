@@ -83,7 +83,7 @@ public class MaterializerSourceGenerator : ISourceGenerator
         sb.AppendLine("        {");
         sb.AppendLine($"            var entity = new {className}();");
 
-        // M1/SG1 fix: resolve column ordinals by name so column order in the result set doesn't matter.
+        // Resolve column ordinals by name so column order in the result set doesn't matter.
         for (int i = 0; i < properties.Count; i++)
             sb.AppendLine($"            int __ord_{properties[i].Name} = reader.GetOrdinal(\"{properties[i].Name}\");");
 

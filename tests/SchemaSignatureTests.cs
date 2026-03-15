@@ -9,7 +9,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// C-1: Verifies that ComputeSchemaSignature uses a 128-bit (32-char hex) SHA-256 fingerprint
+/// Verifies that ComputeSchemaSignature uses a 128-bit (32-char hex) SHA-256 fingerprint
 /// and that the signature changes with column type, nullability, and PK changes.
 /// </summary>
 public class SchemaSignatureTests
@@ -33,7 +33,7 @@ public class SchemaSignatureTests
 
         var sig = Gen().ComputeSchemaSignature(cn, "T1");
 
-        // C-1: SHA-256 truncated to 16 bytes = 32 hex chars
+        // SHA-256 truncated to 16 bytes = 32 hex chars
         Assert.Equal(32, sig.Length);
         Assert.True(Regex.IsMatch(sig, @"^[0-9A-Fa-f]{32}$"), $"Expected 32-char hex, got: {sig}");
     }

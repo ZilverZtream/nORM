@@ -9,7 +9,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// PRV-1: Tests that savepoint operations correctly honour the CancellationToken.
+/// Tests that savepoint operations correctly honour the CancellationToken.
 /// Pre-cancelled tokens must throw OperationCanceledException rather than silently proceeding.
 /// Also covers the normal savepoint flow (create → work → rollback → commit).
 /// </summary>
@@ -37,7 +37,7 @@ public class SavepointCancellationTests
 
         await using var tx = await cn.BeginTransactionAsync();
 
-        // PRV-1: Pre-cancelled token must cause OperationCanceledException
+        // Pre-cancelled token must cause OperationCanceledException
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             provider.CreateSavepointAsync(tx, "sp1", cts.Token));
     }
@@ -56,7 +56,7 @@ public class SavepointCancellationTests
         using var cts = new CancellationTokenSource();
         cts.Cancel(); // pre-cancel
 
-        // PRV-1: Pre-cancelled token must cause OperationCanceledException on rollback too
+        // Pre-cancelled token must cause OperationCanceledException on rollback too
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             provider.RollbackToSavepointAsync(tx, "sp1", cts.Token));
     }
@@ -77,7 +77,7 @@ public class SavepointCancellationTests
         using var cts = new CancellationTokenSource();
         cts.Cancel(); // pre-cancel
 
-        // PRV-1: Pre-cancelled token must cause OperationCanceledException
+        // Pre-cancelled token must cause OperationCanceledException
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             provider.CreateSavepointAsync(tx, "sp1", cts.Token));
     }
@@ -167,7 +167,7 @@ public class SavepointCancellationTests
     // ─── SQL Server: pre-cancelled token → throws before SQL Server check ─
 
     /// <summary>
-    /// PRV-1: SqlServerProvider.CreateSavepointAsync must honour a pre-cancelled token
+    /// SqlServerProvider.CreateSavepointAsync must honour a pre-cancelled token
     /// and throw OperationCanceledException BEFORE attempting the SqlTransaction check.
     /// We use a SQLite transaction here because the CancellationToken check fires first.
     /// </summary>
@@ -185,13 +185,13 @@ public class SavepointCancellationTests
         using var cts = new CancellationTokenSource();
         cts.Cancel(); // pre-cancel
 
-        // PRV-1: Pre-cancelled token must cause OperationCanceledException
+        // Pre-cancelled token must cause OperationCanceledException
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             provider.CreateSavepointAsync(tx, "sp1", cts.Token));
     }
 
     /// <summary>
-    /// PRV-1: SqlServerProvider.RollbackToSavepointAsync must honour a pre-cancelled token.
+    /// SqlServerProvider.RollbackToSavepointAsync must honour a pre-cancelled token.
     /// </summary>
     [Fact]
     public async Task SqlServer_RollbackToSavepointAsync_PreCancelled_ThrowsOperationCanceled()
@@ -204,7 +204,7 @@ public class SavepointCancellationTests
         using var cts = new CancellationTokenSource();
         cts.Cancel(); // pre-cancel
 
-        // PRV-1: Pre-cancelled token must cause OperationCanceledException
+        // Pre-cancelled token must cause OperationCanceledException
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             provider.RollbackToSavepointAsync(tx, "sp1", cts.Token));
     }
@@ -212,7 +212,7 @@ public class SavepointCancellationTests
     // ─── Postgres: pre-cancelled token → throws before reflection check ───
 
     /// <summary>
-    /// PRV-1: PostgresProvider.CreateSavepointAsync must honour a pre-cancelled token.
+    /// PostgresProvider.CreateSavepointAsync must honour a pre-cancelled token.
     /// </summary>
     [Fact]
     public async Task Postgres_CreateSavepointAsync_PreCancelled_ThrowsOperationCanceled()
@@ -225,13 +225,13 @@ public class SavepointCancellationTests
         using var cts = new CancellationTokenSource();
         cts.Cancel(); // pre-cancel
 
-        // PRV-1: Pre-cancelled token must cause OperationCanceledException
+        // Pre-cancelled token must cause OperationCanceledException
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             provider.CreateSavepointAsync(tx, "sp1", cts.Token));
     }
 
     /// <summary>
-    /// PRV-1: PostgresProvider.RollbackToSavepointAsync must honour a pre-cancelled token.
+    /// PostgresProvider.RollbackToSavepointAsync must honour a pre-cancelled token.
     /// </summary>
     [Fact]
     public async Task Postgres_RollbackToSavepointAsync_PreCancelled_ThrowsOperationCanceled()

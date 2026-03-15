@@ -10,10 +10,10 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// Tests that null semantics produce the correct rows when executed against a real SQLite database.
-/// Covers IS NULL, IS NOT NULL, column-vs-constant, and column-vs-column comparisons.
-/// </summary>
+//<summary>
+//Tests that null semantics produce the correct rows when executed against a real SQLite database.
+//Covers IS NULL, IS NOT NULL, column-vs-constant, and column-vs-column comparisons.
+//</summary>
 public class NullSemanticsTests
 {
     [Table("NullRow")]
@@ -66,7 +66,7 @@ public class NullSemanticsTests
         return Convert.ToInt32(cmd.ExecuteScalar());
     }
 
-    // ─── nullable int? == null (IS NULL) ─────────────────────────────────
+ // ─── nullable int? == null (IS NULL) ─────────────────────────────────
 
     [Fact]
     public async Task NullableInt_EqualNull_ReturnsRowsWithNullValue()
@@ -81,7 +81,7 @@ public class NullSemanticsTests
         Assert.Null(results[0].NullableInt);
     }
 
-    // ─── nullable int? != null (IS NOT NULL) ─────────────────────────────
+ // ─── nullable int? != null (IS NOT NULL) ─────────────────────────────
 
     [Fact]
     public async Task NullableInt_NotEqualNull_ReturnsRowsWithNonNullValue()
@@ -97,7 +97,7 @@ public class NullSemanticsTests
         Assert.All(results, r => Assert.NotNull(r.NullableInt));
     }
 
-    // ─── nullable int? == constant ────────────────────────────────────────
+ // ─── nullable int? == constant ────────────────────────────────────────
 
     [Fact]
     public async Task NullableInt_EqualConstant_ReturnsMatchingRows()
@@ -113,7 +113,7 @@ public class NullSemanticsTests
         Assert.Equal(42, results[0].NullableInt);
     }
 
-    // ─── nullable string == null ──────────────────────────────────────────
+ // ─── nullable string == null ──────────────────────────────────────────
 
     [Fact]
     public async Task NullableString_EqualNull_ReturnsRowsWithNullValue()
@@ -128,7 +128,7 @@ public class NullSemanticsTests
         Assert.Null(results[0].NullableStr);
     }
 
-    // ─── nullable string != null ──────────────────────────────────────────
+ // ─── nullable string != null ──────────────────────────────────────────
 
     [Fact]
     public async Task NullableString_NotEqualNull_ReturnsNonNullRows()
@@ -144,7 +144,7 @@ public class NullSemanticsTests
         Assert.All(results, r => Assert.NotNull(r.NullableStr));
     }
 
-    // ─── nullable string == "literal" ─────────────────────────────────────
+ // ─── nullable string == "literal" ─────────────────────────────────────
 
     [Fact]
     public async Task NullableString_EqualLiteral_ReturnsMatchingRows()
@@ -160,14 +160,14 @@ public class NullSemanticsTests
         Assert.Equal("Alice", results[0].NullableStr);
     }
 
-    // ─── column-vs-column: nullable int? == nullable int? ─────────────────
+ // ─── column-vs-column: nullable int? == nullable int? ─────────────────
 
     [Fact]
     public async Task NullableInt_ColumnVsColumn_BothNull_Matches()
     {
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
-        // Row where both NullableInt and NullableB are NULL → should match NullableInt == NullableB
+ // Row where both NullableInt and NullableB are NULL → should match NullableInt == NullableB
         Insert(cn, null, null, 1, null);          // both null → matches
         Insert(cn, 5, null, 2, 5);               // both same non-null value → matches
         Insert(cn, 5, null, 3, 10);              // different non-null values → does not match
@@ -177,7 +177,7 @@ public class NullSemanticsTests
         Assert.Equal(2, results.Count);
     }
 
-    // ─── column-vs-column: nullable int? != nullable int? ────────────────
+ // ─── column-vs-column: nullable int? != nullable int? ────────────────
 
     [Fact]
     public async Task NullableInt_ColumnVsColumn_NotEqual_OneNull_Matches()
@@ -193,14 +193,14 @@ public class NullSemanticsTests
         Assert.Equal(2, results.Count);
     }
 
-    // ─── column-vs-column: nullable string == nullable string ─────────────
+ // ─── column-vs-column: nullable string == nullable string ─────────────
 
     [Fact]
     public async Task NullableString_ColumnVsColumn_BothNull_Matches()
     {
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
-        // Row where both NullableStr and NullableStrB are null → should match
+ // Row where both NullableStr and NullableStrB are null → should match
         Insert(cn, null, null, 1, null, null);           // both null → matches
         Insert(cn, null, "hi", 2, null, "hi");           // both same → matches
         Insert(cn, null, "hi", 3, null, "bye");          // different → no match
@@ -210,7 +210,7 @@ public class NullSemanticsTests
         Assert.Equal(2, results.Count);
     }
 
-    // ─── column-vs-column: nullable string != nullable string ─────────────
+ // ─── column-vs-column: nullable string != nullable string ─────────────
 
     [Fact]
     public async Task NullableString_ColumnVsColumn_OneNull_Matches()
@@ -226,7 +226,7 @@ public class NullSemanticsTests
         Assert.Equal(2, results.Count);
     }
 
-    // ─── non-nullable == non-nullable (no IS NULL expansion) ──────────────
+ // ─── non-nullable == non-nullable (no IS NULL expansion) ──────────────
 
     [Fact]
     public async Task NonNullableInt_EqualConstant_ReturnsMatchingRows()
@@ -242,7 +242,7 @@ public class NullSemanticsTests
         Assert.All(results, r => Assert.Equal(10, r.NonNullableInt));
     }
 
-    // ─── Null IS NULL filter returns nothing when all rows are non-null ────
+ // ─── Null IS NULL filter returns nothing when all rows are non-null ────
 
     [Fact]
     public async Task NullableInt_EqualNull_NoNullRows_ReturnsEmpty()
@@ -257,7 +257,7 @@ public class NullSemanticsTests
         Assert.Empty(results);
     }
 
-    // ─── IS NOT NULL returns nothing when all rows are null ────────────────
+ // ─── IS NOT NULL returns nothing when all rows are null ────────────────
 
     [Fact]
     public async Task NullableInt_NotEqualNull_AllNullRows_ReturnsEmpty()
@@ -271,7 +271,7 @@ public class NullSemanticsTests
         Assert.Empty(results);
     }
 
-    // ─── ToList with null filter covers count verification ─────────────────
+ // ─── ToList with null filter covers count verification ─────────────────
 
     [Fact]
     public async Task NullFilter_ToList_ReturnsCorrectRows()
@@ -284,20 +284,20 @@ public class NullSemanticsTests
         Insert(cn, 5, null, 4);
         Insert(cn, 5, null, 5);
 
-        // Verify null rows via ToList (full query path handles IS NULL correctly)
+ // Verify null rows via ToList (full query path handles IS NULL correctly)
         var nullRows = await ctx.Query<NullRow>().Where(x => x.NullableInt == null).ToListAsync();
         var nonNullRows = await ctx.Query<NullRow>().Where(x => x.NullableInt != null).ToListAsync();
         Assert.Equal(2, nullRows.Count);
         Assert.Equal(3, nonNullRows.Count);
     }
 
-    // ─── QP-1: nullable string != non-null constant includes NULL rows ─────
+ // ─── nullable string != non-null constant includes NULL rows ─────
 
-    /// <summary>
-    /// QP-1: SQL 3VL issue — NULL &lt;&gt; 'Alice' = UNKNOWN (excluded by SQL), but
-    /// C# says null != "Alice" = true (should be included).
-    /// Fix: emit (col IS NULL OR col &lt;&gt; @p) for NotEqual with nullable column vs non-null constant.
-    /// </summary>
+ //<summary>
+ //SQL 3VL issue — NULL &lt;&gt; 'Alice' = UNKNOWN (excluded by SQL), but
+ //C# says null != "Alice" = true (should be included).
+ //Fix: emit (col IS NULL OR col &lt;&gt; @p) for NotEqual with nullable column vs non-null constant.
+ //</summary>
     [Fact]
     public async Task NullableString_NotEqual_NonNullConstant_IncludesNullRows()
     {
@@ -308,17 +308,17 @@ public class NullSemanticsTests
         Insert(cn, null, "Alice", 3);   // NullableStr = "Alice" → "Alice" != "Alice" is false → EXCLUDE
 
         var results = await ctx.Query<NullRow>().Where(x => x.NullableStr != "Alice").ToListAsync();
-        // Both NULL row and "Bob" row should be returned (null != "Alice" is true in C#)
+ // Both NULL row and "Bob" row should be returned (null != "Alice" is true in C#)
         Assert.Equal(2, results.Count);
         Assert.Contains(results, r => r.NullableStr is null);
         Assert.Contains(results, r => r.NullableStr == "Bob");
     }
 
-    /// <summary>
-    /// QP-1 regression: nullable string == non-null constant should NOT include NULL rows.
-    /// C# says null == "Alice" = false, SQL NULL = 'Alice' = UNKNOWN (excluded) — both agree.
-    /// So Equal does NOT need expansion when right side is non-null.
-    /// </summary>
+ //<summary>
+ //regression: nullable string == non-null constant should NOT include NULL rows.
+ //C# says null == "Alice" = false, SQL NULL = 'Alice' = UNKNOWN (excluded) — both agree.
+ //So Equal does NOT need expansion when right side is non-null.
+ //</summary>
     [Fact]
     public async Task NullableString_Equal_NonNullConstant_ExcludesNullRows()
     {
@@ -333,9 +333,9 @@ public class NullSemanticsTests
         Assert.Equal("Alice", results[0].NullableStr);
     }
 
-    /// <summary>
-    /// QP-1: Same pattern for int? — nullable int != non-null constant must include NULL rows.
-    /// </summary>
+ //<summary>
+ //Same pattern for int? — nullable int != non-null constant must include NULL rows.
+ //</summary>
     [Fact]
     public async Task NullableInt_NotEqual_NonNullConstant_IncludesNullRows()
     {
@@ -351,10 +351,10 @@ public class NullSemanticsTests
         Assert.Contains(results, r => r.NullableInt == 99);
     }
 
-    /// <summary>
-    /// QP-1 regression: non-nullable column != constant should NOT expand to include IS NULL.
-    /// The column cannot be null so no expansion is needed.
-    /// </summary>
+ //<summary>
+ //regression: non-nullable column != constant should NOT expand to include IS NULL.
+ //The column cannot be null so no expansion is needed.
+ //</summary>
     [Fact]
     public async Task NonNullable_NotEqual_NoExpansion_ReturnsCorrectRows()
     {
@@ -369,17 +369,17 @@ public class NullSemanticsTests
         Assert.All(results, r => Assert.NotEqual(20, r.NonNullableInt));
     }
 
-    /// <summary>
-    /// QP-1 regression guard: column-vs-column nullable != nullable still uses full 3-way expansion.
-    /// When BOTH sides could be null, the full (IS NOT NULL AND ... OR IS NULL AND ... OR IS NOT NULL AND IS NULL)
-    /// expansion is still needed to handle all null/non-null combinations correctly.
-    /// </summary>
+ //<summary>
+ //regression guard: column-vs-column nullable != nullable still uses full 3-way expansion.
+ //When BOTH sides could be null, the full (IS NOT NULL AND ... OR IS NULL AND ... OR IS NOT NULL AND IS NULL)
+ //expansion is still needed to handle all null/non-null combinations correctly.
+ //</summary>
     [Fact]
     public async Task NullableColumn_NotEqual_NullableColumn_StillExpandsCorrectly()
     {
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
-        // Reuse NullableInt and NullableB columns for column-vs-column test
+ // Reuse NullableInt and NullableB columns for column-vs-column test
         Insert(cn, null, null, 1, null);          // both null → null != null is false → EXCLUDE
         Insert(cn, 5, null, 2, 5);               // both same non-null → 5 != 5 is false → EXCLUDE
         Insert(cn, 5, null, 3, 10);              // different non-null → 5 != 10 is true → INCLUDE
@@ -390,11 +390,11 @@ public class NullSemanticsTests
         Assert.Equal(3, results.Count);
     }
 
-    // ─── Null semantics regression sweep (additional coverage) ─────────────
+ // ─── Null semantics regression sweep (additional coverage) ─────────────
 
-    /// <summary>
-    /// nullable_col == null → IS NULL (already covered, regression guard)
-    /// </summary>
+ //<summary>
+ //nullable_col == null → IS NULL (already covered, regression guard)
+ //</summary>
     [Fact]
     public async Task NullableString_EqualNull_RegressionGuard()
     {
@@ -408,9 +408,9 @@ public class NullSemanticsTests
         Assert.Null(results[0].NullableStr);
     }
 
-    /// <summary>
-    /// nullable_col != null → IS NOT NULL (already covered, regression guard)
-    /// </summary>
+ //<summary>
+ //nullable_col != null → IS NOT NULL (already covered, regression guard)
+ //</summary>
     [Fact]
     public async Task NullableString_NotEqualNull_RegressionGuard()
     {
@@ -424,9 +424,9 @@ public class NullSemanticsTests
         Assert.Equal("hello", results[0].NullableStr);
     }
 
-    /// <summary>
-    /// non_nullable_col == "literal" → plain = (no IS NULL branch)
-    /// </summary>
+ //<summary>
+ //non_nullable_col == "literal" → plain = (no IS NULL branch)
+ //</summary>
     [Fact]
     public async Task NonNullable_Equal_Literal_NoIsNullBranch()
     {

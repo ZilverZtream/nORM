@@ -5,7 +5,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// MIG-1: Verifies that schema diff detects composite index column order changes.
+/// Verifies that schema diff detects composite index column order changes.
 /// Before the fix, OrderBy() was applied before SequenceEqual, making (A,B)
 /// and (B,A) look identical. Now the declared order is preserved.
 /// </summary>
@@ -48,12 +48,12 @@ public class MigrationIndexOrderTests
         return snap;
     }
 
-    // ─── MIG-1: column order change → drop + add ─────────────────────────
+    // ─── column order change → drop + add ─────────────────────────
 
     [Fact]
     public void IndexColumnOrderChange_ProducesDropAndAdd()
     {
-        // MIG-1: IX_T(ColA, ColB) → IX_T(ColB, ColA) must be detected as a definition change.
+        // IX_T(ColA, ColB) → IX_T(ColB, ColA) must be detected as a definition change.
         var before = BuildSnapshotWithIndex("T", IndexName, "ColA", "ColB");
         var after  = BuildSnapshotWithIndex("T", IndexName, "ColB", "ColA");
 
@@ -137,7 +137,7 @@ public class MigrationIndexOrderTests
     [Fact]
     public void ThreeColumnIndex_OrderChange_IsDetected()
     {
-        // MIG-1: three-column composite index — (A,B,C) → (A,C,B) must be detected.
+        // three-column composite index — (A,B,C) → (A,C,B) must be detected.
         var before = BuildSnapshotWithIndex("T", IndexName, "A", "B", "C");
         var after  = BuildSnapshotWithIndex("T", IndexName, "A", "C", "B");
 

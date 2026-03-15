@@ -13,7 +13,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// SQL-1: Verifies that the concurrency-token WHERE predicate is null-safe.
+/// Verifies that the concurrency-token WHERE predicate is null-safe.
 ///
 /// Old SQL: col = @param              (always FALSE when both are NULL in SQL)
 /// New SQL: (col = @param OR (col IS NULL AND @param IS NULL))

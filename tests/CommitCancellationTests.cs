@@ -13,7 +13,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// TX-1: Verifies that commit in single-row write paths (InsertAsync/UpdateAsync/DeleteAsync)
+/// Verifies that commit in single-row write paths (InsertAsync/UpdateAsync/DeleteAsync)
 /// uses CancellationToken.None so that a cancelled caller token does not abort an already-applied
 /// write or produce spurious exceptions.
 /// </summary>
@@ -38,10 +38,10 @@ public class CommitCancellationTests
         return (cn, new DbContext(cn, new SqliteProvider()));
     }
 
-    // ── TX-1: already-cancelled token must not prevent commit ─────────────────
+    // ── already-cancelled token must not prevent commit ─────────────────
 
     /// <summary>
-    /// TX-1: InsertAsync with a pre-cancelled token must still insert the row
+    /// InsertAsync with a pre-cancelled token must still insert the row
     /// (the write executed before the cancellation check on commit).
     /// Before the fix, CommitAsync(ct) with an already-cancelled token could throw
     /// OperationCanceledException even though the DB had already written the row.
@@ -55,7 +55,7 @@ public class CommitCancellationTests
 
         var entity = new CcItem { Name = "committed" };
 
-        // TX-1: If commit used the caller token, this would throw on the commit step.
+        // If commit used the caller token, this would throw on the commit step.
         // With the fix (CancellationToken.None), commit is unconditional.
         // SQLite in-process: the DB write + commit happens synchronously enough that
         // pre-cancellation only affects code that explicitly checks the token.
@@ -70,7 +70,7 @@ public class CommitCancellationTests
     }
 
     /// <summary>
-    /// TX-1: UpdateAsync with a pre-cancelled CancellationToken must not throw
+    /// UpdateAsync with a pre-cancelled CancellationToken must not throw
     /// OperationCanceledException on the commit step.
     /// </summary>
     [Fact]
@@ -93,7 +93,7 @@ public class CommitCancellationTests
     }
 
     /// <summary>
-    /// TX-1: DeleteAsync with a pre-cancelled CancellationToken must not throw
+    /// DeleteAsync with a pre-cancelled CancellationToken must not throw
     /// OperationCanceledException on the commit step.
     /// </summary>
     [Fact]
@@ -114,7 +114,7 @@ public class CommitCancellationTests
     }
 
     /// <summary>
-    /// TX-1: Normal path (non-cancelled token) continues to work correctly after the fix.
+    /// Normal path (non-cancelled token) continues to work correctly after the fix.
     /// Regression guard.
     /// </summary>
     [Fact]

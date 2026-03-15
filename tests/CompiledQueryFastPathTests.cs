@@ -17,14 +17,11 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Tests covering the 3.6/5.0 audit findings for the compile-time query path:
-///   T1  (High)  – fast path crashed on closed/fresh connection
-///   SG1 (Med)   – fast path bypassed transaction binding and interceptors
-///   P1  (Med)   – fixed parameters used direct .Value assignment, bypassing AssignValue
-/// Score gates: 3.6→4.0 (T1+SG1+interceptor), 4.0→4.5 (P1 type matrix),
-///              4.5→5.0 (adversarial parity suite).
+/// Tests covering the compiled query fast path: connection state handling, transaction
+/// binding, interceptor invocation, DbType assignment for fixed parameters, and parity
+/// between compiled and runtime LINQ queries.
 /// </summary>
-public class Audit36CompilePathTests
+public class CompiledQueryFastPathTests
 {
     // ─── shared entity ────────────────────────────────────────────────────────
 
@@ -83,17 +80,16 @@ public class Audit36CompilePathTests
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    // Gate 3.6 → 4.0 : T1 (connection) + SG1 (transaction + interceptors)
+    // Connection state handling
     // ════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// T1: Before the fix the fast path called cmd.ExecuteReader() on a closed connection
-    /// and threw "Connection is closed".  After the fix, a closed connection causes the
-    /// fast path to be skipped; the standard path calls EnsureConnectionAsync which reopens
-    /// the file-backed SQLite connection, and the query succeeds with correct data.
+    /// When the connection is closed, the fast path is skipped. The standard path calls
+    /// EnsureConnectionAsync which reopens the file-backed SQLite connection, and the
+    /// query succeeds with correct data.
     /// </summary>
     [Fact]
-    public async Task T1_CompiledQuery_ClosedConnection_FallsBackToStandardPath()
+    public async Task CompiledQuery_ClosedConnection_FallsBackToStandardPath()
     {
         var path = Path.Combine(Path.GetTempPath(), $"norm_t1_{Guid.NewGuid():N}.db");
         try
@@ -148,13 +144,15 @@ public class Audit36CompilePathTests
         }
     }
 
+    // ════════════════════════════════════════════════════════════════════════════
+    // Transaction binding and interceptor invocation
+    // ════════════════════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// SG1 (interceptors): Removing the CommandInterceptors.Count==0 guard and routing
-    /// through ExecuteReaderWithInterception means registered interceptors are invoked
-    /// for compiled queries on the sync fast path.
+    /// Registered interceptors are invoked for compiled queries on the sync fast path.
     /// </summary>
     [Fact]
-    public async Task SG1_CompiledQuery_WithInterceptor_ReaderExecutingIsInvoked()
+    public async Task CompiledQuery_WithInterceptor_ReaderExecutingIsInvoked()
     {
         using var cn = CreateConnection();
 
@@ -175,12 +173,11 @@ public class Audit36CompilePathTests
     }
 
     /// <summary>
-    /// SG1 (transaction binding): Adding cmd.Transaction = ctx.CurrentTransaction before
-    /// ExecuteReader means the compiled query command participates in the active transaction.
+    /// The compiled query command participates in the active transaction.
     /// Verified via interceptor capturing command.Transaction inside ReaderExecutingAsync.
     /// </summary>
     [Fact]
-    public async Task SG1_CompiledQuery_UnderExplicitTransaction_CommandTransactionIsSet()
+    public async Task CompiledQuery_UnderExplicitTransaction_CommandTransactionIsSet()
     {
         using var cn = CreateConnection();
 
@@ -201,7 +198,6 @@ public class Audit36CompilePathTests
         var result = await compiled(ctx, 1);
 
         // The interceptor captures cmd.Transaction at execution time.
-        // After the SG1 fix it must equal ctx.CurrentTransaction.
         Assert.Same(ctx.CurrentTransaction, interceptor.CapturedTransaction);
         Assert.Single(result);
 
@@ -209,11 +205,11 @@ public class Audit36CompilePathTests
     }
 
     /// <summary>
-    /// SG1 + T1 combined: interceptor is invoked AND transaction is bound even when
-    /// the connection was briefly closed before the call (T1 fall-back path).
+    /// The interceptor is invoked and the transaction is bound even when the connection was
+    /// briefly closed before the call (closed-connection fallback path).
     /// </summary>
     [Fact]
-    public async Task SG1_T1_ClosedConnection_WithInterceptorAndTransaction_BothWork()
+    public async Task ClosedConnection_WithInterceptorAndTransaction_BothWork()
     {
         var path = Path.Combine(Path.GetTempPath(), $"norm_sg1t1_{Guid.NewGuid():N}.db");
         try
@@ -259,15 +255,15 @@ public class Audit36CompilePathTests
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    // Gate 4.0 → 4.5 : P1 fixed-param DbType matrix
+    // Fixed-parameter DbType matrix
     // ════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// P1 unit: AssignValue must set DbType = Int32 (not Object) for an enum value
-    /// with an int32 underlying type so providers do not coerce it as an untyped blob.
+    /// AssignValue must set DbType = Int32 (not Object) for an enum value with an int32
+    /// underlying type so providers do not coerce it as an untyped blob.
     /// </summary>
     [Fact]
-    public void P1_AssignValue_EnumWithInt32Underlying_SetsInt32DbType()
+    public void AssignValue_EnumWithInt32Underlying_SetsInt32DbType()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -281,10 +277,10 @@ public class Audit36CompilePathTests
     }
 
     /// <summary>
-    /// P1 unit: AssignValue must set DbType = Date for a DateOnly value.
+    /// AssignValue must set DbType = Date for a DateOnly value.
     /// </summary>
     [Fact]
-    public void P1_AssignValue_DateOnly_SetsDateDbType()
+    public void AssignValue_DateOnly_SetsDateDbType()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -298,11 +294,11 @@ public class Audit36CompilePathTests
     }
 
     /// <summary>
-    /// P1 unit: AssignValue must set DbType = Time and convert TimeOnly to TimeSpan
-    /// for cross-provider compatibility.
+    /// AssignValue must set DbType = Time and convert TimeOnly to TimeSpan for
+    /// cross-provider compatibility.
     /// </summary>
     [Fact]
-    public void P1_AssignValue_TimeOnly_SetsTimeDbTypeAndConvertsToTimeSpan()
+    public void AssignValue_TimeOnly_SetsTimeDbTypeAndConvertsToTimeSpan()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -317,12 +313,12 @@ public class Audit36CompilePathTests
     }
 
     /// <summary>
-    /// P1 unit: AssignValue must set DbType = Guid for a Guid value.
-    /// Without this fix, a raw Guid stored via p.Value = guid with no DbType hint
-    /// would default to Object / String on some providers causing binding failures.
+    /// AssignValue must set DbType = Guid for a Guid value. Without a DbType hint, a raw
+    /// Guid stored via p.Value defaults to Object / String on some providers, causing
+    /// binding failures.
     /// </summary>
     [Fact]
-    public void P1_AssignValue_Guid_SetsGuidDbType()
+    public void AssignValue_Guid_SetsGuidDbType()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -337,12 +333,11 @@ public class Audit36CompilePathTests
     }
 
     /// <summary>
-    /// P1 integration: A compiled query whose WHERE clause contains an enum constant
-    /// (fixed parameter) must return correct results.  Before the fix, the fixed param
-    /// had no DbType; with the fix ParameterAssign.AssignValue sets DbType = Int32.
+    /// A compiled query whose WHERE clause contains an enum constant (fixed parameter)
+    /// must return correct results. AssignValue sets DbType = Int32 for enum-backed fixed params.
     /// </summary>
     [Fact]
-    public async Task P1_CompiledQuery_EnumConstantFixedParam_CorrectResults()
+    public async Task CompiledQuery_EnumConstantFixedParam_CorrectResults()
     {
         using var cn = CreateConnection();
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -358,11 +353,11 @@ public class Audit36CompilePathTests
     }
 
     /// <summary>
-    /// P1 integration: A compiled query whose runtime parameter is a nullable int
-    /// must bind correctly whether the value is non-null or null.
+    /// A compiled query whose runtime parameter is a nullable int must bind correctly
+    /// whether the value is non-null or null.
     /// </summary>
     [Fact]
-    public async Task P1_CompiledQuery_NullableIntCompiledParam_CorrectResults()
+    public async Task NullableInt_AssignedCorrectly()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -395,15 +390,15 @@ public class Audit36CompilePathTests
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    // Gate 4.5 → 5.0 : adversarial parity
+    // Parity between compiled and runtime queries
     // ════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Parity: compiled query and runtime LINQ query must produce identical result sets
-    /// for the same predicate and parameter values.
+    /// Compiled query and runtime LINQ query must produce identical result sets for the
+    /// same predicate and parameter values.
     /// </summary>
     [Fact]
-    public async Task Adversarial_CompiledAndRuntimeQuery_SameResultsForAllRows()
+    public async Task CompiledAndRuntimeQuery_SameResultsForAllRows()
     {
         using var cn = CreateConnection();
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -429,12 +424,12 @@ public class Audit36CompilePathTests
     }
 
     /// <summary>
-    /// Adversarial full-parity: compiled query with interceptor registered AND under
-    /// an explicit transaction produces correct results, calls the interceptor, and
-    /// the command's transaction reference matches ctx.CurrentTransaction.
+    /// Compiled query with interceptor registered AND under an explicit transaction
+    /// produces correct results, calls the interceptor, and the command's transaction
+    /// reference matches ctx.CurrentTransaction.
     /// </summary>
     [Fact]
-    public async Task Adversarial_CompiledQuery_InterceptorAndTransaction_FullParity()
+    public async Task CompiledQuery_InterceptorAndTransaction_FullParity()
     {
         using var cn = CreateConnection();
 
@@ -460,11 +455,11 @@ public class Audit36CompilePathTests
     }
 
     /// <summary>
-    /// Adversarial soak: 200 iterations alternating between two parameter values
-    /// must all return correct results (catches stale-state / pool-corruption issues).
+    /// 200 iterations alternating between two parameter values must all return correct
+    /// results, catching stale-state or pool-corruption issues.
     /// </summary>
     [Fact]
-    public async Task Adversarial_CompiledQuery_200IterationsAlternating_AllCorrect()
+    public async Task CompiledQuery_200IterationsAlternating_AllCorrect()
     {
         using var cn = CreateConnection();
         using var ctx = new DbContext(cn, new SqliteProvider());

@@ -52,8 +52,8 @@ namespace nORM.Configuration
         // 10 concurrent GroupJoins × 10k records × 1KB/record = ~100MB (safe for most environments)
         // Previous default (100k) could cause 1GB+ memory usage with concurrent queries
         private int _maxGroupJoinSize = 10000;
-        // QP-1: Configurable recursion depth. Default 50 (raised from hardcoded 30) to accommodate
-        // legitimate deep LINQ trees built by report composers or dynamic filter builders.
+        // Configurable recursion depth. Default 50 accommodates legitimate deep LINQ trees
+        // built by report composers or dynamic filter builders.
         // Maximum 200 to prevent stack overflows from adversarial inputs.
         private int _maxRecursionDepth = 50;
 

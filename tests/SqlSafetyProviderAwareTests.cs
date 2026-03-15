@@ -5,10 +5,10 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// P1: Verifies that <c>IsSafeRawSql</c> correctly handles provider-specific syntax.
+/// Verifies that <c>IsSafeRawSql</c> correctly handles provider-specific syntax.
 /// Non-SQL-Server providers skip the TSQL AST parser to avoid false negatives for
 /// dialect-specific statements like SQLite PRAGMA.
-/// X1: Also validates that side-effect commands are blocked for all providers.
+/// Also validates that side-effect commands are blocked for all providers.
 /// </summary>
 public class SqlSafetyProviderAwareTests
 {
@@ -27,7 +27,7 @@ public class SqlSafetyProviderAwareTests
         Assert.True(NormValidator.IsSafeRawSql(sql, null),      $"null provider: expected safe for: {sql}");
     }
 
-    // P1: PRAGMA must be blocked for all providers (keyword denylist applies first)
+    // PRAGMA must be blocked for all providers (keyword denylist applies first)
     [Theory]
     [InlineData("PRAGMA foreign_keys = ON")]
     [InlineData("pragma journal_mode=WAL")]
@@ -38,7 +38,7 @@ public class SqlSafetyProviderAwareTests
         Assert.False(NormValidator.IsSafeRawSql(sql, null),      $"null provider should block: {sql}");
     }
 
-    // P1: non-SQL-Server dialect syntax (e.g. WITH RECURSIVE) should be allowed
+    // non-SQL-Server dialect syntax (e.g. WITH RECURSIVE) should be allowed
     // by the SQLite provider (bypasses TSql parser) but may fail TSql parse path.
     [Fact]
     public void SqliteDialect_WithRecursiveCte_IsSafe_ForSqliteProvider()

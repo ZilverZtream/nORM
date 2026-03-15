@@ -46,9 +46,8 @@ namespace nORM.Core
         /// <returns>The <see cref="EntityEntry"/> representing the tracked entity.</returns>
         internal EntityEntry Track(object entity, EntityState state, TableMapping mapping)
         {
-            // RACE CONDITION FIX: Lock the entire operation to prevent TOCTOU between
-            // reference check and PK operations. This prevents two threads from tracking
-            // the same entity concurrently and causing state corruption.
+            // Lock the entire operation to prevent TOCTOU between reference check and PK operations.
+            // Prevents two threads from tracking the same entity concurrently and causing state corruption.
             lock (_trackLock)
             {
                 // Fast path: entity already tracked by reference
@@ -76,9 +75,8 @@ namespace nORM.Core
 
                 var pk = GetPrimaryKeyValue(entity, mapping);
 
-                // FIX (TASK 10): Use GetOrAdd pattern to atomically check and insert by PK
-                // This prevents race conditions where two threads tracking the same entity by PK
-                // might both create entries, causing duplicate tracking or inconsistent state
+                // Use GetOrAdd to atomically check and insert by PK, preventing race conditions
+                // where two threads tracking the same entity by PK might both create entries.
                 if (pk != null)
                 {
                     var typeEntries = _entriesByKey.GetOrAdd(
@@ -180,7 +178,7 @@ namespace nORM.Core
                 _nonNotifyingEntries.TryRemove(entry, out _);
                 _dirtyNonNotifyingEntries.TryRemove(entry, out _);
                 _dirtyEntries.TryRemove(entry, out _);
-                // CT-1: EntityEntry.OriginalKey stores composite keys as object?[] (CaptureKey shape),
+                // EntityEntry.OriginalKey stores composite keys as object?[] (CaptureKey shape),
                 // but _entriesByKey is keyed by tuples/(CompositeKey) (GetPrimaryKeyValue shape).
                 // Convert OriginalKey to the lookup shape; fall back to reading current PK when null.
                 var pk = entry.OriginalKey != null
@@ -199,7 +197,7 @@ namespace nORM.Core
             }
         }
 
-        // CT-1: EntityEntry.CaptureKey returns object?[] for composite keys, but _entriesByKey
+        // EntityEntry.CaptureKey returns object?[] for composite keys, but _entriesByKey
         // uses the same shape as GetPrimaryKeyValue (ValueTuple for 2/3 keys, CompositeKey for >3).
         // This method converts from the array shape to the dictionary-compatible shape.
         private static object? ToLookupKey(object? originalKey, TableMapping mapping)
@@ -222,8 +220,8 @@ namespace nORM.Core
         /// <param name="rootMapping">Mapping information for the root entity.</param>
         private void CascadeDelete(object rootEntity, TableMapping rootMapping)
         {
-            // FIX (TASK 2): Collect all entities to delete first, then remove them
-            // This prevents the issue where removing an entity early prevents discovering its descendants
+            // Collect all entities to delete first, then remove them to prevent premature removal
+            // from blocking discovery of descendants during graph traversal.
             var queue = new Queue<(object Entity, TableMapping Mapping, int Depth)>();
             var visited = new HashSet<object>(RefComparer.Instance);
             var toRemove = new List<object>();
@@ -308,7 +306,7 @@ namespace nORM.Core
         /// updating their <see cref="EntityState"/> based on current property values.
         /// </summary>
         /// <remarks>
-        /// PERFORMANCE WARNING (TASK 12): This method is called automatically on every SaveChanges() call.
+        /// This method is called automatically on every SaveChanges() call.
         /// It performs snapshot-based comparison of ALL tracked entities, iterating through all properties
         /// and comparing current values against original snapshots. This is O(entities × properties) complexity.
         ///
@@ -467,7 +465,7 @@ namespace nORM.Core
             {
                 var col0 = mapping.KeyColumns[0]; var col1 = mapping.KeyColumns[1];
                 var v0 = col0.Getter(entity);     var v1 = col1.Getter(entity);
-                // CT-1: unassigned DB-generated composite key → treat as null (not yet in identity map)
+                // Unassigned DB-generated composite key → treat as null (not yet in identity map).
                 if ((col0.IsDbGenerated && IsDefaultKeyValue(v0, col0.Prop.PropertyType)) ||
                     (col1.IsDbGenerated && IsDefaultKeyValue(v1, col1.Prop.PropertyType)))
                     return null;
@@ -478,7 +476,7 @@ namespace nORM.Core
             {
                 var col0 = mapping.KeyColumns[0]; var col1 = mapping.KeyColumns[1]; var col2 = mapping.KeyColumns[2];
                 var v0 = col0.Getter(entity);     var v1 = col1.Getter(entity);     var v2 = col2.Getter(entity);
-                // CT-1: unassigned DB-generated composite key → treat as null (not yet in identity map)
+                // Unassigned DB-generated composite key → treat as null (not yet in identity map).
                 if ((col0.IsDbGenerated && IsDefaultKeyValue(v0, col0.Prop.PropertyType)) ||
                     (col1.IsDbGenerated && IsDefaultKeyValue(v1, col1.Prop.PropertyType)) ||
                     (col2.IsDbGenerated && IsDefaultKeyValue(v2, col2.Prop.PropertyType)))
@@ -494,7 +492,7 @@ namespace nORM.Core
                 {
                     var col = mapping.KeyColumns[i];
                     var v = col.Getter(entity);
-                    // CT-1: unassigned DB-generated key component → entity not yet in identity map
+                    // Unassigned DB-generated key component → entity not yet in identity map.
                     if (col.IsDbGenerated && IsDefaultKeyValue(v, col.Prop.PropertyType))
                         return null;
                     values[i] = v;

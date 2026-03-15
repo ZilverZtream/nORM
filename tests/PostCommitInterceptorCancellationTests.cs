@@ -16,7 +16,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// CT-1: Verifies that SavedChangesAsync interceptors are called with CancellationToken.None
+/// Verifies that SavedChangesAsync interceptors are called with CancellationToken.None
 /// after a successful commit, even when the caller's CancellationToken is canceled concurrently.
 /// A post-commit notification must always complete to avoid false-failure reports and
 /// retry side effects when the DB commit already succeeded.
@@ -89,7 +89,7 @@ public class PostCommitInterceptorCancellationTests
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// CT-1: SavedChangesAsync must receive CancellationToken.None, not the caller token.
+    /// SavedChangesAsync must receive CancellationToken.None, not the caller token.
     /// Verified by capturing the token value in the interceptor.
     /// </summary>
     [Fact]
@@ -104,14 +104,14 @@ public class PostCommitInterceptorCancellationTests
         using var cts = new CancellationTokenSource();
         await ctx.SaveChangesAsync(cts.Token);
 
-        // CT-1: interceptor must receive CancellationToken.None.
+        // interceptor must receive CancellationToken.None.
         Assert.NotNull(interceptor.CapturedToken);
         Assert.Equal(CancellationToken.None, interceptor.CapturedToken!.Value);
         Assert.Equal(1, interceptor.SavedCalls);
     }
 
     /// <summary>
-    /// CT-1: When the caller token is canceled AFTER commit but BEFORE SavedChangesAsync runs,
+    /// When the caller token is canceled AFTER commit but BEFORE SavedChangesAsync runs,
     /// the interceptor must still complete without OperationCanceledException.
     /// Data was committed; the caller must not see a failure.
     /// </summary>
@@ -138,7 +138,7 @@ public class PostCommitInterceptorCancellationTests
     }
 
     /// <summary>
-    /// CT-1: Delayed SavedChangesAsync completes without cancellation exception.
+    /// Delayed SavedChangesAsync completes without cancellation exception.
     /// </summary>
     [Fact]
     public async Task SavedChangesAsync_DelayedInterceptor_CompletesCleanly()
@@ -151,6 +151,6 @@ public class PostCommitInterceptorCancellationTests
         await ctx.SaveChangesAsync();
 
         Assert.True(interceptor.CompletedWithoutCancellation,
-            "CT-1: Post-commit interceptor must receive a non-canceled token.");
+            "Post-commit interceptor must receive a non-canceled token.");
     }
 }

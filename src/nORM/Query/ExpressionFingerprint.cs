@@ -55,7 +55,7 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERF: Batch-extend with 5 int values in a single hash operation.
+        /// Batch-extend with 5 int values in a single hash operation.
         /// Eliminates 4 intermediate XxHash128.Hash calls compared to 5 sequential Extend() calls.
         /// </summary>
         public ExpressionFingerprint Extend(int v1, int v2, int v3, int v4, int v5)
@@ -77,7 +77,7 @@ namespace nORM.Query
         public bool Equals(ExpressionFingerprint other) => _low == other._low && _high == other._high;
         public override bool Equals(object? obj) => obj is ExpressionFingerprint fp && Equals(fp);
         public override int GetHashCode() => HashCode.Combine(_low, _high);
-        // QP-1: Without this override, string concatenation (used in _simpleSqlCache keys) calls
+        // Without this override, string concatenation (used in _simpleSqlCache keys) calls
         // the default struct ToString() which returns the type name for every instance, collapsing
         // all distinct fingerprints into the same key and causing wrong SQL to be reused.
         public override string ToString() => $"{_low:x16}{_high:x16}";
@@ -101,7 +101,7 @@ namespace nORM.Query
                     return null;
 
                 AppendInt((int)node.NodeType);
-                // PERF: Use TypeHandle (pointer-based identity) instead of FullName (UTF-8 encoding).
+                // Use TypeHandle (pointer-based identity) instead of FullName (UTF-8 encoding).
                 // TypeHandle.Value is unique per type within a process and costs 8 bytes vs 40-200 bytes
                 // for FullName encoding. For a join query with 25 nodes, this saves ~2.5KB of UTF-8 work.
                 AppendLong(node.Type.TypeHandle.Value.ToInt64());
@@ -111,19 +111,16 @@ namespace nORM.Query
 
             protected override Expression VisitConstant(ConstantExpression node)
             {
-                // PERF: Use TypeHandle instead of FullName for type identity
+                // Use TypeHandle instead of FullName for type identity
                 AppendLong(node.Type.TypeHandle.Value.ToInt64());
 
-                // QP-1 NULL SEMANTICS: Include whether the constant is null as a bit in the fingerprint.
-                // Without this, `x.NullableStr != null` and `x.NullableStr != "Alice"` produce the same
-                // fingerprint even though they generate completely different SQL shapes:
-                //   - != null  → IS NOT NULL  (handled by IsNullExpression in VisitBinary)
-                //   - != "Alice" → (col IS NULL OR col <> @p)  (handled by NeedsNullSafeExpansion)
-                // Caching a plan for one and reusing it for the other causes incorrect query results.
+                // Include whether the constant is null as a bit in the fingerprint.
+                // `x.NullableStr != null` and `x.NullableStr != "Alice"` generate completely different
+                // SQL shapes (IS NOT NULL vs. col IS NULL OR col <> @p), so they must not share a plan.
                 // 1 = null constant, 0 = non-null constant.
                 AppendInt(node.Value is null ? 1 : 0);
 
-                // QP-1: Include stable full-value bytes instead of GetHashCode() (32-bit, collision-prone).
+                // Include stable full-value bytes instead of GetHashCode() (32-bit, collision-prone).
                 // GetHashCode() on strings/longs/doubles loses bit precision and causes wrong-plan reuse.
                 if (node.Value is not null && node.Value is not IQueryable)
                     AppendStableValue(node.Value);
@@ -133,16 +130,16 @@ namespace nORM.Query
 
             protected override Expression VisitMember(MemberExpression node)
             {
-                // PERF: Use MetadataToken + declaring type handle instead of MVID (16 bytes).
+                // Use MetadataToken + declaring type handle instead of MVID (16 bytes).
                 // MetadataToken is unique within a module, and the type handle distinguishes modules.
                 AppendInt(node.Member.MetadataToken);
                 if (node.Member.DeclaringType != null)
                     AppendLong(node.Member.DeclaringType.TypeHandle.Value.ToInt64());
 
-                // QP-1: For closure captures (member access on a ConstantExpression), include
+                // For closure captures (member access on a ConstantExpression), include
                 // whether the captured value is null as a bit in the fingerprint.
-                // This ensures that a cached plan for a non-null closure variable is not reused
-                // when the variable is later null (which requires IS NULL expansion in SQL).
+                // A cached plan for a non-null closure variable must not be reused when the
+                // variable is later null (which requires IS NULL expansion in SQL).
                 if (node.Expression is ConstantExpression closure)
                 {
                     try
@@ -165,7 +162,7 @@ namespace nORM.Query
 
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
-                // PERF: Use MetadataToken + declaring type handle instead of MVID
+                // Use MetadataToken + declaring type handle instead of MVID
                 AppendInt(node.Method.MetadataToken);
                 if (node.Method.DeclaringType != null)
                     AppendLong(node.Method.DeclaringType.TypeHandle.Value.ToInt64());
@@ -181,7 +178,7 @@ namespace nORM.Query
                     _parameters[node] = id;
                 }
                 AppendInt(id);
-                // PERF: Use TypeHandle instead of FullName
+                // Use TypeHandle instead of FullName
                 AppendLong(node.Type.TypeHandle.Value.ToInt64());
                 return base.VisitParameter(node);
             }
@@ -214,7 +211,7 @@ namespace nORM.Query
                 _hasher.Append(data);
             }
 
-            // QP-1: Stable value hashing — emits full bytes for each type so two constants
+            // Stable value hashing — emits full bytes for each type so two constants
             // that differ only in high bits (e.g., longs with same low 32 bits) get distinct fingerprints.
             private void AppendStableValue(object value)
             {
@@ -255,7 +252,7 @@ namespace nORM.Query
                     default:
                         if (value.GetType().IsEnum)
                         {
-                            // QP/PC-1: Convert.ToInt32 overflows for long/ulong-backed enums outside Int32 range.
+                            // Convert.ToInt32 overflows for long/ulong-backed enums outside Int32 range.
                             // Use the underlying type to choose the correct serialization path.
                             var underlying = Enum.GetUnderlyingType(value.GetType());
                             var raw = Convert.ChangeType(value, underlying);
@@ -271,7 +268,7 @@ namespace nORM.Query
                         }
                         else
                         {
-                            // QP-1: Use type name + ToString() for stable, collision-resistant fingerprint.
+                            // Use type name + ToString() for a stable, collision-resistant fingerprint.
                             AppendString(value.GetType().FullName ?? string.Empty);
                             AppendString(value.ToString() ?? string.Empty);
                         }
@@ -286,7 +283,7 @@ namespace nORM.Query
                 _hasher.Append(data);
             }
 
-            // PERFORMANCE OPTIMIZATION 10: Optimized string hashing with reduced allocations
+            // Optimized string hashing with reduced allocations.
             private void AppendString(string value)
             {
                 Span<byte> length = stackalloc byte[4];

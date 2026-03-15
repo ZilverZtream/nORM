@@ -10,7 +10,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// SQL-1: Verifies that SQLite paging SQL is generated correctly for Skip/Take combinations.
+/// Verifies that SQLite paging SQL is generated correctly for Skip/Take combinations.
 /// SQLite requires LIMIT when OFFSET is used; emitting OFFSET without LIMIT is invalid syntax.
 /// </summary>
 public class SqlitePagingTests : TestBase
@@ -43,7 +43,7 @@ public class SqlitePagingTests : TestBase
     [Fact]
     public void Skip_Without_Take_GeneratesLimitNegativeOne()
     {
-        // SQL-1: Skip without Take must synthesize LIMIT -1 for SQLite
+        // Skip without Take must synthesize LIMIT -1 for SQLite
         var (sql, _, _) = TranslatePaging(q => q.Skip(10));
 
         Assert.Contains("LIMIT -1", sql, StringComparison.OrdinalIgnoreCase);
@@ -56,7 +56,7 @@ public class SqlitePagingTests : TestBase
     [Fact]
     public void Skip_And_Take_GeneratesLimitAndOffset()
     {
-        // SQL-1: Skip + Take must produce LIMIT n OFFSET m
+        // Skip + Take must produce LIMIT n OFFSET m
         var (sql, _, _) = TranslatePaging(q => q.Skip(10).Take(5));
 
         Assert.Contains("LIMIT", sql, StringComparison.OrdinalIgnoreCase);
@@ -68,7 +68,7 @@ public class SqlitePagingTests : TestBase
     [Fact]
     public void Take_Without_Skip_GeneratesLimitOnly()
     {
-        // SQL-1: Take without Skip must produce LIMIT n with no OFFSET
+        // Take without Skip must produce LIMIT n with no OFFSET
         var (sql, _, _) = TranslatePaging(q => q.Take(5));
 
         Assert.Contains("LIMIT", sql, StringComparison.OrdinalIgnoreCase);

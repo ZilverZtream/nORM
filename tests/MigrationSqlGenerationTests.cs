@@ -12,7 +12,7 @@ namespace nORM.Tests;
 /// </summary>
 public class MigrationSqlGenerationTests
 {
-    // ─── Helpers ──────────────────────────────────────────────────────────
+ // ─── Helpers ──────────────────────────────────────────────────────────
 
     private static TableSchema MakeTable(string name, params ColumnSchema[] cols)
     {
@@ -27,7 +27,7 @@ public class MigrationSqlGenerationTests
     private static ColumnSchema Col(string name, bool nullable = true, bool unique = false, string indexName = null!, string clrType = null!) =>
         new ColumnSchema { Name = name, ClrType = clrType ?? typeof(string).FullName!, IsNullable = nullable, IsUnique = unique, IndexName = indexName! };
 
-    // ─────────────────────────────── SQLite ────────────────────────────────
+ // ───────────────────────────── SQLite ────────────────────────────────
 
     [Fact]
     public void Sqlite_AddTable_WithAllConstraints_EmitsCorrectDDL()
@@ -49,10 +49,10 @@ public class MigrationSqlGenerationTests
         Assert.Contains("UNIQUE", createStmt);
         Assert.Contains("NOT NULL", createStmt);
 
-        // Should have separate CREATE INDEX for indexed column
+ // Should have separate CREATE INDEX for indexed column
         Assert.Contains(sql.Up, s => s.StartsWith("CREATE INDEX") && s.Contains("idx_Products_Name2"));
 
-        // Down should drop the table
+ // Down should drop the table
         Assert.Contains(sql.Down, s => s.Contains("DROP TABLE"));
     }
 
@@ -102,7 +102,7 @@ public class MigrationSqlGenerationTests
         var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
 
         Assert.Contains(sql.Up, s => s.Contains("ALTER TABLE") && s.Contains("ADD") && s.Contains("\"Tags\""));
-        // MG-2: PRAGMA is in PreTransactionDown, not in the main Down list.
+ // PRAGMA is in PreTransactionDown, not in the main Down list.
         Assert.NotNull(sql.PreTransactionDown);
         Assert.Contains(sql.PreTransactionDown!, s => s.Contains("PRAGMA foreign_keys=off"));
     }
@@ -134,7 +134,7 @@ public class MigrationSqlGenerationTests
 
         var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
 
-        // SQLite doesn't support ALTER COLUMN — must use table recreation
+ // SQLite doesn't support ALTER COLUMN — must use table recreation
         Assert.Contains(sql.Up, s => s.StartsWith("CREATE TABLE"));
         Assert.Contains(sql.Up, s => s.StartsWith("INSERT INTO"));
         Assert.Contains(sql.Up, s => s.StartsWith("DROP TABLE"));
@@ -156,8 +156,8 @@ public class MigrationSqlGenerationTests
 
         var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
 
-        // Down should also use table recreation (to revert nullability)
-        // MG-2: PRAGMA is now in PreTransactionDown, not in the main Down list.
+ // Down should also use table recreation (to revert nullability)
+ // PRAGMA is now in PreTransactionDown, not in the main Down list.
         Assert.Contains(sql.Down, s => s.StartsWith("CREATE TABLE"));
     }
 
@@ -182,8 +182,8 @@ public class MigrationSqlGenerationTests
         var diff = new SchemaDiff();
         var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
 
-        // Empty diff should produce minimal or no statements
-        // (PRAGMA may still be included for structural reasons, but no DDL)
+ // Empty diff should produce minimal or no statements
+ // (PRAGMA may still be included for structural reasons, but no DDL)
         var hasDDL = sql.Up.Any(s => s.StartsWith("CREATE") || s.StartsWith("DROP") || s.StartsWith("ALTER"));
         Assert.False(hasDDL);
     }
@@ -205,7 +205,7 @@ public class MigrationSqlGenerationTests
         Assert.Contains(createStatements, s => s.Contains("Table2"));
     }
 
-    // ─────────────────────────────── SQL Server ────────────────────────────
+ // ───────────────────────────── SQL Server ────────────────────────────
 
     [Fact]
     public void SqlServer_AddTable_WithPk_EmitsPrimaryKey()
@@ -317,8 +317,8 @@ public class MigrationSqlGenerationTests
 
         var sql = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
 
-        // SQL Server supports ALTER COLUMN directly (no table recreation needed)
-        // The up migration should contain an ALTER statement
+ // SQL Server supports ALTER COLUMN directly (no table recreation needed)
+ // The up migration should contain an ALTER statement
         Assert.NotEmpty(sql.Up);
     }
 
@@ -348,7 +348,7 @@ public class MigrationSqlGenerationTests
         Assert.False(hasDDL);
     }
 
-    // ─── Column type mapping tests ─────────────────────────────────────────
+ // ─── Column type mapping tests ─────────────────────────────────────────
 
     [Fact]
     public void Sqlite_IntColumn_MapsToInteger()

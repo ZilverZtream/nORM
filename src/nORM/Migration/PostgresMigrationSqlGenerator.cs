@@ -24,7 +24,7 @@ namespace nORM.Migration
             { typeof(Guid).FullName!, "UUID" }
         };
 
-        // PRV-1: Escape PostgreSQL identifiers to prevent SQL injection via identifier names.
+        // Escape PostgreSQL identifiers to prevent SQL injection via identifier names.
         private static string Esc(string id) => $"\"{id.Replace("\"", "\"\"")}\"";
 
         /// <summary>
@@ -42,12 +42,12 @@ namespace nORM.Migration
                 var colDefs = table.Columns.Select(c =>
                     $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
 
-                // MIG-1: Emit PRIMARY KEY constraint for PK columns
+                // Emit PRIMARY KEY constraint for PK columns.
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
 
-                // MIG-1: Emit UNIQUE constraint for unique non-PK columns
+                // Emit UNIQUE constraint for unique non-PK columns.
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
                 if (uniqueNonPkCols.Count > 0)
                     colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
@@ -58,7 +58,7 @@ namespace nORM.Migration
 
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
-                // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
+                // Emit CREATE INDEX for columns with a named index (non-PK, non-unique).
                 foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
                     up.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
 
@@ -67,7 +67,7 @@ namespace nORM.Migration
 
             foreach (var (table, column) in diff.AddedColumns)
             {
-                // MIG-1: NOT NULL column without a DefaultValue cannot be added to a populated table.
+                // NOT NULL column without a DefaultValue cannot be added to a populated table.
                 if (!column.IsNullable && column.DefaultValue == null)
                     throw new InvalidOperationException(
                         $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
@@ -79,7 +79,7 @@ namespace nORM.Migration
                 down.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
             }
 
-            // SG-1: PostgreSQL requires separate ALTER COLUMN statements for type and nullability changes.
+            // PostgreSQL requires separate ALTER COLUMN statements for type and nullability changes.
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
                 if (!string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal))

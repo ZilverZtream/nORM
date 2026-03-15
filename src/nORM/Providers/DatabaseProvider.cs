@@ -136,7 +136,7 @@ namespace nORM.Providers
         public abstract string TranslateJsonPathAccess(string columnName, string jsonPath);
 
         /// <summary>
-        /// P-1: Describes a column as it actually exists in the live database.
+        /// Describes a column as it actually exists in the live database.
         /// Used by <see cref="IntrospectTableColumnsAsync"/> and
         /// <see cref="GenerateCreateHistoryTableSql"/> to match history-table column
         /// types to the main table rather than deriving them from CLR defaults.
@@ -144,7 +144,7 @@ namespace nORM.Providers
         public record LiveColumnInfo(string Name, string SqlType, bool IsNullable);
 
         /// <summary>
-        /// P-1: Introspects the live column definitions for the named table.
+        /// Introspects the live column definitions for the named table.
         /// Returns an empty list when the table does not yet exist, allowing callers
         /// to fall back to CLR-default type mapping.
         /// Providers override this to use their native schema-inspection facilities.
@@ -173,7 +173,7 @@ namespace nORM.Providers
         public abstract string GenerateTemporalTriggersSql(TableMapping mapping);
 
         /// <summary>
-        /// TP-1/Finding-C: Returns provider-specific SQL to create the temporal tags table if it does not exist.
+        /// Returns provider-specific SQL to create the temporal tags table if it does not exist.
         /// Default uses IF NOT EXISTS syntax with TEXT column types (SQLite/MySQL/Postgres).
         /// SQL Server overrides this to use OBJECT_ID check and NVARCHAR/DATETIME2 types.
         /// </summary>
@@ -186,7 +186,7 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// TP-1/Finding-C: Returns provider-specific SQL to probe for the existence of a history table.
+        /// Returns provider-specific SQL to probe for the existence of a history table.
         /// Default uses SELECT 1 … LIMIT 1 (SQLite/MySQL/Postgres).
         /// SQL Server overrides this to use SELECT TOP 1.
         /// </summary>
@@ -195,7 +195,7 @@ namespace nORM.Providers
             => $"SELECT 1 FROM {escapedHistoryTable} LIMIT 1";
 
         /// <summary>
-        /// TP-1/Finding-D: Returns true when the DbException definitively indicates a table/object
+        /// Returns true when the DbException definitively indicates a table/object
         /// does not exist (schema error), as opposed to a permission denied or connectivity error.
         /// Only return true for definitive "object not found" schema errors so that operational
         /// failures propagate rather than being silently swallowed.
@@ -212,7 +212,7 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// TP-1/Finding-A: Returns provider-specific SQL to look up a temporal tag's timestamp.
+        /// Returns provider-specific SQL to look up a temporal tag's timestamp.
         /// All identifiers are escaped using the provider's Escape method.
         /// </summary>
         /// <param name="paramName">The already-prefixed parameter name for the tag name value.</param>
@@ -225,7 +225,7 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// TP-1/Finding-A: Returns provider-specific SQL to insert a temporal tag record.
+        /// Returns provider-specific SQL to insert a temporal tag record.
         /// All identifiers are escaped using the provider's Escape method.
         /// </summary>
         /// <param name="pTagName">The already-prefixed parameter name for the tag name value.</param>
@@ -284,7 +284,7 @@ namespace nORM.Providers
         public virtual string GetConcatSql(string left, string right) => $"CONCAT({left}, {right})";
 
         /// <summary>
-        /// SG-1: Returns true when the driver reports affected (changed) rows rather than matched rows.
+        /// Returns true when the driver reports affected (changed) rows rather than matched rows.
         /// Affected-row semantics cause false-positive concurrency exceptions on same-value updates.
         /// </summary>
         internal virtual bool UseAffectedRowsSemantics => false;
@@ -500,7 +500,7 @@ namespace nORM.Providers
         {
             ValidateConnection(ctx.Connection);
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
-            // PRV-1: All columns are DB-generated — use DEFAULT VALUES per row (no batching possible).
+            // All columns are DB-generated — use DEFAULT VALUES per row (no batching possible).
             if (cols.Count == 0)
             {
                 var inserted = 0;
@@ -572,7 +572,7 @@ namespace nORM.Providers
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var totalUpdated = 0;
-            // TX-1: Respect ambient CurrentTransaction; only create a new transaction if none is active.
+            // Respect ambient CurrentTransaction; only create a new transaction if none is active.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction transaction = ctx.CurrentTransaction
                 ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -587,13 +587,13 @@ namespace nORM.Providers
                     if (m.TimestampColumn != null) cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                     totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
-                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // Use CancellationToken.None so a cancelled caller token after a successful commit
                 // does not cause a spurious OperationCanceledException for already-committed data.
                 if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {
-                // S5-1: Preserve the original exception if rollback itself fails.
+                // Preserve the original exception if rollback itself fails.
                 if (ownedTx)
                 {
                     try
@@ -645,7 +645,7 @@ namespace nORM.Providers
                 batchSize = Math.Min(batchSize, maxBatchByParams);
             }
 
-            // TX-1: Respect ambient CurrentTransaction; only create a new transaction if none is active.
+            // Respect ambient CurrentTransaction; only create a new transaction if none is active.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction transaction = ctx.CurrentTransaction
                 ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -695,13 +695,13 @@ namespace nORM.Providers
                     totalDeleted += deleted;
                 }
 
-                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // Use CancellationToken.None so a cancelled caller token after a successful commit
                 // does not cause a spurious OperationCanceledException for already-committed data.
                 if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {
-                // S5-1: Preserve the original exception if rollback itself fails.
+                // Preserve the original exception if rollback itself fails.
                 if (ownedTx)
                 {
                     try

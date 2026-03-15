@@ -6,7 +6,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// TP-1: Verifies that the TemporalManager DDL validator accepts SQL Server IF OBJECT_ID
+/// Verifies that the TemporalManager DDL validator accepts SQL Server IF OBJECT_ID
 /// bootstrap SQL in addition to the existing CREATE/ALTER/DROP allowlist.
 /// </summary>
 public class TemporalDdlValidatorTests
@@ -20,7 +20,7 @@ public class TemporalDdlValidatorTests
     }
 
     /// <summary>
-    /// TP-1: SQL Server bootstrap DDL starts with "IF OBJECT_ID" — must pass the validator.
+    /// SQL Server bootstrap DDL starts with "IF OBJECT_ID" — must pass the validator.
     /// Previously rejected, causing temporal initialization to fail on SQL Server.
     /// </summary>
     [Fact]
@@ -33,7 +33,7 @@ public class TemporalDdlValidatorTests
     }
 
     /// <summary>
-    /// TP-1: Baseline — CREATE TABLE must still pass as before.
+    /// Baseline — CREATE TABLE must still pass as before.
     /// </summary>
     [Fact]
     public void IsValidDdl_CreateTable_ReturnsTrue()
@@ -43,7 +43,7 @@ public class TemporalDdlValidatorTests
     }
 
     /// <summary>
-    /// TP-1: ALTER TABLE must still pass.
+    /// ALTER TABLE must still pass.
     /// </summary>
     [Fact]
     public void IsValidDdl_AlterTable_ReturnsTrue()
@@ -53,7 +53,7 @@ public class TemporalDdlValidatorTests
     }
 
     /// <summary>
-    /// TP-1: DROP TABLE must still pass.
+    /// DROP TABLE must still pass.
     /// </summary>
     [Fact]
     public void IsValidDdl_DropTable_ReturnsTrue()
@@ -63,7 +63,7 @@ public class TemporalDdlValidatorTests
     }
 
     /// <summary>
-    /// TP-1: Security guard — SELECT must still be rejected.
+    /// Security guard — SELECT must still be rejected.
     /// </summary>
     [Fact]
     public void IsValidDdl_SelectStatement_ReturnsFalse()
@@ -73,7 +73,7 @@ public class TemporalDdlValidatorTests
     }
 
     /// <summary>
-    /// TP-1: Security guard — UPDATE must still be rejected.
+    /// Security guard — UPDATE must still be rejected.
     /// </summary>
     [Fact]
     public void IsValidDdl_UpdateStatement_ReturnsFalse()
@@ -83,7 +83,7 @@ public class TemporalDdlValidatorTests
     }
 
     /// <summary>
-    /// TP-1: End-to-end check — SqlServerProvider.GetCreateTagsTableSql() returns DDL
+    /// End-to-end check — SqlServerProvider.GetCreateTagsTableSql() returns DDL
     /// that begins with "IF" and is accepted by the validator.
     /// </summary>
     [Fact]

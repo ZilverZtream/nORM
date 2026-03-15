@@ -21,7 +21,7 @@ namespace nORM.Query
     /// Optimized for JOIN scenarios with robust column mapping.
     /// </summary>
     /// <remarks>
-    /// PERFORMANCE FIX (TASK 14): Resolved unnecessary task allocation issue.
+    /// Uses separate caches for sync and async materializers to avoid Task allocation on hot paths.
     ///
     /// **The Solution:**
     /// - Added separate cache for synchronous delegates: `Func&lt;DbDataReader, object&gt;` in `_syncCache`
@@ -43,7 +43,7 @@ namespace nORM.Query
     {
         private const int DefaultCacheSize = 2000; // Increased for JOIN scenarios
 
-        // PERFORMANCE FIX (TASK 14): Separate caches for sync and async materializers
+        // Separate caches for sync and async materializers.
         private static readonly ConcurrentLruCache<MaterializerCacheKey, Func<DbDataReader, object>> _syncCache
             = new(maxSize: DefaultCacheSize, timeToLive: TimeSpan.FromMinutes(15));
 
@@ -68,7 +68,7 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<(Type From, Type To), Func<object, object>> _conversionCache = new();
 
         private static bool IsSimpleType(Type type)
-            // QP-1: Include nullable primitives so projected subqueries (e.g. Select(x => x.NullableInt)) materialize correctly.
+            // Include nullable primitives so projected subqueries (e.g. Select(x => x.NullableInt)) materialize correctly.
             => _simpleTypeCache.GetOrAdd(type, static t => t.IsPrimitive || t == typeof(decimal) || t == typeof(string)
                 || (Nullable.GetUnderlyingType(t) is Type u && (u.IsPrimitive || u == typeof(decimal))));
 
@@ -76,7 +76,6 @@ namespace nORM.Query
         {
             get
             {
-                // PERFORMANCE FIX (TASK 14): Combined stats from both sync and async caches
                 var syncHits = _syncCache.Hits;
                 var syncMisses = _syncCache.Misses;
                 var asyncHits = _asyncCache.Hits;
@@ -119,7 +118,7 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// MM-1: Computes a 64-bit projection hash by combining two independent 32-bit hashes
+        /// Computes a 64-bit projection hash by combining two independent 32-bit hashes
         /// from the <see cref="ExpressionFingerprint"/>. This reduces collision probability
         /// compared to a single 32-bit hash (roughly 1-in-2^64 vs 1-in-2^32 per pair).
         /// </summary>
@@ -376,8 +375,7 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERFORMANCE FIX (TASK 12): Generic version that avoids boxing for value types.
-        /// Creates a strongly-typed synchronous materializer delegate.
+        /// Creates a strongly-typed synchronous materializer delegate, avoiding boxing for value types.
         /// </summary>
         /// <typeparam name="T">The type to materialize.</typeparam>
         /// <param name="mapping">Mapping describing the source table schema.</param>
@@ -420,7 +418,7 @@ namespace nORM.Query
 
         /// <summary>
         /// Creates a synchronous materializer delegate that converts a <see cref="DbDataReader"/> row into the target type.
-        /// PERFORMANCE FIX (TASK 14): This method caches sync delegates to avoid Task allocation overhead.
+        /// Sync delegates are cached to avoid Task allocation overhead.
         /// </summary>
         /// <param name="mapping">Mapping describing the source table schema.</param>
         /// <param name="targetType">CLR type to materialize.</param>
@@ -459,8 +457,7 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERFORMANCE FIX (TASK 12): Generic version that avoids boxing for value types.
-        /// Creates a strongly-typed async materializer delegate.
+        /// Creates a strongly-typed async materializer delegate, avoiding boxing for value types.
         /// </summary>
         /// <typeparam name="T">The type to materialize.</typeparam>
         /// <param name="mapping">Mapping describing the source table schema.</param>
@@ -493,7 +490,7 @@ namespace nORM.Query
 
         /// <summary>
         /// Creates an async materializer delegate that converts a <see cref="DbDataReader"/> row into the target type.
-        /// PERFORMANCE FIX (TASK 14): This wraps the sync materializer efficiently without per-row Task allocation.
+        /// Wraps the sync materializer efficiently without per-row Task allocation.
         /// </summary>
         /// <param name="mapping">Mapping describing the source table schema.</param>
         /// <param name="targetType">CLR type to materialize.</param>
@@ -524,8 +521,8 @@ namespace nORM.Query
 
             return _asyncCache.GetOrAdd(cacheKey, _ =>
             {
-                // PERFORMANCE FIX (TASK 14): Get the sync materializer and wrap it once
-                // This wrapper is cached, so we don't allocate a Task per row
+                // Get the sync materializer and wrap it once.
+                // This wrapper is cached, so we don't allocate a Task per row.
                 var syncMaterializer = CreateSyncMaterializer(mapping, targetType, projection, startOffset);
 
                 return (reader, ct) =>
@@ -647,7 +644,7 @@ namespace nORM.Query
             var ordinals = new int[mapping.Columns.Length];
             var isValid = true;
 
-            // MM-1: Build quick lookup for field names (case-insensitive), detecting duplicates.
+            // Build quick lookup for field names (case-insensitive), detecting duplicates.
             // Duplicate column names (e.g., two JOINed tables both having "Id") are tracked in
             // the ambiguous set and excluded from name-based lookup to prevent silent wrong-table binding.
             var nameCount = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
@@ -668,7 +665,7 @@ namespace nORM.Query
                 var name = reader.GetName(i);
                 if (nameCount[name] > 1)
                 {
-                    // MM-1: Ambiguous — do not add to name map, ordinal-based binding must be used
+                    // Ambiguous — do not add to name map, ordinal-based binding must be used.
                     ambiguous.Add(name);
                 }
                 else
@@ -1102,7 +1099,7 @@ namespace nORM.Query
                 Expression.Assign(entityVar, Expression.New(targetType))
             };
 
-            // PERF: Use NullabilityInfoContext to detect non-nullable reference types (NRT).
+            // Use NullabilityInfoContext to detect non-nullable reference types (NRT).
             // This lets us skip IsDBNull for non-nullable strings etc., saving ~47ns per call.
             NullabilityInfoContext? nullabilityCtx = null;
             try { nullabilityCtx = new NullabilityInfoContext(); } catch { /* edge-case fallback */ }
@@ -1140,7 +1137,7 @@ namespace nORM.Query
 
                 if (skipIsDbNull)
                 {
-                    // PERF: Skip IsDBNull check for non-nullable types.
+                    // Skip IsDBNull check for non-nullable types.
                     // The DB schema should have NOT NULL constraint matching the C# type.
                     // If the DB unexpectedly returns NULL, the typed accessor will throw —
                     // which is correct for a schema violation.
@@ -1696,11 +1693,11 @@ namespace nORM.Query
             public override int VisibleFieldCount => Math.Max(_inner.VisibleFieldCount, _mapping.Ordinals.Length);
         }
 
-        // Value types for better cache performance
-        // M1/R2: Use actual Type references instead of hash codes to prevent collision between
+        // Value types for better cache performance.
+        // Uses actual Type references instead of hash codes to prevent collision between
         // different types that happen to produce the same hash code.
-        // MM-1: ProjectionHash upgraded from int (32-bit) to long (64-bit) to prevent hash
-        // collisions between distinct projection expression trees that happen to share a 32-bit hash.
+        // ProjectionHash is 64-bit to prevent hash collisions between distinct projection
+        // expression trees that happen to share a 32-bit hash.
         private readonly struct MaterializerCacheKey : IEquatable<MaterializerCacheKey>
         {
             public readonly Type MappingType;     // was int MappingTypeHash

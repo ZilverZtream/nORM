@@ -9,7 +9,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>CT-2: DetectChanges must throw AggregateException when a property getter fails.</summary>
+/// <summary>DetectChanges must throw AggregateException when a property getter fails.</summary>
 public class ChangeTrackerAggregateExceptionTests
 {
     private class FaultyEntity

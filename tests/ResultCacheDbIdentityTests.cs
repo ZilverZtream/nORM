@@ -16,7 +16,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// PC-1: Verifies that the result cache key includes the database identity (normalized
+/// Verifies that the result cache key includes the database identity (normalized
 /// connection string) so that two contexts pointing to different databases do not share
 /// a cache entry and return data from the wrong database.
 /// </summary>
@@ -31,14 +31,14 @@ public class ResultCacheDbIdentityTests
         public string Label { get; set; } = string.Empty;
     }
 
-    // ─── PC-1: Two databases, same query/params → different cache entries ──────
+ // ─── Two databases, same query/params → different cache entries ──────
 
     [Fact]
     public void BuildCacheKey_DifferentConnectionStrings_ProduceDifferentKeys()
     {
-        // PC-1: Structural test — verify that the cache key builder includes the
-        // connection string identity component by comparing keys from two contexts
-        // with different SQLite file paths.
+ // Structural test — verify that the cache key builder includes the
+ // connection string identity component by comparing keys from two contexts
+ // with different SQLite file paths.
         using var cn1 = new SqliteConnection("Data Source=file1.db;Mode=Memory;Cache=Shared");
         cn1.Open();
         using var cn2 = new SqliteConnection("Data Source=file2.db;Mode=Memory;Cache=Shared");
@@ -50,21 +50,21 @@ public class ResultCacheDbIdentityTests
         var provider1 = new NormQueryProvider(ctx1);
         var provider2 = new NormQueryProvider(ctx2);
 
-        // Create identical plans (same SQL, same TResult, same parameters).
+ // Create identical plans (same SQL, same TResult, same parameters).
         var plan = CreatePlan("SELECT 1", new Dictionary<string, object>());
 
         var key1 = BuildCacheKey<int>(provider1, plan, new Dictionary<string, object>());
         var key2 = BuildCacheKey<int>(provider2, plan, new Dictionary<string, object>());
 
-        // Different databases → different keys.
+ // Different databases → different keys.
         Assert.NotEqual(key1, key2);
     }
 
     [Fact]
     public void BuildCacheKey_SameConnectionString_ProduceSameKey()
     {
-        // PC-1: Two providers with the same connection string must produce the same
-        // cache key (assuming same SQL and parameters) — they share a DB identity.
+ // Two providers with the same connection string must produce the same
+ // cache key (assuming same SQL and parameters) — they share a DB identity.
         using var cn1 = new SqliteConnection("Data Source=samedb.db;Mode=Memory;Cache=Shared");
         cn1.Open();
         using var cn2 = new SqliteConnection("Data Source=samedb.db;Mode=Memory;Cache=Shared");
@@ -81,14 +81,14 @@ public class ResultCacheDbIdentityTests
         var key1 = BuildCacheKey<int>(provider1, plan, new Dictionary<string, object>());
         var key2 = BuildCacheKey<int>(provider2, plan, new Dictionary<string, object>());
 
-        // Same DB identity → same key.
+ // Same DB identity → same key.
         Assert.Equal(key1, key2);
     }
 
     [Fact]
     public void BuildCacheKey_DifferentSql_ProduceDifferentKeys()
     {
-        // Regression: Different SQL on the same connection → different keys (unchanged behavior).
+ // Regression: Different SQL on the same connection → different keys (unchanged behavior).
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -103,7 +103,7 @@ public class ResultCacheDbIdentityTests
         Assert.NotEqual(key1, key2);
     }
 
-    // ─── Helpers ──────────────────────────────────────────────────────────────
+ // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private static QueryPlan CreatePlan(string sql, IReadOnlyDictionary<string, object> parameters)
     {

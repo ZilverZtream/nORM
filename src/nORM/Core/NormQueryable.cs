@@ -16,7 +16,7 @@ namespace nORM.Core
     public static class NormQueryable
     {
         /// <summary>
-        /// PERF: Cached factory delegates per entity type to avoid GetConstructor + Activator.CreateInstance
+        /// Cached factory delegates per entity type to avoid GetConstructor + Activator.CreateInstance
         /// reflection on every Query&lt;T&gt;() call. Saves ~2 allocations and reflection per call.
         /// </summary>
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Func<DbContext, object>> _queryFactoryCache = new();
@@ -29,7 +29,7 @@ namespace nORM.Core
         /// <returns>An <see cref="IQueryable{T}"/> to compose and execute queries.</returns>
         public static IQueryable<T> Query<T>(this DbContext ctx) where T : class
         {
-            // M-1: Register T as a query-root entity so IsMapped returns true for it.
+            // Register T as a query-root entity so IsMapped returns true for it.
             ctx.RegisterEntityType(typeof(T));
             var factory = _queryFactoryCache.GetOrAdd(typeof(T), static t =>
             {

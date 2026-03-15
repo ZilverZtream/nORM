@@ -3,7 +3,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// T-1: Documentation artifact for BestEffort ambient transaction behavior.
+/// Documentation artifact for BestEffort ambient transaction behavior.
 ///
 /// Known behavior: when a TransactionScope uses TransactionScopeOption.Required
 /// and the underlying ADO.NET driver does not support full distributed transaction
@@ -27,7 +27,7 @@ public class AmbientTransactionBestEffortDocTests
     [Fact]
     public void BestEffort_AmbientTransaction_DocumentedBehavior()
     {
-        // T-1: This is a documentation artifact, not a behavioral gate.
+        // This is a documentation artifact, not a behavioral gate.
         // See class-level XML summary for the documented known behavior.
         Assert.True(true);
     }

@@ -7,7 +7,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>MAP-1: Ensures SaveChanges throws when modifying/deleting a keyless entity.</summary>
+/// <summary>Ensures SaveChanges throws when modifying/deleting a keyless entity.</summary>
 public class NoKeyEntityTests
 {
     [Table("NoKeyTable")]

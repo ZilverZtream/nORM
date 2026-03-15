@@ -92,7 +92,7 @@ namespace nORM.Core
             => PropertyCache.GetOrAdd(type, t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance));
 
         /// <summary>
-        /// PERF: Cache of properties whose declared type could contain entity graph references.
+        /// Cache of properties whose declared type could contain entity graph references.
         /// Excludes value types and strings, avoiding ~90% of GetValue reflection calls
         /// for typical flat entities (e.g., BenchmarkUser with int/string/DateTime/bool/double).
         /// </summary>
@@ -115,8 +115,7 @@ namespace nORM.Core
                 if (depth > MaxEntityDepth)
                     throw new ArgumentException($"Entity graph exceeds maximum depth of {MaxEntityDepth} at {path}");
 
-                // LOGIC FIX (TASK 12): Check if the popped entity itself is IEnumerable
-                // This ensures nested collections are properly validated
+                // Check if the popped entity itself is IEnumerable to validate nested collections.
                 if (entity is IEnumerable enumerable && entity is not string)
                 {
                     ValidateCollection(enumerable, path);
@@ -142,7 +141,7 @@ namespace nORM.Core
                 if (!visited.Add(entity))
                     continue;
 
-                // PERF: Only inspect properties whose declared type is a reference type
+                // Only inspect properties whose declared type is a reference type
                 // (excluding string/byte[]). For flat entities with only value-type + string
                 // properties, this array is empty — skipping all GetValue reflection calls.
                 var properties = GetNavigableProperties(entity.GetType());
@@ -163,7 +162,7 @@ namespace nORM.Core
 
         private static void ValidateCollection(IEnumerable collection, string path)
         {
-            // PERFORMANCE FIX (TASK 11): Use ICollection.Count when available for O(1) check
+            // Use ICollection.Count when available for an O(1) check instead of enumerating.
             if (collection is ICollection coll)
             {
                 if (coll.Count > MaxCollectionSize)
@@ -236,15 +235,13 @@ namespace nORM.Core
             if (parameters != null && parameters.Count > MaxParameterCount)
                 throw new ArgumentException($"Parameter count {parameters.Count} exceeds maximum of {MaxParameterCount}");
 
-            // SECURITY FIX (TASK 6): Enhanced SQL injection detection
-            // Check for common injection patterns that bypass keyword detection
+            // Check for common injection patterns that bypass keyword detection.
             DetectInjectionPatterns(sql, parameters);
         }
 
         /// <summary>
         /// Detects common SQL injection patterns in raw SQL, including UNION attacks,
         /// comment-based injection, and embedded quotes without proper parameterization.
-        /// SECURITY FIX (TASK 6): Added comprehensive injection pattern detection.
         /// </summary>
         /// <param name="sql">SQL string to validate.</param>
         /// <param name="parameters">Optional parameters dictionary.</param>
@@ -270,8 +267,8 @@ namespace nORM.Core
                 }
             }
 
-            // Pattern 2: Comment-based injection (-- or /* */)
-            // S1 fix: a standalone inline -- comment is legitimate SQL (e.g. SELECT * FROM T WHERE Id=1 -- note).
+            // Pattern 2: Comment-based injection (-- or /* */).
+            // A standalone inline -- comment is legitimate SQL (e.g. SELECT * FROM T WHERE Id=1 -- note).
             // The injection vector is a statement terminator (;) BEFORE the --, not the -- itself.
             // Only reject when -- appears outside a string literal AND a ; precedes it outside string literals,
             // indicating a potential "'; malicious SQL --" injection pattern.
@@ -334,7 +331,7 @@ namespace nORM.Core
             }
 
             // Pattern 5: Semicolon-based multi-statement injection.
-            // S1 fix: use lexer-aware semicolon positions so that semicolons inside
+            // Use lexer-aware semicolon positions so that semicolons inside
             // string literals, double-quoted identifiers, line comments, and block
             // comments are not counted as statement terminators.
             var semiPositions = FindSemicolonPositionsOutsideTokens(sql);
@@ -433,10 +430,10 @@ namespace nORM.Core
                     continue;
                 }
                 // Count parameter markers outside quoted/comment regions.
-                // P1/X1 fix: exclude PostgreSQL :: cast syntax.
+                // Exclude PostgreSQL :: cast syntax.
                 // `::type` has the second `:` followed by a type-name (alphanumeric), which
                 // would otherwise be counted as a `:name` parameter marker.
-                // Guard: only count `:` when the PRECEDING character is NOT also `:`.
+                // Only count `:` when the preceding character is NOT also `:`.
                 if ((c == '@' || c == '$' || c == ':') && i + 1 < sql.Length
                     && (char.IsLetterOrDigit(sql[i + 1]) || sql[i + 1] == '_'))
                 {
@@ -451,7 +448,7 @@ namespace nORM.Core
         /// <summary>
         /// Returns a list of character positions of ';' tokens that appear outside string
         /// literals, double-quoted identifiers, line comments, and block comments.
-        /// S1 fix: replaces naive <c>sql.Count(c == ';')</c> / <c>sql.Split(';',...)</c>
+        /// Replaces naive <c>sql.Count(c == ';')</c> / <c>sql.Split(';',...)</c>
         /// with a mini SQL lexer so embedded semicolons in literals/comments are ignored.
         /// </summary>
         private static List<int> FindSemicolonPositionsOutsideTokens(string sql)
@@ -651,33 +648,31 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// P1: Provider-aware SQL safety gate for query APIs (SELECT-only).
+        /// Provider-aware SQL safety gate for query APIs (SELECT-only).
         /// Non-SQL-Server providers skip the TSQL AST parser (which produces false
         /// negatives for dialect-specific syntax like SQLite PRAGMA) and rely on
         /// the keyword denylist PLUS a structural SELECT-only allowlist.
         /// SQL Server still uses the full AST allowlist path.
         /// All providers run keyword checks against the NORMALIZED form to defeat
         /// comment-injection and whitespace-based obfuscation attacks.
-        ///
-        /// S2-1/S9-1: For query APIs the gate is not "not in denylist" but
-        /// "IS a SELECT statement". After denylist check, we verify the normalized
-        /// SQL actually starts with SELECT (or WITH ... SELECT for CTEs).
+        /// For query APIs the gate is not "not in denylist" but "IS a SELECT statement":
+        /// after denylist check, the normalized SQL must start with SELECT (or WITH ... SELECT for CTEs).
         /// </summary>
         internal static bool IsSafeRawSql(string sql, DatabaseProvider? provider = null)
         {
             if (string.IsNullOrWhiteSpace(sql))
                 return false;
 
-            // SEC-1: Normalize BEFORE keyword checks to defeat comment/whitespace obfuscation
+            // Normalize BEFORE keyword checks to defeat comment/whitespace obfuscation.
             var normalized = NormalizeSql(sql);
 
-            // X1 + P1: keyword denylist is always applied first for all providers
+            // Keyword denylist is always applied first for all providers.
             if (!IsSafeByKeywords(normalized)) return false;
 
-            // P1: skip expensive TSQL parse for non-SQL-Server providers
+            // Skip expensive TSQL parse for non-SQL-Server providers.
             if (provider is not null && provider is not SqlServerProvider)
             {
-                // S2-1/S9-1: SELECT-only structural gate for non-SQL-Server providers.
+                // SELECT-only structural gate for non-SQL-Server providers.
                 // The denylist alone is insufficient — commands like ATTACH DATABASE,
                 // DETACH DATABASE, LOAD EXTENSION, USE are not in the denylist.
                 // Require the statement to actually BE a SELECT (or CTE starting with WITH).
@@ -711,8 +706,8 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// S2-1/S9-1: Returns true if the normalized SQL is a SELECT statement or a CTE
-        /// (WITH ... AS (...) SELECT ...). This is the structural SELECT-only gate used
+        /// Returns true if the normalized SQL is a SELECT statement or a CTE
+        /// (WITH ... AS (...) SELECT ...). Used as the structural SELECT-only gate
         /// for query APIs on non-SQL-Server providers.
         /// </summary>
         /// <param name="normalizedSql">Normalized SQL (lowercased, whitespace-collapsed, comment-stripped).</param>
@@ -732,7 +727,7 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// S2-1/S9-1: Finds the position of SELECT after a CTE preamble.
+        /// Finds the position of SELECT after a CTE preamble.
         /// Tracks parenthesis depth so nested parens inside the CTE body are skipped correctly.
         /// Returns -1 if no SELECT is found after the CTE.
         /// </summary>
@@ -770,10 +765,9 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// X1: Keyword-based denylist that catches side-effect and DDL commands.
-        /// IMPORTANT: This method expects an already-normalized (lowercased, whitespace-
-        /// collapsed, comment-stripped) SQL string from <see cref="NormalizeSql"/>.
-        /// Checks are done against the normalized form to defeat obfuscation.
+        /// Keyword-based denylist that catches side-effect and DDL commands.
+        /// Expects an already-normalized (lowercased, whitespace-collapsed, comment-stripped) SQL
+        /// string from <see cref="NormalizeSql"/>. Checks are done against the normalized form to defeat obfuscation.
         /// </summary>
         private static bool IsSafeByKeywords(string normalizedSql)
         {
@@ -795,7 +789,7 @@ namespace nORM.Core
                 ContainsDeniedKeyword(normalizedSql, "revoke"))
                 return false;
 
-            // X1: Additional side-effect commands that bypass the AST path
+            // Additional side-effect commands that bypass the AST path.
             if (ContainsDeniedKeyword(normalizedSql, "pragma") ||
                 ContainsDeniedKeyword(normalizedSql, "vacuum") ||
                 ContainsDeniedKeyword(normalizedSql, "reindex") ||
@@ -803,8 +797,7 @@ namespace nORM.Core
                 ContainsDeniedKeyword(normalizedSql, "call"))
                 return false;
 
-            // S2-1/S9-1: Defense-in-depth denylist additions for SQLite/MySQL side-effect commands
-            // not previously covered. These bypass the old denylist-only check.
+            // Defense-in-depth denylist for SQLite/MySQL side-effect commands:
             // ATTACH DATABASE 'x.db' AS x — attaches external SQLite database
             // DETACH DATABASE x — detaches external SQLite database
             // LOAD EXTENSION 'evil.dll' — SQLite extension loading
@@ -863,8 +856,8 @@ namespace nORM.Core
         /// <exception cref="ArgumentException">Thrown when the character is not allowed.</exception>
         public static char ValidateLikeEscapeChar(char escapeChar)
         {
-            // SECURITY FIX: Explicitly reject SQL-dangerous characters that could cause injection
-            // even if someone modifies AllowedLikeEscapeChars at runtime
+            // Explicitly reject SQL-dangerous characters that could cause injection
+            // even if AllowedLikeEscapeChars is modified at runtime.
             if (escapeChar == '\'' || escapeChar == '"' || escapeChar == ';' || escapeChar == '\0')
                 throw new ArgumentException(
                     $"LIKE escape character '{escapeChar}' is not allowed for security reasons. " +
@@ -922,8 +915,8 @@ namespace nORM.Core
                 if (builder.ContainsKey("Password")) builder["Password"] = "***";
                 if (builder.ContainsKey("Pwd")) builder["Pwd"] = "***";
                 if (builder.ContainsKey("User Password")) builder["User Password"] = "***";
-                // SECURITY FIX: Mask additional sensitive parameters beyond just passwords
-                // API keys, tokens, and secrets in extended properties can leak in logs
+                // Mask additional sensitive parameters: API keys, tokens, and secrets
+                // in extended connection string properties can leak in logs.
                 if (builder.ContainsKey("API Key")) builder["API Key"] = "***";
                 if (builder.ContainsKey("ApiKey")) builder["ApiKey"] = "***";
                 if (builder.ContainsKey("Token")) builder["Token"] = "***";

@@ -26,7 +26,7 @@ namespace nORM.Internal
             var interceptors = ctx.Options.CommandInterceptors;
             if (interceptors.Count == 0)
             {
-                // PERF: Return the task directly — avoids async state machine allocation
+                // Return the task directly — avoids async state machine allocation
                 return command.ExecuteNonQueryAsync(ct);
             }
             return ExecuteNonQueryWithInterceptionSlowAsync(command, ctx, interceptors, ct);
@@ -129,7 +129,7 @@ namespace nORM.Internal
             var interceptors = ctx.Options.CommandInterceptors;
             if (interceptors.Count == 0)
             {
-                // PERF: Return the task directly — avoids async state machine allocation
+                // Return the task directly — avoids async state machine allocation
                 return command.ExecuteScalarAsync(ct);
             }
             return ExecuteScalarWithInterceptionSlowAsync(command, ctx, interceptors, ct);
@@ -233,7 +233,7 @@ namespace nORM.Internal
             var interceptors = ctx.Options.CommandInterceptors;
             if (interceptors.Count == 0)
             {
-                // PERF: Return the task directly — avoids async state machine allocation
+                // Return the task directly — avoids async state machine allocation
                 return command.ExecuteReaderAsync(behavior, ct);
             }
             return ExecuteReaderWithInterceptionSlowAsync(command, ctx, interceptors, behavior, ct);

@@ -37,18 +37,22 @@ file class CustomFallbackType
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 3.8 → 4.0 : P1 — stale DbType on DateTime and fallback branches
+// Stale DbType on DateTime and fallback branches
 // ══════════════════════════════════════════════════════════════════════════════
 
-public class P1_StaleDbTypeTests
+/// <summary>
+/// Verifies that AssignValue always resets DbType when called with a new value type,
+/// preventing stale metadata from a previous call from corrupting subsequent parameter bindings.
+/// </summary>
+public class StaleDbTypeTests
 {
     // ── Direct unit tests of AssignValue metadata reset ───────────────────────
 
     [Fact]
-    public void P1_AssignValue_IntThenDateTime_DbTypeBecomesDateTime()
+    public void AssignValue_IntThenDateTime_DbTypeBecomesDateTime()
     {
         // Simulate: prior int assignment set DbType.Int32; next call is DateTime.
-        // Without the fix, DbType stays Int32 → stale metadata.
+        // Without the reset, DbType stays Int32 → stale metadata.
         var p = new SqliteParameter();
         p.DbType = DbType.Int32;
         p.Value = 42;
@@ -60,7 +64,7 @@ public class P1_StaleDbTypeTests
     }
 
     [Fact]
-    public void P1_AssignValue_DateTimeThenInt_DbTypeBecomesInt32()
+    public void AssignValue_DateTimeThenInt_DbTypeBecomesInt32()
     {
         // Reverse transition: prior DateTime → next int.
         var p = new SqliteParameter();
@@ -74,7 +78,7 @@ public class P1_StaleDbTypeTests
     }
 
     [Fact]
-    public void P1_AssignValue_Int32ThenFallbackObject_DbTypeBecomesObject()
+    public void AssignValue_Int32ThenFallbackObject_DbTypeBecomesObject()
     {
         // Fallback branch (unknown CLR type) must reset DbType to Object.
         var p = new SqliteParameter();
@@ -87,7 +91,7 @@ public class P1_StaleDbTypeTests
     }
 
     [Fact]
-    public void P1_AssignValue_StringThenFallbackObject_DbTypeBecomesObject()
+    public void AssignValue_StringThenFallbackObject_DbTypeBecomesObject()
     {
         var p = new SqliteParameter();
         p.DbType = DbType.String;
@@ -99,7 +103,7 @@ public class P1_StaleDbTypeTests
     }
 
     [Fact]
-    public void P1_AssignValue_FallbackObjectThenString_DbTypeBecomesString()
+    public void AssignValue_FallbackObjectThenString_DbTypeBecomesString()
     {
         // After fallback assignment, next string call must set DbType.String.
         var p = new SqliteParameter();
@@ -113,7 +117,7 @@ public class P1_StaleDbTypeTests
     }
 
     [Fact]
-    public void P1_AssignValue_DateTimeMetadata_NullTransition_ResetsAll()
+    public void AssignValue_DateTimeMetadata_NullTransition_ResetsAll()
     {
         // DateTime → null: null path resets DbType to Object.
         var p = new SqliteParameter();
@@ -127,7 +131,7 @@ public class P1_StaleDbTypeTests
     }
 
     [Fact]
-    public void P1_AssignValue_IntThenDateTimeCycled_DbTypeAlwaysCorrect()
+    public void AssignValue_IntThenDateTimeCycled_DbTypeAlwaysCorrect()
     {
         // 10-cycle alternation: int ↔ DateTime — DbType must be correct each time.
         var p = new SqliteParameter();
@@ -162,7 +166,7 @@ public class P1_StaleDbTypeTests
     }
 
     [Fact]
-    public async Task P1_CompiledQuery_DateTimeParam_ReturnsCorrectRow()
+    public async Task CompiledQuery_DateTimeParam_ReturnsCorrectRow()
     {
         using var cn = CreateDateTimeDb();
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -177,7 +181,7 @@ public class P1_StaleDbTypeTests
     }
 
     [Fact]
-    public async Task P1_CompiledQuery_DateTimeParam_AlternatingValues_ReturnsCorrectRows()
+    public async Task CompiledQuery_DateTimeParam_AlternatingValues_ReturnsCorrectRows()
     {
         using var cn = CreateDateTimeDb();
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -203,10 +207,15 @@ public class P1_StaleDbTypeTests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 4.0 → 4.5 : C1 — atomic _completed guard in DbContextTransaction
+// Atomic _completed guard in DbContextTransaction
 // ══════════════════════════════════════════════════════════════════════════════
 
-public class C1_TransactionAtomicCompletionTests
+/// <summary>
+/// Verifies that DbContextTransaction uses an atomic Interlocked guard to prevent
+/// double-dispose and concurrent commit/dispose races from throwing or leaving the
+/// context in a poisoned state.
+/// </summary>
+public class TransactionAtomicCompletionTests
 {
     private static SqliteConnection OpenConnection()
     {
@@ -220,7 +229,7 @@ public class C1_TransactionAtomicCompletionTests
     }
 
     [Fact]
-    public async Task C1_ConcurrentDispose_NeitherThrows()
+    public async Task ConcurrentDispose_NeitherThrows()
     {
         // Two concurrent Dispose() calls on the same wrapper must not throw.
         using var cn = OpenConnection();
@@ -243,7 +252,7 @@ public class C1_TransactionAtomicCompletionTests
     }
 
     [Fact]
-    public async Task C1_ConcurrentDisposeAsync_NeitherThrows()
+    public async Task ConcurrentDisposeAsync_NeitherThrows()
     {
         // Two concurrent DisposeAsync() calls on the same wrapper must not throw.
         using var cn = OpenConnection();
@@ -258,7 +267,7 @@ public class C1_TransactionAtomicCompletionTests
     }
 
     [Fact]
-    public async Task C1_ConcurrentCommitAndDispose_NeitherThrows()
+    public async Task ConcurrentCommitAndDispose_NeitherThrows()
     {
         // Concurrent Commit() + Dispose() — only one must actually commit/dispose.
         using var cn = OpenConnection();
@@ -278,7 +287,7 @@ public class C1_TransactionAtomicCompletionTests
     }
 
     [Fact]
-    public async Task C1_DoubleCommit_SecondCallDoesNotThrowObjectDisposed()
+    public async Task DoubleCommit_SecondCallDoesNotThrowObjectDisposed()
     {
         // Second Commit() after Dispose has already run must be a no-op, not crash.
         using var cn = OpenConnection();
@@ -287,16 +296,16 @@ public class C1_TransactionAtomicCompletionTests
 
         tx.Commit(); // first call succeeds
 
-        // Second Commit() hits already-completed wrapper; Interlocked gate skips it
-        var ex = Record.Exception(() => tx.Commit());
+        // Second Commit() hits already-completed wrapper; Interlocked gate skips it.
         // Either no exception (gate skipped) or InvalidOperationException from driver —
         // but must NOT be ObjectDisposedException or NullReferenceException.
+        var ex = Record.Exception(() => tx.Commit());
         if (ex != null)
             Assert.IsNotType<ObjectDisposedException>(ex);
     }
 
     [Fact]
-    public async Task C1_DisposeAfterCommit_ContextCurrentTransactionIsNull()
+    public async Task DisposeAfterCommit_ContextCurrentTransactionIsNull()
     {
         // After Commit+Dispose, the context must not retain the old transaction.
         using var cn = OpenConnection();
@@ -312,7 +321,7 @@ public class C1_TransactionAtomicCompletionTests
     // ── Cancellation/rollback matrix ──────────────────────────────────────────
 
     [Fact]
-    public async Task C1_DisposeAsync_AfterCommit_IsNoOp()
+    public async Task DisposeAsync_AfterCommit_IsNoOp()
     {
         using var cn = OpenConnection();
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -326,7 +335,7 @@ public class C1_TransactionAtomicCompletionTests
     }
 
     [Fact]
-    public async Task C1_DisposeAsync_AfterRollback_IsNoOp()
+    public async Task DisposeAsync_AfterRollback_IsNoOp()
     {
         using var cn = OpenConnection();
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -340,15 +349,20 @@ public class C1_TransactionAtomicCompletionTests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 4.5 → 5.0 : S1 — SQL comment false-positive fix + adversarial matrix
+// SQL comment false-positive fix and adversarial validation matrix
 // ══════════════════════════════════════════════════════════════════════════════
 
-public class S1_SqlCommentValidatorTests
+/// <summary>
+/// Verifies that the SQL validator correctly handles inline comments (--) in
+/// legitimate queries without false-positive rejections, while still blocking
+/// real injection patterns.
+/// </summary>
+public class SqlCommentValidatorTests
 {
     // ── Legitimate inline comments must be accepted ───────────────────────────
 
     [Fact]
-    public void S1_InlineComment_EndOfQuery_IsAccepted()
+    public void InlineComment_EndOfQuery_IsAccepted()
     {
         // Baseline: -- at end already worked before the fix.
         var ex = Record.Exception(() =>
@@ -357,9 +371,9 @@ public class S1_SqlCommentValidatorTests
     }
 
     [Fact]
-    public void S1_InlineComment_MidQuery_IsAccepted()
+    public void InlineComment_MidQuery_IsAccepted()
     {
-        // S1 regression: -- in mid-query position was previously rejected (false positive).
+        // Regression: -- in mid-query position was previously rejected (false positive).
         var ex = Record.Exception(() =>
             NormValidator.ValidateRawSql(
                 "SELECT Id, Name FROM Users WHERE Id = @id -- this is a valid comment\nAND IsActive = 1"));
@@ -367,7 +381,7 @@ public class S1_SqlCommentValidatorTests
     }
 
     [Fact]
-    public void S1_LongInlineComment_NotAtTail_IsAccepted()
+    public void LongInlineComment_NotAtTail_IsAccepted()
     {
         // Long comment text far from the end of the string — was rejected by < sql.Length-10 heuristic.
         var ex = Record.Exception(() =>
@@ -377,7 +391,7 @@ public class S1_SqlCommentValidatorTests
     }
 
     [Fact]
-    public void S1_MultipleInlineComments_AreAccepted()
+    public void MultipleInlineComments_AreAccepted()
     {
         var ex = Record.Exception(() =>
             NormValidator.ValidateRawSql(
@@ -386,7 +400,7 @@ public class S1_SqlCommentValidatorTests
     }
 
     [Fact]
-    public void S1_CommentOnlyLine_IsAccepted()
+    public void CommentOnlyLine_IsAccepted()
     {
         var ex = Record.Exception(() =>
             NormValidator.ValidateRawSql("SELECT Id, Name FROM T\n-- this whole line is a comment\nWHERE Id = @id"));
@@ -396,7 +410,7 @@ public class S1_SqlCommentValidatorTests
     // ── Injection patterns must still be blocked ──────────────────────────────
 
     [Fact]
-    public void S1_CommentAfterSemicolon_IsRejected()
+    public void CommentAfterSemicolon_IsRejected()
     {
         // Classic injection: '; DROP TABLE Users -- to hide trailing malicious SQL.
         Assert.Throws<NormUsageException>(() =>
@@ -405,7 +419,7 @@ public class S1_SqlCommentValidatorTests
     }
 
     [Fact]
-    public void S1_CommentAfterSemicolonWithGap_IsRejected()
+    public void CommentAfterSemicolonWithGap_IsRejected()
     {
         // Semicolon before -- further away.
         Assert.Throws<NormUsageException>(() =>
@@ -414,7 +428,7 @@ public class S1_SqlCommentValidatorTests
     }
 
     [Fact]
-    public void S1_Union_InjectionPattern_IsRejected()
+    public void Union_InjectionPattern_IsRejected()
     {
         // Existing UNION injection check must still fire.
         Assert.Throws<NormUsageException>(() =>
@@ -423,7 +437,7 @@ public class S1_SqlCommentValidatorTests
     }
 
     [Fact]
-    public void S1_BlockComment_WithSelectKeyword_IsRejected()
+    public void BlockComment_WithSelectKeyword_IsRejected()
     {
         // Block comments containing SELECT (or other DML keywords) must still be rejected.
         Assert.Throws<NormUsageException>(() =>
@@ -433,7 +447,7 @@ public class S1_SqlCommentValidatorTests
     // ── Edge cases ────────────────────────────────────────────────────────────
 
     [Fact]
-    public void S1_CommentInsideStringLiteral_IsAccepted()
+    public void CommentInsideStringLiteral_IsAccepted()
     {
         // -- inside a quoted string is not a comment — should be accepted.
         var ex = Record.Exception(() =>
@@ -442,7 +456,7 @@ public class S1_SqlCommentValidatorTests
     }
 
     [Fact]
-    public void S1_ValidComplexSelectWithComments_IsAccepted()
+    public void ValidComplexSelectWithComments_IsAccepted()
     {
         // A realistic multi-line query with inline comments.
         var ex = Record.Exception(() =>

@@ -55,8 +55,8 @@ namespace nORM.Core
         {
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
-                // PERF: Try direct count path first — avoids Expression.Call + Type[] allocation
-                // + re-parsing the Count expression in TryGetCountQuery
+                // Try direct count path first — avoids Expression.Call + Type[] allocation
+                // and re-parsing the Count expression in TryGetCountQuery.
                 if (normProvider.TryDirectCountAsync(source.Expression, ct, out var directResult))
                     return directResult;
 

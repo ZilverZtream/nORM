@@ -10,7 +10,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Gate 4.5+: Parametrized migration replay tests.
+/// Parametrized migration replay tests.
 /// Constructs SchemaDiff objects directly, calls generators, inspects SQL tokens.
 /// SQLite sequences also execute DDL against a live :memory: DB for syntax correctness.
 /// </summary>

@@ -24,7 +24,7 @@ namespace nORM.Migration
             { typeof(Guid).FullName!, "TEXT" }
         };
 
-        // PRV-1: Escape SQLite identifiers to prevent SQL injection via identifier names.
+        // Escape SQLite identifiers to prevent SQL injection via identifier names.
         private static string Esc(string id) => $"\"{id.Replace("\"", "\"\"")}\"";
 
         /// <summary>
@@ -45,12 +45,12 @@ namespace nORM.Migration
                 var colDefs = table.Columns.Select(c =>
                     $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
 
-                // MIG-1: Emit PRIMARY KEY constraint for PK columns
+                // Emit PRIMARY KEY constraint for PK columns.
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
 
-                // MIG-1: Emit UNIQUE constraint for unique non-PK columns
+                // Emit UNIQUE constraint for unique non-PK columns.
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
                 if (uniqueNonPkCols.Count > 0)
                     colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
@@ -61,7 +61,7 @@ namespace nORM.Migration
 
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
-                // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
+                // Emit CREATE INDEX for columns with a named index (non-PK, non-unique).
                 foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
                     up.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
 
@@ -75,7 +75,7 @@ namespace nORM.Migration
 
                 foreach (var (_, column) in group)
                 {
-                    // MIG-1: NOT NULL column without a DefaultValue cannot be added to a populated table.
+                    // NOT NULL column without a DefaultValue cannot be added to a populated table.
                     if (!column.IsNullable && column.DefaultValue == null)
                         throw new InvalidOperationException(
                             $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
@@ -208,8 +208,8 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// G2: Generates the SQLite table-recreation DDL sequence for changed columns.
-        /// MIG-1: Now emits full schema including PRIMARY KEY, UNIQUE, and CREATE INDEX constraints.
+        /// Generates the SQLite table-recreation DDL sequence for changed columns.
+        /// Emits full schema including PRIMARY KEY, UNIQUE, and CREATE INDEX constraints.
         /// </summary>
         private static void AddRecreate(List<string> stmts, TableSchema table, Dictionary<string, ColumnSchema> overrides)
         {
@@ -234,16 +234,16 @@ namespace nORM.Migration
 
             var names = cols.Select(c => Esc(c.Name));
 
-            // MIG-1: Build column definitions with full constraint metadata (same as AddedTables path)
+            // Build column definitions with full constraint metadata (same as AddedTables path).
             var colDefs = cols.Select(c =>
                 $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
 
-            // MIG-1: Emit PRIMARY KEY constraint for PK columns
+            // Emit PRIMARY KEY constraint for PK columns.
             var pkCols = cols.Where(c => c.IsPrimaryKey).ToList();
             if (pkCols.Count > 0)
                 colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
 
-            // MIG-1: Emit UNIQUE constraint for unique non-PK columns
+            // Emit UNIQUE constraint for unique non-PK columns.
             var uniqueNonPkCols = cols.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
             if (uniqueNonPkCols.Count > 0)
                 colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
@@ -259,7 +259,7 @@ namespace nORM.Migration
             stmts.Add($"DROP TABLE {Esc(table.Name)}");
             stmts.Add($"ALTER TABLE {tempName} RENAME TO {Esc(table.Name)}");
 
-            // MIG-1: Emit CREATE INDEX for columns with a named index (non-PK, non-unique)
+            // Emit CREATE INDEX for columns with a named index (non-PK, non-unique).
             foreach (var col in cols.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
                 stmts.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
         }

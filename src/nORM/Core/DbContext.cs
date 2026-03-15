@@ -35,7 +35,7 @@ namespace nORM.Core
     public class DbContext : IDisposable, IAsyncDisposable
     {
         private readonly DbConnection _cn;
-        // TX-1/MG-1: When false, Dispose/DisposeAsync must NOT close or dispose the connection
+        // When false, Dispose/DisposeAsync must NOT close or dispose the connection
         // because it was passed in by the caller who retains ownership.
         private readonly bool _ownsConnection;
         private readonly DatabaseProvider _p;
@@ -43,22 +43,20 @@ namespace nORM.Core
         /// <summary>Per-context fast-path SQL template cache. Keyed by entity type; stores provider+model-specific SELECT templates.</summary>
         internal readonly ConcurrentDictionary<Type, string> FastPathSqlCache = new();
         /// <summary>
-        /// PERF: Cached NormQueryProvider for this context. Avoids creating IncludeProcessor,
+        /// Cached NormQueryProvider for this context. Avoids creating IncludeProcessor,
         /// QueryExecutor, and BulkCudBuilder (3 heap allocations) on every Query&lt;T&gt;() call.
         /// </summary>
         private Query.NormQueryProvider? _cachedQueryProvider;
-        /// <summary>PERF: Cached mapping hash for plan cache fingerprinting. Computed lazily once per context.</summary>
+        /// <summary>Cached mapping hash for plan cache fingerprinting. Computed lazily once per context.</summary>
         private int _mappingHashCached;
         private volatile bool _mappingHashComputed;
         private readonly IExecutionStrategy _executionStrategy;
         private readonly AdaptiveTimeoutManager _timeoutManager;
         private readonly ModelBuilder _modelBuilder;
         private readonly DynamicEntityTypeGenerator _typeGenerator = new();
-        // PERFORMANCE FIX (TASK 3): Static cache to avoid recreating for every DbContext instance
-        // Dynamic type generation is expensive (uses Reflection.Emit), so cache should be shared
-        // across all DbContext instances in the application.
-        // MEMORY LEAK FIX: Use LRU cache instead of unbounded ConcurrentDictionary to prevent
-        // unbounded memory growth as new dynamic types are generated
+        // Static cache shared across all DbContext instances. Dynamic type generation is expensive
+        // (uses Reflection.Emit), so sharing avoids recreating types per context.
+        // Bounded LRU cache prevents unbounded memory growth as new dynamic types are generated.
         private static readonly ConcurrentLruCache<string, Lazy<Task<Type>>> _dynamicTypeCache = new(maxSize: 1000);
         private readonly LinkedList<WeakReference<IDisposable>> _disposables = new();
         private readonly object _disposablesLock = new();
@@ -68,7 +66,7 @@ namespace nORM.Core
         private readonly object _providerInitSyncLock = new object(); // For synchronous initialization to avoid deadlock
         private readonly Lazy<Task>? _temporalInit;
         private DbTransaction? _currentTransaction; // Access via Interlocked.* only
-        // PERF: ConcurrentDictionary eliminates lock contention on the insert fast path.
+        // ConcurrentDictionary eliminates lock contention on the insert fast path.
         private readonly ConcurrentDictionary<(Type EntityType, bool HydrateGeneratedKeys), PreparedInsertCommand> _preparedInsertCache = new();
         private bool _disposed;
 
@@ -101,7 +99,7 @@ namespace nORM.Core
         public DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options = null)
             : this(cn, p, options, ownsConnection: true) { }
 
-        // TX-1/MG-1: Internal constructor that allows callers (e.g. migration runners) to pass an
+        // Internal constructor that allows callers (e.g. migration runners) to pass an
         // externally-owned connection. When ownsConnection is false, Dispose/DisposeAsync will NOT
         // close or dispose the connection — the caller retains full ownership.
         internal DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options, bool ownsConnection)
@@ -181,21 +179,20 @@ namespace nORM.Core
             }
             finally
             {
-                // RESOURCE LEAK FIX (TASK 16): Always dispose connection on failure.
-                // If any exception occurs (including TypeLoadException, FileNotFoundException, etc.),
-                // ensure the connection is properly disposed to prevent handle leaks.
+                // Always dispose connection on failure to prevent handle leaks,
+                // including from TypeLoadException, FileNotFoundException, and similar exceptions.
                 if (!success)
                 {
                     connection?.Dispose();
                 }
             }
         }
-        // PERF: Cached completed task to avoid allocation on the hot path
+        // Cached completed task to avoid allocation on the hot path
         private Task<DbConnection>? _ensureConnectionCompletedTask;
 
         internal Task<DbConnection> EnsureConnectionAsync(CancellationToken ct = default)
         {
-            // PERF: Fast path — connection already open, provider initialized, no temporal init.
+            // Fast path — connection already open, provider initialized, no temporal init.
             // Returns a cached Task to avoid async state machine allocation entirely.
             if (_cn.State == ConnectionState.Open && _providerInitialized && _temporalInit == null)
                 return _ensureConnectionCompletedTask ??= Task.FromResult(_cn);
@@ -236,8 +233,8 @@ namespace nORM.Core
                 _cn.Open();
             if (!_providerInitialized)
             {
-                // PROVIDER INITIALIZATION RACE FIX: Use regular lock instead of SemaphoreSlim.Wait()
-                // to avoid deadlock in synchronous contexts (ASP.NET, UI threads with sync context)
+                // Use regular lock instead of SemaphoreSlim.Wait() to avoid deadlock
+                // in synchronous contexts (ASP.NET, UI threads with sync context).
                 lock (_providerInitSyncLock)
                 {
                     if (!_providerInitialized)
@@ -278,8 +275,8 @@ namespace nORM.Core
                 // scan the SQL string as before.  This path is used when no expression
                 // tree was walked (e.g. GetAdaptiveTimeout called with a raw SQL string).
                 //
-                // PERFORMANCE FIX: Skip detailed analysis for extremely large SQL (>100KB)
-                // Scanning multi-megabyte strings with Contains/IndexOf causes severe slowdown
+                // Skip detailed analysis for extremely large SQL (>100KB) to avoid severe
+                // slowdown from scanning multi-megabyte strings with Contains/IndexOf.
                 if (sql.Length > 102400) // 100KB threshold
                 {
                     baseComplexity = 20 + Math.Min(30, sql.Length / 10000);
@@ -388,7 +385,7 @@ namespace nORM.Core
         /// code so that transaction binding is never accidentally omitted.
         /// </summary>
         /// <summary>
-        /// PERF: Returns a cached NormQueryProvider for this context, avoiding 4 heap allocations per query.
+        /// Returns a cached NormQueryProvider for this context, avoiding 4 heap allocations per query.
         /// </summary>
         internal Query.NormQueryProvider GetQueryProvider()
         {
@@ -424,14 +421,14 @@ namespace nORM.Core
             }
             catch (OperationCanceledException)
             {
-                // RELIABILITY FIX: Don't hide cancellation - rethrow to respect cancellation tokens
-                // Swallowing OperationCanceledException breaks proper async cancellation patterns
+                // Rethrow cancellation to respect cancellation tokens; swallowing it
+                // breaks proper async cancellation patterns.
                 throw;
             }
             catch (Exception ex)
             {
-                // RELIABILITY FIX: Log exceptions instead of silently swallowing them
-                // Silent failures make debugging connection issues nearly impossible
+                // Log exceptions instead of silently swallowing them; silent failures
+                // make debugging connection issues nearly impossible.
                 Options.Logger?.LogWarning(ex, "Health check failed: {Message}", ex.Message);
                 return false;
             }
@@ -459,7 +456,7 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// PERF: Returns a stable hash of all entity type → table name mappings.
+        /// Returns a stable hash of all entity type → table name mappings.
         /// Computed once and cached for the lifetime of the context.
         /// </summary>
         internal int GetMappingHash()
@@ -474,20 +471,20 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// M-1: Tracks types that were used as query roots via ctx.Query&lt;T&gt;().
+        /// Tracks types that were used as query roots via ctx.Query&lt;T&gt;().
         /// These are "real" entity types, as opposed to DTO projection result types.
         /// Thread-safe via ConcurrentDictionary (used as a set).
         /// </summary>
         private readonly ConcurrentDictionary<Type, byte> _entityQueryRoots = new();
 
         /// <summary>
-        /// M-1: Registers a type as a query-root entity (called by Query&lt;T&gt; extension).
+        /// Registers a type as a query-root entity (called by Query&lt;T&gt; extension).
         /// Ensures that directly-queried entities are considered "mapped" by IsMapped.
         /// </summary>
         internal void RegisterEntityType(Type t) => _entityQueryRoots.TryAdd(t, 0);
 
         /// <summary>
-        /// M-1: Returns true when the type is a known entity root — either explicitly
+        /// Returns true when the type is a known entity root — either explicitly
         /// registered with the ModelBuilder OR used as a direct query root via Query&lt;T&gt;.
         /// DTO projection results (from .Select(x => new Dto {...})) are never query roots
         /// and will NOT be tracked, preventing ChangeTracker pollution.
@@ -497,11 +494,9 @@ namespace nORM.Core
             _entityQueryRoots.ContainsKey(t);
 
         /// <summary>
-        /// SG-1: Hardened identifier validation that strips optional delimiters and validates
-        /// the inner content against a strict allowlist. This prevents SQL injection via
-        /// crafted identifiers like "[foo]; DROP TABLE Users--" that previously passed
-        /// validation because they started with "[" and ended with "]".
-        /// Validates that an identifier is safe for use in SQL queries. Allows:
+        /// Validates that an identifier is safe for use in SQL queries by stripping optional
+        /// delimiters and checking the inner content against a strict allowlist. Prevents SQL
+        /// injection via crafted identifiers like "[foo]; DROP TABLE Users--". Allows:
         /// - Alphanumeric characters, underscores, dots, spaces (word chars only)
         /// - Quoted identifiers: "name", `name`, [name] with safe inner content
         /// - Schema-qualified identifiers: dbo.Table, [dbo].[Table], "schema"."table"
@@ -535,7 +530,7 @@ namespace nORM.Core
         };
 
         /// <summary>
-        /// PC-1/SEC-1: Normalizes a connection string for use as a static cache key.
+        /// Normalizes a connection string for use as a static cache key.
         /// Uses DbConnectionStringBuilder for robust parsing (handles quoted semicolons, escaped
         /// chars, reordered keys). Strips sensitive keys so credentials never appear in cache key
         /// memory (coredump / diagnostic exposure risk). Keys are sorted case-insensitively so
@@ -631,9 +626,9 @@ namespace nORM.Core
             var lazyTask = _dynamicTypeCache.GetOrAdd(cacheKey,
                 _ => new Lazy<Task<Type>>(() => _typeGenerator.GenerateEntityTypeAsync(this.Connection, tableName)));
 
-            // RELIABILITY FIX: Use Task.Run to avoid blocking the calling thread
-            // This prevents potential deadlocks in synchronization contexts (e.g., ASP.NET, WPF)
-            // The Lazy<T> ensures type generation happens only once per table, so the overhead is minimal
+            // Use Task.Run to avoid blocking the calling thread, preventing potential deadlocks
+            // in synchronization contexts (e.g., ASP.NET, WPF). The Lazy<T> ensures type
+            // generation happens only once per table, so the overhead is minimal.
             var entityType = Task.Run(async () => await lazyTask.Value.ConfigureAwait(false)).GetAwaiter().GetResult();
 
             var method = typeof(NormQueryable).GetMethods()
@@ -701,9 +696,9 @@ namespace nORM.Core
         }
         /// <summary>
         /// Returns the <see cref="EntityEntry"/> for the supplied entity if it is already being tracked.
-        /// SECURITY FIX (TASK 5): This method no longer auto-attaches untracked entities as this was a
-        /// dangerous side-effect. If the entity is not tracked, an exception is thrown instructing the
-        /// caller to use <see cref="Attach{T}"/> explicitly.
+        /// If the entity is not tracked, an exception is thrown instructing the caller to use
+        /// <see cref="Attach{T}"/> explicitly. Auto-attaching is deliberately not supported because
+        /// it is a dangerous side-effect that can silently modify tracking state.
         /// </summary>
         /// <param name="entity">The entity whose tracking entry is requested.</param>
         /// <returns>An <see cref="EntityEntry"/> representing the entity's tracking information.</returns>
@@ -713,8 +708,8 @@ namespace nORM.Core
         {
             NormValidator.ValidateEntity(entity, nameof(entity));
 
-            // SECURITY FIX (TASK 5): Check if entity is already tracked before returning entry
-            // Auto-attaching untracked entities is dangerous - it silently modifies tracking state
+            // Check if entity is already tracked before returning entry.
+            // Auto-attaching untracked entities is dangerous — it silently modifies tracking state.
             var existingEntry = ChangeTracker.Entries.FirstOrDefault(e => ReferenceEquals(e.Entity, entity));
             if (existingEntry == null)
             {
@@ -759,11 +754,10 @@ namespace nORM.Core
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>The total number of state entries written to the database.</returns>
         /// <remarks>
-        /// PERFORMANCE WARNING (TASK 12): This method automatically calls DetectChanges() which
-        /// performs snapshot-based comparison of ALL tracked entities. Avoid calling SaveChanges()
-        /// in tight loops with many tracked entities. For bulk operations, use InsertBulkAsync()
-        /// or UpdateBulkAsync() instead. For read-only queries, use AsNoTracking() to avoid
-        /// change tracking overhead entirely.
+        /// Automatically calls DetectChanges() which performs snapshot-based comparison of ALL
+        /// tracked entities. Avoid calling SaveChanges() in tight loops with many tracked entities.
+        /// For bulk operations, use InsertBulkAsync() or UpdateBulkAsync() instead. For read-only
+        /// queries, use AsNoTracking() to avoid change tracking overhead entirely.
         /// </remarks>
         public Task<int> SaveChangesAsync(CancellationToken ct = default)
             => SaveChangesWithRetryAsync(detectChanges: true, ct);
@@ -774,8 +768,8 @@ namespace nORM.Core
         /// failures such as deadlocks.
         /// </summary>
         /// <param name="detectChanges">
-        /// PERFORMANCE FIX (TASK 12): If true, automatically calls <see cref="ChangeTracker.DetectChanges"/>
-        /// before saving. If false, assumes changes have been manually tracked or detected.
+        /// If true, automatically calls <see cref="ChangeTracker.DetectChanges"/> before saving.
+        /// If false, assumes changes have been manually tracked or detected.
         /// Set to false for performance in scenarios with many tracked entities where you've
         /// manually set entity states using <c>context.Entry(entity).State = EntityState.Modified</c>.
         /// </param>
@@ -830,16 +824,16 @@ namespace nORM.Core
         /// Persists all tracked entity changes to the database within a single transaction.
         /// </summary>
         /// <param name="detectChanges">
-        /// PERFORMANCE FIX (TASK 12): If true, calls ChangeTracker.DetectChanges before saving.
-        /// DetectChanges iterates all tracked entities and compares their current values to
-        /// original values, which can be expensive for contexts tracking thousands of entities.
+        /// If true, calls ChangeTracker.DetectChanges before saving. DetectChanges iterates all
+        /// tracked entities and compares current values to original values, which can be expensive
+        /// for contexts tracking thousands of entities.
         /// </param>
         /// <param name="ct">Token used to cancel the save operation.</param>
         /// <param name="onCommitAttempted">Optional callback invoked immediately before CommitAsync is called, used by retry logic to detect commit attempts.</param>
         /// <returns>The total number of state entries written to the database.</returns>
         private async Task<int> SaveChangesInternalAsync(bool detectChanges, CancellationToken ct, Action? onCommitAttempted = null)
         {
-            // PERFORMANCE FIX (TASK 12): Only detect changes if requested
+            // Only detect changes if requested — DetectChanges is O(entities × properties).
             if (detectChanges)
             {
                 ChangeTracker.DetectAllChanges();
@@ -856,15 +850,11 @@ namespace nORM.Core
                 foreach (var interceptor in saveInterceptors)
                     await interceptor.SavingChangesAsync(this, changedEntries, ct).ConfigureAwait(false);
 
-                // S4-1: Recompute changedEntries AFTER interceptors run.
-                // Interceptors may call context.Add() or modify tracked entities during
-                // SavingChangesAsync. Re-reading the change tracker ensures those additions
-                // and modifications are included in the current save operation.
-                //
-                // Finding-B: Re-run DetectAllChanges so that property-level mutations made
-                // to previously-Unchanged entities by SavingChangesAsync interceptors are picked up.
-                // Without re-detection, interceptors that mutate entity properties (e.g. audit stamping)
-                // without explicitly marking entries as Modified will silently lose those changes.
+                // Recompute changedEntries AFTER interceptors run: interceptors may call context.Add()
+                // or modify tracked entities during SavingChangesAsync. Re-reading the change tracker
+                // ensures those additions and modifications are included in the current save operation.
+                // Also re-run DetectAllChanges so that property-level mutations made to previously-Unchanged
+                // entities (e.g. audit stamping) are picked up even if entries were not explicitly marked Modified.
                 ChangeTracker.DetectAllChanges();
                 changedEntries = ChangeTracker.Entries
                     .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
@@ -906,8 +896,8 @@ namespace nORM.Core
                     var state = group.Key.State;
                     await using var commandScope = new CommandScope(Connection, transaction);
 
-                    // SEC-MT: Include tenant param in per-entity count for Modified/Deleted so
-                    // batch sizing doesn't overflow MaxParameters on bounded providers.
+                    // Include tenant param in per-entity count for Modified/Deleted so that
+                    // batch sizing does not overflow MaxParameters on bounded providers.
                     var tenantParamCount = (Options.TenantProvider != null && map.TenantColumn != null) ? 1 : 0;
                     var paramsPerEntity = state switch
                     {
@@ -919,9 +909,8 @@ namespace nORM.Core
                     var batchSize = CalculateBatchSize(entries.Count, paramsPerEntity);
                     var templateLength = EstimateTemplateLength(state, map);
 
-                    // PERFORMANCE FIX (TASK 14): Reuse DbCommand and StringBuilder across batches
-                    // Instead of creating 100 DbCommand and StringBuilder for 10k entities in batches of 100,
-                    // create ONE of each and clear/reset them between batches
+                    // Reuse DbCommand and StringBuilder across batches: create ONE of each and
+                    // clear/reset between batches rather than allocating per-batch.
                     await using var cmd = commandScope.CreateCommand();
                     var sql = new StringBuilder(templateLength * batchSize);
 
@@ -949,7 +938,7 @@ namespace nORM.Core
                 onCommitAttempted?.Invoke();
                 await transactionManager.CommitAsync().ConfigureAwait(false);
 
-                // TX-1: Only accept tracker state when we own the transaction and commit succeeded.
+                // Only accept tracker state when we own the transaction and commit succeeded.
                 // For external/ambient transactions the caller controls durability; accepting
                 // state here would diverge the tracker from the DB if the caller later rolls back.
                 if (transactionManager.OwnsTransaction)
@@ -972,7 +961,7 @@ namespace nORM.Core
             }
             catch (Exception originalEx)
             {
-                // S5-1: Preserve the original exception if rollback itself fails.
+                // Preserve the original exception if rollback itself fails.
                 // Without this guard, a rollback failure replaces originalEx entirely,
                 // making it impossible to diagnose the root write failure.
                 try
@@ -989,19 +978,14 @@ namespace nORM.Core
                 throw; // unreachable — satisfies compiler
             }
 
-            // C1 / CT-1: Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE
-            // the try/catch block so an interceptor exception does not attempt to roll back an
-            // already-committed transaction. Use CancellationToken.None here: ct was replaced by
-            // transactionManager.Token (linked to caller token) at line 796, so a cancellation
-            // arriving between commit and this point would surface as OperationCanceledException
-            // even though the DB commit already succeeded. Post-commit notifications must always
-            // complete to avoid false-failure reports and duplicate-retry side effects.
-            //
-            // CT-1: Post-commit interceptors are best-effort notifications; they must never surface
-            // as a false SaveChanges failure after the DB commit already succeeded. Each interceptor
-            // is wrapped individually so that one failure does not prevent subsequent interceptors
-            // from running. Failures are logged and suppressed — the caller always receives the
-            // committed row count from this code path.
+            // Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE the try/catch
+            // block so an interceptor exception does not attempt to roll back an already-committed
+            // transaction. Uses CancellationToken.None because ct was replaced by transactionManager.Token
+            // (linked to caller token), so a cancellation arriving here would surface as
+            // OperationCanceledException even though the DB commit already succeeded.
+            // Post-commit interceptors are best-effort notifications and must never surface as a false
+            // SaveChanges failure. Each interceptor is wrapped individually so that one failure does
+            // not prevent subsequent interceptors from running; failures are logged and suppressed.
             if (saveInterceptors.Count > 0)
             {
                 foreach (var interceptor in saveInterceptors)
@@ -1087,7 +1071,7 @@ namespace nORM.Core
             {
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, ct).ConfigureAwait(false);
                 int i = 0;
-                int keysAssigned = 0; // MAT-1: track actual key assignments
+                int keysAssigned = 0; // track actual key assignments to detect partial results
                 do
                 {
                     if (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -1097,18 +1081,17 @@ namespace nORM.Core
                         if (entity != null)
                         {
                             map.SetPrimaryKey(entity, newId);
-                            // M2: Reindex the entity in the identity map now that it has a real PK
+                            // Reindex the entity in the identity map now that it has a real PK.
                             ChangeTracker.ReindexAfterInsert(entity, map);
-                            keysAssigned++; // MAT-1: only count successful assignments
+                            keysAssigned++;
                         }
                     }
-                    // DATA INTEGRITY FIX (TASK 1): Removed AcceptChanges() call
-                    // AcceptChanges must only be called after transaction commits successfully
+                    // AcceptChanges is intentionally deferred until after commit.
                     i++;
                 }
                 while (await reader.NextResultAsync(ct).ConfigureAwait(false) && i < batch.Count);
 
-                // MAT-1: If DB returned fewer keys than entities, identity map is corrupt.
+                // If DB returned fewer keys than entities, identity map is corrupt.
                 // Throwing here triggers the SaveChanges catch block → rollback.
                 if (keysAssigned != batch.Count)
                     throw new InvalidOperationException(
@@ -1121,8 +1104,7 @@ namespace nORM.Core
             }
 
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            // DATA INTEGRITY FIX (TASK 1): Removed AcceptChanges() calls
-            // AcceptChanges must only be called after transaction commits successfully
+            // AcceptChanges is intentionally deferred until after commit.
             return affected;
         }
 
@@ -1142,7 +1124,7 @@ namespace nORM.Core
             {
                 var entity = entry.Entity ?? throw new InvalidOperationException("Entity is null");
 
-                // CT-1 (PK mutation): Detect if the primary key was mutated after tracking.
+                // Detect if the primary key was mutated after tracking.
                 // Updating with a mutated key would target the wrong row.
                 if (entry.OriginalKey != null && map.KeyColumns.Length > 0)
                 {
@@ -1183,11 +1165,10 @@ namespace nORM.Core
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            // SG-1: Skip matched-row concurrency check for providers using affected-row semantics (e.g. MySQL).
+            // Skip matched-row concurrency check for providers using affected-row semantics (e.g. MySQL).
             if (map.TimestampColumn != null && !Provider.UseAffectedRowsSemantics && updated != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
-            // DATA INTEGRITY FIX (TASK 1): Removed AcceptChanges() calls
-            // AcceptChanges must only be called after transaction commits successfully
+            // AcceptChanges is intentionally deferred until after the transaction commits.
             return updated;
         }
 
@@ -1207,7 +1188,7 @@ namespace nORM.Core
             {
                 var entity = entry.Entity ?? throw new InvalidOperationException("Entity is null");
 
-                // CT-1 (PK mutation): Detect if the primary key was mutated after tracking.
+                // Detect if the primary key was mutated after tracking.
                 // Deleting with a mutated key would target the wrong row.
                 if (entry.OriginalKey != null && map.KeyColumns.Length > 0)
                 {
@@ -1244,16 +1225,15 @@ namespace nORM.Core
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            // SG-1: Skip matched-row concurrency check for providers using affected-row semantics (e.g. MySQL).
+            // Skip matched-row concurrency check for providers using affected-row semantics (e.g. MySQL).
             if (map.TimestampColumn != null && !Provider.UseAffectedRowsSemantics && deleted != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
-            // DATA INTEGRITY FIX (TASK 1): Removed entity removal from ChangeTracker
-            // This must only be done after transaction commits successfully
+            // Entity removal from ChangeTracker is deferred until after the transaction commits.
             return deleted;
         }
 
         /// <summary>
-        /// T1: <see cref="TimeoutException"/> is intentionally NOT retried by default because a
+        /// <see cref="TimeoutException"/> is intentionally NOT retried by default because a
         /// timed-out write operation may have already been partially applied by the database and
         /// retrying it could produce duplicate rows. Callers that want to retry on timeout must
         /// wrap the timeout condition inside their <see cref="DbContextOptions.RetryPolicy"/>
@@ -1264,12 +1244,12 @@ namespace nORM.Core
         {
             if (ex is DbException dbEx && Options.RetryPolicy != null)
                 return Options.RetryPolicy.ShouldRetry(dbEx);
-            return false;   // T1: TimeoutException removed — retrying a timed-out write can duplicate data
+            return false;   // TimeoutException is excluded — retrying a timed-out write can duplicate data.
         }
         /// <summary>
-        /// FIX (TASK 8): Prevents integer overflow when converting TimeSpan to seconds.
-        /// If TimeSpan.MaxValue or very large timeouts are provided, this ensures the value
-        /// is clamped to int.MaxValue instead of wrapping to negative numbers.
+        /// Converts a <see cref="TimeSpan"/> to an integer number of seconds, clamping at
+        /// <see cref="int.MaxValue"/> to prevent overflow when very large or maximum timeouts
+        /// are provided. Negative results are raised to a minimum of 1.
         /// </summary>
         private static int ToSecondsClamped(TimeSpan t)
         {
@@ -1293,7 +1273,7 @@ namespace nORM.Core
         public Task<int> InsertAsync<T>(T entity, CancellationToken ct = default) where T : class
         {
             if (entity == null) throw new ArgumentNullException(nameof(entity));
-            // PERF: Fast-path for the common case: no transaction, no retry policy, no tenant, cached prepared command.
+            // Fast-path for the common case: no transaction, no retry policy, no tenant, cached prepared command.
             // This avoids 4 async state machine allocations by inlining the entire chain.
             var map = GetMapping(typeof(T));
             var tx = Database.CurrentTransaction;
@@ -1304,7 +1284,7 @@ namespace nORM.Core
                 if (_preparedInsertCache.TryGetValue(key, out var prepared)
                     && ReferenceEquals(prepared.BoundTransaction, null))
                 {
-                    // PERF: Skip EnableLazyLoading on insert fast path.
+                    // Skip EnableLazyLoading on insert fast path.
                     // Entities being inserted don't need lazy loading proxies — they're being
                     // written to DB, not read from it. Saves ~2-5µs ConditionalWeakTable + reflection.
                     return prepared.ExecuteAsync(entity, ct);
@@ -1441,9 +1421,9 @@ namespace nORM.Core
         private async Task<int> WriteWithTransactionAsync<T>(T entity, TableMapping map, WriteOperation operation, DbTransaction? transaction, CancellationToken ct, bool ownsTransaction) where T : class
         {
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
-            // CT-1/TX-1: When we own the transaction, track it separately so we can always
-            // dispose it (releasing server-side lock memory and log space) in a finally block,
-            // regardless of whether the operation succeeds or fails.
+            // When we own the transaction, track it separately so it can always be disposed
+            // in a finally block (releasing server-side lock memory and log space) regardless
+            // of whether the operation succeeds or fails.
             DbTransaction currentTransaction;
             DbTransaction? ownedTransaction = null;
             if (ownsTransaction)
@@ -1465,7 +1445,7 @@ namespace nORM.Core
             }
             catch (Exception originalEx)
             {
-                // S5-1: Preserve the original exception if rollback itself fails.
+                // Preserve the original exception if rollback itself fails.
                 if (ownsTransaction)
                 {
                     try
@@ -1485,7 +1465,7 @@ namespace nORM.Core
             }
             finally
             {
-                // CT-1/TX-1: Always dispose the owned transaction to release server-side resources.
+                // Always dispose the owned transaction to release server-side resources.
                 if (ownedTransaction != null)
                     await ownedTransaction.DisposeAsync().ConfigureAwait(false);
             }
@@ -1514,7 +1494,7 @@ namespace nORM.Core
                 WriteOperation.Delete => _p.BuildDelete(map),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation))
             };
-            // PERF: Simple INSERT/UPDATE/DELETE have no JOINs/subqueries — use base timeout
+            // Simple INSERT/UPDATE/DELETE have no JOINs/subqueries — use base timeout
             // to avoid SQL string scanning in GetAdaptiveTimeout.
             cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             var originalToken = ChangeTracker.GetEntryOrDefault(entity)?.OriginalToken;
@@ -1553,7 +1533,7 @@ namespace nORM.Core
                         cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
                     if (map.TimestampColumn != null)
                     {
-                        // CT-1: Use the original snapshot token (not the current possibly-mutated property value)
+                        // Use the original snapshot token (not the current possibly-mutated property value)
                         // to match the concurrency predicate parity of the batched SaveChanges path.
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue);
@@ -1565,7 +1545,7 @@ namespace nORM.Core
                         cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
                     if (map.TimestampColumn != null)
                     {
-                        // CT-1: Use the original snapshot token.
+                        // Use the original snapshot token.
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue);
                     }
@@ -1650,7 +1630,7 @@ namespace nORM.Core
                     ErrorMessages.InvalidConfiguration,
                     $"Entity '{map.Type.Name}' has no primary key; UPDATE requires a key."));
 
-            // SQL-1: Guard against empty SET clause when entity has no mutable columns.
+            // Guard against empty SET clause when entity has no mutable columns.
             // This happens when all columns are either keys or concurrency tokens.
             // Emitting "UPDATE T SET WHERE ..." is invalid SQL; throw a clear, actionable error.
             if (map.UpdateColumns.Length == 0)
@@ -1722,7 +1702,7 @@ namespace nORM.Core
                         cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
                     if (map.TimestampColumn != null)
                     {
-                        // CT-1: Use the original snapshot token when available rather than the current
+                        // Use the original snapshot token when available rather than the current
                         // (possibly mutated) property value, to ensure the correct concurrency check.
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddParam($"{_p.ParamPrefix}p{index++}", tokenValue);
@@ -1735,7 +1715,7 @@ namespace nORM.Core
                         cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
                     if (map.TimestampColumn != null)
                     {
-                        // CT-1: Use the original snapshot token when available.
+                        // Use the original snapshot token when available.
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddParam($"{_p.ParamPrefix}p{index++}", tokenValue);
                     }
@@ -1935,7 +1915,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = CommandPool.Get(ctx.Connection, sql);
-                // TX-1: Bind to active transaction so raw SQL reads participate in the unit-of-work.
+                // Bind to active transaction so raw SQL reads participate in the unit-of-work.
                 if (ctx.CurrentTransaction != null)
                     cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
@@ -1944,20 +1924,18 @@ namespace nORM.Core
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
                 NormValidator.ValidateRawSql(sql, paramDict);
 
-                // PERFORMANCE FIX (TASK 8): Use MaterializerFactory for fast compiled materialization
-                // instead of slow reflection. MaterializerFactory generates IL.Emit or Expression-based
-                // materializers that are 10-100x faster than reflection for large result sets.
+                // Use MaterializerFactory for fast compiled materialization instead of slow reflection.
+                // MaterializerFactory generates IL.Emit or Expression-based materializers that are
+                // significantly faster than reflection for large result sets.
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
                 
                 // Get or create mapping for type T - this supports both mapped entities and ad-hoc types
                 var mapping = ctx.GetMapping(typeof(T));
 
-                // M-1: Build a name→ordinal map from the actual reader schema so columns
-                // are always read by name, not by position. The old CreateSyncMaterializer
-                // path assigned column i to mapping column i; raw SQL returning columns in a
-                // different order than the entity mapping would silently populate the wrong
-                // properties (e.g. Name←→Code swap when both are the same CLR type).
+                // Build a name→ordinal map from the actual reader schema so columns are always
+                // read by name, not by position. Reading by position would silently populate the
+                // wrong properties when raw SQL returns columns in a different order than the mapping.
                 var fieldCount = reader.FieldCount;
                 var nameToOrdinal = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
                 for (int i = 0; i < fieldCount; i++)
@@ -2069,7 +2047,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = CommandPool.Get(ctx.Connection, sql);
-                // TX-1: Bind to active transaction so raw SQL reads participate in the unit-of-work.
+                // Bind to active transaction so raw SQL reads participate in the unit-of-work.
                 if (ctx.CurrentTransaction != null)
                     cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
@@ -2106,7 +2084,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
-                // TX-1: Bind to active transaction so stored procedure calls participate in the unit-of-work.
+                // Bind to active transaction so stored procedure calls participate in the unit-of-work.
                 if (ctx.CurrentTransaction != null)
                     cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandType = ctx._p.StoredProcedureCommandType;
@@ -2127,9 +2105,9 @@ namespace nORM.Core
                     cmd.SetParametersFast(span);
                 }
 
-                // PRV-1: Use the same dual-check as the async-enumerable variant: accept either
-                // a safe identifier (stored proc name) or a safe raw SQL (for providers like SQLite
-                // that use CommandType.Text and pass a SELECT query as the "procedure name").
+                // Dual-check: accept either a safe identifier (stored proc name) or safe raw SQL
+                // for providers like SQLite that use CommandType.Text and pass a SELECT query
+                // as the "procedure name".
                 if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, ctx._p))
                     throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
 
@@ -2162,7 +2140,7 @@ namespace nORM.Core
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             var sw = Stopwatch.StartNew();
             await using var cmd = CommandPool.Get(Connection, procedureName);
-            // TX-1: Bind to active transaction so stored procedure calls participate in the unit-of-work.
+            // Bind to active transaction so stored procedure calls participate in the unit-of-work.
             if (CurrentTransaction != null)
                 cmd.Transaction = CurrentTransaction;
             cmd.CommandType = _p.StoredProcedureCommandType;
@@ -2221,7 +2199,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
-                // TX-1: Bind to active transaction so stored procedure calls participate in the unit-of-work.
+                // Bind to active transaction so stored procedure calls participate in the unit-of-work.
                 if (ctx.CurrentTransaction != null)
                     cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandType = ctx._p.StoredProcedureCommandType;
@@ -2245,7 +2223,7 @@ namespace nORM.Core
                 var outputParamMap = new Dictionary<string, DbParameter>();
                 foreach (var op in outputParameters)
                 {
-                    // SECURITY FIX (TASK 20): Validate parameter name to prevent SQL injection
+                    // Validate parameter name to prevent SQL injection.
                     if (!IsSafeIdentifier(op.Name))
                         throw new NormUsageException($"Invalid output parameter name: '{op.Name}'. " +
                             "Parameter names must contain only alphanumeric characters, underscores, and periods.");
@@ -2259,7 +2237,7 @@ namespace nORM.Core
                     outputParamMap[op.Name] = p;
                 }
 
-                // PRV-1: Use dual-check — accept either a safe identifier or safe raw SQL
+                // Dual-check: accept either a safe identifier or safe raw SQL.
                 if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, ctx._p))
                     throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
 
@@ -2293,8 +2271,7 @@ namespace nORM.Core
             if (tenantId == null)
                 throw new InvalidOperationException("Tenant context required but not available");
             var entityTenant = tenantCol.Getter(entity);
-            // SECURITY FIX (TASK 18): Changed auto-injection to throw exception.
-            // Auto-injecting tenant ID is dangerous - developers might intend null for global records.
+            // Auto-injecting tenant ID is dangerous — developers might intend null for global records.
             // Requiring explicit tenant ID setting prevents accidental data leakage.
             if (entityTenant == null)
             {
@@ -2338,8 +2315,8 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 var p0 = _p.ParamPrefix + "p0";
                 var p1 = _p.ParamPrefix + "p1";
-                // TP-1/Finding-A: Use provider-escaped identifiers — raw table/column names are not
-                // safe across all providers (e.g. SQL Server reserves "Timestamp" as a type keyword).
+                // Use provider-escaped identifiers — raw table/column names are not safe across all
+                // providers (e.g. SQL Server reserves "Timestamp" as a type keyword).
                 await using var cmd = CommandPool.Get(ctx.Connection, _p.GetCreateTagSql(p0, p1));
                 var span = new (string name, object value)[2];
                 span[0] = (p0, tagName);
@@ -2486,8 +2463,8 @@ namespace nORM.Core
         {
             if (!_disposed && disposing)
             {
-                // RESOURCE LEAK FIX (TASK 15): Use Dispose(WaitHandle) to ensure timer callbacks complete
-                // before proceeding. This prevents ObjectDisposedException if callback is running.
+                // Use Dispose(WaitHandle) to ensure timer callbacks complete before proceeding.
+                // Prevents ObjectDisposedException if a callback fires concurrently with Dispose.
                 if (_cleanupTimer != null)
                 {
                     var waitHandle = new ManualResetEvent(false);
@@ -2498,8 +2475,8 @@ namespace nORM.Core
                 _providerInitLock?.Dispose();
                 DisposePreparedInsertCache();
 
-                // DEADLOCK FIX (TASK 5): Copy disposables to local list inside lock, then dispose outside lock
-                // This prevents deadlock if a disposable's Dispose() method tries to access DbContext or acquire locks
+                // Copy disposables to a local list inside the lock, then dispose outside the lock.
+                // Prevents deadlock if a disposable's Dispose() acquires locks or accesses DbContext.
                 List<IDisposable> toDispose = new();
                 lock (_disposablesLock)
                 {
@@ -2529,7 +2506,7 @@ namespace nORM.Core
                     }
                 }
 
-                // TX-1/MG-1: Only dispose the connection when this context owns it.
+                // Only dispose the connection when this context owns it.
                 if (_ownsConnection)
                     _cn?.Dispose();
                 _disposed = true;
@@ -2611,8 +2588,8 @@ namespace nORM.Core
         {
             if (!_disposed)
             {
-                // RESOURCE LEAK FIX (TASK 6): Use WaitHandle pattern like Dispose() to safely stop timer
-                // Prevents race condition where timer callback runs during disposal
+                // Use WaitHandle pattern to safely stop the timer, preventing a race condition
+                // where the timer callback fires concurrently with disposal.
                 if (_cleanupTimer != null)
                 {
                     var waitHandle = new ManualResetEvent(false);
@@ -2624,7 +2601,7 @@ namespace nORM.Core
                 _providerInitLock?.Dispose();
                 await DisposePreparedInsertCacheAsync().ConfigureAwait(false);
                 await CleanupDisposablesAsync().ConfigureAwait(false);
-                // TX-1/MG-1: Only dispose the connection when this context owns it.
+                // Only dispose the connection when this context owns it.
                 if (_ownsConnection && _cn != null)
                     await _cn.DisposeAsync().ConfigureAwait(false);
                 _disposed = true;
@@ -2738,12 +2715,12 @@ namespace nORM.Core
 
             if (_hydrateGeneratedKeys)
             {
-                // PERF: Separate async method only for hydrate path to avoid state machine
+                // Separate async method only for hydrate path to avoid state machine
                 // allocation on the non-hydrate fast path.
                 return ExecuteWithHydrateAsync(entity, ct);
             }
 
-            // PERF: Return task directly — no async state machine needed since all
+            // Return task directly — no async state machine needed since all
             // work above is synchronous (parameter binding via compiled delegates).
             return _command.ExecuteNonQueryWithInterceptionAsync(_context, ct);
         }

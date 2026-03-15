@@ -9,10 +9,10 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// CT-1 (PK mutation): Verifies that SaveChanges throws when the primary key of a
-/// tracked entity is mutated after attach, preventing silent updates to the wrong row.
-/// </summary>
+//<summary>
+//(PK mutation): Verifies that SaveChanges throws when the primary key of a
+//tracked entity is mutated after attach, preventing silent updates to the wrong row.
+//</summary>
 public class PKMutationTests
 {
     [Table("Item")]
@@ -52,7 +52,7 @@ public class PKMutationTests
         var item = new Item { Id = 1, Name = "Modified" };
         ctx.Attach(item);
 
-        // Mutate the primary key after tracking — this is the problem scenario
+ // Mutate the primary key after tracking — this is the problem scenario
         item.Id = 999;
         item.Name = "MutatedKey";
 
@@ -73,7 +73,7 @@ public class PKMutationTests
         var item = new Item { Id = 1, Name = "UpdatedName" };
         ctx.Attach(item);
 
-        // Only mutate a non-key column — this must succeed
+ // Only mutate a non-key column — this must succeed
         item.Name = "UpdatedName";
 
         var affected = await ctx.SaveChangesAsync();

@@ -15,11 +15,11 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// CT-1/TX-1: Verifies that internally-created DbTransaction objects are always disposed
-/// after each write operation (Insert, Update, Delete), even when the operation fails.
-/// This prevents connection-level resource leaks (lock memory, log space) under load.
-/// </summary>
+//<summary>
+//Verifies that internally-created DbTransaction objects are always disposed
+//after each write operation (Insert, Update, Delete), even when the operation fails.
+//This prevents connection-level resource leaks (lock memory, log space) under load.
+//</summary>
 public class TransactionLifecycleTests
 {
     [Table("TxLifecycleItem")]
@@ -33,12 +33,12 @@ public class TransactionLifecycleTests
         public int Value { get; set; }
     }
 
-    // ── Tracking wrapper ─────────────────────────────────────────────────────
+ // ── Tracking wrapper ─────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Wraps a SqliteConnection to intercept BeginTransactionAsync and track disposal of
-    /// every created transaction.
-    /// </summary>
+ //<summary>
+ //Wraps a SqliteConnection to intercept BeginTransactionAsync and track disposal of
+ //every created transaction.
+ //</summary>
     private sealed class TrackingConnection : DbConnection
     {
         private readonly SqliteConnection _inner;
@@ -136,10 +136,10 @@ public class TransactionLifecycleTests
         }
     }
 
-    /// <summary>
-    /// A pass-through DbCommand that unwraps TrackingTransaction back to the inner SqliteTransaction
-    /// so that SQLite accepts it (it rejects foreign transaction types).
-    /// </summary>
+ //<summary>
+ //A pass-through DbCommand that unwraps TrackingTransaction back to the inner SqliteTransaction
+ //so that SQLite accepts it (it rejects foreign transaction types).
+ //</summary>
     private sealed class PassthroughCommand : DbCommand
     {
         private readonly SqliteCommand _inner;
@@ -171,7 +171,7 @@ public class TransactionLifecycleTests
             get => _inner.Transaction;
             set
             {
-                // Unwrap TrackingTransaction to get the real SqliteTransaction
+ // Unwrap TrackingTransaction to get the real SqliteTransaction
                 if (value is TrackingTransaction tt)
                 {
                     var field = typeof(TrackingTransaction)
@@ -216,24 +216,24 @@ public class TransactionLifecycleTests
         public override ValueTask DisposeAsync() => _inner.DisposeAsync();
     }
 
-    // ── Test helpers ─────────────────────────────────────────────────────────
+ // ── Test helpers ─────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A SqliteProvider subclass that accepts TrackingConnection (not just SqliteConnection)
-    /// so ValidateConnection doesn't reject the wrapper.
-    /// </summary>
+ //<summary>
+ //A SqliteProvider subclass that accepts TrackingConnection (not just SqliteConnection)
+ //so ValidateConnection doesn't reject the wrapper.
+ //</summary>
     private sealed class TrackingProvider : SqliteProvider
     {
         protected override void ValidateConnection(System.Data.Common.DbConnection connection)
         {
-            // Accept both SqliteConnection and our TrackingConnection wrapper
+ // Accept both SqliteConnection and our TrackingConnection wrapper
             if (connection is not Microsoft.Data.Sqlite.SqliteConnection && connection is not TrackingConnection)
                 throw new InvalidOperationException("Expected SqliteConnection or TrackingConnection.");
         }
 
         public override async Task InitializeConnectionAsync(System.Data.Common.DbConnection connection, System.Threading.CancellationToken ct)
         {
-            // Run PRAGMA commands — TrackingConnection.CreateCommand() delegates to the inner SqliteCommand
+ // Run PRAGMA commands — TrackingConnection.CreateCommand() delegates to the inner SqliteCommand
             await using var pragmaCmd = connection.CreateCommand();
             pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
             await pragmaCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -261,7 +261,7 @@ public class TransactionLifecycleTests
         return (cn, ctx);
     }
 
-    // ── CT-1/TX-1 Tests ──────────────────────────────────────────────────────
+ // ── Tests ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task InsertAsync_WithoutExternalTransaction_CommitsSuccessfully()
@@ -274,10 +274,10 @@ public class TransactionLifecycleTests
 
         Assert.Equal(1, rows);
 
-        // If an internal transaction was created, verify it was disposed
+ // If an internal transaction was created, verify it was disposed
         Assert.All(cn.TransactionWasDisposed, wasDisposed =>
             Assert.True(wasDisposed,
-                "CT-1/TX-1: Transaction created by InsertAsync must be disposed after completion."));
+                "Transaction created by InsertAsync must be disposed after completion."));
     }
 
     [Fact]
@@ -294,11 +294,11 @@ public class TransactionLifecycleTests
         item.Name = "Updated";
         await ctx.UpdateAsync(item);
 
-        // Verify all transactions from UpdateAsync (and any since countBefore) were disposed
+ // Verify all transactions from UpdateAsync (and any since countBefore) were disposed
         for (int i = countBefore; i < cn.TransactionWasDisposed.Count; i++)
         {
             Assert.True(cn.TransactionWasDisposed[i],
-                $"CT-1/TX-1: Transaction [{i}] created by UpdateAsync must be disposed after completion.");
+                $"Transaction [{i}] created by UpdateAsync must be disposed after completion.");
         }
     }
 
@@ -318,7 +318,7 @@ public class TransactionLifecycleTests
         for (int i = countBefore; i < cn.TransactionWasDisposed.Count; i++)
         {
             Assert.True(cn.TransactionWasDisposed[i],
-                $"CT-1/TX-1: Transaction [{i}] created by DeleteAsync must be disposed after completion.");
+                $"Transaction [{i}] created by DeleteAsync must be disposed after completion.");
         }
     }
 
@@ -334,10 +334,10 @@ public class TransactionLifecycleTests
             await ctx.InsertAsync(new TxLifecycleItem { Name = $"Item{i}", Value = i });
         }
 
-        // Every transaction that was created must have been disposed
+ // Every transaction that was created must have been disposed
         Assert.All(cn.TransactionWasDisposed, wasDisposed =>
             Assert.True(wasDisposed,
-                "CT-1/TX-1: Every internal transaction must be disposed after each InsertAsync."));
+                "Every internal transaction must be disposed after each InsertAsync."));
     }
 
     [Fact]
@@ -350,8 +350,8 @@ public class TransactionLifecycleTests
         await ctx.InsertAsync(item);
 
         int afterInsert = cn.TransactionWasDisposed.Count;
-        // Fast-path insert may not create an owned transaction (performance optimization).
-        // If it did, verify it was disposed.
+ // Fast-path insert may not create an owned transaction (performance optimization).
+ // If it did, verify it was disposed.
         if (afterInsert > 0)
             Assert.True(cn.TransactionWasDisposed[afterInsert - 1],
                 "Transaction from InsertAsync must be disposed before UpdateAsync starts.");
@@ -370,12 +370,12 @@ public class TransactionLifecycleTests
             "Transaction from DeleteAsync must be disposed after completion.");
     }
 
-    // ── TX-1: CurrentTransaction cleared after commit/rollback exception ─────
+ // ── CurrentTransaction cleared after commit/rollback exception ─────
 
-    /// <summary>
-    /// TX-1: A transaction whose CommitAsync throws must still clear CurrentTransaction
-    /// so that a subsequent BeginTransactionAsync call does not see "transaction already active".
-    /// </summary>
+ //<summary>
+ //A transaction whose CommitAsync throws must still clear CurrentTransaction
+ //so that a subsequent BeginTransactionAsync call does not see "transaction already active".
+ //</summary>
     [Fact]
     public async Task AfterNormalCommit_CurrentTransaction_IsCleared()
     {
@@ -388,22 +388,22 @@ public class TransactionLifecycleTests
         var ctx = new DbContext(cn, new SqliteProvider());
         await using var _ctx = ctx;
 
-        // Begin + commit normally
+ // Begin + commit normally
         var tx = await ctx.Database.BeginTransactionAsync();
         await tx.CommitAsync();
 
-        // TX-1: CurrentTransaction must be null after normal commit
+ // CurrentTransaction must be null after normal commit
         Assert.Null(ctx.Database.CurrentTransaction);
 
-        // And BeginTransactionAsync must succeed (no "already active" error)
+ // And BeginTransactionAsync must succeed (no "already active" error)
         var tx2 = await ctx.Database.BeginTransactionAsync();
         await tx2.RollbackAsync();
         Assert.Null(ctx.Database.CurrentTransaction);
     }
 
-    /// <summary>
-    /// TX-1: A transaction whose RollbackAsync completes normally must still clear CurrentTransaction.
-    /// </summary>
+ //<summary>
+ //A transaction whose RollbackAsync completes normally must still clear CurrentTransaction.
+ //</summary>
     [Fact]
     public async Task AfterNormalRollback_CurrentTransaction_IsCleared()
     {
@@ -419,20 +419,20 @@ public class TransactionLifecycleTests
         var tx = await ctx.Database.BeginTransactionAsync();
         await tx.RollbackAsync();
 
-        // TX-1: CurrentTransaction must be null after normal rollback
+ // CurrentTransaction must be null after normal rollback
         Assert.Null(ctx.Database.CurrentTransaction);
 
-        // And BeginTransactionAsync must succeed
+ // And BeginTransactionAsync must succeed
         var tx2 = await ctx.Database.BeginTransactionAsync();
         await tx2.CommitAsync();
         Assert.Null(ctx.Database.CurrentTransaction);
     }
 
-    /// <summary>
-    /// TX-1: Tests that CommitAsync using try/finally properly clears CurrentTransaction even
-    /// when the DbContextTransaction.CommitAsync path wraps the underlying commit in try/finally.
-    /// Simulates the scenario by verifying multiple sequential transactions can be started.
-    /// </summary>
+ //<summary>
+ //Tests that CommitAsync using try/finally properly clears CurrentTransaction even
+ //when the DbContextTransaction.CommitAsync path wraps the underlying commit in try/finally.
+ //Simulates the scenario by verifying multiple sequential transactions can be started.
+ //</summary>
     [Fact]
     public async Task AfterCommit_SequentialTransactions_AllSucceed()
     {
@@ -445,7 +445,7 @@ public class TransactionLifecycleTests
         var ctx = new DbContext(cn, new SqliteProvider());
         await using var _ctx = ctx;
 
-        // TX-1: Multiple sequential commit+begin cycles must all succeed without "already active" error
+ // Multiple sequential commit+begin cycles must all succeed without "already active" error
         for (int i = 0; i < 5; i++)
         {
             var tx = await ctx.Database.BeginTransactionAsync();
@@ -455,10 +455,10 @@ public class TransactionLifecycleTests
         }
     }
 
-    /// <summary>
-    /// TX-1: Tests that RollbackAsync in try/finally correctly clears CurrentTransaction,
-    /// allowing subsequent BeginTransactionAsync calls to succeed.
-    /// </summary>
+ //<summary>
+ //Tests that RollbackAsync in try/finally correctly clears CurrentTransaction,
+ //allowing subsequent BeginTransactionAsync calls to succeed.
+ //</summary>
     [Fact]
     public async Task AfterRollback_SequentialTransactions_AllSucceed()
     {
@@ -471,7 +471,7 @@ public class TransactionLifecycleTests
         var ctx = new DbContext(cn, new SqliteProvider());
         await using var _ctx = ctx;
 
-        // TX-1: Multiple sequential rollback+begin cycles must all succeed
+ // Multiple sequential rollback+begin cycles must all succeed
         for (int i = 0; i < 5; i++)
         {
             var tx = await ctx.Database.BeginTransactionAsync();
@@ -481,10 +481,10 @@ public class TransactionLifecycleTests
         }
     }
 
-    /// <summary>
-    /// TX-1: Verifies that CommitAsync exception path correctly clears CurrentTransaction.
-    /// Uses a FailingTransaction wrapper that throws on CommitAsync.
-    /// </summary>
+ //<summary>
+ //Verifies that CommitAsync exception path correctly clears CurrentTransaction.
+ //Uses a FailingTransaction wrapper that throws on CommitAsync.
+ //</summary>
     [Fact]
     public async Task AfterCommitException_CurrentTransaction_IsCleared()
     {
@@ -494,27 +494,27 @@ public class TransactionLifecycleTests
         var ctx = new DbContext(cn, new SqliteProvider());
         await using var _ctx = ctx;
 
-        // Manually inject a DbContextTransaction wrapping a FailingTransaction
-        // to test the try/finally cleanup path on commit failure.
+ // Manually inject a DbContextTransaction wrapping a FailingTransaction
+ // to test the try/finally cleanup path on commit failure.
         var innerTx = await cn.BeginTransactionAsync();
         var failingTx = new FailingTransaction(innerTx);
 
-        // Set CurrentTransaction manually via reflection (simulating what BeginTransactionAsync does)
+ // Set CurrentTransaction manually via reflection (simulating what BeginTransactionAsync does)
         ctx.CurrentTransaction = failingTx;
         Assert.NotNull(ctx.Database.CurrentTransaction);
 
         var dbContextTx = new DbContextTransaction(failingTx, ctx);
 
-        // CommitAsync should throw, but CurrentTransaction must be cleared in finally
+ // CommitAsync should throw, but CurrentTransaction must be cleared in finally
         await Assert.ThrowsAsync<InvalidOperationException>(() => dbContextTx.CommitAsync());
 
-        // TX-1: Even after CommitAsync threw, CurrentTransaction must be null
+ // Even after CommitAsync threw, CurrentTransaction must be null
         Assert.Null(ctx.Database.CurrentTransaction);
     }
 
-    /// <summary>
-    /// TX-1: Verifies that RollbackAsync exception path correctly clears CurrentTransaction.
-    /// </summary>
+ //<summary>
+ //Verifies that RollbackAsync exception path correctly clears CurrentTransaction.
+ //</summary>
     [Fact]
     public async Task AfterRollbackException_CurrentTransaction_IsCleared()
     {
@@ -532,17 +532,17 @@ public class TransactionLifecycleTests
 
         var dbContextTx = new DbContextTransaction(failingTx, ctx);
 
-        // RollbackAsync should throw, but CurrentTransaction must be cleared in finally
+ // RollbackAsync should throw, but CurrentTransaction must be cleared in finally
         await Assert.ThrowsAsync<InvalidOperationException>(() => dbContextTx.RollbackAsync());
 
-        // TX-1: Even after RollbackAsync threw, CurrentTransaction must be null
+ // Even after RollbackAsync threw, CurrentTransaction must be null
         Assert.Null(ctx.Database.CurrentTransaction);
     }
 
-    /// <summary>
-    /// A DbTransaction wrapper that always throws InvalidOperationException on
-    /// CommitAsync and RollbackAsync to simulate network or server errors.
-    /// </summary>
+ //<summary>
+ //A DbTransaction wrapper that always throws InvalidOperationException on
+ //CommitAsync and RollbackAsync to simulate network or server errors.
+ //</summary>
     private sealed class FailingTransaction : DbTransaction
     {
         private readonly DbTransaction _inner;
@@ -577,12 +577,12 @@ public class TransactionLifecycleTests
         }
     }
 
-    // ── S5-1: Rollback exception preservation tests ───────────────────────────
+ // ── S5-1: Rollback exception preservation tests ───────────────────────────
 
-    /// <summary>
-    /// A connection wrapper whose transactions throw on RollbackAsync to simulate
-    /// a broken connection scenario (write fails, then rollback also fails).
-    /// </summary>
+ //<summary>
+ //A connection wrapper whose transactions throw on RollbackAsync to simulate
+ //a broken connection scenario (write fails, then rollback also fails).
+ //</summary>
     private sealed class FailingRollbackConnection : DbConnection
     {
         private readonly SqliteConnection _inner;
@@ -749,7 +749,7 @@ public class TransactionLifecycleTests
     {
         protected override void ValidateConnection(System.Data.Common.DbConnection connection)
         {
-            // Accept both SqliteConnection and our FailingRollbackConnection
+ // Accept both SqliteConnection and our FailingRollbackConnection
             if (connection is not Microsoft.Data.Sqlite.SqliteConnection &&
                 connection is not FailingRollbackConnection)
                 throw new InvalidOperationException("Expected SqliteConnection or FailingRollbackConnection.");
@@ -770,7 +770,7 @@ public class TransactionLifecycleTests
         }
     }
 
-    // ── S5-1 Tests ────────────────────────────────────────────────────────────
+ // ── S5-1 Tests ────────────────────────────────────────────────────────────
 
     [Table("TxLifecycleItem")]
     private class RollbackTestItem
@@ -781,10 +781,10 @@ public class TransactionLifecycleTests
         public string Name { get; set; } = string.Empty;
     }
 
-    /// <summary>
-    /// S5-1: When a write fails and rollback also fails, the caught exception must be
-    /// AggregateException containing both the original write exception and the rollback exception.
-    /// </summary>
+ //<summary>
+ //S5-1: When a write fails and rollback also fails, the caught exception must be
+ //AggregateException containing both the original write exception and the rollback exception.
+ //</summary>
     [Fact]
     public async Task SaveChanges_RollbackThrows_OriginalExceptionPreserved()
     {
@@ -796,34 +796,34 @@ public class TransactionLifecycleTests
             cmd.ExecuteNonQuery();
         }
 
-        // Make all future transactions fail on rollback
+ // Make all future transactions fail on rollback
         cn.MakeRollbackFail();
 
         var ctx = new DbContext(cn, new FailingRollbackProvider());
         await using var _ = ctx;
 
-        // Add an item with a name that will violate a constraint we'll create
-        // We force a write failure by trying to INSERT into a table that has a UNIQUE constraint
+ // Add an item with a name that will violate a constraint we'll create
+ // We force a write failure by trying to INSERT into a table that has a UNIQUE constraint
         using (var constraintCmd = cn.CreateCommand())
         {
             constraintCmd.CommandText = "INSERT INTO TxLifecycleItem (Id, Name) VALUES (1, 'existing')";
             constraintCmd.ExecuteNonQuery();
         }
 
-        // Now try to save an item with Id=1 (primary key conflict) — write will fail
-        // And since MakeRollbackFail() was called, rollback will also fail
+ // Now try to save an item with Id=1 (primary key conflict) — write will fail
+ // And since MakeRollbackFail() was called, rollback will also fail
         var item = new TxLifecycleItem { Name = "conflict" };
         ctx.Add(item);
 
-        // Force the Id to be 1 (PK conflict) by setting it before adding
-        // Actually we can't easily set the Id since it's autoincrement.
-        // Instead, force a unique name constraint violation.
+ // Force the Id to be 1 (PK conflict) by setting it before adding
+ // Actually we can't easily set the Id since it's autoincrement.
+ // Instead, force a unique name constraint violation.
 
-        // Different approach: insert an item that conflicts on the primary key
-        // by manually adding an entry with the same name to a unique-indexed column
-        // Actually let's use a simpler approach: DROP the table so INSERT fails
+ // Different approach: insert an item that conflicts on the primary key
+ // by manually adding an entry with the same name to a unique-indexed column
+ // Actually let's use a simpler approach: DROP the table so INSERT fails
 
-        // Reset: we'll just remove the table so INSERT fails
+ // Reset: we'll just remove the table so INSERT fails
         using (var dropCmd = cn.CreateCommand())
         {
             dropCmd.CommandText = "DROP TABLE TxLifecycleItem";
@@ -834,21 +834,21 @@ public class TransactionLifecycleTests
             () => ctx.SaveChangesAsync());
 
         Assert.Equal(2, ex.InnerExceptions.Count);
-        // First inner = write failure (table doesn't exist), second = rollback failure
+ // First inner = write failure (table doesn't exist), second = rollback failure
         Assert.Contains(ex.InnerExceptions, e => e.Message.Contains("no such table") || e.Message.Contains("SQLite") || e.Message.Length > 0);
         Assert.Contains(ex.InnerExceptions, e => e.Message.Contains("rollback"));
     }
 
-    /// <summary>
-    /// S5-1: When a write fails but rollback succeeds, the original write exception
-    /// must be rethrown (not wrapped in AggregateException).
-    /// </summary>
+ //<summary>
+ //S5-1: When a write fails but rollback succeeds, the original write exception
+ //must be rethrown (not wrapped in AggregateException).
+ //</summary>
     [Fact]
     public async Task SaveChanges_RollbackSucceeds_OriginalExceptionRethrown()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
-        // Do NOT create the table — INSERT will fail with "no such table"
+ // Do NOT create the table — INSERT will fail with "no such table"
 
         var ctx = new DbContext(cn, new SqliteProvider());
         await using var _ = ctx;
@@ -856,21 +856,21 @@ public class TransactionLifecycleTests
         var item = new TxLifecycleItem { Name = "test" };
         ctx.Add(item);
 
-        // Rollback should succeed (connection is fine), so we expect the raw exception,
-        // not AggregateException.
-        // Use Record.ExceptionAsync so we can inspect the actual type without requiring exact match.
+ // Rollback should succeed (connection is fine), so we expect the raw exception,
+ // not AggregateException.
+ // Use Record.ExceptionAsync so we can inspect the actual type without requiring exact match.
         var ex = await Record.ExceptionAsync(() => ctx.SaveChangesAsync());
 
         Assert.NotNull(ex);
-        // Must NOT be AggregateException — rollback succeeded so original ex is rethrown
+ // Must NOT be AggregateException — rollback succeeded so original ex is rethrown
         Assert.IsNotType<AggregateException>(ex);
-        // Must contain the SQLite "no such table" message (the original write failure)
+ // Must contain the SQLite "no such table" message (the original write failure)
         Assert.Contains("no such table", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// S5-1 regression guard: A successful SaveChanges must not throw any exception.
-    /// </summary>
+ //<summary>
+ //S5-1 regression guard: A successful SaveChanges must not throw any exception.
+ //</summary>
     [Fact]
     public async Task SaveChanges_WriteSucceeds_NoExceptionThrown()
     {
@@ -888,7 +888,7 @@ public class TransactionLifecycleTests
         var item = new TxLifecycleItem { Name = "success" };
         ctx.Add(item);
 
-        // Should not throw
+ // Should not throw
         var ex = await Record.ExceptionAsync(() => ctx.SaveChangesAsync());
         Assert.Null(ex);
     }

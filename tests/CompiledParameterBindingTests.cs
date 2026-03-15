@@ -8,7 +8,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-1: Validates that compiled parameter extraction produces correct values
+/// Validates that compiled parameter extraction produces correct values
 /// for runtime parameters (closure captures) in LINQ queries. Verifies that
 /// lambda parameters and IQueryable sources do not contaminate the extracted
 /// parameter values.

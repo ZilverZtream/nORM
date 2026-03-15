@@ -13,7 +13,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// PERF-1: Verifies that BulkInsertAsync/UpdateAsync/DeleteAsync materialize the IEnumerable
+/// Verifies that BulkInsertAsync/UpdateAsync/DeleteAsync materialize the IEnumerable
 /// exactly once. Without the fix, a yield-return iterator is exhausted after the first
 /// enumeration (ValidateBulkOperation) and the provider receives an empty sequence,
 /// silently losing all writes.

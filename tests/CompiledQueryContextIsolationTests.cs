@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// SG-1: Verifies that a compiled query delegate recomputes the plan for a new context
+/// Verifies that a compiled query delegate recomputes the plan for a new context
 /// rather than permanently reusing the first context's plan.
 /// </summary>
 public class CompiledQueryContextIsolationTests

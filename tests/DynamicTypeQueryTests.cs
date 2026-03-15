@@ -8,7 +8,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// MM-1: Verifies that the dynamic type cache uses a composite key that includes the
+/// Verifies that the dynamic type cache uses a composite key that includes the
 /// provider type and connection string hash so that two contexts pointing to different
 /// databases with the same table name each receive their own distinct CLR type.
 /// </summary>

@@ -8,7 +8,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>SQL-1: Verify LIKE helpers emit provider-specific concat.</summary>
+/// <summary>Verify LIKE helpers emit provider-specific concat.</summary>
 public class StringFunctionTests : TestBase
 {
     private class Product
