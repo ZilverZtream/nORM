@@ -142,7 +142,9 @@ namespace nORM.Query
             // DateTime and related types
             if (type == typeof(DateTime))
             {
-                // Provider will set correct DbType (DateTime2 for SQL Server, Timestamp for Postgres, etc.)
+                // P1 fix: set DbType explicitly so stale metadata from a prior int/string/etc.
+                // assignment on a reused parameter does not cause wrong type coercion.
+                p.DbType = System.Data.DbType.DateTime;
                 p.Value = v;
                 return;
             }
@@ -244,6 +246,9 @@ namespace nORM.Query
             }
 
             // Default fallback
+            // P1 fix: reset DbType to Object so stale metadata from a prior assignment
+            // (e.g. DbType.Int32 from a preceding int parameter) does not coerce this value.
+            p.DbType = System.Data.DbType.Object;
             p.Value = v;
         }
     }

@@ -271,21 +271,23 @@ namespace nORM.Core
             }
 
             // Pattern 2: Comment-based injection (-- or /* */)
-            // These can be used to terminate legitimate SQL and inject malicious code
+            // S1 fix: a standalone inline -- comment is legitimate SQL (e.g. SELECT * FROM T WHERE Id=1 -- note).
+            // The injection vector is a statement terminator (;) BEFORE the --, not the -- itself.
+            // Only reject when -- appears outside a string literal AND a ; precedes it outside string literals,
+            // indicating a potential "'; malicious SQL --" injection pattern.
             var doubleHyphenIndex = sql.IndexOf("--");
             if (doubleHyphenIndex >= 0)
             {
-                // Allow if it's in a string literal or legitimate comment at end
                 var beforeComment = sql.Substring(0, doubleHyphenIndex);
                 var singleQuoteCount = beforeComment.Count(c => c == '\'');
 
-                // If odd number of quotes, we're inside a string (allowed)
-                // Otherwise it's a comment in SQL code (suspicious)
-                if (singleQuoteCount % 2 == 0 && doubleHyphenIndex < sql.Length - 10)
+                // Only reject if: -- is outside a string literal AND a semicolon precedes it
+                // (a semicolon outside a string before a -- comment is the injection indicator)
+                if (singleQuoteCount % 2 == 0 && beforeComment.Contains(';'))
                 {
                     throw new NormUsageException(
-                        "Potential SQL injection detected: SQL comment (--) in suspicious context. " +
-                        "If this is legitimate, consider using /* */ style comments.");
+                        "Potential SQL injection detected: SQL comment (--) following a statement terminator. " +
+                        "Use parameterized queries instead of string concatenation.");
                 }
             }
 
