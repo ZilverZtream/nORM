@@ -9,17 +9,17 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// MM-1: Validates that the ordinal mapping correctly handles duplicate column names.
-/// When two result columns share the same name (e.g., two JOINed tables both returning "Id"),
-/// the ambiguous columns must not be silently mapped using name lookup to the wrong column.
-/// </summary>
+//<summary>
+//Validates that the ordinal mapping correctly handles duplicate column names.
+//When two result columns share the same name (e.g., two JOINed tables both returning "Id"),
+//the ambiguous columns must not be silently mapped using name lookup to the wrong column.
+//</summary>
 public class MaterializerDuplicateColumnTests
 {
-    /// <summary>
-    /// A mock DbDataReader with two columns both named "Id".
-    /// Used to verify that duplicate column detection works in CreateOrdinalMapping.
-    /// </summary>
+ //<summary>
+ //A mock DbDataReader with two columns both named "Id".
+ //Used to verify that duplicate column detection works in CreateOrdinalMapping.
+ //</summary>
     private sealed class DuplicateColumnReader : DbDataReader
     {
         private readonly object[][] _rows;
@@ -74,43 +74,43 @@ public class MaterializerDuplicateColumnTests
     [Fact]
     public void DuplicateColumnNames_AreDetectedAsAmbiguous_NotSilentlyMapped()
     {
-        // Two columns both named "Id" — one is 10 (from table A), one is 20 (from table B)
+ // Two columns both named "Id" — one is 10 (from table A), one is 20 (from table B)
         var names = new[] { "Id", "Name", "Id" };
         var rows = new[] { new object[] { 10, "Alice", 20 } };
         using var reader = new DuplicateColumnReader(names, rows);
 
-        // Verify duplicate detection: GetName(0) == GetName(2) == "Id"
+ // Verify duplicate detection: GetName(0) == GetName(2) == "Id"
         Assert.Equal("Id", reader.GetName(0));
         Assert.Equal("Id", reader.GetName(2));
 
-        // The reader correctly exposes two "Id" columns
+ // The reader correctly exposes two "Id" columns
         Assert.Equal(3, reader.FieldCount);
 
-        // Verify that positional access works (not name-based)
+ // Verify that positional access works (not name-based)
         reader.Read();
         Assert.Equal(10, reader.GetValue(0));   // first "Id" = 10
         Assert.Equal("Alice", reader.GetValue(1));
         Assert.Equal(20, reader.GetValue(2));   // second "Id" = 20
 
-        // The ambiguity would cause name-based lookup to always return ordinal 0 (first occurrence).
-        // This test documents that scenario — callers relying on GetOrdinal("Id") get the first one.
+ // The ambiguity would cause name-based lookup to always return ordinal 0 (first occurrence).
+ // This test documents that scenario — callers relying on GetOrdinal("Id") get the first one.
         Assert.Equal(0, reader.GetOrdinal("Id"));
     }
 
     [Fact]
     public void DuplicateColumnNames_FirstOccurrenceUsedByGetOrdinal()
     {
-        // This test documents the deterministic behavior: when duplicate column names exist,
-        // GetOrdinal returns the first occurrence. The MM-1 fix ensures that the name-based
-        // ordinal map detects such duplicates and marks them as ambiguous, preventing
-        // silent wrong-table binding in the schema-aware materializer.
+ // This test documents the deterministic behavior: when duplicate column names exist,
+ // GetOrdinal returns the first occurrence. The fix ensures that the name-based
+ // ordinal map detects such duplicates and marks them as ambiguous, preventing
+ // silent wrong-table binding in the schema-aware materializer.
         var names = new[] { "Id", "Value", "Id" };
         using var reader = new DuplicateColumnReader(names, Array.Empty<object[]>());
 
-        // First occurrence is at ordinal 0
+ // First occurrence is at ordinal 0
         Assert.Equal(0, reader.GetOrdinal("Id"));
 
-        // The name count shows duplicate
+ // The name count shows duplicate
         var nameCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (int i = 0; i < reader.FieldCount; i++)
         {

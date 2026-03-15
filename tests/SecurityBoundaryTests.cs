@@ -230,7 +230,7 @@ public class SecurityBoundaryTests
         Assert.Throws<System.ArgumentException>(() => NormValidator.ValidateLikeEscapeChar(c));
     }
 
-    // ─── SEC-1: NormalizeSql strips comments and collapses whitespace ─────
+    // ─── NormalizeSql strips comments and collapses whitespace ─────
 
     [Fact]
     public void NormalizeSql_BlockCommentBetweenTokens_MergesTokens()
@@ -299,7 +299,7 @@ public class SecurityBoundaryTests
         Assert.Equal("select * from users", result);
     }
 
-    // ─── SEC-1: Comment-obfuscated DML/DDL → rejected ─────────────────────
+    // ─── Comment-obfuscated DML/DDL → rejected ─────────────────────
 
     [Fact]
     public void IsSafeRawSql_CommentObfuscatedDrop_Rejected()
@@ -393,7 +393,7 @@ WHERE u.IsActive = 1";
             "Multi-line SELECT with inline comments should be accepted");
     }
 
-    // ─── SEC-1: All denied keywords tested with comment-obfuscated variants ─
+    // ─── All denied keywords tested with comment-obfuscated variants ─
 
     [Theory]
     [InlineData("DR/**/OP TABLE t")]          // DROP
@@ -442,7 +442,7 @@ WHERE u.IsActive = 1";
             $"Newline-obfuscated DDL '{sql}' should be rejected after normalization");
     }
 
-    // ─── SEC-1: NormalizeSql unit tests ────────────────────────────────────
+    // ─── NormalizeSql unit tests ────────────────────────────────────
 
     [Theory]
     [InlineData("SELECT 1", "select 1")]

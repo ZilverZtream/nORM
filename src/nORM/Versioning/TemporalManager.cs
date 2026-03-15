@@ -29,7 +29,7 @@ namespace nORM.Versioning
                 if (await HistoryTableExistsAsync(context, mapping).ConfigureAwait(false))
                     continue;
 
-                // P-1: Introspect live column types before generating history DDL so that
+                // Introspect live column types before generating history DDL so that
                 // custom precision/length on main-table columns is mirrored in history table.
                 var conn = await context.EnsureConnectionAsync().ConfigureAwait(false);
                 var liveColumns = await provider
@@ -45,7 +45,7 @@ namespace nORM.Versioning
 
         private static async Task CreateTagsTableIfNotExistsAsync(DbContext context)
         {
-            // TP-1/Finding-C: Use provider-specific DDL so that IF NOT EXISTS and column types
+            // Use provider-specific DDL so that IF NOT EXISTS and column types
             // are correct for each database (SQL Server requires OBJECT_ID check + NVARCHAR/DATETIME2).
             var sql = context.Provider.GetCreateTagsTableSql();
             await ExecuteDdlAsync(context, sql).ConfigureAwait(false);
@@ -54,7 +54,7 @@ namespace nORM.Versioning
         private static async Task<bool> HistoryTableExistsAsync(DbContext context, TableMapping mapping)
         {
             var historyTable = context.Provider.Escape(mapping.TableName + "_History");
-            // TP-1/Finding-C: Use provider-specific probe SQL (SQL Server needs TOP 1, not LIMIT 1).
+            // Use provider-specific probe SQL (SQL Server needs TOP 1, not LIMIT 1).
             var probeSql = context.Provider.GetHistoryTableExistsProbeSql(historyTable);
             try
             {
@@ -65,7 +65,7 @@ namespace nORM.Versioning
             }
             catch (DbException dbEx) when (context.Provider.IsObjectNotFoundError(dbEx))
             {
-                // TP-1/Finding-D: Only treat definitive "table not found" schema errors as absence.
+                // Only treat definitive "table not found" schema errors as absence.
                 // Permission denied, transient connection faults, and syntax errors are NOT "table absent"
                 // — they must propagate so the caller sees a real failure, not a phantom DDL re-creation.
                 return false;

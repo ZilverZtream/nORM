@@ -9,7 +9,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>CT-1: Topological sort ensures principals are inserted before dependents.</summary>
+/// <summary>Topological sort ensures principals are inserted before dependents.</summary>
 public class FkOrderingTests
 {
     private class Category
@@ -102,7 +102,7 @@ public class FkOrderingTests
     }
 }
 
-/// <summary>FK-2/FK-3: Tests for namespace collision handling and cycle detection in topological sort.</summary>
+/// <summary>Tests for namespace collision handling and cycle detection in topological sort.</summary>
 public class FkOrderingAdvancedTests
 {
     // Two entities in different namespaces with the same simple type name.

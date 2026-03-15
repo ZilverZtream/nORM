@@ -32,17 +32,17 @@ namespace nORM.Query
         private static readonly Timer _planCacheMonitor = new(AdjustPlanCacheSize, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
-        // PERFORMANCE FIX: Cache GetElementType results to avoid repeated reflection
+        // Cache GetElementType results to avoid repeated reflection.
         private static readonly ConcurrentDictionary<Type, Type> _elementTypeCache = new();
-        // PERF: Singleton MaterializerFactory — only wraps static caches, no instance state
+        // Singleton MaterializerFactory — only wraps static caches, no instance state.
         private static readonly MaterializerFactory _sharedMaterializerFactory = new();
-        // PERFORMANCE FIX: Cache constructor existence checks
+        // Cache constructor existence checks to avoid repeated reflection.
         private static readonly ConcurrentDictionary<Type, bool> _constrainedQueryableCache = new();
-        // PERF: Cache compiled queryable factory delegates to avoid Activator.CreateInstance on every LINQ chain step
+        // Cache compiled queryable factory delegates to avoid Activator.CreateInstance on every LINQ chain step
         private static readonly ConcurrentDictionary<Type, Func<IQueryProvider, Expression, IQueryable>> _queryableFactoryCache = new();
         private static long _totalPlanSize;
         private static int _planSizeSamples;
-        // C1: track live provider count so timers can be stopped when all providers are disposed.
+        // Track live provider count so timers can be stopped when all providers are disposed.
         private static int _activeProviderCount;
         private readonly QueryExecutor _executor;
         private readonly IncludeProcessor _includeProcessor;
@@ -97,7 +97,7 @@ namespace nORM.Query
         }
         private IQueryable CreateQueryInternal(Type elementType, Expression expression)
         {
-            // PERF: Use cached compiled factory instead of Activator.CreateInstance on every LINQ chain step.
+            // Use cached compiled factory instead of Activator.CreateInstance on every LINQ chain step.
             // Each .Where/.Take/.OrderBy calls CreateQuery, so this is on a very hot path.
             var factory = _queryableFactoryCache.GetOrAdd(elementType, static t =>
             {
@@ -123,7 +123,7 @@ namespace nORM.Query
             return factory(this, expression);
         }
         /// <summary>
-        /// PERFORMANCE FIX: Cached check for whether a type can use constrained queryable.
+        /// Cached check for whether a type can use constrained queryable.
         /// GetConstructor is expensive reflection that's called for every query creation.
         /// </summary>
         private static bool CanUseConstrainedQueryable(Type elementType)
@@ -171,7 +171,7 @@ namespace nORM.Query
             }
 
             // Remove in separate pass to avoid concurrent modification.
-            // QP-1: Use value-matching TryRemove so we don't accidentally remove a
+            // Use value-matching TryRemove so we don't accidentally remove a
             // concurrently re-inserted semaphore for the same key. Do NOT dispose —
             // threads holding a reference obtained via GetOrAdd before this removal can
             // still call Wait/WaitAsync safely on the semaphore. GC will collect it once
@@ -209,9 +209,9 @@ namespace nORM.Query
             => ExecuteSync<TResult>(expression);
 
         /// <summary>
-        /// DEADLOCK FIX (TASK 17): Synchronous query execution that doesn't block on async methods.
-        /// Used by IEnumerable.GetEnumerator() to avoid deadlocks from GetAwaiter().GetResult().
-        /// THREAD STARVATION FIX: Now uses true synchronous execution path instead of blocking on async code.
+        /// Synchronous query execution that uses a true synchronous code path rather than blocking on
+        /// async methods. Used by IEnumerable.GetEnumerator() to avoid deadlocks from GetAwaiter().GetResult()
+        /// and thread starvation on bounded thread pools.
         /// </summary>
         public TResult ExecuteSync<TResult>(Expression expression)
         {
@@ -270,7 +270,7 @@ namespace nORM.Query
             return ExecuteUpdateInternalAsync(expression, set, ct);
         }
         /// <summary>
-        /// PERFORMANCE FIX: Fast path execution using cached delegates instead of reflection.
+        /// Fast path execution using cached delegates instead of reflection.
         /// Eliminates MakeGenericMethod and Invoke overhead.
         /// </summary>
         private bool TryExecuteFastPath<TResult>(Expression expression, CancellationToken ct, out Task<TResult> result)
@@ -297,7 +297,7 @@ namespace nORM.Query
             {
                 try
                 {
-                    // PERFORMANCE FIX: Use cached delegate instead of MakeGenericMethod + Invoke
+                    // Use cached delegate instead of MakeGenericMethod + Invoke.
                     if (FastPathQueryExecutor.TryExecuteNonGeneric(elementType, expression, _ctx, ct, out var taskObject))
                     {
                         // Cast Task<object> to Task<TResult> without additional overhead
@@ -314,13 +314,13 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERF: Efficiently converts Task&lt;object&gt; to Task&lt;TResult&gt;.
+        /// Efficiently converts Task&lt;object&gt; to Task&lt;TResult&gt;.
         /// Avoids async state machine allocation when the task is already completed.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Task<TResult> CastTaskResult<TResult>(Task<object> task)
         {
-            // PERF: If the task is already completed (common for cached/fast queries),
+            // If the task is already completed (common for cached/fast queries),
             // skip the async state machine entirely.
             if (task.IsCompletedSuccessfully)
             {
@@ -336,19 +336,19 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERFORMANCE FIX: Converts scalar results without boxing for value types.
-        /// Replaces Convert.ChangeType which forces heap allocation for value types.
+        /// Converts scalar results without boxing for value types.
+        /// Avoids Convert.ChangeType which forces heap allocation for value types.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static TResult ConvertScalarResult<TResult>(object result)
         {
-            // PERFORMANCE FIX: Direct cast for reference types
+            // Direct cast for reference types.
             if (typeof(TResult).IsClass || typeof(TResult).IsInterface)
             {
                 return (TResult)result;
             }
 
-            // PERFORMANCE FIX: Handle value types without Convert.ChangeType boxing
+            // Handle value types without Convert.ChangeType boxing.
             var resultType = typeof(TResult);
             var underlyingType = Nullable.GetUnderlyingType(resultType) ?? resultType;
 
@@ -379,10 +379,10 @@ namespace nORM.Query
         }
         private Task<TResult> ExecuteInternalAsync<TResult>(Expression expression, CancellationToken ct)
         {
-            // PERF: Only allocate Stopwatch when logger is active
+            // Only allocate Stopwatch when logger is active
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
-            // PERF: For cached queries, use the closure-based path (rare).
+            // For cached queries, use the closure-based path (rare).
             // For non-cached queries (common), return task directly — no async state machine needed.
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
@@ -400,13 +400,13 @@ namespace nORM.Query
             return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
         }
         /// <summary>
-        /// PERF: Non-async entry point — does synchronous command setup when connection is ready,
+        /// Non-async entry point — does synchronous command setup when connection is ready,
         /// then dispatches to the appropriate async materializer. Avoids one async state machine
         /// allocation on the hot path.
         /// </summary>
         private Task<TResult> ExecuteQueryFromPlanAsync<TResult>(QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
         {
-            // PERF: Check if connection is ready without awaiting
+            // Check if connection is ready without awaiting
             var ensureTask = _ctx.EnsureConnectionAsync(ct);
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteQueryFromPlanSlowAsync<TResult>(ensureTask, plan, paramValues, sw, ct);
@@ -417,16 +417,16 @@ namespace nORM.Query
             cmd.CommandText = plan.Sql;
             BindPlanParameters(cmd, plan, paramValues);
 
-            // PERF: Dispatch directly to materializer — avoids wrapping in another async method
+            // Dispatch directly to materializer — avoids wrapping in another async method
             if (plan.IsScalar)
             {
-                // PERF: Sync scalar for providers without true async I/O (SQLite)
+                // Sync scalar for providers without true async I/O (SQLite)
                 if (_ctx.Provider.PrefersSyncExecution)
                     return ExecuteScalarPlanSync<TResult>(plan, cmd, sw);
                 return ExecuteScalarPlanAsync<TResult>(plan, cmd, sw, ct);
             }
 
-            // PERF: For providers that don't support true async I/O (SQLite), use fully synchronous
+            // For providers that don't support true async I/O (SQLite), use fully synchronous
             // materialization to eliminate per-row ReadAsync state machine overhead (~50ns × N rows).
             if (_ctx.Provider.PrefersSyncExecution)
                 return ExecuteListPlanSyncWrapped<TResult>(plan, cmd, sw);
@@ -530,7 +530,7 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERF: Fully synchronous materialization wrapped in Task.FromResult.
+        /// Fully synchronous materialization wrapped in Task.FromResult.
         /// Eliminates async state machine overhead for providers without true async I/O (SQLite).
         /// Saves ~50-100ns per Read() call → ~1-4μs for typical result sets.
         /// </summary>
@@ -623,7 +623,7 @@ namespace nORM.Query
             return ExecuteCompiledInternalArrayAsync<TResult>(plan, parameterValues, ct);
         }
 
-        // PERF: Overload that accepts pre-computed compiledParamSet + fixedParams to avoid:
+        // Overload that accepts pre-computed compiledParamSet + fixedParams to avoid:
         // 1. Expensive QueryPlan.GetHashCode() in _compiledParamSets ConcurrentDictionary on every call
         //    (QueryPlan is a sealed record with 20+ properties — auto-generated GetHashCode costs ~200ns)
         // 2. HashSet.Contains per parameter on every call (fixed params pre-filtered at compile time)
@@ -648,7 +648,7 @@ namespace nORM.Query
             {
                 finalParameters[p.Key] = p.Value;
             }
-            // PERF: For cached queries (rare), use closure-based path.
+            // For cached queries (rare), use closure-based path.
             // For non-cached queries (common), inline execution directly to avoid closure allocation.
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
@@ -665,7 +665,7 @@ namespace nORM.Query
             }
         }
         /// <summary>
-        /// PERF: Extracted from lambda to avoid closure allocation on every compiled query call.
+        /// Extracted from lambda to avoid closure allocation on every compiled query call.
         /// </summary>
         private async Task<TResult> ExecuteCompiledDictAsync<TResult>(QueryPlan plan, Dictionary<string, object> finalParameters, Stopwatch? sw, CancellationToken ct)
         {
@@ -690,7 +690,7 @@ namespace nORM.Query
             }
             else
             {
-                // PERF: When TResult is List<object>, materialize directly to avoid covariant copy
+                // When TResult is List<object>, materialize directly to avoid covariant copy
                 if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
                 {
                     var objectList = await _executor.MaterializeAsObjectListAsync(plan, cmd, ct).ConfigureAwait(false);
@@ -734,18 +734,18 @@ namespace nORM.Query
             return (TResult)result!;
         }
 
-        /// <summary>PERF: Cached HashSets for compiled parameter name lookups (O(1) vs O(N)).</summary>
+        /// <summary>Cached HashSets for compiled parameter name lookups (O(1) vs O(N)).</summary>
         private static readonly ConcurrentDictionary<QueryPlan, HashSet<string>> _compiledParamSets = new();
 
         private Task<TResult> ExecuteCompiledInternalArrayAsync<TResult>(QueryPlan plan, object?[] parameterValues, CancellationToken ct)
         {
-            // PERF: For the caching path (rare), use async method.
+            // For the caching path (rare), use async method.
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
                 return ExecuteCompiledInternalArrayCachedAsync<TResult>(plan, parameterValues, ct);
             }
 
-            // PERF: Build command synchronously, then delegate to materialization.
+            // Build command synchronously, then delegate to materialization.
             // This avoids an async state machine for the command setup work.
             var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
@@ -778,7 +778,7 @@ namespace nORM.Query
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
             }
 
-            // PERF: Dispatch directly to materialization — avoids wrapping in another async method.
+            // Dispatch directly to materialization — avoids wrapping in another async method.
             // MaterializeAsObjectListAsync/MaterializeAsync handle cmd disposal via 'await using'.
             if (!plan.IsScalar && typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
             {
@@ -789,18 +789,18 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERF: Optimized compiled query execution that accepts pre-computed compiledParamSet and fixedParams.
+        /// Optimized compiled query execution that accepts pre-computed compiledParamSet and fixedParams.
         /// Avoids: (1) _compiledParamSets ConcurrentDictionary lookup (QueryPlan.GetHashCode on every call),
         /// (2) HashSet.Contains per param (fixed params pre-filtered at compile time).
         /// Routes through the same execution path as non-compiled queries for consistent JIT optimization.
         /// </summary>
         private Task<TResult> ExecuteCompiledPreparedAsync<TResult>(QueryPlan plan, object?[] parameterValues, HashSet<string> compiledParamSet, KeyValuePair<string, object>[]? fixedParams, CancellationToken ct)
         {
-            // PERF: For the caching path (rare), fall back to standard compiled path.
+            // For the caching path (rare), fall back to standard compiled path.
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
                 return ExecuteCompiledInternalArrayCachedAsync<TResult>(plan, parameterValues, ct);
 
-            // PERF: Ensure connection is ready (fast no-op when already open).
+            // Ensure connection is ready (fast no-op when already open).
             // This matches the non-compiled path to ensure identical behavior.
             var ensureTask = _ctx.EnsureConnectionAsync(ct);
             if (!ensureTask.IsCompletedSuccessfully)
@@ -812,10 +812,10 @@ namespace nORM.Query
             cmd.CommandText = plan.Sql;
             BindCompiledParameters(cmd, plan, parameterValues, fixedParams);
 
-            // PERF: Dispatch directly to the same materializer methods used by non-compiled queries.
+            // Dispatch directly to the same materializer methods used by non-compiled queries.
             if (plan.IsScalar)
                 return ExecuteScalarPlanAsync<TResult>(plan, cmd, null, ct);
-            // PERF: Sync materialization for providers without true async I/O
+            // Sync materialization for providers without true async I/O
             if (_ctx.Provider.PrefersSyncExecution)
                 return ExecuteListPlanSyncWrapped<TResult>(plan, cmd, null);
             if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
@@ -839,7 +839,7 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERF: Inline parameter binding for compiled queries with pre-computed fixed params.
+        /// Inline parameter binding for compiled queries with pre-computed fixed params.
         /// When fixedParams is non-null, iterates a pre-filtered array instead of the full
         /// Parameters dictionary with HashSet lookups. Saves ~5 HashSet.Contains per call.
         /// </summary>
@@ -866,7 +866,7 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERF: Compiled query execution with command pooling. The DbCommand is created once
+        /// Compiled query execution with command pooling. The DbCommand is created once
         /// (with Prepare()) and reused across calls — only parameter values are updated.
         /// This eliminates per-call costs of: DbCommand allocation (~0.5μs), DbParameter creation
         /// (~0.3μs per param), and SQL compilation via sqlite3_prepare_v2 (~2-5μs).
@@ -901,13 +901,13 @@ namespace nORM.Query
             if (!state.CommandPool.TryDequeue(out var cmd))
                 cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
 
-            // PERF: Only update compiled parameter values — fixed params are already set
+            // Only update compiled parameter values — fixed params are already set
             UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
 
-            // PERF: Inline materialization — command returned to pool after use
+            // Inline materialization — command returned to pool after use
             if (plan.IsScalar)
                 return ReturnCommandToPool(state.CommandPool, cmd, ExecutePooledScalarAsync<TResult>(plan, cmd, ct));
-            // PERF: Sync materialization for providers without true async I/O
+            // Sync materialization for providers without true async I/O
             if (_ctx.Provider.PrefersSyncExecution)
             {
                 var result = ExecutePooledListSync<TResult>(plan, cmd);
@@ -1009,7 +1009,7 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERF: Fully synchronous materialization for pooled commands.
+        /// Fully synchronous materialization for pooled commands.
         /// Eliminates async state machine overhead for providers like SQLite that lack true async I/O.
         /// The command is NOT disposed (pooled for reuse). Only the reader is disposed.
         /// </summary>
@@ -1062,7 +1062,7 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERF: Optimized compiled query path using fresh commands with sync materialization.
+        /// Optimized compiled query path using fresh commands with sync materialization.
         /// Microsoft.Data.Sqlite internally caches prepared statements, so pooled DbCommand reuse
         /// adds overhead (sqlite3_reset, internal state management) without saving SQL compilation.
         /// Fresh commands avoid this overhead and match the non-compiled execution path's performance.
@@ -1223,7 +1223,7 @@ namespace nORM.Query
             }
             else
             {
-                // PERF: When TResult is List<object> but plan.ElementType is a concrete type,
+                // When TResult is List<object> but plan.ElementType is a concrete type,
                 // materialize directly into List<object> to avoid creating List<ConcreteType>
                 // then copying all elements to a new List<object> (covariant copy).
                 if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
@@ -1307,8 +1307,8 @@ namespace nORM.Query
                     }
                     else if (mc.Method.Name is nameof(Queryable.Take))
                     {
-                        // PERF: Accept Take so queries like .Where(...).Take(10) hit simple path
-                        // Reject non-constant or negative Take values so validation falls through
+                        // Accept Take so queries like .Where(...).Take(10) hit simple path;
+                        // reject non-constant or negative Take values so validation falls through.
                         if (mc.Arguments[1] is not ConstantExpression takeConst || takeConst.Value is not int tv || tv < 0)
                             return false;
                         current = mc.Arguments[0];
@@ -1324,7 +1324,7 @@ namespace nORM.Query
                 }
                 else if (mc.Method.Name == "AsNoTracking" && mc.Arguments.Count >= 1)
                 {
-                    // PERF: Skip AsNoTracking (nORM-specific method, not on Queryable)
+                    // Skip AsNoTracking (nORM-specific method, not on Queryable)
                     current = mc.Arguments[0];
                 }
                 else
@@ -1336,7 +1336,7 @@ namespace nORM.Query
                 return false;
             var elementType = GetElementType(constant);
             var map = _ctx.GetMapping(elementType);
-            // PERF: Use structural key instead of full ToString() to avoid string allocation.
+            // Use structural key instead of full ToString() to avoid string allocation.
             // For simple predicates (member == value), the member name is sufficient.
             string whereKey;
             if (whereCall == null)
@@ -1355,8 +1355,8 @@ namespace nORM.Query
             var cacheKey = string.Concat("SIMPLE:", elementType.FullName, ":", resultMethodName ?? "", ":", whereKey);
             if (!_simpleSqlCache.TryGetValue(cacheKey, out var cachedSql))
             {
-                // PERFORMANCE FIX: Use string interpolation instead of StringBuilder for small queries
-                // StringBuilder has overhead that's not worth it for these simple SELECT statements
+                // Use string interpolation instead of StringBuilder for small queries;
+                // StringBuilder overhead is not worth it for simple SELECT statements.
                 var columnList = string.Join(", ", map.Columns.Select(c => c.EscCol));
                 string whereClause = "";
 
@@ -1389,8 +1389,8 @@ namespace nORM.Query
                             return false;
                         var paramName = _ctx.Provider.ParamPrefix + "p0";
                         whereClause = $" WHERE {column.EscCol} = {paramName}";
-                        // PERFORMANCE & SECURITY FIX: Use ExpressionValueExtractor instead of Compile().DynamicInvoke()
-                        // DynamicInvoke is 100x slower and poses RCE risks
+                        // Use ExpressionValueExtractor instead of Compile().DynamicInvoke();
+                        // DynamicInvoke is significantly slower and poses RCE risks.
                         if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
                             return false;
                         parameters = new Dictionary<string, object>(1) { [paramName] = value! };
@@ -1425,14 +1425,14 @@ namespace nORM.Query
             return true;
         }
 
-        // PERF: Reusable empty dictionary to avoid allocation when count has no parameters
+        // Reusable empty dictionary to avoid allocation when count has no parameters
         private static readonly Dictionary<string, object> _emptyParams = new();
-        // PERF: Cached empty includes list and table name lists for simple query path
+        // Cached empty includes list and table name lists for simple query path
         private static readonly List<IncludePlan> _emptyIncludes = new();
         private static readonly ConcurrentDictionary<string, List<string>> _simpleQueryTableCache = new();
 
         /// <summary>
-        /// PERF: Direct count path that works on the source expression directly,
+        /// Direct count path that works on the source expression directly,
         /// bypassing the need to wrap in Expression.Call(Queryable.Count) and re-parse.
         /// Saves one MethodCallExpression + Type[] allocation per count call.
         /// </summary>
@@ -1464,7 +1464,7 @@ namespace nORM.Query
             var elementType = GetElementType(constant);
             var map = _ctx.GetMapping(elementType);
 
-            // PERF: Use structural key instead of string.Concat to avoid string allocation per count call.
+            // Use structural key instead of string.Concat to avoid string allocation per count call.
             string predicateKey;
             if (predicate == null)
                 predicateKey = "";
@@ -1537,7 +1537,7 @@ namespace nORM.Query
                 return false;
 
             var elementType = GetElementType(constant);
-            // PERF: Use structural hash instead of predicate.Body.ToString() to avoid
+            // Use structural hash instead of predicate.Body.ToString() to avoid
             // string allocation on every count call. For simple predicates (bool member,
             // equality), the member name is sufficient as a cache key.
             string predicateKey;
@@ -1550,7 +1550,7 @@ namespace nORM.Query
             else
                 predicateKey = predicate.Body.ToString(); // fallback for complex predicates
 
-            // PERF: Use ValueTuple key to avoid string.Concat allocation per count call
+            // Use ValueTuple key to avoid string.Concat allocation per count call
             var countCacheKey = (elementType, predicateKey);
 
             if (_countSqlCache.TryGetValue(countCacheKey, out var cached))
@@ -1558,7 +1558,7 @@ namespace nORM.Query
                 sql = cached.Sql;
                 if (cached.NeedsParam && predicate != null)
                 {
-                    // PERF: Only call GetMapping when actually needed for parameter extraction
+                    // Only call GetMapping when actually needed for parameter extraction
                     var map2 = _ctx.GetMapping(elementType);
                     if (!TryBuildCountWhereClause(predicate, map2, ref parameters, out _, populateParameters: true))
                         return false;
@@ -1628,7 +1628,7 @@ namespace nORM.Query
 
                 if (populateParameters)
                 {
-                    // PERF: Only allocate a new dictionary when we actually need to add parameters
+                    // Only allocate a new dictionary when we actually need to add parameters
                     if (ReferenceEquals(parameters, _emptyParams))
                         parameters = new Dictionary<string, object>(1);
                     parameters[paramName] = constValue!;
@@ -1641,7 +1641,7 @@ namespace nORM.Query
         }
         private Task<TResult> ExecuteCountAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
         {
-            // PERF: Split into fast (no logger) and slow (with logger) paths.
+            // Split into fast (no logger) and slow (with logger) paths.
             // The fast path avoids Stopwatch allocation and logger null checks.
             if (_ctx.Options.Logger != null)
                 return ExecuteCountSlowAsync<TResult>(sql, parameters, ct);
@@ -1650,12 +1650,12 @@ namespace nORM.Query
 
         private Task<TResult> ExecuteCountFastAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
         {
-            // PERF: Non-async entry point — avoids state machine when connection is already open.
+            // Non-async entry point — avoids state machine when connection is already open.
             var ensureTask = _ctx.EnsureConnectionAsync(ct);
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteCountFastSlowAsync<TResult>(ensureTask, sql, parameters, ct);
 
-            // PERF: For providers without true async I/O (SQLite), use pooled prepared command
+            // For providers without true async I/O (SQLite), use pooled prepared command
             // for parameterless count queries to eliminate per-call command creation/disposal.
             if (_ctx.Provider.PrefersSyncExecution && ReferenceEquals(parameters, _emptyParams))
             {
@@ -1666,8 +1666,8 @@ namespace nORM.Query
                     try { pooledCmd.Prepare(); } catch { }
                     _pooledCountCommands[sql] = pooledCmd;
                 }
-                // C1 fix: rebind CurrentTransaction on every use — CreateCommand() only binds
-                // the transaction at creation time; reuse across transaction changes would run
+                // Rebind CurrentTransaction on every use — CreateCommand() only binds the
+                // transaction at creation time; reuse across transaction changes would run
                 // the count against a stale (or null) transaction binding.
                 pooledCmd.Transaction = _ctx.CurrentTransaction;
                 var scalar = pooledCmd.ExecuteScalarWithInterception(_ctx);
@@ -1682,7 +1682,7 @@ namespace nORM.Query
             foreach (var p in parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
 
-            // PERF: For providers without true async I/O (SQLite), use sync ExecuteScalar directly
+            // For providers without true async I/O (SQLite), use sync ExecuteScalar directly
             // to avoid the ValueTask/Task wrapper overhead from ExecuteScalarAsync.
             if (_ctx.Provider.PrefersSyncExecution)
             {
@@ -1797,7 +1797,7 @@ namespace nORM.Query
             }
             var mapping = _ctx.GetMapping(elementType);
 
-            // PERF: Use singleton MaterializerFactory (it only wraps static caches)
+            // Use singleton MaterializerFactory (it only wraps static caches)
             var materializer = _sharedMaterializerFactory.CreateMaterializer(mapping, elementType);
             var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(mapping, elementType);
 
@@ -1832,7 +1832,7 @@ namespace nORM.Query
             {
                 return (TResult)list;
             }
-            // QP-1: Preserve First vs FirstOrDefault semantics on the fast path.
+            // Preserve First vs FirstOrDefault semantics.
             if (list.Count > 0) return (TResult)list[0]!;
             if (requestedMethodName == nameof(Queryable.First))
                 throw new InvalidOperationException("Sequence contains no elements");
@@ -1863,7 +1863,7 @@ namespace nORM.Query
             }
             var mapping = _ctx.GetMapping(elementType);
 
-            // PERF: Use singleton MaterializerFactory (it only wraps static caches)
+            // Use singleton MaterializerFactory (it only wraps static caches)
             var materializer = _sharedMaterializerFactory.CreateMaterializer(mapping, elementType);
             var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(mapping, elementType);
 
@@ -1898,7 +1898,7 @@ namespace nORM.Query
             {
                 return (TResult)list;
             }
-            // QP-1: Preserve First vs FirstOrDefault semantics on the fast path.
+            // Preserve First vs FirstOrDefault semantics.
             if (list.Count > 0) return (TResult)list[0]!;
             if (requestedMethodName == nameof(Queryable.First))
                 throw new InvalidOperationException("Sequence contains no elements");
@@ -2033,10 +2033,9 @@ namespace nORM.Query
             finally
             {
                 semaphore.Release();
-                // RACE CONDITION FIX: Removed unsafe eager cleanup
-                // Checking CurrentCount after Release has a race: another thread could Wait() between Release() and the check
-                // This could cause removal of a semaphore that's currently in use, leading to concurrent access bugs
-                // Cleanup is handled safely by the periodic CleanupCacheLocks timer instead
+                // Cleanup is intentionally deferred to the periodic CleanupCacheLocks timer.
+                // Checking CurrentCount immediately after Release has a race where another thread could
+                // Wait() between Release() and the check, causing removal of a semaphore still in use.
             }
         }
 
@@ -2067,10 +2066,9 @@ namespace nORM.Query
             finally
             {
                 semaphore.Release();
-                // RACE CONDITION FIX: Removed unsafe eager cleanup
-                // Checking CurrentCount after Release has a race: another thread could Wait() between Release() and the check
-                // This could cause removal of a semaphore that's currently in use, leading to concurrent access bugs
-                // Cleanup is handled safely by the periodic CleanupCacheLocks timer instead
+                // Cleanup is intentionally deferred to the periodic CleanupCacheLocks timer.
+                // Checking CurrentCount immediately after Release has a race where another thread could
+                // Wait() between Release() and the check, causing removal of a semaphore still in use.
             }
         }
         private string BuildCacheKeyFromPlan<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
@@ -2079,8 +2077,8 @@ namespace nORM.Query
             AppendUtf8(hasher, plan.Sql.AsSpan());
             AppendByte(hasher, (byte)'|');
             AppendUtf8(hasher, typeof(TResult).FullName!.AsSpan());
-            // PC-1: Include a stable database identity in the result cache key so that two
-            // contexts pointing to different databases with the same schema, query, and parameters
+            // Include a stable database identity in the result cache key so that two contexts
+            // pointing to different databases with the same schema, query, and parameters
             // do not share a cache entry and return data from the wrong database.
             var dbIdentity = NormalizeConnectionStringForCacheKey(_ctx.Connection.ConnectionString);
             AppendUtf8(hasher, "|DB:".AsSpan());
@@ -2123,11 +2121,11 @@ namespace nORM.Query
             return Convert.ToHexString(hash);
         }
         /// <summary>
-        /// PC-1: Normalizes a connection string for use as a cache key component.
+        /// Normalizes a connection string for use as a cache key component.
         /// Splits on ';', trims each pair, sorts case-insensitively, and rejoins so that
         /// different orderings of the same connection string map to the same key.
+        /// Sensitive keys (credentials) are stripped so they never appear in cache key material.
         /// </summary>
-        // PC-1: Credentials must not appear in cache key material.
         private static readonly HashSet<string> _sensitiveConnectionStringKeys = new(StringComparer.OrdinalIgnoreCase)
         {
             "password", "pwd", "user password", "access token", "accesstoken", "token", "secret"
@@ -2285,7 +2283,7 @@ namespace nORM.Query
                              plan.ElementType.IsClass &&
                              !plan.ElementType.Name.StartsWith("<>") &&
                              plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
-                             _ctx.IsMapped(plan.ElementType);   // M-1: only mapped entity roots
+                             _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
             if (trackable)
                 _ctx.GetMapping(plan.ElementType);
             var count = 0;
@@ -2311,18 +2309,18 @@ namespace nORM.Query
             _ctx.Options.Logger?.LogQuery(plan.Sql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, count);
         }
         /// <summary>
-        /// PERFORMANCE FIX: Returns the cached plan and binds parameters separately.
-        /// This avoids cloning the parameters dictionary on every cache hit.
+        /// Returns the cached plan and binds parameters separately to avoid cloning the
+        /// parameters dictionary on every cache hit.
         /// </summary>
         internal QueryPlan GetPlan(Expression expression, out Expression filtered, out IReadOnlyList<object?>? parameterValues)
         {
             filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(UnwrapQueryExpression(filtered));
             var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
-            // PERF: Use cached mapping hash instead of recomputing on every query
+            // Use cached mapping hash instead of recomputing on every query
             int mappingHash = _ctx.GetMappingHash();
 
-            // PERF: Batch all 5 extends into a single hash operation (saves 4 XxHash128 calls)
+            // Batch all 5 extends into a single hash operation (saves 4 XxHash128 calls)
             var fingerprint = ExpressionFingerprint
                 .Compute(filtered)
                 .Extend(tenantHash, elementType.GetHashCode(), filtered.Type.GetHashCode(),
@@ -2370,7 +2368,7 @@ namespace nORM.Query
 
         /// <summary>
         /// Returns ONLY the extracted values, no Dictionary allocation.
-        /// PERF: Reuses a thread-local extractor to avoid allocating a new visitor + List per query.
+        /// Reuses a thread-local extractor to avoid allocating a new visitor + List per query.
         /// </summary>
         [ThreadStatic] private static ParameterValueExtractor? t_extractor;
         private IReadOnlyList<object?>? ExtractParameterValues(Expression expression, QueryPlan plan)
@@ -2424,7 +2422,7 @@ namespace nORM.Query
         }
         private Expression ApplyGlobalFilters(Expression expression)
         {
-            // PERF: Skip the entire recursive walk when no global filters or tenant provider exist.
+            // Skip the entire recursive walk when no global filters or tenant provider exist.
             // The recursion allocates new expression nodes (ToArray + Update) on every node even
             // when there are no filters to apply.
             if (_ctx.Options.GlobalFilters.Count == 0 && _ctx.Options.TenantProvider == null)
@@ -2476,14 +2474,13 @@ namespace nORM.Query
                     var param = Expression.Parameter(entityType, "t");
                     var prop = Expression.Property(param, tenantCol.Prop.Name);
                     var tenantId = _ctx.Options.TenantProvider.GetCurrentTenantId();
-                    // QP-1: Coerce the tenant ID to the mapped property type before building
-                    // the expression constant. If TenantProvider.GetCurrentTenantId() returns a
-                    // boxed long but the entity property is int (or any other cross-type mismatch),
-                    // Expression.Constant(tenantId, propertyType) would throw ArgumentException
-                    // before translation, crashing all tenant-scoped queries. Convert.ChangeType
-                    // handles common numeric widening/narrowing and string representations. If
-                    // conversion is genuinely impossible (e.g., string "abc" → int), throw a
-                    // deterministic NormConfigurationException with an actionable message.
+                    // Coerce the tenant ID to the mapped property type before building the expression
+                    // constant. If TenantProvider.GetCurrentTenantId() returns a boxed long but the
+                    // entity property is int (or any other cross-type mismatch), Expression.Constant
+                    // would throw ArgumentException before translation. Convert.ChangeType handles
+                    // common numeric widening/narrowing and string representations. If conversion is
+                    // genuinely impossible (e.g., string "abc" → int), throw a deterministic
+                    // NormConfigurationException with an actionable message.
                     var propType = tenantCol.Prop.PropertyType;
                     object coercedTenantId;
                     if (tenantId == null)
@@ -2532,7 +2529,7 @@ namespace nORM.Query
             return expression;
         }
         /// <summary>
-        /// PERFORMANCE FIX: Cached version of GetElementType to avoid repeated reflection.
+        /// Cached version of GetElementType to avoid repeated reflection.
         /// GetInterfaces() is expensive and this is called frequently in hot paths.
         /// </summary>
         private static Type GetElementType(Expression queryExpression)

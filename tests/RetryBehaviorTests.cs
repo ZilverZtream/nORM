@@ -14,10 +14,10 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// T1: Verifies that <see cref="TimeoutException"/> does NOT trigger retry by default
+/// Verifies that <see cref="TimeoutException"/> does NOT trigger retry by default
 /// (to avoid duplicate writes), while a <see cref="DbException"/> with a custom
 /// <c>ShouldRetry</c> returning true DOES trigger retry.
-/// QP-1: Verifies that exceptions thrown during CommitAsync are never retried, even
+/// Verifies that exceptions thrown during CommitAsync are never retried, even
 /// when <c>ShouldRetry</c> returns true, to prevent duplicate INSERTs.
 /// </summary>
 public class RetryBehaviorTests
@@ -41,7 +41,7 @@ public class RetryBehaviorTests
     [Fact]
     public void TimeoutException_IsNotRetryable_ByDefault()
     {
-        // T1: Even with a policy configured, a bare TimeoutException must not be retried
+        // Even with a policy configured, a bare TimeoutException must not be retried
         // because we cannot know whether the write was applied.
         using var ctx = CreateContext(new RetryPolicy { MaxRetries = 3 });
         var ex = new TimeoutException("command timed out");
@@ -116,7 +116,7 @@ public class RetryBehaviorTests
         Assert.False(IsRetryableException(ctx, dbEx));
     }
 
-    // QP-1: Entity used for retry integration tests
+    // Entity used for retry integration tests
     [Table("RetryEntity")]
     private class RetryEntity
     {
@@ -127,7 +127,7 @@ public class RetryBehaviorTests
     [Fact]
     public async Task PreCommit_TransientException_IsRetried()
     {
-        // QP-1: A transient DbException thrown before commit should be retried.
+        // A transient DbException thrown before commit should be retried.
         // We verify this by having SaveChangesAsync succeed on a second attempt.
         // Use an in-memory SQLite context with MaxRetries = 2.
         var retryCount = 0;
@@ -165,7 +165,7 @@ public class RetryBehaviorTests
     [Fact]
     public async Task CommitException_IsNotRetried_EvenWhenShouldRetryReturnsTrue()
     {
-        // QP-1: If CommitAsync throws, we must NOT retry regardless of ShouldRetry.
+        // If CommitAsync throws, we must NOT retry regardless of ShouldRetry.
         // We simulate this by using a wrapper connection that throws on commit.
         var retryCount = 0;
         var policy = new RetryPolicy

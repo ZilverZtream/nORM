@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Tests for SQL-1/PERF-1: INSERT SQL conditionally appends identity retrieval.
+/// Tests for INSERT SQL conditionally appends identity retrieval.
 /// </summary>
 public class InsertSqlShapeTests
 {
@@ -61,7 +61,7 @@ public class InsertSqlShapeTests
     }
 
     /// <summary>
-    /// SQL-1/PERF-1: For a natural-key entity the INSERT SQL must NOT contain
+    /// For a natural-key entity the INSERT SQL must NOT contain
     /// identity retrieval (last_insert_rowid or equivalent).
     /// </summary>
     [Fact]
@@ -80,7 +80,7 @@ public class InsertSqlShapeTests
     }
 
     /// <summary>
-    /// SQL-1/PERF-1: For a DB-generated-key entity the INSERT SQL MUST contain
+    /// For a DB-generated-key entity the INSERT SQL MUST contain
     /// identity retrieval (last_insert_rowid for SQLite).
     /// </summary>
     [Fact]
@@ -101,7 +101,7 @@ public class InsertSqlShapeTests
     }
 
     /// <summary>
-    /// SQL-1/PERF-1: Insert an entity with a natural key, save, re-query by PK,
+    /// Insert an entity with a natural key, save, re-query by PK,
     /// verify the original PK value is preserved.
     /// </summary>
     [Fact]

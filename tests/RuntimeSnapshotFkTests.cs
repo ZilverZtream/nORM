@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// MIG-1: Verifies that SchemaSnapshot.Build(DbContext) populates FK constraints
+/// Verifies that SchemaSnapshot.Build(DbContext) populates FK constraints
 /// from configured relations, enabling drift detection between snapshots.
 /// </summary>
 public class RuntimeSnapshotFkTests

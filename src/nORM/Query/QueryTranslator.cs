@@ -22,7 +22,7 @@ namespace nORM.Query
     /// Translates LINQ expression trees to SQL queries using the visitor pattern.
     /// </summary>
     /// <remarks>
-    /// PERFORMANCE WARNING (TASK 7): This class uses recursive instantiation for subquery translation.
+    /// This class uses recursive instantiation for subquery translation.
     ///
     /// **Current Architecture:**
     /// - Every subquery or complex nested expression creates a new QueryTranslator instance
@@ -99,9 +99,8 @@ namespace nORM.Query
         // Complexity metrics accumulated during expression-tree visitation.
         // These are used by GetAdaptiveTimeout instead of post-hoc SQL string scanning.
         private QueryComplexityMetrics _complexityMetrics;
-        // QP-1: Recursion depth limit is now read from DbContextOptions.MaxRecursionDepth (default 50).
-        // This replaces the old hardcoded constant of 30. The effective limit is cached on the
-        // QueryTranslator instance so that options changes mid-query have no effect.
+        // Recursion depth limit is read from DbContextOptions.MaxRecursionDepth (default 50).
+        // The effective limit is cached on the QueryTranslator instance so that options changes mid-query have no effect.
         private int _maxRecursionDepth = 50; // Updated from _ctx.Options during Initialize()
         private int _recursionDepth;
         private OptimizedSqlBuilder _sql => _clauses.Sql;
@@ -210,7 +209,7 @@ namespace nORM.Query
                 _asOfTimestamp = null;
                 _detectedCollections = new List<PropertyInfo>();
                 _complexityMetrics = default;
-                // QP-1: Capture the configured recursion depth limit at Reset time
+                // Capture the configured recursion depth limit at Reset time.
                 _maxRecursionDepth = ctx.Options.MaxRecursionDepth;
             }
         }
@@ -299,7 +298,7 @@ namespace nORM.Query
                 if (_expression == null) throw new ArgumentNullException(nameof(_expression));
                 if (_t._ctx == null) throw new InvalidOperationException("QueryTranslator not properly initialized");
                 if (_t._provider == null) throw new InvalidOperationException("Provider not set");
-                // QP-1: Guard here so sub-translators created by BuildExists/BuildIn throw when depth exceeded.
+                // Guard so sub-translators created by BuildExists/BuildIn throw when depth exceeded.
                 if (_t._recursionDepth >= _t._maxRecursionDepth)
                     throw new NormQueryException(
                         $"Query exceeds maximum translation depth of {_t._maxRecursionDepth}. " +
@@ -361,7 +360,7 @@ namespace nORM.Query
                     materializerType = typeof(int);
                 }
 
-                // PERFORMANCE FIX (TASK 14): Create both sync and async materializers
+                // Create both sync and async materializers.
                 Func<DbDataReader, object> syncMaterializer;
                 Func<DbDataReader, CancellationToken, Task<object>> materializer;
 
@@ -570,8 +569,6 @@ namespace nORM.Query
                     dependentQueries = _t.BuildDependentQueryDefinitions();
                 }
 
-                // PERFORMANCE FIX (TASK 14): Pass both sync and async materializers to QueryPlan
-                // PERFORMANCE FIX (TASK 7): Pass Take value to avoid regex parsing on hot path
                 var plan = new QueryPlan(
                     _t._sql.ToString(),
                     (IReadOnlyDictionary<string, object>)_t._params,
@@ -760,9 +757,6 @@ namespace nORM.Query
         /// </remarks>
         private string TranslateSubExpression(Expression e)
         {
-            // QP-1: Use configurable _maxRecursionDepth (from DbContextOptions.MaxRecursionDepth)
-            // instead of the old hardcoded constant. Include the configured limit in the error
-            // message so users know how to increase it via DbContextOptions.MaxRecursionDepth.
             if (_recursionDepth >= _maxRecursionDepth)
                 throw new NormQueryException(
                     $"Query exceeds maximum translation depth of {_maxRecursionDepth}. " +
@@ -770,7 +764,7 @@ namespace nORM.Query
                     $"Consider simplifying the query by breaking it into multiple queries or using CTEs. " +
                     $"You can also increase the limit via DbContextOptions.MaxRecursionDepth (current: {_maxRecursionDepth}, max: 200).");
 
-            // PERFORMANCE WARNING: Log deep recursion for monitoring
+            // Log deep recursion for monitoring.
             if (_recursionDepth > Math.Min(15, _maxRecursionDepth / 2))
             {
                 _ctx.Options.Logger?.LogWarning(
@@ -798,7 +792,7 @@ namespace nORM.Query
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
             var pName = _provider.ParamPrefix + "p0";
-            // TP-1/Finding-A: Use provider-escaped identifier SQL to avoid hardcoded unescaped names.
+            // Use provider-escaped identifier SQL to avoid hardcoded unescaped names.
             cmd.CommandText = _provider.GetTagLookupSql(pName);
             cmd.AddParam(pName, tagName);
             var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
@@ -935,7 +929,6 @@ namespace nORM.Query
                 AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(innerKeyVisitor);
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
-            // PERF: Build directly into _sql to avoid intermediate string allocation
             _sql.Clear();
             JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
             return node;
@@ -973,11 +966,10 @@ namespace nORM.Query
                 AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(innerKeyVisitor);
             JoinBuilder.SetupJoinProjection(null, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
-            // QP-1: Do NOT embed ORDER BY in the SQL string. Instead, insert the outer key as the
+            // Do NOT embed ORDER BY in the SQL string. Instead, insert the outer key as the
             // first ORDER BY entry so that Build() generates exactly one ORDER BY clause.
             // This prevents double ORDER BY when downstream .OrderBy() is chained, and ensures
             // outer-key contiguity (needed for streaming group segmentation) is always first.
-            // PERF: Build directly into _sql to avoid intermediate string allocation
             _sql.Clear();
             JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, orderBy: null);
             // Insert outer-key sort at the front of _orderBy so it is always first.
@@ -1133,7 +1125,6 @@ namespace nORM.Query
                 }
                 var effectiveProjection = composedProjection ?? _projection;
 
-                // PERF: Build directly into _sql to avoid intermediate OptimizedSqlBuilder + ToSqlString() copy
                 _sql.Clear();
                 _sql.AppendSelect(ReadOnlySpan<char>.Empty);
                 bool wroteColumns = false;
@@ -1376,9 +1367,9 @@ namespace nORM.Query
                         return true;
                     }
                     break;
-                // SECURITY FIX (TASK 1): Removed MethodCallExpression handling to prevent RCE.
-                // Method calls should be translated to SQL (e.g., string.Contains) or throw NotSupportedException.
-                // Executing arbitrary user code via Invoke() is a critical security vulnerability.
+                // MethodCallExpression handling was intentionally removed to prevent RCE.
+                // Method calls are translated to SQL (e.g., string.Contains) or throw NotSupportedException.
+                // Executing arbitrary user code via Invoke() would be a critical security vulnerability.
             }
             value = null;
             return false;
@@ -1597,7 +1588,7 @@ namespace nORM.Query
             {
                 if (_correlatedParams.TryGetValue(pe, out var info))
                 {
-                    // RELIABILITY FIX (TASK 10): Use TryGetValue to prevent KeyNotFoundException
+                    // Use TryGetValue to prevent KeyNotFoundException on unmapped properties.
                     if (!info.Mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
                     {
                         // Check if it's a navigation property
@@ -1616,7 +1607,7 @@ namespace nORM.Query
                 }
                 else
                 {
-                    // RELIABILITY FIX (TASK 10): Use TryGetValue to prevent KeyNotFoundException
+                    // Use TryGetValue to prevent KeyNotFoundException on unmapped properties.
                     if (!_mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
                     {
                         // Check if it's a navigation property

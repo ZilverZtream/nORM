@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-1/PRV-1: Fast-path SQL template cache must be per-context, not static.
+/// Fast-path SQL template cache must be per-context, not static.
 /// Cross-context or cross-model use of the same CLR type must not poison each other's SQL.
 /// </summary>
 public class FastPathCachePoisoningTests

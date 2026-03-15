@@ -168,7 +168,7 @@ namespace nORM.Core
             {
                 // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
                 cn?.Dispose();
-                // RELIABILITY FIX (TASK 9): Detect network failures by exception type
+                // Detect network failures by exception type
                 RegisterFailure();
                 _logger.LogError(ex, "Failed to acquire write connection due to network socket error");
                 throw;
@@ -177,7 +177,7 @@ namespace nORM.Core
             {
                 // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
                 cn?.Dispose();
-                // RELIABILITY FIX (TASK 9): Some network errors manifest as IOException
+                // Some network errors manifest as IOException
                 RegisterFailure();
                 _logger.LogError(ex, "Failed to acquire write connection due to network I/O error");
                 throw;
@@ -276,7 +276,7 @@ namespace nORM.Core
 
         /// <summary>
         /// Determines if a database exception represents a transient error that should trip the circuit breaker.
-        /// RELIABILITY FIX (TASK 9): Uses error codes instead of message parsing for robust detection.
+        /// Uses error codes instead of message parsing for robust detection.
         /// </summary>
         /// <param name="ex">The database exception to check.</param>
         /// <returns>True if the exception represents a transient connection/network error.</returns>
@@ -451,9 +451,9 @@ namespace nORM.Core
 
             try
             {
-                // RELIABILITY FIX: Use Task.WaitAsync instead of Task.Wait to avoid potential deadlock
-                // Task.Wait() can deadlock in certain SynchronizationContext scenarios (e.g., WPF, WinForms)
-                // WaitAsync with timeout is safer and works correctly in all contexts
+                // Use Task.WaitAsync instead of Task.Wait to avoid potential deadlock.
+                // Task.Wait() can deadlock in certain SynchronizationContext scenarios (e.g., WPF, WinForms).
+                // WaitAsync with timeout is safer and works correctly in all contexts.
                 _healthCheckTask.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
             }
             catch (TimeoutException)
@@ -471,7 +471,7 @@ namespace nORM.Core
             // No need to dispose connection pools - we rely on ADO.NET provider pooling now.
             // Connections are disposed by callers, which returns them to the provider pool.
 
-            // T1 fix: only dispose semaphores when the health task has actually terminated.
+            // Only dispose semaphores when the health task has actually terminated.
             // If the task is still running (timed out above), it holds references to both
             // semaphores and will call Release() in its finally block — disposing them here
             // would produce ObjectDisposedException in the still-running background code.

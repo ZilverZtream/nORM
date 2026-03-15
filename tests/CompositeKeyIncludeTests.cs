@@ -13,7 +13,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// MM-1: Verifies that Include on a composite-PK dependent entity throws NotSupportedException
+/// Verifies that Include on a composite-PK dependent entity throws NotSupportedException
 /// rather than silently corrupting data.
 /// </summary>
 public class CompositeKeyIncludeTests
@@ -71,7 +71,7 @@ public class CompositeKeyIncludeTests
         ctx.Add(blog);
         await ctx.SaveChangesAsync();
 
-        // MM-1: Include on a composite-PK dependent must throw NotSupportedException.
+        // Include on a composite-PK dependent must throw NotSupportedException.
         await Assert.ThrowsAsync<NotSupportedException>(async () =>
             await ((INormQueryable<Blog>)ctx.Query<Blog>()).Include(b => b.OrderLines).ToListAsync());
     }

@@ -135,7 +135,7 @@ namespace nORM.Providers
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
             EnsureValidParameterName(offsetParameterName, nameof(offsetParameterName));
 
-            // PERF: Inline literal LIMIT/OFFSET values directly in SQL when no parameter name is provided.
+            // Inline literal LIMIT/OFFSET values directly in SQL when no parameter name is provided.
             // Parameterized LIMIT prevents SQLite's planner from using cardinality estimates.
             if (limitParameterName != null)
                 sb.Append(" LIMIT ").Append(limitParameterName);
@@ -158,7 +158,7 @@ namespace nORM.Providers
         /// <returns>SQL fragment to append to the insert command.</returns>
         public override string GetIdentityRetrievalString(TableMapping m)
         {
-            // PERF: Use RETURNING clause (SQLite 3.35+) for single-statement identity retrieval.
+            // Use RETURNING clause (SQLite 3.35+) for single-statement identity retrieval.
             // This is faster than "; SELECT last_insert_rowid();" because SQLite
             // executes one statement instead of two (no separate query plan/parse step).
             var keyCol = m?.KeyColumns?.FirstOrDefault(c => c.IsDbGenerated);
@@ -236,7 +236,7 @@ namespace nORM.Providers
             => $"json_extract({columnName}, '{jsonPath}')";
 
         /// <summary>
-        /// TP-1/Finding-D: SQLite table-not-found errors use SQLITE_ERROR (code 1) combined with
+        /// SQLite table-not-found errors use SQLITE_ERROR (code 1) combined with
         /// the "no such table" message. Code 1 alone is too broad (also covers syntax errors).
         /// Other error codes (SQLITE_PERM=3, SQLITE_CANTOPEN=14, etc.) indicate operational failures
         /// that must NOT be silently treated as "table absent."
@@ -247,7 +247,7 @@ namespace nORM.Providers
                && ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
-        /// P-1: Introspects live column definitions via PRAGMA table_info.
+        /// Introspects live column definitions via PRAGMA table_info.
         /// Returns empty list when the table does not yet exist.
         /// </summary>
         public override async Task<IReadOnlyList<LiveColumnInfo>> IntrospectTableColumnsAsync(
@@ -277,11 +277,11 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// MIG-1: Column types now use the same SQLite type mapping as the main table
-        /// (GetSqliteType) rather than forcing every column to TEXT. This ensures that the
-        /// history table schema mirrors the main table schema exactly (INTEGER for int/bool/long,
-        /// REAL for decimal/double/float, BLOB for byte[], TEXT for strings and everything else).
-        /// P-1: When liveColumns are supplied, prefer live SQL types/nullability over CLR defaults.
+        /// Generates SQL to create a history table. Column types use the same SQLite type
+        /// mapping as the main table (GetSqliteType), ensuring the history schema mirrors
+        /// the main table exactly (INTEGER for int/bool/long, REAL for decimal/double/float,
+        /// BLOB for byte[], TEXT for strings and everything else).
+        /// When liveColumns are supplied, live SQL types and nullability override CLR defaults.
         /// </summary>
         /// <param name="mapping">The entity mapping being tracked.</param>
         /// <param name="liveColumns">Live column info from the main table, or null to use CLR defaults.</param>
@@ -399,7 +399,7 @@ END;";
 
         /// <summary>
         /// Creates a savepoint within a SQLite transaction allowing partial rollbacks.
-        /// PRV-1: Checks the CancellationToken before executing so that pre-cancelled tokens
+        /// Checks the CancellationToken before executing so that pre-cancelled tokens
         /// correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">The active SQLite transaction.</param>
@@ -407,7 +407,7 @@ END;";
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             if (transaction is SqliteTransaction sqliteTransaction)
@@ -421,7 +421,7 @@ END;";
 
         /// <summary>
         /// Rolls back a SQLite transaction to the specified savepoint.
-        /// PRV-1: Checks the CancellationToken before executing so that pre-cancelled tokens
+        /// Checks the CancellationToken before executing so that pre-cancelled tokens
         /// correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">The active SQLite transaction.</param>
@@ -429,7 +429,7 @@ END;";
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             if (transaction is SqliteTransaction sqliteTransaction)
@@ -441,11 +441,9 @@ END;";
             throw new ArgumentException("Transaction must be a SqliteTransaction.", nameof(transaction));
         }
 
-        // PERFORMANCE FIX (TASK 16): SQLite-optimized bulk insert using prepared statements
         /// <summary>
         /// Inserts a collection of entities using SQLite-optimized prepared statements in a single transaction.
-        /// PERFORMANCE FIX (TASK 16): Uses prepared statement reuse and transaction batching for optimal SQLite performance.
-        /// This is significantly faster than calling base class methods which use multiple transactions.
+        /// Uses prepared statement reuse and transaction batching; significantly faster than multiple-transaction approaches.
         /// </summary>
         /// <typeparam name="T">Type of entity being inserted.</typeparam>
         /// <param name="ctx">Current <see cref="DbContext"/>.</param>
@@ -464,7 +462,7 @@ END;";
 
             var totalInserted = 0;
 
-            // TX-1: Respect ambient CurrentTransaction; only create a new transaction if none is active.
+            // Respect ambient CurrentTransaction; only create a new transaction if none is active.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction transaction = ctx.CurrentTransaction
                 ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -472,7 +470,7 @@ END;";
             {
                 if (cols.Length == 0)
                 {
-                    // PRV-1: All columns are DB-generated — use DEFAULT VALUES syntax.
+                    // All columns are DB-generated — use DEFAULT VALUES syntax.
                     // DEFAULT VALUES does not support batching so we loop per entity.
                     await using var cmd = ctx.Connection.CreateCommand();
                     cmd.Transaction = transaction;
@@ -485,7 +483,7 @@ END;";
                     // 2. Create ONE command and ONE set of parameters that will be reused.
                     await using var cmd = ctx.Connection.CreateCommand();
                     cmd.Transaction = transaction;
-                    // PERF: Use INSERT without RETURNING — bulk path uses ExecuteNonQuery
+                    // Use INSERT without RETURNING — bulk path uses ExecuteNonQuery
                     // and doesn't hydrate generated keys, so RETURNING output is wasted work.
                     cmd.CommandText = BuildInsert(m, hydrateGeneratedKeys: false);
 
@@ -515,13 +513,13 @@ END;";
                     }
                 }
 
-                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // Use CancellationToken.None so a cancelled caller token after a successful commit
                 // does not cause a spurious OperationCanceledException for already-committed data.
                 if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {
-                // S5-1: Preserve the original exception if rollback itself fails.
+                // Preserve the original exception if rollback itself fails.
                 if (ownedTx)
                 {
                     try
@@ -547,11 +545,9 @@ END;";
             return totalInserted;
         }
         
-        // PERFORMANCE FIX (TASK 16): SQLite-optimized bulk update using temp tables
         /// <summary>
-        /// Updates multiple entities using SQLite-optimized temp table approach for efficient bulk updates.
-        /// PERFORMANCE FIX (TASK 16): Uses temp tables and UPDATE FROM pattern for optimal SQLite performance.
-        /// This is significantly faster than the base class batched operations.
+        /// Updates multiple entities using a temp table approach for efficient bulk updates.
+        /// Uses temp tables and UPDATE FROM pattern; significantly faster than the base class batched operations.
         /// </summary>
         /// <typeparam name="T">Type of entity being updated.</typeparam>
         /// <param name="ctx">Active <see cref="DbContext"/>.</param>
@@ -566,14 +562,13 @@ END;";
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;
 
-            // PERFORMANCE FIX (TASK 16): Use temp table approach for SQLite bulk updates
             var tempTableName = $"\"BulkUpdate_{Guid.NewGuid():N}\"";
             var nonKeyCols = m.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToList();
             var keyCols = m.KeyColumns.ToList();
 
             var totalUpdated = 0;
 
-            // TX-1: Respect ambient CurrentTransaction; only create a new transaction if none is active.
+            // Respect ambient CurrentTransaction; only create a new transaction if none is active.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction transaction = ctx.CurrentTransaction
                 ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -637,13 +632,13 @@ END;";
                     await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // Use CancellationToken.None so a cancelled caller token after a successful commit
                 // does not cause a spurious OperationCanceledException for already-committed data.
                 if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {
-                // S5-1: Preserve the original exception if rollback itself fails.
+                // Preserve the original exception if rollback itself fails.
                 if (ownedTx)
                 {
                     try
@@ -678,12 +673,10 @@ END;";
             return "TEXT";
         }
         
-        // PERFORMANCE FIX (TASK 16): SQLite-optimized bulk delete using WHERE IN clauses
         /// <summary>
-        /// Deletes entities in bulk using SQLite-optimized WHERE IN clauses for single-key tables
+        /// Deletes entities in bulk using WHERE IN clauses for single-key tables
         /// or prepared statements for composite keys.
-        /// PERFORMANCE FIX (TASK 16): Uses batched WHERE IN clauses for optimal SQLite performance.
-        /// This is significantly faster than the base class operations.
+        /// Uses batched WHERE IN clauses; significantly faster than the base class operations.
         /// </summary>
         /// <typeparam name="T">Type of entity to delete.</typeparam>
         /// <param name="ctx">The <see cref="DbContext"/> managing the connection.</param>
@@ -708,7 +701,7 @@ END;";
                 batchSize = Math.Min(batchSize, MaxParameters);
             if (batchSize <= 0) batchSize = 1;
             
-            // TX-1: Respect ambient CurrentTransaction; only create a new transaction if none is active.
+            // Respect ambient CurrentTransaction; only create a new transaction if none is active.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction transaction = ctx.CurrentTransaction
                 ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -765,13 +758,13 @@ END;";
                     }
                 }
 
-                // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                // Use CancellationToken.None so a cancelled caller token after a successful commit
                 // does not cause a spurious OperationCanceledException for already-committed data.
                 if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception originalEx)
             {
-                // S5-1: Preserve the original exception if rollback itself fails.
+                // Preserve the original exception if rollback itself fails.
                 if (ownedTx)
                 {
                     try

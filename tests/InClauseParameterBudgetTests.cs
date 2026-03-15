@@ -12,7 +12,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// SQL-1: Verifies that the pessimistic 20% parameter reserve has been removed.
+/// Verifies that the pessimistic 20% parameter reserve has been removed.
 /// The old code rejected queries where items.Count > MaxParameters * 0.8 even when
 /// the actual remaining budget was sufficient. The fix uses exact accounting.
 /// </summary>

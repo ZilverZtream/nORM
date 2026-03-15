@@ -10,11 +10,11 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// TX-1: Verifies that TransactionManager.CommitAsync uses CancellationToken.None
-/// so that a cancelled caller token cannot abort a mid-flight commit and leave
-/// the database in an ambiguous state.
-/// </summary>
+//<summary>
+//Verifies that TransactionManager.CommitAsync uses CancellationToken.None
+//so that a cancelled caller token cannot abort a mid-flight commit and leave
+//the database in an ambiguous state.
+//</summary>
 public class TransactionCommitCancellationTests
 {
     [Table("TxCommitItem")]
@@ -42,13 +42,13 @@ public class TransactionCommitCancellationTests
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
 
-    // ─── TX-1: CommitAsync(CancellationToken.None) is not cancelable ──────
+ // ─── CommitAsync(CancellationToken.None) is not cancelable ──────
 
     [Fact]
     public async Task DbTransaction_CommitAsync_WithCancelledToken_StillCommits()
     {
-        // TX-1: Demonstrates the fix at the DbTransaction level.
-        // CommitAsync(CancellationToken.None) must complete even if a caller's token was cancelled.
+ // Demonstrates the fix at the DbTransaction level.
+ // CommitAsync(CancellationToken.None) must complete even if a caller's token was cancelled.
         var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var createCmd = cn.CreateCommand();
@@ -61,12 +61,12 @@ public class TransactionCommitCancellationTests
         insertCmd.CommandText = "INSERT INTO TxCheck VALUES (99)";
         await insertCmd.ExecuteNonQueryAsync();
 
-        // Pre-cancel a token — simulates what would previously have been passed to CommitAsync.
+ // Pre-cancel a token — simulates what would previously have been passed to CommitAsync.
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        // TX-1 fix: CommitAsync uses CancellationToken.None, so no OperationCanceledException.
-        // This call mirrors what TransactionManager.CommitAsync now does.
+ // fix: CommitAsync uses CancellationToken.None, so no OperationCanceledException.
+ // This call mirrors what TransactionManager.CommitAsync now does.
         await tx.CommitAsync(CancellationToken.None);
 
         using var verifyCmd = cn.CreateCommand();
@@ -78,7 +78,7 @@ public class TransactionCommitCancellationTests
     [Fact]
     public async Task SaveChangesAsync_WithValidToken_CommitsData()
     {
-        // Non-regression: normal SaveChangesAsync with a non-cancelled token commits correctly.
+ // Non-regression: normal SaveChangesAsync with a non-cancelled token commits correctly.
         var (cn, ctx) = CreateContext();
         using var _cn = cn;
         using var _ctx = ctx;
@@ -92,7 +92,7 @@ public class TransactionCommitCancellationTests
     [Fact]
     public async Task SaveChangesAsync_MultipleEntities_CommitsAllData()
     {
-        // Non-regression: multiple entities are all committed.
+ // Non-regression: multiple entities are all committed.
         var (cn, ctx) = CreateContext();
         using var _cn = cn;
         using var _ctx = ctx;
@@ -108,7 +108,7 @@ public class TransactionCommitCancellationTests
     [Fact]
     public async Task SaveChangesAsync_AfterRollback_LeavesNoData()
     {
-        // Non-regression: rollback on failure still leaves no data.
+ // Non-regression: rollback on failure still leaves no data.
         var (cn, ctx) = CreateContext();
         using var _cn = cn;
         using var _ctx = ctx;
@@ -116,11 +116,11 @@ public class TransactionCommitCancellationTests
         ctx.Add(new TxCommitItem { Id = 1, Val = "ok" });
         await ctx.SaveChangesAsync();
 
-        // Add duplicate PK to force failure
+ // Add duplicate PK to force failure
         ctx.Add(new TxCommitItem { Id = 1, Val = "duplicate" });
         await Assert.ThrowsAnyAsync<Exception>(() => ctx.SaveChangesAsync());
 
-        // Original row should still be there (only the second transaction rolled back)
+ // Original row should still be there (only the second transaction rolled back)
         Assert.Equal(1L, CountRows(cn));
     }
 }

@@ -9,9 +9,9 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// Tests for QP-1: GroupJoin double ORDER BY fix and grouping correctness.
-/// </summary>
+//<summary>
+//Tests for GroupJoin double ORDER BY fix and grouping correctness.
+//</summary>
 public class GroupJoinOrderByTests : TestBase
 {
     private class Person
@@ -49,10 +49,10 @@ public class GroupJoinOrderByTests : TestBase
         return (cn, ctx);
     }
 
-    /// <summary>
-    /// QP-1 Problem 1: GroupJoin SQL must contain exactly ONE ORDER BY clause.
-    /// Previously HandleGroupJoin embedded ORDER BY in _sql and Build() appended another one.
-    /// </summary>
+ //<summary>
+ //Problem 1: GroupJoin SQL must contain exactly ONE ORDER BY clause.
+ //Previously HandleGroupJoin embedded ORDER BY in _sql and Build() appended another one.
+ //</summary>
     [Fact]
     public void GroupJoin_WithDownstreamOrderBy_GeneratesSingleOrderByClause()
     {
@@ -73,15 +73,15 @@ public class GroupJoinOrderByTests : TestBase
             sql = (string)plan.GetType().GetProperty("Sql")!.GetValue(plan)!;
         }
 
-        // Count occurrences of ORDER BY (case insensitive)
+ // Count occurrences of ORDER BY (case insensitive)
         var orderByCount = CountOccurrences(sql, "ORDER BY");
         Assert.True(orderByCount <= 1,
             $"SQL should contain at most one ORDER BY clause but found {orderByCount}. SQL: {sql}");
     }
 
-    /// <summary>
-    /// QP-1 Problem 2 (regression): GroupJoin happy path still produces correct groups.
-    /// </summary>
+ //<summary>
+ //Problem 2 (regression): GroupJoin happy path still produces correct groups.
+ //</summary>
     [Fact]
     public void GroupJoin_HappyPath_CorrectGroups()
     {
@@ -109,11 +109,11 @@ public class GroupJoinOrderByTests : TestBase
         Assert.Single(charlie!.Pets);
     }
 
-    /// <summary>
-    /// QP-1 Problem 2: When a downstream OrderBy is chained, the outer key appears
-    /// as the primary sort to guarantee contiguous groups.
-    /// The outer key sort is inserted at index 0 in _orderBy so it always comes first.
-    /// </summary>
+ //<summary>
+ //Problem 2: When a downstream OrderBy is chained, the outer key appears
+ //as the primary sort to guarantee contiguous groups.
+ //The outer key sort is inserted at index 0 in _orderBy so it always comes first.
+ //</summary>
     [Fact]
     public void GroupJoin_WithOrderByOnProjectedField_OuterKeyStillFirst()
     {
@@ -134,14 +134,14 @@ public class GroupJoinOrderByTests : TestBase
             sql = (string)plan.GetType().GetProperty("Sql")!.GetValue(plan)!;
         }
 
-        // The SQL must contain ORDER BY (the outer key sort inserted by QP-1 fix).
+ // The SQL must contain ORDER BY (the outer key sort inserted by fix).
         Assert.Contains("ORDER BY", sql, StringComparison.OrdinalIgnoreCase);
 
-        // There must be exactly one ORDER BY.
+ // There must be exactly one ORDER BY.
         var count = CountOccurrences(sql, "ORDER BY");
         Assert.Equal(1, count);
 
-        // The outer key column (Id from Person table alias T0) must appear in the ORDER BY clause.
+ // The outer key column (Id from Person table alias T0) must appear in the ORDER BY clause.
         var orderByIndex = sql.IndexOf("ORDER BY", StringComparison.OrdinalIgnoreCase);
         var afterOrderBy = sql.Substring(orderByIndex);
         Assert.Contains("\"Id\"", afterOrderBy, StringComparison.OrdinalIgnoreCase);

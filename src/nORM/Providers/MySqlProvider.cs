@@ -87,7 +87,7 @@ namespace nORM.Providers
         }
         
         /// <summary>
-        /// SG-1: MySQL returns affected (changed) rows, not matched rows.
+        /// MySQL returns affected (changed) rows, not matched rows.
         /// This causes false-positive concurrency exceptions on same-value updates.
         /// </summary>
         internal override bool UseAffectedRowsSemantics => true;
@@ -156,7 +156,7 @@ namespace nORM.Providers
             => $"JSON_UNQUOTE(JSON_EXTRACT({columnName}, '{jsonPath}'))";
 
         /// <summary>
-        /// P-1: Introspects live column definitions via INFORMATION_SCHEMA.COLUMNS.
+        /// Introspects live column definitions via INFORMATION_SCHEMA.COLUMNS.
         /// Uses COLUMN_TYPE which already includes precision/length (e.g. decimal(10,4)).
         /// Returns empty list when the table does not yet exist.
         /// </summary>
@@ -191,7 +191,7 @@ ORDER BY ORDINAL_POSITION";
 
         /// <summary>
         /// Generates the SQL statement to create the temporal history table for an entity.
-        /// P-1: When liveColumns are supplied, column types are taken from the live DB schema.
+        /// When liveColumns are supplied, column types are taken from the live DB schema.
         /// </summary>
         public override string GenerateCreateHistoryTableSql(
             TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
@@ -301,7 +301,7 @@ END;";
 
         /// <summary>
         /// Creates a transaction savepoint to allow partial rollbacks when supported by the underlying MySQL driver.
-        /// PRV-1: Now checks the CancellationToken before executing so that pre-cancelled tokens
+        /// Checks the CancellationToken before executing so that pre-cancelled tokens
         /// correctly throw <see cref="OperationCanceledException"/> rather than silently proceeding.
         /// </summary>
         /// <param name="transaction">Active transaction to create the savepoint on.</param>
@@ -309,7 +309,7 @@ END;";
         /// <param name="ct">Cancellation token for the asynchronous operation.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) }) ??
@@ -321,15 +321,15 @@ END;";
                 {
                     saveMethod.Invoke(transaction, new object[] { name });
 
-                    // PRV-1: Check after the sync call in case cancellation arrived mid-operation.
+                    // Check after the sync call in case cancellation arrived mid-operation.
                     ct.ThrowIfCancellationRequested();
 
                     return Task.CompletedTask;
                 }
                 catch (System.Reflection.TargetInvocationException ex)
                 {
-                    // RELIABILITY FIX: Unwrap and rethrow the inner exception from reflection invoke
-                    // TargetInvocationException wraps the actual database exception, making it harder to handle
+                    // Unwrap and rethrow the inner exception from reflection invoke.
+                    // TargetInvocationException wraps the actual database exception, making it harder to handle.
                     if (ex.InnerException != null)
                         throw ex.InnerException;
                     throw;
@@ -340,7 +340,7 @@ END;";
 
         /// <summary>
         /// Rolls back the transaction to a previously created savepoint.
-        /// PRV-1: Now checks the CancellationToken before executing so that pre-cancelled tokens
+        /// Checks the CancellationToken before executing so that pre-cancelled tokens
         /// correctly throw <see cref="OperationCanceledException"/> rather than silently proceeding.
         /// </summary>
         /// <param name="transaction">The transaction containing the savepoint.</param>
@@ -348,7 +348,7 @@ END;";
         /// <param name="ct">Cancellation token for the asynchronous operation.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) }) ??
@@ -359,15 +359,15 @@ END;";
                 {
                     rollbackMethod.Invoke(transaction, new object[] { name });
 
-                    // PRV-1: Check after the sync call in case cancellation arrived mid-operation.
+                    // Check after the sync call in case cancellation arrived mid-operation.
                     ct.ThrowIfCancellationRequested();
 
                     return Task.CompletedTask;
                 }
                 catch (System.Reflection.TargetInvocationException ex)
                 {
-                    // RELIABILITY FIX: Unwrap and rethrow the inner exception from reflection invoke
-                    // TargetInvocationException wraps the actual database exception, making it harder to handle
+                    // Unwrap and rethrow the inner exception from reflection invoke.
+                    // TargetInvocationException wraps the actual database exception, making it harder to handle.
                     if (ex.InnerException != null)
                         throw ex.InnerException;
                     throw;
@@ -399,7 +399,7 @@ END;";
             var bulkCopyType = Type.GetType("MySqlConnector.MySqlBulkCopy, MySqlConnector");
             if (bulkCopyType != null && ctx.Connection.GetType().FullName == "MySqlConnector.MySqlConnection")
             {
-                // PRV-1: Respect ambient CurrentTransaction; only create a new one if none is active.
+                // Respect ambient CurrentTransaction; only create a new one if none is active.
                 bool ownedTx = ctx.CurrentTransaction == null;
                 DbTransaction transaction = ctx.CurrentTransaction
                     ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -425,7 +425,7 @@ END;";
                         BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                     }
 
-                    // T1: Use CancellationToken.None so a cancelled caller token after a successful commit
+                    // Use CancellationToken.None so a cancelled caller token after a successful commit
                     // does not cause a spurious OperationCanceledException for already-committed data.
                     if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
                     ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
@@ -452,9 +452,8 @@ END;";
         }
 
         /// <summary>
-        /// Updates multiple entities using MySQL-optimized temp table approach for efficient bulk updates.
-        /// PERFORMANCE FIX (TASK 14): Always uses MySQL-specific implementation with temp tables
-        /// instead of falling back to slow base class batched operations.
+        /// Updates multiple entities using a MySQL-optimized temp table approach for efficient bulk updates.
+        /// Always uses MySQL-specific implementation with temp tables for optimal performance.
         /// </summary>
         /// <typeparam name="T">Entity type being updated.</typeparam>
         /// <param name="ctx">The active <see cref="DbContext"/>.</param>
@@ -465,8 +464,6 @@ END;";
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
-            // PERFORMANCE FIX (TASK 14): Removed slow base.BatchedUpdateAsync fallback
-            // Always use MySQL-specific temp table implementation for optimal performance
 
             var sw = Stopwatch.StartNew();
             var tempTableName = $"`BulkUpdate_{Guid.NewGuid():N}`";
@@ -497,8 +494,7 @@ END;";
         
         /// <summary>
         /// Deletes multiple records using MySQL-optimized WHERE IN clauses for efficient bulk deletes.
-        /// PERFORMANCE FIX (TASK 14): Always uses MySQL-specific implementation with batched WHERE IN
-        /// instead of falling back to slow base class operations.
+        /// Always uses MySQL-specific implementation with batched WHERE IN for optimal performance.
         /// </summary>
         /// <typeparam name="T">Entity type to delete.</typeparam>
         /// <param name="ctx">The <see cref="DbContext"/> managing the connection.</param>
@@ -509,9 +505,6 @@ END;";
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.Connection);
-            // PERFORMANCE FIX (TASK 14): Removed slow base.BatchedDeleteAsync fallback
-            // Always use MySQL-specific WHERE IN implementation for optimal performance
-
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (!entityList.Any()) return 0;

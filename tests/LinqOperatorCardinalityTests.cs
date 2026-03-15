@@ -543,10 +543,10 @@ public class LinqOperatorCardinalityTests
         Assert.Equal("A", results[0].Name);
     }
 
-    // ─── QP-1: First vs FirstOrDefault semantics on fast path ─────────────────
+    // ─── First vs FirstOrDefault semantics on fast path ─────────────────
 
     /// <summary>
-    /// QP-1: First() must throw InvalidOperationException when no rows match, even on the
+    /// First() must throw InvalidOperationException when no rows match, even on the
     /// fast path (simple table scan without complex LINQ composition). Before the fix,
     /// ExecuteSimpleAsync treated First and FirstOrDefault identically, always returning null/default.
     /// </summary>
@@ -562,7 +562,7 @@ public class LinqOperatorCardinalityTests
     }
 
     /// <summary>
-    /// QP-1: FirstOrDefault() must return null (not throw) when no rows match on the fast path.
+    /// FirstOrDefault() must return null (not throw) when no rows match on the fast path.
     /// This was already the case before the fix, but we ensure the fix didn't break it.
     /// </summary>
     [Fact]
@@ -577,7 +577,7 @@ public class LinqOperatorCardinalityTests
     }
 
     /// <summary>
-    /// QP-1: First() on the fast path must return the element when exactly one row is present.
+    /// First() on the fast path must return the element when exactly one row is present.
     /// </summary>
     [Fact]
     public async Task First_FastPath_WithOneMatch_ReturnsElement()
@@ -592,7 +592,7 @@ public class LinqOperatorCardinalityTests
     }
 
     /// <summary>
-    /// QP-1: First() on the slow path (with Where predicate that rules out all rows) must also
+    /// First() on the slow path (with Where predicate that rules out all rows) must also
     /// throw InvalidOperationException — verifies the fast-path fix didn't regress the slow path.
     /// </summary>
     [Fact]

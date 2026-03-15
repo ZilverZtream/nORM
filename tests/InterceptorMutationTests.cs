@@ -15,12 +15,12 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// Finding-B: Verifies that property mutations made to previously-Unchanged entities
-/// by SavingChangesAsync interceptors are picked up and persisted to the database.
-/// Root cause: DetectAllChanges() was not re-run after SavingChangesAsync interceptors,
-/// so interceptor-induced property changes on Unchanged entities were silently dropped.
-/// </summary>
+//<summary>
+//Verifies that property mutations made to previously-Unchanged entities
+//by SavingChangesAsync interceptors are picked up and persisted to the database.
+//Root cause: DetectAllChanges() was not re-run after SavingChangesAsync interceptors,
+//so interceptor-induced property changes on Unchanged entities were silently dropped.
+//</summary>
 public class InterceptorMutationTests
 {
     [Table("ImuItem")]
@@ -33,7 +33,7 @@ public class InterceptorMutationTests
         public string? AuditStamp { get; set; }
     }
 
-    // ── Interceptor that mutates a previously-Unchanged entity ────────────────
+ // ── Interceptor that mutates a previously-Unchanged entity ────────────────
 
     private sealed class AuditStampInterceptor : ISaveChangesInterceptor
     {
@@ -49,9 +49,9 @@ public class InterceptorMutationTests
         public Task SavingChangesAsync(DbContext context, IReadOnlyList<EntityEntry> entries,
             CancellationToken cancellationToken)
         {
-            // Finding-B scenario: mutate a property on the entity. The entity was previously
-            // Unchanged in the tracker. Without re-running DetectAllChanges after this interceptor,
-            // this mutation is invisible to the write pipeline.
+ // Mutate a property on the entity. The entity was previously
+ // Unchanged in the tracker. Without re-running DetectAllChanges after this interceptor,
+ // this mutation is invisible to the write pipeline.
             _targetEntity.AuditStamp = _stamp;
             return Task.CompletedTask;
         }
@@ -60,7 +60,7 @@ public class InterceptorMutationTests
             int result, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
-    // ── Setup helpers ─────────────────────────────────────────────────────────
+ // ── Setup helpers ─────────────────────────────────────────────────────────
 
     private static (SqliteConnection Cn, DbContext Ctx, ImuItem Entity) CreateContextWithTrackedEntity(
         ISaveChangesInterceptor interceptor)
@@ -81,22 +81,22 @@ public class InterceptorMutationTests
         opts.SaveChangesInterceptors.Add(interceptor);
         var ctx = new DbContext(cn, new SqliteProvider(), opts);
 
-        // Insert the entity so it's tracked as Unchanged
+ // Insert the entity so it's tracked as Unchanged
         var entity = new ImuItem { Name = "original" };
         ctx.Add(entity);
         ctx.SaveChangesAsync().GetAwaiter().GetResult();
-        // entity.Id is now set; entity state is Unchanged
+ // entity.Id is now set; entity state is Unchanged
 
         return (cn, ctx, entity);
     }
 
-    // ── Tests ─────────────────────────────────────────────────────────────────
+ // ── Tests ─────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Finding-B: When a SavingChangesAsync interceptor mutates a property on a previously-Unchanged
-    /// tracked entity, that mutation must appear in the database after SaveChangesAsync completes.
-    /// Before the fix, DetectAllChanges was not re-run after interceptors, so this update was dropped.
-    /// </summary>
+ //<summary>
+ //When a SavingChangesAsync interceptor mutates a property on a previously-Unchanged
+ //tracked entity, that mutation must appear in the database after SaveChangesAsync completes.
+ //Before the fix, DetectAllChanges was not re-run after interceptors, so this update was dropped.
+ //</summary>
     [Fact]
     public async Task SavingChangesAsync_InterceptorMutatesUnchangedEntity_MutationIsPersistedToDatabase()
     {
@@ -119,17 +119,17 @@ public class InterceptorMutationTests
         opts.SaveChangesInterceptors.Add(interceptor);
         var ctx = new DbContext(cn, new SqliteProvider(), opts);
 
-        // Insert the entity and let it become Unchanged
+ // Insert the entity and let it become Unchanged
         ctx.Add(entity);
         await ctx.SaveChangesAsync(); // entity is now Unchanged in tracker, AuditStamp=null
 
-        // Now save a DIFFERENT entity — this triggers SavingChangesAsync on ALL interceptors.
-        // The interceptor mutates entity.AuditStamp on the Unchanged entity.
+ // Now save a DIFFERENT entity — this triggers SavingChangesAsync on ALL interceptors.
+ // The interceptor mutates entity.AuditStamp on the Unchanged entity.
         var other = new ImuItem { Name = "trigger" };
         ctx.Add(other);
         await ctx.SaveChangesAsync();
 
-        // Finding-B: The AuditStamp mutation must be in the database.
+ // The AuditStamp mutation must be in the database.
         using var check = cn.CreateCommand();
         check.CommandText = $"SELECT AuditStamp FROM ImuItem WHERE Id = {entity.Id}";
         var stamp = check.ExecuteScalar()?.ToString();
@@ -137,10 +137,10 @@ public class InterceptorMutationTests
         Assert.Equal("audit-2024", stamp);
     }
 
-    /// <summary>
-    /// Finding-B: The interceptor-mutated entity must transition from Unchanged to Modified
-    /// so the write pipeline includes it.
-    /// </summary>
+ //<summary>
+ //The interceptor-mutated entity must transition from Unchanged to Modified
+ //so the write pipeline includes it.
+ //</summary>
     [Fact]
     public async Task SavingChangesAsync_InterceptorMutatesUnchangedEntity_EntryBecomesModified()
     {
@@ -166,13 +166,13 @@ public class InterceptorMutationTests
         ctx.Add(entity);
         await ctx.SaveChangesAsync(); // entity Unchanged
 
-        // Trigger a save with another entity; interceptor mutates the Unchanged entity.
-        // After the fix, DetectAllChanges re-runs and picks up the mutation.
+ // Trigger a save with another entity; interceptor mutates the Unchanged entity.
+ // After the fix, DetectAllChanges re-runs and picks up the mutation.
         var other = new ImuItem { Name = "trigger" };
         ctx.Add(other);
         await ctx.SaveChangesAsync();
 
-        // Verify the mutated entity was persisted
+ // Verify the mutated entity was persisted
         Assert.Equal("modified-stamp", entity.AuditStamp);
 
         using var check = cn.CreateCommand();
@@ -181,10 +181,10 @@ public class InterceptorMutationTests
         Assert.Equal("modified-stamp", dbValue);
     }
 
-    /// <summary>
-    /// Finding-B: When no interceptor mutations occur, the normal save path is unaffected.
-    /// Regression guard: existing interceptors that only read (no mutations) should still work.
-    /// </summary>
+ //<summary>
+ //When no interceptor mutations occur, the normal save path is unaffected.
+ //Regression guard: existing interceptors that only read (no mutations) should still work.
+ //</summary>
     [Fact]
     public async Task SavingChangesAsync_NonMutatingInterceptor_DoesNotAffectNormalSave()
     {

@@ -10,11 +10,11 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// CT-1: Verifies that a composite PK where one column is DB-generated (AUTOINCREMENT)
-/// correctly avoids identity-map aliasing when two entities have the same default key value
-/// before SaveChangesAsync assigns the real DB-generated id.
-/// </summary>
+//<summary>
+//Verifies that a composite PK where one column is DB-generated (AUTOINCREMENT)
+//correctly avoids identity-map aliasing when two entities have the same default key value
+//before SaveChangesAsync assigns the real DB-generated id.
+//</summary>
 public class CompositeKeyDbGeneratedTests
 {
     private class CompositeOrder2
@@ -27,12 +27,12 @@ public class CompositeKeyDbGeneratedTests
     [Table("CompositeOrder")]
     private class CompositeOrder
     {
-        /// <summary>DB-generated; default 0 before insert.</summary>
+ //<summary>DB-generated; default 0 before insert.</summary>
         [Key, Column(Order = 0)]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
 
-        /// <summary>Manually assigned line number; part of composite PK.</summary>
+ //<summary>Manually assigned line number; part of composite PK.</summary>
         [Key, Column(Order = 1)]
         public int LineNumber { get; set; }
 
@@ -45,8 +45,8 @@ public class CompositeKeyDbGeneratedTests
         cn.Open();
         using (var cmd = cn.CreateCommand())
         {
-            // SQLite: Id is AUTOINCREMENT (integer primary key), LineNumber is part of PK
-            // We model this as a composite key where Id is DB-generated.
+ // SQLite: Id is AUTOINCREMENT (integer primary key), LineNumber is part of PK
+ // We model this as a composite key where Id is DB-generated.
             cmd.CommandText =
                 "CREATE TABLE CompositeOrder (" +
                 "  Id INTEGER NOT NULL," +
@@ -72,16 +72,16 @@ public class CompositeKeyDbGeneratedTests
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
 
-        // Both entities have Id=0 (DB-generated default) and LineNumber=0 (also default).
-        // Before the fix they both returned composite key (0,0) and the second entity
-        // was aliased to the first entry in the identity map.
+ // Both entities have Id=0 (DB-generated default) and LineNumber=0 (also default).
+ // Before the fix they both returned composite key (0,0) and the second entity
+ // was aliased to the first entry in the identity map.
         var e1 = new CompositeOrder { Description = "First" };   // Id=0, LineNumber=0
         var e2 = new CompositeOrder { Description = "Second" };  // Id=0, LineNumber=0
 
         ctx.Add(e1);
         ctx.Add(e2);
 
-        // Both must be tracked as distinct entries — not aliased to one another.
+ // Both must be tracked as distinct entries — not aliased to one another.
         Assert.Equal(2, ctx.ChangeTracker.Entries.Count());
     }
 
@@ -91,8 +91,8 @@ public class CompositeKeyDbGeneratedTests
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
 
-        // Id is DB-generated (default 0), LineNumbers differ.
-        // The fix returns null for both (Id=0 triggers the guard), so both tracked by reference.
+ // Id is DB-generated (default 0), LineNumbers differ.
+ // The fix returns null for both (Id=0 triggers the guard), so both tracked by reference.
         var e1 = new CompositeOrder { LineNumber = 1, Description = "Line1" };
         var e2 = new CompositeOrder { LineNumber = 2, Description = "Line2" };
 
@@ -105,8 +105,8 @@ public class CompositeKeyDbGeneratedTests
     [Fact]
     public async Task SaveChanges_inserts_two_rows_with_explicit_composite_keys()
     {
-        // Use a simpler entity without DB-generated column to verify SaveChanges works
-        // after the CT-1 fix doesn't break the persisting path for explicit composite keys.
+ // Use a simpler entity without DB-generated column to verify SaveChanges works
+ // after the fix doesn't break the persisting path for explicit composite keys.
         using var cn2 = new SqliteConnection("Data Source=:memory:");
         cn2.Open();
         using (var cmd = cn2.CreateCommand())
@@ -151,14 +151,14 @@ public class CompositeKeyDbGeneratedTests
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
 
-        // Non-default (non-zero) Id — should still use PK-based identity map
+ // Non-default (non-zero) Id — should still use PK-based identity map
         var e1 = new CompositeOrder { Id = 10, LineNumber = 1, Description = "A" };
         var e2 = new CompositeOrder { Id = 10, LineNumber = 1, Description = "B" };
 
         var entry1 = ctx.Attach(e1);
         var entry2 = ctx.Attach(e2); // same PK → should return the same entry
 
-        // Second attach with same explicit PK must return the first entity (identity resolution)
+ // Second attach with same explicit PK must return the first entity (identity resolution)
         Assert.Same(e1, entry2.Entity);
         Assert.Single(ctx.ChangeTracker.Entries);
     }

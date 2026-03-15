@@ -10,7 +10,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// PRV-1: Validates that all stored procedure overloads use Provider.StoredProcedureCommandType
+/// Validates that all stored procedure overloads use Provider.StoredProcedureCommandType
 /// rather than hardcoding CommandType.StoredProcedure.
 /// </summary>
 public class StoredProcedureTests

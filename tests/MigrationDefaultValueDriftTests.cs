@@ -5,7 +5,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// M1: Verifies that SchemaDiffer.Diff() detects DefaultValue changes and that migration
+/// Verifies that SchemaDiffer.Diff() detects DefaultValue changes and that migration
 /// generators emit the appropriate SQL to apply and roll back those changes.
 /// </summary>
 public class MigrationDefaultValueDriftTests

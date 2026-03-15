@@ -13,7 +13,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Gate 4.5→5.0: Cancellation, rollback, and partial-failure migration fault injection tests.
+/// Cancellation, rollback, and partial-failure migration fault injection tests.
 ///
 /// Tests verify that:
 /// 1. CancellationToken cancellation before migration apply causes OperationCanceledException

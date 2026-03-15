@@ -15,7 +15,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-1: Verifies that the cache-lock cleanup timer never disposes a semaphore that another
+/// Verifies that the cache-lock cleanup timer never disposes a semaphore that another
 /// thread obtained via GetOrAdd but has not yet called Wait on — previously the cleanup code
 /// called semaphore.Dispose() after TryRemove, causing ObjectDisposedException on the waiting thread.
 /// </summary>
@@ -53,7 +53,7 @@ public class CacheLockConcurrencyTests
     // ── tests ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// QP-1: Concurrent cleanup + semaphore Wait must never produce ObjectDisposedException.
+    /// Concurrent cleanup + semaphore Wait must never produce ObjectDisposedException.
     /// Stress test: 50 tasks continuously GetOrAdd + Wait/Release while a tight loop calls
     /// CleanupCacheLocks. We fill the dict past MaxLocksToKeep (1000) to ensure cleanup runs.
     /// </summary>
@@ -109,12 +109,12 @@ public class CacheLockConcurrencyTests
         await Task.WhenAll(workers);
         await cleanupTask;
 
-        // QP-1: must not see any ObjectDisposedException (or any exception from workers).
+        // must not see any ObjectDisposedException (or any exception from workers).
         Assert.Empty(exceptions);
     }
 
     /// <summary>
-    /// QP-1: Value-matching TryRemove semantics — removing a stale (key,semaphore) pair
+    /// Value-matching TryRemove semantics — removing a stale (key,semaphore) pair
     /// must NOT remove a freshly re-inserted semaphore for the same key.
     /// This validates the core invariant of the fix without involving NormQueryProvider.
     /// </summary>

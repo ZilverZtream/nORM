@@ -18,17 +18,12 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Audit gate tests covering all score-movement rules from the nORM Deep Audit Report.
-///
-/// Gate 2.8 → 3.0  — SG1/X1 source-gen parity (see SourceGenMaterializerCorrectnessTests.cs)
-/// Gate 3.0 → 3.5  — Path coverage, malformed expression fuzz, provider edge matrices
-/// Gate 3.5 → 4.0  — Provider SQL correctness matrix, transaction/connection fault injection
-/// Gate 4.0 → 4.5  — C1 cache factory idempotence, migration partial-failure/retry, cancellation matrix
-/// Gate 4.5 → 5.0  — No >Low correctness issues; adversarial cache, shared-state safety
+/// Integration tests covering correctness across query translation, caching, transaction handling,
+/// migration atomicity, cancellation propagation, and compiled query behavior across all providers.
 /// </summary>
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 3.0 → 3.5 : path coverage, fuzz, provider edge matrices
+// Path coverage, fuzz, provider edge matrices
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Table("GateSimple")]
@@ -159,7 +154,7 @@ public class Gate30To35Tests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 3.5 → 4.0 : SQL correctness matrix + fault injection
+// SQL correctness matrix + fault injection
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Table("GateSE")]
@@ -318,25 +313,21 @@ public class Gate35To40Tests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 4.0 → 4.5 : C1 cache factory idempotence, cancellation matrix, migration retry
-// ══════════════════════════════════════════════════════════════════════════════
-// Gate 3.6 → 4.0 : P1 (null param metadata), C1 (COUNT tx rebind), C2 (disposal)
+// Cache factory idempotence, cancellation matrix, migration retry
 // ══════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// Gate 3.6 → 4.0 tests:
-///  - P1: Reused DbParameter gets DbType/Size reset on null (no stale metadata carry-over).
-///  - C1: COUNT pooled command rebinds CurrentTransaction on each use.
-///  - C2: _pooledCountCommands is disposed when provider is disposed.
+/// Tests for null parameter metadata reset, COUNT pooled command transaction rebinding,
+/// and pooled command disposal on provider dispose.
 /// </summary>
 public class Gate36To40Tests
 {
-    // ── P1: Null-after-nonNull on reused compiled-query parameter resets DbType/Size ──
+    // ── Null-after-nonNull on reused compiled-query parameter resets DbType/Size ──
 
     [Fact]
-    public async Task P1_CompiledQuery_NullAfterNonNull_ReturnsCorrectResults()
+    public async Task CompiledQuery_NullAfterNonNull_ReturnsCorrectResults()
     {
-        // P1 guard: compiled query with nullable string param.
+        // Compiled query with nullable string param.
         // First call: non-null value (sets DbType = String on the prepared DbParameter).
         // Second call: null value — must reset DbType/Size so the query returns IS-NULL rows.
         // Third call: non-null again — must return the non-null row (no stale null state).
@@ -373,7 +364,7 @@ public class Gate36To40Tests
     }
 
     [Fact]
-    public async Task P1_CompiledQuery_NonNullAfterNull_ReturnsCorrectResults()
+    public async Task CompiledQuery_NonNullAfterNull_ReturnsCorrectResults()
     {
         // Reverse order: null first (sets DbType=Object), then non-null, then null again.
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -401,13 +392,13 @@ public class Gate36To40Tests
         Assert.Single(rNull2); Assert.Equal(2, rNull2[0].Id);
     }
 
-    // ── C1: COUNT pooled command rebinds transaction on each use ─────────────────────
+    // ── COUNT pooled command rebinds transaction on each use ─────────────────────
 
     [Fact]
-    public async Task C1_CountFastPath_RebindsTransaction_DoesNotThrow()
+    public async Task CountFastPath_RebindsTransaction_DoesNotThrow()
     {
-        // C1 guard: Microsoft.Data.Sqlite throws if cmd.Transaction is null/stale while an
-        // explicit transaction is active on the connection. The C1 fix rebinds
+        // Microsoft.Data.Sqlite throws if cmd.Transaction is null/stale while an
+        // explicit transaction is active on the connection. The fix rebinds
         // pooledCmd.Transaction = _ctx.CurrentTransaction before every execution, preventing
         // "ExecuteReader requires the command to have a transaction" errors.
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -428,8 +419,8 @@ public class Gate36To40Tests
         // Begin a transaction through the context so CurrentTransaction is set.
         await using var tx = await ctx.Database.BeginTransactionAsync();
 
-        // C1 fix: second COUNT must rebind pooledCmd.Transaction to the active tx.
-        // Without fix: cmd.Transaction is still null → SQLite driver throws
+        // Second COUNT must rebind pooledCmd.Transaction to the active tx.
+        // Without the rebind, cmd.Transaction is still null → SQLite driver throws
         // "ExecuteReader requires the command to have a transaction".
         var count2 = await ctx.Query<C1Entity>().CountAsync();
         Assert.Equal(1, count2);
@@ -441,14 +432,13 @@ public class Gate36To40Tests
         Assert.Equal(1, count3);
     }
 
-    // ── C2: Pooled count commands are disposed when provider is disposed ──────────────
+    // ── Pooled count commands are disposed when provider is disposed ──────────────
 
     [Fact]
-    public async Task C2_PooledCountCommands_AreDisposed_OnProviderDispose()
+    public async Task PooledCountCommands_AreDisposed_OnProviderDispose()
     {
-        // C2 guard: warm the COUNT pool, then dispose the context.
-        // Before fix: _pooledCountCommands held alive DbCommands forever (resource leak).
-        // After fix: Dispose() iterates and disposes all pooled commands without throwing.
+        // Warm the COUNT pool, then dispose the context.
+        // Dispose() must iterate and dispose all pooled commands without throwing.
         // We verify: (a) Dispose() does not throw; (b) a fresh context on a new connection
         // can run COUNT without interference from previously disposed commands.
         using var cn1 = new SqliteConnection("Data Source=:memory:");
@@ -510,7 +500,7 @@ file class C2Entity
 
 public class Gate40To45Tests
 {
-    // ── C1: ConcurrentLruCache.GetOrAdd factory called at most once per key ───
+    // ── ConcurrentLruCache.GetOrAdd factory called at most once per key ───
 
     [Fact]
     public async Task ConcurrentLruCache_GetOrAdd_FactoryCalledOncePerKey()
@@ -767,10 +757,9 @@ public class Gate40To45Tests
     [Fact]
     public async Task CompiledQuery_HighContention_ConcurrentDifferentContexts_CorrectResults()
     {
-        // 4.0→4.5 regression guard: with shared pooledState (pre-fix), a command bound to
-        // ctx_A's connection could be dequeued by ctx_B, causing InvalidOperationException
-        // or wrong results. With ConditionalWeakTable (post-fix), each context has its own
-        // command pool — no cross-connection contamination possible.
+        // With shared pooledState, a command bound to ctx_A's connection could be dequeued
+        // by ctx_B, causing InvalidOperationException or wrong results. With ConditionalWeakTable,
+        // each context has its own command pool — no cross-connection contamination possible.
         var compiled = Norm.CompileQuery((DbContext ctx, int id) =>
             ctx.Query<GateCQ>().Where(e => e.Id == id));
 
@@ -887,21 +876,22 @@ public class Gate40To45Tests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 4.5 → 5.0 : adversarial cache, shared-state safety
+// Adversarial cache, shared-state safety
 // ══════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// Gate 3.2 → 3.5: Q1/P1/X1 — compiled-query pooled command and shared arg-array concurrency fixes.
+/// Tests for compiled-query pooled command correctness and shared arg-array safety under
+/// sequential and concurrent access patterns.
 /// </summary>
 public class Gate32To35Tests
 {
-    // ── P1: Sequential calls with different params must never return stale results ──────────────
+    // ── Sequential calls with different params must never return stale results ──────────────
 
     [Fact]
     public async Task CompiledQuery_SequentialDifferentParams_ReturnsCorrectResults()
     {
-        // P1 regression guard: if singleArgArray were shared across calls, second call could
-        // read a stale value from the first call and return wrong rows.
+        // If singleArgArray were shared across calls, the second call could read a stale value
+        // from the first call and return wrong rows.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using (var cmd = cn.CreateCommand())
@@ -936,7 +926,7 @@ public class Gate32To35Tests
     [Fact]
     public async Task CompiledQuery_TupleParams_SequentialDifferentValues_NoBleed()
     {
-        // P1 regression guard for tuple (multi-param) case: tupleArgArray shared would bleed values.
+        // For the tuple (multi-param) case: a shared tupleArgArray would bleed values between calls.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using (var cmd = cn.CreateCommand())
@@ -967,15 +957,15 @@ public class Gate32To35Tests
         Assert.Equal(2, rAllAgain.Count);
     }
 
-    // ── Q1: Compiled delegate called sequentially across different contexts ──────────────────────
+    // ── Compiled delegate called sequentially across different contexts ──────────────────────
 
     [Fact]
     public async Task CompiledQuery_SequentialDifferentContexts_EachGetsOwnResults()
     {
-        // Q1 regression guard: pool must be drained and rebuilt when context changes,
-        // so each context gets a command bound to its own connection. Sequential (not concurrent)
-        // because SQLite in-memory connections are per-connection and the compiled-delegate
-        // closure is designed for single-context sequential use.
+        // The pool must be drained and rebuilt when context changes, so each context gets
+        // a command bound to its own connection. Sequential (not concurrent) because SQLite
+        // in-memory connections are per-connection and the compiled-delegate closure is
+        // designed for single-context sequential use.
         for (int i = 1; i <= 5; i++)
         {
             using var cn = new SqliteConnection("Data Source=:memory:");
@@ -999,12 +989,12 @@ public class Gate32To35Tests
         }
     }
 
-    // ── X1: Same compiled delegate, sequential calls with same context — command pool returns correctly ──
+    // ── Same compiled delegate, sequential calls with same context — command pool returns correctly ──
 
     [Fact]
     public async Task CompiledQuery_ManySequentialCalls_CommandPoolDoesNotLeak()
     {
-        // Q1: verifies the command pool is correctly maintained (command returned after each call).
+        // Verifies the command pool is correctly maintained (command returned after each call).
         // If commands weren't returned to the pool, the pool would be empty and a new command
         // would be created on every call. This test verifies correctness, not pool internals.
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -1046,18 +1036,18 @@ file class GateCQ
 }
 
 /// <summary>
-/// Gate 3.5 → 4.0: A1 — fast-path timeout consistency and provider matrix under contention.
+/// Tests for fast-path timeout consistency and provider matrix under contention.
 /// </summary>
 public class Gate35To40AddlTests
 {
-    // ── A1: Count fast path uses CommandTimeout consistently ─────────────────────────────────
+    // ── Count fast path uses CommandTimeout consistently ─────────────────────────────────
 
     [Fact]
     public async Task CountFastPath_CommandTimeout_IsApplied()
     {
-        // A1: verifies that the count fast path applies CommandTimeout, not leaving it at 0.
+        // Verifies that the count fast path applies CommandTimeout, not leaving it at 0.
         // We can't easily measure the timeout value from outside, but we can verify the
-        // count fast path executes correctly (regression guard — was: timeout could be 0).
+        // count fast path executes correctly.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using (var cmd = cn.CreateCommand())
@@ -1074,7 +1064,7 @@ public class Gate35To40AddlTests
     [Fact]
     public async Task WhereFastPath_CommandTimeout_IsApplied()
     {
-        // A1: verifies the where fast path executes without hanging (timeout applied).
+        // Verifies the where fast path executes without hanging (timeout applied).
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using (var cmd = cn.CreateCommand())
@@ -1214,7 +1204,7 @@ public class Gate45To50Tests
     [Fact]
     public async Task Soak_CompiledQuery_10000Iterations_CorrectResults()
     {
-        // 4.5→5.0 soak test: 10,000 sequential iterations with alternating parameter values.
+        // Soak test: 10,000 sequential iterations with alternating parameter values.
         // Catches parameter bleed, pool corruption, and memory growth bugs that probabilistic
         // tests miss. A leaked/stale parameter would produce wrong Name values for some rows.
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -1284,9 +1274,9 @@ public class Gate45To50Tests
     [Fact]
     public async Task MultiTenant_CompiledQuery_SameDelegate_TenantDataStaysIsolated()
     {
-        // 4.5→5.0: Verify that the ConditionalWeakTable per-context state means
-        // two contexts with different tenant configurations (different global filters)
-        // do NOT share command pools, and each gets only its own tenant's data.
+        // Verify that the ConditionalWeakTable per-context state means two contexts with
+        // different tenant configurations (different global filters) do NOT share command pools,
+        // and each gets only its own tenant's data.
         using var cn1 = new SqliteConnection("Data Source=:memory:");
         using var cn2 = new SqliteConnection("Data Source=:memory:");
         cn1.Open(); cn2.Open();
@@ -1327,7 +1317,7 @@ public class Gate45To50Tests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 3.8 → 4.0 : A1/X1 compile timeout cooperative/bounded, T1 dispose race
+// Compile timeout cooperative/bounded, dispose race safety
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Table("Gate38CQ")]
@@ -1338,12 +1328,12 @@ file class Gate38CQ
 }
 
 /// <summary>
-/// Gate 3.8 → 4.0:
-///  - A1/X1: Compile timeout is caller-cooperative; background workers are bounded via semaphore.
+/// Verifies that compile timeout is caller-cooperative and background workers are bounded
+/// via semaphore, with the semaphore count returning to capacity after each compile.
 /// </summary>
 public class Gate38To40Tests
 {
-    // ── A1/X1: Caller receives TimeoutException; compile semaphore returns to capacity ──
+    // ── Caller receives TimeoutException; compile semaphore returns to capacity ──
 
     [Fact]
     public void CompileQuery_NormalExpression_Succeeds()
@@ -1366,9 +1356,9 @@ public class Gate38To40Tests
     [Fact]
     public async Task CompileQuery_SemaphoreCountReturnsToCapacity_AfterCompilation()
     {
-        // A1/X1: After a successful compile, the semaphore count must return to full capacity.
-        // Before fix: if the semaphore slot was never released, capacity would shrink
-        // permanently and eventually all compiles would deadlock.
+        // After a successful compile, the semaphore count must return to full capacity.
+        // If the semaphore slot were never released, capacity would shrink permanently
+        // and eventually all compiles would deadlock.
         var initialCount = ExpressionCompiler.CompileSemaphoreCurrentCount;
         var capacity = ExpressionCompiler.CompileSemaphoreCapacity;
 
@@ -1399,8 +1389,7 @@ public class Gate38To40Tests
     [Fact]
     public async Task CompileQuery_ConcurrentCompiles_NeverExceedCapacity()
     {
-        // A1/X1 bounded-worker proof: fire capacity+2 concurrent compiles;
-        // in-flight active count must never exceed _compileSemaphoreCapacity.
+        // Fire capacity+2 concurrent compiles; in-flight active count must never exceed _compileSemaphoreCapacity.
         // This proves the semaphore prevents unbounded thread-pool growth.
         var capacity = ExpressionCompiler.CompileSemaphoreCapacity;
 
@@ -1446,7 +1435,7 @@ public class Gate38To40Tests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 4.0 → 4.5 : P1 precision/scale, T1 ConnectionManager disposal
+// Decimal precision/scale metadata reset; ConnectionManager disposal safety
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Table("Gate40Dec")]
@@ -1457,19 +1446,18 @@ file class Gate40Dec
 }
 
 /// <summary>
-/// Gate 4.0 → 4.5:
-///  - P1: Decimal precision/scale reset on null and on reassignment (no stale metadata).
-///  - T1: ConnectionManager Dispose does not throw ObjectDisposedException under slow health check.
+/// Tests for decimal precision/scale metadata reset on null and on reassignment, and for
+/// ConnectionManager Dispose safety when a slow health check overlaps with disposal.
 /// </summary>
 public class Gate40To45NewTests
 {
-    // ── P1: Decimal precision/scale not carried over between reused parameters ───────
+    // ── Decimal precision/scale not carried over between reused parameters ───────
 
     [Fact]
-    public async Task P1_CompiledQuery_DecimalParam_AlternatingValues_CorrectResults()
+    public async Task CompiledQuery_DecimalParam_AlternatingValues_CorrectResults()
     {
-        // P1: reuse a prepared DbParameter across alternating decimal values.
-        // The key regression is: stale Precision/Scale from call N corrupting call N+1.
+        // Reuse a prepared DbParameter across alternating decimal values.
+        // Stale Precision/Scale from call N must not corrupt call N+1.
         // Verify that each call returns the correct row with no metadata bleed-over.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -1498,9 +1486,9 @@ public class Gate40To45NewTests
     }
 
     [Fact]
-    public async Task P1_ParameterReuse_NullResetsAllMetadata_AssignValueDirectly()
+    public async Task ParameterReuse_NullResetsAllMetadata_AssignValueDirectly()
     {
-        // P1: verify that AssignValue resets Precision/Scale on null, not just DbType/Size.
+        // Verify that AssignValue resets Precision/Scale on null, not just DbType/Size.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
 
@@ -1521,14 +1509,14 @@ public class Gate40To45NewTests
         Assert.Equal(0, p.Scale);
     }
 
-    // ── T1: ConnectionManager.Dispose() does not throw under slow health check ────────
+    // ── ConnectionManager.Dispose() does not throw under slow health check ────────
 
     [Fact]
-    public async Task T1_ConnectionManager_Dispose_SafeUnderSlowHealthCheck()
+    public async Task ConnectionManager_Dispose_SafeUnderSlowHealthCheck()
     {
-        // T1 guard: when health check runs slow and Dispose() proceeds past its 10s timeout,
+        // When the health check runs slow and Dispose() proceeds past its 10s timeout,
         // the semaphore disposal must NOT throw ObjectDisposedException back at the health task.
-        // Before fix: Dispose() called _healthCheckSemaphore.Dispose() unconditionally, so a
+        // Before the fix: Dispose() called _healthCheckSemaphore.Dispose() unconditionally, so a
         // slow-running PerformHealthChecksAsync that finally hits Release() would fault.
         // After fix: semaphores are only disposed if the task completed within timeout.
 
@@ -1567,9 +1555,8 @@ public class Gate40To45NewTests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 3.7 → 4.0 : P1 stale Size metadata + SG1/X1 closure-capture cache key
-// Gate 4.0 → 4.5 : C1 bounded plansByCtx LRU eviction
-// Gate 4.5 → 5.0 : adversarial cache-poisoning and closure-capture fuzz matrix
+// Stale Size metadata; closure-capture cache key; bounded plansByCtx LRU eviction;
+// adversarial cache-poisoning and closure-capture fuzz matrix
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Table("Sg1Row")]
@@ -1598,21 +1585,20 @@ file sealed class FixedTenantProvider : nORM.Enterprise.ITenantProvider
 }
 
 /// <summary>
-/// Gate 3.7 → 4.0:
-///  - P1: AssignValue must always set Size correctly for string parameters (short→long, long→short).
-///  - SG1/X1: GetFilterKey must include closure-captured values so that same-shape filters with
-///    different captured values produce distinct compiled-query plan cache keys.
+/// Tests that AssignValue always sets Size correctly for string parameters (short→long, long→short),
+/// and that GetFilterKey produces distinct cache keys for same-shape filters with different
+/// closure-captured values.
 /// </summary>
 public class Gate37To40Tests
 {
-    // ── P1: String Size is always set correctly on every string branch ───────────────────────
+    // ── String Size is always set correctly on every string branch ───────────────────────
 
     [Fact]
-    public void P1_AssignValue_ShortStringThenLong_SizeResetToZero()
+    public void AssignValue_ShortStringThenLong_SizeResetToZero()
     {
-        // P1 regression guard: after a short string (sets p.Size = len), assigning a long
-        // string (> 4000 chars) must reset Size to 0. Before fix: Size stayed at prior length
-        // → provider would truncate the long string to the prior short length.
+        // After a short string assignment (sets p.Size = len), assigning a long string
+        // (> 4000 chars) must reset Size to 0. Without the reset, the provider would truncate
+        // the long string to the prior short length.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var cmd = cn.CreateCommand();
@@ -1630,9 +1616,9 @@ public class Gate37To40Tests
     }
 
     [Fact]
-    public void P1_AssignValue_StringSize_AlwaysUpdated()
+    public void AssignValue_StringSize_AlwaysUpdated()
     {
-        // P1: Size is always written on every string assignment regardless of prior value.
+        // Size is always written on every string assignment regardless of prior value.
         // short→longer-short grows; short→long resets to 0; long→short restores length.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -1653,7 +1639,7 @@ public class Gate37To40Tests
     }
 
     [Fact]
-    public async Task P1_CompiledQuery_StringParam_ShortToLong_CorrectResults()
+    public async Task CompiledQuery_StringParam_ShortToLong_CorrectResults()
     {
         // P1 integration: compiled query with string parameter; short name first (sets Size),
         // then long name (Size must be reset to 0 to avoid truncation).
@@ -1687,15 +1673,15 @@ public class Gate37To40Tests
         Assert.Single(r1b); Assert.Equal(1, r1b[0].Id);
     }
 
-    // ── SG1/X1: GetFilterKey distinguishes same-shape filters with different closure values ──
+    // ── GetFilterKey distinguishes same-shape filters with different closure values ──
     // These are direct unit tests of ExpressionCompiler.GetFilterKey (internal, visible via
-    // InternalsVisibleTo). They verify the fix without relying on compiled queries that
+    // InternalsVisibleTo). They verify the behavior without relying on compiled queries that
     // incorporate the filters (which has a separate architectural limitation).
 
     [Fact]
-    public void SG1X1_GetFilterKey_SameShape_DifferentCapturedValues_DifferentKeys()
+    public void GetFilterKey_SameShape_DifferentCapturedValues_DifferentKeys()
     {
-        // SG1/X1 core fix: MakeTenantFilter(1) and MakeTenantFilter(2) produce lambdas with
+        // MakeTenantFilter(1) and MakeTenantFilter(2) produce lambdas with
         // identical expression shape (e => e.TenantId == <captured_int>) but different closure
         // field values. Before fix: ExpressionFingerprint alone gave same key for both →
         // ctx2 inherited ctx1's plan. After fix: GetFilterKey appends closure field values
@@ -1710,7 +1696,7 @@ public class Gate37To40Tests
     }
 
     [Fact]
-    public void SG1X1_GetFilterKey_SameShape_SameCapturedValue_SameKey()
+    public void GetFilterKey_SameShape_SameCapturedValue_SameKey()
     {
         // Determinism: two separately created lambdas with the same captured value must
         // produce the same key (idempotent — no random or time-based component).
@@ -1721,7 +1707,7 @@ public class Gate37To40Tests
     }
 
     [Fact]
-    public void SG1X1_GetFilterKey_FiveValues_AllDistinctKeys()
+    public void GetFilterKey_FiveValues_AllDistinctKeys()
     {
         // Extended: 5 filters with distinct captured values → 5 distinct keys.
         var keys = Enumerable.Range(1, 5)
@@ -1733,19 +1719,19 @@ public class Gate37To40Tests
 }
 
 /// <summary>
-/// Gate 4.0 → 4.5 (3.7 audit): C1 bounded plansByCtx LRU eviction correctness.
+/// Tests for bounded plansByCtx LRU eviction correctness.
 /// Uses distinct TenantProvider IDs to create 300 unique ctxKeys for one compiled delegate
 /// (no global filters needed — TenantProvider ID is included in the ctxKey string but does
 /// not add a WHERE clause unless an entity-level tenant column is configured).
 /// </summary>
 public class Gate40To45C1Tests
 {
-    // ── C1: 300 distinct tenant IDs → 300 distinct ctxKeys, LRU cap=256 → ~44 evicted ──────
+    // ── 300 distinct tenant IDs → 300 distinct ctxKeys, LRU cap=256 → ~44 evicted ──────
 
     [Fact]
-    public async Task C1_HighCardinality_ContextChurn_EvictionCorrectness()
+    public async Task HighCardinality_ContextChurn_EvictionCorrectness()
     {
-        // C1: plansByCtx LRU is capped at 256. With 300 distinct ctxKeys (via unique tenant
+        // plansByCtx LRU is capped at 256. With 300 distinct ctxKeys (via unique tenant
         // IDs), ~44 entries are evicted. All queries must still return correct results —
         // evicted entries are recomputed on demand, verifying eviction-safe correctness.
         var dbName = $"C1HC_{Guid.NewGuid():N}";
@@ -1791,9 +1777,9 @@ public class Gate40To45C1Tests
     }
 
     [Fact]
-    public async Task C1_ConcurrentChurn_AllQueriesCorrect()
+    public async Task ConcurrentChurn_AllQueriesCorrect()
     {
-        // C1: 50 concurrent contexts with distinct tenant IDs stress the LRU under concurrent
+        // 50 concurrent contexts with distinct tenant IDs stress the LRU under concurrent
         // reads/writes. Verifies no cross-context contamination and no correctness regression.
         var dbName = $"C1CC_{Guid.NewGuid():N}";
         var connStr = $"Data Source={dbName};Mode=Memory;Cache=Shared";
@@ -1830,15 +1816,14 @@ public class Gate40To45C1Tests
 }
 
 /// <summary>
-/// Gate 4.5 → 5.0 (3.7 audit): adversarial closure-capture key tests.
-/// Removes Provisional status from SG1/X1 with deterministic regression coverage.
+/// Adversarial closure-capture key tests with deterministic regression coverage.
 /// </summary>
 public class Gate45To50Sg1Tests
 {
     // ── Adversarial: rapid cycling of closure values → always-distinct keys ──────────────────
 
     [Fact]
-    public void SG1X1_Adversarial_RapidCycling_TenValues_AllDistinctKeys()
+    public void ClosureCapture_Adversarial_RapidCycling_TenValues_AllDistinctKeys()
     {
         // Adversarial: rapidly cycle through 10 closure-captured filter values.
         // Before fix: all 10 produced the same key (f.ToString() is shape-only) →
@@ -1857,11 +1842,10 @@ public class Gate45To50Sg1Tests
     }
 
     [Fact]
-    public void SG1X1_ClosureCapture_FuzzMatrix_20Values_AllDistinctKeys()
+    public void ClosureCapture_FuzzMatrix_20Values_AllDistinctKeys()
     {
         // Fuzz matrix: 20 closure-captured integer values → 20 distinct keys.
         // Deterministic: same inputs always produce same outputs (no randomness).
-        // Removes Provisional status from SG1/X1 — full coverage over realistic range.
         const int FuzzCount = 20;
         var keys = Enumerable.Range(1, FuzzCount)
             .Select(fuzz => ExpressionCompiler.GetFilterKey(Sg1Helpers.MakeTenantFilter(fuzz)))

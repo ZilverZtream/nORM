@@ -15,7 +15,7 @@ namespace nORM.Tests;
 /// </summary>
 public class SchemaSnapshotTests
 {
-    // Entity with explicit [Key]
+ // Entity with explicit [Key]
     [Table("SnapshotBlog")]
     private class SnapshotBlog
     {
@@ -23,7 +23,7 @@ public class SchemaSnapshotTests
         public string Title { get; set; } = string.Empty;
     }
 
-    // Entity using Id convention (no [Key] attribute)
+ // Entity using Id convention (no [Key] attribute)
     [Table("SnapshotWidget")]
     private class SnapshotWidget
     {
@@ -31,17 +31,17 @@ public class SchemaSnapshotTests
         public string Color { get; set; } = string.Empty;
     }
 
-    // Helper: build a single-type snapshot using the assembly of the test type
+ // Helper: build a single-type snapshot using the assembly of the test type
     private static SchemaSnapshot BuildFor(params System.Type[] types)
     {
-        // Build a snapshot manually to avoid scanning the entire test assembly
+ // Build a snapshot manually to avoid scanning the entire test assembly
         var snapshot = new SchemaSnapshot();
         foreach (var type in types)
         {
             var tableAttr = type.GetCustomAttribute<TableAttribute>();
             var table = new TableSchema { Name = tableAttr?.Name ?? type.Name };
 
-            // Collect PK names
+ // Collect PK names
             var pkNames = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
             foreach (var p in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
                 if (p.GetCustomAttribute<KeyAttribute>() != null)
@@ -107,7 +107,7 @@ public class SchemaSnapshotTests
     [Fact]
     public void SchemaDiffer_DetectsAddedIndex_WhenColumnGainsIndexName()
     {
-        // Old snapshot: Blog without indexed Title column
+ // Old snapshot: Blog without indexed Title column
         var oldTable = new TableSchema
         {
             Name = "Blog",
@@ -119,7 +119,7 @@ public class SchemaSnapshotTests
         };
         var oldSnapshot = new SchemaSnapshot { Tables = { oldTable } };
 
-        // New snapshot: same Blog but Title is now indexed
+ // New snapshot: same Blog but Title is now indexed
         var newTable = new TableSchema
         {
             Name = "Blog",
@@ -143,7 +143,7 @@ public class SchemaSnapshotTests
     [Fact]
     public void SchemaDiffer_DetectsDroppedIndex_WhenColumnLosesIndexName()
     {
-        // Old snapshot: Blog with indexed Title
+ // Old snapshot: Blog with indexed Title
         var oldTable = new TableSchema
         {
             Name = "Blog",
@@ -155,7 +155,7 @@ public class SchemaSnapshotTests
         };
         var oldSnapshot = new SchemaSnapshot { Tables = { oldTable } };
 
-        // New snapshot: Title no longer indexed
+ // New snapshot: Title no longer indexed
         var newTable = new TableSchema
         {
             Name = "Blog",
@@ -173,7 +173,7 @@ public class SchemaSnapshotTests
         Assert.Equal("IX_Blog_Title", diff.DroppedIndexes[0].IndexName);
     }
 
-    // SD-8: Tests for dropped table and column detection
+ // Tests for dropped table and column detection
 
     [Fact]
     public void SchemaDiffer_DetectsDroppedTable_WhenTableRemovedFromNewSnapshot()
@@ -213,7 +213,7 @@ public class SchemaSnapshotTests
             Columns =
             {
                 new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false }
-                // OldCol removed
+ // OldCol removed
             }
         };
         var newSnapshot = new SchemaSnapshot { Tables = { newTable } };
@@ -286,12 +286,12 @@ public class SchemaSnapshotTests
         Assert.Contains(stmts.Up, s => s.Contains("DROP COLUMN") && s.Contains("RemovedCol"));
     }
 
-    // MIG-2: Index definition change detection tests
+ // Index definition change detection tests
 
     [Fact]
     public void SchemaDiffer_DetectsChangedIsUnique_WhenIndexNameSameButUniquenessChanges()
     {
-        // Old snapshot: Blog with non-unique index on Title
+ // Old snapshot: Blog with non-unique index on Title
         var oldTable = new TableSchema
         {
             Name = "Blog",
@@ -303,7 +303,7 @@ public class SchemaSnapshotTests
         };
         var oldSnapshot = new SchemaSnapshot { Tables = { oldTable } };
 
-        // New snapshot: same index name on Title but now IsUnique = true
+ // New snapshot: same index name on Title but now IsUnique = true
         var newTable = new TableSchema
         {
             Name = "Blog",
@@ -317,14 +317,14 @@ public class SchemaSnapshotTests
 
         var diff = SchemaDiffer.Diff(oldSnapshot, newSnapshot);
 
-        // Should detect the index as both dropped (old def) and re-added (new def)
+ // Should detect the index as both dropped (old def) and re-added (new def)
         Assert.Single(diff.DroppedIndexes, ix => ix.IndexName == "IX_Blog_Title");
         Assert.Single(diff.AddedIndexes, ix => ix.IndexName == "IX_Blog_Title" && ix.IsUnique);
     }
 
-    // MG-1: Navigation and collection property exclusion tests
+ // Navigation and collection property exclusion tests
 
-    // Helper entity types used by MG-1 tests (private so they don't pollute snapshot scans)
+ // Helper entity types used by tests (private so they don't pollute snapshot scans)
     [Table("MG1_Post")]
     private class MG1Post
     {
@@ -346,31 +346,31 @@ public class SchemaSnapshotTests
         public string Body { get; set; } = string.Empty;
         public int CategoryId { get; set; }
 
-        // Navigation property — should be EXCLUDED from snapshot
+ // Navigation property — should be EXCLUDED from snapshot
         public MG1Category Category { get; set; } = null!;
 
-        // Collection navigation property — should be EXCLUDED from snapshot
+ // Collection navigation property — should be EXCLUDED from snapshot
         public List<MG1Post> Posts { get; set; } = new();
     }
 
     [Fact]
     public void SchemaSnapshotBuilder_ExcludesNavigationProperties()
     {
-        // Build snapshot for the in-process assembly so it picks up MG1Article
+ // Build snapshot for the in-process assembly so it picks up MG1Article
         var snapshot = SchemaSnapshotBuilder.Build(typeof(MG1Article).Assembly);
         var table = snapshot.Tables.FirstOrDefault(t => t.Name == "MG1_Article");
 
-        // If the entity wasn't picked up, skip — some test assemblies may differ
+ // If the entity wasn't picked up, skip — some test assemblies may differ
         if (table == null) return;
 
         var columnNames = table.Columns.Select(c => c.Name).ToList();
 
-        // Scalar columns must be present
+ // Scalar columns must be present
         Assert.Contains("Id", columnNames);
         Assert.Contains("Body", columnNames);
         Assert.Contains("CategoryId", columnNames);
 
-        // Navigation properties must NOT appear as columns
+ // Navigation properties must NOT appear as columns
         Assert.DoesNotContain("Category", columnNames);
         Assert.DoesNotContain("Posts", columnNames);
     }
@@ -378,15 +378,15 @@ public class SchemaSnapshotTests
     [Fact]
     public void SchemaSnapshotBuilder_OnlyScalarColumnsIncluded_ForEntityWithNavigations()
     {
-        // Directly exercise SchemaSnapshotBuilder.Build with a controlled single-type snapshot
-        // by scanning just the test types defined above
+ // Directly exercise SchemaSnapshotBuilder.Build with a controlled single-type snapshot
+ // by scanning just the test types defined above
         var snapshot = SchemaSnapshotBuilder.Build(typeof(MG1Article).Assembly);
 
         foreach (var table in snapshot.Tables)
         {
             foreach (var col in table.Columns)
             {
-                // Collection types should never appear
+ // Collection types should never appear
                 var colType = typeof(MG1Article).Assembly
                     .GetTypes()
                     .SelectMany(t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
@@ -394,7 +394,7 @@ public class SchemaSnapshotTests
 
                 if (colType != null)
                 {
-                    // If we found the property, verify it's not a collection (non-string IEnumerable)
+ // If we found the property, verify it's not a collection (non-string IEnumerable)
                     var isCollection = typeof(System.Collections.IEnumerable).IsAssignableFrom(colType)
                                        && colType != typeof(string);
                     Assert.False(isCollection,
@@ -430,17 +430,17 @@ public class SchemaSnapshotTests
             new SchemaSnapshot { Tables = { oldTable } },
             new SchemaSnapshot { Tables = { newTable } });
 
-        // Same definition — no index changes
+ // Same definition — no index changes
         Assert.Empty(diff.DroppedIndexes.Where(ix => ix.IndexName == "IX_Blog_Title"));
         Assert.Empty(diff.AddedIndexes.Where(ix => ix.IndexName == "IX_Blog_Title"));
     }
 
-    // ─── Fix 2: SchemaDiffer detects PK/unique metadata changes ───────────
+ // ─── Fix 2: SchemaDiffer detects PK/unique metadata changes ───────────
 
     [Fact]
     public void SchemaDiffer_DetectsAlteredColumn_WhenIsUniqueFlips()
     {
-        // Column changes from non-unique to unique (no type or nullability change).
+ // Column changes from non-unique to unique (no type or nullability change).
         var oldTable = new TableSchema
         {
             Name = "Item",
@@ -470,7 +470,7 @@ public class SchemaSnapshotTests
     [Fact]
     public void SchemaDiffer_DetectsAlteredColumn_WhenIsPrimaryKeyFlips()
     {
-        // Column promoted to PK (no type/nullability change).
+ // Column promoted to PK (no type/nullability change).
         var oldTable = new TableSchema
         {
             Name = "Widget",
@@ -498,7 +498,7 @@ public class SchemaSnapshotTests
     [Fact]
     public void SchemaDiffer_DetectsAlteredColumn_WhenIndexNameLost()
     {
-        // Column loses its IndexName without any other change — should be detected.
+ // Column loses its IndexName without any other change — should be detected.
         var oldTable = new TableSchema
         {
             Name = "Post",
@@ -528,7 +528,7 @@ public class SchemaSnapshotTests
     [Fact]
     public void SchemaDiffer_DetectsAlteredColumn_WhenIndexNameAdded()
     {
-        // Column gains an IndexName (becomes indexed) — should be detected.
+ // Column gains an IndexName (becomes indexed) — should be detected.
         var oldTable = new TableSchema
         {
             Name = "Post",
@@ -558,7 +558,7 @@ public class SchemaSnapshotTests
     [Fact]
     public void SchemaDiffer_DetectsAllFourMetadataChanges_InOneDiff()
     {
-        // All four change types combined: IsPrimaryKey, IsUnique, IndexName added, IndexName lost.
+ // All four change types combined: IsPrimaryKey, IsUnique, IndexName added, IndexName lost.
         var oldTable = new TableSchema
         {
             Name = "Mixed",
@@ -595,7 +595,7 @@ public class SchemaSnapshotTests
     [Fact]
     public void SchemaDiffer_NoFalsePositive_WhenColumnUnchanged()
     {
-        // An unchanged column must not appear in AlteredColumns.
+ // An unchanged column must not appear in AlteredColumns.
         var oldTable = new TableSchema
         {
             Name = "Stable",
@@ -624,12 +624,12 @@ public class SchemaSnapshotTests
         Assert.Empty(diff.DroppedColumns);
     }
 
-    // ── MM-1: Read-only / init-only / computed property mapping ──────────────
+ // ── Read-only / init-only / computed property mapping ──────────────
 
-    /// <summary>
-    /// MM-1: A property with a standard getter+setter must be included as a column.
-    /// (Baseline sanity check; must still pass after the fix.)
-    /// </summary>
+ /// <summary>
+ /// A property with a standard getter+setter must be included as a column.
+ /// (Baseline sanity check; must still pass after the fix.)
+ /// </summary>
     [Table("MM1ReadWrite")]
     private class MM1ReadWriteEntity
     {
@@ -647,12 +647,12 @@ public class SchemaSnapshotTests
         Assert.Contains(table.Columns, c => c.Name == "Name");
     }
 
-    /// <summary>
-    /// MM-1: An init-only property (declared with the <c>init</c> accessor) must be included
-    /// as a column. Before the fix, <c>!prop.CanWrite</c> incorrectly excluded init-only
-    /// properties because <see cref="System.Reflection.PropertyInfo.CanWrite"/> returns false
-    /// for them in reflection when accessed from outside the defining assembly.
-    /// </summary>
+ /// <summary>
+ /// An init-only property (declared with the <c>init</c> accessor) must be included
+ /// as a column. Before the fix, <c>!prop.CanWrite</c> incorrectly excluded init-only
+ /// properties because <see cref="System.Reflection.PropertyInfo.CanWrite"/> returns false
+ /// for them in reflection when accessed from outside the defining assembly.
+ /// </summary>
     [Table("MM1InitOnly")]
     private class MM1InitOnlyEntity
     {
@@ -667,15 +667,15 @@ public class SchemaSnapshotTests
         var snapshot = SchemaSnapshotBuilder.Build(typeof(MM1InitOnlyEntity).Assembly);
         var table = snapshot.Tables.FirstOrDefault(t => t.Name == "MM1InitOnly");
         Assert.NotNull(table);
-        // Both Id (key) and Name (init-only scalar) must appear as mapped columns.
+ // Both Id (key) and Name (init-only scalar) must appear as mapped columns.
         Assert.Contains(table.Columns, c => c.Name == "Id");
         Assert.Contains(table.Columns, c => c.Name == "Name");
     }
 
-    /// <summary>
-    /// MM-1: A pure computed property (get-only expression body, no setter at all) must be
-    /// excluded because it has no backing database column.
-    /// </summary>
+ /// <summary>
+ /// A pure computed property (get-only expression body, no setter at all) must be
+ /// excluded because it has no backing database column.
+ /// </summary>
     [Table("MM1Computed")]
     private class MM1ComputedEntity
     {
@@ -683,7 +683,7 @@ public class SchemaSnapshotTests
         public int Id { get; set; }
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
-        // Pure computed — no setter of any kind; should be excluded.
+ // Pure computed — no setter of any kind; should be excluded.
         public string FullName => FirstName + " " + LastName;
     }
 
@@ -693,25 +693,25 @@ public class SchemaSnapshotTests
         var snapshot = SchemaSnapshotBuilder.Build(typeof(MM1ComputedEntity).Assembly);
         var table = snapshot.Tables.FirstOrDefault(t => t.Name == "MM1Computed");
         Assert.NotNull(table);
-        // FullName is a computed expression — must NOT appear.
+ // FullName is a computed expression — must NOT appear.
         Assert.DoesNotContain(table.Columns, c => c.Name == "FullName");
-        // Scalar backing properties must still appear.
+ // Scalar backing properties must still appear.
         Assert.Contains(table.Columns, c => c.Name == "FirstName");
         Assert.Contains(table.Columns, c => c.Name == "LastName");
     }
 
-    /// <summary>
-    /// MM-1: A reference-type navigation property (class type that is not string or byte[])
-    /// must still be excluded after the CanWrite fix. The exclusion criterion is the property
-    /// TYPE (non-scalar reference class), not its writability.
-    /// </summary>
+ /// <summary>
+ /// A reference-type navigation property (class type that is not string or byte[])
+ /// must still be excluded after the CanWrite fix. The exclusion criterion is the property
+ /// TYPE (non-scalar reference class), not its writability.
+ /// </summary>
     [Table("MM1Navigation")]
     private class MM1NavigationEntity
     {
         [Key]
         public int Id { get; set; }
         public int CategoryId { get; set; }
-        // Reference navigation property — class type, not a scalar → must be excluded.
+ // Reference navigation property — class type, not a scalar → must be excluded.
         public MM1ReadWriteEntity? Category { get; set; }
     }
 
@@ -721,9 +721,9 @@ public class SchemaSnapshotTests
         var snapshot = SchemaSnapshotBuilder.Build(typeof(MM1NavigationEntity).Assembly);
         var table = snapshot.Tables.FirstOrDefault(t => t.Name == "MM1Navigation");
         Assert.NotNull(table);
-        // The navigation property must not be mapped to a column.
+ // The navigation property must not be mapped to a column.
         Assert.DoesNotContain(table.Columns, c => c.Name == "Category");
-        // The FK scalar column must be present.
+ // The FK scalar column must be present.
         Assert.Contains(table.Columns, c => c.Name == "CategoryId");
     }
 }

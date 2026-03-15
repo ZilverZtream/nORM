@@ -12,7 +12,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// CT-1: Verifies that UpdateAsync/DeleteAsync use the original snapshot concurrency token
+/// Verifies that UpdateAsync/DeleteAsync use the original snapshot concurrency token
 /// (not the current possibly-mutated property value) for the optimistic-concurrency WHERE predicate,
 /// matching the parity of the batched SaveChangesAsync path.
 /// </summary>
@@ -45,10 +45,10 @@ public class ConcurrencyTokenSnapshotTests
         return (cn, new DbContext(cn, new SqliteProvider()));
     }
 
-    // ── CT-1: snapshot token vs current token ────────────────────────────────
+    // ── snapshot token vs current token ────────────────────────────────
 
     /// <summary>
-    /// CT-1: When the entity's ConcToken property is mutated after being tracked,
+    /// When the entity's ConcToken property is mutated after being tracked,
     /// UpdateAsync must use the original snapshot value in the WHERE predicate —
     /// not the mutated current value — to correctly detect a concurrent modification.
     /// </summary>
@@ -71,7 +71,7 @@ public class ConcurrencyTokenSnapshotTests
         entity.Name = "updated";
         entity.ConcToken = "v2-mutated"; // token changed on the entity object
 
-        // CT-1: UpdateAsync must build WHERE Id=? AND ConcToken='v1' (snapshot),
+        // UpdateAsync must build WHERE Id=? AND ConcToken='v1' (snapshot),
         // NOT WHERE Id=? AND ConcToken='v2-mutated' (current). Since the DB still has
         // 'v1', the WHERE must match → rowsAffected = 1.
         int affected = await ctx.UpdateAsync(entity);
@@ -84,7 +84,7 @@ public class ConcurrencyTokenSnapshotTests
     }
 
     /// <summary>
-    /// CT-1: When the DB row has been modified externally (token mismatch), UpdateAsync
+    /// When the DB row has been modified externally (token mismatch), UpdateAsync
     /// must detect the conflict and throw DbConcurrencyException — using the original
     /// snapshot token (not any mutated value).
     /// </summary>
@@ -108,12 +108,12 @@ public class ConcurrencyTokenSnapshotTests
 
         entity.Name = "should-fail";
 
-        // CT-1: WHERE predicate uses snapshot 'v1', but DB now has 'v2-external' → 0 rows affected → conflict
+        // WHERE predicate uses snapshot 'v1', but DB now has 'v2-external' → 0 rows affected → conflict
         await Assert.ThrowsAsync<DbConcurrencyException>(() => ctx.UpdateAsync(entity));
     }
 
     /// <summary>
-    /// CT-1: DeleteAsync with a mutated ConcToken must use the snapshot token in the
+    /// DeleteAsync with a mutated ConcToken must use the snapshot token in the
     /// WHERE predicate, not the mutated current value.
     /// </summary>
     [Fact]
@@ -132,7 +132,7 @@ public class ConcurrencyTokenSnapshotTests
         // Mutate the token on the entity
         entity.ConcToken = "v9-wrong";
 
-        // CT-1: DELETE WHERE Id=? AND ConcToken='v1' (snapshot) — should match DB row → 1 deleted
+        // DELETE WHERE Id=? AND ConcToken='v1' (snapshot) — should match DB row → 1 deleted
         int affected = await ctx.DeleteAsync(entity);
 
         Assert.Equal(1, affected);
@@ -143,7 +143,7 @@ public class ConcurrencyTokenSnapshotTests
     }
 
     /// <summary>
-    /// CT-1: Entity not in the change tracker falls back to current entity property value.
+    /// Entity not in the change tracker falls back to current entity property value.
     /// This preserves existing behavior for untracked entities passed directly to UpdateAsync.
     /// </summary>
     [Fact]

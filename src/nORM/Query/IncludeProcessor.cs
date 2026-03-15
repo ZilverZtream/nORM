@@ -33,7 +33,7 @@ namespace nORM.Query
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
 
-            // MM-1: Composite-PK dependents are not supported; throw early rather than silently corrupting data.
+            // Composite-PK dependents are not supported; throw early rather than silently corrupting data.
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
             foreach (var (rel, map) in include.Path.Zip(pathMappings))
                 if (map.KeyColumns.Length > 1)
@@ -118,7 +118,7 @@ namespace nORM.Query
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
 
-            // MM-1: Composite-PK dependents are not supported; throw early rather than silently corrupting data.
+            // Composite-PK dependents are not supported; throw early rather than silently corrupting data.
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
             foreach (var (rel, map) in include.Path.Zip(pathMappings))
                 if (map.KeyColumns.Length > 1)
@@ -258,7 +258,7 @@ namespace nORM.Query
                       .Append(" WHERE ").Append(relation.ForeignKey.EscCol)
                       .Append(" IN ").Append(current).Append(';');
 
-                    // MM-1: Include all key columns (composite PK support for multi-level traversal).
+                    // Include all key columns (composite PK support for multi-level traversal).
                     var pkCols = string.Join(", ", map.KeyColumns.Select(k => k.EscCol));
                     current = $"(SELECT {pkCols} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current})";
                 }

@@ -127,7 +127,7 @@ namespace nORM.Query
                         info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
                         t._correlatedParams[param] = info;
                     }
-                    // QP-1: paramIndexStart = t._params.Count so that this predicate's visitor
+                    // paramIndexStart = t._params.Count so that this predicate's visitor
                     // does not reuse @p0/@p1 names already allocated by preceding predicates
                     // (e.g. inner Where's compiled param and global-filter constant colliding).
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
@@ -142,7 +142,7 @@ namespace nORM.Query
                     target.Append($"({sql})");
                     foreach (var kvp in visitor.GetParameters())
                         t._params[kvp.Key] = kvp.Value;
-                    // QP-1: Sync ParameterManager.Index with _params.Count so that subsequent
+                    // Sync ParameterManager.Index with _params.Count so that subsequent
                     // translators (Take, Skip) don't reuse parameter names already allocated
                     // by the visitor (e.g. both WHERE and LIMIT producing @p0).
                     if (t._params.Count > t._parameterManager.Index)
@@ -164,7 +164,7 @@ namespace nORM.Query
             /// <param name="node">The method call expression for <c>Select</c>.</param>
             /// <returns>The translated source expression.</returns>
             /// <remarks>
-            /// FULL IMPLEMENTATION (TASK 4): Automatic client-side evaluation fallback.
+            /// Automatic client-side evaluation fallback for untranslatable projections.
             ///
             /// Process:
             /// 1. Analyze projection for untranslatable expressions (e.g., custom helper methods)
@@ -272,7 +272,7 @@ namespace nORM.Query
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int take))
                 {
                     if (take < 0) throw new ArgumentOutOfRangeException(nameof(take), take, "Take count must be non-negative.");
-                    // PERF: Inline literal Take values directly in SQL instead of parameterizing.
+                    // Inline literal Take values directly in SQL instead of parameterizing.
                     // Parameterized LIMIT (@p0) prevents SQLite's planner from using ANALYZE statistics
                     // to estimate result cardinality. Literal LIMIT (20) lets the planner optimize.
                     t._take = take;
@@ -307,7 +307,7 @@ namespace nORM.Query
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int skip))
                 {
                     if (skip < 0) throw new ArgumentOutOfRangeException(nameof(skip), skip, "Skip count must be non-negative.");
-                    // PERF: Inline literal Skip values directly in SQL (same rationale as Take).
+                    // Inline literal Skip values directly in SQL (same rationale as Take).
                     t._skip = skip;
                     t._skipParam = null;
                 }
@@ -513,7 +513,7 @@ namespace nORM.Query
                         t._parameterManager.Index = t._params.Count;
                     FastExpressionVisitorPool.Return(visitor);
                 }
-                // QP-1: Single/SingleOrDefault must fetch 2 rows so the caller can detect duplicates.
+                // Single/SingleOrDefault must fetch 2 rows so the caller can detect duplicates.
                 // First/FirstOrDefault only need 1 row.
                 var isSingle = t._methodName == "Single" || t._methodName == "SingleOrDefault";
                 t._take = isSingle ? 2 : 1;
@@ -821,7 +821,7 @@ namespace nORM.Query
                         var propName = member.Member.Name;
                         if (t._mapping.Relations.TryGetValue(propName, out var relation))
                         {
-                            // MM-1: Guard against composite-PK dependents early at translation time.
+                            // Guard against composite-PK dependents early at translation time.
                             var depMap = t._ctx.GetMapping(relation.DependentType);
                             if (depMap.KeyColumns.Length > 1)
                                 throw new NotSupportedException(

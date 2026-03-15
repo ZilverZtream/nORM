@@ -19,32 +19,32 @@ namespace nORM.Query
         private readonly record struct WhereInfo(string Property, object Value);
 
         /// <summary>
-        /// PERFORMANCE FIX: Cached delegates to avoid MakeGenericMethod and Invoke on every query.
-        /// This eliminates the reflection overhead in the fast path.
+        /// Cached delegates to avoid MakeGenericMethod and Invoke on every query,
+        /// eliminating the reflection overhead in the fast path.
         /// </summary>
         private delegate bool TryExecuteDelegate(Expression expr, DbContext ctx, CancellationToken ct, out Task<object> result);
         private static readonly ConcurrentDictionary<Type, TryExecuteDelegate> _cachedExecutors = new();
 
         /// <summary>
-        /// PERF: Singleton MaterializerFactory — it only wraps static caches, no instance state.
+        /// Singleton MaterializerFactory — it only wraps static caches, no instance state.
         /// Eliminates one heap allocation per fast-path query.
         /// </summary>
         private static readonly MaterializerFactory _materializer = new();
 
         /// <summary>
-        /// PERF: Cached sync materializer delegates per entity type.
+        /// Cached sync materializer delegates per entity type.
         /// Eliminates MaterializerFactory lookup on every query.
         /// </summary>
         private static readonly ConcurrentDictionary<Type, Delegate> _syncMaterializerCache = new();
 
         /// <summary>
-        /// PERF: Cached full SQL strings (SELECT + WHERE + LIMIT) for fast-path queries.
+        /// Cached full SQL strings (SELECT + WHERE + LIMIT) for fast-path queries.
         /// Uses ValueTuple key to avoid string.Concat allocation on every call.
         /// </summary>
         private static readonly ConcurrentDictionary<(string TypeName, string Property, string WhereKind, int? TakeCount), string> _fullSqlCache = new();
 
         /// <summary>
-        /// PERF: Cache whether a type is eligible for fast-path execution (class with parameterless ctor).
+        /// Cache whether a type is eligible for fast-path execution (class with parameterless ctor).
         /// Avoids GetConstructor reflection call on every query for types that fail the check (e.g. anonymous types from joins).
         /// </summary>
         private static readonly ConcurrentDictionary<Type, bool> _eligibleTypeCache = new();
@@ -56,7 +56,7 @@ namespace nORM.Query
         {
             result = default!;
 
-            // PERF: Cached check — avoids GetConstructor reflection on every call for ineligible types
+            // Cached check — avoids GetConstructor reflection on every call for ineligible types
             if (!_eligibleTypeCache.GetOrAdd(elementType, static t => t.IsClass && t.GetConstructor(Type.EmptyTypes) != null))
                 return false;
 
@@ -89,15 +89,13 @@ namespace nORM.Query
             }
             if (IsSimpleWherePattern(expr, out var whereInfo, out var takeCount))
             {
-                // PERFORMANCE FIX (TASK 14): Avoid ContinueWith closure allocation
-                // Instead of: ExecuteSimpleWhere<T>(...).ContinueWith(t => (object)t.Result)
-                // Use async/await wrapper which is more efficient
+                // Use async/await wrapper instead of ContinueWith to avoid closure allocation
                 result = ExecuteSimpleWhereAsObject<T>(ctx, whereInfo, takeCount, ct);
                 return true;
             }
             if (IsSimpleTakePattern(expr, out takeCount))
             {
-                // PERFORMANCE FIX (TASK 14): Avoid ContinueWith closure allocation
+                // Use async/await wrapper instead of ContinueWith to avoid closure allocation
                 result = ExecuteSimpleTakeAsObject<T>(ctx, takeCount, ct);
                 return true;
             }
@@ -138,7 +136,7 @@ namespace nORM.Query
                     return false;
                 expr = takeCall.Arguments[0];
             }
-            // PERF: Unwrap AsNoTracking between Take and Where so that
+            // Unwrap AsNoTracking between Take and Where so that
             // queries like .Where(...).AsNoTracking().Take(10) hit the fast path.
             expr = Unwrap(expr);
             if (expr is not MethodCallExpression whereCall || whereCall.Method.Name != nameof(Queryable.Where))
@@ -159,9 +157,9 @@ namespace nORM.Query
             }
             if (body is BinaryExpression be && be.NodeType == ExpressionType.Equal && be.Left is MemberExpression me)
             {
-                // SECURITY FIX (TASK 1): Only accept ConstantExpression or simple MemberExpression.
-                // Never compile and execute arbitrary expressions (RCE vulnerability).
-                // Complex expressions should fall back to the safe ExpressionToSqlVisitor.
+                // Only accept ConstantExpression or simple MemberExpression.
+                // Never compile and execute arbitrary expressions (would be an RCE vulnerability).
+                // Complex expressions fall back to the safe ExpressionToSqlVisitor.
                 if (!TryGetSimpleValue(be.Right, out var value))
                     return false;
 
@@ -204,7 +202,7 @@ namespace nORM.Query
             return e;
         }
         /// <summary>
-        /// PERF: Returns a cached sync materializer delegate for the given entity type.
+        /// Returns a cached sync materializer delegate for the given entity type.
         /// </summary>
         private static Func<System.Data.Common.DbDataReader, T> GetSyncMaterializer<T>(DbContext ctx) where T : class
         {
@@ -238,7 +236,7 @@ namespace nORM.Query
             }
         }
         /// <summary>
-        /// PERF: Non-async entry point — does SQL lookup and command setup synchronously,
+        /// Non-async entry point — does SQL lookup and command setup synchronously,
         /// then dispatches to async materialization. Avoids one async state machine allocation.
         /// </summary>
         private static Task<object> ExecuteSimpleWhereAsObject<T>(DbContext ctx, WhereInfo info, int? takeCount, CancellationToken ct) where T : class, new()
@@ -247,7 +245,7 @@ namespace nORM.Query
             if (!map.ColumnsByName.TryGetValue(info.Property, out var column))
                 throw new InvalidOperationException("Fast path failed - unknown column");
 
-            // PERF: Cache full SQL (SELECT + WHERE + LIMIT) using ValueTuple key to avoid string allocation
+            // Cache full SQL (SELECT + WHERE + LIMIT) using ValueTuple key to avoid string allocation
             bool isNull = info.Value == null || info.Value == DBNull.Value;
             bool isBoolTrue = !isNull && info.Value is bool bv2 && bv2;
             bool isBoolFalse = !isNull && info.Value is bool bv3 && !bv3;
@@ -270,7 +268,7 @@ namespace nORM.Query
                 _fullSqlCache[cacheKey] = sql;
             }
 
-            // PERF: Skip EnsureConnectionAsync await when connection is already ready
+            // Skip EnsureConnectionAsync await when connection is already ready
             var ensureTask = ctx.EnsureConnectionAsync(ct);
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteSimpleWhereSlowAsync<T>(ensureTask, ctx, sql, info, isNull, isBoolTrue, isBoolFalse, takeCount, ct);
@@ -281,7 +279,7 @@ namespace nORM.Query
             if (!isNull && !isBoolTrue && !isBoolFalse)
                 cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
 
-            // PERF: Sync materialization for providers without true async I/O
+            // Sync materialization for providers without true async I/O
             if (ctx.Provider.PrefersSyncExecution)
                 return ExecuteSimpleWhereMaterializeSync<T>(cmd, ctx, takeCount);
 
@@ -327,7 +325,7 @@ namespace nORM.Query
             return results;
         }
         /// <summary>
-        /// PERF: Single async method — eliminates the extra async state machine from wrapper approach.
+        /// Single async method — eliminates the extra async state machine from a wrapper approach.
         /// </summary>
         private static async Task<object> ExecuteSimpleTakeAsObject<T>(DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
         {

@@ -13,14 +13,14 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP/PC-1: Verifies that LINQ plan fingerprinting handles enums backed by types wider than int32
+/// QP/Verifies that LINQ plan fingerprinting handles enums backed by types wider than int32
 /// without throwing OverflowException.
 /// Root cause: AppendStableValue used Convert.ToInt32 for all enums, which overflows for
 /// long/ulong-backed enums with values outside Int32 range.
 /// </summary>
 public class EnumFingerprintTests
 {
-    // ── Wide-underlying-type enums ────────────────────────────────────────────
+ // ── Wide-underlying-type enums ────────────────────────────────────────────
 
     private enum IntEnum { A = 1, B = 2, C = int.MaxValue }
     private enum LongEnum : long { Small = 1L, Huge = 5_000_000_000L, MaxVal = long.MaxValue - 1 }
@@ -31,7 +31,7 @@ public class EnumFingerprintTests
     private enum UShortEnum : ushort { A = 0, B = ushort.MaxValue }
     private enum UIntEnum : uint { A = 0, B = uint.MaxValue }
 
-    // ── Entity: 'Tag' is a long so we can filter with (long)LongEnum.Huge ────
+ // ── Entity: 'Tag' is a long so we can filter with (long)LongEnum.Huge ────
 
     [Table("EfpItem")]
     private class EfpItem
@@ -53,22 +53,22 @@ public class EnumFingerprintTests
         return (cn, new DbContext(cn, new SqliteProvider()));
     }
 
-    // ── QP/PC-1 tests — wide enum constants in expression tree ───────────────
+ // ── QP/ tests — wide enum constants in expression tree ───────────────
 
-    /// <summary>
-    /// QP/PC-1: A long-backed enum constant (5 billion) cast to long in a lambda
-    /// must fingerprint without OverflowException.
-    /// The cast `(long)LongEnum.Huge` injects a ConstantExpression{LongEnum} into the
-    /// expression tree; AppendStableValue must use AppendLong, not Convert.ToInt32.
-    /// </summary>
+ /// <summary>
+ /// QP/A long-backed enum constant (5 billion) cast to long in a lambda
+ /// must fingerprint without OverflowException.
+ /// The cast `(long)LongEnum.Huge` injects a ConstantExpression{LongEnum} into the
+ /// expression tree; AppendStableValue must use AppendLong, not Convert.ToInt32.
+ /// </summary>
     [Fact]
     public void Fingerprint_LongEnumConstant_OutsideInt32Range_DoesNotThrow()
     {
         var (cn, ctx) = Create();
         using var _ = cn;
 
-        // QP/PC-1: `(long)LongEnum.Huge` creates Convert(Constant(LongEnum.Huge), long)
-        // in the expression tree. AppendStableValue is called with the enum value.
+ // QP/`(long)LongEnum.Huge` creates Convert(Constant(LongEnum.Huge), long)
+ // in the expression tree. AppendStableValue is called with the enum value.
         var ex = Record.Exception(() =>
             ctx.Query<EfpItem>()
                .Where(e => e.Tag == (long)LongEnum.Huge)
@@ -77,9 +77,9 @@ public class EnumFingerprintTests
         Assert.Null(ex);
     }
 
-    /// <summary>
-    /// QP/PC-1: int.MaxValue enum constant (max value for int) — baseline must work.
-    /// </summary>
+ /// <summary>
+ /// QP/int.MaxValue enum constant (max value for int) — baseline must work.
+ /// </summary>
     [Fact]
     public void Fingerprint_IntEnum_MaxValue_DoesNotThrow()
     {
@@ -94,9 +94,9 @@ public class EnumFingerprintTests
         Assert.Null(ex);
     }
 
-    /// <summary>
-    /// QP/PC-1: uint.MaxValue (4294967295) cast to long — must not throw.
-    /// </summary>
+ /// <summary>
+ /// QP/uint.MaxValue (4294967295) cast to long — must not throw.
+ /// </summary>
     [Fact]
     public void Fingerprint_UIntEnum_MaxValue_DoesNotThrow()
     {
@@ -111,10 +111,10 @@ public class EnumFingerprintTests
         Assert.Null(ex);
     }
 
-    /// <summary>
-    /// QP/PC-1: Two queries with different wide enum constants must produce distinct plan
-    /// cache entries and return the correct (distinct) rows.
-    /// </summary>
+ /// <summary>
+ /// QP/Two queries with different wide enum constants must produce distinct plan
+ /// cache entries and return the correct (distinct) rows.
+ /// </summary>
     [Fact]
     public async Task Fingerprint_DifferentLongEnumValues_ProduceDifferentPlans()
     {
@@ -124,7 +124,7 @@ public class EnumFingerprintTests
         await ctx.InsertAsync(new EfpItem { Name = "small", Tag = (long)LongEnum.Small });
         await ctx.InsertAsync(new EfpItem { Name = "huge", Tag = (long)LongEnum.Huge });
 
-        // Each query must find only its own matching row — proves distinct plans.
+ // Each query must find only its own matching row — proves distinct plans.
         var r1 = ctx.Query<EfpItem>().Where(e => e.Tag == (long)LongEnum.Small).ToList();
         var r2 = ctx.Query<EfpItem>().Where(e => e.Tag == (long)LongEnum.Huge).ToList();
 
@@ -134,9 +134,9 @@ public class EnumFingerprintTests
         Assert.Equal("huge", r2[0].Name);
     }
 
-    /// <summary>
-    /// QP/PC-1: short, byte, sbyte, ushort-backed enum constants in lambdas must not throw.
-    /// </summary>
+ /// <summary>
+ /// QP/short, byte, sbyte, ushort-backed enum constants in lambdas must not throw.
+ /// </summary>
     [Theory]
     [InlineData("byte")]
     [InlineData("sbyte")]
@@ -159,10 +159,10 @@ public class EnumFingerprintTests
         Assert.Null(ex);
     }
 
-    /// <summary>
-    /// QP/PC-1: A inline int enum constant in a lambda produces a ConstantExpression
-    /// that AppendStableValue handles — works before and after the fix.
-    /// </summary>
+ /// <summary>
+ /// QP/A inline int enum constant in a lambda produces a ConstantExpression
+ /// that AppendStableValue handles — works before and after the fix.
+ /// </summary>
     [Fact]
     public void Fingerprint_InlineIntEnumLiteral_StillWorks()
     {

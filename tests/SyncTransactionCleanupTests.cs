@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// T-1: Verifies that DbContextTransaction.Commit() and Rollback() (sync) always clear
+/// Verifies that DbContextTransaction.Commit() and Rollback() (sync) always clear
 /// the context's CurrentTransaction reference via Dispose(), even when the underlying
 /// operation throws.
 ///
@@ -63,7 +63,7 @@ public class SyncTransactionCleanupTests
         return (cn, new DbContext(cn, new SqliteProvider()));
     }
 
-    // ── T-1: Sync Commit throws — CurrentTransaction must be cleared ─────────
+    // ── Sync Commit throws — CurrentTransaction must be cleared ─────────
 
     /// <summary>
     /// T-1 regression: When sync Commit() throws, Dispose() must still run so that
@@ -90,7 +90,7 @@ public class SyncTransactionCleanupTests
     }
 
     /// <summary>
-    /// T-1: Ensure that after a throwing Commit(), starting a new transaction does not
+    /// Ensure that after a throwing Commit(), starting a new transaction does not
     /// fail with "already active transaction" or similar poisoning.
     /// </summary>
     [Fact]
@@ -112,7 +112,7 @@ public class SyncTransactionCleanupTests
         }
     }
 
-    // ── T-1: Sync Rollback throws — CurrentTransaction must be cleared ───────
+    // ── Sync Rollback throws — CurrentTransaction must be cleared ───────
 
     /// <summary>
     /// T-1 regression: When sync Rollback() throws, Dispose() must still run.
@@ -134,7 +134,7 @@ public class SyncTransactionCleanupTests
     }
 
     /// <summary>
-    /// T-1: After a throwing Rollback(), the context must accept a new transaction.
+    /// After a throwing Rollback(), the context must accept a new transaction.
     /// </summary>
     [Fact]
     public async Task Rollback_Throws_SubsequentBeginTransactionAsync_Succeeds()
@@ -156,7 +156,7 @@ public class SyncTransactionCleanupTests
     // ── Happy path: sync Commit/Rollback without exception ───────────────────
 
     /// <summary>
-    /// T-1: Normal sync Commit (no exception) must still clear CurrentTransaction.
+    /// Normal sync Commit (no exception) must still clear CurrentTransaction.
     /// Verifies the try/finally doesn't interfere with the success path.
     /// </summary>
     [Fact]
@@ -180,7 +180,7 @@ public class SyncTransactionCleanupTests
     }
 
     /// <summary>
-    /// T-1: Normal sync Rollback must clear CurrentTransaction (success path guard).
+    /// Normal sync Rollback must clear CurrentTransaction (success path guard).
     /// </summary>
     [Fact]
     public async Task Rollback_Succeeds_CurrentTransactionIsCleared()

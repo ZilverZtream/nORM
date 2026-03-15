@@ -15,7 +15,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// M-1: Verifies that only query-root entity types are tracked by the ChangeTracker.
+/// Verifies that only query-root entity types are tracked by the ChangeTracker.
 /// Types that are NOT registered via Query&lt;T&gt; must not be tracked, even if they
 /// satisfy the structural trackability conditions (class, parameterless ctor, etc.).
 /// </summary>

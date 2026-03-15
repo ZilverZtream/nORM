@@ -64,8 +64,8 @@ namespace nORM.Mapping
 
         private readonly IEntityTypeConfiguration? _fluentConfig;
 
-        // PERFORMANCE FIX: Cache derived type discovery to avoid expensive AppDomain.GetAssemblies() scan on every mapping
-        // Scanning all assemblies and types can take 100-1000ms+ in large applications with many assemblies
+        // Cache derived type discovery to avoid an expensive AppDomain.GetAssemblies() scan on every mapping
+        // (scanning all assemblies can take 100–1000 ms+ in large applications).
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, List<Type>> _derivedTypesCache = new();
 
         /// <summary>
@@ -111,8 +111,7 @@ namespace nORM.Mapping
             {
                 DiscriminatorColumn = cols.FirstOrDefault(c => string.Equals(c.Prop.Name, discriminatorAttr.PropertyName, StringComparison.OrdinalIgnoreCase));
 
-                // PERFORMANCE FIX: Use cached derived type discovery instead of scanning all assemblies
-                // This avoids 100-1000ms+ delay from AppDomain.GetAssemblies().SelectMany(a => a.GetTypes())
+                // Use cached derived type discovery instead of scanning all assemblies on each call.
                 var derivedTypes = _derivedTypesCache.GetOrAdd(t, baseType =>
                 {
                     // Only scan assemblies once per base type, then cache forever

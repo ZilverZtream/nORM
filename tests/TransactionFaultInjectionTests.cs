@@ -12,7 +12,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Fault-injection tests for T-1: connection-drop mid-commit and commit-acknowledgment
+/// Fault-injection tests for connection-drop mid-commit and commit-acknowledgment
 /// ambiguity on both sync and async DbContextTransaction paths.
 ///
 /// "Commit acknowledgment ambiguity" is the scenario where the database receives and

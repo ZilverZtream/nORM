@@ -10,7 +10,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// TX-1: Verifies that bulk operations participate in an ambient transaction
+/// Verifies that bulk operations participate in an ambient transaction
 /// rather than creating their own independent transaction.
 /// </summary>
 public class BulkTransactionAtomicityTests

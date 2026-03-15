@@ -6,7 +6,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-1: Verifies that ExpressionFingerprint uses full-value bytes instead of
+/// Verifies that ExpressionFingerprint uses full-value bytes instead of
 /// GetHashCode() for constant values so that distinct constants always produce
 /// distinct fingerprints (no 32-bit truncation collisions for strings/longs/doubles).
 /// </summary>
@@ -21,7 +21,7 @@ public class FingerprintCollisionResistanceTests
 
     private static object Compute(Expression expr) => _compute.Invoke(null, new object[] { expr })!;
 
-    // ─── QP-1: Different string constants → different fingerprints ────────────
+    // ─── Different string constants → different fingerprints ────────────
 
     [Fact]
     public void DifferentStringConstants_ProduceDifferentFingerprints()
@@ -48,7 +48,7 @@ public class FingerprintCollisionResistanceTests
         Assert.Equal(Compute(e1), Compute(e2));
     }
 
-    // ─── QP-1: Longs differing only in high 32 bits → different fingerprints ──
+    // ─── Longs differing only in high 32 bits → different fingerprints ──
 
     [Fact]
     public void LongsWithSameGetHashCode_ProduceDifferentFingerprints()
@@ -71,7 +71,7 @@ public class FingerprintCollisionResistanceTests
         Assert.NotEqual(Compute(e1), Compute(e2));
     }
 
-    // ─── QP-1: Doubles → different fingerprints ───────────────────────────────
+    // ─── Doubles → different fingerprints ───────────────────────────────
 
     [Fact]
     public void DoublesWithSameInt32Truncation_ProduceDifferentFingerprints()
@@ -87,7 +87,7 @@ public class FingerprintCollisionResistanceTests
         Assert.NotEqual(Compute(e1), Compute(e2));
     }
 
-    // ─── QP-1: Guid constants → different fingerprints ────────────────────────
+    // ─── Guid constants → different fingerprints ────────────────────────
 
     [Fact]
     public void DifferentGuidConstants_ProduceDifferentFingerprints()
@@ -111,7 +111,7 @@ public class FingerprintCollisionResistanceTests
         Assert.Equal(Compute(e1), Compute(e2));
     }
 
-    // ─── QP-1: Decimal constants → different fingerprints ─────────────────────
+    // ─── Decimal constants → different fingerprints ─────────────────────
 
     [Fact]
     public void DifferentDecimalConstants_ProduceDifferentFingerprints()

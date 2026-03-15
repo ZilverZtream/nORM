@@ -5,7 +5,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>QP-1: Verify AppendStableValue fallback produces collision-resistant fingerprints.</summary>
+/// <summary>Verify AppendStableValue fallback produces collision-resistant fingerprints.</summary>
 public class FingerprintFallbackTests
 {
     // Helper: compute fingerprint for a constant expression containing the given value.

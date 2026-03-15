@@ -10,7 +10,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-1: Verifies that scalar aggregate materializers return the correct CLR type and value
+/// Verifies that scalar aggregate materializers return the correct CLR type and value
 /// instead of always coercing to long.
 /// </summary>
 public class ScalarAggregateTypeTests

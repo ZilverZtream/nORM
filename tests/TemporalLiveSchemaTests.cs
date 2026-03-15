@@ -16,7 +16,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// P-1: Verifies that IntrospectTableColumnsAsync returns live column info,
+/// Verifies that IntrospectTableColumnsAsync returns live column info,
 /// and that GenerateCreateHistoryTableSql uses live types when available.
 /// </summary>
 public class TemporalLiveSchemaTests

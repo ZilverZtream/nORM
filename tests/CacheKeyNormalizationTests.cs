@@ -6,7 +6,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// PERF-1: Verifies NormalizeConnectionStringForCacheKey correctly handles quoted semicolons,
+/// Verifies NormalizeConnectionStringForCacheKey correctly handles quoted semicolons,
 /// key ordering, credential stripping, malformed strings, and distinct databases.
 /// </summary>
 public class CacheKeyNormalizationTests

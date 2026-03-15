@@ -71,11 +71,11 @@ public class CompiledQueryTests
         Assert.Equal(2, result[0].Id);
     }
 
-    /// <summary>
-    /// PC-1: A compiled query whose plan has multiple SQL parameters, called with a non-tuple
-    /// value, must throw InvalidOperationException (not silently replicate the same object).
-    /// A custom class with two properties becomes two compiled params in the plan.
-    /// </summary>
+ /// <summary>
+ /// A compiled query whose plan has multiple SQL parameters, called with a non-tuple
+ /// value, must throw InvalidOperationException (not silently replicate the same object).
+ /// A custom class with two properties becomes two compiled params in the plan.
+ /// </summary>
     public class TwoParamQuery
     {
         public int MinAge { get; set; }
@@ -96,8 +96,8 @@ public class CompiledQueryTests
         }
         using var ctx = new DbContext(cn, new SqliteProvider());
 
-        // Custom non-tuple class with two properties → plan will have 2 compiled params.
-        // Passing it as a non-tuple value must throw, not silently fan-out the same object.
+ // Custom non-tuple class with two properties → plan will have 2 compiled params.
+ // Passing it as a non-tuple value must throw, not silently fan-out the same object.
         var compiled = Norm.CompileQuery<DbContext, TwoParamQuery, PersonInfo>(
             (ctx2, p) => ctx2.Query<PersonInfo>().Where(x => x.Age > p.MinAge && x.City == p.City));
 
@@ -106,9 +106,9 @@ public class CompiledQueryTests
         Assert.Contains("ValueTuple", ex.Message);
     }
 
-    /// <summary>
-    /// PC-1 non-regression: tuple params still work, single-param non-tuple still works.
-    /// </summary>
+ /// <summary>
+ /// non-regression: tuple params still work, single-param non-tuple still works.
+ /// </summary>
     [Fact]
     public async Task Compiled_query_single_param_non_tuple_still_works()
     {

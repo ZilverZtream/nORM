@@ -12,17 +12,17 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Gate 2.8 → 3.0: M1/SG1/X1 — source-generated materializer correctness tests.
+/// Source-generated materializer correctness tests.
 ///
 /// Verifies that:
 /// 1. Source-generated materializers use name-based ordinal resolution (reader.GetOrdinal)
 ///    so column ORDER in the result set does not affect mapping correctness.
-/// 2. FromSqlRawAsync uses the compiled materializer and inherits the same name-based fix (X1).
+/// 2. FromSqlRawAsync uses the compiled materializer and inherits the same name-based fix.
 /// 3. Owned-type column names (Owner_Prop) are resolved correctly regardless of position.
 /// </summary>
 public class SourceGenMaterializerCorrectnessTests
 {
-    // ── M1/SG1: reordered columns do not swap property values ─────────────────
+    // ── reordered columns do not swap property values ─────────────────
 
     [Fact]
     public async Task SourceGen_ReorderedColumns_ValuesCorrect()
@@ -100,7 +100,7 @@ public class SourceGenMaterializerCorrectnessTests
         Assert.Equal(Status.Active, entity.Status);
     }
 
-    // ── X1: FromSqlRawAsync uses compiled materializer; reordered columns must be correct ──
+    // ── FromSqlRawAsync uses compiled materializer; reordered columns must be correct ──
 
     [Fact]
     public async Task FromSqlRawAsync_ReorderedColumns_ValuesCorrect()
@@ -135,12 +135,12 @@ public class SourceGenMaterializerCorrectnessTests
         Assert.Null(e.Created);
     }
 
-    // ── SG2: compile-time proof — two [GenerateMaterializer] classes with the same simple name
+    // ── compile-time proof — two [GenerateMaterializer] classes with the same simple name
     //    in different namespaces. If the generator uses only class name as hint, the build fails.
     //    If this file compiled successfully, the hint-name collision fix is working. ─────────────
 
     [Fact]
-    public void SG2_SameNameDifferentNamespace_BothRegistered()
+    public void SameNameDifferentNamespace_BothRegistered()
     {
         // nORM.Tests.Materialized registered by nORM.Tests namespace entity
         Assert.True(CompiledMaterializerStore.TryGet(typeof(Materialized), out _),

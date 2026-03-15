@@ -6,7 +6,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// PC-1: Verifies that NormalizeConnectionStringForCacheKey strips sensitive
+/// Verifies that NormalizeConnectionStringForCacheKey strips sensitive
 /// keys (Password, Pwd, Access Token, Token, Secret) before producing the
 /// cache key so that credentials never appear in cache key material.
 /// </summary>
@@ -20,7 +20,7 @@ public class ConnectionStringRedactionTests
     private static string Normalize(string? cs) =>
         (string)_normalize.Invoke(null, new object?[] { cs })!;
 
-    // ─── PC-1: Sensitive key values are stripped from normalized result ────────
+ // ─── Sensitive key values are stripped from normalized result ────────
 
     [Fact]
     public void Password_NotInNormalizedKey()
@@ -69,25 +69,25 @@ public class ConnectionStringRedactionTests
         Assert.DoesNotContain("topsecret", result, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ─── PC-1: Strings differing only by password → same normalized key ───────
+ // ─── Strings differing only by password → same normalized key ───────
 
     [Fact]
     public void DifferentPasswords_ProduceSameNormalizedKey()
     {
-        // Two connection strings differing only in the password must produce
-        // the same cache key (credentials are stripped before hashing).
+ // Two connection strings differing only in the password must produce
+ // the same cache key (credentials are stripped before hashing).
         var cs1 = "Server=myserver;Database=mydb;Password=pass1";
         var cs2 = "Server=myserver;Database=mydb;Password=pass2";
 
         Assert.Equal(Normalize(cs1), Normalize(cs2));
     }
 
-    // ─── PC-1: Non-sensitive keys remain in the normalized key ────────────────
+ // ─── Non-sensitive keys remain in the normalized key ────────────────
 
     [Fact]
     public void DifferentServers_ProduceDifferentNormalizedKeys()
     {
-        // Cache isolation must still work: different Server= values → different keys.
+ // Cache isolation must still work: different Server= values → different keys.
         var cs1 = "Server=server1;Database=mydb;Password=secret";
         var cs2 = "Server=server2;Database=mydb;Password=secret";
 
@@ -104,7 +104,7 @@ public class ConnectionStringRedactionTests
         Assert.Contains("Database=mydb", result, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ─── PC-1: Edge cases ─────────────────────────────────────────────────────
+ // ─── Edge cases ─────────────────────────────────────────────────────
 
     [Fact]
     public void NullConnectionString_ReturnsEmpty()
@@ -125,7 +125,7 @@ public class ConnectionStringRedactionTests
         var cs2 = "Server=s;password=secret";
         var cs3 = "Server=s;Password=secret";
 
-        // All should strip password and produce the same key.
+ // All should strip password and produce the same key.
         Assert.Equal(Normalize(cs1), Normalize(cs2));
         Assert.Equal(Normalize(cs2), Normalize(cs3));
         Assert.DoesNotContain("secret", Normalize(cs1), StringComparison.OrdinalIgnoreCase);

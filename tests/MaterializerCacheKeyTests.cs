@@ -18,10 +18,10 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// M1/R2: Verifies that <c>MaterializerCacheKey</c> uses actual <see cref="Type"/> references
+/// Verifies that <c>MaterializerCacheKey</c> uses actual <see cref="Type"/> references
 /// (not hash codes) so that two entity types with identical column layouts but different CLR
 /// types produce separate cache entries and separate materializer delegates.
-/// MM-1: Verifies that <c>ProjectionHash</c> is a 64-bit value, reducing hash collision risk
+/// Verifies that <c>ProjectionHash</c> is a 64-bit value, reducing hash collision risk
 /// compared to the previous 32-bit representation.
 /// </summary>
 public class MaterializerCacheKeyTests
@@ -89,7 +89,7 @@ public class MaterializerCacheKeyTests
     [Fact]
     public void MaterializerCacheKey_ProjectionHash_Is64Bit()
     {
-        // MM-1: Verify that the ProjectionHash field on MaterializerCacheKey is 64-bit (long),
+        // Verify that the ProjectionHash field on MaterializerCacheKey is 64-bit (long),
         // not 32-bit (int), to reduce hash collision probability.
         var keyType = typeof(MaterializerFactory).Assembly
             .GetType("nORM.Query.MaterializerFactory+MaterializerCacheKey", throwOnError: true)!;
@@ -104,7 +104,7 @@ public class MaterializerCacheKeyTests
     [Fact]
     public void MaterializerCacheKey_TwoKeys_WithDifferent64BitHash_AreDistinct()
     {
-        // MM-1: Two keys with the same 32-bit low word but different 64-bit values must
+        // Two keys with the same 32-bit low word but different 64-bit values must
         // not be equal, demonstrating that the 64-bit field prevents 32-bit collisions.
         var keyType = typeof(MaterializerFactory).Assembly
             .GetType("nORM.Query.MaterializerFactory+MaterializerCacheKey", throwOnError: true)!;

@@ -30,17 +30,12 @@ namespace nORM.Query
         private readonly NormExceptionHandler _exceptionHandler;
         private readonly ILogger<QueryExecutor> _logger;
 
-        // PERFORMANCE FIX (TASK 7): Removed regex patterns - no longer needed since Take is passed from QueryPlan
-        // Previously these regex patterns were executed on EVERY query to estimate list capacity
-        // This was extremely CPU intensive for large SQL strings (kilobytes long)
-        // Now we pass the Take value directly from the query plan, avoiding regex entirely
-
-        // PERFORMANCE FIX (TASK 13): Cached list factory delegates to avoid reflection
-        // Activator.CreateInstance is slow - using compiled Expression delegates instead
+        // Cached list factory delegates to avoid Activator.CreateInstance on every materialization.
+        // Take values are now passed directly from the query plan rather than parsed via regex.
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Func<int, IList>> _listFactoryCache = new();
 
         /// <summary>
-        /// PERF: Singleton MaterializerFactory — wraps only static caches, no instance state.
+        /// Singleton MaterializerFactory — wraps only static caches, no instance state.
         /// Eliminates heap allocation per dependent/group-join query.
         /// </summary>
         private static readonly MaterializerFactory _sharedMaterializerFactory = new();
@@ -66,8 +61,8 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// PERFORMANCE FIX (TASK 13): Creates a list using a cached compiled delegate instead of Activator.CreateInstance.
-        /// This is 10-50x faster on hot paths.
+        /// Creates a list using a cached compiled delegate instead of Activator.CreateInstance,
+        /// which is significantly faster on hot paths.
         /// </summary>
         /// <param name="elementType">The element type for the list.</param>
         /// <param name="capacity">The initial capacity.</param>
@@ -101,7 +96,7 @@ namespace nORM.Query
         /// <param name="ct">Token used to cancel the operation.</param>
         /// <returns>A list containing the materialized entities.</returns>
         /// <summary>
-        /// PERF: Overload that materializes directly into List&lt;object&gt; to avoid covariant copy
+        /// Overload that materializes directly into List&lt;object&gt; to avoid covariant copy
         /// when the caller needs List&lt;object&gt; but the plan's ElementType is a concrete type.
         /// </summary>
         public async Task<List<object>> MaterializeAsObjectListAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
@@ -156,7 +151,7 @@ namespace nORM.Query
         public async Task<IList> MaterializeAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
             await using var command = cmd;
-            // PERF: Inline exception handling instead of wrapping in ExecuteWithExceptionHandling.
+            // Inline exception handling instead of wrapping in ExecuteWithExceptionHandling.
             // The wrapper allocates: Func<Task<T>> delegate, Stopwatch.StartNew(), Dictionary,
             // and calls LogInformation on EVERY successful query — all pure overhead on the hot path.
             try
@@ -169,31 +164,28 @@ namespace nORM.Query
                 // - Take specified: use Take value
                 // - No Take: use heuristic (16 is typical small result set, avoids resize for most queries)
                 var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
-                // PERFORMANCE FIX (TASK 13): Use cached list factory instead of Activator.CreateInstance
                 var list = CreateList(plan.ElementType, capacity);
 
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
                                  !plan.ElementType.Name.StartsWith("<>") &&
                                  plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
-                                 _ctx.IsMapped(plan.ElementType);   // M-1: only mapped entity roots
+                                 _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
-                // PERFORMANCE FIX (TASK 15): Hoist read-only check out of per-row loop
-                // IsReadOnlyQuery() checks context options which don't change during query execution
-                // Calling it once instead of millions of times for large result sets
+                // Hoist read-only check out of per-row loop: context options don't change during execution.
                 bool isReadOnly = IsReadOnlyQuery();
 
                 await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
                     .ConfigureAwait(false);
 
-                // PERFORMANCE FIX (TASK 14): Use sync materializer to avoid per-row Task allocation
+                // Use sync materializer to avoid per-row Task allocation.
                 var syncMaterializer = plan.SyncMaterializer;
 
-                // PERFORMANCE FIX (TASK 19): Respect SingleResult flag to avoid materializing unnecessary rows.
-                // QP-1: Single/SingleOrDefault must read up to 2 rows to detect duplicate-row violations.
-                //        First/FirstOrDefault only need 1 row.
+                // Respect SingleResult flag to avoid materializing unnecessary rows.
+                // Single/SingleOrDefault must read up to 2 rows to detect duplicate-row violations;
+                // First/FirstOrDefault only need 1.
                 var maxRows = plan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
                 if (plan.SingleResult)
                 {
@@ -266,11 +258,11 @@ namespace nORM.Query
                                  plan.ElementType.IsClass &&
                                  !plan.ElementType.Name.StartsWith("<>") &&
                                  plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
-                                 _ctx.IsMapped(plan.ElementType);   // M-1: only mapped entity roots
+                                 _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
-                // PERFORMANCE FIX (TASK 15): Hoist read-only check out of per-row loop
+                // Hoist read-only check out of per-row loop: context options don't change during execution.
                 bool isReadOnly = IsReadOnlyQuery();
 
                 using var reader = command.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
@@ -339,7 +331,7 @@ namespace nORM.Query
         /// <param name="trackable">Whether the entity type is trackable.</param>
         /// <param name="entityMap">The table mapping for the entity.</param>
         /// <param name="isReadOnly">
-        /// PERFORMANCE FIX (TASK 15): Whether this is a read-only query (hoisted from per-row check).
+        /// Whether this is a read-only query, hoisted out of per-row check since context options don't change during execution.
         /// </param>
         /// <returns>The processed entity (may be a tracking proxy).</returns>
         // PERFORMANCE OPTIMIZATION 14: Aggressive inlining for per-row hot path
@@ -349,7 +341,7 @@ namespace nORM.Query
             if (!trackable)
                 return entity;
 
-            // PERFORMANCE FIX (TASK 15): Use pre-computed isReadOnly flag instead of calling method
+            // Use pre-computed isReadOnly flag.
             if (isReadOnly)
             {
                 return entity; // Skip all tracking setup
@@ -370,10 +362,6 @@ namespace nORM.Query
             return _ctx.Options.DefaultTrackingBehavior == QueryTrackingBehavior.NoTracking;
         }
 
-        // PERFORMANCE FIX (TASK 7): Removed EstimateCapacity method entirely
-        // This method used expensive regex parsing on every query execution
-        // Replaced with direct Take value from QueryPlan
-
         /// <summary>
         /// Materializes the results of a LINQ <c>GroupJoin</c> operation by streaming records from
         /// the provided command and constructing the grouped results in memory.
@@ -386,12 +374,9 @@ namespace nORM.Query
         {
             var info = plan.GroupJoinInfo!;
 
-            // RELIABILITY FIX (TASK 14): Removed try-catch with manual cmd.DisposeAsync
-            // MaterializeAsync already owns the command's lifetime via "await using var command = cmd"
-            // Double-disposing the command causes errors. Let the caller handle disposal.
             return await _exceptionHandler.ExecuteWithExceptionHandling(async () =>
             {
-                // PERFORMANCE FIX (TASK 13): Use cached list factory instead of Activator.CreateInstance
+                // Use cached list factory instead of Activator.CreateInstance.
                 var resultList = CreateList(info.ResultType, 16);
 
                 var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
@@ -440,8 +425,8 @@ namespace nORM.Query
 
                     if (!reader.IsDBNull(innerKeyIndex))
                     {
-                        // FIX (TASK 5): Use configurable MaxGroupJoinSize instead of hard-coded limit
-                        // Prevents unbounded memory growth while allowing users to opt-in to larger datasets
+                        // Use configurable MaxGroupJoinSize instead of a hard-coded limit.
+                        // Prevents unbounded memory growth while allowing users to opt-in to larger datasets.
                         var maxSize = _ctx.Options.MaxGroupJoinSize;
                         if (currentChildren.Count >= maxSize)
                         {
@@ -493,9 +478,8 @@ namespace nORM.Query
                     return compiled(reader, ct).GetAwaiter().GetResult();
                 }
 
-                // PERFORMANCE FIX (TASK 9): Use MaterializerFactory instead of slow reflection
-                // MaterializerFactory creates compiled IL.Emit/Expression-based materializers
-                // that are 10-100x faster than reflection (read.Invoke, col.Setter)
+                // Use MaterializerFactory instead of reflection.
+                // MaterializerFactory creates compiled IL.Emit/Expression-based materializers.
                 var factory = _sharedMaterializerFactory;
                 var materializer = factory.CreateSyncMaterializer(map, map.Type, startOffset: offset);
                 return materializer(reader);
@@ -568,7 +552,7 @@ namespace nORM.Query
 
                     if (!reader.IsDBNull(innerKeyIndex))
                     {
-                        // FIX (TASK 5): Use configurable MaxGroupJoinSize instead of hard-coded limit
+                        // Use configurable MaxGroupJoinSize instead of a hard-coded limit.
                         var maxSize = _ctx.Options.MaxGroupJoinSize;
                         if (currentChildren.Count >= maxSize)
                         {
@@ -887,8 +871,7 @@ namespace nORM.Query
                 IList childCollection;
                 if (parentKeyValue != null && childrenByParentKey.TryGetValue(parentKeyValue, out var childList))
                 {
-                    // PERFORMANCE FIX: Use cached compiled factory instead of Activator.CreateInstance
-                    // This is 10-50x faster on hot paths
+                    // Use cached compiled factory instead of Activator.CreateInstance.
                     childCollection = CreateList(depQuery.CollectionElementType, childList.Count);
                     foreach (var child in childList)
                     {
@@ -897,8 +880,7 @@ namespace nORM.Query
                 }
                 else
                 {
-                    // No children found, create empty list
-                    // PERFORMANCE FIX: Use cached compiled factory instead of Activator.CreateInstance
+                    // No children found, create empty list.
                     childCollection = CreateList(depQuery.CollectionElementType, 0);
                 }
 
@@ -911,8 +893,7 @@ namespace nORM.Query
         /// </summary>
         private static void AssignEmptyCollection(object parent, DependentQueryDefinition depQuery)
         {
-            // PERFORMANCE FIX: Use cached compiled factory instead of Activator.CreateInstance
-            // This is 10-50x faster on hot paths
+            // Use cached compiled factory instead of Activator.CreateInstance.
             var emptyList = CreateList(depQuery.CollectionElementType, 0);
             depQuery.TargetCollectionProperty.SetValue(parent, emptyList);
         }

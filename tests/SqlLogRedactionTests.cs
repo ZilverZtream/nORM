@@ -8,7 +8,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Gate 4.0→4.5 (S1): SQL error log redaction policy tests.
+/// : SQL error log redaction policy tests.
 /// Verifies that RedactSqlForLogging strips single-quoted string literals from SQL text
 /// before writing to log sinks, preventing sensitive literal values from leaking into
 /// log output while preserving SQL structure, parameters, and identifiers.

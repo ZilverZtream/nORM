@@ -5,9 +5,9 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// Tests for PostgresMigrationSqlGenerator covering SG-1, PRV-1, and MIG-1 findings.
-/// </summary>
+//<summary>
+//Tests for PostgresMigrationSqlGenerator covering , , and findings.
+//</summary>
 public class PostgresMigrationSqlGeneratorTests
 {
     private static TableSchema BuildTable(string name, params ColumnSchema[] columns)
@@ -19,7 +19,7 @@ public class PostgresMigrationSqlGeneratorTests
 
     private static readonly PostgresMigrationSqlGenerator Gen = new();
 
-    // ─── SG-1: ALTER COLUMN must emit separate TYPE and NOT NULL statements ───
+ // ─── ALTER COLUMN must emit separate TYPE and NOT NULL statements ───
 
     [Fact]
     public void AlteredColumn_TypeOnly_EmitsTypeStatement_NoNullabilityStatement()
@@ -94,7 +94,7 @@ public class PostgresMigrationSqlGeneratorTests
         Assert.Equal(2, sql.Up.Count);
         Assert.Contains(sql.Up, s => s.Contains("TYPE"));
         Assert.Contains(sql.Up, s => s.Contains("SET NOT NULL"));
-        // Down should also have 2 statements
+ // Down should also have 2 statements
         Assert.Equal(2, sql.Down.Count);
     }
 
@@ -111,12 +111,12 @@ public class PostgresMigrationSqlGeneratorTests
 
         var sql = Gen.GenerateSql(diff);
 
-        // Up: SET NOT NULL; Down: DROP NOT NULL
+ // Up: SET NOT NULL; Down: DROP NOT NULL
         Assert.Contains("SET NOT NULL", sql.Up[0]);
         Assert.Contains("DROP NOT NULL", sql.Down[0]);
     }
 
-    // ─── PRV-1: Identifier escaping ──────────────────────────────────────────
+ // ─── Identifier escaping ──────────────────────────────────────────
 
     [Fact]
     public void CreateTable_EscapesTableNameWithDoubleQuote()
@@ -128,7 +128,7 @@ public class PostgresMigrationSqlGeneratorTests
 
         var sql = Gen.GenerateSql(diff);
 
-        // The escaped table name should double the embedded quote: "He""llo"
+ // The escaped table name should double the embedded quote: "He""llo"
         Assert.Contains("\"He\"\"llo\"", sql.Up[0]);
     }
 
@@ -159,7 +159,7 @@ public class PostgresMigrationSqlGeneratorTests
         Assert.Contains("\"ix\"\"val\"", indexStmt);
     }
 
-    // ─── MIG-1: NOT NULL + DefaultValue ──────────────────────────────────────
+ // ─── NOT NULL + DefaultValue ──────────────────────────────────────
 
     [Fact]
     public void AddColumn_NotNull_WithDefaultValue_EmitsDefault()

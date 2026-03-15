@@ -121,10 +121,10 @@ namespace nORM.Migration
 
                 foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
                 {
-                    // MM-1: A property must be readable to be a column.
+                    // A property must be readable to be a column.
                     if (!prop.CanRead)
                         continue;
-                    // MM-1: The old `!prop.CanWrite` check was wrong — it excluded init-only and
+                    // The old `!prop.CanWrite` check was wrong — it excluded init-only and
                     // read-only properties that legitimately map to DB columns. The correct
                     // exclusion criterion is the property's TYPE (navigation vs scalar), not
                     // its writability. The navigation-property filters below handle exclusion.
@@ -137,7 +137,7 @@ namespace nORM.Migration
                     // MG-1: Exclude reference navigation properties (class types that are not mappable scalars)
                     if (!IsMappableType(prop.PropertyType))
                         continue;
-                    // MM-1: Exclude computed properties with no backing column — these are get-only
+                    // Exclude computed properties with no backing column — these are get-only
                     // properties that have no setter AND no init accessor, meaning they are pure
                     // expressions (e.g., public string FullName => FirstName + " " + LastName).
                     // Properties with init-only setters DO have a SetMethod (IsInitOnly = true) and
@@ -363,9 +363,9 @@ namespace nORM.Migration
                     }
                     else
                     {
-                        // MIG-2: Index exists in both — check for definition changes
+                        // Index exists in both — check for definition changes
                         var (oldIsUnique, oldCols) = oldIndexes[name];
-                        // MIG-1: Compare column lists in declared order; (A,B) and (B,A) are semantically distinct indexes.
+                        // Compare column lists in declared order; (A,B) and (B,A) are semantically distinct indexes.
                         var colsChanged = !oldCols.SequenceEqual(cols, StringComparer.OrdinalIgnoreCase);
                         if (oldIsUnique != isUnique || colsChanged)
                         {

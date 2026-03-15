@@ -10,7 +10,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// SQL-1: Provider-unsafe boolean literal in fast path and NormQueryProvider.
+/// Provider-unsafe boolean literal in fast path and NormQueryProvider.
 /// </summary>
 public class BooleanLiteralProviderTests
 {

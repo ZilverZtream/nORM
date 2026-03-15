@@ -9,7 +9,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>CT-1: Identity-map must not be corrupted when Remove() is called after PK mutation.</summary>
+/// <summary>Identity-map must not be corrupted when Remove() is called after PK mutation.</summary>
 public class ChangeTrackerRemoveAfterMutationTests
 {
     private class MutableKeyEntity
@@ -43,7 +43,7 @@ public class ChangeTrackerRemoveAfterMutationTests
     }
 
     /// <summary>
-    /// CT-1: After attaching an entity with pk=1, mutating its PK to 999, and then
+    /// After attaching an entity with pk=1, mutating its PK to 999, and then
     /// calling Remove(), the tracker must use the original key (1) to clean up the
     /// identity map — not the mutated key (999). A subsequent Track of a fresh entity
     /// with pk=1 must succeed without getting a zombie null-entity entry.
@@ -77,7 +77,7 @@ public class ChangeTrackerRemoveAfterMutationTests
     }
 
     /// <summary>
-    /// CT-1: After attaching, mutating PK, and removing, the tracker must have zero entries.
+    /// After attaching, mutating PK, and removing, the tracker must have zero entries.
     /// A zombie entry (Entity==null) left under the original key would cause this to fail.
     /// </summary>
     [Fact]

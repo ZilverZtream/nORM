@@ -63,7 +63,7 @@ namespace nORM.Providers
             => $"{left} IS DISTINCT FROM {right}";
 
         /// <inheritdoc />
-        /// SG-1/PR-1/SEC-1: Double embedded double-quote characters to prevent SQL injection via identifiers.
+        /// Doubles embedded double-quote characters to prevent SQL injection via identifiers.
         /// Handles schema-qualified identifiers (schema.table) by escaping each part separately.
         public override string Escape(string id)
         {
@@ -165,15 +165,14 @@ namespace nORM.Providers
         /// <param name="jsonPath">The JSON path expression (dot-delimited with optional array indices).</param>
         /// <returns>SQL fragment that retrieves the JSON value as text.</returns>
         /// <remarks>
-        /// ENHANCEMENT (TASK 3): Now supports both dot-notation and array accessors.
+        /// Supports both dot-notation and array accessors.
         /// Supported patterns:
         /// - Simple dot-notation: "user.address.city"
         /// - Array accessors: "items[0]", "items[0].name", "data[1].users[2].id"
         /// - Mixed: "order.items[0].product.name"
         /// NOT supported: JSONPath filter expressions like "items[*]", "items[?(@.active)]"
         ///
-        /// PERFORMANCE FIX (TASK 20): Use pooled StringBuilder instead of LINQ + string.Join.
-        /// Pools the StringBuilder to reduce allocations; sb.ToString() still allocates for the returned string.
+        /// Uses a pooled StringBuilder to reduce allocations; sb.ToString() still allocates for the returned string.
         /// </remarks>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
         {
@@ -290,7 +289,7 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// P-1: Introspects live column definitions via information_schema.columns.
+        /// Introspects live column definitions via information_schema.columns.
         /// Reconstructs full type strings including numeric precision/scale and character length.
         /// Returns empty list when the table does not yet exist.
         /// </summary>
@@ -340,7 +339,7 @@ ORDER BY ordinal_position";
 
         /// <summary>
         /// Generates the SQL definition for the temporal history table corresponding to the entity mapping.
-        /// P-1: When liveColumns are supplied, column types are taken from the live DB schema.
+        /// When liveColumns are supplied, column types are taken from the live DB schema.
         /// </summary>
         /// <param name="mapping">The entity mapping to create history storage for.</param>
         /// <param name="liveColumns">Live column info from the main table, or null to use CLR defaults.</param>
@@ -464,7 +463,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
 
         /// <summary>
         /// Creates a transaction savepoint using Npgsql's save or savepoint APIs if available.
-        /// PRV-1: Checks the CancellationToken before executing so that pre-cancelled tokens
+        /// Checks the CancellationToken before executing so that pre-cancelled tokens
         /// correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">The transaction on which to create the savepoint.</param>
@@ -472,7 +471,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         /// <param name="ct">Cancellation token.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) }) ??
@@ -487,8 +486,8 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 }
                 catch (System.Reflection.TargetInvocationException ex)
                 {
-                    // RELIABILITY FIX: Unwrap and rethrow the inner exception from reflection invoke
-                    // TargetInvocationException wraps the actual database exception, making it harder to handle
+                    // Unwrap and rethrow the inner exception from reflection invoke.
+                    // TargetInvocationException wraps the actual database exception, making it harder to handle.
                     if (ex.InnerException != null)
                         throw ex.InnerException;
                     throw;
@@ -499,7 +498,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
 
         /// <summary>
         /// Rolls back a transaction to the specified savepoint.
-        /// PRV-1: Checks the CancellationToken before executing so that pre-cancelled tokens
+        /// Checks the CancellationToken before executing so that pre-cancelled tokens
         /// correctly throw <see cref="OperationCanceledException"/>.
         /// </summary>
         /// <param name="transaction">Transaction containing the savepoint.</param>
@@ -507,7 +506,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         /// <param name="ct">Cancellation token.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // PRV-1: Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) }) ??
@@ -522,8 +521,8 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 }
                 catch (System.Reflection.TargetInvocationException ex)
                 {
-                    // RELIABILITY FIX: Unwrap and rethrow the inner exception from reflection invoke
-                    // TargetInvocationException wraps the actual database exception, making it harder to handle
+                    // Unwrap and rethrow the inner exception from reflection invoke.
+                    // TargetInvocationException wraps the actual database exception, making it harder to handle.
                     if (ex.InnerException != null)
                         throw ex.InnerException;
                     throw;

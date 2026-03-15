@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// M-1: Verifies that QueryUnchangedAsync uses name-based column ordinal resolution
+/// Verifies that QueryUnchangedAsync uses name-based column ordinal resolution
 /// rather than positional (index-based) mapping.
 ///
 /// Root bug: CreateSyncMaterializer mapped reader column i to entity property i.
@@ -83,7 +83,7 @@ public class RawSqlNameBasedMaterializationTests
     }
 
     /// <summary>
-    /// M-1: Reversed column order (Id last instead of first) must still populate correctly.
+    /// Reversed column order (Id last instead of first) must still populate correctly.
     /// </summary>
     [Fact]
     public async Task QueryUnchangedAsync_IdColumnLast_PopulatesCorrectly()
@@ -104,7 +104,7 @@ public class RawSqlNameBasedMaterializationTests
     }
 
     /// <summary>
-    /// M-1: Mixed-type entity with columns in full reverse order must populate correctly.
+    /// Mixed-type entity with columns in full reverse order must populate correctly.
     /// Before the fix, int←string and double←int would cause type errors or silently wrong values.
     /// </summary>
     [Fact]
@@ -131,7 +131,7 @@ public class RawSqlNameBasedMaterializationTests
     // ── Aligned order: verify normal case still works ────────────────────────
 
     /// <summary>
-    /// M-1: When SQL returns columns in the same order as the entity mapping,
+    /// When SQL returns columns in the same order as the entity mapping,
     /// behavior must be identical to before the fix (no regression on the happy path).
     /// </summary>
     [Fact]
@@ -154,7 +154,7 @@ public class RawSqlNameBasedMaterializationTests
     }
 
     /// <summary>
-    /// M-1: A missing column (present in mapping but absent from the SQL SELECT list) must
+    /// A missing column (present in mapping but absent from the SQL SELECT list) must
     /// throw an InvalidOperationException with a clear diagnostic message — not silently
     /// populate from the wrong column (which was the M-1 failure mode).
     /// </summary>

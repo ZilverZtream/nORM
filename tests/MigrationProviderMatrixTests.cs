@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Gate 4.5→5.0: Provider matrix + concurrency stress + idempotency tests.
+/// Provider matrix + concurrency stress + idempotency tests.
 ///
 /// Provider matrix: runs the same migration scenarios (add table with FK, add FK on existing
 /// table, drop FK, alter column) through all four SQL generators and asserts structural

@@ -8,11 +8,11 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Gate 3.8→4.0: FK referential action allowlist enforcement on all 4 migration SQL generators.
+/// FK referential action allowlist enforcement on all 4 migration SQL generators.
 /// Verifies that malformed OnDelete/OnUpdate tokens are rejected before DDL emission (M1/X1),
 /// that all standard SQL referential actions are accepted, and that NO ACTION suppresses the clause.
 ///
-/// Gate 4.0→4.5 (adversarial fuzz): Tests hostile snapshot metadata — injection payloads in
+/// : Tests hostile snapshot metadata — injection payloads in
 /// FK action strings must be rejected; table/column/constraint names with injection characters
 /// must be escaped (not rejected) by the Esc() mechanism.
 /// </summary>

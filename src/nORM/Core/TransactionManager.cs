@@ -56,11 +56,10 @@ namespace nORM.Core
             }
             else if (ambientTransaction != null && existingTransaction == null)
             {
-                // TX-1 / Gate E: When an ambient System.Transactions.Transaction exists but no
-                // explicit DbTransaction has been started, attempt to enlist the connection so
-                // that providers are included in the TransactionScope and roll back correctly if
-                // the scope is disposed without Complete().
-                // Gate E: The enlistment failure policy is configurable via AmbientTransactionPolicy.
+                // When an ambient System.Transactions.Transaction exists but no explicit DbTransaction
+                // has been started, attempt to enlist the connection so that providers are included
+                // in the TransactionScope and roll back correctly if the scope is disposed without
+                // Complete(). The enlistment failure policy is configurable via AmbientTransactionPolicy.
                 await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 var connection = context.Connection;
                 var policy = context.Options.AmbientTransactionPolicy;
@@ -108,8 +107,8 @@ namespace nORM.Core
         public async ValueTask CommitAsync()
         {
             if (OwnsTransaction && Transaction != null)
-                // TX-1: Use CancellationToken.None — commit must not be aborted mid-flight.
-                // A cancelled commit leaves ambiguous DB state; always run to completion like RollbackAsync.
+                // Use CancellationToken.None — commit must not be aborted mid-flight.
+                // A cancelled commit leaves ambiguous DB state; always run to completion.
                 await Transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
         }
 
@@ -123,7 +122,7 @@ namespace nORM.Core
         public async ValueTask RollbackAsync(CancellationToken _ = default)
         {
             if (OwnsTransaction && Transaction != null)
-                // TX-1: Use CancellationToken.None — rollback must complete regardless of caller cancellation
+                // Use CancellationToken.None — rollback must complete regardless of caller cancellation.
                 await Transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
         }
 
@@ -151,7 +150,7 @@ namespace nORM.Core
                 }
                 catch (Exception ex)
                 {
-                    // TX-1: Unexpected exception during dispose — log for diagnostics but don't
+                    // Unexpected exception during dispose — log for diagnostics but don't
                     // throw per .NET Dispose contract. Connection pool may be in indeterminate state.
                     _logger?.LogWarning(ex,
                         "Unexpected exception disposing database transaction. " +
@@ -185,7 +184,7 @@ namespace nORM.Core
                 }
                 catch (Exception ex)
                 {
-                    // TX-1: Unexpected exception during dispose — log for diagnostics but don't
+                    // Unexpected exception during dispose — log for diagnostics but don't
                     // throw per .NET Dispose contract. Connection pool may be in indeterminate state.
                     _logger?.LogWarning(ex,
                         "Unexpected exception disposing database transaction. " +

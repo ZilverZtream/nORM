@@ -6,7 +6,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// SG-1: Verifies that SqlServerProvider.ApplyPaging correctly detects ORDER BY in a
+/// Verifies that SqlServerProvider.ApplyPaging correctly detects ORDER BY in a
 /// case-insensitive manner. Previously the check was case-sensitive (Contains("ORDER BY"))
 /// so lowercase or mixed-case ORDER BY clauses were not detected and a duplicate
 /// ORDER BY (SELECT NULL) was appended.
@@ -23,7 +23,7 @@ public class SqlServerPagingOrderByTests
         return sb.ToString();
     }
 
-    // ─── SG-1: Uppercase ORDER BY — should NOT add (SELECT NULL) ─────────────
+    // ─── Uppercase ORDER BY — should NOT add (SELECT NULL) ─────────────
 
     [Fact]
     public void ApplyPaging_UppercaseOrderBy_DoesNotDuplicate()
@@ -34,7 +34,7 @@ public class SqlServerPagingOrderByTests
         Assert.Equal(1, count);
     }
 
-    // ─── SG-1: Lowercase order by — should NOT add (SELECT NULL) ─────────────
+    // ─── Lowercase order by — should NOT add (SELECT NULL) ─────────────
 
     [Fact]
     public void ApplyPaging_LowercaseOrderBy_DoesNotDuplicate()
@@ -46,7 +46,7 @@ public class SqlServerPagingOrderByTests
         Assert.Equal(1, lowerCount);
     }
 
-    // ─── SG-1: Mixed-case Order By — should NOT add (SELECT NULL) ────────────
+    // ─── Mixed-case Order By — should NOT add (SELECT NULL) ────────────
 
     [Fact]
     public void ApplyPaging_MixedCaseOrderBy_DoesNotDuplicate()
@@ -56,7 +56,7 @@ public class SqlServerPagingOrderByTests
         Assert.Equal(1, count);
     }
 
-    // ─── SG-1: No ORDER BY present — MUST add (SELECT NULL) ──────────────────
+    // ─── No ORDER BY present — MUST add (SELECT NULL) ──────────────────
 
     [Fact]
     public void ApplyPaging_NoOrderBy_AddsSelectNull()
@@ -65,7 +65,7 @@ public class SqlServerPagingOrderByTests
         Assert.Contains("ORDER BY (SELECT NULL)", sql, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ─── SG-1: OFFSET + FETCH syntax is present regardless of ORDER BY case ──
+    // ─── OFFSET + FETCH syntax is present regardless of ORDER BY case ──
 
     [Fact]
     public void ApplyPaging_AnyOrderByCasing_ContainsOffsetFetch()

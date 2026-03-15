@@ -9,18 +9,18 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>
-/// SG-1: Verifies that UseAffectedRowsSemantics is correct per provider, and that
-/// concurrency checks are skipped for providers reporting affected (not matched) rows.
-/// </summary>
+//<summary>
+//Verifies that UseAffectedRowsSemantics is correct per provider, and that
+//concurrency checks are skipped for providers reporting affected (not matched) rows.
+//</summary>
 public class ConcurrencyRowcountSemanticsTests
 {
-    // ─── Provider property assertions ─────────────────────────────────────
+ // ─── Provider property assertions ─────────────────────────────────────
 
     [Fact]
     public void MySqlProvider_UseAffectedRowsSemantics_IsTrue()
     {
-        // SG-1: MySQL returns affected rows, not matched rows — must skip the count check.
+ // MySQL returns affected rows, not matched rows — must skip the count check.
         var provider = new MySqlProvider(new SqliteParameterFactory());
         Assert.True(provider.UseAffectedRowsSemantics);
     }
@@ -28,7 +28,7 @@ public class ConcurrencyRowcountSemanticsTests
     [Fact]
     public void SqliteProvider_UseAffectedRowsSemantics_IsFalse()
     {
-        // SG-1: SQLite returns matched rows — concurrency check is valid.
+ // SQLite returns matched rows — concurrency check is valid.
         var provider = new SqliteProvider();
         Assert.False(provider.UseAffectedRowsSemantics);
     }
@@ -36,12 +36,12 @@ public class ConcurrencyRowcountSemanticsTests
     [Fact]
     public void SqlServerProvider_UseAffectedRowsSemantics_IsFalse()
     {
-        // SG-1: SQL Server returns matched rows — concurrency check is valid.
+ // SQL Server returns matched rows — concurrency check is valid.
         var provider = new SqlServerProvider();
         Assert.False(provider.UseAffectedRowsSemantics);
     }
 
-    // ─── Concurrency detection still fires for SQLite ─────────────────────
+ // ─── Concurrency detection still fires for SQLite ─────────────────────
 
     [Table("SgConcUser")]
     private class SgConcUser
@@ -67,7 +67,7 @@ public class ConcurrencyRowcountSemanticsTests
     [Fact]
     public async Task SqliteProvider_ConcurrencyConflict_ThrowsDbConcurrencyException()
     {
-        // SG-1 non-regression: concurrency detection still fires for SQLite (matched-row semantics).
+ // non-regression: concurrency detection still fires for SQLite (matched-row semantics).
         var (cn, ctx) = CreateSqliteContext();
         using var _cn = cn;
         using var _ctx = ctx;
@@ -76,27 +76,27 @@ public class ConcurrencyRowcountSemanticsTests
         ctx.Add(user);
         await ctx.SaveChangesAsync();
 
-        // Simulate external update that changes the RowVersion
+ // Simulate external update that changes the RowVersion
         using var cmd = cn.CreateCommand();
         cmd.CommandText = "UPDATE SgConcUser SET RowVersion = @rv WHERE Id = 1";
         cmd.Parameters.AddWithValue("@rv", new byte[] { 99 });
         cmd.ExecuteNonQuery();
 
-        // Mark the entity as modified
+ // Mark the entity as modified
         user.Name = "Bob";
         var entry = ctx.ChangeTracker.Entries.Single();
         typeof(ChangeTracker)
             .GetMethod("MarkDirty", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
             .Invoke(ctx.ChangeTracker, new object[] { entry });
 
-        // Must still throw because SQLite uses matched-row semantics
+ // Must still throw because SQLite uses matched-row semantics
         await Assert.ThrowsAsync<DbConcurrencyException>(() => ctx.SaveChangesAsync());
     }
 
     [Fact]
     public async Task SqliteProvider_SameValueUpdate_StillDetectsConflict()
     {
-        // SG-1 non-regression: SQLite matched-row semantics correctly reports 0 for stale RowVersion.
+ // non-regression: SQLite matched-row semantics correctly reports 0 for stale RowVersion.
         var (cn, ctx) = CreateSqliteContext();
         using var _cn = cn;
         using var _ctx = ctx;
@@ -105,13 +105,13 @@ public class ConcurrencyRowcountSemanticsTests
         ctx.Add(user);
         await ctx.SaveChangesAsync();
 
-        // Simulate concurrent modification
+ // Simulate concurrent modification
         using var cmd = cn.CreateCommand();
         cmd.CommandText = "UPDATE SgConcUser SET RowVersion = @rv WHERE Id = 1";
         cmd.Parameters.AddWithValue("@rv", new byte[] { 55 });
         cmd.ExecuteNonQuery();
 
-        // Update the entity — stale RowVersion means the UPDATE WHERE clause won't match.
+ // Update the entity — stale RowVersion means the UPDATE WHERE clause won't match.
         user.Name = "Charlie Updated";
         var entry = ctx.ChangeTracker.Entries.Single();
         typeof(ChangeTracker)

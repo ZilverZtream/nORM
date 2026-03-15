@@ -31,16 +31,14 @@ namespace nORM.Internal
 
     internal static class ExpressionCompiler
     {
-        // C1 fix: replaced unbounded ConcurrentDictionary with a size-capped ConcurrentLruCache.
-        // 512 slots covers the vast majority of real-app query-site shapes (one per call-site per
-        // provider) while preventing unbounded memory growth over long process lifetimes.
+        // Bounded at 512 entries to prevent unbounded memory growth over long process lifetimes.
+        // 512 slots covers the vast majority of real-app expression shapes (one per call-site per provider).
         // Internal for test assertions.
         internal static readonly ConcurrentLruCache<ExpressionFingerprint, Delegate> _compiledDelegateCache = new(512);
 
-        // A1/X1 fix: cap concurrent compile operations so repeated hostile-timeout callers cannot
-        // starve the thread pool. Each in-flight compile acquires one slot; the slot is released
-        // when the compile task finishes (success or exception), NOT when the caller times out.
-        // This provides the "bounded thread/task count" guarantee the audit requires.
+        // Cap concurrent compile operations so repeated hostile-timeout callers cannot starve
+        // the thread pool. Each in-flight compile acquires one slot; the slot is released when
+        // the compile finishes (success or exception), not when the caller times out.
         private static readonly int _compileSemaphoreCapacity = Math.Max(2, Environment.ProcessorCount);
         private static readonly SemaphoreSlim _compileSemaphore = new(_compileSemaphoreCapacity, _compileSemaphoreCapacity);
         // Exposed for deterministic test assertions (bounded-worker proof).
@@ -76,7 +74,7 @@ namespace nORM.Internal
             Func<TContext, TParam, Task<List<T>>>? result = null;
             Exception? compileException = null;
 
-            // A1/X1 fix: acquire one compile slot before launching the task.
+            // Acquire one compile slot before launching the task.
             // The slot is released inside the task's finally block (not when the caller times out),
             // so concurrent in-flight compiles never exceed _compileSemaphoreCapacity even under
             // repeated hostile-timeout pressure. Expression.Compile() is not interruptible, but
@@ -117,9 +115,9 @@ namespace nORM.Internal
             where TContext : DbContext
             where T : class
         {
-            // SG-1/QP-1/SEC-1: Use per-context-shape cache keyed by a collision-resistant string
+            // Use per-context-shape cache keyed by a collision-resistant string
             // that encodes provider type, mappings, tenant ID, and global filter expressions.
-            // C1 fix: cap at 256 entries via ConcurrentLruCache so long-lived processes with many
+            // Cap at 256 entries via ConcurrentLruCache so long-lived processes with many
             // distinct tenant/filter/provider/model combinations don't grow this dictionary without bound.
             var plansByCtx = new ConcurrentLruCache<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams)>(256);
             string? cachedCtxKey = null;
@@ -134,18 +132,18 @@ namespace nORM.Internal
             // ConditionalWeakTable provides automatic GC-tracked lifetime: when a context is
             // collected after Dispose, its pooled commands are released automatically.
             var stateByCtx = new System.Runtime.CompilerServices.ConditionalWeakTable<DbContext, CompiledQueryState>();
-            // PERF: Single-slot fast-path cache for same-context repeated calls (common case).
+            // Single-slot fast-path cache for same-context repeated calls (common case).
             // The fast-path vars are NOT synchronized — concurrent different-context callers
             // may race on them, causing a stale cache miss. That is safe: the only consequence
             // is a ConditionalWeakTable lookup instead of a direct field read (no correctness impact).
             DbContext? fastCtxOwner = null;
             CompiledQueryState? fastCtxState = null;
-            // PERF: Cache the sync materializer delegate.
+            // Cache the sync materializer delegate.
             Func<System.Data.Common.DbDataReader, object>? cachedMaterializer = null;
 
             return (ctx, value) =>
             {
-                // PERF: Fast path — same context as last call (common in benchmarks and real apps).
+                // Fast path — same context as last call (common in benchmarks and real apps).
                 if (!hasCachedEntry || !ReferenceEquals(cachedCtxKeyOwner, ctx))
                 {
                     string ctxKey;
@@ -156,7 +154,7 @@ namespace nORM.Internal
                     else
                     {
                         var tenantId = ctx.Options.TenantProvider?.GetCurrentTenantId();
-                        // SG1/X1 fix: use GetFilterKey() instead of f.ToString().
+                        // Use GetFilterKey() instead of f.ToString().
                         // f.ToString() is shape-only — same string regardless of captured closure value.
                         // ExpressionFingerprint alone also misses closure values: it hashes the closure
                         // object reference (whose ToString() is the type name), not the actual field values.
@@ -174,7 +172,7 @@ namespace nORM.Internal
                         cachedCtxKeyOwner = ctx;
                     }
 
-                    // C1 fix: use GetOrAdd on the LRU cache so evicted entries are re-computed on
+                    // Use GetOrAdd on the LRU cache so evicted entries are re-computed on
                     // demand and concurrent misses serialize through the factory (at most once per key).
                     var capturedCtx = ctx;
                     var capturedExpr = queryExpression;
@@ -206,7 +204,7 @@ namespace nORM.Internal
                 var cachedPlan = cachedEntry.Plan;
                 var paramNames = cachedEntry.ParamNames;
 
-                // PERF: Reuse single-element array for the common single-param case
+                // Reuse single-element array for the common single-param case
                 object?[] args;
                 if (paramNames != null && paramNames.Count > 0)
                 {
@@ -247,13 +245,13 @@ namespace nORM.Internal
                     fastCtxState = state;
                 }
 
-                // PERF: Inline pooled sync execution for providers without true async I/O (SQLite).
+                // Inline pooled sync execution for providers without true async I/O (SQLite).
                 // Bypasses the entire NormQueryProvider call chain (RetryPolicy, CacheProvider,
                 // EnsureConnectionAsync, IsScalar dispatch) by inlining command reuse + sync read.
                 // Pooled commands avoid per-call DbCommand/DbParameter allocation and SQL compilation.
-                // T1 fix: guard on Connection.State == Open — closed connection falls through to the
+                // Guard on Connection.State == Open — closed connection falls through to the
                 // standard path which calls EnsureConnectionAsync before executing.
-                // SG1 fix: interceptors guard removed — the fast path now routes through
+                // Interceptors guard removed — the fast path now routes through
                 // ExecuteReaderWithInterception so interceptors are honoured.
                 if (cachedPlan != null &&
                     ctx.Provider.PrefersSyncExecution &&
@@ -322,11 +320,10 @@ namespace nORM.Internal
 
                     try
                     {
-                        // SG1 fix: rebind transaction on every use — the transaction may have
-                        // changed since the command was created/last-used (or the command is
-                        // dequeued from the pool with a stale/null transaction reference).
+                        // Rebind transaction on every use — the transaction may have changed since
+                        // the command was created or last dequeued from the pool.
                         cmd.Transaction = ctx.CurrentTransaction;
-                        // SG1 fix: route through ExecuteReaderWithInterception so registered
+                        // Route through ExecuteReaderWithInterception so registered
                         // CommandInterceptors are invoked even on the pooled sync fast path.
                         using var reader = cmd.ExecuteReaderWithInterception(ctx, CommandBehavior.Default);
                         if (cachedPlan.SingleResult)
@@ -360,7 +357,7 @@ namespace nORM.Internal
         }
 
         /// <summary>
-        /// SG1/X1 fix: builds a cache key for a global filter expression that captures both
+        /// Builds a cache key for a global filter expression that captures both
         /// expression shape and closure-captured runtime values.
         ///
         /// f.ToString() is shape-only (same string regardless of captured value).

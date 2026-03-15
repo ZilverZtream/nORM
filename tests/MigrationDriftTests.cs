@@ -6,7 +6,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
-/// <summary>MIG-1: Verify migration runner throws when a version's name drifts.</summary>
+/// <summary>Verify migration runner throws when a version's name drifts.</summary>
 public class MigrationDriftTests
 {
     [Fact]

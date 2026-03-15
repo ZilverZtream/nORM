@@ -16,7 +16,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-1: Verifies null-tenant-ID handling in the global filter expression builder.
+/// Verifies null-tenant-ID handling in the global filter expression builder.
 /// Previously, returning null from GetCurrentTenantId() when the tenant column is a
 /// non-nullable value type (e.g. int) would crash with an unhandled ArgumentException
 /// inside Expression.Constant(null, typeof(int)).

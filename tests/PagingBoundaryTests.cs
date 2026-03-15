@@ -9,7 +9,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// SQL-1: Verifies that negative Skip/Take values throw ArgumentOutOfRangeException
+/// Verifies that negative Skip/Take values throw ArgumentOutOfRangeException
 /// at query translation time, while zero is valid.
 /// </summary>
 public class PagingBoundaryTests

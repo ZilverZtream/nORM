@@ -12,7 +12,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// QP-2: Fast path must forward CancellationToken to all DB calls.
+/// Fast path must forward CancellationToken to all DB calls.
 /// </summary>
 public class FastPathCancellationTests
 {

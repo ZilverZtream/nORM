@@ -16,7 +16,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// P-1: Verifies that MySqlMigrationRunner uses per-step transactions (one commit per
+/// Verifies that MySqlMigrationRunner uses per-step transactions (one commit per
 /// migration) rather than a single wrapping transaction across all migrations.
 ///
 /// Root bug: A single transaction wrapped all migrations. MySQL DDL (ALTER TABLE,
@@ -205,7 +205,7 @@ public class MySqlMigrationPerStepTests
     }
 
     /// <summary>
-    /// P-1: When the third of three migrations fails, the first two must have been
+    /// When the third of three migrations fails, the first two must have been
     /// individually committed (schema applied + history recorded). Only the third is absent.
     ///
     /// Before the fix: a single wrapping rollback would remove history for all prior

@@ -7,7 +7,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// SG-1: Validates that IsSafeIdentifier rejects injected identifiers and that
+/// Validates that IsSafeIdentifier rejects injected identifiers and that
 /// DbContext.Query throws before executing any SQL when given a malicious table name.
 /// </summary>
 public class IdentifierInjectionTests

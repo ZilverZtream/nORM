@@ -29,7 +29,7 @@ file class BoolPredEntity
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 3.4 → 3.5 : BooleanFalseLiteral contract + cross-provider bool SQL shape
+// BooleanFalseLiteral contract + cross-provider bool SQL shape
 // ══════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
@@ -261,7 +261,7 @@ public class BoolLiteralSqlShapeTests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 3.5 → 4.0 : Expanded bool matrix — null bool, joins/subqueries
+// Expanded bool matrix — null bool, joins/subqueries
 // ══════════════════════════════════════════════════════════════════════════════
 
 public class BoolLiteralExpandedTests
@@ -444,7 +444,7 @@ public class BoolLiteralExpandedTests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 4.0 → 4.5 : Concurrency/cancellation chaos with bool predicates
+// Concurrency/cancellation chaos with bool predicates
 // ══════════════════════════════════════════════════════════════════════════════
 
 public class BoolLiteralChaosTests
@@ -595,10 +595,10 @@ public class BoolLiteralChaosTests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gate 4.5 → 5.0 : Provider literal correctness + TranslateJsonPathAccess docs
+// Provider literal correctness + TranslateJsonPathAccess docs
 // ══════════════════════════════════════════════════════════════════════════════
 
-public class BoolLiteralGate50Tests
+public class BoolLiteralProviderLiteralTests
 {
     [Fact]
     public void Provider_PostgresBooleanFalseLiteral_ReturnsFalse()

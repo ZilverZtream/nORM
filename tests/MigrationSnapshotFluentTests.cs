@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// MIG-1: SchemaSnapshotBuilder.Build(DbContext) must reflect fluent model configuration.
+/// SchemaSnapshotBuilder.Build(DbContext) must reflect fluent model configuration.
 /// </summary>
 public class MigrationSnapshotFluentTests
 {

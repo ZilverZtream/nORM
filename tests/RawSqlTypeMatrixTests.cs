@@ -79,10 +79,10 @@ public class RawSqlTypeMatrixTests
         return (cn, new DbContext(cn, new SqliteProvider()));
     }
 
-    // ── M1: Materialization — Guid from TEXT ───────────────────────────────
+    // ── Materialization — Guid from TEXT ───────────────────────────────
 
     [Fact]
-    public async Task M1_GuidColumn_MaterializesFromText()
+    public async Task GuidColumn_MaterializesFromText()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxGuidDate (Id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -103,10 +103,10 @@ public class RawSqlTypeMatrixTests
         Assert.Equal(expected, results[0].GuidCol);
     }
 
-    // ── M1: Materialization — DateOnly from TEXT ───────────────────────────
+    // ── Materialization — DateOnly from TEXT ───────────────────────────
 
     [Fact]
-    public async Task M1_DateOnlyColumn_MaterializesFromText()
+    public async Task DateOnlyColumn_MaterializesFromText()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxGuidDate (Id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -126,10 +126,10 @@ public class RawSqlTypeMatrixTests
         Assert.Equal(new DateOnly(2024, 3, 15), results[0].DateCol);
     }
 
-    // ── M1: Materialization — enum from INTEGER ────────────────────────────
+    // ── Materialization — enum from INTEGER ────────────────────────────
 
     [Fact]
-    public async Task M1_EnumColumn_MaterializesFromInteger()
+    public async Task EnumColumn_MaterializesFromInteger()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxGuidDate (Id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -149,10 +149,10 @@ public class RawSqlTypeMatrixTests
         Assert.Equal(OrderStatus.Active, results[0].StatusCol);
     }
 
-    // ── M1: Materialization — TimeOnly from TEXT ───────────────────────────
+    // ── Materialization — TimeOnly from TEXT ───────────────────────────
 
     [Fact]
-    public async Task M1_TimeOnlyColumn_MaterializesFromText()
+    public async Task TimeOnlyColumn_MaterializesFromText()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxTimeOnly (Id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -170,10 +170,10 @@ public class RawSqlTypeMatrixTests
         Assert.Equal(new TimeOnly(14, 30, 0), results[0].TimeCol);
     }
 
-    // ── M1: Materialization — all three non-primitive types together ────────
+    // ── Materialization — all three non-primitive types together ────────
 
     [Fact]
-    public async Task M1_AllModernTypes_MaterializeCorrectly()
+    public async Task AllModernTypes_MaterializeCorrectly()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxGuidDate (Id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -196,10 +196,10 @@ public class RawSqlTypeMatrixTests
         Assert.Equal(OrderStatus.Closed, results[0].StatusCol);
     }
 
-    // ── P2: Parameter binding — DateOnly in WHERE clause ───────────────────
+    // ── Parameter binding — DateOnly in WHERE clause ───────────────────
 
     [Fact]
-    public async Task P2_DateOnlyParameter_FiltersCorrectly()
+    public async Task DateOnlyParameter_FiltersCorrectly()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxDateParam (Id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -222,10 +222,10 @@ public class RawSqlTypeMatrixTests
         Assert.Equal(target, results[0].DateCol);
     }
 
-    // ── P2: Parameter binding — enum in WHERE clause ───────────────────────
+    // ── Parameter binding — enum in WHERE clause ───────────────────────
 
     [Fact]
-    public async Task P2_EnumParameter_FiltersCorrectly()
+    public async Task EnumParameter_FiltersCorrectly()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxEnumParam (Id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -247,10 +247,10 @@ public class RawSqlTypeMatrixTests
         Assert.All(results, r => Assert.Equal(OrderStatus.Active, r.Status));
     }
 
-    // ── P2: Parameter binding — TimeOnly does not throw ───────────────────
+    // ── Parameter binding — TimeOnly does not throw ───────────────────
 
     [Fact]
-    public async Task P2_TimeOnlyParameter_DoesNotThrow()
+    public async Task TimeOnlyParameter_DoesNotThrow()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxTimeOnly (Id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -264,10 +264,10 @@ public class RawSqlTypeMatrixTests
         Assert.Null(ex);
     }
 
-    // ── P2: Parameter binding — char does not throw ────────────────────────
+    // ── Parameter binding — char does not throw ────────────────────────
 
     [Fact]
-    public async Task P2_CharParameter_DoesNotThrow()
+    public async Task CharParameter_DoesNotThrow()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxScalar (Id INTEGER PRIMARY KEY AUTOINCREMENT, IntCol INTEGER NOT NULL)");
@@ -280,10 +280,10 @@ public class RawSqlTypeMatrixTests
         Assert.Null(ex);
     }
 
-    // ── P2: Parameter binding — uint does not throw ────────────────────────
+    // ── Parameter binding — uint does not throw ────────────────────────
 
     [Fact]
-    public async Task P2_UIntParameter_DoesNotThrow()
+    public async Task UIntParameter_DoesNotThrow()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxScalar (Id INTEGER PRIMARY KEY AUTOINCREMENT, IntCol INTEGER NOT NULL)");
@@ -297,10 +297,10 @@ public class RawSqlTypeMatrixTests
         Assert.Null(ex);
     }
 
-    // ── X1: Cross-subsystem — bind DateOnly then materialize round-trip ────
+    // ── Cross-subsystem — bind DateOnly then materialize round-trip ────
 
     [Fact]
-    public async Task X1_DateOnly_RoundTrip_BindAndMaterialize()
+    public async Task DateOnly_RoundTrip_BindAndMaterialize()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxDateParam (Id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -325,10 +325,10 @@ public class RawSqlTypeMatrixTests
         Assert.Equal("Independence", results[0].Label);
     }
 
-    // ── X1: Cross-subsystem — bind enum then materialize round-trip ────────
+    // ── Cross-subsystem — bind enum then materialize round-trip ────────
 
     [Fact]
-    public async Task X1_Enum_RoundTrip_BindAndMaterialize()
+    public async Task Enum_RoundTrip_BindAndMaterialize()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE TmxEnumParam (Id INTEGER PRIMARY KEY AUTOINCREMENT, " +

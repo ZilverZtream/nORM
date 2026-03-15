@@ -11,7 +11,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// T1/T2: Verifies that ExecuteBulkOperationAsync (BulkOperationProvider) reuses ctx.CurrentTransaction
+/// Verifies that ExecuteBulkOperationAsync (BulkOperationProvider) reuses ctx.CurrentTransaction
 /// when one is already open (T2), and that CommitAsync uses CancellationToken.None so a cancelled
 /// caller token after a successful DB commit does not cause a spurious OperationCanceledException (T1).
 /// </summary>
@@ -43,7 +43,7 @@ public class BulkTransactionOwnershipTests
     }
 
     /// <summary>
-    /// T2: When caller starts a transaction, BulkInsertAsync should enlist in it.
+    /// When caller starts a transaction, BulkInsertAsync should enlist in it.
     /// Committing the caller's transaction persists the rows.
     /// </summary>
     [Fact]
@@ -63,7 +63,7 @@ public class BulkTransactionOwnershipTests
     }
 
     /// <summary>
-    /// T2: When caller rolls back after BulkInsertAsync, no rows must remain.
+    /// When caller rolls back after BulkInsertAsync, no rows must remain.
     /// </summary>
     [Fact]
     public async Task BulkInsert_WithAmbientTransaction_RollsBackWhenCallerRollsBack()
@@ -101,7 +101,7 @@ public class BulkTransactionOwnershipTests
     }
 
     /// <summary>
-    /// T1: A pre-cancelled CancellationToken must not cause OperationCanceledException
+    /// A pre-cancelled CancellationToken must not cause OperationCanceledException
     /// after the DB has already committed. The fix: CommitAsync(CancellationToken.None).
     /// </summary>
     [Fact]
