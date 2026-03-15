@@ -576,6 +576,10 @@ namespace nORM.Core
             var sb = new System.Text.StringBuilder(sql.Length);
             int i = 0;
             int len = sql.Length;
+            // Tracks whether the last character appended to sb was a space,
+            // allowing consecutive whitespace runs to be collapsed in a single pass
+            // without a separate O(n²) post-processing loop.
+            bool lastWasSpace = true; // start true to suppress leading spaces
 
             while (i < len)
             {
@@ -615,12 +619,16 @@ namespace nORM.Core
                     i += 2;
                     while (i < len && sql[i] != '\n' && sql[i] != '\r')
                         i++;
-                    // Replace with a space so the next token is still separated
-                    sb.Append(' ');
+                    // Separate the next token with one space (skipped if already at a space)
+                    if (!lastWasSpace)
+                    {
+                        sb.Append(' ');
+                        lastWasSpace = true;
+                    }
                     continue;
                 }
 
-                // Whitespace normalization — collapse all whitespace variants to space
+                // Whitespace normalization — collapse all whitespace variants to a single space
                 char c = sql[i];
                 if (c == ' ' || c == '\t' || c == '\r' || c == '\n' ||
                     c == '\u00A0' || c == '\u2003' || c == '\u2002' ||
@@ -629,22 +637,26 @@ namespace nORM.Core
                     c == '\u2008' || c == '\u2009' || c == '\u200A' ||
                     c == '\u3000' || char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.SpaceSeparator)
                 {
-                    sb.Append(' ');
+                    if (!lastWasSpace)
+                    {
+                        sb.Append(' ');
+                        lastWasSpace = true;
+                    }
                     i++;
                     continue;
                 }
 
                 // Regular character — append lowercased
                 sb.Append(char.ToLowerInvariant(c));
+                lastWasSpace = false;
                 i++;
             }
 
-            // Collapse multiple spaces into one and trim
-            var result = sb.ToString();
-            // Use a fast path: replace sequences of spaces
-            while (result.Contains("  "))
-                result = result.Replace("  ", " ");
-            return result.Trim();
+            // Strip any trailing space produced by a line comment or whitespace at end of input
+            if (lastWasSpace && sb.Length > 0)
+                sb.Length--;
+
+            return sb.ToString();
         }
 
         /// <summary>
