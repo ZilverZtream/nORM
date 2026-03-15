@@ -26,6 +26,11 @@ namespace nORM.Providers
         private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: 100);
 
         /// <summary>
+        /// SQL Server uses TOP(n)/OFFSET-FETCH paging syntax rather than LIMIT.
+        /// </summary>
+        public override bool UsesFetchOffsetPaging => true;
+
+        /// <summary>
         /// Maximum length of a single SQL statement supported by SQL Server.
         /// </summary>
         public override int MaxSqlLength => 8_000;

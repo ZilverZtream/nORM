@@ -60,6 +60,13 @@ namespace nORM.Providers
         public virtual bool PrefersSyncExecution => false;
 
         /// <summary>
+        /// Returns true when the provider uses TOP(n)/OFFSET-FETCH paging syntax (SQL Server style).
+        /// Providers using LIMIT return false. Used by the fast-path query executor to emit the
+        /// correct paging fragment without inspecting the provider type name.
+        /// </summary>
+        public virtual bool UsesFetchOffsetPaging => false;
+
+        /// <summary>
         /// Generates a null-safe equality expression: TRUE when both sides are equal OR both are NULL.
         /// Providers can override for more efficient syntax (e.g., SQLite's <c>IS</c> operator).
         /// The default uses the portable OR-based expansion.

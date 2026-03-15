@@ -32,16 +32,19 @@ namespace nORM.Query
         private static readonly MaterializerFactory _materializer = new();
 
         /// <summary>
-        /// Cached sync materializer delegates per entity type.
-        /// Eliminates MaterializerFactory lookup on every query.
+        /// Cached sync materializer delegates keyed by entity type and mapping hash.
+        /// The mapping hash distinguishes contexts whose fluent configuration differs
+        /// for the same CLR type, preventing stale delegate reuse across divergent schemas.
         /// </summary>
-        private static readonly ConcurrentDictionary<Type, Delegate> _syncMaterializerCache = new();
+        private static readonly ConcurrentDictionary<(Type EntityType, int MappingHash), Delegate> _syncMaterializerCache = new();
 
         /// <summary>
-        /// Cached full SQL strings (SELECT + WHERE + LIMIT) for fast-path queries.
-        /// Uses ValueTuple key to avoid string.Concat allocation on every call.
+        /// Cached full SQL strings (SELECT + WHERE + LIMIT/TOP) for fast-path queries.
+        /// Key includes the fully-qualified type name (avoids same-short-name collision across
+        /// namespaces), provider type (avoids quoting/literal poisoning across provider switches),
+        /// and mapping hash (avoids wrong SQL reuse when fluent config differs across contexts).
         /// </summary>
-        private static readonly ConcurrentDictionary<(string TypeName, string Property, string WhereKind, int? TakeCount), string> _fullSqlCache = new();
+        private static readonly ConcurrentDictionary<(string TypeFullName, string Property, string WhereKind, int? TakeCount, string ProviderType, int MappingHash), string> _fullSqlCache = new();
 
         /// <summary>
         /// Cache whether a type is eligible for fast-path execution (class with parameterless ctor).
@@ -206,9 +209,10 @@ namespace nORM.Query
         /// </summary>
         private static Func<System.Data.Common.DbDataReader, T> GetSyncMaterializer<T>(DbContext ctx) where T : class
         {
-            return (Func<System.Data.Common.DbDataReader, T>)_syncMaterializerCache.GetOrAdd(typeof(T), t =>
+            var key = (typeof(T), ctx.GetMappingHash());
+            return (Func<System.Data.Common.DbDataReader, T>)_syncMaterializerCache.GetOrAdd(key, _ =>
             {
-                var map = ctx.GetMapping(t);
+                var map = ctx.GetMapping(typeof(T));
                 return (Delegate)_materializer.CreateSyncMaterializer<T>(map);
             });
         }
@@ -225,15 +229,9 @@ namespace nORM.Query
         }
         private static string ApplyLimit(string sql, int limit, DatabaseProvider provider)
         {
-            bool isSqlServer = provider.GetType().Name.Contains("SqlServer", StringComparison.OrdinalIgnoreCase);
-            if (isSqlServer)
-            {
+            if (provider.UsesFetchOffsetPaging)
                 return sql.Replace("SELECT ", $"SELECT TOP({limit}) ");
-            }
-            else
-            {
-                return sql + $" LIMIT {limit}";
-            }
+            return sql + $" LIMIT {limit}";
         }
         /// <summary>
         /// Non-async entry point — does SQL lookup and command setup synchronously,
@@ -250,7 +248,8 @@ namespace nORM.Query
             bool isBoolTrue = !isNull && info.Value is bool bv2 && bv2;
             bool isBoolFalse = !isNull && info.Value is bool bv3 && !bv3;
             string whereKind = isNull ? "N" : isBoolTrue ? "BT" : isBoolFalse ? "BF" : "P";
-            var cacheKey = (typeof(T).Name, info.Property, whereKind, takeCount);
+            var cacheKey = (typeof(T).FullName!, info.Property, whereKind, takeCount,
+                            ctx.Provider.GetType().FullName!, ctx.GetMappingHash());
 
             if (!_fullSqlCache.TryGetValue(cacheKey, out var sql))
             {
