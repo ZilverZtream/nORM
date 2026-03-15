@@ -50,8 +50,8 @@ namespace nORM.Query
         private readonly ConcurrentDictionary<string, string> _simpleSqlCache = new();
         /// <summary>PERF: Dedicated count SQL cache with ValueTuple keys to avoid string.Concat allocation per count call.</summary>
         private readonly ConcurrentDictionary<(Type ElementType, string PredicateKey), (string Sql, bool NeedsParam)> _countSqlCache = new();
-        /// <summary>PERF: Pooled prepared commands for parameterless count queries (keyed by SQL).</summary>
-        private readonly ConcurrentDictionary<string, DbCommand> _pooledCountCommands = new();
+        /// <summary>PERF: Pooled prepared commands for parameterless count queries (keyed by SQL), each paired with a lock object to serialize concurrent access.</summary>
+        private readonly ConcurrentDictionary<string, (DbCommand Cmd, object Lock)> _pooledCountCommands = new();
         public NormQueryProvider(DbContext ctx)
         {
             _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
@@ -67,9 +67,8 @@ namespace nORM.Query
         }
         public void Dispose()
         {
-            // C2 fix: dispose all pooled count commands to release handle/resource pressure.
-            foreach (var cmd in _pooledCountCommands.Values)
-                try { cmd.Dispose(); } catch { }
+            foreach (var entry in _pooledCountCommands.Values)
+                try { entry.Cmd.Dispose(); } catch { }
             _pooledCountCommands.Clear();
 
             // C1: stop background timers when the last provider is disposed so the process
@@ -1659,21 +1658,26 @@ namespace nORM.Query
             // for parameterless count queries to eliminate per-call command creation/disposal.
             if (_ctx.Provider.PrefersSyncExecution && ReferenceEquals(parameters, _emptyParams))
             {
-                if (!_pooledCountCommands.TryGetValue(sql, out var pooledCmd))
+                var entry = _pooledCountCommands.GetOrAdd(sql, static (s, ctx) =>
                 {
-                    pooledCmd = _ctx.CreateCommand();
-                    pooledCmd.CommandText = sql;
-                    try { pooledCmd.Prepare(); } catch { }
-                    _pooledCountCommands[sql] = pooledCmd;
+                    var c = ctx.CreateCommand();
+                    c.CommandText = s;
+                    try { c.Prepare(); } catch { }
+                    return (c, new object());
+                }, _ctx);
+
+                lock (entry.Lock)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    // Rebind CurrentTransaction on every use — CreateCommand() only binds the
+                    // transaction at creation time; reuse across transaction changes would run
+                    // the count against a stale (or null) transaction binding.
+                    entry.Cmd.Transaction = _ctx.CurrentTransaction;
+                    var scalar = entry.Cmd.ExecuteScalarWithInterception(_ctx);
+                    if (scalar == null || scalar is DBNull)
+                        return Task.FromResult(default(TResult)!);
+                    return Task.FromResult(ConvertScalarResult<TResult>(scalar));
                 }
-                // Rebind CurrentTransaction on every use — CreateCommand() only binds the
-                // transaction at creation time; reuse across transaction changes would run
-                // the count against a stale (or null) transaction binding.
-                pooledCmd.Transaction = _ctx.CurrentTransaction;
-                var scalar = pooledCmd.ExecuteScalarWithInterception(_ctx);
-                if (scalar == null || scalar is DBNull)
-                    return Task.FromResult(default(TResult)!);
-                return Task.FromResult(ConvertScalarResult<TResult>(scalar));
             }
 
             var cmd = _ctx.CreateCommand();
@@ -1686,6 +1690,7 @@ namespace nORM.Query
             // to avoid the ValueTask/Task wrapper overhead from ExecuteScalarAsync.
             if (_ctx.Provider.PrefersSyncExecution)
             {
+                ct.ThrowIfCancellationRequested();
                 var scalar = cmd.ExecuteScalarWithInterception(_ctx);
                 cmd.Dispose();
                 if (scalar == null || scalar is DBNull)
