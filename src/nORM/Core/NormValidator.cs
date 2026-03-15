@@ -333,22 +333,43 @@ namespace nORM.Core
                 }
             }
 
-            // Pattern 5: Semicolon-based multi-statement injection
-            var semicolonCount = sql.Count(c => c == ';');
-            if (semicolonCount > 1)
+            // Pattern 5: Semicolon-based multi-statement injection.
+            // S1 fix: use lexer-aware semicolon positions so that semicolons inside
+            // string literals, double-quoted identifiers, line comments, and block
+            // comments are not counted as statement terminators.
+            var semiPositions = FindSemicolonPositionsOutsideTokens(sql);
+            if (semiPositions.Count >= 1)
             {
-                // Multiple statements can be legitimate (batching) but check context
-                var statements = sql.Split(';', StringSplitOptions.RemoveEmptyEntries);
-                foreach (var stmt in statements)
+                // Multiple real statement terminators — extract statements and check for DDL.
+                int prev = 0;
+                foreach (var pos in semiPositions)
                 {
-                    var trimmed = stmt.Trim().ToUpperInvariant();
+                    var stmt = sql.Substring(prev, pos - prev).Trim();
+                    var upper = stmt.ToUpperInvariant();
                     // If any statement is DDL or system procedure, it's suspicious in this context
-                    if (trimmed.StartsWith("DROP ") || trimmed.StartsWith("ALTER ") ||
-                        trimmed.StartsWith("CREATE ") || trimmed.StartsWith("EXEC "))
+                    if (upper.StartsWith("DROP ") || upper.StartsWith("ALTER ") ||
+                        upper.StartsWith("CREATE ") || upper.StartsWith("EXEC "))
                     {
                         throw new NormUsageException(
                             "Potential SQL injection detected: Multiple statements with DDL/EXEC commands. " +
                             "FromSqlRaw should only execute SELECT queries, not administrative commands.");
+                    }
+                    prev = pos + 1;
+                }
+                // Check the last fragment after the final semicolon.
+                if (prev < sql.Length)
+                {
+                    var last = sql.Substring(prev).Trim();
+                    if (last.Length > 0)
+                    {
+                        var upper = last.ToUpperInvariant();
+                        if (upper.StartsWith("DROP ") || upper.StartsWith("ALTER ") ||
+                            upper.StartsWith("CREATE ") || upper.StartsWith("EXEC "))
+                        {
+                            throw new NormUsageException(
+                                "Potential SQL injection detected: Multiple statements with DDL/EXEC commands. " +
+                                "FromSqlRaw should only execute SELECT queries, not administrative commands.");
+                        }
                     }
                 }
             }
@@ -411,15 +432,77 @@ namespace nORM.Core
                     i += 2;
                     continue;
                 }
-                // Count parameter markers outside quoted/comment regions
+                // Count parameter markers outside quoted/comment regions.
+                // P1/X1 fix: exclude PostgreSQL :: cast syntax.
+                // `::type` has the second `:` followed by a type-name (alphanumeric), which
+                // would otherwise be counted as a `:name` parameter marker.
+                // Guard: only count `:` when the PRECEDING character is NOT also `:`.
                 if ((c == '@' || c == '$' || c == ':') && i + 1 < sql.Length
                     && (char.IsLetterOrDigit(sql[i + 1]) || sql[i + 1] == '_'))
                 {
-                    count++;
+                    if (c != ':' || i == 0 || sql[i - 1] != ':')
+                        count++;
                 }
                 i++;
             }
             return count;
+        }
+
+        /// <summary>
+        /// Returns a list of character positions of ';' tokens that appear outside string
+        /// literals, double-quoted identifiers, line comments, and block comments.
+        /// S1 fix: replaces naive <c>sql.Count(c == ';')</c> / <c>sql.Split(';',...)</c>
+        /// with a mini SQL lexer so embedded semicolons in literals/comments are ignored.
+        /// </summary>
+        private static List<int> FindSemicolonPositionsOutsideTokens(string sql)
+        {
+            var positions = new List<int>();
+            var i = 0;
+            while (i < sql.Length)
+            {
+                var c = sql[i];
+                // Skip single-quoted literals ('...' with '' escape)
+                if (c == '\'')
+                {
+                    i++;
+                    while (i < sql.Length)
+                    {
+                        if (sql[i] == '\'') { i++; if (i < sql.Length && sql[i] == '\'') i++; else break; }
+                        else i++;
+                    }
+                    continue;
+                }
+                // Skip double-quoted identifiers ("..." with "" escape)
+                if (c == '"')
+                {
+                    i++;
+                    while (i < sql.Length)
+                    {
+                        if (sql[i] == '"') { i++; if (i < sql.Length && sql[i] == '"') i++; else break; }
+                        else i++;
+                    }
+                    continue;
+                }
+                // Skip line comments (-- to newline)
+                if (c == '-' && i + 1 < sql.Length && sql[i + 1] == '-')
+                {
+                    i += 2;
+                    while (i < sql.Length && sql[i] != '\n') i++;
+                    continue;
+                }
+                // Skip block comments (/* ... */)
+                if (c == '/' && i + 1 < sql.Length && sql[i + 1] == '*')
+                {
+                    i += 2;
+                    while (i < sql.Length - 1 && !(sql[i] == '*' && sql[i + 1] == '/')) i++;
+                    i += 2;
+                    continue;
+                }
+                if (c == ';')
+                    positions.Add(i);
+                i++;
+            }
+            return positions;
         }
 
         /// <summary>
