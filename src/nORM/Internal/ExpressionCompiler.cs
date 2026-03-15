@@ -31,7 +31,11 @@ namespace nORM.Internal
 
     internal static class ExpressionCompiler
     {
-        private static readonly ConcurrentDictionary<ExpressionFingerprint, Delegate> _compiledDelegateCache = new();
+        // C1 fix: replaced unbounded ConcurrentDictionary with a size-capped ConcurrentLruCache.
+        // 512 slots covers the vast majority of real-app query-site shapes (one per call-site per
+        // provider) while preventing unbounded memory growth over long process lifetimes.
+        // Internal for test assertions.
+        internal static readonly ConcurrentLruCache<ExpressionFingerprint, Delegate> _compiledDelegateCache = new(512);
 
         // A1/X1 fix: cap concurrent compile operations so repeated hostile-timeout callers cannot
         // starve the thread pool. Each in-flight compile acquires one slot; the slot is released
@@ -47,11 +51,11 @@ namespace nORM.Internal
         {
             var key = ExpressionFingerprint.Compute(expr);
 
-            if (_compiledDelegateCache.TryGetValue(key, out var cached))
+            if (_compiledDelegateCache.TryGet(key, out var cached))
                 return (Func<T, TResult>)cached;
 
             var compiled = expr.Compile();
-            _compiledDelegateCache.TryAdd(key, compiled);
+            _compiledDelegateCache.Set(key, compiled);
             return compiled;
         }
 
