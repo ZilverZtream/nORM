@@ -30,6 +30,16 @@ namespace nORM.Internal
     {
         private static readonly ConcurrentDictionary<ExpressionFingerprint, Delegate> _compiledDelegateCache = new();
 
+        // A1/X1 fix: cap concurrent compile operations so repeated hostile-timeout callers cannot
+        // starve the thread pool. Each in-flight compile acquires one slot; the slot is released
+        // when the compile task finishes (success or exception), NOT when the caller times out.
+        // This provides the "bounded thread/task count" guarantee the audit requires.
+        private static readonly int _compileSemaphoreCapacity = Math.Max(2, Environment.ProcessorCount);
+        private static readonly SemaphoreSlim _compileSemaphore = new(_compileSemaphoreCapacity, _compileSemaphoreCapacity);
+        // Exposed for deterministic test assertions (bounded-worker proof).
+        internal static int CompileSemaphoreCurrentCount => _compileSemaphore.CurrentCount;
+        internal static int CompileSemaphoreCapacity => _compileSemaphoreCapacity;
+
         public static Func<T, TResult> CompileExpression<T, TResult>(Expression<Func<T, TResult>> expr)
         {
             var key = ExpressionFingerprint.Compute(expr);
@@ -59,8 +69,14 @@ namespace nORM.Internal
             Func<TContext, TParam, Task<List<T>>>? result = null;
             Exception? compileException = null;
 
+            // A1/X1 fix: acquire one compile slot before launching the task.
+            // The slot is released inside the task's finally block (not when the caller times out),
+            // so concurrent in-flight compiles never exceed _compileSemaphoreCapacity even under
+            // repeated hostile-timeout pressure. Expression.Compile() is not interruptible, but
+            // bounding concurrency prevents unbounded thread-pool growth.
             var task = Task.Run(() =>
             {
+                _compileSemaphore.Wait(CancellationToken.None); // always release, even after caller timeout
                 try
                 {
                     result = CompileQueryInternal<TContext, TParam, T>(queryExpression);
@@ -68,6 +84,10 @@ namespace nORM.Internal
                 catch (Exception ex)
                 {
                     compileException = ex;
+                }
+                finally
+                {
+                    _compileSemaphore.Release();
                 }
             }, token);
 

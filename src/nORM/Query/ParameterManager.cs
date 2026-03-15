@@ -49,13 +49,15 @@ namespace nORM.Query
         internal static void AssignValue(DbParameter p, object? v)
         {
             // PERFORMANCE OPTIMIZATION 2: Fast null check first (most common nullable scenario)
-            // P1 fix: also reset DbType and Size so stale metadata from a previous non-null
-            // value does not carry over when a reused DbParameter is assigned null.
+            // P1 fix: reset all provider-visible metadata (DbType, Size, Precision, Scale) so
+            // stale values from a previous non-null assignment do not carry over on reuse.
             if (v is null)
             {
                 p.Value = DBNull.Value;
                 p.DbType = System.Data.DbType.Object;
                 p.Size = 0;
+                p.Precision = 0;
+                p.Scale = 0;
                 return;
             }
 
@@ -99,6 +101,10 @@ namespace nORM.Query
             if (type == typeof(decimal))
             {
                 p.DbType = System.Data.DbType.Decimal;
+                // P1 fix: reset precision/scale to 0 (driver-default) so stale values from a
+                // previous high-precision decimal assignment do not coerce the new value.
+                p.Precision = 0;
+                p.Scale = 0;
                 p.Value = v;
                 return;
             }
