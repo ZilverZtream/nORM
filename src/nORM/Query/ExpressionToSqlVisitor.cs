@@ -260,7 +260,7 @@ namespace nORM.Query
 
         private void EmitBoolComparison(Expression memberSide, bool boolVal, ExpressionType op)
         {
-            var literal = boolVal ? _provider.BooleanTrueLiteral : "0";
+            var literal = boolVal ? _provider.BooleanTrueLiteral : _provider.BooleanFalseLiteral;
             _sql.Append("(");
             Visit(memberSide);
             _sql.Append(op == ExpressionType.Equal ? " = " : " <> ");

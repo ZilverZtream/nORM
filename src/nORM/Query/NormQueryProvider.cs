@@ -1370,6 +1370,15 @@ namespace nORM.Query
                             return false;
                         whereClause = $" WHERE {boolCol.EscCol} = {_ctx.Provider.BooleanTrueLiteral}";
                     }
+                    // Support negated boolean member: u => !u.IsActive
+                    else if (lambda.Body is UnaryExpression { NodeType: ExpressionType.Not } notExpr
+                             && notExpr.Operand is MemberExpression negBoolMember
+                             && negBoolMember.Type == typeof(bool))
+                    {
+                        if (!map.ColumnsByName.TryGetValue(negBoolMember.Member.Name, out var boolCol))
+                            return false;
+                        whereClause = $" WHERE {boolCol.EscCol} = {_ctx.Provider.BooleanFalseLiteral}";
+                    }
                     else
                     {
                         if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
@@ -1397,9 +1406,11 @@ namespace nORM.Query
             if (whereCall != null)
             {
                 var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
-                if (lambda.Body is MemberExpression boolMember && boolMember.Type == typeof(bool))
+                if ((lambda.Body is MemberExpression boolMember2 && boolMember2.Type == typeof(bool))
+                    || (lambda.Body is UnaryExpression { NodeType: ExpressionType.Not } notExpr3
+                        && notExpr3.Operand is MemberExpression negBm && negBm.Type == typeof(bool)))
                 {
-                    // no parameter to bind for boolean predicate
+                    // no parameter to bind for boolean literal predicate
                 }
                 else
                 {
@@ -1584,6 +1595,17 @@ namespace nORM.Query
                     return false;
 
                 whereClause = $" WHERE {boolCol.EscCol} = {_ctx.Provider.BooleanTrueLiteral}";
+                return true;
+            }
+
+            if (lambda.Body is UnaryExpression { NodeType: ExpressionType.Not } notExpr2
+                && notExpr2.Operand is MemberExpression negBoolMember2
+                && negBoolMember2.Type == typeof(bool))
+            {
+                if (!map.ColumnsByName.TryGetValue(negBoolMember2.Member.Name, out var boolCol2))
+                    return false;
+
+                whereClause = $" WHERE {boolCol2.EscCol} = {_ctx.Provider.BooleanFalseLiteral}";
                 return true;
             }
 
