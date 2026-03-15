@@ -261,11 +261,13 @@ namespace nORM.Internal
                     }
 
                     // Update compiled parameter values (only these change per call)
+                    // P1 fix: use AssignValue (not direct .Value) so DbType and Size are reset
+                    // on null values — prevents stale metadata carry-over on reused parameters.
                     var compiledParams = cachedPlan.CompiledParameters;
                     var compiledCount = Math.Min(compiledParams.Count, args.Length);
                     var fixedParamCount = state.FixedParamCount;
                     for (int i = 0; i < compiledCount; i++)
-                        cmd.Parameters[fixedParamCount + i].Value = args[i] ?? DBNull.Value;
+                        ParameterAssign.AssignValue(cmd.Parameters[fixedParamCount + i], args[i]);
 
                     var materializer = cachedMaterializer!;
                     var capacity = cachedPlan.SingleResult ? 1 : (cachedPlan.Take ?? 16);
