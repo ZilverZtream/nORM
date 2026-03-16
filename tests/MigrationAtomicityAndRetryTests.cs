@@ -2,6 +2,7 @@ using System;
 using System.Data.Common;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Migration;
@@ -34,8 +35,8 @@ public class MigrationAtomicityAndRetryTests
         var baseCtor = baseMigType.GetConstructor(
             BindingFlags.NonPublic | BindingFlags.Instance,
             null, new[] { typeof(long), typeof(string) }, null)!;
-        var upMethod = baseMigType.GetMethod("Up",   new[] { typeof(DbConnection), typeof(DbTransaction) })!;
-        var downMethod = baseMigType.GetMethod("Down", new[] { typeof(DbConnection), typeof(DbTransaction) })!;
+        var upMethod = baseMigType.GetMethod("Up",   new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) })!;
+        var downMethod = baseMigType.GetMethod("Down", new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) })!;
 
         foreach (var (name, version) in migrations)
         {
@@ -49,12 +50,12 @@ public class MigrationAtomicityAndRetryTests
             il.Emit(OpCodes.Ret);
 
             var up = tb.DefineMethod("Up", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot,
-                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction) });
+                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             up.GetILGenerator().Emit(OpCodes.Ret);
             tb.DefineMethodOverride(up, upMethod);
 
             var down = tb.DefineMethod("Down", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot,
-                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction) });
+                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             down.GetILGenerator().Emit(OpCodes.Ret);
             tb.DefineMethodOverride(down, downMethod);
 
@@ -77,8 +78,8 @@ public class MigrationAtomicityAndRetryTests
         var baseCtor = baseMigType.GetConstructor(
             BindingFlags.NonPublic | BindingFlags.Instance,
             null, new[] { typeof(long), typeof(string) }, null)!;
-        var upMethod   = baseMigType.GetMethod("Up",   new[] { typeof(DbConnection), typeof(DbTransaction) })!;
-        var downMethod = baseMigType.GetMethod("Down", new[] { typeof(DbConnection), typeof(DbTransaction) })!;
+        var upMethod   = baseMigType.GetMethod("Up",   new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) })!;
+        var downMethod = baseMigType.GetMethod("Down", new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) })!;
         var exCtor = typeof(InvalidOperationException).GetConstructor(new[] { typeof(string) })!;
 
         // First migration: no-op Up
@@ -89,11 +90,11 @@ public class MigrationAtomicityAndRetryTests
             il.Emit(OpCodes.Ldarg_0); il.Emit(OpCodes.Ldc_I8, v1); il.Emit(OpCodes.Ldstr, firstVersion);
             il.Emit(OpCodes.Call, baseCtor); il.Emit(OpCodes.Ret);
             var up = tb.DefineMethod("Up", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot,
-                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction) });
+                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             up.GetILGenerator().Emit(OpCodes.Ret);
             tb.DefineMethodOverride(up, upMethod);
             var down = tb.DefineMethod("Down", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot,
-                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction) });
+                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             down.GetILGenerator().Emit(OpCodes.Ret);
             tb.DefineMethodOverride(down, downMethod);
             tb.CreateType();
@@ -107,14 +108,14 @@ public class MigrationAtomicityAndRetryTests
             il.Emit(OpCodes.Ldarg_0); il.Emit(OpCodes.Ldc_I8, v2); il.Emit(OpCodes.Ldstr, secondName);
             il.Emit(OpCodes.Call, baseCtor); il.Emit(OpCodes.Ret);
             var up = tb.DefineMethod("Up", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot,
-                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction) });
+                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             var upIl = up.GetILGenerator();
             upIl.Emit(OpCodes.Ldstr, "Simulated migration failure");
             upIl.Emit(OpCodes.Newobj, exCtor);
             upIl.Emit(OpCodes.Throw);
             tb.DefineMethodOverride(up, upMethod);
             var down = tb.DefineMethod("Down", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot,
-                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction) });
+                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             down.GetILGenerator().Emit(OpCodes.Ret);
             tb.DefineMethodOverride(down, downMethod);
             tb.CreateType();
@@ -146,8 +147,8 @@ public class MigrationAtomicityAndRetryTests
         var baseMigType = typeof(MigrationBase);
         var baseCtor = baseMigType.GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance,
             null, new[] { typeof(long), typeof(string) }, null)!;
-        var upMethod = baseMigType.GetMethod("Up", new[] { typeof(DbConnection), typeof(DbTransaction) })!;
-        var downMethod = baseMigType.GetMethod("Down", new[] { typeof(DbConnection), typeof(DbTransaction) })!;
+        var upMethod = baseMigType.GetMethod("Up", new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) })!;
+        var downMethod = baseMigType.GetMethod("Down", new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) })!;
         var exCtor = typeof(InvalidOperationException).GetConstructor(new[] { typeof(string) })!;
         {
             var tb = throwMod.DefineType("ThrowMig", TypeAttributes.Public | TypeAttributes.Class, baseMigType);
@@ -156,14 +157,14 @@ public class MigrationAtomicityAndRetryTests
             ilC.Emit(OpCodes.Ldarg_0); ilC.Emit(OpCodes.Ldc_I8, 99L); ilC.Emit(OpCodes.Ldstr, "ThrowMig");
             ilC.Emit(OpCodes.Call, baseCtor); ilC.Emit(OpCodes.Ret);
             var up = tb.DefineMethod("Up", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot,
-                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction) });
+                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             var upIl = up.GetILGenerator();
             upIl.Emit(OpCodes.Ldstr, "Intentional test failure");
             upIl.Emit(OpCodes.Newobj, exCtor);
             upIl.Emit(OpCodes.Throw);
             tb.DefineMethodOverride(up, upMethod);
             var down = tb.DefineMethod("Down", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot,
-                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction) });
+                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             down.GetILGenerator().Emit(OpCodes.Ret);
             tb.DefineMethodOverride(down, downMethod);
             tb.CreateType();

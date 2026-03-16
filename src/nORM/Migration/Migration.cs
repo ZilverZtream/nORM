@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Threading;
 
 #nullable enable
 
@@ -31,19 +32,26 @@ namespace nORM.Migration
         /// Gets the descriptive name of the migration.
         /// </summary>
         public string Name { get; }
-        
+
         /// <summary>
         /// Applies the migration by bringing the database schema to the new state.
         /// </summary>
         /// <param name="connection">An open connection to the target database.</param>
         /// <param name="transaction">The transaction within which the migration should run.</param>
-        public abstract void Up(DbConnection connection, DbTransaction transaction);
+        /// <param name="ct">
+        /// Token that can be used to signal cancellation. Implementations should check
+        /// <paramref name="ct"/> between long-running DDL steps. The token is provided on a
+        /// best-effort basis — DDL already sent to the database cannot be recalled, and any
+        /// partial schema changes remain subject to the enclosing transaction.
+        /// </param>
+        public abstract void Up(DbConnection connection, DbTransaction transaction, CancellationToken ct = default);
 
         /// <summary>
         /// Reverts the migration, returning the database schema to the previous state.
         /// </summary>
         /// <param name="connection">An open connection to the target database.</param>
         /// <param name="transaction">The transaction within which the rollback should run.</param>
-        public abstract void Down(DbConnection connection, DbTransaction transaction);
+        /// <param name="ct">Token that can be used to signal cancellation between DDL steps.</param>
+        public abstract void Down(DbConnection connection, DbTransaction transaction, CancellationToken ct = default);
     }
 }

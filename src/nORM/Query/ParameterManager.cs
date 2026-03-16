@@ -65,6 +65,14 @@ namespace nORM.Query
             // Pattern matching with is + cast is faster than switch expression for primitives
             var type = v.GetType();
 
+            // P1 fix: reset all provider-visible metadata at the top of the non-null path so
+            // stale Size (from a previous string), Precision/Scale (from a previous decimal),
+            // or DbType (from any prior type) cannot contaminate the new binding on reuse.
+            // String will override Size below; decimal will override Precision/Scale below.
+            p.Size = 0;
+            p.Precision = 0;
+            p.Scale = 0;
+
             // Most common types first (int, string, long, bool)
             if (type == typeof(int))
             {

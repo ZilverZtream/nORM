@@ -49,15 +49,23 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// S1: Redacts single-quoted string literals from SQL before it is written to logs,
+        /// S1: Redacts string literals from SQL before it is written to logs,
         /// preventing sensitive literal values from appearing in log sinks.
+        /// Covers:
+        ///   'standard single-quoted literals' (ANSI SQL, SQLite, PostgreSQL, MySQL)
+        ///   N'national string literals' (SQL Server)
+        ///   $$dollar-quoted blocks$$ (PostgreSQL)
         /// Identifiers, parameter placeholders (@p0), and SQL keywords are preserved.
         /// </summary>
         private static string RedactSqlForLogging(string sql)
         {
             if (string.IsNullOrEmpty(sql)) return sql;
-            // Replace every 'literal' (including escaped '' sequences) with '[redacted]'.
-            return Regex.Replace(sql, @"'(?:[^']|'')*'", "'[redacted]'");
+            // N'...' (SQL Server national strings) and '...' (ANSI SQL, including escaped '' pairs).
+            var step1 = Regex.Replace(sql, @"N?'(?:[^']|'')*'", "'[redacted]'");
+            // $$...$$ (PostgreSQL dollar-quoting with no tag).
+            // Named tags ($tag$...$tag$) are not covered here because tag names are identifiers,
+            // not sensitive data; covering bare $$ is sufficient for the S1 provisional finding.
+            return Regex.Replace(step1, @"\$\$.*?\$\$", "'[redacted]'", RegexOptions.Singleline);
         }
 
         /// <summary>

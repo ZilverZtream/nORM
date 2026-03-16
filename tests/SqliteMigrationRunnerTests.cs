@@ -1,5 +1,6 @@
 using System;
 using System.Data.Common;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Migration;
@@ -20,9 +21,13 @@ public class SqliteMigrationRunnerTests
         Assert.True(await runner.HasPendingMigrationsAsync());
 
         var pending = await runner.GetPendingMigrationsAsync();
-        // The test assembly contains 4 migration classes: the two declared in SqliteMigrationRunnerTests
-        // (v1, v2), the one in MigrationHistoryFaultTests (v100), and the one in MigrationWithDataTests (v200).
-        Assert.Equal(new[] { "1_CreateBlogTable", "2_AddPostsTable", "100_CreateItemTable", "200_CreateMwdTable" }, pending);
+        // The test assembly contains 7 migration classes: v1/v2 in SqliteMigrationRunnerTests,
+        // v100 in MigrationHistoryFaultTests, v200 in MigrationWithDataTests, and
+        // v9001/v9002/v9003 in MigrationCancellationTests.
+        Assert.Equal(new[] {
+            "1_CreateBlogTable", "2_AddPostsTable", "100_CreateItemTable", "200_CreateMwdTable",
+            "9001_TokenCaptureMigration", "9002_BlockingMigration", "9003_MultiStepCancellableMigration"
+        }, pending);
 
         await runner.ApplyMigrationsAsync();
 
@@ -39,7 +44,7 @@ public class SqliteMigrationRunnerTests
         {
             cmd.CommandText = "SELECT COUNT(*) FROM \"__NormMigrationsHistory\";";
             var count = Convert.ToInt64(await cmd.ExecuteScalarAsync());
-            Assert.Equal(4L, count);
+            Assert.Equal(7L, count);
         }
     }
 
@@ -47,7 +52,7 @@ public class SqliteMigrationRunnerTests
     {
         public CreateBlogTable() : base(1, nameof(CreateBlogTable)) { }
 
-        public override void Up(DbConnection connection, DbTransaction transaction)
+        public override void Up(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)
         {
             using var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
@@ -55,7 +60,7 @@ public class SqliteMigrationRunnerTests
             cmd.ExecuteNonQuery();
         }
 
-        public override void Down(DbConnection connection, DbTransaction transaction)
+        public override void Down(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)
         {
             using var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
@@ -68,7 +73,7 @@ public class SqliteMigrationRunnerTests
     {
         public AddPostsTable() : base(2, nameof(AddPostsTable)) { }
 
-        public override void Up(DbConnection connection, DbTransaction transaction)
+        public override void Up(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)
         {
             using var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
@@ -76,7 +81,7 @@ public class SqliteMigrationRunnerTests
             cmd.ExecuteNonQuery();
         }
 
-        public override void Down(DbConnection connection, DbTransaction transaction)
+        public override void Down(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)
         {
             using var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
