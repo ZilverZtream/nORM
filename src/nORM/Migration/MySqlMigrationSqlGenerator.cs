@@ -75,7 +75,7 @@ namespace nORM.Migration
                         $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
                         "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
 
-                var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {column.DefaultValue}";
+                var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {nullPart}";
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
                 down.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
@@ -84,10 +84,10 @@ namespace nORM.Migration
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
                 // M1: Include DEFAULT in MODIFY COLUMN — MySQL replaces the full column definition.
-                var newDefault = newCol.DefaultValue != null ? $" DEFAULT {newCol.DefaultValue}" : "";
+                var newDefault = newCol.DefaultValue != null ? $" DEFAULT {DefaultValueValidator.Validate(newCol.DefaultValue)}" : "";
                 var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}{newDefault}";
                 up.Add($"ALTER TABLE {Esc(table.Name)} MODIFY COLUMN {newDef}");
-                var oldDefault = oldCol.DefaultValue != null ? $" DEFAULT {oldCol.DefaultValue}" : "";
+                var oldDefault = oldCol.DefaultValue != null ? $" DEFAULT {DefaultValueValidator.Validate(oldCol.DefaultValue)}" : "";
                 var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}{oldDefault}";
                 down.Add($"ALTER TABLE {Esc(table.Name)} MODIFY COLUMN {oldDef}");
             }

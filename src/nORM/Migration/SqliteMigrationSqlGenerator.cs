@@ -81,7 +81,7 @@ namespace nORM.Migration
                             $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
                             "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
 
-                    var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {column.DefaultValue}";
+                    var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
                     var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {nullPart}";
                     up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
                 }

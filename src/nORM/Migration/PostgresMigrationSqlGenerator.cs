@@ -73,7 +73,7 @@ namespace nORM.Migration
                         $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
                         "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
 
-                var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {column.DefaultValue}";
+                var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {nullPart}";
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
                 down.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
@@ -92,7 +92,7 @@ namespace nORM.Migration
                 // M1: Emit DEFAULT changes as separate SET DEFAULT / DROP DEFAULT statements.
                 if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
                     up.Add(newCol.DefaultValue != null
-                        ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} SET DEFAULT {newCol.DefaultValue}"
+                        ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} SET DEFAULT {DefaultValueValidator.Validate(newCol.DefaultValue)}"
                         : $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} DROP DEFAULT");
 
                 // Down: reverse type and nullability changes
@@ -106,7 +106,7 @@ namespace nORM.Migration
                 // M1: Down — restore old DEFAULT.
                 if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
                     down.Add(oldCol.DefaultValue != null
-                        ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} SET DEFAULT {oldCol.DefaultValue}"
+                        ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} SET DEFAULT {DefaultValueValidator.Validate(oldCol.DefaultValue)}"
                         : $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} DROP DEFAULT");
             }
 
