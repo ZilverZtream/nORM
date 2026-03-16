@@ -54,7 +54,8 @@ namespace nORM.Query
         /// Covers:
         ///   'standard single-quoted literals' (ANSI SQL, SQLite, PostgreSQL, MySQL)
         ///   N'national string literals' (SQL Server)
-        ///   $$dollar-quoted blocks$$ (PostgreSQL)
+        ///   $$dollar-quoted blocks$$ (PostgreSQL bare dollar-quoting)
+        ///   $tag$...$tag$ (PostgreSQL tagged dollar-quoting, e.g. $func$...$func$)
         /// Identifiers, parameter placeholders (@p0), and SQL keywords are preserved.
         /// </summary>
         private static string RedactSqlForLogging(string sql)
@@ -62,10 +63,10 @@ namespace nORM.Query
             if (string.IsNullOrEmpty(sql)) return sql;
             // N'...' (SQL Server national strings) and '...' (ANSI SQL, including escaped '' pairs).
             var step1 = Regex.Replace(sql, @"N?'(?:[^']|'')*'", "'[redacted]'");
-            // $$...$$ (PostgreSQL dollar-quoting with no tag).
-            // Named tags ($tag$...$tag$) are not covered here because tag names are identifiers,
-            // not sensitive data; covering bare $$ is sufficient for the S1 provisional finding.
-            return Regex.Replace(step1, @"\$\$.*?\$\$", "'[redacted]'", RegexOptions.Singleline);
+            // S1 fix: $(\w*)$...$\1$ covers both bare $$...$$ (empty tag captured by \w*) and
+            // named tags ($func$...$func$, $body$...$body$, etc.) via the backreference \1.
+            // Without this fix a tagged literal like $secret$val$secret$ leaked to log sinks.
+            return Regex.Replace(step1, @"\$(\w*)\$.*?\$\1\$", "'[redacted]'", RegexOptions.Singleline);
         }
 
         /// <summary>
