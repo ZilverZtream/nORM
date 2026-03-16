@@ -68,13 +68,14 @@ public class TransactionDisposeLoggingTests
         var ctor = typeof(TransactionManager).GetConstructor(
             BindingFlags.NonPublic | BindingFlags.Instance,
             null,
-            new[] { typeof(DbTransaction), typeof(bool), typeof(CancellationTokenSource), typeof(CancellationToken), typeof(ILogger) },
+            new[] { typeof(DbTransaction), typeof(bool), typeof(bool), typeof(CancellationTokenSource), typeof(CancellationToken), typeof(ILogger) },
             null)!;
 
         return (TransactionManager)ctor.Invoke(new object?[]
         {
             tx,
             true,            // ownsTransaction = true so Dispose path is taken
+            true,            // shouldAcceptChanges = true (owned tx)
             null,            // no CTS
             CancellationToken.None,
             logger

@@ -938,10 +938,12 @@ namespace nORM.Core
                 onCommitAttempted?.Invoke();
                 await transactionManager.CommitAsync().ConfigureAwait(false);
 
-                // Only accept tracker state when we own the transaction and commit succeeded.
-                // For external/ambient transactions the caller controls durability; accepting
-                // state here would diverge the tracker from the DB if the caller later rolls back.
-                if (transactionManager.OwnsTransaction)
+                // X1 fix: accept tracker state whenever writes committed independently.
+                // This covers: owned tx (OwnsTransaction=true), ambient Ignore policy (enlistment
+                // intentionally skipped), and ambient BestEffort where enlistment failed (writes
+                // committed outside scope). For external explicit transactions or successfully-enlisted
+                // ambient scopes, ShouldAcceptChanges=false and the caller controls durability.
+                if (transactionManager.ShouldAcceptChanges)
                 {
                     foreach (var entry in changedEntries)
                     {

@@ -17,11 +17,24 @@ namespace nORM.Core
         public CancellationToken Token { get; }
         public bool OwnsTransaction { get; }
 
-        private TransactionManager(DbTransaction? transaction, bool ownsTransaction,
+        /// <summary>
+        /// X1 fix: true when the writes performed within this manager have committed
+        /// independently and the change tracker should be advanced to Unchanged.
+        /// This is true when:
+        ///   — we own the transaction (commit was ours),
+        ///   — ambient policy is Ignore (enlistment intentionally skipped), or
+        ///   — ambient policy is BestEffort but enlistment failed (writes committed outside scope).
+        /// It is false when an external or successfully-enlisted ambient transaction controls
+        /// durability (the caller decides whether to commit or roll back).
+        /// </summary>
+        public bool ShouldAcceptChanges { get; }
+
+        private TransactionManager(DbTransaction? transaction, bool ownsTransaction, bool shouldAcceptChanges,
             CancellationTokenSource? cts, CancellationToken token, ILogger? logger)
         {
             Transaction = transaction;
             OwnsTransaction = ownsTransaction;
+            ShouldAcceptChanges = shouldAcceptChanges;
             _cts = cts;
             Token = token;
             _logger = logger;
@@ -43,6 +56,9 @@ namespace nORM.Core
             DbTransaction? transaction = existingTransaction;
             CancellationTokenSource? cts = null;
             var token = ct;
+            // X1 fix: track whether DB writes committed independently so SaveChanges can
+            // decide whether to call AcceptChanges on the change tracker.
+            bool shouldAcceptChanges = ownsTransaction; // default: true only when we own the tx
 
             if (ownsTransaction)
             {
@@ -64,8 +80,13 @@ namespace nORM.Core
                 var connection = context.Connection;
                 var policy = context.Options.AmbientTransactionPolicy;
 
-                if (connection != null && connection.State == System.Data.ConnectionState.Open
-                    && policy != AmbientTransactionEnlistmentPolicy.Ignore)
+                if (policy == AmbientTransactionEnlistmentPolicy.Ignore)
+                {
+                    // Enlistment intentionally skipped — writes commit independently of the scope.
+                    // X1 fix: accept tracker state after save because DB is already committed.
+                    shouldAcceptChanges = true;
+                }
+                else if (connection != null && connection.State == System.Data.ConnectionState.Open)
                 {
                     try
                     {
@@ -73,6 +94,8 @@ namespace nORM.Core
                         context.Options.Logger?.LogDebug(
                             "Explicitly enlisted connection in ambient transaction {TransactionId}.",
                             ambientTransaction.TransactionInformation.LocalIdentifier);
+                        // Enlistment succeeded — caller's scope controls durability; do NOT accept.
+                        shouldAcceptChanges = false;
                     }
                     catch (Exception ex)
                     {
@@ -87,7 +110,10 @@ namespace nORM.Core
                                 $"Provider error: {ex.Message}", ex);
                         }
 
-                        // BestEffort: log warning and continue (operations may commit outside scope)
+                        // BestEffort: enlistment failed — log warning and continue.
+                        // Writes will commit independently of the scope.
+                        // X1 fix: accept tracker state because the DB commits without the scope.
+                        shouldAcceptChanges = true;
                         context.Options.Logger?.LogWarning(
                             "Could not enlist connection in ambient transaction {TransactionId}: {Message}. " +
                             "Operations may commit independently of the TransactionScope.",
@@ -96,8 +122,10 @@ namespace nORM.Core
                     }
                 }
             }
+            // else: existingTransaction != null — external explicit transaction controls durability.
+            // shouldAcceptChanges remains false; caller commits/rolls back.
 
-            return new TransactionManager(transaction, ownsTransaction, cts, token, context.Options.Logger);
+            return new TransactionManager(transaction, ownsTransaction, shouldAcceptChanges, cts, token, context.Options.Logger);
         }
 
         /// <summary>
