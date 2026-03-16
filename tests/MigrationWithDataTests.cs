@@ -409,7 +409,7 @@ public class MigrationWithDataTests
     {
         public MwdMigration200() : base(200, "CreateMwdTable") { }
 
-        public override void Up(DbConnection connection, DbTransaction transaction)
+        public override void Up(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)
         {
             using var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
@@ -419,7 +419,7 @@ public class MigrationWithDataTests
             cmd.ExecuteNonQuery();
         }
 
-        public override void Down(DbConnection connection, DbTransaction transaction)
+        public override void Down(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)
         {
             using var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;

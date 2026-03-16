@@ -2,6 +2,7 @@ using System;
 using System.Data.Common;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Migration;
@@ -31,8 +32,8 @@ public class MigrationVersionUniqueTests
             BindingFlags.NonPublic | BindingFlags.Instance,
             null, new[] { typeof(long), typeof(string) }, null)!;
 
-        var upAbstract  = baseMigType.GetMethod("Up",   new[] { typeof(DbConnection), typeof(DbTransaction) })!;
-        var downAbstract = baseMigType.GetMethod("Down", new[] { typeof(DbConnection), typeof(DbTransaction) })!;
+        var upAbstract  = baseMigType.GetMethod("Up",   new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) })!;
+        var downAbstract = baseMigType.GetMethod("Down", new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) })!;
 
         foreach (var (typeName, version) in migrations)
         {
@@ -52,14 +53,14 @@ public class MigrationVersionUniqueTests
             // Up override (no-op)
             var up = tb.DefineMethod("Up",
                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot,
-                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction) });
+                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             up.GetILGenerator().Emit(OpCodes.Ret);
             tb.DefineMethodOverride(up, upAbstract);
 
             // Down override (no-op)
             var down = tb.DefineMethod("Down",
                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot,
-                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction) });
+                typeof(void), new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             down.GetILGenerator().Emit(OpCodes.Ret);
             tb.DefineMethodOverride(down, downAbstract);
 

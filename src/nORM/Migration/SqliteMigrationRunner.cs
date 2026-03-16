@@ -67,7 +67,7 @@ namespace nORM.Migration
             await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             foreach (var migration in pending)
             {
-                migration.Up(_connection, (DbTransaction)transaction);
+                migration.Up(_connection, (DbTransaction)transaction, ct);
                 await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
             }
             // Use CancellationToken.None — commit must not be aborted mid-flight.

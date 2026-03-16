@@ -416,8 +416,8 @@ public class MySqlMigrationPerStepTests
             BindingFlags.NonPublic | BindingFlags.Instance, null,
             new[] { typeof(long), typeof(string) }, null)!;
 
-        var upMethod   = migBase.GetMethod("Up",   new[] { typeof(DbConnection), typeof(DbTransaction) })!;
-        var downMethod = migBase.GetMethod("Down", new[] { typeof(DbConnection), typeof(DbTransaction) })!;
+        var upMethod   = migBase.GetMethod("Up",   new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) })!;
+        var downMethod = migBase.GetMethod("Down", new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) })!;
 
         var throwCtor = typeof(InvalidOperationException)
             .GetConstructor(new[] { typeof(string) })!;
@@ -444,7 +444,7 @@ public class MySqlMigrationPerStepTests
                 "Up",
                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
                 typeof(void),
-                new[] { typeof(DbConnection), typeof(DbTransaction) });
+                new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             var upIL = upBuilder.GetILGenerator();
             if (throwOnUp)
             {
@@ -463,7 +463,7 @@ public class MySqlMigrationPerStepTests
                 "Down",
                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
                 typeof(void),
-                new[] { typeof(DbConnection), typeof(DbTransaction) });
+                new[] { typeof(DbConnection), typeof(DbTransaction), typeof(CancellationToken) });
             var downIL = downBuilder.GetILGenerator();
             downIL.Emit(OpCodes.Ret);
             tb.DefineMethodOverride(downBuilder, downMethod);

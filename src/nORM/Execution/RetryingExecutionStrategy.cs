@@ -30,7 +30,11 @@ namespace nORM.Execution
                 {
                     return await operation(_ctx, ct).ConfigureAwait(false);
                 }
-                catch (Exception ex) when (ex is DbException or TimeoutException or System.IO.IOException or System.Net.Sockets.SocketException)
+                // A1/X1 fix: TimeoutException is excluded. Retrying a timed-out write can duplicate
+                // data (the write may have succeeded before the timeout was raised), so timeout
+                // exceptions are not retryable on either the query or the save path.
+                // This aligns with DbContext.IsRetryableException which already excludes timeouts.
+                catch (Exception ex) when (ex is DbException or System.IO.IOException or System.Net.Sockets.SocketException)
                 {
                     var normEx = ex is NormException ? ex as NormException : new NormException(ex.Message, null, null, ex);
                     _ctx.Options.Logger?.LogError(normEx!, retryCount);

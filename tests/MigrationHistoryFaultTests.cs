@@ -26,7 +26,7 @@ public class MigrationHistoryFaultTests
  // Use a high version number to avoid conflict with SqliteMigrationRunnerTests (v1, v2).
         public CreateItemTable() : base(100, nameof(CreateItemTable)) { }
 
-        public override void Up(DbConnection connection, DbTransaction transaction)
+        public override void Up(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)
         {
             using var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
@@ -34,7 +34,7 @@ public class MigrationHistoryFaultTests
             cmd.ExecuteNonQuery();
         }
 
-        public override void Down(DbConnection connection, DbTransaction transaction)
+        public override void Down(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)
         {
             using var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
