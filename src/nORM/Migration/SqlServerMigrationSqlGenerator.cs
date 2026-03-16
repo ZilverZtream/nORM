@@ -76,7 +76,7 @@ namespace nORM.Migration
                         $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
                         "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
 
-                var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {column.DefaultValue}";
+                var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {nullPart}";
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD {colDef}");
                 down.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
@@ -95,12 +95,12 @@ namespace nORM.Migration
                     // Drop the old default constraint (if any) by finding it via system metadata.
                     up.Add($"DECLARE @__df_{table.Name}_{newCol.Name} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_column_id,column_id)='{EscLiteral(newCol.Name)}') IF @__df_{table.Name}_{newCol.Name} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+@__df_{table.Name}_{newCol.Name}+']')");
                     if (newCol.DefaultValue != null)
-                        up.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{newCol.Name}")} DEFAULT ({newCol.DefaultValue}) FOR {Esc(newCol.Name)}");
+                        up.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{newCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(newCol.DefaultValue)}) FOR {Esc(newCol.Name)}");
 
                     // Down: restore the old default.
                     down.Add($"DECLARE @__df_{table.Name}_{oldCol.Name} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_column_id,column_id)='{EscLiteral(oldCol.Name)}') IF @__df_{table.Name}_{oldCol.Name} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+@__df_{table.Name}_{oldCol.Name}+']')");
                     if (oldCol.DefaultValue != null)
-                        down.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{oldCol.Name}")} DEFAULT ({oldCol.DefaultValue}) FOR {Esc(oldCol.Name)}");
+                        down.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{oldCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(oldCol.DefaultValue)}) FOR {Esc(oldCol.Name)}");
                 }
             }
 

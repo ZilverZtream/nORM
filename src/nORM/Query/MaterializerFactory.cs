@@ -471,8 +471,9 @@ namespace nORM.Query
 
             var targetType = typeof(T);
 
-            // CHECK FOR COMPILED MATERIALIZER FIRST
-            if (projection == null && CompiledMaterializerStore.TryGet(targetType, out var compiled))
+            // CHECK FOR COMPILED MATERIALIZER FIRST — use mapping.TableName to discriminate
+            // between the same CLR type registered under different model mappings.
+            if (projection == null && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled))
             {
                 // Wrap the compiled materializer to return strongly-typed result
                 return async (reader, ct) => (T)(await compiled(reader, ct).ConfigureAwait(false));
@@ -506,8 +507,9 @@ namespace nORM.Query
             ArgumentNullException.ThrowIfNull(mapping);
             ArgumentNullException.ThrowIfNull(targetType);
 
-            // CHECK FOR COMPILED MATERIALIZER FIRST
-            if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, out var compiled))
+            // CHECK FOR COMPILED MATERIALIZER FIRST — use mapping.TableName to discriminate
+            // between the same CLR type registered under different model mappings.
+            if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled))
             {
                 return compiled;
             }
@@ -551,8 +553,9 @@ namespace nORM.Query
             ArgumentNullException.ThrowIfNull(mapping);
             ArgumentNullException.ThrowIfNull(targetType);
 
-            // For simple cases without JOINs, use regular materializer
-            if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, out var compiled))
+            // For simple cases without JOINs, use regular materializer.
+            // Use mapping.TableName to discriminate same CLR type across different model mappings.
+            if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled))
             {
                 return compiled;
             }
