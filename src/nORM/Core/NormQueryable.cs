@@ -153,12 +153,9 @@ namespace nORM.Core
         /// <returns>An untracked query.</returns>
         public INormQueryable<T> AsNoTracking()
         {
-            var expression = Expression.Call(
-                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
-                nameof(AsNoTracking),
-                Type.EmptyTypes,
-                Expression
-            );
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsNoTracking))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
             return new NormQueryableImpl<T>(Provider, expression);
         }
 
@@ -168,12 +165,9 @@ namespace nORM.Core
         /// <returns>A query configured for split query execution.</returns>
         public INormQueryable<T> AsSplitQuery()
         {
-            var expression = Expression.Call(
-                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
-                nameof(AsSplitQuery),
-                Type.EmptyTypes,
-                Expression
-            );
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsSplitQuery))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
             return new NormQueryableImpl<T>(Provider, expression);
         }
 
@@ -230,23 +224,17 @@ namespace nORM.Core
 
         public INormQueryable<T> AsNoTracking()
         {
-            var expression = Expression.Call(
-                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
-                nameof(AsNoTracking),
-                Type.EmptyTypes,
-                Expression
-            );
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsNoTracking))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
             return new NormQueryableImplUnconstrained<T>(Provider, expression);
         }
 
         public INormQueryable<T> AsSplitQuery()
         {
-            var expression = Expression.Call(
-                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
-                nameof(AsSplitQuery),
-                Type.EmptyTypes,
-                Expression
-            );
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsSplitQuery))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
             return new NormQueryableImplUnconstrained<T>(Provider, expression);
         }
 
@@ -284,23 +272,17 @@ namespace nORM.Core
 
         public INormQueryable<T> AsNoTracking()
         {
-            var expression = Expression.Call(
-                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
-                nameof(INormQueryable<T>.AsNoTracking),
-                Type.EmptyTypes,
-                Expression
-            );
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsNoTracking))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
             return new NormQueryableImplUnconstrained<T>(Provider, expression);
         }
 
         public INormQueryable<T> AsSplitQuery()
         {
-            var expression = Expression.Call(
-                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
-                nameof(INormQueryable<T>.AsSplitQuery),
-                Type.EmptyTypes,
-                Expression
-            );
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsSplitQuery))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
             return new NormQueryableImplUnconstrained<T>(Provider, expression);
         }
 
@@ -349,12 +331,9 @@ namespace nORM.Core
         /// <returns>An untracked query.</returns>
         public INormQueryable<T> AsNoTracking()
         {
-            var expression = Expression.Call(
-                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
-                nameof(INormQueryable<T>.AsNoTracking),
-                Type.EmptyTypes,
-                Expression
-            );
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsNoTracking))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
             return new NormQueryableImpl<T>(Provider, expression);
         }
 
@@ -364,12 +343,9 @@ namespace nORM.Core
         /// <returns>A query configured for split query execution.</returns>
         public INormQueryable<T> AsSplitQuery()
         {
-            var expression = Expression.Call(
-                typeof(INormQueryable<>).MakeGenericType(typeof(T)),
-                nameof(INormQueryable<T>.AsSplitQuery),
-                Type.EmptyTypes,
-                Expression
-            );
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsSplitQuery))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
             return new NormQueryableImpl<T>(Provider, expression);
         }
 
