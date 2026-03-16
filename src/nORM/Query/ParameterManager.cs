@@ -69,7 +69,10 @@ namespace nORM.Query
             // stale Size (from a previous string), Precision/Scale (from a previous decimal),
             // or DbType (from any prior type) cannot contaminate the new binding on reuse.
             // String will override Size below; decimal will override Precision/Scale below.
-            p.Size = 0;
+            // Use -1 (not 0) so that text-bound types (DateTime, DateOnly, Guid, decimal on SQLite)
+            // are not truncated to 0 characters. Size=0 with DbType.DateTime2/Date/etc. causes
+            // Microsoft.Data.Sqlite to bind an empty string instead of the formatted value.
+            p.Size = -1;
             p.Precision = 0;
             p.Scale = 0;
 

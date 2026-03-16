@@ -20,6 +20,10 @@ namespace nORM.Tests;
 /// P1 root cause: Size was only reset in the null branch. A string→binary transition
 /// would leave the previous string's Size on the parameter, potentially truncating
 /// or mis-binding the binary value.
+///
+/// Size reset value is -1 (not 0) because Microsoft.Data.Sqlite uses Size to truncate
+/// text-bound values (DateTime, DateOnly, Guid, decimal, binary): Size=0 produces an empty
+/// string/blob; Size=-1 means "no limit" and binds the full value.
 /// </summary>
 public class ParameterMetadataContaminationTests
 {
@@ -35,7 +39,7 @@ public class ParameterMetadataContaminationTests
 
         ParameterAssign.AssignValue(p, new byte[] { 0xDE, 0xAD, 0xBE });
         Assert.Equal(DbType.Binary, p.DbType);
-        Assert.Equal(0, p.Size); // must NOT be 11 (stale string size)
+        Assert.Equal(-1, p.Size); // must NOT be 11 (stale string size); -1 = no limit
     }
 
     [Fact]
@@ -47,7 +51,7 @@ public class ParameterMetadataContaminationTests
 
         ParameterAssign.AssignValue(p, new byte[] { 1, 2, 3, 4, 5 });
         Assert.Equal(DbType.Binary, p.DbType);
-        Assert.Equal(0, p.Size);
+        Assert.Equal(-1, p.Size); // stale 8000 removed; -1 = no limit
     }
 
     // ── string → int ──────────────────────────────────────────────────────────
@@ -62,7 +66,7 @@ public class ParameterMetadataContaminationTests
         ParameterAssign.AssignValue(p, 42);
         Assert.Equal(DbType.Int32, p.DbType);
         Assert.Equal(42, p.Value);
-        Assert.Equal(0, p.Size);
+        Assert.Equal(-1, p.Size); // stale 3 removed
     }
 
     [Fact]
@@ -74,7 +78,7 @@ public class ParameterMetadataContaminationTests
 
         ParameterAssign.AssignValue(p, 9_999_999_999L);
         Assert.Equal(DbType.Int64, p.DbType);
-        Assert.Equal(0, p.Size);
+        Assert.Equal(-1, p.Size); // stale 5 removed
     }
 
     [Fact]
@@ -86,7 +90,7 @@ public class ParameterMetadataContaminationTests
 
         ParameterAssign.AssignValue(p, true);
         Assert.Equal(DbType.Boolean, p.DbType);
-        Assert.Equal(0, p.Size);
+        Assert.Equal(-1, p.Size); // stale 6 removed
     }
 
     [Fact]
@@ -98,7 +102,7 @@ public class ParameterMetadataContaminationTests
 
         ParameterAssign.AssignValue(p, 3.14159265);
         Assert.Equal(DbType.Double, p.DbType);
-        Assert.Equal(0, p.Size);
+        Assert.Equal(-1, p.Size); // stale 4 removed
     }
 
     [Fact]
@@ -110,7 +114,8 @@ public class ParameterMetadataContaminationTests
 
         ParameterAssign.AssignValue(p, new DateTime(2024, 6, 15));
         Assert.Equal(DbType.DateTime2, p.DbType);
-        Assert.Equal(0, p.Size);
+        // Size=-1 (not 0!) — Size=0 would cause SQLite to bind DateTime as empty string.
+        Assert.Equal(-1, p.Size);
     }
 
     // ── decimal → guid: stale Precision/Scale ─────────────────────────────────
@@ -143,7 +148,7 @@ public class ParameterMetadataContaminationTests
         Assert.Equal(7, p.Value);
         Assert.Equal(0, p.Precision);
         Assert.Equal(0, p.Scale);
-        Assert.Equal(0, p.Size);
+        Assert.Equal(-1, p.Size); // stale size removed
     }
 
     // ── mixed-type reuse cycle matrix ─────────────────────────────────────────
@@ -161,15 +166,15 @@ public class ParameterMetadataContaminationTests
             Assert.Equal(DbType.String, p.DbType);
             Assert.Equal(50 + i, p.Size);
 
-            // 2. Binary — Size must be reset to 0
+            // 2. Binary — Size must be reset (stale string Size removed); -1 = no limit
             ParameterAssign.AssignValue(p, new byte[] { (byte)i, 0xFF });
             Assert.Equal(DbType.Binary, p.DbType);
-            Assert.Equal(0, p.Size);
+            Assert.Equal(-1, p.Size);
 
-            // 3. Int — Size stays 0
+            // 3. Int — Size stays -1
             ParameterAssign.AssignValue(p, i);
             Assert.Equal(DbType.Int32, p.DbType);
-            Assert.Equal(0, p.Size);
+            Assert.Equal(-1, p.Size);
 
             // 4. Decimal with explicit precision/scale via manual set (simulating driver state)
             ParameterAssign.AssignValue(p, 1.23m);
@@ -181,7 +186,7 @@ public class ParameterMetadataContaminationTests
             Assert.Equal(DbType.Guid, p.DbType);
             Assert.Equal(0, p.Precision);
             Assert.Equal(0, p.Scale);
-            Assert.Equal(0, p.Size);
+            Assert.Equal(-1, p.Size);
         }
     }
 
@@ -203,7 +208,7 @@ public class ParameterMetadataContaminationTests
 
             ParameterAssign.AssignValue(p, numericValues[i]);
             Assert.Equal(expectedTypes[i], p.DbType);
-            Assert.Equal(0, p.Size); // must always be reset
+            Assert.Equal(-1, p.Size); // stale string Size removed; -1 = no limit
         }
     }
 
@@ -220,7 +225,7 @@ public class ParameterMetadataContaminationTests
         ParameterAssign.AssignValue(p, null);
         Assert.Equal(DBNull.Value, p.Value);
         Assert.Equal(DbType.Object, p.DbType);
-        Assert.Equal(0, p.Size);
+        Assert.Equal(0, p.Size);   // null path resets to 0 (null binds as NULL regardless of Size)
         Assert.Equal(0, p.Precision);
         Assert.Equal(0, p.Scale);
     }
@@ -232,11 +237,11 @@ public class ParameterMetadataContaminationTests
     {
         var p = new SqliteParameter();
         ParameterAssign.AssignValue(p, new byte[] { 1, 2, 3 });
-        Assert.Equal(0, p.Size);
+        Assert.Equal(-1, p.Size); // binary: -1 = no limit
 
         ParameterAssign.AssignValue(p, "hello");
         Assert.Equal(DbType.String, p.DbType);
-        Assert.Equal(5, p.Size); // string Size must be str.Length, not 0
+        Assert.Equal(5, p.Size); // string Size must be str.Length, not -1
     }
 
     [Fact]
