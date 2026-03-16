@@ -1464,13 +1464,14 @@ namespace nORM.Query
             var map = _ctx.GetMapping(elementType);
 
             // Use structural key instead of string.Concat to avoid string allocation per count call.
+            // Q1 fix: include null-shape in key so col==null and col==value produce distinct cache entries.
             string predicateKey;
             if (predicate == null)
                 predicateKey = "";
             else if (predicate.Body is MemberExpression pm)
                 predicateKey = pm.Member.Name; // interned by CLR, no alloc
             else if (predicate.Body is BinaryExpression pb && pb.Left is MemberExpression pbm)
-                predicateKey = pbm.Member.Name; // just member name, skip NodeType.ToString()
+                predicateKey = IsNullConstant(pb.Right) ? pbm.Member.Name + "==NULL" : pbm.Member.Name;
             else
                 return false; // Complex predicates fall back to normal path
 
@@ -1539,13 +1540,16 @@ namespace nORM.Query
             // Use structural hash instead of predicate.Body.ToString() to avoid
             // string allocation on every count call. For simple predicates (bool member,
             // equality), the member name is sufficient as a cache key.
+            // Q1 fix: include null-shape in key so col==null and col==value produce distinct cache entries.
             string predicateKey;
             if (predicate == null)
                 predicateKey = "";
             else if (predicate.Body is MemberExpression pm)
                 predicateKey = pm.Member.Name;
             else if (predicate.Body is BinaryExpression pb && pb.Left is MemberExpression pbm)
-                predicateKey = string.Concat(pbm.Member.Name, "=", pb.NodeType.ToString());
+                predicateKey = IsNullConstant(pb.Right)
+                    ? string.Concat(pbm.Member.Name, "=", pb.NodeType.ToString(), ":NULL")
+                    : string.Concat(pbm.Member.Name, "=", pb.NodeType.ToString());
             else
                 predicateKey = predicate.Body.ToString(); // fallback for complex predicates
 
@@ -1583,6 +1587,15 @@ namespace nORM.Query
                 return true;
             }
         }
+
+        /// <summary>
+        /// Q1 fix: returns true when <paramref name="e"/> is a null literal or a Nullable&lt;T&gt; Convert
+        /// wrapping a null literal, so cache keys distinguish col==null from col==value.
+        /// </summary>
+        private static bool IsNullConstant(Expression e) =>
+            e is ConstantExpression { Value: null } ||
+            (e is UnaryExpression { NodeType: ExpressionType.Convert } ue &&
+             ue.Operand is ConstantExpression { Value: null });
 
         private bool TryBuildCountWhereClause(LambdaExpression lambda, TableMapping map, ref Dictionary<string, object> parameters, out string whereClause, bool populateParameters)
         {
