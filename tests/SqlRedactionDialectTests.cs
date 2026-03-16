@@ -227,4 +227,74 @@ public class SqlRedactionDialectTests
         var sql = "SELECT col FROM \"schema$table\" WHERE id = @id";
         Assert.Equal(sql, Redact(sql));
     }
+
+    // ── S1 fix: PostgreSQL tagged dollar-quoted literals ($tag$...$tag$) ──────
+
+    [Fact]
+    public void Redact_TaggedDollarQuotedLiteral_IsRedacted()
+    {
+        // $func$...$func$ is a common PostgreSQL form for function bodies.
+        var result = Redact("CREATE FUNCTION f() RETURNS void AS $func$ BEGIN END $func$ LANGUAGE plpgsql");
+        Assert.DoesNotContain("BEGIN END", result);
+        Assert.Contains("[redacted]", result);
+    }
+
+    [Fact]
+    public void Redact_TaggedDollarQuotedWithSensitiveValue_SensitiveValueNotLeaked()
+    {
+        var sql = "SELECT $secret$top_secret_password$secret$";
+        var result = Redact(sql);
+        Assert.DoesNotContain("top_secret_password", result);
+        Assert.Contains("[redacted]", result);
+    }
+
+    [Fact]
+    public void Redact_TaggedDollarQuotedMultiline_IsRedacted()
+    {
+        var sql = "INSERT INTO Logs (Body) VALUES ($body$\nline1\nline2\n$body$)";
+        var result = Redact(sql);
+        Assert.DoesNotContain("line1", result);
+        Assert.DoesNotContain("line2", result);
+        Assert.Equal("INSERT INTO Logs (Body) VALUES ('[redacted]')", result);
+    }
+
+    [Fact]
+    public void Redact_MultipleTaggedDollarQuotedBlocks_AllRedacted()
+    {
+        var sql = "SELECT $a$secret_a$a$, $b$secret_b$b$";
+        var result = Redact(sql);
+        Assert.DoesNotContain("secret_a", result);
+        Assert.DoesNotContain("secret_b", result);
+        Assert.Equal("SELECT '[redacted]', '[redacted]'", result);
+    }
+
+    [Fact]
+    public void Redact_MixedBareAndTaggedDollarQuoted_AllRedacted()
+    {
+        // Mix of bare $$ and tagged $tag$ forms.
+        var sql = "SELECT $$bare_secret$$, $tagged$tagged_secret$tagged$";
+        var result = Redact(sql);
+        Assert.DoesNotContain("bare_secret", result);
+        Assert.DoesNotContain("tagged_secret", result);
+        Assert.Equal("SELECT '[redacted]', '[redacted]'", result);
+    }
+
+    [Fact]
+    public void Redact_TaggedDollarQuotedAdversarial_DifferentTagsDoNotCross()
+    {
+        // $a$...$b$ should NOT be redacted — mismatched tags mean this is not a valid
+        // dollar-quoted literal; the backreference \1 prevents tag-crossing.
+        var sql = "SELECT $a$content$b$";
+        var result = Redact(sql);
+        // No redaction should occur for mismatched delimiters.
+        Assert.Equal(sql, result);
+    }
+
+    [Fact]
+    public void Redact_AllFourDialects_AllRedacted()
+    {
+        // ANSI, N'', bare $$, tagged $tag$ all in one statement.
+        var result = Redact("SELECT 'ansi', N'national', $$bare$$, $t$tagged$t$");
+        Assert.Equal("SELECT '[redacted]', '[redacted]', '[redacted]', '[redacted]'", result);
+    }
 }

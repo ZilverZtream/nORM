@@ -64,7 +64,12 @@ namespace nORM.Core
         private bool _providerInitialized;
         private readonly SemaphoreSlim _providerInitLock = new(1, 1);
         private readonly object _providerInitSyncLock = new object(); // For synchronous initialization to avoid deadlock
-        private readonly Lazy<Task>? _temporalInit;
+        // A1 fix: replaced Lazy<Task> with an explicit double-checked lock so that the
+        // CancellationToken passed to EnsureConnectionAsync is forwarded to TemporalManager.
+        // Lazy<Task> fixes the factory at creation time with no way to accept a later ct.
+        private volatile Task? _temporalInitTask;
+        private readonly SemaphoreSlim _temporalInitLock = new(1, 1);
+        private volatile bool _temporalInitComplete;
         private DbTransaction? _currentTransaction; // Access via Interlocked.* only
         // ConcurrentDictionary eliminates lock contention on the insert fast path.
         private readonly ConcurrentDictionary<(Type EntityType, bool HydrateGeneratedKeys), PreparedInsertCommand> _preparedInsertCache = new();
@@ -126,10 +131,8 @@ namespace nORM.Core
                 : new DefaultExecutionStrategy(this);
             _timeoutManager = new AdaptiveTimeoutManager(Options.TimeoutConfiguration,
                 Options.Logger ?? NullLogger.Instance);
-            if (Options.IsTemporalVersioningEnabled)
-            {
-                _temporalInit = new Lazy<Task>(() => TemporalManager.InitializeAsync(this));
-            }
+            // _temporalInitTask / _temporalInitLock initialized via field declarations above;
+            // initialization happens lazily inside EnsureConnectionSlowAsync when ct is available.
             _cleanupTimer = new Timer(_ => CleanupDisposables(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
         /// <summary>
@@ -192,9 +195,10 @@ namespace nORM.Core
 
         internal Task<DbConnection> EnsureConnectionAsync(CancellationToken ct = default)
         {
-            // Fast path — connection already open, provider initialized, no temporal init.
-            // Returns a cached Task to avoid async state machine allocation entirely.
-            if (_cn.State == ConnectionState.Open && _providerInitialized && _temporalInit == null)
+            // Fast path — connection already open, provider initialized, and temporal init either
+            // not needed or already complete. Returns a cached Task to avoid async state machine allocation.
+            if (_cn.State == ConnectionState.Open && _providerInitialized &&
+                (!Options.IsTemporalVersioningEnabled || _temporalInitComplete))
                 return _ensureConnectionCompletedTask ??= Task.FromResult(_cn);
             return EnsureConnectionSlowAsync(ct);
         }
@@ -219,9 +223,26 @@ namespace nORM.Core
                     _providerInitLock.Release();
                 }
             }
-            if (_temporalInit != null)
+            if (Options.IsTemporalVersioningEnabled && !_temporalInitComplete)
             {
-                await _temporalInit.Value.ConfigureAwait(false);
+                // A1 fix: double-checked lock so the caller's CancellationToken is forwarded to
+                // TemporalManager.InitializeAsync. If already complete (fast-path race), skip.
+                await _temporalInitLock.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    if (!_temporalInitComplete)
+                    {
+                        // Pass _cn directly to avoid re-entering EnsureConnectionAsync
+                    // from within the bootstrap (which would deadlock on _temporalInitLock).
+                    _temporalInitTask = TemporalManager.InitializeAsync(this, _cn, ct);
+                        await _temporalInitTask.ConfigureAwait(false);
+                        _temporalInitComplete = true;
+                    }
+                }
+                finally
+                {
+                    _temporalInitLock.Release();
+                }
             }
             // Cache for future fast-path returns
             _ensureConnectionCompletedTask = Task.FromResult(_cn);
