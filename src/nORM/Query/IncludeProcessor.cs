@@ -90,7 +90,7 @@ namespace nORM.Query
                     paramNames.Add(pn);
                 }
 
-                cmd.CommandText = BuildSql(include.Path, mappings, paramNames);
+                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, cmd);
                 cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
 
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
@@ -171,7 +171,7 @@ namespace nORM.Query
                     paramNames.Add(pn);
                 }
 
-                cmd.CommandText = BuildSql(include.Path, mappings, paramNames);
+                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, cmd);
                 cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
 
                 using var reader = cmd.ExecuteReaderWithInterception(_ctx, System.Data.CommandBehavior.Default);
@@ -244,8 +244,9 @@ namespace nORM.Query
             relation.NavProp.SetValue(parent, childList);
         }
 
-        private static string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames)
+        private string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames, DbCommand cmd)
         {
+            var tenantId = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             var current = $"({PooledStringBuilder.Join(paramNames, ",")})";
             var sb = PooledStringBuilder.Rent();
             try
@@ -254,13 +255,27 @@ namespace nORM.Query
                 {
                     var relation = path[i];
                     var map = mappings[i];
+                    var tenantCol = map.TenantColumn;
+
                     sb.Append("SELECT * FROM ").Append(map.EscTable)
                       .Append(" WHERE ").Append(relation.ForeignKey.EscCol)
-                      .Append(" IN ").Append(current).Append(';');
+                      .Append(" IN ").Append(current);
+
+                    if (tenantId != null && tenantCol != null)
+                    {
+                        var tp = $"{_ctx.Provider.ParamPrefix}tkn{i}";
+                        sb.Append(" AND ").Append(tenantCol.EscCol).Append(" = ").Append(tp);
+                        cmd.AddParam(tp, tenantId);
+                    }
+
+                    sb.Append(';');
 
                     // Include all key columns (composite PK support for multi-level traversal).
                     var pkCols = string.Join(", ", map.KeyColumns.Select(k => k.EscCol));
-                    current = $"(SELECT {pkCols} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current})";
+                    var tenantPart = (tenantId != null && tenantCol != null)
+                        ? $" AND {tenantCol.EscCol} = {_ctx.Provider.ParamPrefix}tkn{i}"
+                        : string.Empty;
+                    current = $"(SELECT {pkCols} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current}{tenantPart})";
                 }
 
                 return sb.ToString().TrimEnd(';');

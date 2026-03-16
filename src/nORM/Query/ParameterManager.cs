@@ -142,9 +142,7 @@ namespace nORM.Query
             // DateTime and related types
             if (type == typeof(DateTime))
             {
-                // P1 fix: set DbType explicitly so stale metadata from a prior int/string/etc.
-                // assignment on a reused parameter does not cause wrong type coercion.
-                p.DbType = System.Data.DbType.DateTime;
+                p.DbType = System.Data.DbType.DateTime2;
                 p.Value = v;
                 return;
             }

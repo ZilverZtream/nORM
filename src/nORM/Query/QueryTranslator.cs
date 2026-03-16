@@ -220,7 +220,7 @@ namespace nORM.Query
                 SqlBuilder? oldClauses = Interlocked.Exchange(ref _clauses, null!);
                 oldClauses?.Dispose();
                 _clauses = new SqlBuilder();
-                _includes?.Clear();
+                _includes = new List<IncludePlan>();
                 _correlatedParams?.Clear();
                 _tables?.Clear();
                 _ctx = null!;
@@ -580,7 +580,7 @@ namespace nORM.Query
                     singleResult,
                     _t._noTracking,
                     _t._methodName,
-                    _t._includes,
+                    new List<IncludePlan>(_t._includes),
                     _t._groupJoinInfo,
                     _t._tables.ToArray(),
                     _t._splitQuery,

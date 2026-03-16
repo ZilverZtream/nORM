@@ -59,7 +59,7 @@ public class StaleDbTypeTests
 
         ParameterAssign.AssignValue(p, new DateTime(2024, 6, 15, 10, 30, 0));
 
-        Assert.Equal(DbType.DateTime, p.DbType);
+        Assert.Equal(DbType.DateTime2, p.DbType);
         Assert.IsType<DateTime>(p.Value);
     }
 
@@ -122,7 +122,7 @@ public class StaleDbTypeTests
         // DateTime → null: null path resets DbType to Object.
         var p = new SqliteParameter();
         ParameterAssign.AssignValue(p, new DateTime(2024, 1, 1));
-        Assert.Equal(DbType.DateTime, p.DbType);
+        Assert.Equal(DbType.DateTime2, p.DbType);
 
         ParameterAssign.AssignValue(p, null);
 
@@ -144,7 +144,7 @@ public class StaleDbTypeTests
             Assert.Equal(i, p.Value);
 
             ParameterAssign.AssignValue(p, dt.AddDays(i));
-            Assert.Equal(DbType.DateTime, p.DbType);
+            Assert.Equal(DbType.DateTime2, p.DbType);
             Assert.IsType<DateTime>(p.Value);
         }
     }

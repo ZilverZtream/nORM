@@ -936,10 +936,18 @@ namespace nORM.Benchmarks
             _nOrmConnection?.Dispose();
             _dapperConnection?.Dispose();
 
+            // Flush the SQLite connection pool so all physical connections are
+            // closed before we delete the file. Without this, Dispose() only
+            // returns connections to the pool; the file stays locked and the
+            // next benchmark process's Setup() fails with IOException.
+            SqliteConnection.ClearAllPools();
+
             try
             {
                 if (System.IO.File.Exists("benchmark.db"))
                     System.IO.File.Delete("benchmark.db");
+                System.IO.File.Delete("benchmark.db-wal");
+                System.IO.File.Delete("benchmark.db-shm");
             }
             catch { /* ignore */ }
         }
