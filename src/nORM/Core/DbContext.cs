@@ -2670,7 +2670,7 @@ namespace nORM.Core
         private readonly DbContext _context;
         private readonly (DbParameter Parameter, Mapping.Column Column)[] _bindings;
         private readonly bool _hydrateGeneratedKeys;
-        private bool _disposed;
+        private volatile bool _disposed;
 
         internal PreparedInsertCommand(
             DbCommand command,

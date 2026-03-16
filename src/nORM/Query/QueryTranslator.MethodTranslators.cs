@@ -810,6 +810,9 @@ namespace nORM.Query
                     rawLambda = node.Arguments.Count > 1 ? node.Arguments[1] : null;
                 }
 
+                // Visit source FIRST to establish _mapping before the Relations lookup.
+                var visited = t.Visit(source);
+
                 if (rawLambda != null)
                 {
                     var includeLambda = rawLambda is UnaryExpression qu ? qu.Operand as LambdaExpression : rawLambda as LambdaExpression;
@@ -819,7 +822,7 @@ namespace nORM.Query
                                      (MemberExpression)unary.Operand :
                                      (MemberExpression)includeLambda.Body;
                         var propName = member.Member.Name;
-                        if (t._mapping.Relations.TryGetValue(propName, out var relation))
+                        if (t._mapping != null && t._mapping.Relations.TryGetValue(propName, out var relation))
                         {
                             // Guard against composite-PK dependents early at translation time.
                             var depMap = t._ctx.GetMapping(relation.DependentType);
@@ -832,7 +835,7 @@ namespace nORM.Query
                         }
                     }
                 }
-                return t.Visit(source);
+                return visited;
             }
         }
 
@@ -880,7 +883,8 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._noTracking = true;
-                return t.Visit(node.Arguments[0]);
+                var source = node.Object ?? node.Arguments[0];
+                return t.Visit(source);
             }
         }
 
@@ -895,7 +899,8 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._splitQuery = true;
-                return t.Visit(node.Arguments[0]);
+                var source = node.Object ?? node.Arguments[0];
+                return t.Visit(source);
             }
         }
 
