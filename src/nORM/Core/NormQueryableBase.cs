@@ -52,6 +52,10 @@ namespace nORM.Core
                     var plan = qp.GetPlan(Expression, out _, out _);
                     return plan.Sql;
                 }
+                catch (NormQueryException)
+                {
+                    throw; // Deliberate validation failures (e.g. invalid JSON path) must propagate.
+                }
                 catch
                 {
                     // Fall through to default if translation fails (e.g. unsupported expression).
