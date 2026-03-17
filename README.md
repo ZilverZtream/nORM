@@ -104,6 +104,8 @@ var getActiveUsers = Norm.CompileQuery<MyContext, DateTime, User[]>(
 
 ### Lightning-Fast CRUD Operations
 
+> **Note:** nORM is async-first. Only `SaveChangesAsync()` is provided; there is no synchronous `SaveChanges()`. Use `await ctx.SaveChangesAsync()` in all contexts, including console apps: `ctx.SaveChangesAsync().GetAwaiter().GetResult()` can cause deadlocks in some synchronization contexts.
+
 ```csharp
 // Same familiar API as EF Core
 var user = new User { Name = "John Doe", Email = "john@example.com" };

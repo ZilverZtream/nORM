@@ -693,28 +693,39 @@ namespace nORM.Core
 
             // Feed the ORIGINAL sql to the TSQL parser (it handles its own syntax);
             // the keyword check above already caught any obfuscated keywords.
-            using var reader = new StringReader(sql);
-            var parser = new TSql150Parser(false);
-            var fragment = parser.Parse(reader, out var errors);
-
-            if (errors != null && errors.Count > 0)
+            // ScriptDom is an optional dependency (PrivateAssets="all") — fall back to the
+            // structural SELECT-only gate when it is not installed in the consumer's application.
+            try
             {
-                // Parse failed (non-TSQL syntax) — apply SELECT-only structural gate
+                using var reader = new StringReader(sql);
+                var parser = new TSql150Parser(false);
+                var fragment = parser.Parse(reader, out var errors);
+
+                if (errors != null && errors.Count > 0)
+                {
+                    // Parse failed (non-TSQL syntax) — apply SELECT-only structural gate
+                    return IsSelectStatement(normalized);
+                }
+
+                var allowed = new HashSet<Type> { typeof(SelectStatement), typeof(SetVariableStatement) };
+
+                if (fragment is TSqlScript script)
+                {
+                    foreach (var batch in script.Batches)
+                        foreach (var statement in batch.Statements)
+                            if (!allowed.Contains(statement.GetType()))
+                                return false;
+                    return true;
+                }
+
+                return false;
+            }
+            catch (System.IO.FileNotFoundException)
+            {
+                // Microsoft.SqlServer.TransactSql.ScriptDom is not available.
+                // Fall back to the keyword denylist + SELECT-only structural gate.
                 return IsSelectStatement(normalized);
             }
-
-            var allowed = new HashSet<Type> { typeof(SelectStatement), typeof(SetVariableStatement) };
-
-            if (fragment is TSqlScript script)
-            {
-                foreach (var batch in script.Batches)
-                    foreach (var statement in batch.Statements)
-                        if (!allowed.Contains(statement.GetType()))
-                            return false;
-                return true;
-            }
-
-            return false;
         }
 
         /// <summary>

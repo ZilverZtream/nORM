@@ -32,6 +32,17 @@ namespace nORM.Providers
         /// Initializes a new instance of the <see cref="PostgresProvider"/> class.
         /// </summary>
         /// <param name="parameterFactory">Factory responsible for creating PostgreSQL parameters.</param>
+        /// <remarks>
+        /// <para>
+        /// <b>Runtime dependency:</b> This provider uses PostgreSQL via reflection and requires
+        /// <c>Npgsql</c> to be installed in the consuming application.
+        /// Add it to your project:
+        /// <code>
+        /// dotnet add package Npgsql
+        /// </code>
+        /// A clear <see cref="InvalidOperationException"/> is thrown at runtime if Npgsql is not present.
+        /// </para>
+        /// </remarks>
         public PostgresProvider(IDbParameterFactory parameterFactory)
         {
             _parameterFactory = parameterFactory ?? throw new ArgumentNullException(nameof(parameterFactory));
