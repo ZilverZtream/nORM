@@ -61,8 +61,17 @@ namespace nORM.Providers
         public override int MaxParameters => 65_535;
 
         /// <inheritdoc />
+        /// Escapes an identifier using MySQL backtick delimiters.
+        /// Handles multi-part identifiers (schema.table) by escaping each segment separately so
+        /// that <c>`schema`.`table`</c> is produced rather than the invalid <c>`schema.table`</c>.
         /// ID-7: Embedded backtick characters are doubled to prevent SQL injection via identifiers.
-        public override string Escape(string id) => $"`{id.Replace("`", "``")}`";
+        public override string Escape(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return id;
+            if (id.Contains('.'))
+                return string.Join(".", id.Split('.').Select(part => $"`{part.Replace("`", "``")}`"));
+            return $"`{id.Replace("`", "``")}`";
+        }
 
         /// <summary>
         /// Appends a MySQL <c>LIMIT</c> clause to the SQL builder to paginate results.

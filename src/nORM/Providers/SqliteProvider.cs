@@ -55,11 +55,20 @@ namespace nORM.Providers
 
         /// <summary>
         /// Escapes an identifier by wrapping it in double quotes, per SQLite requirements.
+        /// Handles multi-part identifiers (schema.table / attached-db.table) by escaping each
+        /// segment separately so that <c>"schema"."table"</c> is produced rather than the invalid
+        /// <c>"schema.table"</c>.
         /// Embedded double-quote characters are doubled to prevent SQL injection via identifiers.
         /// </summary>
-        /// <param name="id">Identifier to escape.</param>
+        /// <param name="id">Identifier to escape (e.g., <c>"table"</c> or <c>"schema.table"</c>).</param>
         /// <returns>The escaped identifier.</returns>
-        public override string Escape(string id) => $"\"{id.Replace("\"", "\"\"")}\"";
+        public override string Escape(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return id;
+            if (id.Contains('.'))
+                return string.Join(".", id.Split('.').Select(part => $"\"{part.Replace("\"", "\"\"")}\""));
+            return $"\"{id.Replace("\"", "\"\"")}\"";
+        }
 
 
         /// <summary>
