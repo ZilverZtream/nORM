@@ -87,8 +87,15 @@ namespace nORM.Providers
         }
         
         /// <summary>
-        /// MySQL returns affected (changed) rows, not matched rows.
-        /// This causes false-positive concurrency exceptions on same-value updates.
+        /// MySQL Connector/NET defaults to reporting <em>affected</em> (changed) rows rather than
+        /// <em>matched</em> rows. Returning <c>true</c> here disables the rowcount-based OCC check
+        /// in the save pipeline to prevent false-positive <see cref="DbConcurrencyException"/>s
+        /// on same-value updates.
+        ///
+        /// <para><b>Known trade-off (S1):</b> With affected-row semantics, a genuine stale-row
+        /// conflict where the concurrent writer sets the token to the <em>same</em> value is not
+        /// detected. For full OCC guarantee on MySQL, add <c>useAffectedRows=false</c> to the
+        /// connection string and derive a provider subclass that overrides this to <c>false</c>.</para>
         /// </summary>
         internal override bool UseAffectedRowsSemantics => true;
 

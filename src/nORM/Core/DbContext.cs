@@ -1188,7 +1188,13 @@ namespace nORM.Core
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            // Skip matched-row concurrency check for providers using affected-row semantics (e.g. MySQL).
+            // S1 — Optimistic-concurrency rowcount check.
+            // Skipped for providers that report affected (changed) rows rather than matched rows
+            // (UseAffectedRowsSemantics=true, e.g. MySQL default). On such providers a same-value
+            // update returns 0 affected rows even when the row exists, causing a false-positive
+            // conflict. Trade-off: genuine stale-row conflicts where the competing writer set the
+            // token to the same new value will also go undetected. Use useAffectedRows=false in
+            // the MySQL connection string and a provider subclass override to restore the check.
             if (map.TimestampColumn != null && !Provider.UseAffectedRowsSemantics && updated != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
             // AcceptChanges is intentionally deferred until after the transaction commits.
@@ -1248,7 +1254,7 @@ namespace nORM.Core
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            // Skip matched-row concurrency check for providers using affected-row semantics (e.g. MySQL).
+            // S1 — see UpdateBatch comment above for the affected-row semantics trade-off.
             if (map.TimestampColumn != null && !Provider.UseAffectedRowsSemantics && deleted != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
             // Entity removal from ChangeTracker is deferred until after the transaction commits.
