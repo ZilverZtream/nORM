@@ -21,22 +21,24 @@ namespace nORM.Tests;
 ///
 /// <list type="bullet">
 ///   <item>SQLite (matched-row semantics) — rowcount check fires, genuine conflicts detected.</item>
-///   <item>AffectedRows-semantics providers (MySQL default) — rowcount check skipped to prevent
-///         false-positive <see cref="DbConcurrencyException"/> on same-value updates.</item>
+///   <item>AffectedRows-semantics providers (MySQL default) — genuine conflicts detected via
+///         SELECT-then-verify fallback; same-value updates (no columns changed) do not throw.</item>
 ///   <item>Matched-row opt-in override — subclass that sets <c>UseAffectedRowsSemantics=false</c>
-///         restores full conflict detection.</item>
+///         uses direct rowcount check without SELECT-then-verify overhead.</item>
+///   <item>DELETE path — always checked regardless of affected-row semantics (no same-value
+///         ambiguity: 0 deleted rows is always a genuine conflict).</item>
 /// </list>
 ///
 /// S1 root cause: MySQL returns "affected" (changed) rows rather than "matched" rows.
 /// A same-value update (row found but no column changed) returns 0 affected rows, which
-/// nORM's rowcount check would incorrectly interpret as a stale-row conflict.
+/// the naive rowcount check would misinterpret as a stale-row conflict. The SELECT-then-verify
+/// fallback (<see cref="DbContext.VerifyUpdateOccAsync"/>) disambiguates by querying whether
+/// the original token still exists in the database.
 ///
-/// Contract: when <c>UseAffectedRowsSemantics=true</c>, the rowcount check is intentionally
-/// skipped for both the update and delete paths. The trade-off is that a genuine conflict
-/// where the competing writer sets the concurrency token to the <em>same</em> new value will
-/// go undetected. Strict OCC on MySQL requires <c>useAffectedRows=false</c> in the connection
-/// string paired with a provider subclass that overrides <c>UseAffectedRowsSemantics</c> to
-/// <c>false</c>.
+/// Residual gap: if a concurrent writer sets the token to the <em>same</em> new value as the
+/// existing token (same-value token conflict), the UPDATE WHERE clause still matches and returns
+/// 1 row, so neither path detects the conflict. This is a documented trade-off for all OCC
+/// rowcount approaches and requires application-level versioning to close.
 /// </summary>
 public class OptimisticConcurrencyProviderMatrixTests
 {
@@ -164,23 +166,17 @@ public class OptimisticConcurrencyProviderMatrixTests
         await ctx.SaveChangesAsync();
     }
 
-    // ── Affected-row provider: same-value update does NOT throw ───────────────
+    // ── Affected-row provider: SELECT-then-verify detects genuine conflicts ────
 
     /// <summary>
-    /// S1 core scenario: with affected-row semantics, a same-value UPDATE (e.g., no columns
-    /// actually changed) returns 0 rows even though the WHERE clause matched. The rowcount
-    /// check must be skipped to prevent a false-positive DbConcurrencyException.
-    ///
-    /// SQLite actually does report matched rows, so this test simulates the affected-row
-    /// provider returning 0 by using a token-stale scenario with the skip-check flag set.
-    /// We verify no exception is thrown when UseAffectedRowsSemantics=true.
+    /// S1 fix: with affected-row semantics, a genuine stale-token conflict (token changed
+    /// by a competing writer) is now detected via SELECT-then-verify. The UPDATE returns 0
+    /// rows; VerifyUpdateOccAsync queries whether the original token still exists in the DB.
+    /// Since the token was overwritten, the SELECT returns 0 → DbConcurrencyException thrown.
     /// </summary>
     [Fact]
-    public async Task AffectedRowsProvider_StaleToken_DoesNotThrow()
+    public async Task AffectedRowsProvider_StaleToken_ThrowsViaSelectVerify()
     {
-        // With UseAffectedRowsSemantics=true the rowcount check is bypassed entirely,
-        // so even a genuine conflict (stale token → 0 matched rows) doesn't throw.
-        // This is the intentional trade-off for affected-row providers.
         var (cn, ctx) = BuildContext(new AffectedRowsProvider());
         await using var _ = ctx; using var __ = cn;
 
@@ -188,13 +184,69 @@ public class OptimisticConcurrencyProviderMatrixTests
         ctx.Add(e);
         await ctx.SaveChangesAsync();
 
+        // Competing writer changes the token — our snapshot is now stale.
         SimulateExternalRowVersionChange(cn, e.Id, new byte[] { 99 });
         e.Name = "Charlie v2";
         MarkDirty(ctx, e);
 
-        // Must NOT throw — affected-row check is skipped.
+        // SELECT-then-verify: original token not in DB → genuine conflict → must throw.
+        await Assert.ThrowsAsync<DbConcurrencyException>(() => ctx.SaveChangesAsync());
+    }
+
+    /// <summary>
+    /// S1 no-false-positive: with AffectedRowsProvider and a fresh (non-stale) update,
+    /// the UPDATE matches 1 row (SQLite uses matched-row semantics), so updated==batch.Count
+    /// and VerifyUpdateOccAsync is never invoked. Confirms no false positive for valid saves.
+    /// </summary>
+    [Fact]
+    public async Task AffectedRowsProvider_FreshUpdate_NoFalsePositive()
+    {
+        var (cn, ctx) = BuildContext(new AffectedRowsProvider());
+        await using var _ = ctx; using var __ = cn;
+
+        var e = new OccMatrixEntity { Name = "Charlie", RowVersion = new byte[] { 1 } };
+        ctx.Add(e);
+        await ctx.SaveChangesAsync();
+
+        // No external change — token still matches.
+        e.Name = "Charlie v2";
+        MarkDirty(ctx, e);
+
+        // updated == 1 == batch.Count → no verify triggered → no throw.
         var ex = await Record.ExceptionAsync(() => ctx.SaveChangesAsync());
         Assert.Null(ex);
+    }
+
+    /// <summary>
+    /// S1 batch scenario: two entities updated, one with stale token. The batch UPDATE
+    /// returns fewer rows than expected; VerifyUpdateOccAsync finds only one token still
+    /// matching → count(1) != batch.Count(2) → throws DbConcurrencyException.
+    /// </summary>
+    [Fact]
+    public async Task AffectedRowsProvider_BatchUpdate_PartialStaleToken_Throws()
+    {
+        var (cn, ctx) = BuildContext(new AffectedRowsProvider());
+        await using var _ = ctx; using var __ = cn;
+
+        var e1 = new OccMatrixEntity { Name = "Foo", RowVersion = new byte[] { 1 } };
+        var e2 = new OccMatrixEntity { Name = "Bar", RowVersion = new byte[] { 2 } };
+        ctx.Add(e1); ctx.Add(e2);
+        await ctx.SaveChangesAsync();
+
+        // Make e2's token stale.
+        SimulateExternalRowVersionChange(cn, e2.Id, new byte[] { 99 });
+
+        e1.Name = "Foo v2"; e2.Name = "Bar v2";
+        var entries = ctx.ChangeTracker.Entries.ToList();
+        foreach (var entry in entries)
+        {
+            typeof(ChangeTracker)
+                .GetMethod("MarkDirty", System.Reflection.BindingFlags.Instance |
+                                        System.Reflection.BindingFlags.NonPublic)!
+                .Invoke(ctx.ChangeTracker, new object[] { entry });
+        }
+
+        await Assert.ThrowsAsync<DbConcurrencyException>(() => ctx.SaveChangesAsync());
     }
 
     [Fact]
@@ -254,8 +306,11 @@ public class OptimisticConcurrencyProviderMatrixTests
     }
 
     [Fact]
-    public async Task AffectedRowsProvider_DeleteWithStaleToken_DoesNotThrow()
+    public async Task AffectedRowsProvider_DeleteWithStaleToken_ThrowsDbConcurrencyException()
     {
+        // S1 fix: DELETE rowcount is always checked, even under affected-row semantics.
+        // Unlike UPDATE, DELETE has no same-value ambiguity: 0 deleted rows always means
+        // either the token was stale or the row is gone — both are genuine conflicts.
         var (cn, ctx) = BuildContext(new AffectedRowsProvider());
         await using var _ = ctx; using var __ = cn;
 
@@ -266,9 +321,8 @@ public class OptimisticConcurrencyProviderMatrixTests
         SimulateExternalRowVersionChange(cn, e.Id, new byte[] { 88 });
         ctx.Remove(e);
 
-        // Skip check — must not throw.
-        var ex = await Record.ExceptionAsync(() => ctx.SaveChangesAsync());
-        Assert.Null(ex);
+        // Stale token → DELETE matches 0 rows → always throw, regardless of affected-row flag.
+        await Assert.ThrowsAsync<DbConcurrencyException>(() => ctx.SaveChangesAsync());
     }
 
     // ── Strict-mode (useAffectedRows=false) end-to-end path ─────────────────
