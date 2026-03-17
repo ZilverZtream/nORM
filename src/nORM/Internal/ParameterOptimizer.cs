@@ -75,6 +75,14 @@ namespace nORM.Internal
             var param = cmd.CreateParameter();
             param.ParameterName = name;
 
+            // P1/X1: DBNull.Value is not reference-equal to null, so `value == null` does not catch it.
+            // Callers use `paramValues[i] ?? DBNull.Value`, which means a null runtime argument arrives
+            // here as DBNull.Value. Without this normalization DBNull falls into the non-null type-dispatch
+            // branch where System.DBNull has no entry in _typeMap, leaving param.DbType at the ADO.NET
+            // provider default (typically DbType.String) rather than DbType.Object — causing type-metadata
+            // contamination and potential provider-specific binding errors for typed-null comparisons.
+            if (value is DBNull) value = null;
+
             if (value == null)
             {
                 param.Value = DBNull.Value;

@@ -291,8 +291,27 @@ namespace nORM.Providers
         public virtual string GetConcatSql(string left, string right) => $"CONCAT({left}, {right})";
 
         /// <summary>
-        /// Returns true when the driver reports affected (changed) rows rather than matched rows.
-        /// Affected-row semantics cause false-positive concurrency exceptions on same-value updates.
+        /// Returns <c>true</c> when the ADO.NET driver reports <em>affected</em> (changed) rows
+        /// rather than <em>matched</em> rows in response to UPDATE/DELETE.
+        ///
+        /// <para>
+        /// <b>Optimistic-concurrency contract for affected-row providers (e.g. MySQL with default
+        /// <c>useAffectedRows=true</c> in the connection string):</b>
+        /// The <c>[Timestamp]</c> / row-version feature relies on the driver returning the number of
+        /// rows that matched the WHERE clause so that a zero result can signal a stale-row conflict.
+        /// Affected-row drivers return 0 even for a successful same-value update (no bytes changed),
+        /// which would produce a false-positive <see cref="DbConcurrencyException"/>. To prevent this,
+        /// nORM skips the rowcount conflict check for such providers. This means that on an
+        /// affected-row provider a stale-row conflict is <b>not detected</b> when a concurrent writer
+        /// updates the token to the same value that the current session is writing.
+        /// </para>
+        ///
+        /// <para>
+        /// For strict optimistic-concurrency guarantees on MySQL, use the connection-string option
+        /// <c>useAffectedRows=false</c>, which switches MySQL Connector/NET to report matched rows.
+        /// When <c>useAffectedRows=false</c>, override this property to return <c>false</c> so that
+        /// nORM can perform the rowcount check normally.
+        /// </para>
         /// </summary>
         internal virtual bool UseAffectedRowsSemantics => false;
 
