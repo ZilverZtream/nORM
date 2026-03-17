@@ -59,6 +59,10 @@ namespace nORM.Core
                           && state == EntityState.Unchanged))
                     {
                         existingEntry.State = state;
+                        // When explicitly marking as Modified (ctx.Update), prevent DetectChanges
+                        // from reverting the state to Unchanged when no scalar properties changed.
+                        if (state == EntityState.Modified)
+                            existingEntry.MarkExplicitlyModified();
                     }
 
                     // If the entity now has a primary key that wasn't tracked, add it

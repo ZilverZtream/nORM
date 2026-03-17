@@ -291,6 +291,18 @@ namespace nORM.Providers
         public virtual string GetConcatSql(string left, string right) => $"CONCAT({left}, {right})";
 
         /// <summary>
+        /// Returns an INSERT statement for a join table row that does nothing (ignores) on duplicate key.
+        /// Providers override this for their native upsert/ignore syntax.
+        /// </summary>
+        /// <param name="escTable">Escaped join table name.</param>
+        /// <param name="escC1">Escaped left FK column name.</param>
+        /// <param name="escC2">Escaped right FK column name.</param>
+        /// <param name="p1">Parameter placeholder for the left FK value.</param>
+        /// <param name="p2">Parameter placeholder for the right FK value.</param>
+        public virtual string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
+            => $"INSERT INTO {escTable} ({escC1}, {escC2}) SELECT {p1}, {p2} WHERE NOT EXISTS (SELECT 1 FROM {escTable} WHERE {escC1} = {p1} AND {escC2} = {p2})";
+
+        /// <summary>
         /// Returns <c>true</c> when the ADO.NET driver reports <em>affected</em> (changed) rows
         /// rather than <em>matched</em> rows in response to UPDATE/DELETE.
         ///

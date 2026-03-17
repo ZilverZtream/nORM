@@ -57,6 +57,18 @@ namespace nORM.Mapping
                     else
                     {
                         var column = new Column(propInfo, provider, config);
+                        // Wire converter if configured
+                        if (config?.Converters != null)
+                        {
+                            foreach (var cc in config.Converters)
+                            {
+                                if (cc.Property == propInfo.Property)
+                                {
+                                    column.Converter = cc.Converter;
+                                    break;
+                                }
+                            }
+                        }
                         columns.Add(column);
                     }
                 }

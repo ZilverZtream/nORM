@@ -11,16 +11,22 @@ namespace nORM.Configuration
     public class ModelBuilder
     {
         private readonly Dictionary<Type, IEntityTypeConfiguration> _configurations = new();
+        private readonly Dictionary<Type, object> _builders = new();
 
         /// <summary>
         /// Begins configuration for the specified entity CLR type.
+        /// Repeated calls for the same type return the same builder so that
+        /// multiple chained configurations are accumulated rather than replaced.
         /// </summary>
         /// <typeparam name="TEntity">The entity type to configure.</typeparam>
         /// <returns>An <see cref="EntityTypeBuilder{TEntity}"/> for configuring the entity.</returns>
         public EntityTypeBuilder<TEntity> Entity<TEntity>() where TEntity : class
         {
+            if (_builders.TryGetValue(typeof(TEntity), out var existing))
+                return (EntityTypeBuilder<TEntity>)existing;
             var builder = new EntityTypeBuilder<TEntity>();
             _configurations[typeof(TEntity)] = builder.Configuration;
+            _builders[typeof(TEntity)] = builder;
             return builder;
         }
 

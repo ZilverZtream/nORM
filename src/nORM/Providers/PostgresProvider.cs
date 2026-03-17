@@ -102,6 +102,10 @@ namespace nORM.Providers
             return keyCol != null ? $" RETURNING {keyCol.EscCol}" : string.Empty;
         }
 
+        /// <summary>PostgreSQL supports ON CONFLICT DO NOTHING for idempotent join-table inserts.</summary>
+        public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
+            => $"INSERT INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2}) ON CONFLICT DO NOTHING";
+
         /// <summary>
         /// Creates a <see cref="DbParameter"/> instance for use with Npgsql commands.
         /// </summary>

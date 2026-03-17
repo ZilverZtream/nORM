@@ -148,6 +148,14 @@ namespace nORM.Query
                         await _includeProcessor.EagerLoadAsync(include, iList, ct, plan.NoTracking).ConfigureAwait(false);
                 }
 
+                // M2M eager loading runs unconditionally (no SplitQuery requirement)
+                if (plan.M2MIncludes != null && plan.M2MIncludes.Count > 0)
+                {
+                    IList iList = list;
+                    foreach (var m2mPlan in plan.M2MIncludes)
+                        await _includeProcessor.LoadManyToManyAsync(m2mPlan, iList, ct, plan.NoTracking).ConfigureAwait(false);
+                }
+
                 return list;
             }
             catch (Exception ex)
@@ -236,10 +244,23 @@ namespace nORM.Query
                     }
                 }
 
+                // M2M eager loading runs unconditionally (no SplitQuery requirement)
+                if (plan.M2MIncludes != null && plan.M2MIncludes.Count > 0)
+                {
+                    foreach (var m2mPlan in plan.M2MIncludes)
+                        await _includeProcessor.LoadManyToManyAsync(m2mPlan, list, ct, plan.NoTracking).ConfigureAwait(false);
+                }
+
                 // Execute dependent queries for nested collections (split query for projections)
                 if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
                 {
                     await ExecuteDependentQueriesAsync(plan.DependentQueries, list, plan.NoTracking, ct).ConfigureAwait(false);
+                }
+
+                // Load owned collections (OwnsMany) for all materialized entities
+                if (entityMap != null && entityMap.OwnedCollections.Count > 0 && list.Count > 0)
+                {
+                    await LoadOwnedCollectionsAsync(list, entityMap, ct).ConfigureAwait(false);
                 }
 
                 return list;
@@ -315,6 +336,13 @@ namespace nORM.Query
                         // Truly synchronous eager load — no GetAwaiter().GetResult().
                         _includeProcessor.EagerLoad(include, list, plan.NoTracking);
                     }
+                }
+
+                // M2M eager loading — truly synchronous, no GetAwaiter().GetResult().
+                if (plan.M2MIncludes != null && plan.M2MIncludes.Count > 0)
+                {
+                    foreach (var m2mPlan in plan.M2MIncludes)
+                        _includeProcessor.LoadManyToMany(m2mPlan, list, plan.NoTracking);
                 }
 
                 // Execute dependent queries for nested collections (split query for projections).
@@ -906,6 +934,12 @@ namespace nORM.Query
             var emptyList = CreateList(depQuery.CollectionElementType, 0);
             depQuery.TargetCollectionProperty.SetValue(parent, emptyList);
         }
+
+        /// <summary>
+        /// Loads owned collection items for all given owner entities. Delegates to DbContext.
+        /// </summary>
+        internal Task LoadOwnedCollectionsAsync(IList owners, TableMapping ownerMap, CancellationToken ct)
+            => _ctx.LoadOwnedCollectionsAsync(owners, ownerMap, ct);
 
     }
 }

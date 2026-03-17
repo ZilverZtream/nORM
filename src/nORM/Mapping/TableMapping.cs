@@ -62,6 +62,18 @@ namespace nORM.Mapping
         /// <summary>Gets mappings for derived types in TPH inheritance scenarios.</summary>
         public readonly Dictionary<object, TableMapping> TphMappings = new();
 
+        /// <summary>Gets a fingerprint hash of all converter configurations for cache differentiation.</summary>
+        public int ConverterFingerprint { get; private set; }
+
+        /// <summary>Gets a fingerprint hash of shadow property columns for cache differentiation.</summary>
+        public int ShadowFingerprint { get; private set; }
+
+        /// <summary>Gets the owned collection mappings for this entity type.</summary>
+        public readonly List<OwnedCollectionMapping> OwnedCollections = new();
+
+        /// <summary>Gets the many-to-many join table mappings for this entity type.</summary>
+        public readonly List<JoinTableMapping> ManyToManyJoins = new();
+
         private readonly IEntityTypeConfiguration? _fluentConfig;
 
         // Cache derived type discovery to avoid an expensive AppDomain.GetAssemblies() scan on every mapping
@@ -161,7 +173,22 @@ namespace nORM.Mapping
             InsertColumns = Columns.Where(c => !c.IsDbGenerated).ToArray();
             UpdateColumns = Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
 
+            // Compute converter fingerprint for materializer cache differentiation
+            int fp = 0;
+            foreach (var col in Columns)
+                if (col.Converter != null) fp = HashCode.Combine(fp, col.Name, col.Converter.GetType());
+            ConverterFingerprint = fp;
+
+            // Compute shadow fingerprint so that different shadow-property configurations for
+            // the same entity type produce distinct materializer cache entries.
+            int sfp = Columns.Length; // include total column count
+            foreach (var col in Columns)
+                if (col.IsShadow) sfp = HashCode.Combine(sfp, col.Name);
+            ShadowFingerprint = sfp;
+
             DiscoverRelations(ctx);
+            BuildOwnedCollections(fluentConfig, p);
+            BuildManyToManyJoins(fluentConfig, p, ctx);
         }
 
         /// <summary>
@@ -246,6 +273,71 @@ namespace nORM.Mapping
             }
         }
 
+        private void BuildOwnedCollections(IEntityTypeConfiguration? fluentConfig, DatabaseProvider p)
+        {
+            if (fluentConfig?.OwnedCollectionNavigations == null) return;
+            foreach (var kvp in fluentConfig.OwnedCollectionNavigations)
+            {
+                var navProp = kvp.Key;
+                var nav = kvp.Value;
+
+                // Determine element type from the collection navigation property
+                // (IEnumerable<TOwned> → TOwned, List<TOwned> → TOwned)
+                var collectionType = navProp.PropertyType;
+                var ownedType = nav.OwnedType;
+
+                // Build columns for the owned type (excluding the FK column itself)
+                var ownedCols = ColumnMappingCache.GetCachedColumns(ownedType, p, nav.Configuration);
+                var keyColumns = ownedCols.Where(c => c.IsKey).ToArray();
+
+                OwnedCollections.Add(new OwnedCollectionMapping(
+                    navProp, ownedType, nav.TableName, nav.ForeignKeyName, ownedCols, keyColumns, p));
+            }
+        }
+
+        private void BuildManyToManyJoins(IEntityTypeConfiguration? fluentConfig, DatabaseProvider p, DbContext ctx)
+        {
+            if (fluentConfig?.ManyToManyRelationships == null || fluentConfig.ManyToManyRelationships.Count == 0)
+                return;
+
+            foreach (var m2m in fluentConfig.ManyToManyRelationships)
+            {
+                // Resolve the left PK column (this entity)
+                if (KeyColumns.Length == 0)
+                    continue;
+                var leftPkCol = KeyColumns[0];
+
+                // Resolve the right entity mapping and PK column
+                var rightMapping = ctx.GetMapping(m2m.RelatedType);
+                if (rightMapping.KeyColumns.Length == 0)
+                    continue;
+                var rightPkCol = rightMapping.KeyColumns[0];
+
+                // Resolve nav properties
+                var leftNavProp = Type.GetProperty(m2m.NavPropertyName)
+                    ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration,
+                        $"Navigation property '{m2m.NavPropertyName}' not found on type '{Type.Name}'"));
+
+                System.Reflection.PropertyInfo? rightNavProp = null;
+                if (m2m.RelatedNavPropertyName != null)
+                    rightNavProp = m2m.RelatedType.GetProperty(m2m.RelatedNavPropertyName);
+
+                ManyToManyJoins.Add(new JoinTableMapping(
+                    m2m.JoinTableName,
+                    m2m.LeftFkColumn,
+                    m2m.RightFkColumn,
+                    Type,
+                    m2m.RelatedType,
+                    m2m.NavPropertyName,
+                    m2m.RelatedNavPropertyName,
+                    leftPkCol,
+                    rightPkCol,
+                    leftNavProp,
+                    rightNavProp,
+                    p));
+            }
+        }
+
         /// <summary>
         /// Represents the mapping of a relationship from the principal entity to a dependent entity type.
         /// </summary>
@@ -255,5 +347,72 @@ namespace nORM.Mapping
         /// <param name="ForeignKey">The foreign key column on the dependent entity referencing the principal key.</param>
         /// <param name="CascadeDelete">Specifies whether deletes on the principal entity cascade to dependents.</param>
         public record Relation(PropertyInfo NavProp, Type DependentType, Column PrincipalKey, Column ForeignKey, bool CascadeDelete = true);
+    }
+
+    /// <summary>
+    /// Describes an owned collection stored in a child table with a foreign key back to the owner.
+    /// </summary>
+    public sealed class OwnedCollectionMapping
+    {
+        /// <summary>The navigation property on the owner entity that holds the collection.</summary>
+        public readonly PropertyInfo NavigationProperty;
+
+        /// <summary>CLR element type of the owned collection items.</summary>
+        public readonly Type OwnedType;
+
+        /// <summary>Escaped name of the child table that stores owned items.</summary>
+        public readonly string EscTable;
+
+        /// <summary>Plain name of the child table.</summary>
+        public readonly string TableName;
+
+        /// <summary>Column name in the child table that holds the FK to the owner's PK.</summary>
+        public readonly string ForeignKeyColumn;
+
+        /// <summary>Escaped FK column.</summary>
+        public readonly string EscForeignKeyColumn;
+
+        /// <summary>All columns of the owned item (excluding the FK column itself).</summary>
+        public readonly Column[] Columns;
+
+        /// <summary>PK columns of the owned item (used for UPDATE/DELETE targeting).</summary>
+        public readonly Column[] KeyColumns;
+
+        /// <summary>Getter that reads the collection from an owner instance.</summary>
+        public readonly Func<object, object?> CollectionGetter;
+
+        /// <summary>Setter that assigns the collection on an owner instance.</summary>
+        public readonly Action<object, object?> CollectionSetter;
+
+        internal OwnedCollectionMapping(
+            PropertyInfo navProp,
+            Type ownedType,
+            string tableName,
+            string foreignKeyColumn,
+            Column[] columns,
+            Column[] keyColumns,
+            DatabaseProvider provider)
+        {
+            NavigationProperty = navProp;
+            OwnedType = ownedType;
+            TableName = tableName;
+            EscTable = provider.Escape(tableName);
+            ForeignKeyColumn = foreignKeyColumn;
+            EscForeignKeyColumn = provider.Escape(foreignKeyColumn);
+            Columns = columns;
+            KeyColumns = keyColumns;
+
+            var entityParam = Expression.Parameter(typeof(object), "e");
+            var cast = Expression.Convert(entityParam, navProp.DeclaringType!);
+            var getProp = Expression.Property(cast, navProp);
+            CollectionGetter = Expression.Lambda<Func<object, object?>>(
+                Expression.Convert(getProp, typeof(object)), entityParam).Compile();
+
+            var valueParam = Expression.Parameter(typeof(object), "v");
+            var castV = Expression.Convert(valueParam, navProp.PropertyType);
+            var setProp = Expression.Call(cast, navProp.GetSetMethod()!, castV);
+            CollectionSetter = Expression.Lambda<Action<object, object?>>(
+                setProp, entityParam, valueParam).Compile();
+        }
     }
 }

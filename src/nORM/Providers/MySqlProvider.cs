@@ -104,6 +104,10 @@ namespace nORM.Providers
         /// </summary>
         public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT LAST_INSERT_ID();";
 
+        /// <summary>MySQL supports INSERT IGNORE for idempotent join-table inserts.</summary>
+        public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
+            => $"INSERT IGNORE INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2})";
+
         /// <summary>
         /// Creates a new <see cref="DbParameter"/> for use with MySQL commands.
         /// </summary>

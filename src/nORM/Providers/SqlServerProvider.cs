@@ -106,6 +106,10 @@ namespace nORM.Providers
         /// <returns>SQL fragment appended after the insert to obtain the identity value.</returns>
         public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT SCOPE_IDENTITY();";
 
+        /// <summary>SQL Server uses MERGE or WHERE NOT EXISTS for idempotent join-table inserts.</summary>
+        public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
+            => $"IF NOT EXISTS (SELECT 1 FROM {escTable} WHERE {escC1} = {p1} AND {escC2} = {p2}) INSERT INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2})";
+
         /// <summary>
         /// Creates a SQL Server specific <see cref="DbParameter"/> instance.
         /// </summary>

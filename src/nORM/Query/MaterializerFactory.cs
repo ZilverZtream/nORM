@@ -395,13 +395,16 @@ namespace nORM.Query
                 targetType,
                 projection != null ? ComputeProjectionHash(projection) : 0L,
                 mapping.TableName,
-                startOffset);
+                startOffset,
+                mapping.ConverterFingerprint,
+                mapping.ShadowFingerprint);
 
             // Get the object-returning materializer from cache
             var objectMaterializer = _syncCache.GetOrAdd(cacheKey, _ =>
             {
                 // For simple entity materialization without projection, prefer fast materializers
-                if (projection == null && startOffset == 0 && _fastMaterializers.TryGetValue(targetType, out var fast))
+                // Skip fast materializer when converters are configured
+                if (projection == null && startOffset == 0 && mapping.ConverterFingerprint == 0 && _fastMaterializers.TryGetValue(targetType, out var fast))
                 {
                     return fast;
                 }
@@ -439,12 +442,15 @@ namespace nORM.Query
                 targetType,
                 projection != null ? ComputeProjectionHash(projection) : 0L,
                 mapping.TableName,
-                startOffset);
+                startOffset,
+                mapping.ConverterFingerprint,
+                mapping.ShadowFingerprint);
 
             return _syncCache.GetOrAdd(cacheKey, _ =>
             {
                 // For simple entity materialization without projection, prefer fast materializers
-                if (projection == null && startOffset == 0 && _fastMaterializers.TryGetValue(targetType, out var fast))
+                // Skip fast materializer when converters are configured
+                if (projection == null && startOffset == 0 && mapping.ConverterFingerprint == 0 && _fastMaterializers.TryGetValue(targetType, out var fast))
                 {
                     return fast;
                 }
@@ -519,7 +525,9 @@ namespace nORM.Query
                 targetType,
                 projection != null ? ComputeProjectionHash(projection) : 0L,
                 mapping.TableName,
-                startOffset);
+                startOffset,
+                mapping.ConverterFingerprint,
+                mapping.ShadowFingerprint);
 
             return _asyncCache.GetOrAdd(cacheKey, _ =>
             {
@@ -565,7 +573,9 @@ namespace nORM.Query
                 targetType,
                 projection != null ? ComputeProjectionHash(projection) : 0L,
                 mapping.TableName,
-                startOffset);
+                startOffset,
+                mapping.ConverterFingerprint,
+                mapping.ShadowFingerprint);
 
             return _asyncCache.GetOrAdd(cacheKey, _ =>
             {
@@ -844,16 +854,22 @@ namespace nORM.Query
             if (IsSimpleType(targetType))
             {
                 var getter = CreateReaderGetter(targetType, 0, startOffset);
-                var defaultFactory = _parameterlessCtorDelegates.GetOrAdd(targetType, t =>
+                // Only build a default factory for value types (used when DB returns NULL for non-nullable value type)
+                // Reference types (e.g., string) use null! directly.
+                Func<object>? defaultFactory = null;
+                if (targetType.IsValueType)
                 {
-                    var body = Expression.Convert(Expression.New(t), typeof(object));
-                    return Expression.Lambda<Func<object>>(body).Compile();
-                });
+                    defaultFactory = _parameterlessCtorDelegates.GetOrAdd(targetType, t =>
+                    {
+                        var body = Expression.Convert(Expression.New(t), typeof(object));
+                        return Expression.Lambda<Func<object>>(body).Compile();
+                    });
+                }
 
                 return reader =>
                 {
                     if (reader.IsDBNull(startOffset))
-                        return targetType.IsValueType ? defaultFactory() : null!;
+                        return targetType.IsValueType ? defaultFactory!() : null!;
                     return getter(reader)!;
                 };
             }
@@ -863,8 +879,9 @@ namespace nORM.Query
                 : ExtractColumnsFromProjection(mapping, projection);
 
             var parameterlessCtor = _parameterlessCtorCache.GetOrAdd(targetType, t => t.GetConstructor(Type.EmptyTypes));
+            bool hasConverters = columns.Any(c => c.Converter != null);
 
-            if (parameterlessCtor != null && columns.All(c => c.Prop.DeclaringType == targetType && c.Prop.GetSetMethod() != null))
+            if (parameterlessCtor != null && !hasConverters && columns.All(c => c.Prop.DeclaringType == targetType && c.Prop.GetSetMethod() != null))
             {
                 return CreateOptimizedMaterializer(columns, targetType, startOffset);
             }
@@ -877,6 +894,40 @@ namespace nORM.Query
                     var body = Expression.Convert(newExpr, typeof(object));
                     return Expression.Lambda<Func<object>>(body).Compile();
                 });
+
+                if (hasConverters)
+                {
+                    // Converter-aware path: use ConvertDbValue + apply converter per column
+                    var colsSnapshot = columns;
+                    return reader =>
+                    {
+                        var entity = parameterlessCtorDelegate();
+                        for (int i = 0; i < colsSnapshot.Length; i++)
+                        {
+                            var col = colsSnapshot[i];
+                            int ordinal;
+                            try { ordinal = reader.GetOrdinal(col.Name); }
+                            catch (Exception) { continue; } // skip unmapped columns (incl. validation reader)
+                            if (reader.IsDBNull(ordinal)) continue;
+                            var rawValue = reader.GetValue(ordinal);
+                            try
+                            {
+                                object? value;
+                                if (col.Converter != null)
+                                    value = col.Converter.ConvertFromProvider(rawValue);
+                                else
+                                    value = ConvertDbValue(rawValue, col.Prop.PropertyType);
+                                col.Setter(entity, value);
+                            }
+                            catch (Exception)
+                            {
+                                // skip columns that cannot be converted (e.g., no converter configured
+                                // but DB type doesn't match property type)
+                            }
+                        }
+                        return entity!;
+                    };
+                }
 
                 var properties = _propertiesCache.GetOrAdd(targetType, t => t.GetProperties(BindingFlags.Instance | BindingFlags.Public));
                 var canOptimize = columns.Length <= properties.Length;
@@ -904,16 +955,32 @@ namespace nORM.Query
                     };
                 }
 
-                var getters = columns.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, i, startOffset)).ToArray();
+                var fallbackCols = columns;
+                var getters = fallbackCols.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, i, startOffset)).ToArray();
                 return reader =>
                 {
                     var entity = parameterlessCtorDelegate();
-                    for (int i = 0; i < columns.Length; i++)
+                    for (int i = 0; i < fallbackCols.Length; i++)
                     {
-                        if (reader.IsDBNull(i + startOffset)) continue;
-                        var col = columns[i];
-                        var value = getters[i](reader);
-                        col.Setter(entity, value);
+                        var col = fallbackCols[i];
+                        if (col.IsShadow)
+                        {
+                            // Shadow columns use name-based lookup to handle the case where the
+                            // column doesn't exist in the result set (e.g., SELECT * without the column).
+                            int ord;
+                            try { ord = reader.GetOrdinal(col.Name); }
+                            catch (Exception) { continue; }
+                            if (reader.IsDBNull(ord)) continue;
+                            var rawVal = reader.GetValue(ord);
+                            try { col.Setter(entity, ConvertDbValue(rawVal, col.Prop.PropertyType)); }
+                            catch (Exception) { }
+                        }
+                        else
+                        {
+                            if (reader.IsDBNull(i + startOffset)) continue;
+                            var value = getters[i](reader);
+                            col.Setter(entity, value);
+                        }
                     }
                     return entity!;
                 };
@@ -1708,14 +1775,18 @@ namespace nORM.Query
             public readonly long ProjectionHash;  // was int — now 64-bit to reduce collision risk
             public readonly string TableName;
             public readonly int StartOffset;
+            public readonly int ConverterFingerprint;
+            public readonly int ShadowFingerprint;
 
-            public MaterializerCacheKey(Type mappingType, Type targetType, long projectionHash, string tableName, int startOffset)
+            public MaterializerCacheKey(Type mappingType, Type targetType, long projectionHash, string tableName, int startOffset, int converterFingerprint = 0, int shadowFingerprint = 0)
             {
                 MappingType = mappingType;
                 TargetType = targetType;
                 ProjectionHash = projectionHash;
                 TableName = tableName ?? string.Empty;
                 StartOffset = startOffset;
+                ConverterFingerprint = converterFingerprint;
+                ShadowFingerprint = shadowFingerprint;
             }
 
             /// <summary>
@@ -1729,6 +1800,8 @@ namespace nORM.Query
                 TargetType == other.TargetType &&
                 ProjectionHash == other.ProjectionHash &&
                 StartOffset == other.StartOffset &&
+                ConverterFingerprint == other.ConverterFingerprint &&
+                ShadowFingerprint == other.ShadowFingerprint &&
                 string.Equals(TableName, other.TableName, StringComparison.Ordinal);
 
             /// <summary>
@@ -1742,7 +1815,7 @@ namespace nORM.Query
             /// Generates a hash code for the current key instance.
             /// </summary>
             /// <returns>A hash code that can be used in hashing algorithms and data structures.</returns>
-            public override int GetHashCode() => HashCode.Combine(MappingType, TargetType, ProjectionHash, TableName, StartOffset);
+            public override int GetHashCode() => HashCode.Combine(MappingType, TargetType, ProjectionHash, TableName, StartOffset, ConverterFingerprint, ShadowFingerprint);
         }
 
         private readonly struct SchemaCacheKey : IEquatable<SchemaCacheKey>

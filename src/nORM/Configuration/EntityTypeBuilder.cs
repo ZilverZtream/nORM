@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
 using nORM.Core;
+using nORM.Mapping;
 
 #nullable enable
 
@@ -24,6 +25,14 @@ namespace nORM.Configuration
             public Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; } = new();
             public Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; } = new();
             public List<RelationshipConfiguration> Relationships { get; } = new();
+            public List<ConverterConfiguration> ConverterList { get; } = new();
+            IReadOnlyList<ConverterConfiguration> IEntityTypeConfiguration.Converters => ConverterList;
+
+            public Dictionary<PropertyInfo, OwnedCollectionNavigation> OwnedCollectionNavigations { get; } = new();
+            Dictionary<PropertyInfo, OwnedCollectionNavigation> IEntityTypeConfiguration.OwnedCollectionNavigations => OwnedCollectionNavigations;
+
+            public List<ManyToManyConfiguration> ManyToManyList { get; } = new();
+            IReadOnlyList<ManyToManyConfiguration> IEntityTypeConfiguration.ManyToManyRelationships => ManyToManyList;
 
             /// <summary>
             /// Sets the database table name that <typeparamref name="TEntity"/> maps to.
@@ -84,6 +93,22 @@ namespace nORM.Configuration
             /// </summary>
             /// <param name="relationship">The relationship configuration to register.</param>
             public void AddRelationship(RelationshipConfiguration relationship) => Relationships.Add(relationship);
+
+            /// <summary>
+            /// Registers a value converter for the specified property.
+            /// </summary>
+            public void AddConverter(PropertyInfo prop, IValueConverter converter) => ConverterList.Add(new ConverterConfiguration(prop, converter));
+
+            /// <summary>
+            /// Registers an owned collection navigation property stored in a separate child table.
+            /// </summary>
+            public void AddOwnedCollection(PropertyInfo prop, OwnedCollectionNavigation nav)
+                => OwnedCollectionNavigations[prop] = nav;
+
+            /// <summary>
+            /// Registers a many-to-many relationship configuration.
+            /// </summary>
+            public void AddManyToMany(ManyToManyConfiguration config) => ManyToManyList.Add(config);
         }
 
         private readonly MappingConfiguration _config = new();
@@ -146,6 +171,18 @@ namespace nORM.Configuration
         }
 
         /// <summary>
+        /// Begins typed configuration for the specified property.
+        /// </summary>
+        /// <typeparam name="TProperty">The CLR type of the property.</typeparam>
+        /// <param name="propertyExpression">Expression selecting the property to configure.</param>
+        /// <returns>A <see cref="PropertyBuilder{TProperty}"/> for further configuration including value converters.</returns>
+        public PropertyBuilder<TProperty> Property<TProperty>(Expression<Func<TEntity, TProperty>> propertyExpression)
+        {
+            var prop = GetProperty(propertyExpression);
+            return new PropertyBuilder<TProperty>(this, prop);
+        }
+
+        /// <summary>
         /// Creates a shadow property on the entity type configuration.
         /// </summary>
         /// <typeparam name="TProperty">CLR type of the shadow property.</typeparam>
@@ -171,6 +208,30 @@ namespace nORM.Configuration
             var builder = new EntityTypeBuilder<TOwned>();
             buildAction?.Invoke(builder);
             _config.AddOwned(prop, builder.Configuration);
+            return this;
+        }
+
+        /// <summary>
+        /// Configures a collection navigation property as an owned collection stored in a separate child table.
+        /// </summary>
+        /// <typeparam name="TOwned">CLR element type of the owned collection.</typeparam>
+        /// <param name="navigation">Expression selecting the collection navigation property.</param>
+        /// <param name="tableName">Name of the child table. Defaults to the owned type name.</param>
+        /// <param name="foreignKey">FK column name referencing owner's PK. Defaults to owner type name + "Id".</param>
+        /// <param name="buildAction">Optional configuration for the owned element type.</param>
+        /// <returns>The same builder instance for chaining.</returns>
+        public EntityTypeBuilder<TEntity> OwnsMany<TOwned>(
+            Expression<Func<TEntity, IEnumerable<TOwned>>> navigation,
+            string? tableName = null,
+            string? foreignKey = null,
+            Action<EntityTypeBuilder<TOwned>>? buildAction = null) where TOwned : class
+        {
+            var prop = GetProperty(navigation);
+            var ownedBuilder = new EntityTypeBuilder<TOwned>();
+            buildAction?.Invoke(ownedBuilder);
+            var childTable = tableName ?? typeof(TOwned).Name;
+            var fkCol = foreignKey ?? typeof(TEntity).Name + "Id";
+            _config.AddOwnedCollection(prop, new OwnedCollectionNavigation(typeof(TOwned), childTable, fkCol, ownedBuilder.Configuration));
             return this;
         }
 
@@ -202,8 +263,8 @@ namespace nORM.Configuration
         /// </summary>
         public class PropertyBuilder
         {
-            private readonly EntityTypeBuilder<TEntity> _parent;
-            private readonly PropertyInfo _property;
+            protected readonly EntityTypeBuilder<TEntity> _parent;
+            protected readonly PropertyInfo _property;
 
             internal PropertyBuilder(EntityTypeBuilder<TEntity> parent, PropertyInfo property)
             {
@@ -221,6 +282,36 @@ namespace nORM.Configuration
                 _parent._config.SetColumnName(_property, name);
                 return _parent;
             }
+
+            /// <summary>
+            /// Configures a value converter for this property using the untyped interface.
+            /// </summary>
+            /// <param name="converter">The value converter to apply.</param>
+            /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+            public EntityTypeBuilder<TEntity> HasConversion(IValueConverter converter)
+            {
+                _parent._config.AddConverter(_property, converter);
+                return _parent;
+            }
+        }
+
+        /// <summary>
+        /// Strongly-typed property builder that enables type-safe value converter configuration.
+        /// </summary>
+        /// <typeparam name="TProperty">The CLR type of the property being configured.</typeparam>
+        public class PropertyBuilder<TProperty> : PropertyBuilder
+        {
+            internal PropertyBuilder(EntityTypeBuilder<TEntity> parent, PropertyInfo property)
+                : base(parent, property) { }
+
+            /// <summary>
+            /// Configures a strongly-typed value converter for this property.
+            /// </summary>
+            /// <typeparam name="TProvider">The provider/database storage type.</typeparam>
+            /// <param name="converter">The strongly-typed value converter.</param>
+            /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+            public EntityTypeBuilder<TEntity> HasConversion<TProvider>(ValueConverter<TProperty, TProvider> converter)
+                => HasConversion((IValueConverter)converter);
         }
 
         /// <summary>
@@ -276,6 +367,55 @@ namespace nORM.Configuration
                 if (navigation != null)
                     dependentNav = _parent.GetProperty(navigation);
                 return new ReferenceCollectionBuilder(_parent, PrincipalNavigation, dependentNav);
+            }
+
+            /// <summary>
+            /// Begins configuration of a many-to-many relationship with an optional inverse navigation.
+            /// </summary>
+            /// <param name="inverseNavigation">Expression selecting the inverse collection property on <typeparamref name="TDependent"/>, if any.</param>
+            /// <returns>A builder for specifying the join table details.</returns>
+            public ManyToManyBuilder WithMany(Expression<Func<TDependent, IEnumerable<TEntity>>>? inverseNavigation = null)
+            {
+                string? inverseNavName = null;
+                if (inverseNavigation != null)
+                    inverseNavName = _parent.GetProperty(inverseNavigation).Name;
+                return new ManyToManyBuilder(_parent, PrincipalNavigation, inverseNavName);
+            }
+
+            /// <summary>
+            /// Supports fluent specification of join table details for a many-to-many relationship.
+            /// </summary>
+            public class ManyToManyBuilder
+            {
+                private readonly EntityTypeBuilder<TEntity> _parent;
+                private readonly PropertyInfo _principalNavigation;
+                private readonly string? _inverseNavName;
+
+                internal ManyToManyBuilder(EntityTypeBuilder<TEntity> parent, PropertyInfo principalNavigation, string? inverseNavName)
+                {
+                    _parent = parent;
+                    _principalNavigation = principalNavigation;
+                    _inverseNavName = inverseNavName;
+                }
+
+                /// <summary>
+                /// Specifies the join table, left FK column (this entity's PK) and right FK column (related entity's PK).
+                /// </summary>
+                /// <param name="joinTable">Name of the join table.</param>
+                /// <param name="leftFk">Column referencing this entity's PK.</param>
+                /// <param name="rightFk">Column referencing the related entity's PK.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+                public EntityTypeBuilder<TEntity> UsingTable(string joinTable, string leftFk, string rightFk)
+                {
+                    _parent._config.AddManyToMany(new ManyToManyConfiguration(
+                        _principalNavigation.Name,
+                        typeof(TDependent),
+                        joinTable,
+                        leftFk,
+                        rightFk,
+                        _inverseNavName));
+                    return _parent;
+                }
             }
 
             /// <summary>
