@@ -497,13 +497,21 @@ namespace nORM.Query
                         throw new NormQueryException("JSON path cannot be null or whitespace.");
                     }
 
-                    // Basic validation: ensure path doesn't contain suspicious SQL characters
-                    // JSON paths should only contain alphanumeric, dots, brackets, underscores, and dollar signs
-                    if (jsonPath.IndexOfAny(new[] { '\'', '"', ';', '-', '/', '*', '\\' }) >= 0)
+                    // Q1 fix: validate JSON path for SQL-injection-capable chars only.
+                    // Chars that can break out of the enclosing SQL string literal:
+                    //   ' → closes string literal
+                    //   " → identifier-quote escape
+                    //   ; → statement terminator
+                    //   \ → SQL/escape sequence in some dialects
+                    // Chars that are VALID in JSON property names and must be allowed:
+                    //   - (hyphen) → e.g. $.order-items[0].id (RFC 7159 §7 allows in key names)
+                    //   * (wildcard) → e.g. $.* for JSONPath wildcard selection
+                    //   / (path separator) → e.g. JSON Pointer RFC 6901 paths
+                    if (jsonPath.IndexOfAny(new[] { '\'', '"', ';', '\\' }) >= 0)
                     {
                         throw new NormQueryException(
                             $"JSON path '{jsonPath}' contains invalid characters. " +
-                            "JSON paths should only contain alphanumeric characters, dots, brackets, underscores, and dollar signs.");
+                            "JSON paths must not contain single-quote, double-quote, semicolon, or backslash.");
                     }
 
                     // Limit path length to prevent potential DoS

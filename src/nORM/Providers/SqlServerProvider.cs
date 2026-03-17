@@ -101,25 +101,61 @@ namespace nORM.Providers
         
         /// <summary>
         /// Returns <c>true</c> if the SQL string contains an <c>ORDER BY</c> clause at the
-        /// top-level scope (depth-0 parentheses). A plain Contains scan
-        /// would false-positive on <c>ORDER BY</c> inside subqueries or string literals;
-        /// this method walks the string tracking open/close parentheses so only depth-0
-        /// occurrences count.  String literals are not parsed (a quoted ORDER BY would be
-        /// extremely rare in practice and is acceptable as a minor conservatism).
+        /// top-level scope (depth-0 parentheses). Uses a mini-lexer that skips single-quoted
+        /// string literals (including '' escape sequences) and double-quoted identifiers so that
+        /// an ORDER BY appearing inside a literal — e.g. WHERE name = 'sort ORDER BY price' —
+        /// is not mistaken for a real ORDER BY clause.
         /// </summary>
         private static bool HasTopLevelOrderBy(string sql)
         {
             int depth = 0;
             int i = 0;
-            while (i < sql.Length)
+            int len = sql.Length;
+            while (i < len)
             {
                 var ch = sql[i];
+
+                // Skip single-quoted string literals ('...', '' escape)
+                if (ch == '\'')
+                {
+                    i++;
+                    while (i < len)
+                    {
+                        if (sql[i] == '\'') { i++; if (i < len && sql[i] == '\'') i++; else break; }
+                        else i++;
+                    }
+                    continue;
+                }
+
+                // Skip double-quoted identifiers ("...", "" escape)
+                if (ch == '"')
+                {
+                    i++;
+                    while (i < len)
+                    {
+                        if (sql[i] == '"') { i++; if (i < len && sql[i] == '"') i++; else break; }
+                        else i++;
+                    }
+                    continue;
+                }
+
+                // Skip bracket-quoted identifiers ([...]) — SQL Server specific
+                if (ch == '[')
+                {
+                    i++;
+                    while (i < len && sql[i] != ']') i++;
+                    if (i < len) i++; // consume ']'
+                    continue;
+                }
+
                 if (ch == '(') { depth++; i++; continue; }
                 if (ch == ')') { depth--; i++; continue; }
-                if (depth == 0 && i + 8 <= sql.Length &&
+
+                if (depth == 0 && i + 8 <= len &&
                     (sql[i] == 'O' || sql[i] == 'o') &&
                     string.Compare(sql, i, "ORDER BY", 0, 8, StringComparison.OrdinalIgnoreCase) == 0)
                     return true;
+
                 i++;
             }
             return false;
