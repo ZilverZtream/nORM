@@ -24,6 +24,8 @@ namespace nORM.Migration
         private readonly Assembly _migrationsAssembly;
         private DbContext? _context;
         private const string HistoryTableName = "__NormMigrationsHistory";
+        internal const string MigrationLockName = "__NormMigrationsLock";
+        internal const int MigrationLockTimeoutSeconds = 30;
         private bool _disposed = false;
 
         /// <summary>
@@ -46,6 +48,8 @@ namespace nORM.Migration
 
         /// <summary>
         /// Applies all pending migrations to the MySQL database.
+        /// Acquires an exclusive named advisory lock (<c>GET_LOCK</c>) before reading the pending list,
+        /// preventing concurrent deployers from running the same DDL simultaneously.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
@@ -54,39 +58,75 @@ namespace nORM.Migration
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
 
-            await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
-            var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-            if (!pending.Any()) return;
-
-            // MySQL DDL (ALTER TABLE, CREATE TABLE, DROP TABLE, etc.) implicitly auto-commits,
-            // so a single wrapping transaction cannot roll back schema changes on failure. If migration
-            // N+1 fails, the wrapping rollback reverts only the history INSERT for migration N (not the
-            // DDL itself), leaving the schema advanced but history behind — causing replay on next run.
-            //
-            // Each migration runs in its own per-step transaction. The history INSERT is committed
-            // atomically with the step's end-of-step marker. If a later migration fails:
-            //   - Earlier migrations: DDL committed + history recorded (safe to skip on rerun)
-            //   - Failed migration:   DDL may have partially committed; history NOT recorded (rerun applies it)
-            // This matches MySQL's actual DDL semantics: best-effort atomicity per migration step.
-            foreach (var migration in pending)
+            await AcquireAdvisoryLockAsync(ct).ConfigureAwait(false);
+            try
             {
-                await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-                try
+                await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
+                var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
+                if (!pending.Any()) return;
+
+                // MySQL DDL (ALTER TABLE, CREATE TABLE, DROP TABLE, etc.) implicitly auto-commits,
+                // so a single wrapping transaction cannot roll back schema changes on failure. If migration
+                // N+1 fails, the wrapping rollback reverts only the history INSERT for migration N (not the
+                // DDL itself), leaving the schema advanced but history behind — causing replay on next run.
+                //
+                // Each migration runs in its own per-step transaction. The history INSERT is committed
+                // atomically with the step's end-of-step marker. If a later migration fails:
+                //   - Earlier migrations: DDL committed + history recorded (safe to skip on rerun)
+                //   - Failed migration:   DDL may have partially committed; history NOT recorded (rerun applies it)
+                // This matches MySQL's actual DDL semantics: best-effort atomicity per migration step.
+                foreach (var migration in pending)
                 {
-                    migration.Up(_connection, (DbTransaction)transaction, ct);
-                    await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
-                    // CancellationToken.None — commit must not be aborted mid-flight.
-                    await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
-                }
-                catch
-                {
-                    // Attempt rollback; DDL may have already auto-committed (no-op for those statements).
-                    // Suppress rollback exceptions so the original failure is the one that propagates.
-                    try { await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); }
-                    catch { /* DDL auto-commit makes rollback a no-op; suppress to surface root cause */ }
-                    throw;
+                    await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                    try
+                    {
+                        migration.Up(_connection, (DbTransaction)transaction, ct);
+                        await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
+                        // CancellationToken.None — commit must not be aborted mid-flight.
+                        await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // Attempt rollback; DDL may have already auto-committed (no-op for those statements).
+                        // Suppress rollback exceptions so the original failure is the one that propagates.
+                        try { await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); }
+                        catch { /* DDL auto-commit makes rollback a no-op; suppress to surface root cause */ }
+                        throw;
+                    }
                 }
             }
+            finally
+            {
+                await ReleaseAdvisoryLockAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Acquires a MySQL named advisory lock using <c>GET_LOCK(name, timeout)</c>.
+        /// Returns 1 if acquired, 0 if timeout, NULL on error. Throws
+        /// <see cref="InvalidOperationException"/> on timeout or error so the caller is
+        /// not silently blocked.
+        /// </summary>
+        protected internal virtual async Task AcquireAdvisoryLockAsync(CancellationToken ct)
+        {
+            await using var cmd = _connection.CreateCommand();
+            cmd.CommandText = $"SELECT GET_LOCK('{MigrationLockName}', {MigrationLockTimeoutSeconds})";
+            var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            if (result == null || result == DBNull.Value || Convert.ToInt32(result) != 1)
+                throw new InvalidOperationException(
+                    $"nORM: Failed to acquire migration advisory lock (GET_LOCK returned {result}). " +
+                    "Another process may already be deploying migrations.");
+        }
+
+        /// <summary>
+        /// Releases the MySQL named advisory lock acquired by <see cref="AcquireAdvisoryLockAsync"/>.
+        /// </summary>
+        protected internal virtual async Task ReleaseAdvisoryLockAsync(CancellationToken ct)
+        {
+            await using var cmd = _connection.CreateCommand();
+            cmd.CommandText = $"DO RELEASE_LOCK('{MigrationLockName}')";
+            try { await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false); }
+            catch { /* Best-effort release; connection may already be closing. */ }
         }
 
         /// <summary>

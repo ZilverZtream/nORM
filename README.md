@@ -255,9 +255,52 @@ await runner.ApplyMigrationsAsync();
 
 ### Migration Notes
 
-**Property renames cause data loss.** nORM detects migration name drift (a class renamed after being applied) and throws at startup, but it cannot detect when you rename a C# property. Renaming `Order.TotalCost` to `Order.TotalAmount` generates a diff that drops `TotalCost` and adds `TotalAmount`, losing all existing data. Always create a manual migration that renames the column using the provider's DDL.
+> **DATA LOSS WARNING — Column renames.** nORM cannot detect when you rename a C# property. Renaming
+> `Order.TotalCost` to `Order.TotalAmount` generates a migration diff that **drops `TotalCost` and adds
+> `TotalAmount`**, destroying all column data silently. Always create a manual migration instead:
+>
+> ```csharp
+> // WRONG — renames the C# property directly → DROP + ADD → DATA LOSS
+> // public decimal TotalAmount { get; set; }   // was TotalCost
+>
+> // CORRECT — write a manual migration that renames the column
+> public class RenameTotalCostToTotalAmount : Migration
+> {
+>     public RenameTotalCostToTotalAmount() : base(20240201001, "RenameTotalCostToTotalAmount") { }
+>
+>     public override void Up(DbConnection connection, DbTransaction transaction)
+>     {
+>         using var cmd = connection.CreateCommand();
+>         cmd.Transaction = transaction;
+>         // SQL Server:
+>         cmd.CommandText = "EXEC sp_rename 'Orders.TotalCost', 'TotalAmount', 'COLUMN'";
+>         // PostgreSQL / SQLite 3.25+:
+>         // cmd.CommandText = "ALTER TABLE Orders RENAME COLUMN TotalCost TO TotalAmount";
+>         // MySQL:
+>         // cmd.CommandText = "ALTER TABLE Orders RENAME COLUMN TotalCost TO TotalAmount";
+>         cmd.ExecuteNonQuery();
+>     }
+> }
+> ```
+>
+> nORM *does* detect **migration class name drift** (renaming the C# migration class after it has already been
+> applied) and throws at startup. Only property-to-column renames are undetected.
 
-**Concurrent deployments (SQL Server / MySQL / Postgres).** If multiple application instances start simultaneously and both detect pending migrations, both will attempt to apply them. The history table's PRIMARY KEY prevents a migration from being recorded twice — the second INSERT fails with a constraint violation. To serialize migrations across instances, acquire an advisory lock before calling `ApplyMigrationsAsync`: `sp_getapplock` (SQL Server), `GET_LOCK` (MySQL), or `pg_advisory_lock` (Postgres). The SQLite runner already uses an exclusive transaction for this purpose.
+**Concurrent deployments (SQL Server / MySQL / Postgres).** The runners acquire a database-level advisory
+lock before reading the pending list, serializing concurrent deployments automatically:
+
+| Provider | Mechanism |
+|---|---|
+| SQLite | `BEGIN EXCLUSIVE` transaction |
+| SQL Server | `sp_getapplock` (Session scope, 30 s timeout) |
+| MySQL | `GET_LOCK('__NormMigrationsLock', 30)` |
+| PostgreSQL | `pg_advisory_lock(key)` (session level, blocks until available) |
+
+No application-level coordination is required. On SQL Server, DDL is transactional — if the second process
+somehow races past the lock, the PK constraint on the history table prevents double-recording and the whole
+transaction rolls back cleanly. On MySQL, DDL auto-commits per step; the advisory lock prevents the race
+entirely. If you need a bounded wait on PostgreSQL (which blocks indefinitely), wrap `ApplyMigrationsAsync`
+in a `CancellationTokenSource` with a timeout.
 
 ## Production-Ready Features
 
