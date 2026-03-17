@@ -7,6 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
+  # ── Core test matrix: SQLite-only (always runs, no external infra required) ─
   test:
     name: Build and Test (${{ matrix.os }})
     strategy:
@@ -42,5 +43,170 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.os }}
+          path: "**/*.trx"
+          retention-days: 7
+
+  # ── P1 gate: live MySQL provider parity (ubuntu only, service container) ────
+  # Gate 4.5 requirement: mandatory live provider matrix, no optional skip path
+  # for core parity scenarios. The NORM_TEST_MYSQL env var activates live tests;
+  # this job always sets it so the parity tests are never skipped in CI.
+  test-mysql:
+    name: Live MySQL Provider Parity
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: normtest
+          MYSQL_DATABASE: normtest
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore tests/
+
+      - name: Build
+        run: dotnet build tests/ --no-restore --nologo -v quiet
+
+      - name: Wait for MySQL
+        run: |
+          for i in $(seq 1 30); do
+            mysqladmin ping -h 127.0.0.1 -u root -pnormtest --silent && break
+            echo "Waiting for MySQL... ($i/30)"
+            sleep 2
+          done
+
+      - name: Test (live MySQL parity)
+        env:
+          NORM_TEST_MYSQL: "Server=127.0.0.1;Port=3306;Database=normtest;User=root;Password=normtest;AllowPublicKeyRetrieval=True"
+        run: >
+          dotnet test tests/ --no-build --nologo
+          --filter "FullyQualifiedName~LiveProvider|FullyQualifiedName~MySql|FullyQualifiedName~OccConflictMatrix"
+          --logger "trx;LogFileName=test-results-mysql.trx"
+          --logger "console;verbosity=normal"
+
+      - name: Upload MySQL test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-mysql
+          path: "**/*.trx"
+          retention-days: 7
+
+  # ── P1 gate: live PostgreSQL provider parity ─────────────────────────────────
+  test-postgres:
+    name: Live PostgreSQL Provider Parity
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: normtest
+          POSTGRES_DB: normtest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore tests/
+
+      - name: Build
+        run: dotnet build tests/ --no-restore --nologo -v quiet
+
+      - name: Test (live Postgres parity)
+        env:
+          NORM_TEST_POSTGRES: "Host=127.0.0.1;Port=5432;Database=normtest;Username=postgres;Password=normtest"
+        run: >
+          dotnet test tests/ --no-build --nologo
+          --filter "FullyQualifiedName~LiveProvider|FullyQualifiedName~Postgres|FullyQualifiedName~ProviderParity"
+          --logger "trx;LogFileName=test-results-postgres.trx"
+          --logger "console;verbosity=normal"
+
+      - name: Upload Postgres test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-postgres
+          path: "**/*.trx"
+          retention-days: 7
+
+  # ── P1 gate: live SQL Server provider parity ──────────────────────────────────
+  test-sqlserver:
+    name: Live SQL Server Provider Parity
+    runs-on: ubuntu-latest
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          SA_PASSWORD: "NormTest!2024"
+          MSSQL_PID: "Developer"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd="/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'NormTest!2024' -Q 'SELECT 1' -No"
+          --health-interval=15s
+          --health-timeout=10s
+          --health-retries=8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore tests/
+
+      - name: Build
+        run: dotnet build tests/ --no-restore --nologo -v quiet
+
+      - name: Test (live SQL Server parity)
+        env:
+          NORM_TEST_SQLSERVER: "Server=127.0.0.1,1433;Database=normtest;User Id=sa;Password=NormTest!2024;TrustServerCertificate=True"
+        run: >
+          dotnet test tests/ --no-build --nologo
+          --filter "FullyQualifiedName~LiveProvider|FullyQualifiedName~SqlServer|FullyQualifiedName~ProviderParity"
+          --logger "trx;LogFileName=test-results-sqlserver.trx"
+          --logger "console;verbosity=normal"
+
+      - name: Upload SQL Server test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-sqlserver
           path: "**/*.trx"
           retention-days: 7

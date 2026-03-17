@@ -246,6 +246,20 @@ namespace nORM.Configuration
         public AmbientTransactionEnlistmentPolicy AmbientTransactionPolicy { get; set; }
             = AmbientTransactionEnlistmentPolicy.FailFast;
 
+        /// <summary>
+        /// S1 enforcement: when <c>true</c>, <see cref="DbContext"/> will throw
+        /// <see cref="NormConfigurationException"/> if the provider uses affected-row semantics
+        /// (e.g. MySQL with <c>useAffectedRows=true</c>, the default) and an entity with an
+        /// optimistic-concurrency token (<c>[Timestamp]</c>) is saved. Affected-row semantics
+        /// cannot reliably detect conflicts where the concurrent writer sets the token to the
+        /// same value; matched-row semantics (set <c>useAffectedRows=false</c> in the MySQL
+        /// connection string and override the provider) are required for full OCC guarantees.
+        ///
+        /// <para>Default: <c>false</c> — existing behaviour is preserved; a warning is logged
+        /// instead of throwing.</para>
+        /// </summary>
+        public bool RequireMatchedRowOccSemantics { get; set; } = false;
+
         // C1: backing store is ConcurrentDictionary so outer dict ops are thread-safe.
         // Inner lists are replaced atomically (copy-on-write) in AddGlobalFilter so
         // readers in the query translation path always see a stable snapshot.
