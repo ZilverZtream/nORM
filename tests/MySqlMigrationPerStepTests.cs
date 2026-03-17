@@ -36,6 +36,25 @@ namespace nORM.Tests;
 /// </summary>
 public class MySqlMigrationPerStepTests
 {
+    // ── No-advisory-lock test runner ─────────────────────────────────────────
+
+    /// <summary>
+    /// Subclass of <see cref="MySqlMigrationRunner"/> that bypasses the advisory lock
+    /// (<c>GET_LOCK</c> / <c>RELEASE_LOCK</c>) so the per-step transaction tests can run
+    /// against a SQLite-backed connection without requiring a real MySQL server.
+    /// </summary>
+    private sealed class NoLockMySqlRunner : MySqlMigrationRunner
+    {
+        public NoLockMySqlRunner(System.Data.Common.DbConnection cn, Assembly asm)
+            : base(cn, asm) { }
+
+        protected internal override Task AcquireAdvisoryLockAsync(CancellationToken ct)
+            => Task.CompletedTask;
+
+        protected internal override Task ReleaseAdvisoryLockAsync(CancellationToken ct)
+            => Task.CompletedTask;
+    }
+
     // ── Counting transaction wrapper ─────────────────────────────────────────
 
     /// <summary>
@@ -194,7 +213,7 @@ public class MySqlMigrationPerStepTests
             (1000L, "DynStep1", false),
             (1001L, "DynStep2", false));
 
-        var runner = new MySqlMigrationRunner(counting, testAsm);
+        var runner = new NoLockMySqlRunner(counting, testAsm);
 
         await runner.ApplyMigrationsAsync();
 
@@ -233,7 +252,7 @@ public class MySqlMigrationPerStepTests
             (1001L, "DynStep2", false),
             (1002L, "DynFailing", true));
 
-        var runner = new MySqlMigrationRunner(cn, testAsm);
+        var runner = new NoLockMySqlRunner(cn, testAsm);
 
         // Third migration throws — runner must propagate the exception.
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -278,12 +297,12 @@ public class MySqlMigrationPerStepTests
             (1001L, "DynStep2", false));
 
         // First run: apply both migrations.
-        var runner1 = new MySqlMigrationRunner(counting, testAsm);
+        var runner1 = new NoLockMySqlRunner(counting, testAsm);
         await runner1.ApplyMigrationsAsync();
         var firstRunCommits = counting.CommitLog.Count;
 
         // Second run: all migrations already recorded → must be a no-op.
-        var runner2 = new MySqlMigrationRunner(counting, testAsm);
+        var runner2 = new NoLockMySqlRunner(counting, testAsm);
         await runner2.ApplyMigrationsAsync();
 
         // No new commits since the first run ended.
@@ -324,7 +343,7 @@ public class MySqlMigrationPerStepTests
             (1002L, "DynFailing", true));
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => new MySqlMigrationRunner(cn, failingAsm).ApplyMigrationsAsync());
+            () => new NoLockMySqlRunner(cn, failingAsm).ApplyMigrationsAsync());
 
         // Run 2: same 3 migration versions, but step 3 now succeeds.
         await using var counting = new CountingConnection(cn);
@@ -333,7 +352,7 @@ public class MySqlMigrationPerStepTests
             (1001L, "DynStep2", false),
             (1002L, "DynStep3Fixed", false));
 
-        var runner2 = new MySqlMigrationRunner(counting, fixedAsm);
+        var runner2 = new NoLockMySqlRunner(counting, fixedAsm);
         await runner2.ApplyMigrationsAsync();
 
         // P-1 replay safety: only 1 commit on the second run (step 3 only, not steps 1+2).
@@ -382,7 +401,7 @@ public class MySqlMigrationPerStepTests
             (1001L, "DynStep2", false),
             (1002L, "DynStep3", false));
 
-        var runner = new MySqlMigrationRunner(counting, testAsm);
+        var runner = new NoLockMySqlRunner(counting, testAsm);
         await runner.ApplyMigrationsAsync();
 
         // P-1 crash-safe: only step 3 was pending → exactly 1 commit on this run.

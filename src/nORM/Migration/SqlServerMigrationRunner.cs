@@ -28,6 +28,8 @@ namespace nORM.Migration
         private DbContext? _context;
         private readonly ILogger? _logger;
         internal const string HistoryTableName = "__NormMigrationsHistory";
+        internal const string MigrationLockResource = "__NormMigrationsLock";
+        internal const int MigrationLockTimeoutMs = 30_000;
         private bool _disposed = false;
 
         /// <summary>
@@ -52,6 +54,8 @@ namespace nORM.Migration
 
         /// <summary>
         /// Applies all pending migrations to the SQL Server database.
+        /// Acquires an exclusive session-scoped advisory lock (<c>sp_getapplock</c>) before reading
+        /// the pending list, preventing concurrent deployers from running the same DDL simultaneously.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
@@ -60,21 +64,64 @@ namespace nORM.Migration
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
 
-            await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
-            var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-            if (!pending.Any()) return;
-
-            await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-            foreach (var migration in pending)
+            await AcquireAdvisoryLockAsync(ct).ConfigureAwait(false);
+            try
             {
-                migration.Up(_connection, (DbTransaction)transaction, ct);
-                await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
+                await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
+                var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
+                if (!pending.Any()) return;
+
+                await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                foreach (var migration in pending)
+                {
+                    migration.Up(_connection, (DbTransaction)transaction, ct);
+                    await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
+                }
+                // Use CancellationToken.None — commit must not be aborted mid-flight.
+                await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
-            // Use CancellationToken.None — commit must not be aborted mid-flight.
-            // Cancellation during commit acknowledgment leaves ambiguous migration history state;
-            // callers would see a failure while DDL may already have committed, risking re-run
-            // of already-applied migrations on retry.
-            await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+            finally
+            {
+                await ReleaseAdvisoryLockAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Acquires an exclusive session-scoped advisory lock using <c>sp_getapplock</c>.
+        /// Session scope ensures the lock survives across transaction boundaries within this connection.
+        /// Throws <see cref="InvalidOperationException"/> if the lock cannot be acquired within
+        /// <see cref="MigrationLockTimeoutMs"/> milliseconds.
+        /// </summary>
+        internal async Task AcquireAdvisoryLockAsync(CancellationToken ct)
+        {
+            await using var cmd = _connection.CreateCommand();
+            cmd.CommandText = $@"
+DECLARE @Result INT;
+EXEC @Result = sp_getapplock
+    @Resource      = '{MigrationLockResource}',
+    @LockMode      = 'Exclusive',
+    @LockOwner     = 'Session',
+    @LockTimeout   = {MigrationLockTimeoutMs};
+IF @Result < 0
+    RAISERROR(
+        'nORM: Failed to acquire migration advisory lock (sp_getapplock returned %d). ' +
+        'Another process may already be deploying migrations.',
+        16, 1, @Result);";
+            await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Releases the session-scoped advisory lock acquired by <see cref="AcquireAdvisoryLockAsync"/>.
+        /// </summary>
+        internal async Task ReleaseAdvisoryLockAsync(CancellationToken ct)
+        {
+            await using var cmd = _connection.CreateCommand();
+            cmd.CommandText = $@"
+EXEC sp_releaseapplock
+    @Resource  = '{MigrationLockResource}',
+    @LockOwner = 'Session';";
+            try { await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false); }
+            catch { /* Best-effort release; connection may already be closing. */ }
         }
 
         /// <summary>

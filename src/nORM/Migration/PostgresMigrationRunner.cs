@@ -26,6 +26,9 @@ namespace nORM.Migration
         private DbContext? _context;
         private readonly ILogger? _logger;
         private const string HistoryTableName = "__NormMigrationsHistory";
+        // Stable int8 key used for pg_advisory_lock. Derived from FNV-1a of "__NormMigrationsLock"
+        // so it is consistent across deployments and does not collide with application-defined lock keys.
+        internal const long MigrationLockKey = unchecked((long)0x62C3B8F921A4D507L);
         private bool _disposed = false;
 
         /// <summary>
@@ -50,6 +53,8 @@ namespace nORM.Migration
 
         /// <summary>
         /// Applies all pending migrations to the PostgreSQL database.
+        /// Acquires a session-level advisory lock (<c>pg_advisory_lock</c>) before reading the pending list,
+        /// preventing concurrent deployers from running the same DDL simultaneously.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
@@ -58,21 +63,51 @@ namespace nORM.Migration
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
 
-            await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
-            var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-            if (!pending.Any()) return;
-
-            await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-            foreach (var migration in pending)
+            await AcquireAdvisoryLockAsync(ct).ConfigureAwait(false);
+            try
             {
-                migration.Up(_connection, (DbTransaction)transaction, ct);
-                await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
+                await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
+                var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
+                if (!pending.Any()) return;
+
+                await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                foreach (var migration in pending)
+                {
+                    migration.Up(_connection, (DbTransaction)transaction, ct);
+                    await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
+                }
+                // Use CancellationToken.None — commit must not be aborted mid-flight.
+                await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
-            // Use CancellationToken.None — commit must not be aborted mid-flight.
-            // Cancellation during commit acknowledgment leaves ambiguous migration history state;
-            // callers would see a failure while DDL may already have committed, risking re-run
-            // of already-applied migrations on retry.
-            await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+            finally
+            {
+                await ReleaseAdvisoryLockAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Acquires a PostgreSQL session-level advisory lock using <c>pg_advisory_lock(bigint)</c>.
+        /// The lock key <see cref="MigrationLockKey"/> is a stable constant derived from the migration
+        /// lock name. The call blocks until the lock is available — no timeout. Callers should wrap in a
+        /// higher-level timeout if a bounded wait is required.
+        /// </summary>
+        internal async Task AcquireAdvisoryLockAsync(CancellationToken ct)
+        {
+            await using var cmd = _connection.CreateCommand();
+            cmd.CommandText = $"SELECT pg_advisory_lock({MigrationLockKey})";
+            await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Releases the PostgreSQL session-level advisory lock acquired by
+        /// <see cref="AcquireAdvisoryLockAsync"/>.
+        /// </summary>
+        internal async Task ReleaseAdvisoryLockAsync(CancellationToken ct)
+        {
+            await using var cmd = _connection.CreateCommand();
+            cmd.CommandText = $"SELECT pg_advisory_unlock({MigrationLockKey})";
+            try { await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false); }
+            catch { /* Best-effort release; connection may already be closing. */ }
         }
 
         /// <summary>
