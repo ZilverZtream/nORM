@@ -159,14 +159,8 @@ public class SecurityBoundaryTests
     [InlineData("REVOKE SELECT ON Users FROM PUBLIC")]
     public void IsSafeRawSql_ReturnsFalse_ForPrivilegeStatements(string sql)
     {
-        // GRANT and REVOKE are not in the denylist per se, but they may pass or fail
-        // depending on the implementation. Just verify the method doesn't throw.
         var result = NormValidator.IsSafeRawSql(sql);
-        // These should be blocked because they don't start with SELECT in the AST path
-        // (for SQL Server parser) or contain dangerous keywords.
-        // If they pass through, note it — don't fail the test on implementation detail.
-        // The important thing is the method runs without throwing.
-        _ = result;
+        Assert.False(result, $"'{sql}' should be blocked by IsSafeRawSql");
     }
 
     // ─── QueryUnchangedAsync rejects unsafe SQL ────────────────────────────
