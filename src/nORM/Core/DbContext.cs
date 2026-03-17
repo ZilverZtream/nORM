@@ -265,6 +265,24 @@ namespace nORM.Core
                     }
                 }
             }
+            // A1/X1: Parity with EnsureConnectionSlowAsync — run temporal bootstrap on
+            // sync entry paths too. Safe in .NET 8 because all async code in
+            // TemporalManager.InitializeAsync uses ConfigureAwait(false), so there is no
+            // captured SynchronizationContext to deadlock against.
+            if (Options.IsTemporalVersioningEnabled && !_temporalInitComplete)
+            {
+                _temporalInitLock.Wait();
+                try
+                {
+                    if (!_temporalInitComplete)
+                    {
+                        TemporalManager.InitializeAsync(this, _cn, CancellationToken.None)
+                            .GetAwaiter().GetResult();
+                        _temporalInitComplete = true;
+                    }
+                }
+                finally { _temporalInitLock.Release(); }
+            }
             return _cn;
         }
         /// <summary>
