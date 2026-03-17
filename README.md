@@ -253,7 +253,45 @@ var runner = new SqlServerMigrationRunner(connection, Assembly.GetExecutingAssem
 await runner.ApplyMigrationsAsync();
 ```
 
+### Migration Notes
+
+**Property renames cause data loss.** nORM detects migration name drift (a class renamed after being applied) and throws at startup, but it cannot detect when you rename a C# property. Renaming `Order.TotalCost` to `Order.TotalAmount` generates a diff that drops `TotalCost` and adds `TotalAmount`, losing all existing data. Always create a manual migration that renames the column using the provider's DDL.
+
+**Concurrent deployments (SQL Server / MySQL / Postgres).** If multiple application instances start simultaneously and both detect pending migrations, both will attempt to apply them. The history table's PRIMARY KEY prevents a migration from being recorded twice — the second INSERT fails with a constraint violation. To serialize migrations across instances, acquire an advisory lock before calling `ApplyMigrationsAsync`: `sp_getapplock` (SQL Server), `GET_LOCK` (MySQL), or `pg_advisory_lock` (Postgres). The SQLite runner already uses an exclusive transaction for this purpose.
+
 ## Production-Ready Features
+
+### Thread Safety
+
+**`DbContext` is not thread-safe.** Use one context per request, operation, or unit of work. For ASP.NET Core, register it as `Scoped` so each HTTP request gets its own instance:
+
+```csharp
+// ASP.NET Core — correct DI registration
+builder.Services.AddScoped(sp =>
+    new DbContext(connectionString, new SqlServerProvider()));
+
+// Incorrect — do NOT share a single context across requests
+builder.Services.AddSingleton<DbContext>(...);  // data races
+```
+
+For long-running background jobs that process many entities in a loop, call `ctx.ChangeTracker.Clear()` periodically to release tracked entity memory (approximately 300 bytes per tracked entity):
+
+```csharp
+foreach (var batch in items.Chunk(500))
+{
+    foreach (var item in batch) { /* process */ }
+    await ctx.SaveChangesAsync();
+    ctx.ChangeTracker.Clear();  // release snapshots before next batch
+}
+```
+
+### MySQL Optimistic Concurrency
+
+`MySqlProvider` defaults to `UseAffectedRowsSemantics = true`, which is required by most MySQL connectors. MySQL's `affected-rows` count does not distinguish "row matched but value unchanged" from "no row matched". nORM handles this with a **SELECT-then-verify** fallback: when an UPDATE returns fewer rows than expected, nORM queries the database to check whether the original concurrency tokens still exist. If they do, the update was a same-value no-op and no conflict is raised. If any token has changed, a `DbConcurrencyException` is thrown as expected.
+
+**Residual gap**: if a concurrent writer sets the concurrency token to the *same* new value (same-value token conflict), neither the UPDATE rowcount nor the SELECT verification can detect the conflict — the WHERE clause still matches. This edge case requires application-level versioning (e.g. monotonically increasing versions) to close. To eliminate the gap entirely, use `useAffectedRows=false` in the connection string with a connector that supports it, or subclass `MySqlProvider` and override `UseAffectedRowsSemantics` to `false`.
+
+**DELETE path**: DELETE rowcount is always checked regardless of `UseAffectedRowsSemantics`, because deleting a row always counts it as affected — there is no same-value ambiguity for deletes.
 
 ### Connection Management & Pooling
 

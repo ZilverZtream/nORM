@@ -1385,7 +1385,7 @@ namespace nORM.Core
                             converted = col.Converter.ConvertFromProvider(raw);
                         else
                             converted = ConvertSimple(raw, col.Prop.PropertyType);
-                        try { col.Setter(item, converted); } catch { }
+                        col.Setter(item, converted);
                     }
 
                     // Read FK and assign to owner
@@ -1538,14 +1538,20 @@ namespace nORM.Core
 
             var updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
             // S1 — Optimistic-concurrency rowcount check.
-            // Skipped for providers that report affected (changed) rows rather than matched rows
-            // (UseAffectedRowsSemantics=true, e.g. MySQL default). On such providers a same-value
-            // update returns 0 affected rows even when the row exists, causing a false-positive
-            // conflict. Trade-off: genuine stale-row conflicts where the competing writer set the
-            // token to the same new value will also go undetected. Use useAffectedRows=false in
-            // the MySQL connection string and a provider subclass override to restore the check.
-            if (map.TimestampColumn != null && !Provider.UseAffectedRowsSemantics && updated != batch.Count)
-                throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+            // For matched-row providers (UseAffectedRowsSemantics=false): 0 rows updated means
+            // the WHERE clause (pk + token) did not match, so the token was stale — throw.
+            // For affected-row providers (UseAffectedRowsSemantics=true, e.g. MySQL default):
+            // 0 rows can mean either a genuine stale token OR a same-value update (no columns
+            // actually changed). Disambiguate with a SELECT-then-verify: query for rows that
+            // still carry the original token. If all tokens still match, it was a same-value
+            // update with no conflict. If any token is missing, it's a genuine stale-row conflict.
+            if (map.TimestampColumn != null && updated != batch.Count)
+            {
+                if (Provider.UseAffectedRowsSemantics)
+                    await VerifyUpdateOccAsync(cmd, map, batch, ct).ConfigureAwait(false);
+                else
+                    throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+            }
             // AcceptChanges is intentionally deferred until after the transaction commits.
             return updated;
         }
@@ -1603,11 +1609,62 @@ namespace nORM.Core
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            // S1 — see UpdateBatch comment above for the affected-row semantics trade-off.
-            if (map.TimestampColumn != null && !Provider.UseAffectedRowsSemantics && deleted != batch.Count)
+            // S1 — DELETE rowcount check. Unlike UPDATE, DELETE has no same-value ambiguity:
+            // a row is "deleted" only if it actually existed and was removed. Even on affected-row
+            // providers (UseAffectedRowsSemantics=true), 0 deleted rows always means either the
+            // token was stale or the row was already gone — both are genuine conflicts. No
+            // SELECT-then-verify is needed; we always throw when deleted != batch.Count.
+            if (map.TimestampColumn != null && deleted != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
             // Entity removal from ChangeTracker is deferred until after the transaction commits.
             return deleted;
+        }
+
+        /// <summary>
+        /// S1 — SELECT-then-verify fallback for affected-row semantics providers (e.g. MySQL).
+        /// Called from <see cref="ExecuteUpdateBatch"/> when <c>UseAffectedRowsSemantics=true</c>
+        /// and the UPDATE rowcount does not match the batch size. Queries the database for rows
+        /// that still carry their original concurrency tokens:
+        /// <list type="bullet">
+        ///   <item>If all tokens still match (<c>count == batch.Count</c>): the UPDATE returned 0
+        ///     because no column values actually changed (same-value update). No conflict — return.</item>
+        ///   <item>If any token is missing (<c>count &lt; batch.Count</c>): a competing writer
+        ///     changed the token. Genuine stale-row conflict — throw <see cref="DbConcurrencyException"/>.</item>
+        /// </list>
+        /// </summary>
+        private async Task VerifyUpdateOccAsync(DbCommand batchCmd, TableMapping map, List<EntityEntry> batch, CancellationToken ct)
+        {
+            await using var cmd = _cn.CreateCommand();
+            if (batchCmd.Transaction != null)
+                cmd.Transaction = batchCmd.Transaction;
+
+            var tc = map.TimestampColumn!;
+            var sb = new StringBuilder("SELECT COUNT(*) FROM ").Append(map.EscTable).Append(" WHERE ");
+            var conditions = new List<string>(batch.Count);
+            int pi = 0;
+
+            foreach (var entry in batch)
+            {
+                var entity = entry.Entity!;
+                var pkConds = new List<string>(map.KeyColumns.Length + 1);
+                foreach (var kc in map.KeyColumns)
+                {
+                    pkConds.Add($"{kc.EscCol}={_p.ParamPrefix}v{pi}");
+                    cmd.AddParam($"{_p.ParamPrefix}v{pi++}", kc.Getter(entity));
+                }
+                // Null-safe token equality matches the predicate used in BuildUpdateBatch/BuildDeleteBatch.
+                pkConds.Add($"({tc.EscCol}={_p.ParamPrefix}v{pi} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}v{pi} IS NULL))");
+                var tok = entry.OriginalToken;
+                cmd.AddParam($"{_p.ParamPrefix}v{pi++}", tok ?? (object)DBNull.Value);
+                conditions.Add($"({string.Join(" AND ", pkConds)})");
+            }
+
+            sb.Append(string.Join(" OR ", conditions));
+            cmd.CommandText = sb.ToString();
+
+            var matchCount = Convert.ToInt32(await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false));
+            if (matchCount != batch.Count)
+                throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
         }
 
         /// <summary>

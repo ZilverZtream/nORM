@@ -39,37 +39,59 @@ namespace nORM.Migration
             var up = new List<string>();
             var down = new List<string>();
 
+            // ─ UP: correct DDL dependency ordering ──────────────────────────────────
+            // FK constraints must be dropped BEFORE the columns/tables they reference
+            // are removed. Symmetric rule for DOWN: FK constraints added in UP must be
+            // dropped BEFORE the columns/tables added in UP are removed.
+
+            // UP-1: Drop FK constraints first (before columns/tables they depend on).
+            // MySQL uses DROP FOREIGN KEY (not DROP CONSTRAINT) for FK removal.
+            foreach (var (table, fk) in diff.DroppedForeignKeys)
+                up.Add($"ALTER TABLE {Esc(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
+
+            // UP-2: Drop tables.
+            foreach (var table in diff.DroppedTables)
+                up.Add($"DROP TABLE {Esc(table.Name)}");
+
+            // UP-3: Drop columns (safe — FKs on those columns are removed in UP-1).
+            foreach (var (table, column) in diff.DroppedColumns)
+                up.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
+
+            // UP-4: Alter existing columns.
+            foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
+            {
+                // M1: Include DEFAULT in MODIFY COLUMN — MySQL replaces the full column definition.
+                var newDefault = newCol.DefaultValue != null ? $" DEFAULT {DefaultValueValidator.Validate(newCol.DefaultValue)}" : "";
+                var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}{newDefault}";
+                up.Add($"ALTER TABLE {Esc(table.Name)} MODIFY COLUMN {newDef}");
+            }
+
+            // UP-5: Create new tables (including inline FK constraints).
             foreach (var table in diff.AddedTables)
             {
                 var colDefs = table.Columns.Select(c =>
                     $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
 
-                // Emit PRIMARY KEY constraint for PK columns.
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
 
-                // Emit UNIQUE constraint for unique non-PK columns.
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
                 if (uniqueNonPkCols.Count > 0)
                     colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
 
-                // MG-1: Emit inline FOREIGN KEY constraints
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
 
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
-                // Emit CREATE INDEX for columns with a named index (non-PK, non-unique).
                 foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
                     up.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
-
-                down.Add($"DROP TABLE {Esc(table.Name)}");
             }
 
+            // UP-6: Add columns to existing tables.
             foreach (var (table, column) in diff.AddedColumns)
             {
-                // NOT NULL column without a DefaultValue cannot be added to a populated table.
                 if (!column.IsNullable && column.DefaultValue == null)
                     throw new InvalidOperationException(
                         $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
@@ -78,25 +100,44 @@ namespace nORM.Migration
                 var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {nullPart}";
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
-                down.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
             }
 
+            // UP-7: Add FK constraints last (all tables and columns are in place).
+            foreach (var (table, fk) in diff.AddedForeignKeys)
+                up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
+
+            // ─ DOWN: reverse of UP, with symmetric FK ordering ──────────────────────
+
+            // DOWN-1: Drop FK constraints that were added in UP-7 (before touching their columns).
+            foreach (var (table, fk) in diff.AddedForeignKeys)
+                down.Add($"ALTER TABLE {Esc(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
+
+            // DOWN-2: Drop columns that were added in UP-6.
+            foreach (var (table, column) in diff.AddedColumns)
+                down.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
+
+            // DOWN-3: Drop tables that were created in UP-5.
+            foreach (var table in diff.AddedTables)
+                down.Add($"DROP TABLE {Esc(table.Name)}");
+
+            // DOWN-4: Reverse column alterations from UP-4.
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
-                // M1: Include DEFAULT in MODIFY COLUMN — MySQL replaces the full column definition.
-                var newDefault = newCol.DefaultValue != null ? $" DEFAULT {DefaultValueValidator.Validate(newCol.DefaultValue)}" : "";
-                var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}{newDefault}";
-                up.Add($"ALTER TABLE {Esc(table.Name)} MODIFY COLUMN {newDef}");
                 var oldDefault = oldCol.DefaultValue != null ? $" DEFAULT {DefaultValueValidator.Validate(oldCol.DefaultValue)}" : "";
                 var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}{oldDefault}";
                 down.Add($"ALTER TABLE {Esc(table.Name)} MODIFY COLUMN {oldDef}");
             }
 
-            // SD-8: Generate DROP TABLE for tables removed in the new snapshot
+            // DOWN-5: Restore columns that were dropped in UP-3.
+            foreach (var (table, column) in diff.DroppedColumns)
+            {
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
+                down.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
+            }
+
+            // DOWN-6: Restore tables that were dropped in UP-2.
             foreach (var table in diff.DroppedTables)
             {
-                up.Add($"DROP TABLE {Esc(table.Name)}");
-                // Down: recreate the table with full constraint metadata
                 var colDefs = table.Columns.Select(c =>
                     $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
@@ -105,7 +146,6 @@ namespace nORM.Migration
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
                 if (uniqueNonPkCols.Count > 0)
                     colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
-                // MG-1: Restore FK constraints in Down recreation
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
                 down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
@@ -113,28 +153,9 @@ namespace nORM.Migration
                     down.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
             }
 
-            // SD-8: Generate DROP COLUMN for columns removed in the new snapshot
-            foreach (var (table, column) in diff.DroppedColumns)
-            {
-                up.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
-                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
-                down.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
-            }
-
-            // MG-1: Add FK constraints to existing tables
-            foreach (var (table, fk) in diff.AddedForeignKeys)
-            {
-                up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
-                // MySQL uses DROP FOREIGN KEY (not DROP CONSTRAINT) for FK removal
-                down.Add($"ALTER TABLE {Esc(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
-            }
-
-            // MG-1: Drop FK constraints from existing tables
+            // DOWN-7: Restore FK constraints that were dropped in UP-1.
             foreach (var (table, fk) in diff.DroppedForeignKeys)
-            {
-                up.Add($"ALTER TABLE {Esc(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
-            }
 
             return new MigrationSqlStatements(up, down);
         }

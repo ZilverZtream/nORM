@@ -50,8 +50,11 @@ namespace nORM.Migration
 
         /// <summary>
         /// Applies all pending migrations to the connected SQLite database. The method
-        /// wraps migration execution in a transaction ensuring that either all migrations
-        /// succeed or none are applied.
+        /// wraps migration execution in an EXCLUSIVE transaction, which prevents any
+        /// other connection from acquiring ANY transaction (read or write) until this
+        /// runner commits. A second concurrent runner will block at the exclusive-lock
+        /// acquisition, then re-read applied migrations after commit and find nothing
+        /// pending — achieving correct serialization without explicit advisory locks.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
@@ -61,10 +64,23 @@ namespace nORM.Migration
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
 
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
-            var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-            if (!pending.Any()) return;
 
-            await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+            // CCD-1: IsolationLevel.Serializable maps to BEGIN EXCLUSIVE in SQLite.
+            // This prevents any other connection from starting a transaction until we
+            // commit, serializing concurrent ApplyMigrationsAsync calls correctly.
+            await using var transaction = await _connection.BeginTransactionAsync(IsolationLevel.Serializable, ct).ConfigureAwait(false);
+
+            // Re-read pending migrations INSIDE the exclusive lock to close the TOCTOU
+            // window: a second runner that was blocked on the lock will re-check here
+            // and find no pending migrations after the first runner commits.
+            var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
+            if (!pending.Any())
+            {
+                // Nothing to do; commit to release the exclusive lock.
+                await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+                return;
+            }
+
             foreach (var migration in pending)
             {
                 migration.Up(_connection, (DbTransaction)transaction, ct);
