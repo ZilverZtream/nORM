@@ -596,8 +596,74 @@ public class LiveProviderIntegrationTests
         var configured = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(envVar));
         // This test always passes but its output tells CI which providers are live.
         if (configured)
-            Assert.True(true, $"✓ {providerName} live tests ENABLED ({envVar} is set).");
+            Assert.True(true, $"{providerName} live tests ENABLED ({envVar} is set).");
         else
-            Assert.True(true, $"○ {providerName} live tests SKIPPED ({envVar} not set).");
+            Assert.True(true, $"{providerName} live tests SKIPPED ({envVar} not set).");
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // P2 — Failure-if-skipped policy for enforced parity CI lanes.
+    //
+    // Set NORM_REQUIRE_LIVE_PARITY=all  → all three non-SQLite providers required.
+    // Set NORM_REQUIRE_LIVE_PARITY=any  → at least one non-SQLite provider required.
+    //
+    // Default (env var absent): policy is advisory (tests skip without failing).
+    // In a parity-enforced CI lane, set the env var to enforce hard failures.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void P2_ParityPolicy_EnforcedWhenRequested()
+    {
+        var policy = Environment.GetEnvironmentVariable("NORM_REQUIRE_LIVE_PARITY")?.ToLowerInvariant()?.Trim();
+        if (string.IsNullOrEmpty(policy))
+            return; // Advisory mode — no enforcement.
+
+        bool sqlServerLive = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_SQLSERVER"));
+        bool mysqlLive     = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_MYSQL"));
+        bool postgresLive  = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_POSTGRES"));
+
+        if (policy == "all")
+        {
+            Assert.True(sqlServerLive,
+                "P2 parity policy 'all' requires NORM_TEST_SQLSERVER to be set in this CI lane.");
+            Assert.True(mysqlLive,
+                "P2 parity policy 'all' requires NORM_TEST_MYSQL to be set in this CI lane.");
+            Assert.True(postgresLive,
+                "P2 parity policy 'all' requires NORM_TEST_POSTGRES to be set in this CI lane.");
+        }
+        else if (policy == "any")
+        {
+            Assert.True(sqlServerLive || mysqlLive || postgresLive,
+                "P2 parity policy 'any' requires at least one of NORM_TEST_SQLSERVER, " +
+                "NORM_TEST_MYSQL, or NORM_TEST_POSTGRES to be set in this CI lane.");
+        }
+        else
+        {
+            Assert.Fail(
+                $"P2 parity policy value '{policy}' is not recognised. " +
+                "Valid values: 'all' (all three non-SQLite providers required), " +
+                "'any' (at least one required).");
+        }
+    }
+
+    /// <summary>
+    /// Counts how many live non-SQLite providers are configured and asserts it
+    /// matches the minimum specified by <c>NORM_MIN_LIVE_PROVIDERS</c> (if set).
+    /// </summary>
+    [Fact]
+    public void P2_MinimumLiveProviderCount_MeetsPolicyFloor()
+    {
+        var minStr = Environment.GetEnvironmentVariable("NORM_MIN_LIVE_PROVIDERS");
+        if (!int.TryParse(minStr, out var minRequired) || minRequired <= 0)
+            return; // Advisory mode.
+
+        int liveCount = 0;
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_SQLSERVER"))) liveCount++;
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_MYSQL")))     liveCount++;
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_POSTGRES")))  liveCount++;
+
+        Assert.True(liveCount >= minRequired,
+            $"P2 minimum live provider count not met: required {minRequired}, got {liveCount}. " +
+            $"Set NORM_TEST_SQLSERVER / NORM_TEST_MYSQL / NORM_TEST_POSTGRES as needed.");
     }
 }

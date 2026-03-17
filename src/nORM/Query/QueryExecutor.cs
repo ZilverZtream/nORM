@@ -510,7 +510,11 @@ namespace nORM.Query
                     }
                 }
 
-                if (CompiledMaterializerStore.TryGet(map.Type, out var compiled) && offset == 0)
+                // Q1/X1 fix: use model-aware (type, tableName) lookup to avoid wrong
+                // materializer selection when the same CLR type is registered under
+                // multiple table mappings.  Type-only lookup used the [Table]-attribute
+                // name, silently bypassing the actual mapping discriminator.
+                if (CompiledMaterializerStore.TryGet(map.Type, map.TableName, out var compiled) && offset == 0)
                 {
                     return compiled(reader, ct).GetAwaiter().GetResult();
                 }
