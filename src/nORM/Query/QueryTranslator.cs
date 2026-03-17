@@ -78,6 +78,7 @@ namespace nORM.Query
         private Dictionary<ParameterExpression, string> _paramMap { get => _parameterManager.ParameterMap; set => _parameterManager.ParameterMap = value; }
         internal int ParameterIndex => _parameterManager.Index;
         private List<IncludePlan> _includes = new();
+        private List<M2MIncludePlan> _m2mIncludes = new();
         private LambdaExpression? _projection;
         private Func<object, object>? _clientProjection;
         private bool _isAggregate;
@@ -189,6 +190,7 @@ namespace nORM.Query
                 _rootType = null;
                 _parameterManager.Reset();
                 _includes = new List<IncludePlan>();
+                _m2mIncludes = new List<M2MIncludePlan>();
                 _projection = null;
                 _clientProjection = null;
                 _isAggregate = false;
@@ -221,6 +223,7 @@ namespace nORM.Query
                 oldClauses?.Dispose();
                 _clauses = new SqlBuilder();
                 _includes = new List<IncludePlan>();
+                _m2mIncludes = new List<M2MIncludePlan>();
                 _correlatedParams?.Clear();
                 _tables?.Clear();
                 _ctx = null!;
@@ -590,7 +593,8 @@ namespace nORM.Query
                     Take: _t._take,
                     DependentQueries: dependentQueries,
                     ClientProjection: _t._clientProjection,
-                    Complexity: _t._complexityMetrics
+                    Complexity: _t._complexityMetrics,
+                    M2MIncludes: _t._m2mIncludes.Count > 0 ? new List<M2MIncludePlan>(_t._m2mIncludes) : null
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;

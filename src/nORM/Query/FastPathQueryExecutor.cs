@@ -280,7 +280,7 @@ namespace nORM.Query
 
             // Sync materialization for providers without true async I/O
             if (ctx.Provider.PrefersSyncExecution)
-                return ExecuteSimpleWhereMaterializeSync<T>(cmd, ctx, takeCount);
+                return ExecuteSimpleWhereMaterializeWithOwnedAsync<T>(cmd, ctx, takeCount, ct, sync: true);
 
             return ExecuteSimpleWhereMaterializeAsync<T>(cmd, ctx, takeCount, ct);
         }
@@ -298,6 +298,10 @@ namespace nORM.Query
             await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 results.Add(materializer(reader));
+            // Load owned collections (OwnsMany) if configured
+            var map = ctx.GetMapping(typeof(T));
+            if (map.OwnedCollections.Count > 0 && results.Count > 0)
+                await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
             return results;
         }
 
@@ -313,6 +317,31 @@ namespace nORM.Query
             return Task.FromResult<object>(results);
         }
 
+        /// <summary>Materializes WHERE results and loads owned collections (sync read + async owned-collection load).</summary>
+        private static async Task<object> ExecuteSimpleWhereMaterializeWithOwnedAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, CancellationToken ct, bool sync) where T : class, new()
+        {
+            var results = new List<T>(takeCount ?? 16);
+            var materializer = GetSyncMaterializer<T>(ctx);
+            using var command = cmd;
+            if (sync)
+            {
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                    results.Add(materializer(reader));
+            }
+            else
+            {
+                await using var asyncReader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                while (await asyncReader.ReadAsync(ct).ConfigureAwait(false))
+                    results.Add(materializer(asyncReader));
+            }
+            // Load owned collections (OwnsMany) if configured
+            var map = ctx.GetMapping(typeof(T));
+            if (map.OwnedCollections.Count > 0 && results.Count > 0)
+                await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
+            return results;
+        }
+
         private static async Task<object> ExecuteSimpleWhereMaterializeAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
         {
             var results = new List<T>(takeCount ?? 16);
@@ -321,6 +350,12 @@ namespace nORM.Query
             await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 results.Add(materializer(reader));
+
+            // Load owned collections (OwnsMany) if configured
+            var map = ctx.GetMapping(typeof(T));
+            if (map.OwnedCollections.Count > 0 && results.Count > 0)
+                await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
+
             return results;
         }
         /// <summary>
@@ -345,6 +380,9 @@ namespace nORM.Query
             {
                 results.Add(materializer(reader));
             }
+            // Load owned collections (OwnsMany) if configured
+            if (map.OwnedCollections.Count > 0 && results.Count > 0)
+                await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
             return results;
         }
         private static async Task<object> ExecuteSimpleCount<T>(DbContext ctx, CancellationToken ct) where T : class

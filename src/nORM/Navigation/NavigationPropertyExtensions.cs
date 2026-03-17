@@ -167,10 +167,15 @@ namespace nORM.Navigation
                 {
                     if (navProp.IsCollection)
                     {
-                        // Create lazy collection
+                        // Create lazy collection only if the property type can accept it
                         var collectionType = typeof(LazyNavigationCollection<>).MakeGenericType(navProp.TargetType);
-                        var collection = Activator.CreateInstance(collectionType, entity, navProp.Property, context);
-                        navProp.Property.SetValue(entity, collection);
+                        if (navProp.Property.PropertyType.IsAssignableFrom(collectionType))
+                        {
+                            var collection = Activator.CreateInstance(collectionType, entity, navProp.Property, context);
+                            navProp.Property.SetValue(entity, collection);
+                        }
+                        // If property type is List<T> or similar concrete type, skip lazy proxy;
+                        // the property stays null and won't interfere with owned collection loading.
                     }
                     else
                     {

@@ -833,6 +833,16 @@ namespace nORM.Query
                             t._includes.Add(new IncludePlan(new List<TableMapping.Relation> { relation }));
                             t.TrackMapping(relation.DependentType);
                         }
+                        else if (t._mapping != null)
+                        {
+                            // Check if this is a many-to-many navigation property
+                            var jtm = t._mapping.ManyToManyJoins.FirstOrDefault(j => j.LeftNavPropertyName == propName);
+                            if (jtm != null)
+                            {
+                                t._m2mIncludes.Add(new M2MIncludePlan(jtm));
+                                t.TrackMapping(jtm.RightType);
+                            }
+                        }
                     }
                 }
                 return visited;

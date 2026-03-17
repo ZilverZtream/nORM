@@ -114,9 +114,9 @@ public class MaterializerCacheKeyTests
         var ctor = keyType.GetConstructors(BindingFlags.Public | BindingFlags.Instance).First();
 
         // Key1: projectionHash = 1 (low=1, high=0)
-        var key1 = ctor.Invoke(new object[] { typeof(EntityA), typeof(EntityA), 1L, "EntityA", 0 });
+        var key1 = ctor.Invoke(new object[] { typeof(EntityA), typeof(EntityA), 1L, "EntityA", 0, 0, 0 });
         // Key2: projectionHash = 1 + (1L << 32) — same low 32 bits, different upper 32 bits
-        var key2 = ctor.Invoke(new object[] { typeof(EntityA), typeof(EntityA), 1L + (1L << 32), "EntityA", 0 });
+        var key2 = ctor.Invoke(new object[] { typeof(EntityA), typeof(EntityA), 1L + (1L << 32), "EntityA", 0, 0, 0 });
 
         // They must NOT be equal
         Assert.False(key1.Equals(key2),

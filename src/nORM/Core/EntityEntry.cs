@@ -50,6 +50,15 @@ namespace nORM.Core
         public EntityState State { get; internal set; }
 
         /// <summary>
+        /// Marks this entry as explicitly modified (e.g. via ctx.Update), preventing
+        /// DetectChanges from reverting the state to Unchanged when no scalar changes are found.
+        /// </summary>
+        internal void MarkExplicitlyModified()
+        {
+            _hasNotifiedChange = true;
+        }
+
+        /// <summary>
         /// Stores the original concurrency token (timestamp/rowversion) value captured at
         /// attach time. Used in UPDATE and DELETE WHERE clauses to ensure the correct snapshot
         /// value is compared, even if the entity's property has been mutated before SaveChanges.
@@ -63,6 +72,41 @@ namespace nORM.Core
         internal object? OriginalKey { get; set; }
 
         internal TableMapping Mapping => _mapping;
+
+        /// <summary>
+        /// Snapshots of many-to-many collections at attach/accept time.
+        /// Key = nav property name; Value = set of related-entity PK values at last save.
+        /// Used by SaveChanges to compute toAdd/toRemove deltas without re-querying the join table.
+        /// </summary>
+        internal Dictionary<string, HashSet<object>>? ManyToManySnapshots { get; private set; }
+
+        /// <summary>
+        /// Captures the current M2M collection state as the new snapshot baseline.
+        /// Called after SaveChanges succeeds and after initial attach.
+        /// </summary>
+        internal void CaptureManyToManySnapshots()
+        {
+            if (_mapping.ManyToManyJoins == null || _mapping.ManyToManyJoins.Count == 0) return;
+            var entity = Entity;
+            if (entity == null) return;
+
+            ManyToManySnapshots ??= new Dictionary<string, HashSet<object>>();
+            foreach (var jtm in _mapping.ManyToManyJoins)
+            {
+                var collection = jtm.LeftCollectionGetter(entity);
+                var snapshot = new HashSet<object>();
+                if (collection != null)
+                {
+                    foreach (var item in collection)
+                    {
+                        if (item == null) continue;
+                        var pk = jtm.RightPkGetter(item);
+                        if (pk != null) snapshot.Add(pk);
+                    }
+                }
+                ManyToManySnapshots[jtm.LeftNavPropertyName] = snapshot;
+            }
+        }
 
         internal EntityEntry(object entity, EntityState state, TableMapping mapping, DbContextOptions options, Action<EntityEntry>? markDirty = null, bool lazy = false)
         {
@@ -136,6 +180,10 @@ namespace nORM.Core
             _isInitialized = true;
 
             CaptureOriginalValues();
+            // Only capture M2M snapshots if entity is already Unchanged (loaded from DB).
+            // For Added entities, AcceptChanges() will capture after the INSERT succeeds.
+            if (State == EntityState.Unchanged)
+                CaptureManyToManySnapshots();
 
             if (Entity is INotifyPropertyChanged notify)
             {
@@ -281,6 +329,7 @@ namespace nORM.Core
         {
             UpgradeToFullTracking();
             CaptureOriginalValues();
+            CaptureManyToManySnapshots();
             State = EntityState.Unchanged;
             _hasNotifiedChange = false;
             // Refresh the original token so future saves use the latest DB value.

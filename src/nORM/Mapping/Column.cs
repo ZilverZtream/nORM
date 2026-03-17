@@ -41,6 +41,8 @@ namespace nORM.Mapping
         public readonly Action<object, object?> Setter;
         /// <summary>The underlying setter method for the property.</summary>
         public readonly MethodInfo SetterMethod;
+        /// <summary>Optional converter between model value and provider (database) value.</summary>
+        public IValueConverter? Converter;
 
         /// <summary>
         /// Initializes a new mapping using cached property metadata produced by the mapping cache.

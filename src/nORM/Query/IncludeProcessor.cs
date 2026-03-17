@@ -22,6 +22,307 @@ namespace nORM.Query
         private readonly DbContext _ctx;
         private readonly MaterializerFactory _materializerFactory = new();
 
+        /// <summary>
+        /// Eagerly loads a many-to-many relationship for the given parent entities by
+        /// querying the join table and then loading the related entities.
+        /// </summary>
+        public async Task LoadManyToManyAsync(M2MIncludePlan plan, IList parents, CancellationToken ct, bool noTracking)
+        {
+            if (parents.Count == 0) return;
+            var jtm = plan.JoinTable;
+
+            // Collect left PKs
+            var parentByPk = new Dictionary<object, List<object>>();
+            foreach (var p in parents.Cast<object>())
+            {
+                var pk = jtm.LeftPkGetter(p);
+                if (pk == null) continue;
+                if (!parentByPk.TryGetValue(pk, out var list))
+                    parentByPk[pk] = list = new List<object>();
+                list.Add(p);
+            }
+            if (parentByPk.Count == 0) return;
+
+            // Build a query: SELECT right_fk, right_pk FROM join_table INNER JOIN right_table ON ... WHERE left_fk IN (...)
+            // Simpler: SELECT right_fk FROM join_table WHERE left_fk IN (...) → then load right entities
+            var pkeys = parentByPk.Keys.ToArray();
+            var rightMapping = _ctx.GetMapping(jtm.RightType);
+
+            // Reset/initialize empty collections on all parents.
+            // Always create a fresh list so that M2M loading replaces whatever
+            // was in the collection before (avoids duplicates when the same
+            // context is used for both saving and querying).
+            foreach (var p in parents.Cast<object>())
+            {
+                var emptyList = (System.Collections.IList)Activator.CreateInstance(
+                    typeof(List<>).MakeGenericType(jtm.RightType))!;
+                jtm.LeftCollectionSetter(p, emptyList);
+            }
+
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
+            await using var cmd = _ctx.CreateCommand();
+
+            // Build IN clause params for the join table query
+            var paramNames = new List<string>();
+            for (int i = 0; i < pkeys.Length; i++)
+            {
+                var pn = $"{_ctx.Provider.ParamPrefix}jlfk{i}";
+                cmd.AddParam(pn, pkeys[i]!);
+                paramNames.Add(pn);
+            }
+            var inClause = $"({string.Join(", ", paramNames)})";
+
+            // Query: SELECT left_fk, right_fk FROM join_table WHERE left_fk IN (...)
+            cmd.CommandText = $"SELECT {jtm.EscLeftFkColumn}, {jtm.EscRightFkColumn} FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} IN {inClause}";
+            cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
+
+            // Read all join rows: leftPk → list of rightPks
+            var joinRows = new Dictionary<object, List<object>>();
+            var allRightPks = new HashSet<object>();
+            await using (var jReader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, System.Data.CommandBehavior.Default, ct).ConfigureAwait(false))
+            {
+                while (await jReader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    if (jReader.IsDBNull(0) || jReader.IsDBNull(1)) continue;
+                    var lPk = jReader.GetValue(0);
+                    var rPk = jReader.GetValue(1);
+                    if (!joinRows.TryGetValue(lPk, out var rList))
+                        joinRows[lPk] = rList = new List<object>();
+                    rList.Add(rPk);
+                    allRightPks.Add(rPk);
+                }
+            }
+
+            if (allRightPks.Count == 0) return;
+
+            // Load related (right) entities in a single query
+            await using var cmd2 = _ctx.CreateCommand();
+            var rightParamNames = new List<string>();
+            var allRightPkList = allRightPks.ToList();
+            for (int i = 0; i < allRightPkList.Count; i++)
+            {
+                var pn = $"{_ctx.Provider.ParamPrefix}jrpk{i}";
+                cmd2.AddParam(pn, allRightPkList[i]!);
+                rightParamNames.Add(pn);
+            }
+            var rightPkCol = rightMapping.KeyColumns[0];
+            var rightInClause = $"({string.Join(", ", rightParamNames)})";
+            cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause}";
+            cmd2.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText).TotalSeconds;
+
+            var rightEntitiesByPk = new Dictionary<object, object>();
+            var rightMat = _materializerFactory.CreateSyncMaterializer(rightMapping, jtm.RightType);
+            await using (var rReader = await cmd2.ExecuteReaderWithInterceptionAsync(_ctx, System.Data.CommandBehavior.Default, ct).ConfigureAwait(false))
+            {
+                while (await rReader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    var rightEntity = rightMat(rReader);
+                    if (!noTracking)
+                    {
+                        var entry = _ctx.ChangeTracker.Track(rightEntity, EntityState.Unchanged, rightMapping);
+                        rightEntity = entry.Entity!;
+                        NavigationPropertyExtensions.EnableLazyLoading(rightEntity, _ctx);
+                    }
+                    var rpk = rightPkCol.Getter(rightEntity);
+                    if (rpk != null)
+                        rightEntitiesByPk[rpk] = rightEntity;
+                }
+            }
+
+            // Assign collections to parents
+            foreach (var p in parents.Cast<object>())
+            {
+                var leftPk = jtm.LeftPkGetter(p);
+                if (leftPk == null) continue;
+
+                var collection = jtm.LeftCollectionGetter(p);
+                if (collection == null)
+                {
+                    collection = (System.Collections.IList)Activator.CreateInstance(
+                        typeof(List<>).MakeGenericType(jtm.RightType))!;
+                    jtm.LeftCollectionSetter(p, collection);
+                }
+
+                // Try direct PK lookup, then coerced lookup (SQLite returns Int64 for int PKs)
+                if (!joinRows.TryGetValue(leftPk, out var rightPks))
+                {
+                    // Try converting leftPk type (SQLite returns Int64 for int PKs)
+                    foreach (var candidate in joinRows.Keys)
+                    {
+                        if (Convert.ToString(candidate) == Convert.ToString(leftPk))
+                        {
+                            rightPks = joinRows[candidate];
+                            break;
+                        }
+                    }
+                }
+
+                if (rightPks == null) continue;
+
+                foreach (var rPk in rightPks)
+                {
+                    // Try direct lookup, then coerced
+                    if (!rightEntitiesByPk.TryGetValue(rPk, out var rightEntity))
+                    {
+                        foreach (var candidate in rightEntitiesByPk.Keys)
+                        {
+                            if (Convert.ToString(candidate) == Convert.ToString(rPk))
+                            {
+                                rightEntity = rightEntitiesByPk[candidate];
+                                break;
+                            }
+                        }
+                    }
+                    if (rightEntity != null)
+                        collection.Add(rightEntity);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Synchronous equivalent of <see cref="LoadManyToManyAsync"/> for use in the sync
+        /// <c>Materialize</c> code path. Uses synchronous reader APIs so the sync path stays
+        /// truly synchronous without any <c>GetAwaiter().GetResult()</c> calls.
+        /// </summary>
+        public void LoadManyToMany(M2MIncludePlan plan, IList parents, bool noTracking)
+        {
+            if (parents.Count == 0) return;
+            var jtm = plan.JoinTable;
+
+            var parentByPk = new Dictionary<object, List<object>>();
+            foreach (var p in parents.Cast<object>())
+            {
+                var pk = jtm.LeftPkGetter(p);
+                if (pk == null) continue;
+                if (!parentByPk.TryGetValue(pk, out var list))
+                    parentByPk[pk] = list = new List<object>();
+                list.Add(p);
+            }
+            if (parentByPk.Count == 0) return;
+
+            var pkeys = parentByPk.Keys.ToArray();
+            var rightMapping = _ctx.GetMapping(jtm.RightType);
+
+            // Reset collections to fresh empty lists before populating.
+            foreach (var p in parents.Cast<object>())
+            {
+                var emptyList = (IList)Activator.CreateInstance(
+                    typeof(List<>).MakeGenericType(jtm.RightType))!;
+                jtm.LeftCollectionSetter(p, emptyList);
+            }
+
+            _ctx.EnsureConnection();
+            using var cmd = _ctx.CreateCommand();
+
+            var paramNames = new List<string>();
+            for (int i = 0; i < pkeys.Length; i++)
+            {
+                var pn = $"{_ctx.Provider.ParamPrefix}jlfk{i}";
+                cmd.AddParam(pn, pkeys[i]!);
+                paramNames.Add(pn);
+            }
+            var inClause = $"({string.Join(", ", paramNames)})";
+
+            cmd.CommandText = $"SELECT {jtm.EscLeftFkColumn}, {jtm.EscRightFkColumn} FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} IN {inClause}";
+            cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
+
+            var joinRows = new Dictionary<object, List<object>>();
+            var allRightPks = new HashSet<object>();
+            using (var jReader = cmd.ExecuteReaderWithInterception(_ctx, System.Data.CommandBehavior.Default))
+            {
+                while (jReader.Read())
+                {
+                    if (jReader.IsDBNull(0) || jReader.IsDBNull(1)) continue;
+                    var lPk = jReader.GetValue(0);
+                    var rPk = jReader.GetValue(1);
+                    if (!joinRows.TryGetValue(lPk, out var rList))
+                        joinRows[lPk] = rList = new List<object>();
+                    rList.Add(rPk);
+                    allRightPks.Add(rPk);
+                }
+            }
+
+            if (allRightPks.Count == 0) return;
+
+            using var cmd2 = _ctx.CreateCommand();
+            var rightParamNames = new List<string>();
+            var allRightPkList = allRightPks.ToList();
+            for (int i = 0; i < allRightPkList.Count; i++)
+            {
+                var pn = $"{_ctx.Provider.ParamPrefix}jrpk{i}";
+                cmd2.AddParam(pn, allRightPkList[i]!);
+                rightParamNames.Add(pn);
+            }
+            var rightPkCol = rightMapping.KeyColumns[0];
+            var rightInClause = $"({string.Join(", ", rightParamNames)})";
+            cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause}";
+            cmd2.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText).TotalSeconds;
+
+            var rightEntitiesByPk = new Dictionary<object, object>();
+            var rightMat = _materializerFactory.CreateSyncMaterializer(rightMapping, jtm.RightType);
+            using (var rReader = cmd2.ExecuteReaderWithInterception(_ctx, System.Data.CommandBehavior.Default))
+            {
+                while (rReader.Read())
+                {
+                    var rightEntity = rightMat(rReader);
+                    if (!noTracking)
+                    {
+                        var entry = _ctx.ChangeTracker.Track(rightEntity, EntityState.Unchanged, rightMapping);
+                        rightEntity = entry.Entity!;
+                        NavigationPropertyExtensions.EnableLazyLoading(rightEntity, _ctx);
+                    }
+                    var rpk = rightPkCol.Getter(rightEntity);
+                    if (rpk != null)
+                        rightEntitiesByPk[rpk] = rightEntity;
+                }
+            }
+
+            foreach (var p in parents.Cast<object>())
+            {
+                var leftPk = jtm.LeftPkGetter(p);
+                if (leftPk == null) continue;
+
+                var collection = jtm.LeftCollectionGetter(p);
+                if (collection == null)
+                {
+                    collection = (IList)Activator.CreateInstance(
+                        typeof(List<>).MakeGenericType(jtm.RightType))!;
+                    jtm.LeftCollectionSetter(p, collection);
+                }
+
+                if (!joinRows.TryGetValue(leftPk, out var rightPks))
+                {
+                    foreach (var candidate in joinRows.Keys)
+                    {
+                        if (Convert.ToString(candidate) == Convert.ToString(leftPk))
+                        {
+                            rightPks = joinRows[candidate];
+                            break;
+                        }
+                    }
+                }
+
+                if (rightPks == null) continue;
+
+                foreach (var rPk in rightPks)
+                {
+                    if (!rightEntitiesByPk.TryGetValue(rPk, out var rightEntity))
+                    {
+                        foreach (var candidate in rightEntitiesByPk.Keys)
+                        {
+                            if (Convert.ToString(candidate) == Convert.ToString(rPk))
+                            {
+                                rightEntity = rightEntitiesByPk[candidate];
+                                break;
+                            }
+                        }
+                    }
+                    if (rightEntity != null)
+                        collection.Add(rightEntity);
+                }
+            }
+        }
+
         public IncludeProcessor(DbContext ctx) => _ctx = ctx;
 
         /// <summary>

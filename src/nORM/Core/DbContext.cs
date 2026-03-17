@@ -953,6 +953,21 @@ namespace nORM.Core
                     await using var cmd = commandScope.CreateCommand();
                     var sql = new StringBuilder(templateLength * batchSize);
 
+                    // For Deleted: delete owned collections and M2M join rows BEFORE the owner is deleted
+                    if (state == EntityState.Deleted)
+                    {
+                        foreach (var entry in entries)
+                        {
+                            if (entry.Entity != null)
+                            {
+                                if (map.OwnedCollections.Count > 0)
+                                    await SaveOwnedCollectionsAsync(entry.Entity, map, state, transaction, ct).ConfigureAwait(false);
+                                if (map.ManyToManyJoins.Count > 0)
+                                    await ExecuteJoinTableSyncAsync(entry.Entity, entry, transaction, ct).ConfigureAwait(false);
+                            }
+                        }
+                    }
+
                     for (int start = 0; start < entries.Count; start += batchSize)
                     {
                         var batch = entries.Skip(start).Take(Math.Min(batchSize, entries.Count - start)).ToList();
@@ -971,6 +986,21 @@ namespace nORM.Core
                             case EntityState.Deleted:
                                 totalAffected += await ExecuteDeleteBatch(cmd, map, batch, sql, 0, ct).ConfigureAwait(false);
                                 break;
+                        }
+                    }
+
+                    // For Added/Modified: save owned collections and M2M join rows AFTER the owner is persisted
+                    if (state != EntityState.Deleted)
+                    {
+                        foreach (var entry in entries)
+                        {
+                            if (entry.Entity != null)
+                            {
+                                if (map.OwnedCollections.Count > 0)
+                                    await SaveOwnedCollectionsAsync(entry.Entity, map, state, transaction, ct).ConfigureAwait(false);
+                                if (map.ManyToManyJoins.Count > 0)
+                                    await ExecuteJoinTableSyncAsync(entry.Entity, entry, transaction, ct).ConfigureAwait(false);
+                            }
                         }
                     }
                 }
@@ -1083,6 +1113,252 @@ namespace nORM.Core
                 EntityState.Deleted => BuildDeleteBatch(map, 0).Length + 1,
                 _ => 0
             };
+
+        /// <summary>
+        /// Inserts, updates or deletes owned collection items for a single owner entity.
+        /// For Added owners: INSERT all items. For Modified owners: DELETE then INSERT.
+        /// For Deleted owners: DELETE all items (called BEFORE the owner is deleted).
+        /// </summary>
+        private async Task SaveOwnedCollectionsAsync(object owner, TableMapping ownerMap, EntityState ownerState, DbTransaction? transaction, CancellationToken ct)
+        {
+            var ownerKey = ownerMap.KeyColumns.Length == 1 ? ownerMap.KeyColumns[0].Getter(owner) : null;
+            if (ownerKey == null) return;
+
+            foreach (var ownedMap in ownerMap.OwnedCollections)
+            {
+                await using var cmdScope = new CommandScope(Connection, transaction);
+                await using var cmd = cmdScope.CreateCommand();
+
+                if (ownerState == EntityState.Modified || ownerState == EntityState.Deleted)
+                {
+                    // DELETE existing owned items
+                    cmd.CommandText = $"DELETE FROM {ownedMap.EscTable} WHERE {ownedMap.EscForeignKeyColumn} = @ownerPk";
+                    var dp = cmd.CreateParameter();
+                    dp.ParameterName = "@ownerPk";
+                    dp.Value = ownerKey;
+                    cmd.Parameters.Add(dp);
+                    await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                }
+
+                if (ownerState == EntityState.Deleted) continue; // no re-insert for deleted owners
+
+                // INSERT all current owned items
+                var collection = ownedMap.CollectionGetter(owner);
+                if (collection == null) continue;
+                var items = ((System.Collections.IEnumerable)collection).Cast<object>().ToList();
+                if (items.Count == 0) continue;
+
+                // Clear any params left from the DELETE phase
+                cmd.Parameters.Clear();
+
+                var insertCols = ownedMap.Columns.Where(c => !c.IsDbGenerated).ToArray();
+                var colNames = string.Join(", ", insertCols.Select(c => c.EscCol).Prepend(ownedMap.EscForeignKeyColumn));
+
+                int pi = 0;
+                var sqlSb = new StringBuilder();
+                foreach (var item in items)
+                {
+                    sqlSb.Append($"INSERT INTO {ownedMap.EscTable} ({colNames}) VALUES (@ownerFk{pi}");
+                    var fkp = cmd.CreateParameter();
+                    fkp.ParameterName = $"@ownerFk{pi}";
+                    fkp.Value = ownerKey;
+                    cmd.Parameters.Add(fkp);
+                    int pj = 0;
+                    foreach (var col in insertCols)
+                    {
+                        var pname = $"@op{pi}_{pj}";
+                        sqlSb.Append($", {pname}");
+                        var pp = cmd.CreateParameter();
+                        pp.ParameterName = pname;
+                        var rawVal = col.Getter(item);
+                        if (col.Converter != null) rawVal = col.Converter.ConvertToProvider(rawVal);
+                        pp.Value = rawVal ?? DBNull.Value;
+                        cmd.Parameters.Add(pp);
+                        pj++;
+                    }
+                    sqlSb.Append(");");
+                    pi++;
+                }
+                cmd.CommandText = sqlSb.ToString();
+                await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Syncs the many-to-many join table rows for a single owner entity.
+        /// For Added/Modified owners: computes delta from snapshot, DELETEs removed rows, INSERTs new rows.
+        /// For Deleted owners: DELETEs ALL join rows for this entity.
+        /// </summary>
+        private async Task ExecuteJoinTableSyncAsync(object entity, EntityEntry entry, DbTransaction? transaction, CancellationToken ct)
+        {
+            var map = entry.Mapping;
+            foreach (var jtm in map.ManyToManyJoins)
+            {
+                var leftPk = jtm.LeftPkGetter(entity);
+                if (leftPk == null) continue;
+
+                await using var cmdScope = new CommandScope(Connection, transaction);
+                await using var cmd = cmdScope.CreateCommand();
+
+                if (entry.State == EntityState.Deleted)
+                {
+                    // Delete all join rows for this entity
+                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} = {_p.ParamPrefix}lpk";
+                    cmd.AddParam($"{_p.ParamPrefix}lpk", leftPk);
+                    await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                    continue;
+                }
+
+                // Compute current set of right PKs from the collection
+                var collection = jtm.LeftCollectionGetter(entity);
+                var currentSet = new HashSet<object>();
+                if (collection != null)
+                {
+                    foreach (var item in collection)
+                    {
+                        if (item == null) continue;
+                        var rpk = jtm.RightPkGetter(item);
+                        if (rpk != null) currentSet.Add(rpk);
+                    }
+                }
+
+                // For Added entities, snapshot is irrelevant — insert everything.
+                // For Modified entities, use the snapshot to compute delta.
+                HashSet<object> snapshot;
+                if (entry.State == EntityState.Added ||
+                    entry.ManyToManySnapshots == null ||
+                    !entry.ManyToManySnapshots.TryGetValue(jtm.LeftNavPropertyName, out var snap))
+                {
+                    snapshot = new HashSet<object>();
+                }
+                else
+                {
+                    snapshot = snap;
+                }
+
+                var toAdd = currentSet.Except(snapshot).ToList();
+                var toRemove = snapshot.Except(currentSet).ToList();
+
+                // DELETE removed join rows
+                foreach (var removedPk in toRemove)
+                {
+                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} = {_p.ParamPrefix}lp AND {jtm.EscRightFkColumn} = {_p.ParamPrefix}rp";
+                    cmd.Parameters.Clear();
+                    cmd.AddParam($"{_p.ParamPrefix}lp", leftPk);
+                    cmd.AddParam($"{_p.ParamPrefix}rp", removedPk);
+                    await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                }
+
+                // INSERT new join rows (idempotent / ignore duplicates)
+                foreach (var addedPk in toAdd)
+                {
+                    cmd.Parameters.Clear();
+                    var p1 = $"{_p.ParamPrefix}lp";
+                    var p2 = $"{_p.ParamPrefix}rp";
+                    cmd.CommandText = Provider.GetInsertOrIgnoreSql(
+                        jtm.EscTableName, jtm.EscLeftFkColumn, jtm.EscRightFkColumn, p1, p2);
+                    cmd.AddParam(p1, leftPk);
+                    cmd.AddParam(p2, addedPk);
+                    await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Loads owned collection items for all given owner entities using a single IN-query per collection.
+        /// </summary>
+        internal async Task LoadOwnedCollectionsAsync(System.Collections.IList owners, TableMapping ownerMap, CancellationToken ct)
+        {
+            if (ownerMap.KeyColumns.Length == 0 || owners.Count == 0) return;
+            var pkCol = ownerMap.KeyColumns[0];
+
+            // Build PK → owner lookup
+            var ownerByPk = new Dictionary<object, object>(owners.Count);
+            foreach (var owner in owners)
+            {
+                if (owner == null) continue;
+                var pk = pkCol.Getter(owner);
+                if (pk != null && !ownerByPk.ContainsKey(pk))
+                    ownerByPk[pk] = owner;
+            }
+            if (ownerByPk.Count == 0) return;
+
+            foreach (var ownedMap in ownerMap.OwnedCollections)
+            {
+                // SELECT owned cols + fk_col FROM child_table WHERE fk_col IN (@p0, @p1, ...)
+                var colSql = string.Join(", ", ownedMap.Columns.Select(c => c.EscCol));
+                if (colSql.Length > 0) colSql += ", ";
+                colSql += ownedMap.EscForeignKeyColumn;
+
+                var pks = ownerByPk.Keys.ToArray();
+                var inParams = string.Join(", ", pks.Select((_, i) => _p.ParamPrefix + "lpk" + i));
+                var querySql = $"SELECT {colSql} FROM {ownedMap.EscTable} WHERE {ownedMap.EscForeignKeyColumn} IN ({inParams})";
+
+                await using var cmd = CreateCommand();
+                cmd.CommandText = querySql;
+                cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+                for (int i = 0; i < pks.Length; i++)
+                {
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = _p.ParamPrefix + "lpk" + i;
+                    p.Value = pks[i];
+                    cmd.Parameters.Add(p);
+                }
+
+                // Initialize empty collections on all owners first
+                foreach (var owner in owners)
+                {
+                    if (owner == null) continue;
+                    var existing = ownedMap.CollectionGetter(owner);
+                    if (existing == null)
+                        ownedMap.CollectionSetter(owner, Activator.CreateInstance(typeof(List<>).MakeGenericType(ownedMap.OwnedType)));
+                }
+
+                int fkOrdinal = ownedMap.Columns.Length; // FK is the last column in our SELECT
+                await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    // Materialize owned item
+                    var item = Activator.CreateInstance(ownedMap.OwnedType)!;
+                    for (int ci = 0; ci < ownedMap.Columns.Length; ci++)
+                    {
+                        var col = ownedMap.Columns[ci];
+                        if (reader.IsDBNull(ci)) continue;
+                        var raw = reader.GetValue(ci);
+                        object? converted;
+                        if (col.Converter != null)
+                            converted = col.Converter.ConvertFromProvider(raw);
+                        else
+                            converted = ConvertSimple(raw, col.Prop.PropertyType);
+                        try { col.Setter(item, converted); } catch { }
+                    }
+
+                    // Read FK and assign to owner
+                    if (reader.IsDBNull(fkOrdinal)) continue;
+                    var fkVal = reader.GetValue(fkOrdinal);
+                    if (!ownerByPk.TryGetValue(fkVal, out var ownerEntity))
+                    {
+                        // Try type coercion (e.g. int64 vs int32)
+                        fkVal = ConvertSimple(fkVal, pkCol.Prop.PropertyType)!;
+                        if (fkVal == null || !ownerByPk.TryGetValue(fkVal, out ownerEntity)) continue;
+                    }
+
+                    var col2 = ownedMap.CollectionGetter(ownerEntity);
+                    if (col2 is System.Collections.IList list)
+                        list.Add(item);
+                }
+            }
+        }
+
+        /// <summary>Converts a DB value to the target CLR type using safe fallback logic.</summary>
+        private static object? ConvertSimple(object raw, Type targetType)
+        {
+            if (raw == null || raw == DBNull.Value) return null;
+            var underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
+            if (raw.GetType() == underlying) return raw;
+            try { return Convert.ChangeType(raw, underlying); }
+            catch { return raw; }
+        }
 
         /// <summary>
         /// Builds and executes a batched INSERT command for the provided entities.
@@ -1571,13 +1847,25 @@ namespace nORM.Core
             {
                 case WriteOperation.Insert:
                     foreach (var col in map.InsertColumns)
-                        cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
+                    {
+                        var rawVal = col.Getter(entity);
+                        var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
+                        cmd.AddParam(_p.ParamPrefix + col.PropName, val);
+                    }
                     break;
                 case WriteOperation.Update:
                     foreach (var col in map.UpdateColumns)
-                        cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
+                    {
+                        var rawVal = col.Getter(entity);
+                        var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
+                        cmd.AddParam(_p.ParamPrefix + col.PropName, val);
+                    }
                     foreach (var col in map.KeyColumns)
-                        cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
+                    {
+                        var rawVal = col.Getter(entity);
+                        var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
+                        cmd.AddParam(_p.ParamPrefix + col.PropName, val);
+                    }
                     if (map.TimestampColumn != null)
                     {
                         // Use the original snapshot token (not the current possibly-mutated property value)
@@ -1589,7 +1877,11 @@ namespace nORM.Core
 
                 case WriteOperation.Delete:
                     foreach (var col in map.KeyColumns)
-                        cmd.AddParam(_p.ParamPrefix + col.PropName, col.Getter(entity));
+                    {
+                        var rawVal = col.Getter(entity);
+                        var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
+                        cmd.AddParam(_p.ParamPrefix + col.PropName, val);
+                    }
                     if (map.TimestampColumn != null)
                     {
                         // Use the original snapshot token.
@@ -1740,13 +2032,25 @@ namespace nORM.Core
             {
                 case WriteOperation.Insert:
                     foreach (var col in map.InsertColumns)
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
+                    {
+                        var rawVal = col.Getter(entity);
+                        var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", val);
+                    }
                     break;
                 case WriteOperation.Update:
                     foreach (var col in map.UpdateColumns)
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
+                    {
+                        var rawVal = col.Getter(entity);
+                        var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", val);
+                    }
                     foreach (var col in map.KeyColumns)
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
+                    {
+                        var rawVal = col.Getter(entity);
+                        var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", val);
+                    }
                     if (map.TimestampColumn != null)
                     {
                         // Use the original snapshot token when available rather than the current
@@ -1759,7 +2063,11 @@ namespace nORM.Core
                     break;
                 case WriteOperation.Delete:
                     foreach (var col in map.KeyColumns)
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", col.Getter(entity));
+                    {
+                        var rawVal = col.Getter(entity);
+                        var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", val);
+                    }
                     if (map.TimestampColumn != null)
                     {
                         // Use the original snapshot token when available.
@@ -2757,7 +3065,9 @@ namespace nORM.Core
             for (int i = 0; i < bindings.Length; i++)
             {
                 var (param, col) = bindings[i];
-                param.Value = col.Getter(entity) ?? DBNull.Value;
+                var rawValue = col.Getter(entity);
+                var value = col.Converter != null ? col.Converter.ConvertToProvider(rawValue) : rawValue;
+                param.Value = value ?? DBNull.Value;
             }
 
             if (_hydrateGeneratedKeys)

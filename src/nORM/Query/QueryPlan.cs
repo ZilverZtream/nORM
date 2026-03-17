@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Mapping;
+using nORM.Configuration;
 
 #nullable enable
 
@@ -76,10 +77,14 @@ namespace nORM.Query
         int? Take = null,
         List<DependentQueryDefinition>? DependentQueries = null,
         Func<object, object>? ClientProjection = null,
-        QueryComplexityMetrics Complexity = default
+        QueryComplexityMetrics Complexity = default,
+        List<M2MIncludePlan>? M2MIncludes = null
     );
 
     internal sealed record IncludePlan(List<TableMapping.Relation> Path);
+
+    /// <summary>Eager-load plan for a many-to-many navigation property.</summary>
+    internal sealed record M2MIncludePlan(JoinTableMapping JoinTable);
 
     internal sealed record GroupJoinInfo(
         Type OuterType,
