@@ -214,9 +214,9 @@ ORDER BY ORDINAL_POSITION";
 
             var columns = string.Join(",\n    ", mapping.Columns.Select(c =>
             {
-                if (liveMap.TryGetValue(c.PropName, out var live))
-                    return $"{Escape(c.PropName)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
-                return $"{Escape(c.PropName)} {GetSqlType(c.Prop.PropertyType)}";
+                if (liveMap.TryGetValue(c.Name, out var live))
+                    return $"{Escape(c.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
+                return $"{Escape(c.Name)} {GetSqlType(c.Prop.PropertyType)}";
             }));
 
             return $@"
@@ -236,10 +236,10 @@ CREATE TABLE {historyTable} (
         {
             var table = Escape(mapping.TableName);
             var history = Escape(mapping.TableName + "_History");
-            var columns = string.Join(", ", mapping.Columns.Select(c => Escape(c.PropName)));
-            var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.PropName)));
-            var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.PropName)));
-            var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.PropName)} = OLD.{Escape(c.PropName)}"));
+            var columns = string.Join(", ", mapping.Columns.Select(c => Escape(c.Name)));
+            var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.Name)));
+            var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.Name)));
+            var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.Name)} = OLD.{Escape(c.Name)}"));
 
             return $@"
 CREATE TRIGGER {Escape(mapping.TableName + "_ai")} AFTER INSERT ON {table}

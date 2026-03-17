@@ -86,7 +86,7 @@ namespace nORM.Providers
                 // Use case-insensitive comparison so that lower-case or mixed-case
                 // ORDER BY clauses (e.g. "order by name") are detected correctly and a
                 // duplicate ORDER BY is not appended.
-                if (!sb.ToString().Contains("ORDER BY", StringComparison.OrdinalIgnoreCase)) sb.Append(" ORDER BY (SELECT NULL)");
+                if (!HasTopLevelOrderBy(sb.ToString())) sb.Append(" ORDER BY (SELECT NULL)");
                 sb.Append(" OFFSET ");
                 if (offsetParameterName != null) sb.Append(offsetParameterName);
                 else if (offset.HasValue) sb.Append(offset.Value);
@@ -99,6 +99,32 @@ namespace nORM.Providers
             }
         }
         
+        /// <summary>
+        /// Returns <c>true</c> if the SQL string contains an <c>ORDER BY</c> clause at the
+        /// top-level scope (depth-0 parentheses). A plain Contains scan
+        /// would false-positive on <c>ORDER BY</c> inside subqueries or string literals;
+        /// this method walks the string tracking open/close parentheses so only depth-0
+        /// occurrences count.  String literals are not parsed (a quoted ORDER BY would be
+        /// extremely rare in practice and is acceptable as a minor conservatism).
+        /// </summary>
+        private static bool HasTopLevelOrderBy(string sql)
+        {
+            int depth = 0;
+            int i = 0;
+            while (i < sql.Length)
+            {
+                var ch = sql[i];
+                if (ch == '(') { depth++; i++; continue; }
+                if (ch == ')') { depth--; i++; continue; }
+                if (depth == 0 && i + 8 <= sql.Length &&
+                    (sql[i] == 'O' || sql[i] == 'o') &&
+                    string.Compare(sql, i, "ORDER BY", 0, 8, StringComparison.OrdinalIgnoreCase) == 0)
+                    return true;
+                i++;
+            }
+            return false;
+        }
+
         /// <summary>
         /// Returns SQL for retrieving the last identity value generated in the current scope.
         /// </summary>
@@ -302,10 +328,10 @@ ORDER BY c.ORDINAL_POSITION";
 
             var columns = string.Join(",\n    ", mapping.Columns.Select(c =>
             {
-                if (liveMap.TryGetValue(c.PropName, out var live))
-                    return $"{Escape(c.PropName)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
+                if (liveMap.TryGetValue(c.Name, out var live))
+                    return $"{Escape(c.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
                 var sqlType = GetSqlType(c.Prop.PropertyType);
-                return $"{Escape(c.PropName)} {sqlType}";
+                return $"{Escape(c.Name)} {sqlType}";
             }));
 
             return $@"CREATE TABLE {historyTable} (
@@ -326,11 +352,11 @@ ORDER BY c.ORDINAL_POSITION";
         {
             var table = Escape(mapping.TableName);
             var history = Escape(mapping.TableName + "_History");
-            var columns = string.Join(", ", mapping.Columns.Select(c => Escape(c.PropName)));
-            var insertedColumns = string.Join(", ", mapping.Columns.Select(c => "i." + Escape(c.PropName)));
-            var deletedColumns = string.Join(", ", mapping.Columns.Select(c => "d." + Escape(c.PropName)));
-            var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h.{Escape(c.PropName)} = d.{Escape(c.PropName)}"));
-            var keyConditionH2 = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h2.{Escape(c.PropName)} = d.{Escape(c.PropName)}"));
+            var columns = string.Join(", ", mapping.Columns.Select(c => Escape(c.Name)));
+            var insertedColumns = string.Join(", ", mapping.Columns.Select(c => "i." + Escape(c.Name)));
+            var deletedColumns = string.Join(", ", mapping.Columns.Select(c => "d." + Escape(c.Name)));
+            var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h.{Escape(c.Name)} = d.{Escape(c.Name)}"));
+            var keyConditionH2 = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h2.{Escape(c.Name)} = d.{Escape(c.Name)}"));
 
             return $@"
 CREATE TRIGGER {Escape(mapping.TableName + "_TemporalInsert")} ON {table} AFTER INSERT AS

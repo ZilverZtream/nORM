@@ -299,11 +299,11 @@ namespace nORM.Providers
 
             var columns = string.Join(",\n                ", mapping.Columns.Select(c =>
             {
-                if (liveMap.TryGetValue(c.PropName, out var live))
-                    return $"{Escape(c.PropName)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
+                if (liveMap.TryGetValue(c.Name, out var live))
+                    return $"{Escape(c.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
                 var sqlType = GetSqliteType(c.Prop.PropertyType);
                 var nullability = IsNullableOrReferenceType(c.Prop.PropertyType) ? "" : " NOT NULL";
-                return $"{Escape(c.PropName)} {sqlType}{nullability}";
+                return $"{Escape(c.Name)} {sqlType}{nullability}";
             }));
             return @$"CREATE TABLE IF NOT EXISTS {Escape(mapping.TableName + "_History")} (
                 __VersionId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -330,11 +330,11 @@ namespace nORM.Providers
         {
             var table = Escape(mapping.TableName);
             var history = Escape(mapping.TableName + "_History");
-            var columnList = string.Join(", ", mapping.Columns.Select(c => Escape(c.PropName)));
-            var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.PropName)));
-            var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.PropName)));
+            var columnList = string.Join(", ", mapping.Columns.Select(c => Escape(c.Name)));
+            var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.Name)));
+            var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.Name)));
             var keyCondition = mapping.KeyColumns.Length > 0
-                ? string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.PropName)} = OLD.{Escape(c.PropName)}"))
+                ? string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.Name)} = OLD.{Escape(c.Name)}"))
                 : "1=1";
 
             return @$"

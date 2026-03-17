@@ -256,6 +256,264 @@ public class TemporalProviderBootstrapTests
         Assert.Equal("2024-01-15T12:00:00", result!.ToString());
     }
 
+ // ── MySQL: temporal bootstrap SQL ────────────────────────────────────────
+
+    //<summary>
+    //MySQL GetCreateTagsTableSql must use backtick-escaped identifiers and IF NOT EXISTS.
+    //</summary>
+    [Fact]
+    public void MySqlProvider_GetCreateTagsTableSql_UsesBacktickEscaping()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var sql = provider.GetCreateTagsTableSql();
+
+        Assert.Contains("`__NormTemporalTags`", sql);
+        Assert.Contains("`TagName`", sql);
+        Assert.Contains("`Timestamp`", sql);
+        Assert.Contains("IF NOT EXISTS", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    //<summary>
+    //MySQL GetHistoryTableExistsProbeSql must use LIMIT (not TOP).
+    //</summary>
+    [Fact]
+    public void MySqlProvider_GetHistoryTableExistsProbeSql_UsesLimit_NotTop()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var sql = provider.GetHistoryTableExistsProbeSql("`MyTable_History`");
+
+        Assert.Contains("LIMIT", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("TOP", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    //<summary>
+    //MySQL GetTagLookupSql must use backtick-escaped identifiers and include the param name.
+    //</summary>
+    [Fact]
+    public void MySqlProvider_GetTagLookupSql_UsesBacktickEscaping()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var sql = provider.GetTagLookupSql("@p0");
+
+        Assert.Contains("`__NormTemporalTags`", sql);
+        Assert.Contains("`TagName`", sql);
+        Assert.Contains("`Timestamp`", sql);
+        Assert.Contains("@p0", sql);
+    }
+
+    //<summary>
+    //MySQL GetCreateTagSql must use backtick-escaped identifiers and include both param names.
+    //</summary>
+    [Fact]
+    public void MySqlProvider_GetCreateTagSql_UsesBacktickEscaping()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var sql = provider.GetCreateTagSql("@p0", "@p1");
+
+        Assert.Contains("`__NormTemporalTags`", sql);
+        Assert.Contains("`TagName`", sql);
+        Assert.Contains("`Timestamp`", sql);
+        Assert.Contains("@p0", sql);
+        Assert.Contains("@p1", sql);
+    }
+
+    //<summary>
+    //MySQL IsObjectNotFoundError must return true for "doesn't exist" messages (base fallback).
+    //</summary>
+    [Fact]
+    public void MySqlProvider_IsObjectNotFoundError_TableDoesntExistMessage_ReturnsTrue()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var ex = new GenericDbException("Table 'mydb.Foo' doesn't exist");
+
+        Assert.True(provider.IsObjectNotFoundError(ex));
+    }
+
+    //<summary>
+    //MySQL IsObjectNotFoundError must return false for connection-level errors.
+    //</summary>
+    [Fact]
+    public void MySqlProvider_IsObjectNotFoundError_ConnectionError_ReturnsFalse()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var ex = new GenericDbException("Cannot connect to server");
+
+        Assert.False(provider.IsObjectNotFoundError(ex));
+    }
+
+ // ── PostgreSQL: temporal bootstrap SQL ───────────────────────────────────
+
+    //<summary>
+    //PostgreSQL GetCreateTagsTableSql must use double-quote-escaped identifiers and IF NOT EXISTS.
+    //</summary>
+    [Fact]
+    public void PostgresProvider_GetCreateTagsTableSql_UsesDoubleQuoteEscaping()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var sql = provider.GetCreateTagsTableSql();
+
+        Assert.Contains("\"__NormTemporalTags\"", sql);
+        Assert.Contains("\"TagName\"", sql);
+        Assert.Contains("\"Timestamp\"", sql);
+        Assert.Contains("IF NOT EXISTS", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    //<summary>
+    //PostgreSQL GetHistoryTableExistsProbeSql must use LIMIT (not TOP).
+    //</summary>
+    [Fact]
+    public void PostgresProvider_GetHistoryTableExistsProbeSql_UsesLimit_NotTop()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var sql = provider.GetHistoryTableExistsProbeSql("\"MyTable_History\"");
+
+        Assert.Contains("LIMIT", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("TOP", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    //<summary>
+    //PostgreSQL GetTagLookupSql must use double-quote-escaped identifiers and include the param name.
+    //</summary>
+    [Fact]
+    public void PostgresProvider_GetTagLookupSql_UsesDoubleQuoteEscaping()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var sql = provider.GetTagLookupSql("@p0");
+
+        Assert.Contains("\"__NormTemporalTags\"", sql);
+        Assert.Contains("\"TagName\"", sql);
+        Assert.Contains("\"Timestamp\"", sql);
+        Assert.Contains("@p0", sql);
+    }
+
+    //<summary>
+    //PostgreSQL GetCreateTagSql must use double-quote-escaped identifiers and include both param names.
+    //</summary>
+    [Fact]
+    public void PostgresProvider_GetCreateTagSql_UsesDoubleQuoteEscaping()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var sql = provider.GetCreateTagSql("@p0", "@p1");
+
+        Assert.Contains("\"__NormTemporalTags\"", sql);
+        Assert.Contains("\"TagName\"", sql);
+        Assert.Contains("\"Timestamp\"", sql);
+        Assert.Contains("@p0", sql);
+        Assert.Contains("@p1", sql);
+    }
+
+    //<summary>
+    //PostgreSQL IsObjectNotFoundError must return true for "does not exist" messages (base fallback).
+    //</summary>
+    [Fact]
+    public void PostgresProvider_IsObjectNotFoundError_RelationDoesNotExist_ReturnsTrue()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var ex = new GenericDbException("relation \"Foo\" does not exist");
+
+        Assert.True(provider.IsObjectNotFoundError(ex));
+    }
+
+    //<summary>
+    //PostgreSQL IsObjectNotFoundError must return false for connection-level errors.
+    //</summary>
+    [Fact]
+    public void PostgresProvider_IsObjectNotFoundError_ConnectionError_ReturnsFalse()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var ex = new GenericDbException("connection refused");
+
+        Assert.False(provider.IsObjectNotFoundError(ex));
+    }
+
+ // ── Provider matrix tests ────────────────────────────────────────────────
+
+    //<summary>
+    //Only SQL Server uses TOP; all other providers use LIMIT for the existence probe.
+    //</summary>
+    [Fact]
+    public void AllProviders_GetHistoryTableExistsProbeSql_OnlySqlServer_UsesTop()
+    {
+        var providers = new (DatabaseProvider Provider, string EscapedName)[]
+        {
+            (new SqliteProvider(),                            "\"SomeTable_History\""),
+            (new SqlServerProvider(),                         "[SomeTable_History]"),
+            (new MySqlProvider(new SqliteParameterFactory()), "`SomeTable_History`"),
+            (new PostgresProvider(new SqliteParameterFactory()), "\"SomeTable_History\""),
+        };
+
+        foreach (var (provider, escapedName) in providers)
+        {
+            var sql = provider.GetHistoryTableExistsProbeSql(escapedName);
+            var isSqlServer = provider is SqlServerProvider;
+
+            if (isSqlServer)
+            {
+                Assert.True(sql.Contains("TOP", StringComparison.OrdinalIgnoreCase),
+                    $"{provider.GetType().Name} should use TOP but got: {sql}");
+                Assert.False(sql.Contains("LIMIT", StringComparison.OrdinalIgnoreCase),
+                    $"{provider.GetType().Name} should not use LIMIT but got: {sql}");
+            }
+            else
+            {
+                Assert.True(sql.Contains("LIMIT", StringComparison.OrdinalIgnoreCase),
+                    $"{provider.GetType().Name} should use LIMIT but got: {sql}");
+                Assert.False(sql.Contains("TOP", StringComparison.OrdinalIgnoreCase),
+                    $"{provider.GetType().Name} should not use TOP but got: {sql}");
+            }
+        }
+    }
+
+    //<summary>
+    //Each provider uses its own escaping style in GetCreateTagsTableSql; all contain the table name.
+    //</summary>
+    [Fact]
+    public void AllProviders_GetCreateTagsTableSql_UsesCorrectEscaping()
+    {
+        // SQLite: double-quote
+        {
+            var sql = new SqliteProvider().GetCreateTagsTableSql();
+            Assert.Contains("\"__NormTemporalTags\"", sql);
+        }
+        // SQL Server: bracket
+        {
+            var sql = new SqlServerProvider().GetCreateTagsTableSql();
+            Assert.Contains("[__NormTemporalTags]", sql);
+        }
+        // MySQL: backtick
+        {
+            var sql = new MySqlProvider(new SqliteParameterFactory()).GetCreateTagsTableSql();
+            Assert.Contains("`__NormTemporalTags`", sql);
+        }
+        // PostgreSQL: double-quote
+        {
+            var sql = new PostgresProvider(new SqliteParameterFactory()).GetCreateTagsTableSql();
+            Assert.Contains("\"__NormTemporalTags\"", sql);
+        }
+    }
+
+    //<summary>
+    //All providers include the param name passed to GetTagLookupSql in the resulting SQL.
+    //</summary>
+    [Fact]
+    public void AllProviders_GetTagLookupSql_ContainsParamName()
+    {
+        var providers = new DatabaseProvider[]
+        {
+            new SqliteProvider(),
+            new SqlServerProvider(),
+            new MySqlProvider(new SqliteParameterFactory()),
+            new PostgresProvider(new SqliteParameterFactory()),
+        };
+
+        foreach (var provider in providers)
+        {
+            var sql = provider.GetTagLookupSql("@p0");
+            Assert.True(sql.Contains("@p0"),
+                $"{provider.GetType().Name}.GetTagLookupSql should contain '@p0' but got: {sql}");
+        }
+    }
+
  // ── Helper: generic DbException for fallback tests ────────────────────────
 
     private sealed class GenericDbException : DbException
