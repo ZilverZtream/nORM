@@ -42,14 +42,12 @@ public class IdentifierEscapingMatrixTests
     }
 
     [Fact]
-    public void Sqlite_SchemaQualified_WrapsWholeNameAsSingleIdentifier()
+    public void Sqlite_SchemaQualified_SplitsOnDotAndEachPartWrapped()
     {
-        // SQLite does not split on '.' — whole name is wrapped as one identifier
+        // P1 fix: SQLite now splits on '.' and wraps each segment separately.
         var p = new SqliteProvider();
         var result = p.Escape("dbo.Users");
-        Assert.StartsWith("\"", result);
-        Assert.EndsWith("\"", result);
-        Assert.Contains("dbo.Users", result);
+        Assert.Equal("\"dbo\".\"Users\"", result);
     }
 
     [Fact]
@@ -158,14 +156,12 @@ public class IdentifierEscapingMatrixTests
     }
 
     [Fact]
-    public void MySql_SchemaQualified_WrapsWholeNameAsSingleIdentifier()
+    public void MySql_SchemaQualified_SplitsOnDotAndEachPartWrapped()
     {
-        // MySQL wraps everything in backticks as one identifier (no dot-splitting)
+        // P1 fix: MySQL now splits on '.' and wraps each segment separately.
         var p = new MySqlProvider(new SqliteParameterFactory());
         var result = p.Escape("mydb.Users");
-        Assert.StartsWith("`", result);
-        Assert.EndsWith("`", result);
-        Assert.Contains("mydb.Users", result);
+        Assert.Equal("`mydb`.`Users`", result);
     }
 
     [Fact]
@@ -251,12 +247,13 @@ public class IdentifierEscapingMatrixTests
     // ─── EscapeIdentifier: empty string handling ───────────────────────────
 
     [Fact]
-    public void Sqlite_EmptyStringOrWhitespace_WrapsInDoubleQuotes()
+    public void Sqlite_EmptyStringOrWhitespace_PassedThroughUnchanged()
     {
         var p = new SqliteProvider();
-        // Empty string — should not throw, just wrap empty identifier
+        // Empty/whitespace identifiers are returned as-is (null-guard behaviour).
         var result = p.Escape(string.Empty);
-        Assert.Equal("\"\"", result);
+        Assert.True(string.IsNullOrEmpty(result),
+            $"Expected empty/null result for empty input, got: '{result}'");
     }
 
     [Fact]

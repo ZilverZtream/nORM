@@ -466,10 +466,10 @@ namespace nORM.Query
             }
             else
             {
-                if (!_compiledParamSets.TryGetValue(plan, out var compiledSet))
+                if (!_compiledParamSets.TryGet(plan, out var compiledSet))
                 {
                     compiledSet = new HashSet<string>(compiledParams, StringComparer.Ordinal);
-                    _compiledParamSets.TryAdd(plan, compiledSet);
+                    _compiledParamSets.Set(plan, compiledSet);
                 }
                 foreach (var p in plan.Parameters)
                 {
@@ -733,8 +733,14 @@ namespace nORM.Query
             return (TResult)result!;
         }
 
-        /// <summary>Cached HashSets for compiled parameter name lookups (O(1) vs O(N)).</summary>
-        private static readonly ConcurrentDictionary<QueryPlan, HashSet<string>> _compiledParamSets = new();
+        /// <summary>
+        /// Bounded FIFO cache mapping QueryPlan → compiled parameter name set (O(1) vs O(N) lookup).
+        /// Capped at 10 000 entries to prevent unbounded memory growth under adversarial or
+        /// pathological query-shape churn (Q1/X1 audit finding). FIFO eviction: oldest-inserted
+        /// entry is dropped first when the cap is exceeded.
+        /// </summary>
+        private static readonly nORM.Internal.BoundedCache<QueryPlan, HashSet<string>> _compiledParamSets
+            = new(maxSize: 10_000);
 
         private Task<TResult> ExecuteCompiledInternalArrayAsync<TResult>(QueryPlan plan, object?[] parameterValues, CancellationToken ct)
         {
@@ -758,10 +764,10 @@ namespace nORM.Query
             }
             else
             {
-                if (!_compiledParamSets.TryGetValue(plan, out var compiledSet))
+                if (!_compiledParamSets.TryGet(plan, out var compiledSet))
                 {
                     compiledSet = new HashSet<string>(compiledParams, StringComparer.Ordinal);
-                    _compiledParamSets.TryAdd(plan, compiledSet);
+                    _compiledParamSets.Set(plan, compiledSet);
                 }
 
                 foreach (var p in plan.Parameters)
