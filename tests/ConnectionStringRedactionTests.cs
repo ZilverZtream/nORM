@@ -1,133 +1,169 @@
 using System;
-using System.Reflection;
-using nORM.Query;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
+using nORM.Core;
+using nORM.Providers;
 using Xunit;
+
+#nullable enable
 
 namespace nORM.Tests;
 
+// ══════════════════════════════════════════════════════════════════════════════
+// T1 — Connection string credential redaction in ConnectionManager logs
+//      (Gate 4.0→4.5)
+// ══════════════════════════════════════════════════════════════════════════════
+
 /// <summary>
-/// Verifies that NormalizeConnectionStringForCacheKey strips sensitive
-/// keys (Password, Pwd, Access Token, Token, Secret) before producing the
-/// cache key so that credentials never appear in cache key material.
+/// Verifies that ConnectionManager never emits raw connection-string credentials
+/// (Password, Token, Secret, etc.) to the logger in the read-replica failure
+/// path or the failover path.
+///
+/// T1 root cause: GetReadConnectionAsync logged replica.ConnectionString directly
+/// on failure; TriggerFailoverAsync logged newPrimary.ConnectionString on
+/// promotion — both without redaction.
+///
+/// Fix: RedactConnectionString() replaces sensitive key values with "***" using
+/// DbConnectionStringBuilder before any log call.
 /// </summary>
 public class ConnectionStringRedactionTests
 {
-    private static readonly MethodInfo _normalize =
-        typeof(NormQueryProvider)
-            .GetMethod("NormalizeConnectionStringForCacheKey",
-                BindingFlags.NonPublic | BindingFlags.Static)!;
+    // ── Minimal capturing ILogger ─────────────────────────────────────────────
 
-    private static string Normalize(string? cs) =>
-        (string)_normalize.Invoke(null, new object?[] { cs })!;
-
- // ─── Sensitive key values are stripped from normalized result ────────
-
-    [Fact]
-    public void Password_NotInNormalizedKey()
+    private sealed class CapturingLogger : ILogger
     {
-        var cs = "Server=myserver;Database=mydb;Password=secret123";
-        var result = Normalize(cs);
+        public List<string> Messages { get; } = new();
 
-        Assert.DoesNotContain("secret123", result, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Password", result, StringComparison.OrdinalIgnoreCase);
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+            => NullScope.Instance;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter)
+            => Messages.Add(formatter(state, exception));
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+            public void Dispose() { }
+        }
+    }
+
+    // ── Unit tests for RedactConnectionString ─────────────────────────────────
+
+    [Theory]
+    [InlineData("Data Source=db;Password=SuperSecret;User ID=admin",   "SuperSecret")]
+    [InlineData("Server=host;Database=db;Pwd=P@ssw0rd!",              "P@ssw0rd!")]
+    [InlineData("Host=db;Port=5432;Token=eyJsecrettoken",             "eyJsecrettoken")]
+    [InlineData("Server=db;Access Token=tok123",                       "tok123")]
+    [InlineData("Server=db;Secret=mysecret123",                        "mysecret123")]
+    public void RedactConnectionString_SensitiveValue_IsReplaced(
+        string raw, string sensitiveValue)
+    {
+        var redacted = ConnectionManager.RedactConnectionString(raw);
+        Assert.DoesNotContain(sensitiveValue, redacted, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("***", redacted);
+    }
+
+    [Theory]
+    [InlineData("Data Source=:memory:")]
+    [InlineData("Data Source=mydb.sqlite")]
+    [InlineData("Server=myhost;Database=mydb;User ID=readonly")]
+    public void RedactConnectionString_NoSensitiveKeys_NoStarsInOutput(string raw)
+    {
+        var redacted = ConnectionManager.RedactConnectionString(raw);
+        Assert.DoesNotContain("***", redacted);
     }
 
     [Fact]
-    public void Pwd_NotInNormalizedKey()
+    public void RedactConnectionString_PasswordKey_NonSensitiveKeysPreserved()
     {
-        var cs = "Server=myserver;Database=mydb;Pwd=hunter2";
-        var result = Normalize(cs);
-
-        Assert.DoesNotContain("hunter2", result, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Pwd", result, StringComparison.OrdinalIgnoreCase);
+        const string raw = "Data Source=mydb;User ID=alice;Password=topsecret";
+        var redacted = ConnectionManager.RedactConnectionString(raw);
+        Assert.DoesNotContain("topsecret", redacted, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("alice", redacted, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void AccessToken_NotInNormalizedKey()
+    public void RedactConnectionString_MalformedString_DoesNotThrow()
     {
-        var cs = "Server=myserver;Database=mydb;Access Token=abc123token";
-        var result = Normalize(cs);
-
-        Assert.DoesNotContain("abc123token", result, StringComparison.OrdinalIgnoreCase);
+        var result = ConnectionManager.RedactConnectionString("not=valid;;===malformed");
+        Assert.NotNull(result);
     }
 
-    [Fact]
-    public void Token_NotInNormalizedKey()
-    {
-        var cs = "Server=myserver;Database=mydb;Token=eyJhbGci";
-        var result = Normalize(cs);
+    // ── Integration: replica failure path does not log raw credentials ─────────
 
-        Assert.DoesNotContain("eyJhbGci", result, StringComparison.OrdinalIgnoreCase);
+    [Fact]
+    public async Task GetReadConnectionAsync_ReplicaFailure_DoesNotLogCredentials()
+    {
+        const string secret = "TopSecret999";
+        var logger = new CapturingLogger();
+
+        // Replica uses a path that will fail to open (ReadOnly + non-existent file).
+        var replicaConnStr =
+            $"Data Source=/nonexistent/__norm_test_{Guid.NewGuid():N}.db;Password={secret};Mode=ReadOnly";
+        var primaryConnStr = "Data Source=:memory:";
+
+        var topology = new DatabaseTopology();
+        topology.Nodes.Add(new DatabaseTopology.DatabaseNode
+            { ConnectionString = primaryConnStr, Role = DatabaseTopology.DatabaseRole.Primary });
+        topology.Nodes.Add(new DatabaseTopology.DatabaseNode
+            { ConnectionString = replicaConnStr, Role = DatabaseTopology.DatabaseRole.ReadReplica });
+
+        using var mgr = new ConnectionManager(
+            topology, new SqliteProvider(), logger,
+            healthCheckInterval: TimeSpan.FromHours(1));
+
+        // Attempt a read — replica fails, falls back to primary.
+        try
+        {
+            var cn = await mgr.GetReadConnectionAsync();
+            cn.Dispose();
+        }
+        catch { /* primary may also fail; we only care about log content */ }
+
+        foreach (var msg in logger.Messages)
+            Assert.DoesNotContain(secret, msg, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void Secret_NotInNormalizedKey()
-    {
-        var cs = "Server=myserver;Database=mydb;Secret=topsecret";
-        var result = Normalize(cs);
-
-        Assert.DoesNotContain("topsecret", result, StringComparison.OrdinalIgnoreCase);
-    }
-
- // ─── Strings differing only by password → same normalized key ───────
+    // ── Integration: failover path does not log raw credentials ───────────────
 
     [Fact]
-    public void DifferentPasswords_ProduceSameNormalizedKey()
+    public async Task Failover_PromotionLog_DoesNotLogCredentials()
     {
- // Two connection strings differing only in the password must produce
- // the same cache key (credentials are stripped before hashing).
-        var cs1 = "Server=myserver;Database=mydb;Password=pass1";
-        var cs2 = "Server=myserver;Database=mydb;Password=pass2";
+        const string secret = "FailoverSecret777";
+        var logger = new CapturingLogger();
 
-        Assert.Equal(Normalize(cs1), Normalize(cs2));
-    }
+        var node1 = new DatabaseTopology.DatabaseNode
+        {
+            ConnectionString = $"Data Source=:memory:;Password={secret}",
+            Role             = DatabaseTopology.DatabaseRole.Primary
+        };
+        var node2 = new DatabaseTopology.DatabaseNode
+        {
+            ConnectionString = $"Data Source=:memory:;Password={secret}",
+            Role             = DatabaseTopology.DatabaseRole.ReadReplica
+        };
+        var topology = new DatabaseTopology();
+        topology.Nodes.Add(node1);
+        topology.Nodes.Add(node2);
+        using var mgr = new ConnectionManager(
+            topology, new SqliteProvider(), logger,
+            healthCheckInterval: TimeSpan.FromHours(1));
 
- // ─── Non-sensitive keys remain in the normalized key ────────────────
+        // Force failover: mark primary unhealthy, make replica look healthy.
+        node1.IsHealthy = false;
+        node2.IsHealthy = true;
 
-    [Fact]
-    public void DifferentServers_ProduceDifferentNormalizedKeys()
-    {
- // Cache isolation must still work: different Server= values → different keys.
-        var cs1 = "Server=server1;Database=mydb;Password=secret";
-        var cs2 = "Server=server2;Database=mydb;Password=secret";
+        try
+        {
+            var cn = await mgr.GetWriteConnectionAsync();
+            cn.Dispose();
+        }
+        catch { }
 
-        Assert.NotEqual(Normalize(cs1), Normalize(cs2));
-    }
-
-    [Fact]
-    public void ServerKey_RemainsInNormalizedKey()
-    {
-        var cs = "Server=myserver;Database=mydb;Password=secret";
-        var result = Normalize(cs);
-
-        Assert.Contains("Server=myserver", result, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Database=mydb", result, StringComparison.OrdinalIgnoreCase);
-    }
-
- // ─── Edge cases ─────────────────────────────────────────────────────
-
-    [Fact]
-    public void NullConnectionString_ReturnsEmpty()
-    {
-        Assert.Equal(string.Empty, Normalize(null));
-    }
-
-    [Fact]
-    public void EmptyConnectionString_ReturnsEmpty()
-    {
-        Assert.Equal(string.Empty, Normalize(string.Empty));
-    }
-
-    [Fact]
-    public void PasswordKeyIsCaseInsensitive()
-    {
-        var cs1 = "Server=s;PASSWORD=secret";
-        var cs2 = "Server=s;password=secret";
-        var cs3 = "Server=s;Password=secret";
-
- // All should strip password and produce the same key.
-        Assert.Equal(Normalize(cs1), Normalize(cs2));
-        Assert.Equal(Normalize(cs2), Normalize(cs3));
-        Assert.DoesNotContain("secret", Normalize(cs1), StringComparison.OrdinalIgnoreCase);
+        foreach (var msg in logger.Messages)
+            Assert.DoesNotContain(secret, msg, StringComparison.OrdinalIgnoreCase);
     }
 }

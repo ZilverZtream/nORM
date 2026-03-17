@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -245,12 +246,17 @@ namespace nORM.Configuration
         public AmbientTransactionEnlistmentPolicy AmbientTransactionPolicy { get; set; }
             = AmbientTransactionEnlistmentPolicy.FailFast;
 
+        // C1: backing store is ConcurrentDictionary so outer dict ops are thread-safe.
+        // Inner lists are replaced atomically (copy-on-write) in AddGlobalFilter so
+        // readers in the query translation path always see a stable snapshot.
+        private readonly ConcurrentDictionary<Type, List<LambdaExpression>> _globalFilters = new();
+
         /// <summary>
         /// Gets a dictionary of global query filters keyed by entity type. Each entry
         /// contains a list of lambda expressions that will be applied to queries for the
         /// corresponding entity.
         /// </summary>
-        public IDictionary<Type, List<LambdaExpression>> GlobalFilters { get; } = new Dictionary<Type, List<LambdaExpression>>();
+        public IDictionary<Type, List<LambdaExpression>> GlobalFilters => _globalFilters;
 
         /// <summary>
         /// Registers a global query filter that has access to both the current
@@ -262,12 +268,11 @@ namespace nORM.Configuration
         /// <returns>The current <see cref="DbContextOptions"/> instance for chaining.</returns>
         public DbContextOptions AddGlobalFilter<TEntity>(Expression<Func<DbContext, TEntity, bool>> filter)
         {
-            if (!GlobalFilters.TryGetValue(typeof(TEntity), out var list))
-            {
-                list = new List<LambdaExpression>();
-                GlobalFilters[typeof(TEntity)] = list;
-            }
-            list.Add(filter);
+            // C1: copy-on-write so the query pipeline never sees a list mutated in place.
+            _globalFilters.AddOrUpdate(
+                typeof(TEntity),
+                _ => new List<LambdaExpression> { filter },
+                (_, existing) => new List<LambdaExpression>(existing) { filter });
             return this;
         }
 

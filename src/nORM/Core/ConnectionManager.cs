@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -231,7 +233,7 @@ namespace nORM.Core
             {
                 // CONNECTION LEAK FIX (TASK 2): Dispose failed connection before falling back
                 cn?.Dispose();
-                _logger.LogWarning(ex, "Failed to acquire connection from read replica {Replica}", replica.ConnectionString);
+                _logger.LogWarning(ex, "Failed to acquire connection from read replica {Replica}", RedactConnectionString(replica.ConnectionString));
                 replica.IsHealthy = false;
                 UpdateAvailableReadReplicas();
                 return await GetWriteConnectionAsync(ct).ConfigureAwait(false);
@@ -314,6 +316,38 @@ namespace nORM.Core
         {
             // Check if inner exception is a SocketException
             return HasSocketExceptionInChain(ex);
+        }
+
+        // ── T1: connection-string credential redaction ────────────────────────
+
+        private static readonly HashSet<string> _sensitiveConnStrKeys = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "password", "pwd", "user password",
+            "access token", "accesstoken", "token", "secret"
+        };
+
+        /// <summary>
+        /// Returns a copy of <paramref name="connectionString"/> with sensitive values
+        /// (Password, Token, Secret, etc.) replaced by <c>***</c>. Safe to log.
+        /// </summary>
+        internal static string RedactConnectionString(string connectionString)
+        {
+            try
+            {
+                var builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
+                foreach (var key in _sensitiveConnStrKeys)
+                {
+                    if (builder.ContainsKey(key))
+                        builder[key] = "***";
+                }
+                return builder.ConnectionString;
+            }
+            catch
+            {
+                // Malformed connection string — emit a hash rather than the raw value.
+                var hash = SHA256.HashData(Encoding.UTF8.GetBytes(connectionString));
+                return $"[redacted:{Convert.ToHexString(hash)[..8]}]";
+            }
         }
 
         /// <summary>
@@ -422,7 +456,7 @@ namespace nORM.Core
 
                 if (newPrimary != null)
                 {
-                    _logger.LogWarning("Failing over to {ConnectionString}", newPrimary.ConnectionString);
+                    _logger.LogWarning("Failing over to {ConnectionString}", RedactConnectionString(newPrimary.ConnectionString));
                     _currentPrimary = newPrimary;
                 }
                 else
