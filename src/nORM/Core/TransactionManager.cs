@@ -82,8 +82,32 @@ namespace nORM.Core
 
                 if (policy == AmbientTransactionEnlistmentPolicy.Ignore)
                 {
-                    // Enlistment intentionally skipped — writes commit independently of the scope.
-                    // X1 fix: accept tracker state after save because DB is already committed.
+                    // X1 fix: Explicitly de-enlist from any ambient transaction that the
+                    // ADO.NET driver may have auto-enlisted into when the connection was
+                    // opened (SqlClient, Microsoft.Data.Sqlite with Enlist=true in the
+                    // connection string both auto-enlist on Open() if Transaction.Current
+                    // is set at that moment). EnlistTransaction(null) detaches the connection
+                    // so subsequent writes commit independently rather than being rolled back
+                    // when the ambient scope is abandoned without Complete().
+                    if (connection != null && connection.State == System.Data.ConnectionState.Open)
+                    {
+                        try
+                        {
+                            connection.EnlistTransaction(null);
+                            context.Options.Logger?.LogDebug(
+                                "De-enlisted connection from ambient transaction for Ignore policy.");
+                        }
+                        catch (Exception deEx)
+                        {
+                            // Some providers do not support explicit de-enlistment. Log at debug
+                            // level so the operator can investigate auto-enlist behavior.
+                            context.Options.Logger?.LogDebug(
+                                "Could not de-enlist connection from ambient transaction " +
+                                "(Ignore policy): {Message}. Writes may participate in the " +
+                                "ambient scope if the provider auto-enlists.", deEx.Message);
+                        }
+                    }
+                    // Writes commit independently of the ambient scope — advance the tracker.
                     shouldAcceptChanges = true;
                 }
                 else if (connection != null && connection.State == System.Data.ConnectionState.Open)

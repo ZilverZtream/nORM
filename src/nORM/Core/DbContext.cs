@@ -1492,6 +1492,28 @@ namespace nORM.Core
         /// <returns>The number of rows affected by the batch.</returns>
         private async Task<int> ExecuteUpdateBatch(DbCommand cmd, TableMapping map, List<EntityEntry> batch, StringBuilder sql, int paramIndex, CancellationToken ct)
         {
+            // S1 enforcement: warn or throw when the provider uses affected-row semantics with OCC tokens.
+            // Affected-row semantics (MySQL default) cannot detect OCC conflicts where the concurrent
+            // writer sets the token to the same value. RequireMatchedRowOccSemantics opts into strict mode.
+            if (map.TimestampColumn != null && Provider.UseAffectedRowsSemantics)
+            {
+                if (Options.RequireMatchedRowOccSemantics)
+                    throw new NormConfigurationException(
+                        $"Entity '{map.Type.Name}' uses optimistic concurrency tokens ([Timestamp]) but " +
+                        "the provider is configured with affected-row semantics (UseAffectedRowsSemantics=true). " +
+                        "Affected-row semantics cannot detect conflicts where a concurrent writer sets the token " +
+                        "to the same value. To fix: add 'useAffectedRows=false' to the MySQL connection string " +
+                        "and override the provider, or set DbContextOptions.RequireMatchedRowOccSemantics=false " +
+                        "to suppress this error and accept the known trade-off (S1).");
+                else
+                    Options.Logger?.LogWarning(
+                        "S1: Entity '{EntityType}' uses OCC tokens but the provider uses affected-row semantics. " +
+                        "Stale-write conflicts where the new token equals the original token will NOT be detected. " +
+                        "Set RequireMatchedRowOccSemantics=true to enforce strict OCC, or add useAffectedRows=false " +
+                        "to the MySQL connection string for full OCC guarantees.",
+                        map.Type.Name);
+            }
+
             foreach (var entry in batch)
             {
                 var entity = entry.Entity ?? throw new InvalidOperationException("Entity is null");
