@@ -270,4 +270,119 @@ public class OptimisticConcurrencyProviderMatrixTests
         var ex = await Record.ExceptionAsync(() => ctx.SaveChangesAsync());
         Assert.Null(ex);
     }
+
+    // ── Strict-mode (useAffectedRows=false) end-to-end path ─────────────────
+
+    /// <summary>
+    /// End-to-end strict-mode path: a MySqlProvider subclass with
+    /// UseAffectedRowsSemantics=false (representing MySQL connection string
+    /// useAffectedRows=false) restores full OCC detection on the DELETE path.
+    /// </summary>
+    [Fact]
+    public async Task MatchedRowsProvider_DeleteWithStaleToken_ThrowsDbConcurrencyException()
+    {
+        var (cn, ctx) = BuildContext(new MatchedRowsProvider());
+        await using var _ = ctx; using var __ = cn;
+
+        var e = new OccMatrixEntity { Name = "Henry", RowVersion = new byte[] { 1 } };
+        ctx.Add(e);
+        await ctx.SaveChangesAsync();
+
+        SimulateExternalRowVersionChange(cn, e.Id, new byte[] { 77 });
+        ctx.Remove(e);
+
+        // Strict mode: must detect the stale-token conflict on delete.
+        await Assert.ThrowsAsync<DbConcurrencyException>(() => ctx.SaveChangesAsync());
+    }
+
+    /// <summary>
+    /// Strict-mode path: batch save with multiple Modified entities — each entity's
+    /// rowcount check is evaluated individually. With UseAffectedRowsSemantics=false,
+    /// the first entity with a stale token raises DbConcurrencyException.
+    /// </summary>
+    [Fact]
+    public async Task MatchedRowsProvider_BatchSave_StaleTokenOnOneEntity_Throws()
+    {
+        var (cn, ctx) = BuildContext(new MatchedRowsProvider());
+        await using var _ = ctx; using var __ = cn;
+
+        var e1 = new OccMatrixEntity { Name = "Iris", RowVersion = new byte[] { 1 } };
+        var e2 = new OccMatrixEntity { Name = "Jack", RowVersion = new byte[] { 2 } };
+        ctx.Add(e1); ctx.Add(e2);
+        await ctx.SaveChangesAsync();
+
+        // Externally change e2's token — e1 is still valid.
+        SimulateExternalRowVersionChange(cn, e2.Id, new byte[] { 99 });
+
+        e1.Name = "Iris v2";
+        e2.Name = "Jack v2";
+        // Mark both dirty by accessing entries
+        var entries = ctx.ChangeTracker.Entries.ToList();
+        foreach (var entry in entries)
+        {
+            typeof(ChangeTracker)
+                .GetMethod("MarkDirty", System.Reflection.BindingFlags.Instance |
+                                        System.Reflection.BindingFlags.NonPublic)!
+                .Invoke(ctx.ChangeTracker, new object[] { entry });
+        }
+
+        // e2's stale token must surface as DbConcurrencyException.
+        await Assert.ThrowsAsync<DbConcurrencyException>(() => ctx.SaveChangesAsync());
+    }
+
+    /// <summary>
+    /// Strict-mode path: a fresh (non-stale) update on the MatchedRowsProvider
+    /// succeeds, proving the override doesn't break normal operations.
+    /// </summary>
+    [Fact]
+    public async Task MatchedRowsProvider_ValidUpdate_Succeeds()
+    {
+        var (cn, ctx) = BuildContext(new MatchedRowsProvider());
+        await using var _ = ctx; using var __ = cn;
+
+        var e = new OccMatrixEntity { Name = "Kate", RowVersion = new byte[] { 3 } };
+        ctx.Add(e);
+        await ctx.SaveChangesAsync();
+
+        e.Name = "Kate v2";
+        MarkDirty(ctx, e);
+
+        // Fresh token — should succeed.
+        var ex = await Record.ExceptionAsync(() => ctx.SaveChangesAsync());
+        Assert.Null(ex);
+    }
+
+    /// <summary>
+    /// Documents the "same-value conflict detection gap" for affected-row providers:
+    /// if a concurrent writer sets the concurrency token to the SAME value as before,
+    /// UseAffectedRowsSemantics=true will NOT detect the conflict (the UPDATE succeeds
+    /// because the WHERE clause still matches). This is the documented trade-off.
+    /// </summary>
+    [Fact]
+    public async Task AffectedRowsProvider_SameValueTokenConflict_NotDetected()
+    {
+        // This test documents intentional behavior — not a bug.
+        var (cn, ctx) = BuildContext(new AffectedRowsProvider());
+        await using var _ = ctx; using var __ = cn;
+
+        var token = new byte[] { 42 };
+        var e = new OccMatrixEntity { Name = "Leo", RowVersion = token };
+        ctx.Add(e);
+        await ctx.SaveChangesAsync();
+
+        // Concurrent writer modifies Name but sets RowVersion to the same value.
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "UPDATE OccMatrixEntity SET Name = 'Leo-concurrent', RowVersion = @rv WHERE Id = @id";
+        cmd.Parameters.AddWithValue("@rv", token);
+        cmd.Parameters.AddWithValue("@id", e.Id);
+        cmd.ExecuteNonQuery();
+
+        // Our local change — WHERE will still match because token is the same.
+        e.Name = "Leo-local";
+        MarkDirty(ctx, e);
+
+        // Affected-row provider: no exception (gap in conflict detection).
+        var ex = await Record.ExceptionAsync(() => ctx.SaveChangesAsync());
+        Assert.Null(ex);
+    }
 }

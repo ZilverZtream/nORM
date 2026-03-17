@@ -388,4 +388,209 @@ public class TemporalSchemaTests
         Assert.Contains("AFTER UPDATE", triggerSql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("AFTER DELETE", triggerSql, StringComparison.OrdinalIgnoreCase);
     }
+
+ // ── MySQL history DDL ─────────────────────────────────────────────────────
+
+ //<summary>
+ //MySQL history table DDL must use BIGINT AUTO_INCREMENT PRIMARY KEY for the version column.
+ //</summary>
+    [Fact]
+    public void MySql_TemporalHistoryTable_UsesBigintAutoIncrementPrimaryKey()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var ddl = provider.GenerateCreateHistoryTableSql(mapping);
+
+        Assert.Contains("BIGINT AUTO_INCREMENT PRIMARY KEY", ddl, StringComparison.OrdinalIgnoreCase);
+    }
+
+ //<summary>
+ //MySQL history table DDL must use DATETIME for the period columns with NOT NULL constraint.
+ //</summary>
+    [Fact]
+    public void MySql_TemporalHistoryTable_UsesDatetimePeriodColumns()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var ddl = provider.GenerateCreateHistoryTableSql(mapping);
+
+        Assert.Contains("`__ValidFrom` DATETIME NOT NULL", ddl);
+        Assert.Contains("`__ValidTo` DATETIME NOT NULL", ddl);
+    }
+
+ //<summary>
+ //MySQL history table DDL must include the operation column.
+ //</summary>
+    [Fact]
+    public void MySql_TemporalHistoryTable_IncludesOperationColumn()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var ddl = provider.GenerateCreateHistoryTableSql(mapping);
+
+        Assert.Contains("`__Operation` CHAR(1) NOT NULL", ddl);
+    }
+
+ //<summary>
+ //MySQL history table DDL must use InnoDB storage engine.
+ //</summary>
+    [Fact]
+    public void MySql_TemporalHistoryTable_UsesInnoDB()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var ddl = provider.GenerateCreateHistoryTableSql(mapping);
+
+        Assert.Contains("ENGINE=InnoDB", ddl, StringComparison.OrdinalIgnoreCase);
+    }
+
+ //<summary>
+ //MySQL history table DDL must use correct column types for common CLR types (int → INT, string → TEXT or VARCHAR).
+ //</summary>
+    [Fact]
+    public void MySql_TemporalHistoryTable_UsesCorrectColumnTypes_ForCommonClrTypes()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var ddl = provider.GenerateCreateHistoryTableSql(mapping);
+
+ // int maps to INT (or similar integer type), string maps to TEXT or VARCHAR
+        Assert.True(
+            ddl.Contains("`Id` INT", StringComparison.OrdinalIgnoreCase) ||
+            ddl.Contains("`Id` BIGINT", StringComparison.OrdinalIgnoreCase) ||
+            ddl.Contains("`Id` SMALLINT", StringComparison.OrdinalIgnoreCase),
+            $"Expected int column to be INT/BIGINT/SMALLINT but got: {ddl}");
+        Assert.True(
+            ddl.Contains("`Name` TEXT", StringComparison.OrdinalIgnoreCase) ||
+            ddl.Contains("`Name` VARCHAR", StringComparison.OrdinalIgnoreCase) ||
+            ddl.Contains("`Name` LONGTEXT", StringComparison.OrdinalIgnoreCase),
+            $"Expected string column to be TEXT/VARCHAR/LONGTEXT but got: {ddl}");
+    }
+
+ // ── PostgreSQL history DDL ────────────────────────────────────────────────
+
+ //<summary>
+ //PostgreSQL history table DDL must use BIGSERIAL PRIMARY KEY for the version column.
+ //</summary>
+    [Fact]
+    public void Postgres_TemporalHistoryTable_UsesBigserialPrimaryKey()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var ddl = provider.GenerateCreateHistoryTableSql(mapping);
+
+        Assert.Contains("BIGSERIAL PRIMARY KEY", ddl, StringComparison.OrdinalIgnoreCase);
+    }
+
+ //<summary>
+ //PostgreSQL history table DDL must use TIMESTAMP for the period columns with NOT NULL constraint.
+ //</summary>
+    [Fact]
+    public void Postgres_TemporalHistoryTable_UsesTimestampPeriodColumns()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var ddl = provider.GenerateCreateHistoryTableSql(mapping);
+
+        Assert.Contains("\"__ValidFrom\" TIMESTAMP NOT NULL", ddl);
+        Assert.Contains("\"__ValidTo\" TIMESTAMP NOT NULL", ddl);
+    }
+
+ //<summary>
+ //PostgreSQL history table DDL must include the operation column.
+ //</summary>
+    [Fact]
+    public void Postgres_TemporalHistoryTable_IncludesOperationColumn()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var ddl = provider.GenerateCreateHistoryTableSql(mapping);
+
+        Assert.Contains("\"__Operation\" CHAR(1) NOT NULL", ddl);
+    }
+
+ //<summary>
+ //PostgreSQL history table DDL must include the entity's column names.
+ //</summary>
+    [Fact]
+    public void Postgres_TemporalHistoryTable_IncludesEntityColumns()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var ddl = provider.GenerateCreateHistoryTableSql(mapping);
+
+ // Entity columns from TemporalEntity must appear in DDL
+        Assert.Contains("\"Id\"", ddl);
+        Assert.Contains("\"Name\"", ddl);
+        Assert.Contains("\"Price\"", ddl);
+    }
+
+ // ── PostgreSQL trigger SQL ────────────────────────────────────────────────
+
+ //<summary>
+ //PostgreSQL trigger SQL must use CREATE OR REPLACE FUNCTION.
+ //</summary>
+    [Fact]
+    public void Postgres_TemporalTriggersSql_UsesCreateOrReplaceFunction()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var sql = provider.GenerateTemporalTriggersSql(mapping);
+
+        Assert.Contains("CREATE OR REPLACE FUNCTION", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+ //<summary>
+ //PostgreSQL trigger SQL must use LANGUAGE plpgsql.
+ //</summary>
+    [Fact]
+    public void Postgres_TemporalTriggersSql_UsesPlpgsqlLanguage()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var sql = provider.GenerateTemporalTriggersSql(mapping);
+
+        Assert.Contains("LANGUAGE plpgsql", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+ //<summary>
+ //PostgreSQL trigger SQL must handle all three DML operations (INSERT, UPDATE, DELETE).
+ //</summary>
+    [Fact]
+    public void Postgres_TemporalTriggersSql_HandlesAllThreeOperations()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var sql = provider.GenerateTemporalTriggersSql(mapping);
+
+        Assert.Contains("TG_OP = 'INSERT'", sql);
+        Assert.Contains("TG_OP = 'UPDATE'", sql);
+        Assert.Contains("TG_OP = 'DELETE'", sql);
+    }
+
+ //<summary>
+ //PostgreSQL trigger must fire AFTER INSERT OR UPDATE OR DELETE.
+ //</summary>
+    [Fact]
+    public void Postgres_TemporalTriggersSql_UsesAfterInsertOrUpdateOrDeleteTrigger()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var mapping = GetMapping(new SqliteProvider());
+
+        var sql = provider.GenerateTemporalTriggersSql(mapping);
+
+        Assert.Contains("AFTER INSERT OR UPDATE OR DELETE", sql, StringComparison.OrdinalIgnoreCase);
+    }
 }

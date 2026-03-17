@@ -78,6 +78,117 @@ public class SqlServerPagingOrderByTests
         }
     }
 
+    // ─── S1 adversarial: ORDER BY inside subquery must NOT suppress top-level inject ──
+
+    /// <summary>
+    /// Root cause of S1: A plain Contains scan on the full SQL string would find the
+    /// "ORDER BY" inside a derived-table subquery and incorrectly skip injecting
+    /// "ORDER BY (SELECT NULL)" for the outer OFFSET/FETCH paging.
+    /// HasTopLevelOrderBy walks parenthesis depth; only depth-0 ORDER BY counts.
+    /// </summary>
+    [Fact]
+    public void ApplyPaging_SubqueryOrderBy_InFromClause_AddsSelectNull()
+    {
+        // The ORDER BY is at paren-depth 1 (inside a derived table).
+        // The outer SELECT has no ORDER BY → must inject ORDER BY (SELECT NULL).
+        const string sql =
+            "SELECT t.[Id] FROM (SELECT TOP 10 [Id] FROM [Widget] ORDER BY [Id]) AS t";
+
+        var result = ApplyPaging(sql);
+        Assert.Contains("ORDER BY (SELECT NULL)", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplyPaging_SubqueryOrderBy_InWhereIn_AddsSelectNull()
+    {
+        // ORDER BY is inside an IN-subquery at paren-depth 1.
+        const string sql =
+            "SELECT [Id] FROM [Widget] " +
+            "WHERE [Id] IN (SELECT TOP 5 [Id] FROM [Archive] ORDER BY [Score] DESC)";
+
+        var result = ApplyPaging(sql);
+        Assert.Contains("ORDER BY (SELECT NULL)", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplyPaging_SubqueryOrderBy_InExistsClause_AddsSelectNull()
+    {
+        // ORDER BY is inside an EXISTS subquery at paren-depth 1.
+        const string sql =
+            "SELECT [Id] FROM [Widget] " +
+            "WHERE EXISTS (SELECT 1 FROM [Detail] WHERE [Detail].[WidgetId] = [Widget].[Id] ORDER BY [Detail].[Seq])";
+
+        var result = ApplyPaging(sql);
+        Assert.Contains("ORDER BY (SELECT NULL)", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplyPaging_DeeplyNestedSubqueryOrderBy_AddsSelectNull()
+    {
+        // ORDER BY is at paren-depth 2 — two levels of subquery nesting.
+        const string sql =
+            "SELECT [Id] FROM [Widget] " +
+            "WHERE [Id] IN (SELECT [Id] FROM " +
+            "(SELECT TOP 3 [Id] FROM [Inner] ORDER BY [Id]) AS sub)";
+
+        var result = ApplyPaging(sql);
+        Assert.Contains("ORDER BY (SELECT NULL)", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplyPaging_TopLevelOrderBy_AfterSubqueryWithOrderBy_DoesNotDuplicate()
+    {
+        // Both a subquery ORDER BY (depth 1) AND a top-level ORDER BY (depth 0) exist.
+        // HasTopLevelOrderBy should find the depth-0 one → inject nothing.
+        const string sql =
+            "SELECT t.[Id] FROM " +
+            "(SELECT TOP 10 [Id] FROM [Widget] ORDER BY [Score]) AS t " +
+            "ORDER BY t.[Id] DESC";
+
+        var result = ApplyPaging(sql);
+        // Exactly two ORDER BY occurrences: one from the subquery, one from the top level.
+        var count = CountOccurrences(result.ToUpperInvariant(), "ORDER BY");
+        Assert.Equal(2, count);
+        // And (SELECT NULL) must NOT appear.
+        Assert.DoesNotContain("SELECT NULL", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplyPaging_SubqueryOrderBy_CaseInsensitiveKeyword_AddsSelectNull()
+    {
+        // Lowercase "order by" inside a subquery — depth-aware scan must be case-insensitive.
+        const string sql =
+            "SELECT [id] FROM (SELECT TOP 5 [id] FROM [t] order by [id]) sub";
+
+        var result = ApplyPaging(sql);
+        Assert.Contains("ORDER BY (SELECT NULL)", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplyPaging_SubqueryOrderBy_WithAliasedParens_AddsSelectNull()
+    {
+        // Parenthesized expression in SELECT list that is NOT a subquery —
+        // should not confuse the depth counter.
+        const string sql =
+            "SELECT ([Qty] * [Price]) AS [Total], [Id] FROM [Widget]";
+
+        var result = ApplyPaging(sql);
+        Assert.Contains("ORDER BY (SELECT NULL)", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplyPaging_MultipleSubqueriesWithOrderBy_AddsSelectNull()
+    {
+        // Two sibling subqueries, each with ORDER BY; outer has none.
+        const string sql =
+            "SELECT a.[Id], b.[Id] " +
+            "FROM (SELECT TOP 5 [Id] FROM [A] ORDER BY [Id]) a " +
+            "JOIN (SELECT TOP 5 [Id] FROM [B] ORDER BY [Id] DESC) b ON a.[Id] = b.[Id]";
+
+        var result = ApplyPaging(sql);
+        Assert.Contains("ORDER BY (SELECT NULL)", result, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private static int CountOccurrences(string source, string pattern)
