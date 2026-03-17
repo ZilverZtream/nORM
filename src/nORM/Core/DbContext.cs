@@ -447,6 +447,7 @@ namespace nORM.Core
         /// <returns><c>true</c> if the connection is healthy; otherwise <c>false</c>.</returns>
         public async Task<bool> IsHealthyAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             try
             {
                 return await _executionStrategy.ExecuteAsync(async (ctx, token) =>
@@ -643,6 +644,7 @@ namespace nORM.Core
         /// <exception cref="NormUsageException">Thrown when the provided name contains invalid characters.</exception>
         public IQueryable Query(string tableName)
         {
+            ThrowIfDisposed();
             if (string.IsNullOrWhiteSpace(tableName))
                 throw new ArgumentException("Table name cannot be null or empty.", nameof(tableName));
             if (!IsSafeIdentifier(tableName))
@@ -687,6 +689,7 @@ namespace nORM.Core
         /// <returns>An <see cref="EntityEntry"/> representing the tracked entity.</returns>
         public EntityEntry Add<T>(T entity) where T : class
         {
+            ThrowIfDisposed();
             NormValidator.ValidateEntity(entity);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
             return ChangeTracker.Track(entity, EntityState.Added, GetMapping(typeof(T)));
@@ -702,6 +705,7 @@ namespace nORM.Core
         /// <returns>An <see cref="EntityEntry"/> for the attached entity.</returns>
         public EntityEntry Attach<T>(T entity) where T : class
         {
+            ThrowIfDisposed();
             NormValidator.ValidateEntity(entity);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
             return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(typeof(T)));
@@ -717,6 +721,7 @@ namespace nORM.Core
         /// <returns>An <see cref="EntityEntry"/> for the updated entity.</returns>
         public EntityEntry Update<T>(T entity) where T : class
         {
+            ThrowIfDisposed();
             NormValidator.ValidateEntity(entity);
             return ChangeTracker.Track(entity, EntityState.Modified, GetMapping(typeof(T)));
         }
@@ -730,6 +735,7 @@ namespace nORM.Core
         /// <returns>An <see cref="EntityEntry"/> for the removed entity.</returns>
         public EntityEntry Remove<T>(T entity) where T : class
         {
+            ThrowIfDisposed();
             NormValidator.ValidateEntity(entity);
             return ChangeTracker.Track(entity, EntityState.Deleted, GetMapping(typeof(T)));
         }
@@ -745,6 +751,7 @@ namespace nORM.Core
         /// <exception cref="InvalidOperationException">Thrown when the entity is not currently tracked.</exception>
         public EntityEntry Entry(object entity)
         {
+            ThrowIfDisposed();
             NormValidator.ValidateEntity(entity, nameof(entity));
 
             // Check if entity is already tracked before returning entry.
@@ -772,6 +779,7 @@ namespace nORM.Core
         /// <returns>The current <see cref="DbContextOptions"/> instance for fluent configuration.</returns>
         public DbContextOptions UseDeadlockResilientSaveChanges()
         {
+            ThrowIfDisposed();
             Options.RetryPolicy = new RetryPolicy
             {
                 MaxRetries = 3,
@@ -793,13 +801,24 @@ namespace nORM.Core
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>The total number of state entries written to the database.</returns>
         /// <remarks>
+        /// <para>
         /// Automatically calls DetectChanges() which performs snapshot-based comparison of ALL
         /// tracked entities. Avoid calling SaveChanges() in tight loops with many tracked entities.
         /// For bulk operations, use InsertBulkAsync() or UpdateBulkAsync() instead. For read-only
         /// queries, use AsNoTracking() to avoid change tracking overhead entirely.
+        /// </para>
+        /// <para>
+        /// <b>Async-first:</b> nORM does not provide a synchronous <c>SaveChanges()</c> method.
+        /// Always use <c>await ctx.SaveChangesAsync()</c>. Blocking with
+        /// <c>.GetAwaiter().GetResult()</c> can cause deadlocks in synchronization contexts
+        /// such as ASP.NET classic or WPF.
+        /// </para>
         /// </remarks>
         public Task<int> SaveChangesAsync(CancellationToken ct = default)
-            => SaveChangesWithRetryAsync(detectChanges: true, ct);
+        {
+            ThrowIfDisposed();
+            return SaveChangesWithRetryAsync(detectChanges: true, ct);
+        }
 
         /// <summary>
         /// Persists all tracked changes to the database. The operation is executed
@@ -815,7 +834,10 @@ namespace nORM.Core
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>The total number of state entries written to the database.</returns>
         public Task<int> SaveChangesAsync(bool detectChanges, CancellationToken ct = default)
-            => SaveChangesWithRetryAsync(detectChanges, ct);
+        {
+            ThrowIfDisposed();
+            return SaveChangesWithRetryAsync(detectChanges, ct);
+        }
 
         /// <summary>
         /// Invokes <see cref="SaveChangesInternalAsync"/> using the configured retry policy to
@@ -1121,23 +1143,29 @@ namespace nORM.Core
         /// </summary>
         private async Task SaveOwnedCollectionsAsync(object owner, TableMapping ownerMap, EntityState ownerState, DbTransaction? transaction, CancellationToken ct)
         {
-            var ownerKey = ownerMap.KeyColumns.Length == 1 ? ownerMap.KeyColumns[0].Getter(owner) : null;
-            if (ownerKey == null) return;
+            if (ownerMap.KeyColumns.Length == 0) return;
 
             foreach (var ownedMap in ownerMap.OwnedCollections)
             {
-                await using var cmdScope = new CommandScope(Connection, transaction);
-                await using var cmd = cmdScope.CreateCommand();
+                // Resolve which owner key column the FK on the owned table references.
+                // For single-key owners this is trivial; for composite-key owners we use
+                // name matching to find the right key column rather than always using index 0.
+                var ownerKeyCol = ResolveOwnerKeyColumnForOwnedFk(ownerMap.KeyColumns, ownedMap.ForeignKeyColumn, ownerMap.Type.Name);
+                var ownerKey = ownerKeyCol.Getter(owner);
+                if (ownerKey == null) continue;
 
                 if (ownerState == EntityState.Modified || ownerState == EntityState.Deleted)
                 {
-                    // DELETE existing owned items
-                    cmd.CommandText = $"DELETE FROM {ownedMap.EscTable} WHERE {ownedMap.EscForeignKeyColumn} = @ownerPk";
-                    var dp = cmd.CreateParameter();
+                    // DELETE existing owned items — use a dedicated command so that the
+                    // INSERT command below starts fully fresh (no prepared-statement residue).
+                    await using var delScope = new CommandScope(Connection, transaction);
+                    await using var delCmd = delScope.CreateCommand();
+                    delCmd.CommandText = $"DELETE FROM {ownedMap.EscTable} WHERE {ownedMap.EscForeignKeyColumn} = @ownerPk";
+                    var dp = delCmd.CreateParameter();
                     dp.ParameterName = "@ownerPk";
                     dp.Value = ownerKey;
-                    cmd.Parameters.Add(dp);
-                    await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                    delCmd.Parameters.Add(dp);
+                    await delCmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
                 }
 
                 if (ownerState == EntityState.Deleted) continue; // no re-insert for deleted owners
@@ -1148,40 +1176,66 @@ namespace nORM.Core
                 var items = ((System.Collections.IEnumerable)collection).Cast<object>().ToList();
                 if (items.Count == 0) continue;
 
-                // Clear any params left from the DELETE phase
-                cmd.Parameters.Clear();
-
                 var insertCols = ownedMap.Columns.Where(c => !c.IsDbGenerated).ToArray();
                 var colNames = string.Join(", ", insertCols.Select(c => c.EscCol).Prepend(ownedMap.EscForeignKeyColumn));
 
-                int pi = 0;
-                var sqlSb = new StringBuilder();
+                // INSERT each item individually — avoids multi-statement batch issues
+                // across providers (e.g. SQLite drivers that stop after the first statement).
                 foreach (var item in items)
                 {
-                    sqlSb.Append($"INSERT INTO {ownedMap.EscTable} ({colNames}) VALUES (@ownerFk{pi}");
-                    var fkp = cmd.CreateParameter();
-                    fkp.ParameterName = $"@ownerFk{pi}";
+                    await using var insScope = new CommandScope(Connection, transaction);
+                    await using var insCmd = insScope.CreateCommand();
+                    var valuePlaceholders = new StringBuilder("@ownerFk");
+                    var fkp = insCmd.CreateParameter();
+                    fkp.ParameterName = "@ownerFk";
                     fkp.Value = ownerKey;
-                    cmd.Parameters.Add(fkp);
+                    insCmd.Parameters.Add(fkp);
                     int pj = 0;
                     foreach (var col in insertCols)
                     {
-                        var pname = $"@op{pi}_{pj}";
-                        sqlSb.Append($", {pname}");
-                        var pp = cmd.CreateParameter();
+                        var pname = $"@op{pj}";
+                        valuePlaceholders.Append($", {pname}");
+                        var pp = insCmd.CreateParameter();
                         pp.ParameterName = pname;
                         var rawVal = col.Getter(item);
                         if (col.Converter != null) rawVal = col.Converter.ConvertToProvider(rawVal);
                         pp.Value = rawVal ?? DBNull.Value;
-                        cmd.Parameters.Add(pp);
+                        insCmd.Parameters.Add(pp);
                         pj++;
                     }
-                    sqlSb.Append(");");
-                    pi++;
+                    insCmd.CommandText = $"INSERT INTO {ownedMap.EscTable} ({colNames}) VALUES ({valuePlaceholders});";
+                    await insCmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
                 }
-                cmd.CommandText = sqlSb.ToString();
-                await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
             }
+        }
+
+        /// <summary>
+        /// Resolves which owner key column corresponds to the FK column on an owned table.
+        /// For single-key owners this is the one key column. For composite-key owners the
+        /// method tries: (1) exact column name match, (2) owner-type-name-prefixed match,
+        /// then falls back to the first key column.
+        /// </summary>
+        private static Column ResolveOwnerKeyColumnForOwnedFk(Column[] ownerKeyColumns, string ownedFkColumnName, string ownerTypeName)
+        {
+            if (ownerKeyColumns.Length == 1) return ownerKeyColumns[0];
+
+            // Try 1: exact FK column name matches a key column name (e.g. FK="OrderId", key="OrderId")
+            var match = Array.Find(ownerKeyColumns, c =>
+                string.Equals(c.Name, ownedFkColumnName, StringComparison.OrdinalIgnoreCase));
+            if (match != null) return match;
+
+            // Try 2: strip owner type name prefix (e.g. FK="OrderId", owner type="Order" → "Id", key="Id")
+            if (ownedFkColumnName.Length > ownerTypeName.Length &&
+                ownedFkColumnName.StartsWith(ownerTypeName, StringComparison.OrdinalIgnoreCase))
+            {
+                var suffix = ownedFkColumnName.Substring(ownerTypeName.Length);
+                match = Array.Find(ownerKeyColumns, c =>
+                    string.Equals(c.Name, suffix, StringComparison.OrdinalIgnoreCase));
+                if (match != null) return match;
+            }
+
+            // Fall back to first key column (preserves legacy single-key behavior)
+            return ownerKeyColumns[0];
         }
 
         /// <summary>
@@ -1270,21 +1324,22 @@ namespace nORM.Core
         internal async Task LoadOwnedCollectionsAsync(System.Collections.IList owners, TableMapping ownerMap, CancellationToken ct)
         {
             if (ownerMap.KeyColumns.Length == 0 || owners.Count == 0) return;
-            var pkCol = ownerMap.KeyColumns[0];
-
-            // Build PK → owner lookup
-            var ownerByPk = new Dictionary<object, object>(owners.Count);
-            foreach (var owner in owners)
-            {
-                if (owner == null) continue;
-                var pk = pkCol.Getter(owner);
-                if (pk != null && !ownerByPk.ContainsKey(pk))
-                    ownerByPk[pk] = owner;
-            }
-            if (ownerByPk.Count == 0) return;
 
             foreach (var ownedMap in ownerMap.OwnedCollections)
             {
+                // Resolve which owner key column this FK references (composite-key aware).
+                var pkCol = ResolveOwnerKeyColumnForOwnedFk(ownerMap.KeyColumns, ownedMap.ForeignKeyColumn, ownerMap.Type.Name);
+
+                // Build PK → owner lookup keyed by the FK-referenced key column value.
+                var ownerByPk = new Dictionary<object, object>(owners.Count);
+                foreach (var owner in owners)
+                {
+                    if (owner == null) continue;
+                    var pk = pkCol.Getter(owner);
+                    if (pk != null && !ownerByPk.ContainsKey(pk))
+                        ownerByPk[pk] = owner;
+                }
+                if (ownerByPk.Count == 0) continue;
                 // SELECT owned cols + fk_col FROM child_table WHERE fk_col IN (@p0, @p1, ...)
                 var colSql = string.Join(", ", ownedMap.Columns.Select(c => c.EscCol));
                 if (colSql.Length > 0) colSql += ", ";
@@ -1595,6 +1650,7 @@ namespace nORM.Core
         /// <returns>The number of affected rows.</returns>
         public Task<int> InsertAsync<T>(T entity, CancellationToken ct = default) where T : class
         {
+            ThrowIfDisposed();
             if (entity == null) throw new ArgumentNullException(nameof(entity));
             // Fast-path for the common case: no transaction, no retry policy, no tenant, cached prepared command.
             // This avoids 4 async state machine allocations by inlining the entire chain.
@@ -1654,6 +1710,7 @@ namespace nORM.Core
         /// <returns>The number of affected rows.</returns>
         public Task<int> InsertAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
         {
+            ThrowIfDisposed();
             var result = WriteOptimizedAsync(entity, WriteOperation.Insert, ct, transaction);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
             return result;
@@ -1667,7 +1724,10 @@ namespace nORM.Core
         /// <param name="ct">Cancellation token for the operation.</param>
         /// <returns>The number of affected rows.</returns>
         public Task<int> UpdateAsync<T>(T entity, CancellationToken ct = default) where T : class
-            => UpdateAsync(entity, null, ct);
+        {
+            ThrowIfDisposed();
+            return UpdateAsync(entity, null, ct);
+        }
 
         /// <summary>
         /// Updates the entity within the given transaction.
@@ -1678,7 +1738,10 @@ namespace nORM.Core
         /// <param name="ct">Cancellation token for the operation.</param>
         /// <returns>The number of affected rows.</returns>
         public Task<int> UpdateAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
-            => WriteOptimizedAsync(entity, WriteOperation.Update, ct, transaction);
+        {
+            ThrowIfDisposed();
+            return WriteOptimizedAsync(entity, WriteOperation.Update, ct, transaction);
+        }
 
         /// <summary>
         /// Deletes the specified entity from the database asynchronously.
@@ -1688,7 +1751,10 @@ namespace nORM.Core
         /// <param name="ct">Cancellation token for the operation.</param>
         /// <returns>The number of affected rows.</returns>
         public Task<int> DeleteAsync<T>(T entity, CancellationToken ct = default) where T : class
-            => DeleteAsync(entity, null, ct);
+        {
+            ThrowIfDisposed();
+            return DeleteAsync(entity, null, ct);
+        }
 
         /// <summary>
         /// Deletes the entity within the supplied transaction.
@@ -1699,7 +1765,10 @@ namespace nORM.Core
         /// <param name="ct">Cancellation token for the operation.</param>
         /// <returns>The number of affected rows.</returns>
         public Task<int> DeleteAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
-            => WriteOptimizedAsync(entity, WriteOperation.Delete, ct, transaction);
+        {
+            ThrowIfDisposed();
+            return WriteOptimizedAsync(entity, WriteOperation.Delete, ct, transaction);
+        }
 
         private enum WriteOperation { Insert, Update, Delete }
 
@@ -2151,7 +2220,9 @@ namespace nORM.Core
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Total number of inserted rows.</returns>
         public Task<int> BulkInsertAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
-            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
+        {
+            ThrowIfDisposed();
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 if (entities == null) throw new ArgumentNullException(nameof(entities));
                 var entityList = entities.ToList();                         // single enumeration
@@ -2165,6 +2236,7 @@ namespace nORM.Core
                 }
                 return await _p.BulkInsertAsync(ctx, map, entityList, token).ConfigureAwait(false);
             }, ct);
+        }
 
         /// <summary>
         /// Performs a set based update of the provided entities using the provider's
@@ -2175,7 +2247,9 @@ namespace nORM.Core
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Total number of updated rows.</returns>
         public Task<int> BulkUpdateAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
-            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
+        {
+            ThrowIfDisposed();
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 if (entities == null) throw new ArgumentNullException(nameof(entities));
                 var entityList = entities.ToList();                         // single enumeration
@@ -2189,6 +2263,7 @@ namespace nORM.Core
                 }
                 return await _p.BulkUpdateAsync(ctx, map, entityList, token).ConfigureAwait(false);
             }, ct);
+        }
 
         /// <summary>
         /// Removes a collection of entities from the database using bulk delete
@@ -2199,7 +2274,9 @@ namespace nORM.Core
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Total number of deleted rows.</returns>
         public Task<int> BulkDeleteAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
-            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
+        {
+            ThrowIfDisposed();
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 if (entities == null) throw new ArgumentNullException(nameof(entities));
                 var entityList = entities.ToList();                         // single enumeration
@@ -2213,6 +2290,7 @@ namespace nORM.Core
                 }
                 return await _p.BulkDeleteAsync(ctx, map, entityList, token).ConfigureAwait(false);
             }, ct);
+        }
         #endregion
 
         #region Transaction Savepoints
@@ -2228,6 +2306,7 @@ namespace nORM.Core
         /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is null or empty.</exception>
         public Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             if (transaction == null)
                 throw new InvalidOperationException("No active transaction.");
             if (string.IsNullOrWhiteSpace(name))
@@ -2246,6 +2325,7 @@ namespace nORM.Core
         /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is null or empty.</exception>
         public Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             if (transaction == null)
                 throw new InvalidOperationException("No active transaction.");
             if (string.IsNullOrWhiteSpace(name))
@@ -2265,7 +2345,9 @@ namespace nORM.Core
         /// <param name="parameters">Optional parameters for the SQL query.</param>
         /// <returns>A list of entities populated from the query results.</returns>
         public Task<List<T>> QueryUnchangedAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
-            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
+        {
+            ThrowIfDisposed();
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
@@ -2329,6 +2411,7 @@ namespace nORM.Core
                 cmd.Parameters.Clear();
                 return list;
             }, ct);
+        }
 
         /// <summary>
         /// Coerces a provider-returned raw value to the target CLR property type.
@@ -2397,7 +2480,9 @@ namespace nORM.Core
         /// <param name="parameters">Optional parameters for the SQL query.</param>
         /// <returns>A list of materialized entities.</returns>
         public Task<List<T>> FromSqlRawAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
-            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
+        {
+            ThrowIfDisposed();
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
@@ -2423,6 +2508,7 @@ namespace nORM.Core
                 cmd.Parameters.Clear();
                 return list;
             }, ct);
+        }
 
         /// <summary>
         /// Executes a stored procedure and materializes the first result set into
@@ -2434,7 +2520,9 @@ namespace nORM.Core
         /// <param name="parameters">Anonymous object containing input parameters.</param>
         /// <returns>A list of results returned by the procedure.</returns>
         public Task<List<T>> ExecuteStoredProcedureAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()
-            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
+        {
+            ThrowIfDisposed();
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
@@ -2480,6 +2568,7 @@ namespace nORM.Core
                 cmd.Parameters.Clear();
                 return list;
             }, ct);
+        }
 
         /// <summary>
         /// Streams the results of a stored procedure as an <see cref="IAsyncEnumerable{T}"/>.
@@ -2492,6 +2581,7 @@ namespace nORM.Core
         /// <returns>An asynchronous stream of materialized entities.</returns>
         public async IAsyncEnumerable<T> ExecuteStoredProcedureAsAsyncEnumerable<T>(string procedureName, [EnumeratorCancellation] CancellationToken ct = default, object? parameters = null) where T : class, new()
         {
+            ThrowIfDisposed();
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             var sw = Stopwatch.StartNew();
             await using var cmd = CommandPool.Get(Connection, procedureName);
@@ -2549,7 +2639,9 @@ namespace nORM.Core
         /// <param name="outputParameters">Definitions of output parameters to retrieve.</param>
         /// <returns>A <see cref="StoredProcedureResult{T}"/> containing results and output values.</returns>
         public Task<StoredProcedureResult<T>> ExecuteStoredProcedureWithOutputAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()
-            => _executionStrategy.ExecuteAsync(async (ctx, token) =>
+        {
+            ThrowIfDisposed();
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
@@ -2615,6 +2707,7 @@ namespace nORM.Core
                 cmd.Parameters.Clear();
                 return new StoredProcedureResult<T>(list, outputs);
             }, ct);
+        }
         #endregion
 
         private void ValidateTenantContext<T>(T entity, TableMapping map, WriteOperation operation) where T : class
@@ -2646,7 +2739,10 @@ namespace nORM.Core
         /// <param name="name">The name of the shadow property to set.</param>
         /// <param name="value">The value to assign.</param>
         public void SetShadowProperty(object entity, string name, object? value)
-            => Internal.ShadowPropertyStore.Set(entity, name, value);
+        {
+            ThrowIfDisposed();
+            Internal.ShadowPropertyStore.Set(entity, name, value);
+        }
 
         /// <summary>
         /// Retrieves the value of a shadow property from the specified entity.
@@ -2655,7 +2751,10 @@ namespace nORM.Core
         /// <param name="name">The name of the shadow property to retrieve.</param>
         /// <returns>The current value of the shadow property, or <c>null</c> if not set.</returns>
         public object? GetShadowProperty(object entity, string name)
-            => Internal.ShadowPropertyStore.Get(entity, name);
+        {
+            ThrowIfDisposed();
+            return Internal.ShadowPropertyStore.Get(entity, name);
+        }
 
         /// <summary>
         /// Creates a temporal tag entry in the database. Temporal tags can be used to
@@ -2665,6 +2764,7 @@ namespace nORM.Core
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task CreateTagAsync(string tagName)
         {
+            ThrowIfDisposed();
             await _executionStrategy.ExecuteAsync(async (ctx, ct) =>
             {
                 await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
@@ -2710,6 +2810,7 @@ namespace nORM.Core
             CancellationToken ct = default,
             bool hydrateGeneratedKeys = true) where T : class
         {
+            ThrowIfDisposed();
             var mapping = GetMapping(typeof(T));
             if (Database.CurrentTransaction == null && System.Transactions.Transaction.Current != null)
             {
@@ -2924,6 +3025,17 @@ namespace nORM.Core
                     _disposables.AddLast(new WeakReference<IDisposable>(disposable));
                 }
             }
+        }
+
+        /// <summary>
+        /// Throws <see cref="ObjectDisposedException"/> if this context has been disposed.
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(GetType().Name,
+                    "This DbContext instance has been disposed. Create a new instance to continue.");
         }
 
         /// <summary>

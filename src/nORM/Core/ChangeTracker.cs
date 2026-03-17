@@ -95,6 +95,13 @@ namespace nORM.Core
                             ? CreateLazyEntry(entity, mapping)
                             : new EntityEntry(entity, state, mapping, _options, MarkDirty);
 
+                        // When explicitly tracking as Modified (ctx.Update on a new-to-context entity),
+                        // prevent DetectChanges from reverting the state to Unchanged when no scalar
+                        // properties differ from the freshly-taken snapshot (they never will because the
+                        // snapshot is captured at the same moment as the entity's current values).
+                        if (state == EntityState.Modified)
+                            newEntry.MarkExplicitlyModified();
+
                         // Also track by reference
                         _entriesByReference.TryAdd(entity, newEntry);
 

@@ -30,6 +30,21 @@ namespace nORM.Providers
         /// Initializes a new instance of the <see cref="MySqlProvider"/> class.
         /// </summary>
         /// <param name="parameterFactory">Factory used to create provider-specific parameters.</param>
+        /// <remarks>
+        /// <para>
+        /// <b>Runtime dependency:</b> This provider uses MySQL via reflection and requires either
+        /// <c>MySqlConnector</c> or <c>MySql.Data</c> to be installed in the consuming application.
+        /// Add one of the following to your project:
+        /// <code>
+        /// dotnet add package MySqlConnector
+        /// </code>
+        /// or
+        /// <code>
+        /// dotnet add package MySql.Data
+        /// </code>
+        /// A clear <see cref="InvalidOperationException"/> is thrown at runtime if neither package is present.
+        /// </para>
+        /// </remarks>
         public MySqlProvider(IDbParameterFactory parameterFactory)
         {
             _parameterFactory = parameterFactory ?? throw new ArgumentNullException(nameof(parameterFactory));
