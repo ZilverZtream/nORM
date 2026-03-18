@@ -101,10 +101,16 @@ namespace nORM.Providers
         
         /// <summary>
         /// Returns <c>true</c> if the SQL string contains an <c>ORDER BY</c> clause at the
-        /// top-level scope (depth-0 parentheses). Uses a mini-lexer that skips single-quoted
-        /// string literals (including '' escape sequences) and double-quoted identifiers so that
-        /// an ORDER BY appearing inside a literal — e.g. WHERE name = 'sort ORDER BY price' —
-        /// is not mistaken for a real ORDER BY clause.
+        /// top-level scope (depth-0 parentheses). Uses a mini-lexer that skips:
+        /// <list type="bullet">
+        ///   <item>single-quoted string literals (<c>'...'</c>, <c>''</c> escape),</item>
+        ///   <item>double-quoted identifiers (<c>"..."</c>),</item>
+        ///   <item>bracket-quoted identifiers (<c>[...]</c>),</item>
+        ///   <item>line comments (<c>-- comment</c>),</item>
+        ///   <item>block comments (<c>/* comment */</c>).</item>
+        /// </list>
+        /// This prevents an <c>ORDER BY</c> appearing inside a comment or literal from being
+        /// mistaken for a real ORDER BY clause (Q1 fix).
         /// </summary>
         private static bool HasTopLevelOrderBy(string sql)
         {
@@ -114,6 +120,23 @@ namespace nORM.Providers
             while (i < len)
             {
                 var ch = sql[i];
+
+                // Skip line comments: -- skip to end of line
+                if (ch == '-' && i + 1 < len && sql[i + 1] == '-')
+                {
+                    i += 2;
+                    while (i < len && sql[i] != '\n' && sql[i] != '\r') i++;
+                    continue;
+                }
+
+                // Skip block comments: /* skip to matching */
+                if (ch == '/' && i + 1 < len && sql[i + 1] == '*')
+                {
+                    i += 2;
+                    while (i + 1 < len && !(sql[i] == '*' && sql[i + 1] == '/')) i++;
+                    if (i + 1 < len) i += 2; // consume */
+                    continue;
+                }
 
                 // Skip single-quoted string literals ('...', '' escape)
                 if (ch == '\'')
