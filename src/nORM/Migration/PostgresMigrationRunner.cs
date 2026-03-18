@@ -107,7 +107,15 @@ namespace nORM.Migration
             await using var cmd = _connection.CreateCommand();
             cmd.CommandText = $"SELECT pg_advisory_unlock({MigrationLockKey})";
             try { await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false); }
-            catch { /* Best-effort release; connection may already be closing. */ }
+            catch (Exception ex)
+            {
+                // M1: Best-effort release; surface failure for diagnostics rather than silently swallowing.
+                // Do not propagate — throwing from a finally block would mask the original exception.
+                _logger?.LogWarning(
+                    "nORM: PostgreSQL migration advisory-lock release failed: {Message}. " +
+                    "A stale pg_advisory_lock entry may block future migrations until the session resets.",
+                    ex.Message);
+            }
         }
 
         /// <summary>

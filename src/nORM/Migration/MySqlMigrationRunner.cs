@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using nORM.Internal;
 using nORM.Core;
 using nORM.Configuration;
@@ -126,7 +127,20 @@ namespace nORM.Migration
             await using var cmd = _connection.CreateCommand();
             cmd.CommandText = $"DO RELEASE_LOCK('{MigrationLockName}')";
             try { await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false); }
-            catch { /* Best-effort release; connection may already be closing. */ }
+            catch (Exception ex)
+            {
+                // M1: Best-effort release; surface failure for diagnostics rather than silently swallowing.
+                // Do not propagate — throwing from a finally block would mask the original exception.
+                var logger = _context?.Options?.Logger;
+                if (logger != null)
+                    logger.LogWarning(
+                        "nORM: MySQL migration advisory-lock release failed: {Message}. " +
+                        "A stale GET_LOCK entry may block future migrations until the connection resets.",
+                        ex.Message);
+                else
+                    System.Diagnostics.Trace.TraceWarning(
+                        $"nORM: MySQL migration advisory-lock release failed: {ex.Message}");
+            }
         }
 
         /// <summary>

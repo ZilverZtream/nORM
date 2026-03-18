@@ -9,13 +9,13 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Regression tests for S1: HasTopLevelOrderBy in SqlServerProvider did not skip
-/// string literals, so ORDER BY inside a quoted literal was incorrectly treated as
-/// a real top-level ORDER BY clause, causing ApplyPaging to omit the synthetic
-/// ORDER BY (SELECT NULL) and produce malformed OFFSET…FETCH SQL.
+/// Regression tests for S1/Q1: HasTopLevelOrderBy in SqlServerProvider now skips
+/// string literals, double-quoted identifiers, bracket-quoted identifiers, AND
+/// SQL comments (-- line comments and /* block comments */) so that an ORDER BY
+/// appearing inside a comment is not mistaken for a real ORDER BY clause.
 ///
-/// Fix: the scanner now skips single-quoted literals ('...' with '' escape),
-/// double-quoted identifiers, and bracket-quoted identifiers ([...]).
+/// Q1 fix: add comment-token lexing to HasTopLevelOrderBy.
+/// S1 fix: add literal/identifier lexing (prior fix).
 /// </summary>
 public class SqlServerOrderByDetectionTests
 {
@@ -98,10 +98,6 @@ public class SqlServerOrderByDetectionTests
     [Fact]
     public void ApplyPaging_EmitsSyntheticOrderBy_WhenLiteralContainsOrderBy()
     {
-        // Build the kind of SQL string that would be generated for a query like
-        // SELECT * FROM T WHERE label = 'price ORDER BY desc' OFFSET 0 ROWS FETCH ...
-        // Before the fix, HasTopLevelOrderBy returned true for this input and the
-        // synthetic ORDER BY (SELECT NULL) was omitted — producing invalid TSQL.
         var provider = new SqlServerProvider();
         var sb = new OptimizedSqlBuilder();
         sb.Append("SELECT * FROM T WHERE label = 'sort ORDER BY column'");
@@ -110,9 +106,107 @@ public class SqlServerOrderByDetectionTests
             limitParameterName: "@lim", offsetParameterName: "@off");
 
         var result = sb.ToString();
-        // Must contain ORDER BY (SELECT NULL) because the real top-level query has none
         Assert.Contains("ORDER BY (SELECT NULL)", result, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("OFFSET", result, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("FETCH", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ── Q1-1: ORDER BY inside line comment (--) is NOT detected ──────────────
+
+    [Theory]
+    [InlineData("SELECT * FROM T -- ORDER BY Id")]
+    [InlineData("SELECT * FROM T -- this order by should be ignored\nWHERE Id = 1")]
+    [InlineData("-- ORDER BY Id\nSELECT * FROM T")]
+    [InlineData("SELECT * FROM T -- ORDER BY Id\r\nWHERE x = 1")]
+    public void OrderByInsideLineComment_IsNotDetected(string sql)
+        => Assert.False(HasTopLevelOrderBy(sql));
+
+    // ── Q1-2: ORDER BY inside block comment (/* */) is NOT detected ──────────
+
+    [Theory]
+    [InlineData("SELECT * FROM T /* ORDER BY Id */")]
+    [InlineData("/* ORDER BY fake */ SELECT * FROM T")]
+    [InlineData("SELECT * FROM T /* multi\nline\nORDER BY x */ WHERE Id = 1")]
+    [InlineData("SELECT /* ORDER BY col */ Id FROM T")]
+    public void OrderByInsideBlockComment_IsNotDetected(string sql)
+        => Assert.False(HasTopLevelOrderBy(sql));
+
+    // ── Q1-3: Real ORDER BY after a line comment IS detected ─────────────────
+
+    [Fact]
+    public void LineCommentThenRealOrderBy_IsDetected()
+    {
+        // The line comment should be skipped; the trailing real ORDER BY must be found.
+        var sql = "SELECT * FROM T -- no order here\nORDER BY Id";
+        Assert.True(HasTopLevelOrderBy(sql));
+    }
+
+    // ── Q1-4: Real ORDER BY after a block comment IS detected ────────────────
+
+    [Fact]
+    public void BlockCommentThenRealOrderBy_IsDetected()
+    {
+        // The block comment should be skipped; the trailing real ORDER BY must be found.
+        var sql = "SELECT * FROM T /* ORDER BY Id in comment */ ORDER BY Name";
+        Assert.True(HasTopLevelOrderBy(sql));
+    }
+
+    // ── Q1-5: Nested mix — line comment + literal, then real ORDER BY ─────────
+
+    [Fact]
+    public void MixedCommentAndLiteralThenRealOrderBy_IsDetected()
+    {
+        var sql = "SELECT * FROM T -- comment ORDER BY fake\nWHERE x = 'also ORDER BY in literal'\nORDER BY Id";
+        Assert.True(HasTopLevelOrderBy(sql));
+    }
+
+    // ── Q1-6: ApplyPaging emits synthetic ORDER BY for line-comment input ─────
+
+    [Fact]
+    public void ApplyPaging_WithLineCommentContainingOrderBy_EmitsSyntheticOrderBy()
+    {
+        // Q1 scenario: line comment contains ORDER BY — must still emit synthetic ORDER BY (SELECT NULL).
+        var provider = new SqlServerProvider();
+        var sb = new OptimizedSqlBuilder();
+        sb.Append("SELECT * FROM T -- ORDER BY Id here\nWHERE x = 1");
+
+        provider.ApplyPaging(sb, limit: 5, offset: 0,
+            limitParameterName: "@lim", offsetParameterName: "@off");
+
+        var result = sb.ToString();
+        Assert.Contains("ORDER BY (SELECT NULL)", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("OFFSET", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("FETCH", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ── Q1-7: ApplyPaging emits synthetic ORDER BY for block-comment input ────
+
+    [Fact]
+    public void ApplyPaging_WithBlockCommentContainingOrderBy_EmitsSyntheticOrderBy()
+    {
+        // Q1 scenario: block comment contains ORDER BY — must still emit synthetic ORDER BY (SELECT NULL).
+        var provider = new SqlServerProvider();
+        var sb = new OptimizedSqlBuilder();
+        sb.Append("SELECT * FROM T /* ORDER BY Id */ WHERE x = 1");
+
+        provider.ApplyPaging(sb, limit: 5, offset: 0,
+            limitParameterName: "@lim", offsetParameterName: "@off");
+
+        var result = sb.ToString();
+        Assert.Contains("ORDER BY (SELECT NULL)", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("OFFSET", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("FETCH", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ── Q1-8: Unclosed block comment handled gracefully ───────────────────────
+
+    [Fact]
+    public void UnclosedBlockComment_DoesNotThrow_ReturnsFalse()
+    {
+        // Malformed SQL: unclosed /* — scanner must reach EOF without exception.
+        var sql = "SELECT * FROM T /* unclosed comment ORDER BY Id";
+        var ex = Record.Exception(() => HasTopLevelOrderBy(sql));
+        Assert.Null(ex);
+        Assert.False(HasTopLevelOrderBy(sql)); // ORDER BY inside unclosed comment
     }
 }

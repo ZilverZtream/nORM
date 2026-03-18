@@ -121,7 +121,15 @@ EXEC sp_releaseapplock
     @Resource  = '{MigrationLockResource}',
     @LockOwner = 'Session';";
             try { await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false); }
-            catch { /* Best-effort release; connection may already be closing. */ }
+            catch (Exception ex)
+            {
+                // M1: Best-effort release; surface failure for diagnostics rather than silently swallowing.
+                // Do not propagate — throwing from a finally block would mask the original exception.
+                _logger?.LogWarning(
+                    "nORM: SQL Server migration advisory-lock release failed: {Message}. " +
+                    "A stale sp_getapplock entry may block future migrations until the session resets.",
+                    ex.Message);
+            }
         }
 
         /// <summary>
