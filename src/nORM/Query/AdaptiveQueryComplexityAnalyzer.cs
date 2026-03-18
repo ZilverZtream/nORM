@@ -55,7 +55,11 @@ namespace nORM.Query
                 return cached;
             if (_analysisCache.Count >= MaxCacheSize)
             {
-                _analysisCache.Clear();
+                // Evict oldest half rather than wiping the entire cache to avoid
+                // a thundering-herd where every concurrent miss repopulates from scratch.
+                var toRemove = _analysisCache.Keys.Take(MaxCacheSize / 2).ToList();
+                foreach (var k in toRemove)
+                    _analysisCache.TryRemove(k, out _);
             }
             if (IsSimpleQuery(query))
             {

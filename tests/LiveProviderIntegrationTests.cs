@@ -139,6 +139,18 @@ public class LiveProviderIntegrationTests
     // Entity definitions
     // ══════════════════════════════════════════════════════════════════════════
 
+    // Used by the SQL Server live CRUD test (maps to LiveItem_Test created by the DDL above).
+    [Table("LiveItem_Test")]
+    private class LiveItem_SS
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public decimal Price { get; set; }
+        public bool Active { get; set; }
+    }
+
     [Table("LiveItem")]
     private class LiveItem
     {
@@ -396,12 +408,46 @@ public class LiveProviderIntegrationTests
                 DELETE FROM LiveItem_Test;";
             createCmd.ExecuteNonQuery();
 
-            // TODO: full CRUD test body (runs when NORM_TEST_SQLSERVER is set)
-            // For now: verify connection type is correct
-            Assert.True(true, "SQL Server connection established successfully.");
-        }
+            using var ctx = new DbContext(conn, provider!);
 
-        await Task.CompletedTask;
+            // INSERT
+            var item = new LiveItem_SS { Name = "Widget", Price = 9.99m, Active = true };
+            ctx.Add(item);
+            await ctx.SaveChangesAsync();
+            Assert.True(item.Id > 0, "DB-generated identity key must be assigned after INSERT.");
+
+            // SELECT
+            var loaded = ctx.Query<LiveItem_SS>()
+                            .Where(i => i.Id == item.Id)
+                            .ToList();
+            Assert.Single(loaded);
+            Assert.Equal("Widget", loaded[0].Name);
+            Assert.Equal(9.99m, loaded[0].Price);
+            Assert.True(loaded[0].Active);
+
+            // UPDATE
+            using var ctx2 = new DbContext(conn, provider!);
+            var toUpdate = new LiveItem_SS { Id = item.Id, Name = "Widget Pro", Price = 19.99m, Active = false };
+            ctx2.Update(toUpdate);
+            await ctx2.SaveChangesAsync();
+
+            using var verifyCmd = conn.CreateCommand();
+            verifyCmd.CommandText = "SELECT Name, Active FROM LiveItem_Test WHERE Id = " + item.Id;
+            using var rdr = verifyCmd.ExecuteReader();
+            Assert.True(rdr.Read());
+            Assert.Equal("Widget Pro", rdr.GetString(0));
+            Assert.False(rdr.GetBoolean(1));
+            rdr.Close();
+
+            // DELETE
+            using var ctx3 = new DbContext(conn, provider!);
+            ctx3.Remove(new LiveItem_SS { Id = item.Id, Name = "Widget Pro", Price = 19.99m });
+            await ctx3.SaveChangesAsync();
+
+            using var countCmd = conn.CreateCommand();
+            countCmd.CommandText = "SELECT COUNT(*) FROM LiveItem_Test";
+            Assert.Equal(0, Convert.ToInt32(countCmd.ExecuteScalar()));
+        }
     }
 
     [Fact]

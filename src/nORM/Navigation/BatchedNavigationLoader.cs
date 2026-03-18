@@ -147,22 +147,25 @@ namespace nORM.Navigation
             }
         }
 
+        // A1 fix: Do NOT link individual caller tokens into a shared CancellationToken for the
+        // DB query. If any one caller's token fires, the linked token would cancel the shared
+        // DB query and propagate OperationCanceledException to ALL callers in the same batch —
+        // including those whose tokens had not fired. Instead, run the DB query to completion
+        // with CancellationToken.None, then perform per-caller token checks when delivering
+        // results so each caller receives either its own cancellation or the actual result.
         private async Task LoadNavigationBatchAsync(Type entityType, string propertyName,
             List<(object Entity, TaskCompletionSource<object> Tcs, CancellationToken Ct)> entities)
         {
-            var activeCts = entities.Select(e => e.Ct).Where(t => t.CanBeCanceled).ToArray();
-            using var linkedCts = activeCts.Length > 0
-                ? CancellationTokenSource.CreateLinkedTokenSource(activeCts)
-                : null;
-            var ct = linkedCts?.Token ?? CancellationToken.None;
+            // A1 fix: shared DB query always runs to completion; per-caller tokens checked on delivery.
+            var ct = CancellationToken.None;
 
             try
             {
                 var mapping = _context.GetMapping(entityType);
                 if (!mapping.Relations.TryGetValue(propertyName, out var relation))
                 {
-                    foreach (var (_, tcs, _) in entities)
-                        tcs.SetResult(new List<object>());
+                    foreach (var (_, tcs, callerCt) in entities)
+                        DeliverEmpty(tcs, callerCt);
                     return;
                 }
 
@@ -173,8 +176,8 @@ namespace nORM.Navigation
 
                 if (!keys.Any())
                 {
-                    foreach (var (_, tcs, _) in entities)
-                        tcs.SetResult(new List<object>());
+                    foreach (var (_, tcs, callerCt) in entities)
+                        DeliverEmpty(tcs, callerCt);
                     return;
                 }
 
@@ -182,8 +185,13 @@ namespace nORM.Navigation
                 var grouped = relatedData.GroupBy(relation.ForeignKey.Getter)
                                          .ToDictionary(g => g.Key!, g => g.ToList());
 
-                foreach (var (entity, tcs, _) in entities)
+                foreach (var (entity, tcs, callerCt) in entities)
                 {
+                    if (callerCt.IsCancellationRequested)
+                    {
+                        tcs.SetCanceled(callerCt);
+                        continue;
+                    }
                     var key = relation.PrincipalKey.Getter(entity);
                     var related = grouped.TryGetValue(key!, out var list) ? list : new List<object>();
                     tcs.SetResult(related);
@@ -191,9 +199,27 @@ namespace nORM.Navigation
             }
             catch (Exception ex)
             {
-                foreach (var (_, tcs, _) in entities)
-                    tcs.SetException(ex);
+                foreach (var (_, tcs, callerCt) in entities)
+                {
+                    if (callerCt.IsCancellationRequested)
+                        tcs.SetCanceled(callerCt);
+                    else
+                        tcs.SetException(ex);
+                }
             }
+        }
+
+        /// <summary>
+        /// Delivers an empty result to a single caller's <see cref="TaskCompletionSource{T}"/>,
+        /// honouring the caller's cancellation token. If cancellation has already been requested,
+        /// the task is cancelled instead of resolved with an empty list.
+        /// </summary>
+        private static void DeliverEmpty(TaskCompletionSource<object> tcs, CancellationToken callerCt)
+        {
+            if (callerCt.IsCancellationRequested)
+                tcs.SetCanceled(callerCt);
+            else
+                tcs.SetResult(new List<object>());
         }
 
         /// <summary>

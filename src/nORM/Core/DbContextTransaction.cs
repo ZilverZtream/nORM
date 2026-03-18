@@ -129,9 +129,10 @@ namespace nORM.Core
             if (Interlocked.CompareExchange(ref _completed, 1, 0) == 0)
             {
                 if (_transaction != null)
+                {
                     await _transaction.DisposeAsync().ConfigureAwait(false);
-                if (_transaction != null)
                     _context.ClearTransaction(_transaction);
+                }
             }
         }
     }

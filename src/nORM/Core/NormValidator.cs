@@ -294,6 +294,11 @@ namespace nORM.Core
                 var commentStart = sql.IndexOf("/*");
                 var commentEnd = sql.IndexOf("*/", commentStart);
 
+                if (commentEnd < 0)
+                    throw new NormUsageException(
+                        "Malformed SQL: block comment opened with '/*' but no matching '*/' found after it. " +
+                        "Ensure block comments are properly closed.");
+
                 // Check if there are suspicious keywords inside the comment
                 var commentContent = sql.Substring(commentStart + 2, commentEnd - commentStart - 2).ToUpperInvariant();
                 if (commentContent.Contains("UNION") || commentContent.Contains("SELECT") ||

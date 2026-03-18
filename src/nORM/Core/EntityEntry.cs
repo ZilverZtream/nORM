@@ -129,6 +129,49 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Returns a snapshot of <paramref name="value"/> that is safe to store as an
+        /// original-value baseline. For <c>byte[]</c> a defensive clone is returned so
+        /// that in-place mutations to the array cannot silently match the snapshot;
+        /// all other values are returned as-is (they are either immutable value types
+        /// or reference types compared by identity/Equals).
+        /// </summary>
+        private static object? SnapshotValue(object? value)
+            => value is byte[] b ? (object)((byte[])b.Clone()) : value;
+
+        /// <summary>
+        /// Content-aware equality check used when comparing current vs. original values.
+        /// Provides a fast <see cref="object.ReferenceEquals"/> short-circuit, then
+        /// byte-by-byte <see cref="Enumerable.SequenceEqual{TSource}(IEnumerable{TSource},IEnumerable{TSource})"/> for <c>byte[]</c>,
+        /// and falls back to <see cref="object.Equals(object,object)"/> for everything else.
+        /// </summary>
+        private static bool ValuesEqual(object? current, object? original)
+        {
+            if (ReferenceEquals(current, original)) return true;
+            if (current is byte[] cb && original is byte[] ob) return cb.SequenceEqual(ob);
+            return Equals(current, original);
+        }
+
+        /// <summary>
+        /// Content-based hash code for use in hash-based dirty detection.
+        /// For <c>byte[]</c> a simple polynomial hash over the bytes is computed so
+        /// that two equal arrays produce the same hash regardless of instance identity.
+        /// All other types delegate to <see cref="object.GetHashCode"/>.
+        /// </summary>
+        private static int ContentHashCode(object? value)
+        {
+            if (value is byte[] b)
+            {
+                unchecked
+                {
+                    int h = 17;
+                    foreach (var by in b) h = h * 31 + by;
+                    return h;
+                }
+            }
+            return value?.GetHashCode() ?? 0;
+        }
+
+        /// <summary>
         /// Reads the primary key value(s) from an entity using the provided mapping.
         /// Returns null when the entity has no key columns defined.
         /// </summary>
@@ -163,7 +206,7 @@ namespace nORM.Core
             // rather than the potentially-mutated current value of the entity property.
             var tsCol = _mapping.TimestampColumn;
             if (tsCol != null && Entity != null)
-                OriginalToken = tsCol.Getter(Entity);
+                OriginalToken = SnapshotValue(tsCol.Getter(Entity));
             _getHashCodes = new Func<object, int>[_nonKeyColumns.Length];
             _getValues = new Func<object, object?>[_nonKeyColumns.Length];
             _propertyIndex = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -171,7 +214,7 @@ namespace nORM.Core
             {
                 var getter = _nonKeyColumns[i].Getter;
                 _getValues[i] = getter;
-                _getHashCodes[i] = e => getter(e)?.GetHashCode() ?? 0;
+                _getHashCodes[i] = e => ContentHashCode(getter(e));
                 _propertyIndex[_nonKeyColumns[i].Prop.Name] = i;
             }
             _originalHashes = new int[_nonKeyColumns.Length];
@@ -208,7 +251,7 @@ namespace nORM.Core
             if (e.PropertyName != null && _propertyIndex!.TryGetValue(e.PropertyName, out var idx))
             {
                 var currentValue = _getValues![idx](currentEntity);
-                var changed = !Equals(currentValue, _originalValues![idx]);
+                var changed = !ValuesEqual(currentValue, _originalValues![idx]);
                 _changedProperties![idx] = changed;
             }
             else
@@ -216,7 +259,7 @@ namespace nORM.Core
                 for (int i = 0; i < _nonKeyColumns!.Length; i++)
                 {
                     var currentValue = _getValues![i](currentEntity);
-                    var changed = !Equals(currentValue, _originalValues![i]);
+                    var changed = !ValuesEqual(currentValue, _originalValues![i]);
                     _changedProperties![i] = changed;
                 }
             }
@@ -264,8 +307,9 @@ namespace nORM.Core
             }
             for (int i = 0; i < _nonKeyColumns!.Length; i++)
             {
-                _originalHashes![i] = _getHashCodes![i](entity);
-                _originalValues![i] = _getValues![i](entity);
+                var val = _getValues![i](entity);
+                _originalValues![i] = SnapshotValue(val);
+                _originalHashes![i] = ContentHashCode(val);
                 _changedProperties![i] = false;
             }
         }
@@ -295,7 +339,7 @@ namespace nORM.Core
                 if (_options.UsePreciseChangeTracking)
                 {
                     var currentValue = _getValues![i](entity);
-                    changed = !Equals(currentValue, _originalValues![i]);
+                    changed = !ValuesEqual(currentValue, _originalValues![i]);
                 }
                 else
                 {
@@ -308,7 +352,7 @@ namespace nORM.Core
                     {
                         // Hash collision - verify using precise comparison
                         var currentValue = _getValues![i](entity);
-                        changed = !Equals(currentValue, _originalValues![i]);
+                        changed = !ValuesEqual(currentValue, _originalValues![i]);
                     }
                 }
                 _changedProperties![i] = changed;
@@ -335,7 +379,7 @@ namespace nORM.Core
             // Refresh the original token so future saves use the latest DB value.
             var tsCol = _mapping.TimestampColumn;
             if (tsCol != null && Entity != null)
-                OriginalToken = tsCol.Getter(Entity);
+                OriginalToken = SnapshotValue(tsCol.Getter(Entity));
             // Refresh the tracked original key so that a DB-generated key assigned after INSERT
             // is accepted as the new "original" and does not trigger a false-positive
             // PK-mutation error on the next UPDATE.

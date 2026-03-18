@@ -77,9 +77,9 @@ namespace nORM.Navigation
         /// <summary>
         /// Loads a navigation property explicitly
         /// </summary>
-        public static async Task LoadAsync<T, TProperty>(this T entity, 
-            System.Linq.Expressions.Expression<Func<T, TProperty?>> navigationProperty, 
-            CancellationToken ct = default) 
+        public static async Task LoadAsync<T, TProperty>(this T entity,
+            System.Linq.Expressions.Expression<Func<T, TProperty?>> navigationProperty,
+            CancellationToken ct = default)
             where T : class
             where TProperty : class
         {
