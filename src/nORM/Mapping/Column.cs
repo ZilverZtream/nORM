@@ -89,7 +89,10 @@ namespace nORM.Mapping
 
             Getter = getterOverride ?? info.Getter;
             Setter = setterOverride ?? info.Setter;
-            SetterMethod = setterMethodOverride ?? info.Property.GetSetMethod()!;
+            SetterMethod = setterMethodOverride ?? info.Property.GetSetMethod()
+                ?? throw new InvalidOperationException(
+                    $"Property '{info.Property.DeclaringType?.Name}.{info.Property.Name}' has no public setter " +
+                    "and cannot be used as a mapped column. Remove it from the mapping or make it read-write.");
             IsShadow = false;
         }
 
@@ -138,7 +141,10 @@ namespace nORM.Mapping
 
             Getter = getterOverride ?? CreateGetterDelegate(pi);
             Setter = setterOverride ?? CreateSetterDelegate(pi);
-            SetterMethod = setterMethodOverride ?? pi.GetSetMethod()!;
+            SetterMethod = setterMethodOverride ?? pi.GetSetMethod()
+                ?? throw new InvalidOperationException(
+                    $"Property '{pi.DeclaringType?.Name}.{pi.Name}' has no public setter " +
+                    "and cannot be used as a mapped column. Remove it from the mapping or make it read-write.");
             IsShadow = false;
         }
 

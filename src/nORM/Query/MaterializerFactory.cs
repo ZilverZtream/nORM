@@ -1289,7 +1289,13 @@ namespace nORM.Query
             }
 
             public override string GetName(int ordinal) => $"Field_{ordinal}";
-            public override int GetOrdinal(string name) => int.Parse(name.Replace("Field_", ""));
+            public override int GetOrdinal(string name)
+            {
+                if (name.StartsWith("Field_", StringComparison.Ordinal) &&
+                    int.TryParse(name.AsSpan(6), out var ordinal))
+                    return ordinal;
+                throw new IndexOutOfRangeException($"Column name '{name}' was not found in the reader.");
+            }
             public override string GetDataTypeName(int ordinal) => nameof(Object);
             public override Type GetFieldType(int ordinal) => typeof(object);
             public override bool HasRows => false;

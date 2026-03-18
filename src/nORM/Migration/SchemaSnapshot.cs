@@ -146,9 +146,16 @@ namespace nORM.Migration
                     {
                         // Check if it's an init-only property (has a set accessor marked IsInitOnly)
                         var setter = prop.GetSetMethod(nonPublic: true);
-                        bool isInitOnly = setter != null &&
-                            setter.ReturnParameter.GetRequiredCustomModifiers()
-                                .Contains(typeof(System.Runtime.CompilerServices.IsExternalInit));
+                        bool isInitOnly = false;
+                        if (setter != null)
+                        {
+                            try
+                            {
+                                isInitOnly = setter.ReturnParameter.GetRequiredCustomModifiers()
+                                    .Contains(typeof(System.Runtime.CompilerServices.IsExternalInit));
+                            }
+                            catch (NotSupportedException) { /* dynamic/emitted types may not support modifier introspection */ }
+                        }
                         // If no setter at all (not even init-only), it's a computed/expression property — exclude it
                         if (!isInitOnly && setter == null)
                             continue;
