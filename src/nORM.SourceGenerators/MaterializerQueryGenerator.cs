@@ -80,6 +80,26 @@ namespace nORM.SourceGenerators
             return data != null;
         }
 
+        /// <summary>
+        /// SG1: Returns the database column name for a property, honouring
+        /// <c>[System.ComponentModel.DataAnnotations.Schema.Column("name")]</c> when present.
+        /// Fluent <c>HasColumnName</c> is runtime-only and cannot be resolved at compile time;
+        /// entities that rely solely on fluent renames must not use <c>[GenerateMaterializer]</c>.
+        /// </summary>
+        private static string GetColumnName(IPropertySymbol prop)
+        {
+            foreach (var attr in prop.GetAttributes())
+            {
+                var cls = attr.AttributeClass?.ToDisplayString();
+                if (cls == "System.ComponentModel.DataAnnotations.Schema.ColumnAttribute"
+                    && attr.ConstructorArguments.Length > 0
+                    && attr.ConstructorArguments[0].Value is string colName
+                    && !string.IsNullOrEmpty(colName))
+                    return colName;
+            }
+            return prop.Name;
+        }
+
         private void GenerateMaterializer(INamedTypeSymbol type, GeneratorExecutionContext context)
         {
             var ns = type.ContainingNamespace.IsGlobalNamespace ? null : type.ContainingNamespace.ToDisplayString();
@@ -92,7 +112,8 @@ namespace nORM.SourceGenerators
 
             // Collect (ordinalVarName, columnName) pairs first so we can emit
             // reader.GetOrdinal("ColumnName") lookups instead of hardcoded positional indices.
-            // This makes the generated materializer correct regardless of column order in the result set.
+            // SG1 fix: use mapped column name from [Column] attribute when present, else prop.Name.
+            // For owned types: use {ownerColumnName}_{ownedColumnName} (mirrors runtime convention).
             var ordinalEntries = new List<(string VarName, string ColName)>();
             foreach (var prop in props)
             {
@@ -102,12 +123,13 @@ namespace nORM.SourceGenerators
                     var ownedProps = ownedType.GetMembers().OfType<IPropertySymbol>()
                         .Where(p => !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
                         .OrderBy(p => p.Name);
+                    var ownerColName = GetColumnName(prop);
                     foreach (var op in ownedProps)
-                        ordinalEntries.Add(($"__ord_{prop.Name}_{op.Name}", $"{prop.Name}_{op.Name}"));
+                        ordinalEntries.Add(($"__ord_{prop.Name}_{op.Name}", $"{ownerColName}_{GetColumnName(op)}"));
                 }
                 else
                 {
-                    ordinalEntries.Add(($"__ord_{prop.Name}", prop.Name));
+                    ordinalEntries.Add(($"__ord_{prop.Name}", GetColumnName(prop)));
                 }
             }
 
@@ -255,7 +277,10 @@ namespace nORM.SourceGenerators
             sb.AppendLine("{");
             sb.AppendLine($"    public static async partial System.Threading.Tasks.Task<System.Collections.Generic.List<{entityTypeName}>> {methodName}({paramList})");
             sb.AppendLine("    {");
-            sb.AppendLine($"        await using var cmd = {ctxParam}.Connection.CreateCommand();");
+            // X1 fix: use CreateCompiledQueryCommandAsync instead of ctx.Connection.CreateCommand()
+            // so that connection initialisation, transaction binding, and interceptors all fire.
+            var ctArg = ctParam ?? "System.Threading.CancellationToken.None";
+            sb.AppendLine($"        await using var cmd = await {ctxParam}.CreateCompiledQueryCommandAsync({ctArg}).ConfigureAwait(false);");
             var escapedSql = sql.Replace("\"", "\"\"");
             sb.AppendLine($"        cmd.CommandText = @\"{escapedSql}\";");
             foreach (var p in queryParams)
@@ -268,14 +293,9 @@ namespace nORM.SourceGenerators
                 sb.AppendLine($"        cmd.Parameters.Add(p_{p.Name});");
             }
             sb.AppendLine($"        var materializer = CompiledMaterializerStore.Get<{entityTypeName}>();");
-            sb.AppendLine($"        var list = new System.Collections.Generic.List<{entityTypeName}>();");
-            var ctArg = ctParam ?? "System.Threading.CancellationToken.None";
-            sb.AppendLine($"        await using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.Default, {ctArg}).ConfigureAwait(false);");
-            sb.AppendLine($"        while (await reader.ReadAsync({ctArg}).ConfigureAwait(false))");
-            sb.AppendLine("        {");
-            sb.AppendLine($"            list.Add(await materializer(reader, {ctArg}).ConfigureAwait(false));");
-            sb.AppendLine("        }");
-            sb.AppendLine("        return list;");
+            // X1 fix: use ExecuteCompiledQueryListAsync instead of cmd.ExecuteReaderAsync so that
+            // command interceptors (logging, tracing, auditing) are invoked.
+            sb.AppendLine($"        return await {ctxParam}.ExecuteCompiledQueryListAsync(cmd, materializer, {ctArg}).ConfigureAwait(false);");
             sb.AppendLine("    }");
             sb.AppendLine("}");
 

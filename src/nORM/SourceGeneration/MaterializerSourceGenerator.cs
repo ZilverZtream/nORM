@@ -83,9 +83,10 @@ public class MaterializerSourceGenerator : ISourceGenerator
         sb.AppendLine("        {");
         sb.AppendLine($"            var entity = new {className}();");
 
-        // Resolve column ordinals by name so column order in the result set doesn't matter.
+        // SG1 fix: resolve column ordinals using mapped column name ([Column] attr if present,
+        // else property name), so [Column("db_name")] renames are honoured.
         for (int i = 0; i < properties.Count; i++)
-            sb.AppendLine($"            int __ord_{properties[i].Name} = reader.GetOrdinal(\"{properties[i].Name}\");");
+            sb.AppendLine($"            int __ord_{properties[i].Name} = reader.GetOrdinal(\"{GetMappedColumnName(properties[i])}\");");
 
         for (int i = 0; i < properties.Count; i++)
         {
@@ -153,6 +154,24 @@ public class MaterializerSourceGenerator : ISourceGenerator
         sb.AppendLine("}");
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// SG1: Returns the database column name for a property. Reads the <c>[Column("name")]</c>
+    /// attribute when present; falls back to the property name.
+    /// </summary>
+    private static string GetMappedColumnName(IPropertySymbol prop)
+    {
+        foreach (var attr in prop.GetAttributes())
+        {
+            var cls = attr.AttributeClass?.ToDisplayString();
+            if (cls == "System.ComponentModel.DataAnnotations.Schema.ColumnAttribute"
+                && attr.ConstructorArguments.Length > 0
+                && attr.ConstructorArguments[0].Value is string colName
+                && !string.IsNullOrEmpty(colName))
+                return colName;
+        }
+        return prop.Name;
     }
 
     private List<IPropertySymbol> GetWritableProperties(INamedTypeSymbol classSymbol)
