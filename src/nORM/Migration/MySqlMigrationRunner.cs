@@ -67,29 +67,32 @@ namespace nORM.Migration
                 if (!pending.Any()) return;
 
                 // MySQL DDL (ALTER TABLE, CREATE TABLE, DROP TABLE, etc.) implicitly auto-commits,
-                // so a single wrapping transaction cannot roll back schema changes on failure. If migration
-                // N+1 fails, the wrapping rollback reverts only the history INSERT for migration N (not the
-                // DDL itself), leaving the schema advanced but history behind — causing replay on next run.
+                // so a single wrapping transaction cannot roll back schema changes on failure.
                 //
-                // Each migration runs in its own per-step transaction. The history INSERT is committed
-                // atomically with the step's end-of-step marker. If a later migration fails:
-                //   - Earlier migrations: DDL committed + history recorded (safe to skip on rerun)
-                //   - Failed migration:   DDL may have partially committed; history NOT recorded (rerun applies it)
-                // This matches MySQL's actual DDL semantics: best-effort atomicity per migration step.
+                // M1 durable-checkpoint strategy: before running each step, write a Partial row to
+                // the history table (auto-committed, outside the per-step transaction). If the step
+                // succeeds, UPDATE the row to Applied inside the transaction and commit. If the step
+                // fails (or the process dies mid-flight), the Partial row remains and the NEXT run
+                // will detect it and throw an informative error instead of silently re-executing
+                // potentially-incompatible DDL. The operator can DELETE the Partial row after
+                // manually inspecting / completing the schema, then rerun.
                 foreach (var migration in pending)
                 {
+                    // Write durable Partial checkpoint before any DDL runs.
+                    await InsertMigrationCheckpointAsync(migration, ct).ConfigureAwait(false);
+
                     await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
                     try
                     {
                         migration.Up(_connection, (DbTransaction)transaction, ct);
-                        await MarkMigrationAppliedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
+                        await MarkMigrationCompletedAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
                         // CancellationToken.None — commit must not be aborted mid-flight.
                         await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
                     }
                     catch
                     {
                         // Attempt rollback; DDL may have already auto-committed (no-op for those statements).
-                        // Suppress rollback exceptions so the original failure is the one that propagates.
+                        // The Partial checkpoint row survives so the next run can report it explicitly.
                         try { await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); }
                         catch { /* DDL auto-commit makes rollback a no-op; suppress to surface root cause */ }
                         throw;
@@ -198,29 +201,46 @@ namespace nORM.Migration
 
             var applied = await GetAppliedMigrationsAsync(ct).ConfigureAwait(false);
 
-            foreach (var m in all.Where(m => applied.TryGetValue(m.Version, out var name) &&
-                !string.Equals(name, m.Name, StringComparison.Ordinal)))
+            // M1: Detect Partial state — DDL auto-committed but step was not recorded as Applied.
+            // Silently re-running an already-partially-applied migration can corrupt the schema.
+            // Require operator intervention: inspect schema, then DELETE the Partial row to retry.
+            var partials = applied
+                .Where(kvp => string.Equals(kvp.Value.Status, "Partial", StringComparison.Ordinal))
+                .ToList();
+            if (partials.Count > 0)
             {
-                applied.TryGetValue(m.Version, out var recordedName);
+                var desc = string.Join(", ", partials.Select(p => $"v{p.Key} '{p.Value.Name}'"));
                 throw new InvalidOperationException(
-                    $"Migration version {m.Version} name drift: recorded '{recordedName}', found '{m.Name}'. " +
+                    $"nORM: MySQL migration(s) are in Partial state (DDL auto-committed, step not recorded as Applied): {desc}. " +
+                    $"Inspect the schema manually, then DELETE FROM `{HistoryTableName}` WHERE Version IN " +
+                    $"({string.Join(",", partials.Select(p => p.Key))}) to retry.");
+            }
+
+            // Name drift check (Applied rows only; Partial rows already threw above).
+            foreach (var m in all.Where(m => applied.TryGetValue(m.Version, out var info) &&
+                string.Equals(info.Status, "Applied", StringComparison.Ordinal) &&
+                !string.Equals(info.Name, m.Name, StringComparison.Ordinal)))
+            {
+                applied.TryGetValue(m.Version, out var recordedInfo);
+                throw new InvalidOperationException(
+                    $"Migration version {m.Version} name drift: recorded '{recordedInfo.Name}', found '{m.Name}'. " +
                     "Rename the migration class back to its original name or create a new migration version.");
             }
 
+            // Pending = versions absent from history entirely (Partial rows already caused a throw above).
             return all.Where(m => !applied.ContainsKey(m.Version)).ToList();
         }
 
         /// <summary>
-        /// Records in the history table that the specified migration has been successfully applied.
+        /// M1: Inserts a durable <c>Partial</c> checkpoint row for the migration BEFORE the
+        /// per-step transaction begins. If the step fails (including a mid-flight process kill),
+        /// this row remains and is detected on the next run, triggering a loud error instead of
+        /// silently re-applying already-partially-committed DDL.
         /// </summary>
-        /// <param name="migration">The migration that was applied.</param>
-        /// <param name="transaction">The active transaction.</param>
-        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
-        private async Task MarkMigrationAppliedAsync(Migration migration, DbTransaction transaction, CancellationToken ct)
+        private async Task InsertMigrationCheckpointAsync(Migration migration, CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
-            cmd.Transaction = transaction;
-            cmd.CommandText = $"INSERT INTO `{HistoryTableName}` (`Version`, `Name`, `AppliedOn`) VALUES (@Version, @Name, @AppliedOn);";
+            cmd.CommandText = $"INSERT INTO `{HistoryTableName}` (`Version`, `Name`, `AppliedOn`, `Status`) VALUES (@Version, @Name, @AppliedOn, 'Partial');";
             cmd.AddParam("@Version", migration.Version);
             cmd.AddParam("@Name", migration.Name);
             cmd.AddParam("@AppliedOn", DateTime.UtcNow);
@@ -228,27 +248,40 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// Retrieves the set of migration versions (and names) that have already been applied to the database.
+        /// M1: Updates the <c>Partial</c> checkpoint row to <c>Applied</c> inside the per-step
+        /// transaction. Both this UPDATE and the transaction commit must succeed for the migration
+        /// to be considered durable.
+        /// </summary>
+        private async Task MarkMigrationCompletedAsync(Migration migration, DbTransaction transaction, CancellationToken ct)
+        {
+            await using var cmd = _connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = $"UPDATE `{HistoryTableName}` SET `Status` = 'Applied' WHERE `Version` = @Version;";
+            cmd.AddParam("@Version", migration.Version);
+            await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Retrieves all history rows (Applied and Partial) from the history table.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
-        /// <returns>A dictionary mapping version numbers to migration names for applied migrations.</returns>
-        private async Task<Dictionary<long, string>> GetAppliedMigrationsAsync(CancellationToken ct)
+        /// <returns>A dictionary mapping version numbers to <c>(Name, Status)</c> tuples.</returns>
+        private async Task<Dictionary<long, (string Name, string Status)>> GetAppliedMigrationsAsync(CancellationToken ct)
         {
-            var applied = new Dictionary<long, string>();
+            var applied = new Dictionary<long, (string Name, string Status)>();
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"SELECT `Version`, `Name` FROM `{HistoryTableName}`";
+            cmd.CommandText = $"SELECT `Version`, `Name`, `Status` FROM `{HistoryTableName}`";
             try
             {
                 await using var reader = await ExecuteReaderAsync(cmd, ct).ConfigureAwait(false);
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
-                    applied[reader.GetInt64(0)] = reader.GetString(1);
+                    applied[reader.GetInt64(0)] = (reader.GetString(1), reader.GetString(2));
                 }
             }
             catch (DbException ex) when (IsTableNotFoundError(ex))
             {
                 // MG-1: History table doesn't exist yet (first run) — return empty dict.
-                // All other DbException (transient failures, permission errors, etc.) propagate.
             }
             return applied;
         }
@@ -271,14 +304,36 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// Creates the migration history table if it does not already exist.
+        /// Creates the migration history table (with Status column) if it does not exist,
+        /// and upgrades existing tables that lack the Status column.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         private async Task EnsureHistoryTableAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS `{HistoryTableName}` (Version BIGINT PRIMARY KEY, Name VARCHAR(255) NOT NULL, AppliedOn DATETIME(6) NOT NULL);";
+            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS `{HistoryTableName}` " +
+                "(Version BIGINT PRIMARY KEY, Name VARCHAR(255) NOT NULL, AppliedOn DATETIME(6) NOT NULL, " +
+                "Status VARCHAR(20) NOT NULL DEFAULT 'Applied');";
             await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
+
+            // M1: Upgrade existing deployments that have the table without the Status column.
+            // ALTER TABLE ADD COLUMN is idempotent via error suppression for "duplicate column name".
+            await using var alterCmd = _connection.CreateCommand();
+            alterCmd.CommandText = $"ALTER TABLE `{HistoryTableName}` ADD COLUMN Status VARCHAR(20) NOT NULL DEFAULT 'Applied'";
+            try { await ExecuteNonQueryAsync(alterCmd, ct).ConfigureAwait(false); }
+            catch (DbException ex) when (IsColumnAlreadyExistsError(ex)) { /* column already present — new schema */ }
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> when the exception indicates that the column already exists.
+        /// MySQL error 1060 = "Duplicate column name"; SQLite message = "duplicate column name".
+        /// </summary>
+        private static bool IsColumnAlreadyExistsError(DbException ex)
+        {
+            var numberProp = ex.GetType().GetProperty("Number");
+            if (numberProp?.GetValue(ex) is int n && n == 1060) return true;
+            return ex.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase)
+                || ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

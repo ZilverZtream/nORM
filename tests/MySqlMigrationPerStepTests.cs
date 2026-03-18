@@ -260,12 +260,16 @@ public class MySqlMigrationPerStepTests
 
         Assert.Contains("P-1 simulated migration failure", ex.Message);
 
-        // P-1 fix: steps 1 and 2 were individually committed BEFORE step 3 ran.
-        // History must contain exactly 2 entries (for versions 1000 and 1001).
+        // M1 checkpoint: step 3 has a Partial row (DDL auto-committed, status not Applied).
+        // Steps 1 and 2 are Applied; step 3 is Partial. Total = 3 rows.
         using var check = cn.CreateCommand();
-        check.CommandText = "SELECT COUNT(*) FROM \"__NormMigrationsHistory\"";
-        var historyCount = Convert.ToInt64(check.ExecuteScalar());
-        Assert.Equal(2L, historyCount);
+        check.CommandText = "SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE Status = 'Applied'";
+        var appliedCount = Convert.ToInt64(check.ExecuteScalar());
+        Assert.Equal(2L, appliedCount);
+
+        check.CommandText = "SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE Status = 'Partial'";
+        var partialCount = Convert.ToInt64(check.ExecuteScalar());
+        Assert.Equal(1L, partialCount);
     }
 
     // ── P-1 replay safety, idempotency, crash-safe reconciliation ────────────
@@ -315,12 +319,11 @@ public class MySqlMigrationPerStepTests
     }
 
     /// <summary>
-    /// P-1 replay safety: after a partial failure (third migration fails, only 2 history rows),
-    /// a second run with a fixed (non-failing) assembly for the third migration must apply
-    /// ONLY the third migration — not reapply the first two.
+    /// M1 partial-state guard: after a partial failure (step 3 fails, leaving a Partial row),
+    /// the NEXT run throws an informative error instead of silently re-applying DDL that may
+    /// have already partially committed. The operator must DELETE the Partial row to resume.
     ///
-    /// This validates the per-step history model: once a migration is committed to history,
-    /// it is skipped on the next run regardless of failure in later steps.
+    /// After deletion, the third run applies ONLY step 3 (skipping steps 1+2 as Applied).
     /// </summary>
     [Fact]
     public async Task ApplyMigrations_AfterPartialFailure_ReplaySkipsAlreadyApplied()
@@ -336,7 +339,7 @@ public class MySqlMigrationPerStepTests
             setup.ExecuteNonQuery();
         }
 
-        // Run 1: third migration fails. Steps 1 and 2 committed individually to history.
+        // Run 1: third migration fails. Steps 1 and 2 are Applied; step 3 is Partial.
         var failingAsm = BuildDynamicMigrationAssembly(
             (1000L, "DynStep1", false),
             (1001L, "DynStep2", false),
@@ -345,22 +348,34 @@ public class MySqlMigrationPerStepTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => new NoLockMySqlRunner(cn, failingAsm).ApplyMigrationsAsync());
 
-        // Run 2: same 3 migration versions, but step 3 now succeeds.
-        await using var counting = new CountingConnection(cn);
+        // Run 2: Partial state detected — runner throws before applying anything.
         var fixedAsm = BuildDynamicMigrationAssembly(
             (1000L, "DynStep1", false),
             (1001L, "DynStep2", false),
             (1002L, "DynStep3Fixed", false));
 
-        var runner2 = new NoLockMySqlRunner(counting, fixedAsm);
-        await runner2.ApplyMigrationsAsync();
+        var run2Ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => new NoLockMySqlRunner(cn, fixedAsm).ApplyMigrationsAsync());
+        Assert.Contains("Partial state", run2Ex.Message);
+        Assert.Contains("1002", run2Ex.Message);
 
-        // P-1 replay safety: only 1 commit on the second run (step 3 only, not steps 1+2).
+        // Simulate operator deleting the Partial row after manual schema inspection.
+        using (var del = cn.CreateCommand())
+        {
+            del.CommandText = "DELETE FROM \"__NormMigrationsHistory\" WHERE Version = 1002";
+            del.ExecuteNonQuery();
+        }
+
+        // Run 3: after operator cleanup, only step 3 is pending → exactly 1 commit.
+        await using var counting = new CountingConnection(cn);
+        var runner3 = new NoLockMySqlRunner(counting, fixedAsm);
+        await runner3.ApplyMigrationsAsync();
+
         Assert.Single(counting.CommitLog);
 
-        // History must now have exactly 3 rows total.
+        // History must now have exactly 3 rows, all Applied.
         using var check = cn.CreateCommand();
-        check.CommandText = "SELECT COUNT(*) FROM \"__NormMigrationsHistory\"";
+        check.CommandText = "SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE Status = 'Applied'";
         Assert.Equal(3L, Convert.ToInt64(check.ExecuteScalar()));
     }
 

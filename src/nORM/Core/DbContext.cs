@@ -441,6 +441,46 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// X1: Creates a <see cref="DbCommand"/> that is fully lifecycle-aware:
+        /// opens the connection if closed, binds the active transaction, and participates in
+        /// command interception. Generated <c>[CompileTimeQuery]</c> methods must use this
+        /// instead of <c>ctx.Connection.CreateCommand()</c> to avoid bypassing connection
+        /// initialisation, transaction scope, and interceptor pipelines.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A ready-to-use <see cref="DbCommand"/> bound to the current context.</returns>
+        public async Task<DbCommand> CreateCompiledQueryCommandAsync(CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            await EnsureConnectionAsync(ct).ConfigureAwait(false);
+            return CreateCommand();
+        }
+
+        /// <summary>
+        /// X1: Executes a pre-built command through the interception pipeline and materializes
+        /// all rows into a <see cref="List{T}"/>. Generated <c>[CompileTimeQuery]</c> methods
+        /// must use this instead of calling <c>cmd.ExecuteReaderAsync</c> directly so that
+        /// command interceptors (logging, tracing, auditing) are invoked.
+        /// </summary>
+        /// <typeparam name="T">Entity type returned by each row.</typeparam>
+        /// <param name="cmd">The prepared command with <c>CommandText</c> and parameters already set.</param>
+        /// <param name="materializer">Delegate that converts one reader row into an entity.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A list of materialized entities.</returns>
+        public async Task<List<T>> ExecuteCompiledQueryListAsync<T>(
+            DbCommand cmd,
+            Func<DbDataReader, CancellationToken, Task<T>> materializer,
+            CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            var list = new List<T>();
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, ct).ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                list.Add(await materializer(reader, ct).ConfigureAwait(false));
+            return list;
+        }
+
+        /// <summary>
         /// Checks whether the database connection is healthy by executing a lightweight query.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
