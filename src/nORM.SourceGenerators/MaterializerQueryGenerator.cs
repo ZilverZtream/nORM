@@ -11,6 +11,32 @@ namespace nORM.SourceGenerators
     [Generator]
     public sealed class MaterializerQueryGenerator : ISourceGenerator
     {
+#pragma warning disable RS2008 // Enable analyzer release tracking
+        private static readonly DiagnosticDescriptor SG001 = new DiagnosticDescriptor(
+            id: "nORMSG001",
+            title: "Unsupported return type for [CompileTimeQuery]",
+            messageFormat: "Method '{0}' has return type '{1}' which is not supported by [CompileTimeQuery]. Return type must be Task<List<T>>.",
+            category: "nORM.SourceGeneration",
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+
+        private static readonly DiagnosticDescriptor SG002 = new DiagnosticDescriptor(
+            id: "nORMSG002",
+            title: "Unsupported containing type for [CompileTimeQuery]",
+            messageFormat: "Method '{0}' must be in a non-nested, public, static partial class to use [CompileTimeQuery]",
+            category: "nORM.SourceGeneration",
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+
+        private static readonly DiagnosticDescriptor SG003 = new DiagnosticDescriptor(
+            id: "nORMSG003",
+            title: "Type lacks parameterless constructor for [GenerateMaterializer]",
+            messageFormat: "Type '{0}' does not have a public parameterless constructor. [GenerateMaterializer] requires parameterless construction.",
+            category: "nORM.SourceGeneration",
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+#pragma warning restore RS2008
+
         private sealed class SyntaxReceiver : ISyntaxContextReceiver
         {
             public List<(ClassDeclarationSyntax Syntax, INamedTypeSymbol Symbol)> CandidateTypes { get; } = new();
@@ -109,6 +135,19 @@ namespace nORM.SourceGenerators
                 .Where(p => !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
                 .OrderBy(p => p.Name)
                 .ToList();
+
+            // MAP1 fix: emit diagnostic when type has no public parameterless constructor.
+            var hasParameterlessCtor = type.Constructors.Any(c =>
+                c.Parameters.Length == 0 &&
+                c.DeclaredAccessibility == Microsoft.CodeAnalysis.Accessibility.Public);
+            if (!hasParameterlessCtor)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    SG003,
+                    type.Locations.FirstOrDefault(),
+                    type.Name));
+                return;
+            }
 
             // Collect (ordinalVarName, columnName) pairs first so we can emit
             // reader.GetOrdinal("ColumnName") lookups instead of hardcoded positional indices.
@@ -252,8 +291,26 @@ namespace nORM.SourceGenerators
             var className = cls.Name;
             var methodName = method.Name;
 
+            // SG1 fix: emit diagnostic for unsupported return types
             if (!TryGetEntityType(method.ReturnType, out var entity))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    SG001,
+                    method.Locations.FirstOrDefault(),
+                    method.Name,
+                    method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
                 return;
+            }
+
+            // SG1 fix: emit diagnostic for unsupported containing type shapes
+            if (cls.ContainingType != null || !cls.IsStatic || cls.DeclaredAccessibility != Microsoft.CodeAnalysis.Accessibility.Public)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    SG002,
+                    method.Locations.FirstOrDefault(),
+                    method.Name));
+                return;
+            }
 
             var entityTypeName = entity!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 

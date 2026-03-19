@@ -335,13 +335,15 @@ CREATE TABLE [__NormTemporalTags] ({tagCol} NVARCHAR(450) NOT NULL, {tsCol} DATE
             try
             {
                 await using var cmd = conn.CreateCommand();
+                var (schema, bareTable) = SplitSchemaTable(tableName, "dbo");
                 cmd.CommandText = @"
 SELECT c.COLUMN_NAME, c.DATA_TYPE, c.CHARACTER_MAXIMUM_LENGTH,
        c.NUMERIC_PRECISION, c.NUMERIC_SCALE, c.IS_NULLABLE
 FROM INFORMATION_SCHEMA.COLUMNS c
-WHERE c.TABLE_NAME = @t AND c.TABLE_SCHEMA = 'dbo'
+WHERE c.TABLE_NAME = @t AND c.TABLE_SCHEMA = @s
 ORDER BY c.ORDINAL_POSITION";
-                var p = cmd.CreateParameter(); p.ParameterName = "@t"; p.Value = tableName; cmd.Parameters.Add(p);
+                var p = cmd.CreateParameter(); p.ParameterName = "@t"; p.Value = bareTable; cmd.Parameters.Add(p);
+                var ps = cmd.CreateParameter(); ps.ParameterName = "@s"; ps.Value = schema; cmd.Parameters.Add(ps);
                 await using var rdr = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
                 while (await rdr.ReadAsync(ct).ConfigureAwait(false))
                 {
@@ -368,6 +370,14 @@ ORDER BY c.ORDINAL_POSITION";
                 // Table does not exist yet — return empty list.
             }
             return result;
+        }
+
+        private static (string Schema, string Table) SplitSchemaTable(string tableName, string defaultSchema)
+        {
+            var dot = tableName.IndexOf('.');
+            if (dot < 0)
+                return (defaultSchema, tableName.Trim('[', ']'));
+            return (tableName[..dot].Trim('[', ']'), tableName[(dot + 1)..].Trim('[', ']'));
         }
 
         /// <summary>

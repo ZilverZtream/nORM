@@ -202,12 +202,23 @@ namespace nORM.Providers
             try
             {
                 await using var cmd = conn.CreateCommand();
-                cmd.CommandText = @"
+                var (schemaOverride, bareTable) = SplitSchemaTable(tableName);
+                cmd.CommandText = schemaOverride != null
+                    ? @"
+SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = @t AND TABLE_SCHEMA = @s
+ORDER BY ORDINAL_POSITION"
+                    : @"
 SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE
 FROM INFORMATION_SCHEMA.COLUMNS
 WHERE TABLE_NAME = @t AND TABLE_SCHEMA = DATABASE()
 ORDER BY ORDINAL_POSITION";
-                var p = cmd.CreateParameter(); p.ParameterName = "@t"; p.Value = tableName; cmd.Parameters.Add(p);
+                var p = cmd.CreateParameter(); p.ParameterName = "@t"; p.Value = bareTable; cmd.Parameters.Add(p);
+                if (schemaOverride != null)
+                {
+                    var ps = cmd.CreateParameter(); ps.ParameterName = "@s"; ps.Value = schemaOverride; cmd.Parameters.Add(ps);
+                }
                 await using var rdr = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
                 while (await rdr.ReadAsync(ct).ConfigureAwait(false))
                 {
@@ -222,6 +233,14 @@ ORDER BY ORDINAL_POSITION";
                 // Table does not exist yet — return empty list.
             }
             return result;
+        }
+
+        private static (string? Schema, string Table) SplitSchemaTable(string tableName)
+        {
+            var dot = tableName.IndexOf('.');
+            if (dot < 0)
+                return (null, tableName.Trim('`'));
+            return (tableName[..dot].Trim('`'), tableName[(dot + 1)..].Trim('`'));
         }
 
         /// <summary>

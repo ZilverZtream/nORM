@@ -229,7 +229,7 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var provider = setup.Provider;
         var (sql, _, _) = TranslateQuery<Product, Product>(q => q.Union(q), connection, provider);
         var select = $"SELECT {Columns(provider)} FROM {provider.Escape("Product")}";
-        var expected = $"({select}) UNION ({select})";
+        var expected = $"{select} UNION {select}";
         Assert.Equal(expected, sql);
     }
 
@@ -242,7 +242,7 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var provider = setup.Provider;
         var (sql, _, _) = TranslateQuery<Product, Product>(q => q.Intersect(q), connection, provider);
         var select = $"SELECT {Columns(provider)} FROM {provider.Escape("Product")}";
-        var expected = $"({select}) INTERSECT ({select})";
+        var expected = $"{select} INTERSECT {select}";
         Assert.Equal(expected, sql);
     }
 
@@ -255,7 +255,7 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var provider = setup.Provider;
         var (sql, _, _) = TranslateQuery<Product, Product>(q => q.Except(q), connection, provider);
         var select = $"SELECT {Columns(provider)} FROM {provider.Escape("Product")}";
-        var expected = $"({select}) EXCEPT ({select})";
+        var expected = $"{select} EXCEPT {select}";
         Assert.Equal(expected, sql);
     }
 

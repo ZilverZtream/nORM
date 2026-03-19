@@ -277,11 +277,14 @@ namespace nORM.Query
                     {
                         if (readerMethod.ReturnType == typeof(object))
                         {
+                            // Value came from GetValue() as a boxed object; convert then unbox.
                             il.Emit(OpCodes.Ldtoken, pType);
                             il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
                             il.Emit(OpCodes.Call, typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) })!);
+                            il.Emit(OpCodes.Unbox_Any, pType);
                         }
-                        il.Emit(OpCodes.Unbox_Any, pType);
+                        // If the typed getter (GetInt32, GetBoolean, etc.) already returned the
+                        // exact value type, it is already on the stack — no unboxing needed.
                     }
                     else if (readerMethod.ReturnType != pType)
                     {
@@ -1118,7 +1121,7 @@ namespace nORM.Query
                     }
                     else if (arg is ParameterExpression p)
                     {
-                        var memberName = newExpr.Members![i].Name;
+                        var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
                         cols.Add(new Column(memberName, p.Type, mapping.Type, mapping.Provider, memberName));
                     }
                 }

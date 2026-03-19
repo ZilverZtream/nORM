@@ -1893,16 +1893,19 @@ namespace nORM.Query
                     }
                     return "AVG(*)";
                 case "Min":
-                    if (methodCall.Arguments.Count > 0)
                     {
-                        var selector = StripQuotes(methodCall.Arguments[0]) as LambdaExpression;
-                        if (selector != null)
+                        // Extension method form: Enumerable.Min(source, selector) — selector at [1]
+                        // Instance method form (hypothetical): g.Min(selector) — selector at [0]
+                        var selectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
+                            ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
+                        var minSelector = selectorArg != null ? StripQuotes(selectorArg) as LambdaExpression : null;
+                        if (minSelector != null)
                         {
-                            if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
-                                _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                            if (!_correlatedParams.ContainsKey(minSelector.Parameters[0]))
+                                _correlatedParams[minSelector.Parameters[0]] = (_mapping, alias);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, minSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
-                            var columnSql = visitor.Translate(selector.Body);
+                            var columnSql = visitor.Translate(minSelector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 AddParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
@@ -1911,16 +1914,19 @@ namespace nORM.Query
                     }
                     return null;
                 case "Max":
-                    if (methodCall.Arguments.Count > 0)
                     {
-                        var selector = StripQuotes(methodCall.Arguments[0]) as LambdaExpression;
-                        if (selector != null)
+                        // Extension method form: Enumerable.Max(source, selector) — selector at [1]
+                        // Instance method form (hypothetical): g.Max(selector) — selector at [0]
+                        var selectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
+                            ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
+                        var maxSelector = selectorArg != null ? StripQuotes(selectorArg) as LambdaExpression : null;
+                        if (maxSelector != null)
                         {
-                            if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
-                                _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                            if (!_correlatedParams.ContainsKey(maxSelector.Parameters[0]))
+                                _correlatedParams[maxSelector.Parameters[0]] = (_mapping, alias);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, maxSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
-                            var columnSql = visitor.Translate(selector.Body);
+                            var columnSql = visitor.Translate(maxSelector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 AddParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
@@ -1968,15 +1974,17 @@ namespace nORM.Query
         }
         private Expression HandleAllOperation(MethodCallExpression node)
         {
-            // ALL is translated as NOT EXISTS with negated predicate
+            // ALL is translated as:
+            // SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM table alias WHERE NOT (pred)) THEN 1 ELSE 0 END
+            // The predicate MUST be embedded inside the subquery — do NOT use _where, which
+            // Build() would append AFTER the closing parenthesis, breaking the EXISTS syntax.
             var sourceQuery = node.Arguments[0];
-            var predicate = node.Arguments[1] as LambdaExpression;
+            var predicate = StripQuotes(node.Arguments[1]) as LambdaExpression;
 
             if (predicate == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "All operation requires a predicate"));
             Visit(sourceQuery);
 
-            // Create negated predicate: NOT (predicate)
             var param = predicate.Parameters[0];
             var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
@@ -1987,13 +1995,14 @@ namespace nORM.Query
             foreach (var kvp in visitor.GetParameters())
                 AddParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(visitor);
-            // Wrap in NOT EXISTS
-            _sql.Insert(0, "SELECT CASE WHEN NOT EXISTS(");
-            if (_where.Length > 0)
-                _where.Append($" AND NOT ({predicateSql})");
-            else
-                _where.Append($"NOT ({predicateSql})");
-            _sql.Append(") THEN 1 ELSE 0 END");
+
+            // Build the complete SQL inline so the predicate is inside the EXISTS subquery.
+            _sql.Insert(0,
+                $"SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM {_mapping.EscTable} {alias} WHERE NOT ({predicateSql})) THEN 1 ELSE 0 END");
+
+            // Signal to Build() that this is a scalar query so it uses the scalar materializer
+            // path (reads position 0, converts via Convert.ChangeType to bool).
+            _isAggregate = true;
 
             return node;
         }
