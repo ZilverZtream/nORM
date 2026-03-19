@@ -410,7 +410,7 @@ namespace nORM.Query
                     _ => throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "Set operation"))
                 };
                 t._sql.Clear();
-                t._sql.Append($"({leftSql}) {setOp} ({rightSql})");
+                t._sql.Append($"{leftSql} {setOp} {rightSql}");
                 return node;
             }
         }
@@ -496,22 +496,26 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression predicate)
+                if (node.Arguments.Count > 1)
                 {
-                    var param = predicate.Parameters[0];
-                    var alias = t.EscapeAlias("T" + t._joinCounter);
-                    if (!t._correlatedParams.ContainsKey(param))
-                        t._correlatedParams[param] = (t._mapping, alias);
-                    var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
-                    var visitor = FastExpressionVisitorPool.Get(in vctxFS);
-                    var sql = visitor.Translate(predicate.Body);
-                    if (t._where.Length > 0) t._where.Append(" AND ");
-                    t._where.Append($"({sql})");
-                    foreach (var kvp in visitor.GetParameters())
-                        t._params[kvp.Key] = kvp.Value;
-                    if (t._params.Count > t._parameterManager.Index)
-                        t._parameterManager.Index = t._params.Count;
-                    FastExpressionVisitorPool.Return(visitor);
+                    var predicate = StripQuotes(node.Arguments[1]) as LambdaExpression;
+                    if (predicate != null)
+                    {
+                        var param = predicate.Parameters[0];
+                        var alias = t.EscapeAlias("T" + t._joinCounter);
+                        if (!t._correlatedParams.ContainsKey(param))
+                            t._correlatedParams[param] = (t._mapping, alias);
+                        var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
+                        var visitor = FastExpressionVisitorPool.Get(in vctxFS);
+                        var sql = visitor.Translate(predicate.Body);
+                        if (t._where.Length > 0) t._where.Append(" AND ");
+                        t._where.Append($"({sql})");
+                        foreach (var kvp in visitor.GetParameters())
+                            t._params[kvp.Key] = kvp.Value;
+                        if (t._params.Count > t._parameterManager.Index)
+                            t._parameterManager.Index = t._params.Count;
+                        FastExpressionVisitorPool.Return(visitor);
+                    }
                 }
                 // Single/SingleOrDefault must fetch 2 rows so the caller can detect duplicates.
                 // First/FirstOrDefault only need 1 row.
@@ -540,22 +544,26 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression lastPredicate)
+                if (node.Arguments.Count > 1)
                 {
-                    var param = lastPredicate.Parameters[0];
-                    var alias = t.EscapeAlias("T" + t._joinCounter);
-                    if (!t._correlatedParams.ContainsKey(param))
-                        t._correlatedParams[param] = (t._mapping, alias);
-                    var vctxLast = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
-                    var visitor = FastExpressionVisitorPool.Get(in vctxLast);
-                    var sql = visitor.Translate(lastPredicate.Body);
-                    if (t._where.Length > 0) t._where.Append(" AND ");
-                    t._where.Append($"({sql})");
-                    foreach (var kvp in visitor.GetParameters())
-                        t._params[kvp.Key] = kvp.Value;
-                    if (t._params.Count > t._parameterManager.Index)
-                        t._parameterManager.Index = t._params.Count;
-                    FastExpressionVisitorPool.Return(visitor);
+                    var lastPredicate = StripQuotes(node.Arguments[1]) as LambdaExpression;
+                    if (lastPredicate != null)
+                    {
+                        var param = lastPredicate.Parameters[0];
+                        var alias = t.EscapeAlias("T" + t._joinCounter);
+                        if (!t._correlatedParams.ContainsKey(param))
+                            t._correlatedParams[param] = (t._mapping, alias);
+                        var vctxLast = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
+                        var visitor = FastExpressionVisitorPool.Get(in vctxLast);
+                        var sql = visitor.Translate(lastPredicate.Body);
+                        if (t._where.Length > 0) t._where.Append(" AND ");
+                        t._where.Append($"({sql})");
+                        foreach (var kvp in visitor.GetParameters())
+                            t._params[kvp.Key] = kvp.Value;
+                        if (t._params.Count > t._parameterManager.Index)
+                            t._parameterManager.Index = t._params.Count;
+                        FastExpressionVisitorPool.Return(visitor);
+                    }
                 }
                 var terminalMethodLast = t._methodName;
                 var lastSrc = t.Visit(node.Arguments[0]);
@@ -597,25 +605,29 @@ namespace nORM.Query
                 // Reset projection and ensure method name reflects Count
                 t._projection = null;
                 t._methodName = node.Method.Name;
-                if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression countPredicate)
+                if (node.Arguments.Count > 1)
                 {
-                    countPredicate = t.ExpandProjection(countPredicate);
-                    var param = countPredicate.Parameters[0];
-                    if (!t._correlatedParams.TryGetValue(param, out var info))
+                    var countPredicate = StripQuotes(node.Arguments[1]) as LambdaExpression;
+                    if (countPredicate != null)
                     {
-                        info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
-                        t._correlatedParams[param] = info;
+                        countPredicate = t.ExpandProjection(countPredicate);
+                        var param = countPredicate.Parameters[0];
+                        if (!t._correlatedParams.TryGetValue(param, out var info))
+                        {
+                            info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
+                            t._correlatedParams[param] = info;
+                        }
+                        var vctxCount = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
+                        var visitor = FastExpressionVisitorPool.Get(in vctxCount);
+                        var sql = visitor.Translate(countPredicate.Body);
+                        if (t._where.Length > 0) t._where.Append(" AND ");
+                        t._where.Append($"({sql})");
+                        foreach (var kvp in visitor.GetParameters())
+                            t._params[kvp.Key] = kvp.Value;
+                        if (t._params.Count > t._parameterManager.Index)
+                            t._parameterManager.Index = t._params.Count;
+                        FastExpressionVisitorPool.Return(visitor);
                     }
-                    var vctxCount = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
-                    var visitor = FastExpressionVisitorPool.Get(in vctxCount);
-                    var sql = visitor.Translate(countPredicate.Body);
-                    if (t._where.Length > 0) t._where.Append(" AND ");
-                    t._where.Append($"({sql})");
-                    foreach (var kvp in visitor.GetParameters())
-                        t._params[kvp.Key] = kvp.Value;
-                    if (t._params.Count > t._parameterManager.Index)
-                        t._parameterManager.Index = t._params.Count;
-                    FastExpressionVisitorPool.Return(visitor);
                 }
                 var newArgs = new[] { source }.Concat(node.Arguments.Skip(1));
                 return node.Update(node.Object, newArgs);
@@ -860,21 +872,26 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var parentExpression = t.Visit(node.Arguments[0]);
-                if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression thenLambda)
+                if (node.Arguments.Count > 1)
                 {
-                    var member = thenLambda.Body is UnaryExpression unary2 ?
-                                 (MemberExpression)unary2.Operand :
-                                 (MemberExpression)thenLambda.Body;
-                    var propName = member.Member.Name;
-                    if (t._includes.Count > 0)
+                    // Arguments[1] is typically a quoted lambda (UnaryExpression{Quote}); strip quotes.
+                    var thenLambda = StripQuotes(node.Arguments[1]) as LambdaExpression;
+                    if (thenLambda != null)
                     {
-                        var lastInclude = t._includes[^1];
-                        var lastRelation = lastInclude.Path.Last();
-                        var parentMap = t.TrackMapping(lastRelation.DependentType);
-                        if (parentMap.Relations.TryGetValue(propName, out var relation))
+                        var member = thenLambda.Body is UnaryExpression unary2 ?
+                                     (MemberExpression)unary2.Operand :
+                                     (MemberExpression)thenLambda.Body;
+                        var propName = member.Member.Name;
+                        if (t._includes.Count > 0)
                         {
-                            lastInclude.Path.Add(relation);
-                            t.TrackMapping(relation.DependentType);
+                            var lastInclude = t._includes[^1];
+                            var lastRelation = lastInclude.Path.Last();
+                            var parentMap = t.TrackMapping(lastRelation.DependentType);
+                            if (parentMap.Relations.TryGetValue(propName, out var relation))
+                            {
+                                lastInclude.Path.Add(relation);
+                                t.TrackMapping(relation.DependentType);
+                            }
                         }
                     }
                 }

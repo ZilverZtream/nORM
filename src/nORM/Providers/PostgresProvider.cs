@@ -298,9 +298,39 @@ namespace nORM.Providers
             var pName = ParamPrefix + "p0";
             var p = cmd.CreateParameter();
             p.ParameterName = pName;
-            p.Value = values.ToArray();
+            // SQL1 fix: create a typed array so Npgsql can infer NpgsqlDbType correctly.
+            // An untyped object[] causes binding failures for Guid, int, enum, nullable types on live PostgreSQL.
+            p.Value = CreateTypedArray(values);
             cmd.Parameters.Add(p);
             return $"{columnName} = ANY({pName})";
+        }
+
+        /// <summary>SQL1 fix: builds the strongest common-type array from values.</summary>
+        private static System.Array CreateTypedArray(IReadOnlyList<object?> values)
+        {
+            Type? commonType = null;
+            foreach (var v in values)
+            {
+                if (v == null) continue;
+                var t = v.GetType();
+                if (commonType == null) { commonType = t; }
+                else if (commonType != t) { commonType = null; break; }
+            }
+            if (commonType == null)
+                return values.ToArray(); // mixed or all-null — object[] fallback
+            var arr = System.Array.CreateInstance(commonType, values.Count);
+            for (int i = 0; i < values.Count; i++)
+                arr.SetValue(values[i], i);
+            return arr;
+        }
+
+        /// <summary>MIG1 fix: splits "schema.table" into parts; defaults to 'public' schema.</summary>
+        private static (string Schema, string Table) SplitSchemaTable(string tableName, string defaultSchema)
+        {
+            var dot = tableName.IndexOf('.');
+            if (dot < 0)
+                return (defaultSchema, tableName.Trim('"'));
+            return (tableName[..dot].Trim('"'), tableName[(dot + 1)..].Trim('"'));
         }
 
         /// <summary>
@@ -315,13 +345,15 @@ namespace nORM.Providers
             try
             {
                 await using var cmd = conn.CreateCommand();
+                var (schema, bareTable) = SplitSchemaTable(tableName, "public");
                 cmd.CommandText = @"
 SELECT column_name, data_type, character_maximum_length,
        numeric_precision, numeric_scale, is_nullable
 FROM information_schema.columns
-WHERE table_name = @t AND table_schema = 'public'
+WHERE table_name = @t AND table_schema = @s
 ORDER BY ordinal_position";
-                var p = cmd.CreateParameter(); p.ParameterName = "@t"; p.Value = tableName; cmd.Parameters.Add(p);
+                var p = cmd.CreateParameter(); p.ParameterName = "@t"; p.Value = bareTable; cmd.Parameters.Add(p);
+                var ps = cmd.CreateParameter(); ps.ParameterName = "@s"; ps.Value = schema; cmd.Parameters.Add(ps);
                 await using var rdr = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
                 while (await rdr.ReadAsync(ct).ConfigureAwait(false))
                 {
