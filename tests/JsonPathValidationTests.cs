@@ -169,4 +169,42 @@ public class JsonPathValidationTests : TestBase
             Assert.Contains("order-items", sql, StringComparison.Ordinal);
         }
     }
+
+    // ── Q2: PostgreSQL root-only path "$" produces valid SQL ─────────────────
+
+    [Fact]
+    public void PostgresProvider_RootOnlyPath_ProducesValidSql()
+    {
+        // Q2 fix: TranslateJsonPathAccess(col, "$") previously emitted
+        // jsonb_extract_path_text(col, ) — missing required path argument.
+        // Fix: root-only path casts column to text directly: (col)::text
+        var factory = new SqliteParameterFactory();
+        var pg = new PostgresProvider(factory);
+        var result = pg.TranslateJsonPathAccess("\"Data\"", "$");
+        Assert.DoesNotContain("jsonb_extract_path_text", result);
+        Assert.Contains("::text", result);
+        // Must be syntactically valid — no trailing comma or empty args
+        Assert.DoesNotContain(", )", result);
+    }
+
+    [Fact]
+    public void PostgresProvider_DollarDotPath_StillUsesJsonbExtract()
+    {
+        // Non-root paths still use jsonb_extract_path_text
+        var factory = new SqliteParameterFactory();
+        var pg = new PostgresProvider(factory);
+        var result = pg.TranslateJsonPathAccess("\"Data\"", "$.name");
+        Assert.Contains("jsonb_extract_path_text", result);
+        Assert.Contains("'name'", result);
+    }
+
+    [Fact]
+    public void PostgresProvider_EmptyPath_ProducesValidSql()
+    {
+        // Empty string path should also fall through to cast
+        var factory = new SqliteParameterFactory();
+        var pg = new PostgresProvider(factory);
+        var result = pg.TranslateJsonPathAccess("\"Data\"", "");
+        Assert.DoesNotContain(", )", result);
+    }
 }

@@ -203,6 +203,18 @@ namespace nORM.Providers
                 if (startIndex > 0 && startIndex < jsonPath.Length && jsonPath[startIndex] == '.')
                     startIndex++;
 
+                // Q2 fix: root-only path "$" has no path segments after stripping the $.
+                // PostgreSQL's jsonb_extract_path_text requires at least one path argument.
+                // For root access, cast the column to text directly instead of using the function.
+                if (startIndex >= jsonPath.Length)
+                {
+                    sb.Clear();
+                    sb.Append('(');
+                    sb.Append(columnName);
+                    sb.Append(")::text");
+                    return sb.ToString();
+                }
+
                 bool isFirst = true;
 
                 while (startIndex < jsonPath.Length)

@@ -265,13 +265,18 @@ public class ProviderParityDepthTests
     // Gate 4.0 → 4.5 — OCC live execution across provider dialects
     // ══════════════════════════════════════════════════════════════════════════
 
+    private static DbContextOptions OccOpts(string providerKind) =>
+        providerKind == "mysql"
+            ? new DbContextOptions { RequireMatchedRowOccSemantics = false }
+            : new DbContextOptions();
+
     [Theory]
     [InlineData("sqlite")]
     [InlineData("mysql")]
     [InlineData("postgres")]
     public async Task OCC_FreshToken_AllProviders_UpdateSucceeds(string providerKind)
     {
-        var (cn, ctx) = CreateDb(MakeProvider(providerKind), OccDdl);
+        var (cn, ctx) = CreateDb(MakeProvider(providerKind), OccDdl, OccOpts(providerKind));
         await using var _ = ctx; using var __ = cn;
 
         var item = new PpdOccItem { Id = 1, Label = "original" };
@@ -288,7 +293,7 @@ public class ProviderParityDepthTests
     [InlineData("postgres")]
     public async Task OCC_StaleToken_AllProviders_ThrowsConcurrencyException(string providerKind)
     {
-        var (cn, ctx) = CreateDb(MakeProvider(providerKind), OccDdl);
+        var (cn, ctx) = CreateDb(MakeProvider(providerKind), OccDdl, OccOpts(providerKind));
         await using var _ = ctx; using var __ = cn;
 
         var item = new PpdOccItem { Id = 1, Label = "v1" };
@@ -312,7 +317,7 @@ public class ProviderParityDepthTests
     [InlineData("postgres")]
     public async Task OCC_Delete_StaleToken_AllProviders_ThrowsConcurrencyException(string providerKind)
     {
-        var (cn, ctx) = CreateDb(MakeProvider(providerKind), OccDdl);
+        var (cn, ctx) = CreateDb(MakeProvider(providerKind), OccDdl, OccOpts(providerKind));
         await using var _ = ctx; using var __ = cn;
 
         var item = new PpdOccItem { Id = 1, Label = "to-delete" };

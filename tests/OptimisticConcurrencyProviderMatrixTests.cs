@@ -4,6 +4,7 @@ using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
 using Xunit;
@@ -87,7 +88,13 @@ public class OptimisticConcurrencyProviderMatrixTests
             "CREATE TABLE OccMatrixEntity " +
             "(Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL, RowVersion BLOB NOT NULL)";
         cmd.ExecuteNonQuery();
-        return (cn, new DbContext(cn, provider));
+        // When using affected-row semantics, opt out of the strict RequireMatchedRowOccSemantics
+        // check so that the SELECT-then-verify path is exercised instead of throwing
+        // NormConfigurationException.
+        var opts = provider.UseAffectedRowsSemantics
+            ? new DbContextOptions { RequireMatchedRowOccSemantics = false }
+            : new DbContextOptions();
+        return (cn, new DbContext(cn, provider, opts));
     }
 
     private static void SimulateExternalRowVersionChange(SqliteConnection cn, int id, byte[] newToken)

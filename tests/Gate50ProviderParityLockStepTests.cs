@@ -196,13 +196,18 @@ public class Gate50ProviderParityLockStepTests
     // 5.0 — OCC lock-step parity: fresh token / stale token / delete stale
     // ══════════════════════════════════════════════════════════════════════
 
+    private static DbContextOptions OccOpts(string kind) =>
+        kind == "mysql"
+            ? new DbContextOptions { RequireMatchedRowOccSemantics = false }
+            : new DbContextOptions();
+
     [Theory]
     [InlineData("sqlite")]
     [InlineData("mysql")]
     [InlineData("postgres")]
     public async Task LockStep_OCC_FreshToken_AllProviders_Succeeds(string kind)
     {
-        var (cn, ctx) = CreateDb(kind, OccDdl);
+        var (cn, ctx) = CreateDb(kind, OccDdl, OccOpts(kind));
         await using var _ = ctx; using var __ = cn;
 
         var item = new G50OccItem { Id = 1, Payload = "v1" };
@@ -220,7 +225,7 @@ public class Gate50ProviderParityLockStepTests
     [InlineData("postgres")]
     public async Task LockStep_OCC_StaleToken_AllProviders_ThrowsConcurrencyException(string kind)
     {
-        var (cn, ctx) = CreateDb(kind, OccDdl);
+        var (cn, ctx) = CreateDb(kind, OccDdl, OccOpts(kind));
         await using var _ = ctx; using var __ = cn;
 
         var item = new G50OccItem { Id = 1, Payload = "v1" };

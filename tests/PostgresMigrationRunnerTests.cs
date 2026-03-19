@@ -448,7 +448,7 @@ public class PostgresMigrationRunnerTests
     [Fact]
     public async Task ApplyMigrationsAsync_ExceptionMessage_ContainsPgAdvisoryLockContext()
     {
-        // The exception from SQLite when pg_advisory_lock doesn't exist should
+        // The exception from SQLite when pg_try_advisory_lock doesn't exist should
         // reference that function in the error message.
         await using var cn = OpenSqlite();
         var runner = new PostgresMigrationRunner(cn, BuildEmptyAssembly());
@@ -456,8 +456,8 @@ public class PostgresMigrationRunnerTests
         var ex = await Assert.ThrowsAnyAsync<Exception>(
             () => runner.ApplyMigrationsAsync());
 
-        // SQLite reports "no such function: pg_advisory_lock"
-        Assert.Contains("pg_advisory_lock", ex.Message, StringComparison.OrdinalIgnoreCase);
+        // SQLite reports "no such function: pg_try_advisory_lock"
+        Assert.Contains("pg_try_advisory_lock", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── PG-7: Dispose ─────────────────────────────────────────────────────────

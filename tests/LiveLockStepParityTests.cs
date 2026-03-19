@@ -325,7 +325,10 @@ public class LiveLockStepParityTests
         var (cn, provider, skip) = OpenLive(kind);
         if (skip != null) return;
 
-        using (cn) await using (var ctx = new DbContext(cn!, provider!))
+        var occOpts = provider!.UseAffectedRowsSemantics
+            ? new DbContextOptions { RequireMatchedRowOccSemantics = false }
+            : new DbContextOptions();
+        using (cn) await using (var ctx = new DbContext(cn!, provider!, occOpts))
         {
             Exec(cn!, OccDdl(kind));
             Exec(cn!, CleanupDdl("LS_OccItem"));
@@ -354,7 +357,10 @@ public class LiveLockStepParityTests
         var (cn, provider, skip) = OpenLive(kind);
         if (skip != null) return;
 
-        using (cn) await using (var ctx = new DbContext(cn!, provider!))
+        var occOpts = provider!.UseAffectedRowsSemantics
+            ? new DbContextOptions { RequireMatchedRowOccSemantics = false }
+            : new DbContextOptions();
+        using (cn) await using (var ctx = new DbContext(cn!, provider!, occOpts))
         {
             Exec(cn!, OccDdl(kind));
             Exec(cn!, CleanupDdl("LS_OccItem"));
@@ -408,7 +414,8 @@ public class LiveLockStepParityTests
             Exec(cn, "CREATE TABLE LS_OccItem (Id INTEGER PRIMARY KEY, Payload TEXT NOT NULL, Token BLOB)");
 
             var provider = new AffectedRowsProviderLS();
-            await using var ctx = new DbContext(cn, provider);
+            var opts = new DbContextOptions { RequireMatchedRowOccSemantics = false };
+            await using var ctx = new DbContext(cn, provider, opts);
 
             var item = new LsOccItem { Id = 1, Payload = "original" };
             ctx.Add(item);
@@ -433,7 +440,8 @@ public class LiveLockStepParityTests
             Exec(cn, "CREATE TABLE LS_OccItem (Id INTEGER PRIMARY KEY, Payload TEXT NOT NULL, Token BLOB)");
 
             var provider = new AffectedRowsProviderLS();
-            await using var ctx = new DbContext(cn, provider);
+            var opts = new DbContextOptions { RequireMatchedRowOccSemantics = false };
+            await using var ctx = new DbContext(cn, provider, opts);
 
             var item = new LsOccItem { Id = 1, Payload = "same" };
             ctx.Add(item);

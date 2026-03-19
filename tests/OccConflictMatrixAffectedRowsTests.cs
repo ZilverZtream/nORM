@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
 using Xunit;
@@ -93,7 +94,8 @@ public class OccConflictMatrixAffectedRowsTests
         cmd.CommandText = "CREATE TABLE OccMatrixRow " +
             "(Id INTEGER PRIMARY KEY AUTOINCREMENT, Payload TEXT NOT NULL, Token BLOB NOT NULL)";
         cmd.ExecuteNonQuery();
-        return (cn, new DbContext(cn, new AffectedRowsSqliteProvider()));
+        return (cn, new DbContext(cn, new AffectedRowsSqliteProvider(),
+            new DbContextOptions { RequireMatchedRowOccSemantics = false }));
     }
 
     private static (SqliteConnection Cn, DbContext Ctx) CreateNullTokenDb()
@@ -104,7 +106,8 @@ public class OccConflictMatrixAffectedRowsTests
         cmd.CommandText = "CREATE TABLE OccNullTokenRow " +
             "(Id INTEGER PRIMARY KEY AUTOINCREMENT, Payload TEXT NOT NULL, Token BLOB)";
         cmd.ExecuteNonQuery();
-        return (cn, new DbContext(cn, new AffectedRowsSqliteProvider()));
+        return (cn, new DbContext(cn, new AffectedRowsSqliteProvider(),
+            new DbContextOptions { RequireMatchedRowOccSemantics = false }));
     }
 
     private static (SqliteConnection Cn, DbContext Ctx) CreateCompositeDb()
@@ -116,7 +119,8 @@ public class OccConflictMatrixAffectedRowsTests
             "(TenantId INTEGER NOT NULL, RowId INTEGER NOT NULL, Payload TEXT NOT NULL, Token BLOB NOT NULL, " +
             "PRIMARY KEY (TenantId, RowId))";
         cmd.ExecuteNonQuery();
-        return (cn, new DbContext(cn, new AffectedRowsSqliteProvider()));
+        return (cn, new DbContext(cn, new AffectedRowsSqliteProvider(),
+            new DbContextOptions { RequireMatchedRowOccSemantics = false }));
     }
 
     private static void ForceTokenChange(SqliteConnection cn, string table, int id, byte[] newToken)
@@ -458,7 +462,8 @@ public class OccConflictMatrixAffectedRowsTests
         using var init = cn.CreateCommand();
         init.CommandText = "CREATE TABLE OccNoToken (Id INTEGER PRIMARY KEY AUTOINCREMENT, Payload TEXT NOT NULL)";
         init.ExecuteNonQuery();
-        await using var ctx = new DbContext(cn, new AffectedRowsSqliteProvider());
+        await using var ctx = new DbContext(cn, new AffectedRowsSqliteProvider(),
+            new DbContextOptions { RequireMatchedRowOccSemantics = false });
 
         var row = new OccNoToken { Payload = "data" };
         ctx.Add(row);
@@ -508,7 +513,10 @@ public class OccConflictMatrixAffectedRowsTests
             ? (DatabaseProvider)new AffectedRowsSqliteProvider()
             : new SqliteProvider();
 
-        await using var ctx = new DbContext(cn, provider);
+        var opts = affectedRowMode
+            ? new DbContextOptions { RequireMatchedRowOccSemantics = false }
+            : new DbContextOptions();
+        await using var ctx = new DbContext(cn, provider, opts);
 
         var row = new OccMatrixRow { Payload = "x", Token = new byte[] { 1 } };
         ctx.Add(row);
@@ -538,7 +546,10 @@ public class OccConflictMatrixAffectedRowsTests
             ? (DatabaseProvider)new AffectedRowsSqliteProvider()
             : new SqliteProvider();
 
-        await using var ctx = new DbContext(cn, provider);
+        var opts = affectedRowMode
+            ? new DbContextOptions { RequireMatchedRowOccSemantics = false }
+            : new DbContextOptions();
+        await using var ctx = new DbContext(cn, provider, opts);
 
         var row = new OccMatrixRow { Payload = "x", Token = new byte[] { 1 } };
         ctx.Add(row);

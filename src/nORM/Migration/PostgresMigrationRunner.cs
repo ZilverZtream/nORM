@@ -86,16 +86,45 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// Acquires a PostgreSQL session-level advisory lock using <c>pg_advisory_lock(bigint)</c>.
-        /// The lock key <see cref="MigrationLockKey"/> is a stable constant derived from the migration
-        /// lock name. The call blocks until the lock is available — no timeout. Callers should wrap in a
-        /// higher-level timeout if a bounded wait is required.
+        /// Acquires a PostgreSQL session-level advisory lock using <c>pg_try_advisory_lock(bigint)</c>
+        /// in a polling loop with bounded timeout.
+        /// <para>
+        /// M1 fix: Replaced unbounded <c>pg_advisory_lock</c> with <c>pg_try_advisory_lock</c> + retry
+        /// loop to prevent indefinite blocking when a stale session holds the lock. The default timeout
+        /// (30 seconds) matches the operational expectations of automated deploys. MySQL and SQL Server
+        /// runners already have bounded lock acquisition; this brings PostgreSQL to parity.
+        /// </para>
         /// </summary>
-        internal async Task AcquireAdvisoryLockAsync(CancellationToken ct)
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <param name="timeout">Maximum time to wait for the lock. Defaults to 30 seconds.</param>
+        internal async Task AcquireAdvisoryLockAsync(CancellationToken ct, TimeSpan? timeout = null)
         {
-            await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"SELECT pg_advisory_lock({MigrationLockKey})";
-            await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
+            var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
+            const int retryDelayMs = 250;
+
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                await using var cmd = _connection.CreateCommand();
+                cmd.CommandText = $"SELECT pg_try_advisory_lock({MigrationLockKey})";
+                var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+
+                // pg_try_advisory_lock returns true if the lock was acquired
+                if (result is bool acquired && acquired)
+                    return;
+                // Some drivers return string "t"/"f" instead of bool
+                if (result is string s && s.Equals("t", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                if (DateTime.UtcNow >= deadline)
+                    throw new TimeoutException(
+                        $"Failed to acquire PostgreSQL migration advisory lock (key={MigrationLockKey}) " +
+                        $"within {(timeout ?? TimeSpan.FromSeconds(30)).TotalSeconds} seconds. " +
+                        "Another migration runner or stale session may be holding the lock.");
+
+                await Task.Delay(retryDelayMs, ct).ConfigureAwait(false);
+            }
         }
 
         /// <summary>

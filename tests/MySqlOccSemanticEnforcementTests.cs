@@ -113,10 +113,10 @@ public class MySqlOccSemanticEnforcementTests
     }
 
     [Fact]
-    public void DbContextOptions_RequireMatchedRowOccSemantics_DefaultIsFalse()
+    public void DbContextOptions_RequireMatchedRowOccSemantics_DefaultIsTrue()
     {
         var opts = new DbContextOptions();
-        Assert.False(opts.RequireMatchedRowOccSemantics);
+        Assert.True(opts.RequireMatchedRowOccSemantics);
     }
 
     [Fact]
