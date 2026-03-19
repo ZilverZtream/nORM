@@ -255,10 +255,12 @@ namespace nORM.Configuration
         /// same value; matched-row semantics (set <c>useAffectedRows=false</c> in the MySQL
         /// connection string and override the provider) are required for full OCC guarantees.
         ///
-        /// <para>Default: <c>false</c> — existing behaviour is preserved; a warning is logged
-        /// instead of throwing.</para>
+        /// <para>Default: <c>true</c> — throws <see cref="NormConfigurationException"/> when
+        /// affected-row semantics are used with OCC tokens. Set to <c>false</c> to suppress the
+        /// error and accept the known trade-off (S1), or add <c>useAffectedRows=false</c> to the
+        /// MySQL connection string for full OCC guarantees.</para>
         /// </summary>
-        public bool RequireMatchedRowOccSemantics { get; set; } = false;
+        public bool RequireMatchedRowOccSemantics { get; set; } = true;
 
         // C1: backing store is ConcurrentDictionary so outer dict ops are thread-safe.
         // Inner lists are replaced atomically (copy-on-write) in AddGlobalFilter so

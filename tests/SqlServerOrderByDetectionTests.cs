@@ -209,4 +209,47 @@ public class SqlServerOrderByDetectionTests
         Assert.Null(ex);
         Assert.False(HasTopLevelOrderBy(sql)); // ORDER BY inside unclosed comment
     }
+
+    // ── Q1-9: Escaped ]] inside bracket-quoted identifiers ──────────────────
+
+    [Fact]
+    public void EscapedBracketIdentifier_OrderByInsideIdentifier_ReturnsFalse()
+    {
+        // Q1 fix: [a]]ORDER BYb] is a single identifier containing literal ] + "ORDER BYb"
+        // The old parser stopped at the first ], exposing "ORDER BYb]" to the scanner.
+        var sql = "SELECT [a]]ORDER BYb] FROM T";
+        Assert.False(HasTopLevelOrderBy(sql));
+    }
+
+    [Fact]
+    public void EscapedBracketIdentifier_OrderByAfterIdentifier_ReturnsTrue()
+    {
+        // Real ORDER BY after an identifier with ]]
+        var sql = "SELECT [col]] ] FROM T ORDER BY Id";
+        Assert.True(HasTopLevelOrderBy(sql));
+    }
+
+    [Fact]
+    public void EscapedBracketIdentifier_MultipleEscapedBrackets_ReturnsFalse()
+    {
+        // Identifier with multiple ]] sequences: [a]]b]]c]
+        var sql = "SELECT [a]]b]]c] FROM T";
+        Assert.False(HasTopLevelOrderBy(sql));
+    }
+
+    [Fact]
+    public void EscapedBracketIdentifier_EmptyBrackets_NoOrderBy_ReturnsFalse()
+    {
+        // Empty bracket identifier [] followed by no ORDER BY
+        var sql = "SELECT [] FROM T";
+        Assert.False(HasTopLevelOrderBy(sql));
+    }
+
+    [Fact]
+    public void EscapedBracketIdentifier_TrailingOrderByText_ReturnsFalse()
+    {
+        // The identifier [x]]ORDER BY] contains ]] + "ORDER BY" as part of the name
+        var sql = "SELECT [x]]ORDER BY] FROM T";
+        Assert.False(HasTopLevelOrderBy(sql));
+    }
 }

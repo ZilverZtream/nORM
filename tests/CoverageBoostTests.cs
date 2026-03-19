@@ -6683,12 +6683,14 @@ internal sealed class FakeMigrationDbCommand : DbCommand
 
     public override void Cancel() { }
     public override int ExecuteNonQuery() => 1;
-    public override object? ExecuteScalar() => null;
+    public override object? ExecuteScalar()
+        => CommandText?.Contains("pg_try_advisory_lock", StringComparison.OrdinalIgnoreCase) == true ? (object)true : null;
     public override void Prepare() { }
     protected override DbParameter CreateDbParameter() => new FakeMigrationDbParameter();
     protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior) => new FakeMigrationEmptyReader();
     public override Task<int> ExecuteNonQueryAsync(CancellationToken ct) => Task.FromResult(1);
-    public override Task<object?> ExecuteScalarAsync(CancellationToken ct) => Task.FromResult<object?>(null);
+    public override Task<object?> ExecuteScalarAsync(CancellationToken ct)
+        => Task.FromResult<object?>(CommandText?.Contains("pg_try_advisory_lock", StringComparison.OrdinalIgnoreCase) == true ? (object)true : null);
     protected override Task<DbDataReader> ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken ct)
         => Task.FromResult<DbDataReader>(new FakeMigrationEmptyReader());
 }

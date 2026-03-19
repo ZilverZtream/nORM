@@ -163,11 +163,24 @@ namespace nORM.Providers
                 }
 
                 // Skip bracket-quoted identifiers ([...]) — SQL Server specific
+                // Q1 fix: handle escaped ]] inside brackets (]] represents a literal ] character).
+                // Without this, [a]]ORDER BYb] would terminate at the first ] and expose
+                // "ORDER BYb]" to the ORDER BY scanner, producing a false positive.
                 if (ch == '[')
                 {
                     i++;
-                    while (i < len && sql[i] != ']') i++;
-                    if (i < len) i++; // consume ']'
+                    while (i < len)
+                    {
+                        if (sql[i] == ']')
+                        {
+                            i++;
+                            // ]] is an escaped literal ] — continue scanning inside the identifier
+                            if (i < len && sql[i] == ']') { i++; continue; }
+                            // Single ] closes the identifier
+                            break;
+                        }
+                        i++;
+                    }
                     continue;
                 }
 
