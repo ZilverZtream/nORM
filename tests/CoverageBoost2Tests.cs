@@ -1052,7 +1052,8 @@ public class CoverageBoost2Tests : TestBase
         var sql = (string)buildMethod.Invoke(provider, new object[] { mapping, cols, 2 })!;
         Assert.Contains("INSERT INTO", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("VALUES", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("ON CONFLICT DO NOTHING", sql, StringComparison.OrdinalIgnoreCase);
+        // P1: ON CONFLICT DO NOTHING removed — batch inserts should not silently swallow conflicts
+        Assert.DoesNotContain("ON CONFLICT DO NOTHING", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

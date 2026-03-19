@@ -628,6 +628,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                     else if (importerObj is IDisposable id) id.Dispose();
                 }
                 BatchSizer.RecordBatchPerformance(operationKey, entityList.Count, sw.Elapsed, entityList.Count);
+                ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, entityList.Count, sw.Elapsed);
                 return entityList.Count;
             }
@@ -635,6 +636,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             var recordsAffected = await ExecuteBulkOperationAsync(ctx, m, entityList, operationKey,
                 (batch, tx, token) => ExecutePostgresBatchInsert(ctx, tx, m, cols, batch, token), ct).ConfigureAwait(false);
 
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, recordsAffected, sw.Elapsed);
             return recordsAffected;
         }
@@ -686,9 +688,6 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
 
                     sb.Append(")");
                 }
-
-                // Add ON CONFLICT clause for upsert scenarios if needed
-                sb.Append(" ON CONFLICT DO NOTHING");
 
                 return sb.ToString();
             }
@@ -765,6 +764,13 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                     if (m.TimestampColumn != null)
                         joinConditions.Add($"t.{m.TimestampColumn.EscCol} = v.{m.TimestampColumn.EscCol}");
                     sb.Append(string.Join(" AND ", joinConditions));
+                    // X1: Add tenant predicate to prevent cross-tenant bulk updates
+                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                    {
+                        var tenantParam = $"{ParamPrefix}__tenant_bulk";
+                        cmd.AddParam(tenantParam, ctx.Options.TenantProvider.GetCurrentTenantId());
+                        sb.Append($" AND t.{m.TenantColumn.EscCol} = {tenantParam}");
+                    }
 
                     cmd.CommandText = sb.ToString();
 
@@ -780,6 +786,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 }
             }
 
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, totalUpdated, sw.Elapsed);
             return totalUpdated;
         }
@@ -822,13 +829,25 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 p.ParameterName = pName;
                 p.Value = keys;
                 cmd.Parameters.Add(p);
-                cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} = ANY({pName})";
+                var deleteSql = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} = ANY({pName})";
+                // X1: Add tenant predicate to prevent cross-tenant bulk deletes
+                if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                {
+                    var tenantParam = $"{ParamPrefix}__tenant_bulk";
+                    var tp = cmd.CreateParameter();
+                    tp.ParameterName = tenantParam;
+                    tp.Value = ctx.Options.TenantProvider.GetCurrentTenantId() ?? (object)DBNull.Value;
+                    cmd.Parameters.Add(tp);
+                    deleteSql += $" AND {m.TenantColumn.EscCol} = {tenantParam}";
+                }
+                cmd.CommandText = deleteSql;
                 var batchSw = Stopwatch.StartNew();
                 totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 batchSw.Stop();
                 BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
             }
 
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
             return totalDeleted;
         }
