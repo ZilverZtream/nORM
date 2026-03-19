@@ -482,6 +482,7 @@ END;";
                     // Use CancellationToken.None so a cancelled caller token after a successful commit
                     // does not cause a spurious OperationCanceledException for already-committed data.
                     if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+                    ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
                     ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
                     return totalInserted;
                 }
@@ -522,28 +523,64 @@ END;";
             var sw = Stopwatch.StartNew();
             var tempTableName = $"`BulkUpdate_{Guid.NewGuid():N}`";
             var nonKeyCols = m.Columns.Where(c => !c.IsKey).ToList();
-
             var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetSqlType(c.Prop.PropertyType)}"));
-            await using (var cmd = ctx.CreateCommand())
+
+            var tempCreated = false;
+            var updatedCount = 0;
+            try
             {
-                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-                cmd.CommandText = $"CREATE TEMPORARY TABLE {tempTableName} ({colDefs})";
-                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                await using (var cmd = ctx.CreateCommand())
+                {
+                    cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+                    cmd.CommandText = $"CREATE TEMPORARY TABLE {tempTableName} ({colDefs})";
+                    await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                }
+                tempCreated = true;
+
+                var tempMapping = new TableMapping(m.Type, this, ctx, null) { EscTable = tempTableName };
+                await BulkInsertAsync(ctx, tempMapping, entities, ct).ConfigureAwait(false);
+
+                var setClause = string.Join(", ", nonKeyCols.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
+                var joinConditions = m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}").ToList();
+                // X3: Include timestamp in join to enforce OCC semantics
+                if (m.TimestampColumn != null)
+                    joinConditions.Add($"T1.{m.TimestampColumn.EscCol} = T2.{m.TimestampColumn.EscCol}");
+                var joinClause = string.Join(" AND ", joinConditions);
+
+                await using (var cmd = ctx.CreateCommand())
+                {
+                    cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+                    // X1: Add tenant predicate to prevent cross-tenant bulk updates
+                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                    {
+                        cmd.AddParam($"{ParamPrefix}__tenant_bulk", ctx.Options.TenantProvider.GetCurrentTenantId());
+                        cmd.CommandText = $"UPDATE {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause} SET {setClause} WHERE T1.{m.TenantColumn.EscCol} = {ParamPrefix}__tenant_bulk";
+                    }
+                    else
+                    {
+                        cmd.CommandText = $"UPDATE {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause} SET {setClause}";
+                    }
+                    updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                // X4: Always drop temp table to prevent session resource leak
+                if (tempCreated)
+                {
+                    try
+                    {
+                        await using var dropCmd = ctx.CreateCommand();
+                        dropCmd.CommandText = $"DROP TEMPORARY TABLE IF EXISTS {tempTableName}";
+                        await dropCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch { /* best-effort cleanup */ }
+                }
             }
 
-            var tempMapping = new TableMapping(m.Type, this, ctx, null) { EscTable = tempTableName };
-            await BulkInsertAsync(ctx, tempMapping, entities, ct).ConfigureAwait(false);
-
-            var setClause = string.Join(", ", nonKeyCols.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
-            var joinClause = string.Join(" AND ", m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
-            await using (var cmd = ctx.CreateCommand())
-            {
-                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-                cmd.CommandText = $"UPDATE {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause} SET {setClause}";
-                var updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
-                ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, updatedCount, sw.Elapsed);
-                return updatedCount;
-            }
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
+            ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, updatedCount, sw.Elapsed);
+            return updatedCount;
         }
         
         /// <summary>
@@ -608,6 +645,13 @@ END;";
                     whereClause = $"({cols}) IN ({string.Join(", ", valueClauses)})";
                 }
 
+                // X1: Add tenant predicate to prevent cross-tenant bulk deletes
+                if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                {
+                    var tenantParam = $"{ParamPrefix}__tenant_bulk";
+                    cmd.AddParam(tenantParam, ctx.Options.TenantProvider.GetCurrentTenantId());
+                    whereClause += $" AND {m.TenantColumn.EscCol} = {tenantParam}";
+                }
                 cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {whereClause}";
                 var batchSw = Stopwatch.StartNew();
                 totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
@@ -615,6 +659,7 @@ END;";
                 BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
             }
 
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
             return totalDeleted;
         }

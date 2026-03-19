@@ -554,6 +554,7 @@ END;";
                 if (ownedTx) await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw?.Elapsed ?? default);
             return totalInserted;
         }
@@ -630,9 +631,22 @@ END;";
                 await using (var cmd = ctx.Connection.CreateCommand())
                 {
                     cmd.Transaction = transaction;
-                    var setClause = string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = (SELECT {Escape(c.PropName)} FROM {tempTableName} WHERE {string.Join(" AND ", keyCols.Select(k => $"{tempTableName}.{Escape(k.PropName)} = {m.EscTable}.{k.EscCol}"))})"));
-                    var whereClause = $"EXISTS (SELECT 1 FROM {tempTableName} WHERE {string.Join(" AND ", keyCols.Select(k => $"{tempTableName}.{Escape(k.PropName)} = {m.EscTable}.{k.EscCol}"))})";
-
+                    var keyMatchConditions = string.Join(" AND ", keyCols.Select(k => $"{tempTableName}.{Escape(k.PropName)} = {m.EscTable}.{k.EscCol}"));
+                    // X3: Include timestamp in EXISTS match to enforce OCC
+                    // Use IS (null-safe equality) instead of = because NULL = NULL is NULL (falsy) in SQL.
+                    // SQLite's IS operator treats NULL IS NULL as TRUE, matching entities with null tokens.
+                    var tsCondition = m.TimestampColumn != null
+                        ? $" AND {tempTableName}.{Escape(m.TimestampColumn.PropName)} IS {m.EscTable}.{m.TimestampColumn.EscCol}"
+                        : "";
+                    var setClause = string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = (SELECT {Escape(c.PropName)} FROM {tempTableName} WHERE {keyMatchConditions})"));
+                    var whereClause = $"EXISTS (SELECT 1 FROM {tempTableName} WHERE {keyMatchConditions}{tsCondition})";
+                    // X1: Add tenant predicate to prevent cross-tenant modifications
+                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                    {
+                        var tenantParam = $"{ParamPrefix}__tenant_bulk";
+                        cmd.AddParam(tenantParam, ctx.Options.TenantProvider.GetCurrentTenantId());
+                        whereClause += $" AND {m.EscTable}.{m.TenantColumn.EscCol} = {tenantParam}";
+                    }
                     cmd.CommandText = $"UPDATE {m.EscTable} SET {setClause} WHERE {whereClause}";
                     totalUpdated = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
@@ -673,6 +687,7 @@ END;";
                 if (ownedTx) await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, totalUpdated, sw.Elapsed);
             return totalUpdated;
         }
@@ -741,32 +756,60 @@ END;";
                             cmd.AddParam(paramName, keyCol.Getter(entity));
                         }
 
-                        cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} IN ({string.Join(",", paramNames)})";
+                        // X1: Add tenant predicate to prevent cross-tenant deletes
+                        var tenantSuffix = "";
+                        if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                        {
+                            var tenantParam = $"{ParamPrefix}__tenant_bulk";
+                            cmd.AddParam(tenantParam, ctx.Options.TenantProvider.GetCurrentTenantId());
+                            tenantSuffix = $" AND {m.TenantColumn.EscCol} = {tenantParam}";
+                        }
+                        cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} IN ({string.Join(",", paramNames)}){tenantSuffix}";
                         totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                     }
                 }
                 else
                 {
+                    // X1: Build delete SQL with optional tenant predicate
+                    bool hasTenant = ctx.Options.TenantProvider != null && m.TenantColumn != null;
+                    string compositeDeleteSql;
+                    if (hasTenant)
+                    {
+                        var whereParts = m.KeyColumns.Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}").ToList();
+                        if (m.TimestampColumn != null)
+                        {
+                            var tc = m.TimestampColumn;
+                            whereParts.Add($"({tc.EscCol}={ParamPrefix}{tc.PropName} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{tc.PropName} IS NULL))");
+                        }
+                        whereParts.Add($"{m.TenantColumn!.EscCol}={ParamPrefix}__tenant_bulk");
+                        compositeDeleteSql = $"DELETE FROM {m.EscTable} WHERE {string.Join(" AND ", whereParts)}";
+                    }
+                    else
+                    {
+                        compositeDeleteSql = BuildDelete(m);
+                    }
+
                     await using var cmd = ctx.Connection.CreateCommand();
                     cmd.Transaction = transaction;
-                    cmd.CommandText = BuildDelete(m);
+                    cmd.CommandText = compositeDeleteSql;
                     cmd.CommandTimeout = 30;
                     await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
                     foreach (var entity in entityList)
                     {
                         cmd.Parameters.Clear();
-
                         foreach (var col in m.KeyColumns)
                         {
                             cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
                         }
-
                         if (m.TimestampColumn != null)
                         {
                             cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                         }
-
+                        if (hasTenant)
+                        {
+                            cmd.AddParam($"{ParamPrefix}__tenant_bulk", ctx.Options.TenantProvider!.GetCurrentTenantId());
+                        }
                         totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                     }
                 }
@@ -799,6 +842,7 @@ END;";
                 if (ownedTx) await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
             return totalDeleted;
         }
