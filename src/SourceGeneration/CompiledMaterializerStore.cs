@@ -55,6 +55,22 @@ namespace nORM.SourceGeneration
             }));
 
         /// <summary>
+        /// Registers a materializer delegate for the generic entity type <typeparamref name="T"/>
+        /// under an explicit <paramref name="tableName"/> discriminator. Use this overload when the
+        /// table name is known at compile time (e.g., source-generated queries) to support multi-model
+        /// scenarios where the same CLR type maps to different tables.
+        /// </summary>
+        /// <typeparam name="T">Entity type the materializer produces.</typeparam>
+        /// <param name="tableName">Table name used as the model discriminator in the cache key.</param>
+        /// <param name="materializer">Function that converts a <see cref="DbDataReader"/> row into an entity instance.</param>
+        public static void Add<T>(string tableName, Func<DbDataReader, T> materializer)
+            => _map.GetOrAdd((typeof(T), tableName), _ => (materializer, (reader, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return Task.FromResult((object)materializer(reader)!);
+            }));
+
+        /// <summary>
         /// Attempts to retrieve a previously registered untyped materializer for the given entity type,
         /// using the <c>[Table]</c> attribute name (or CLR type name) as the model discriminator.
         /// </summary>
@@ -86,14 +102,27 @@ namespace nORM.SourceGeneration
 
         /// <summary>
         /// Retrieves a strongly typed materializer for <typeparamref name="T"/>. Throws if none has been registered.
+        /// Uses the <c>[Table]</c> attribute name (or CLR type name) as the model discriminator.
         /// </summary>
         /// <typeparam name="T">Entity type to retrieve.</typeparam>
         /// <returns>A delegate that asynchronously materializes an entity of type <typeparamref name="T"/>.</returns>
         /// <exception cref="KeyNotFoundException">Thrown if no materializer is registered for <typeparamref name="T"/>.</exception>
         public static Func<DbDataReader, CancellationToken, Task<T>> Get<T>()
+            => Get<T>(GetTableName(typeof(T)));
+
+        /// <summary>
+        /// Retrieves a strongly typed materializer for <typeparamref name="T"/> registered under the
+        /// specified <paramref name="tableName"/>. Throws if none has been registered.
+        /// Use this overload when the table name is known at compile time (e.g., source-generated queries).
+        /// </summary>
+        /// <typeparam name="T">Entity type to retrieve.</typeparam>
+        /// <param name="tableName">Table name used as the model discriminator in the cache key.</param>
+        /// <returns>A delegate that asynchronously materializes an entity of type <typeparamref name="T"/>.</returns>
+        /// <exception cref="KeyNotFoundException">Thrown if no materializer is registered for the given type/table combination.</exception>
+        public static Func<DbDataReader, CancellationToken, Task<T>> Get<T>(string tableName)
         {
-            if (!_map.TryGet((typeof(T), GetTableName(typeof(T))), out var entry))
-                throw new KeyNotFoundException($"Materializer for {typeof(T)} not found.");
+            if (!_map.TryGet((typeof(T), tableName), out var entry))
+                throw new KeyNotFoundException($"Materializer for {typeof(T)} (table '{tableName}') not found.");
             return (reader, ct) =>
             {
                 ct.ThrowIfCancellationRequested();

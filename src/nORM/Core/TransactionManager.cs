@@ -89,6 +89,7 @@ namespace nORM.Core
                     // is set at that moment). EnlistTransaction(null) detaches the connection
                     // so subsequent writes commit independently rather than being rolled back
                     // when the ambient scope is abandoned without Complete().
+                    bool deEnlistFailed = false;
                     if (connection != null && connection.State == System.Data.ConnectionState.Open)
                     {
                         try
@@ -97,18 +98,47 @@ namespace nORM.Core
                             context.Options.Logger?.LogDebug(
                                 "De-enlisted connection from ambient transaction for Ignore policy.");
                         }
+                        catch (NotSupportedException deEx)
+                        {
+                            // Provider does not support EnlistTransaction at all, which also means
+                            // it did not auto-enlist on Open(). Writes commit independently.
+                            context.Options.Logger?.LogDebug(
+                                "Provider does not support EnlistTransaction " +
+                                "(Ignore policy): {Message}. No auto-enlistment occurred.", deEx.Message);
+                        }
+                        catch (InvalidOperationException deEx)
+                        {
+                            // Provider threw InvalidOperationException — typically means the
+                            // operation is not supported in the current state. Same reasoning
+                            // as NotSupportedException: no auto-enlistment happened.
+                            context.Options.Logger?.LogDebug(
+                                "EnlistTransaction(null) not valid in current state " +
+                                "(Ignore policy): {Message}. Treating as no auto-enlistment.", deEx.Message);
+                        }
                         catch (Exception deEx)
                         {
-                            // Some providers do not support explicit de-enlistment. Log at debug
-                            // level so the operator can investigate auto-enlist behavior.
-                            context.Options.Logger?.LogDebug(
-                                "Could not de-enlist connection from ambient transaction " +
-                                "(Ignore policy): {Message}. Writes may participate in the " +
-                                "ambient scope if the provider auto-enlists.", deEx.Message);
+                            // T1 fix: check if there's still an active ambient scope. If so,
+                            // the connection may still be enlisted and writes could be rolled
+                            // back — do NOT advance the tracker. If no ambient scope exists
+                            // (e.g., SQLite which never auto-enlists), the failure is harmless.
+                            if (System.Transactions.Transaction.Current != null)
+                            {
+                                deEnlistFailed = true;
+                                context.Options.Logger?.LogWarning(
+                                    "Failed to de-enlist connection from ambient transaction " +
+                                    "(Ignore policy): {Message}. Tracker will NOT advance (T1).", deEx.Message);
+                            }
+                            else
+                            {
+                                context.Options.Logger?.LogDebug(
+                                    "EnlistTransaction(null) failed but no ambient scope active " +
+                                    "(Ignore policy): {Message}. Writes commit independently.", deEx.Message);
+                            }
                         }
                     }
-                    // Writes commit independently of the ambient scope — advance the tracker.
-                    shouldAcceptChanges = true;
+                    // T1 fix: advance the tracker unless de-enlistment failed while an ambient
+                    // scope was active, indicating the connection may still be scope-bound.
+                    shouldAcceptChanges = !deEnlistFailed;
                 }
                 else if (connection != null && connection.State == System.Data.ConnectionState.Open)
                 {
