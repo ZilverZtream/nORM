@@ -8,8 +8,12 @@ namespace nORM.Internal
 {
     internal static class ExpressionUtils
     {
-        private const int MaxNodeCount = 10000;
-        private const int MaxDepth = 100;
+        private const int MaxNodeCount = 10000;  // Safety ceiling; largest real-world LINQ trees are ~2 000 nodes
+        private const int MaxDepth = 100;       // Safety ceiling; typical depth is < 30 even with nested sub-queries
+        private const int BaseTimeoutSeconds = 30;       // Compilation timeout per complexity unit
+        private const int MaxTimeoutMinutes = 5;         // Hard ceiling to prevent runaway compilations
+        private const int NodesPerTimeoutUnit = 1000;    // Nodes per additional timeout unit
+        private const int DepthPerTimeoutUnit = 10;      // Depth per additional timeout unit
 
         internal sealed class Complexity
         {
@@ -51,9 +55,9 @@ namespace nORM.Internal
         public static TimeSpan GetCompilationTimeout(Expression expression)
         {
             var complexity = AnalyzeExpressionComplexity(expression);
-            var multiplier = Math.Max(1, Math.Max(complexity.NodeCount / 1000, complexity.Depth / 10));
-            var timeout = TimeSpan.FromSeconds(30 * multiplier);
-            var maxTimeout = TimeSpan.FromMinutes(5);
+            var multiplier = Math.Max(1, Math.Max(complexity.NodeCount / NodesPerTimeoutUnit, complexity.Depth / DepthPerTimeoutUnit));
+            var timeout = TimeSpan.FromSeconds(BaseTimeoutSeconds * multiplier);
+            var maxTimeout = TimeSpan.FromMinutes(MaxTimeoutMinutes);
             return timeout > maxTimeout ? maxTimeout : timeout;
         }
 

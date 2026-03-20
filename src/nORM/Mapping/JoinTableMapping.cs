@@ -98,9 +98,7 @@ namespace nORM.Mapping
                 Expression.Convert(leftGetProp, typeof(IList)), leftParam).Compile();
 
             var leftValueParam = Expression.Parameter(typeof(IList), "v");
-            var leftCastV = leftNavProp.PropertyType.IsAssignableFrom(typeof(List<>).MakeGenericType(rightType))
-                ? (Expression)Expression.Convert(leftValueParam, leftNavProp.PropertyType)
-                : Expression.Convert(leftValueParam, leftNavProp.PropertyType);
+            var leftCastV = Expression.Convert(leftValueParam, leftNavProp.PropertyType);
             var leftSetProp = Expression.Call(leftCast, leftNavProp.GetSetMethod()!, leftCastV);
             LeftCollectionSetter = Expression.Lambda<Action<object, IList?>>(
                 leftSetProp, leftParam, leftValueParam).Compile();

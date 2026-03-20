@@ -177,12 +177,13 @@ public class JsonPathValidationTests : TestBase
     {
         // Q2 fix: TranslateJsonPathAccess(col, "$") previously emitted
         // jsonb_extract_path_text(col, ) — missing required path argument.
-        // Fix: root-only path casts column to text directly: (col)::text
+        // Bug 21 fix: root-only path uses col #>> '{}' which strips JSON quotes,
+        // unlike (col)::text which preserves them for JSONB string values.
         var factory = new SqliteParameterFactory();
         var pg = new PostgresProvider(factory);
         var result = pg.TranslateJsonPathAccess("\"Data\"", "$");
         Assert.DoesNotContain("jsonb_extract_path_text", result);
-        Assert.Contains("::text", result);
+        Assert.Contains("#>> '{}'", result);
         // Must be syntactically valid — no trailing comma or empty args
         Assert.DoesNotContain(", )", result);
     }

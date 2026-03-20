@@ -24,6 +24,9 @@ internal static class DbConnectionFactory
     /// <exception cref="NotSupportedException">Thrown when the provider type is not supported.</exception>
     public static DbConnection Create(string connectionString, DatabaseProvider provider)
     {
+        ArgumentNullException.ThrowIfNull(connectionString);
+        ArgumentNullException.ThrowIfNull(provider);
+
         var providerName = provider switch
         {
             SqlServerProvider => "sqlserver",

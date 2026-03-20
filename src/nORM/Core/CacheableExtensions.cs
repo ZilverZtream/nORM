@@ -17,6 +17,10 @@ namespace nORM.Core
         /// <param name="absoluteExpiration">The absolute expiration time.</param>
         public static IQueryable<T> Cacheable<T>(this IQueryable<T> source, TimeSpan absoluteExpiration)
         {
+            ArgumentNullException.ThrowIfNull(source);
+            if (absoluteExpiration <= TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(nameof(absoluteExpiration), absoluteExpiration, "Cache expiration must be a positive duration.");
+
             var method = ((MethodInfo)MethodBase.GetCurrentMethod()!)
                 .MakeGenericMethod(typeof(T));
 

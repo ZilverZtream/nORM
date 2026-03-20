@@ -22,9 +22,15 @@ namespace nORM.Navigation
         private readonly DbContext _context;
         private readonly Dictionary<(Type EntityType, string PropertyName), List<(object Entity, TaskCompletionSource<object> Tcs, CancellationToken Ct)>> _pendingLoads = new();
         private Timer? _batchTimer;
+        /// <summary>Atomic flag (0 = idle, 1 = processing) guarding single-flight batch execution.</summary>
         private int _processing;
         private readonly SemaphoreSlim _batchSemaphore = new(1, 1);
-        private readonly object _syncLock = new object();
+        private volatile bool _disposed;
+
+        /// <summary>
+        /// Delay in milliseconds before the batch timer fires after the first pending load is queued.
+        /// Balances latency (lower value) against batching efficiency (higher value).
+        /// </summary>
         private const int BatchDelayMs = 10;
 
         /// <summary>
@@ -32,13 +38,14 @@ namespace nORM.Navigation
         /// for the specified <see cref="DbContext"/>.
         /// </summary>
         /// <param name="context">The owning context used to execute navigation queries.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="context"/> is <c>null</c>.</exception>
         /// <remarks>
         /// PERFORMANCE OPTIMIZATION: Uses reactive timer scheduling instead of polling.
-        /// Timer is only active when there are pending loads, reducing CPU overhead by ~99%.
+        /// Timer is only active when there are pending loads, reducing CPU overhead.
         /// </remarks>
         public BatchedNavigationLoader(DbContext context)
         {
-            _context = context;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
             NavigationPropertyExtensions.RegisterLoader(this);
             _context.RegisterForDisposal(this);
         }
@@ -52,11 +59,20 @@ namespace nORM.Navigation
         /// <param name="propertyName">Name of the navigation property to load.</param>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>A list of related entities once the batch has been processed.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="entity"/> or <paramref name="propertyName"/> is <c>null</c>.</exception>
+        /// <exception cref="ObjectDisposedException">The loader has been disposed.</exception>
         public async Task<List<object>> LoadNavigationAsync(object entity, string propertyName, CancellationToken ct = default)
         {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            if (propertyName == null) throw new ArgumentNullException(nameof(propertyName));
+            ThrowIfDisposed();
+
             var entityType = entity.GetType();
             var key = (entityType, propertyName);
-            var tcs = new TaskCompletionSource<object>();
+            // RunContinuationsAsynchronously prevents synchronous continuations from running
+            // inline on the thread that calls SetResult/SetException/SetCanceled, avoiding
+            // potential stack dives when many callers await the same batch.
+            var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             await _batchSemaphore.WaitAsync(ct).ConfigureAwait(false);
             try
@@ -68,18 +84,18 @@ namespace nORM.Navigation
                 }
                 list.Add((entity, tcs, ct));
 
-                // PERFORMANCE: Only schedule timer when first item is added
-                // Check _batchTimer first to avoid unnecessary count calculation
+                // Schedule a one-shot timer when the first pending item is queued.
+                // Check _batchTimer first to avoid unnecessary count calculation.
                 if (_batchTimer == null)
                 {
-                    // PERFORMANCE: Avoid LINQ Sum() - use simple iteration
+                    // Count total pending items without LINQ allocation.
                     int totalCount = 0;
                     foreach (var kvp in _pendingLoads)
                     {
                         totalCount += kvp.Value.Count;
-                        if (totalCount > 1) break; // Early exit
+                        if (totalCount > 1) break; // Early exit — only care whether count == 1
                     }
-                    // Fix: create timer INSIDE the lock to prevent TOCTOU race
+                    // Create timer INSIDE the semaphore to prevent TOCTOU race
                     // where ProcessBatchAsync disposes/nulls _batchTimer between
                     // the check and the assignment.
                     if (totalCount == 1)
@@ -95,19 +111,26 @@ namespace nORM.Navigation
         }
 
         /// <summary>
-        /// Callback invoked by the internal timer to trigger processing of pending navigation
-        /// loads. The method ensures only one batch is processed at a time by using an atomic
-        /// flag and dispatches the work to the thread pool.
+        /// Callback invoked by the internal one-shot timer to trigger processing of pending
+        /// navigation loads. Uses an atomic flag to ensure only one batch is processed at a
+        /// time and dispatches the work to the thread pool.
         /// </summary>
         /// <param name="state">Unused timer state object.</param>
-        /// <remarks>
-        /// PERFORMANCE: Timer is one-shot and only fires when there are pending loads.
-        /// This eliminates ~100 timer callbacks/second when idle (99% reduction in overhead).
-        /// </remarks>
         private void TimerTick(object? state)
         {
+            if (_disposed) return;
             if (Interlocked.Exchange(ref _processing, 1) == 1) return;
-            _ = Task.Run(async () => { try { await ProcessBatchAsync().ConfigureAwait(false); } finally { Volatile.Write(ref _processing, 0); } });
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await ProcessBatchAsync().ConfigureAwait(false);
+                }
+                finally
+                {
+                    Volatile.Write(ref _processing, 0);
+                }
+            });
         }
 
         /// <summary>
@@ -121,39 +144,42 @@ namespace nORM.Navigation
         {
             await _batchSemaphore.WaitAsync().ConfigureAwait(false);
 
+            Dictionary<(Type, string), List<(object Entity, TaskCompletionSource<object> Tcs, CancellationToken Ct)>> batches;
             try
             {
-                var batches = new Dictionary<(Type, string), List<(object Entity, TaskCompletionSource<object> Tcs, CancellationToken Ct)>>(_pendingLoads);
+                batches = new Dictionary<(Type, string), List<(object Entity, TaskCompletionSource<object> Tcs, CancellationToken Ct)>>(_pendingLoads);
                 _pendingLoads.Clear();
 
-                // PERFORMANCE: Dispose timer after processing batch (reactive approach)
+                // Dispose the one-shot timer after draining the queue (reactive approach).
                 _batchTimer?.Dispose();
                 _batchTimer = null;
-
-                foreach (var kvp in batches)
-                {
-                    var (entityType, propertyName) = kvp.Key;
-                    var entities = kvp.Value;
-
-                    await LoadNavigationBatchAsync(entityType, propertyName, entities).ConfigureAwait(false);
-                }
             }
             finally
             {
                 _batchSemaphore.Release();
             }
+
+            // Execute batch loads outside the semaphore to avoid holding the lock
+            // during potentially long-running DB operations.
+            foreach (var kvp in batches)
+            {
+                var (entityType, propertyName) = kvp.Key;
+                var entities = kvp.Value;
+
+                await LoadNavigationBatchAsync(entityType, propertyName, entities).ConfigureAwait(false);
+            }
         }
 
-        // A1 fix: Do NOT link individual caller tokens into a shared CancellationToken for the
-        // DB query. If any one caller's token fires, the linked token would cancel the shared
-        // DB query and propagate OperationCanceledException to ALL callers in the same batch —
-        // including those whose tokens had not fired. Instead, run the DB query to completion
-        // with CancellationToken.None, then perform per-caller token checks when delivering
-        // results so each caller receives either its own cancellation or the actual result.
+        /// <summary>
+        /// Loads related entities for a batch of pending navigation requests sharing the same
+        /// entity type and property name. The shared DB query always runs to completion with
+        /// <see cref="CancellationToken.None"/>; individual caller tokens are checked only when
+        /// delivering results, so one caller's cancellation does not abort the query for others.
+        /// </summary>
         private async Task LoadNavigationBatchAsync(Type entityType, string propertyName,
             List<(object Entity, TaskCompletionSource<object> Tcs, CancellationToken Ct)> entities)
         {
-            // A1 fix: shared DB query always runs to completion; per-caller tokens checked on delivery.
+            // Shared DB query always runs to completion; per-caller tokens checked on delivery.
             var ct = CancellationToken.None;
 
             try
@@ -171,7 +197,7 @@ namespace nORM.Navigation
                                    .Distinct()
                                    .ToList();
 
-                if (!keys.Any())
+                if (keys.Count == 0)
                 {
                     foreach (var (_, tcs, callerCt) in entities)
                         DeliverEmpty(tcs, callerCt);
@@ -186,12 +212,20 @@ namespace nORM.Navigation
                 {
                     if (callerCt.IsCancellationRequested)
                     {
-                        tcs.SetCanceled(callerCt);
+                        tcs.TrySetCanceled(callerCt);
                         continue;
                     }
                     var key = relation.PrincipalKey.Getter(entity);
-                    var related = grouped.TryGetValue(key!, out var list) ? list : new List<object>();
-                    tcs.SetResult(related);
+                    var related = key != null && grouped.TryGetValue(key, out var list) ? list : new List<object>();
+                    tcs.TrySetResult(related);
+                }
+            }
+            catch (OperationCanceledException oce)
+            {
+                foreach (var (_, tcs, callerCt) in entities)
+                {
+                    // Deliver cancellation with the caller's own token when possible.
+                    tcs.TrySetCanceled(callerCt.IsCancellationRequested ? callerCt : oce.CancellationToken);
                 }
             }
             catch (Exception ex)
@@ -199,9 +233,9 @@ namespace nORM.Navigation
                 foreach (var (_, tcs, callerCt) in entities)
                 {
                     if (callerCt.IsCancellationRequested)
-                        tcs.SetCanceled(callerCt);
+                        tcs.TrySetCanceled(callerCt);
                     else
-                        tcs.SetException(ex);
+                        tcs.TrySetException(ex);
                 }
             }
         }
@@ -214,9 +248,9 @@ namespace nORM.Navigation
         private static void DeliverEmpty(TaskCompletionSource<object> tcs, CancellationToken callerCt)
         {
             if (callerCt.IsCancellationRequested)
-                tcs.SetCanceled(callerCt);
+                tcs.TrySetCanceled(callerCt);
             else
-                tcs.SetResult(new List<object>());
+                tcs.TrySetResult(new List<object>());
         }
 
         /// <summary>
@@ -237,7 +271,8 @@ namespace nORM.Navigation
             var where = _context.Provider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, keys);
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";
 
-            cmd.CommandTimeout = (int)_context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
+            var timeout = _context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
+            cmd.CommandTimeout = ToSecondsClamped(timeout);
 
             using var translator = Query.QueryTranslator.Rent(_context);
             var materializer = translator.CreateMaterializer(mapping, relation.DependentType);
@@ -263,8 +298,11 @@ namespace nORM.Navigation
         /// <param name="entity">The entity whose pending navigation loads should be cleared.</param>
         internal void RemovePendingLoadsForEntity(object entity)
         {
-            // C1 fix: use the same semaphore as LoadNavigationAsync/ProcessBatchAsync
-            // to prevent concurrent Dictionary mutation across different lock domains
+            if (entity == null) return;
+            if (_disposed) return;
+
+            // Use the same semaphore as LoadNavigationAsync/ProcessBatchAsync
+            // to prevent concurrent Dictionary mutation.
             _batchSemaphore.Wait();
             try
             {
@@ -283,13 +321,51 @@ namespace nORM.Navigation
         }
 
         /// <summary>
-        /// Releases resources used by the loader and unregisters it from the navigation system.
+        /// Releases resources used by the loader, cancels any pending navigation requests, and
+        /// unregisters it from the navigation system. Safe to call multiple times.
         /// </summary>
         public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
+
             NavigationPropertyExtensions.UnregisterLoader(this);
             _batchTimer?.Dispose();
+            _batchTimer = null;
+
+            // Cancel any pending TCS entries so callers are not left waiting indefinitely.
+            foreach (var kvp in _pendingLoads)
+            {
+                foreach (var (_, tcs, callerCt) in kvp.Value)
+                {
+                    tcs.TrySetCanceled(callerCt.IsCancellationRequested ? callerCt : CancellationToken.None);
+                }
+            }
+            _pendingLoads.Clear();
+
             _batchSemaphore.Dispose();
+        }
+
+        /// <summary>
+        /// Throws <see cref="ObjectDisposedException"/> if this loader has been disposed.
+        /// </summary>
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(BatchedNavigationLoader));
+        }
+
+        /// <summary>
+        /// Converts a <see cref="TimeSpan"/> to whole seconds suitable for
+        /// <see cref="System.Data.Common.DbCommand.CommandTimeout"/>, clamping to a minimum of 1
+        /// and guarding against overflow. Mirrors the helper used by <see cref="DbContext"/>.
+        /// </summary>
+        private static int ToSecondsClamped(TimeSpan t)
+        {
+            if (t.TotalSeconds > int.MaxValue)
+                return int.MaxValue;
+
+            return Math.Max(1, (int)Math.Ceiling(t.TotalSeconds));
         }
     }
 }

@@ -31,10 +31,16 @@ namespace nORM.Internal
 
     internal static class ExpressionCompiler
     {
-        // Bounded at 512 entries to prevent unbounded memory growth over long process lifetimes.
-        // 512 slots covers the vast majority of real-app expression shapes (one per call-site per provider).
+        /// <summary>Maximum number of compiled delegate cache entries before LRU eviction.</summary>
+        private const int DelegateCacheCapacity = 512;
+
+        /// <summary>Maximum number of per-context query plan cache entries before LRU eviction.</summary>
+        private const int PlanCacheCapacity = 256;
+
+        // Bounded to prevent unbounded memory growth over long process lifetimes.
+        // Covers the vast majority of real-app expression shapes (one per call-site per provider).
         // Internal for test assertions.
-        internal static readonly ConcurrentLruCache<ExpressionFingerprint, Delegate> _compiledDelegateCache = new(512);
+        internal static readonly ConcurrentLruCache<ExpressionFingerprint, Delegate> _compiledDelegateCache = new(DelegateCacheCapacity);
 
         // Cap concurrent compile operations so repeated hostile-timeout callers cannot starve
         // the thread pool. Each in-flight compile acquires one slot; the slot is released when
@@ -81,7 +87,7 @@ namespace nORM.Internal
             // bounding concurrency prevents unbounded thread-pool growth.
             var task = Task.Run(() =>
             {
-                _compileSemaphore.Wait(CancellationToken.None); // always release, even after caller timeout
+                _compileSemaphore.Wait(token); // cancellable wait; if cancelled, task faults without acquiring semaphore
                 try
                 {
                     result = CompileQueryInternal<TContext, TParam, T>(queryExpression);
@@ -106,7 +112,7 @@ namespace nORM.Internal
             }
 
             if (compileException != null)
-                throw compileException;
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(compileException).Throw();
 
             return result!;
         }
@@ -117,9 +123,9 @@ namespace nORM.Internal
         {
             // Use per-context-shape cache keyed by a collision-resistant string
             // that encodes provider type, mappings, tenant ID, and global filter expressions.
-            // Cap at 256 entries via ConcurrentLruCache so long-lived processes with many
+            // Cap entries via ConcurrentLruCache so long-lived processes with many
             // distinct tenant/filter/provider/model combinations don't grow this dictionary without bound.
-            var plansByCtx = new ConcurrentLruCache<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams)>(256);
+            var plansByCtx = new ConcurrentLruCache<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams)>(PlanCacheCapacity);
             string? cachedCtxKey = null;
             DbContext? cachedCtxKeyOwner = null;
             (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams) cachedEntry = default;
@@ -161,10 +167,15 @@ namespace nORM.Internal
                         // GetFilterKey() combines the shape fingerprint with a recursive extraction of all
                         // closure-accessed field values so two lambdas with the same shape but different
                         // captured values (e.g., tenantId=1 vs tenantId=2) produce distinct cache keys.
+                        // Tenant segment: "TENANT:NULL:" when provider is set but returns null,
+                        // vs empty string when no provider — prevents cross-tenant plan sharing.
+                        var tenantSegment = ctx.Options.TenantProvider != null
+                            ? string.Concat("TENANT:", tenantId?.ToString() ?? "NULL", ":")
+                            : "";
                         ctxKey = string.Concat(
                             ctx.Provider.GetType().FullName, "|",
                             ctx.GetMappingHash().ToString(), "|",
-                            tenantId?.ToString() ?? "", "|",
+                            tenantSegment, "|",
                             ctx.Options.GlobalFilters.Count > 0
                                 ? string.Join(";", ctx.Options.GlobalFilters.SelectMany(kvp => kvp.Value.Select(GetFilterKey)))
                                 : "");
@@ -301,7 +312,7 @@ namespace nORM.Internal
                             p.Value = DBNull.Value;
                             cmd.Parameters.Add(p);
                         }
-                        try { cmd.Prepare(); } catch { }
+                        try { cmd.Prepare(); } catch (DbException) { /* Prepare is a performance optimization; failure is non-fatal */ }
                         state.FixedParamCount = fixedCount;
                     }
 
@@ -388,7 +399,11 @@ namespace nORM.Internal
                     sb.Append(val?.ToString() ?? "null");
                     sb.Append(';');
                 }
-                catch { /* ignore reflection failures — treats the value as stable */ }
+                catch (Exception ex) when (ex is MemberAccessException or TargetInvocationException or InvalidOperationException or NotSupportedException)
+                {
+                    // Reflection failure reading closure value — treat as stable (no value appended).
+                    // Only catch expected reflection exceptions; let unexpected failures propagate.
+                }
                 return; // Don't recurse further into this constant node
             }
 

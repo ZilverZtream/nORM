@@ -15,12 +15,22 @@ using nORM.Execution;
 namespace nORM.Query
 {
     /// <summary>
-    /// Handles eager loading of navigation properties using multi-result-set queries.
+    /// Handles eager loading of navigation properties. Uses multi-result-set queries
+    /// for one-to-many chains (<see cref="EagerLoadAsync"/>/<see cref="EagerLoad"/>)
+    /// and separate paired queries for many-to-many relationships
+    /// (<see cref="LoadManyToManyAsync"/>/<see cref="LoadManyToMany"/>).
     /// </summary>
     internal sealed class IncludeProcessor
     {
         private readonly DbContext _ctx;
         private readonly MaterializerFactory _materializerFactory = new();
+
+        /// <summary>
+        /// Number of parameter slots reserved for internal use (tenant params, etc.)
+        /// when computing the maximum keys per eager-load batch.
+        /// Mirrors <c>DatabaseProvider.ParameterReserve</c>.
+        /// </summary>
+        private const int ParameterReserve = 10;
 
         /// <summary>
         /// Eagerly loads a many-to-many relationship for the given parent entities by
@@ -78,8 +88,12 @@ namespace nORM.Query
             var tenantId = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             var leftMapping = _ctx.GetMapping(jtm.LeftType);
             var leftTenantCol = leftMapping.TenantColumn;
-            var leftPkCol = leftMapping.KeyColumns.Length > 0 ? leftMapping.KeyColumns[0] : null;
-            var hasTenantFilter = tenantId != null && leftTenantCol != null && leftPkCol != null;
+            // M2M requires single-column PK on both sides; guard early.
+            if (leftMapping.KeyColumns.Length == 0)
+                throw new InvalidOperationException(
+                    $"Many-to-many Include on '{leftMapping.Type.Name}' failed: entity has no primary key columns.");
+            var leftPkCol = leftMapping.KeyColumns[0]; // single-PK required for M2M join table queries
+            var hasTenantFilter = tenantId != null && leftTenantCol != null;
 
             // Query: SELECT jt.left_fk, jt.right_fk FROM join_table jt [INNER JOIN left_table lt ON ...] WHERE jt.left_fk IN (...)
             if (hasTenantFilter)
@@ -92,7 +106,7 @@ namespace nORM.Query
             {
                 cmd.CommandText = $"SELECT {jtm.EscLeftFkColumn}, {jtm.EscRightFkColumn} FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} IN {inClause}";
             }
-            cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
+            cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
             // Read all join rows: leftPk → list of rightPks
             var joinRows = new Dictionary<object, List<object>>();
@@ -123,7 +137,11 @@ namespace nORM.Query
                 cmd2.AddParam(pn, allRightPkList[i]!);
                 rightParamNames.Add(pn);
             }
-            var rightPkCol = rightMapping.KeyColumns[0];
+            // M2M requires single-column PK on the right side; guard early.
+            if (rightMapping.KeyColumns.Length == 0)
+                throw new InvalidOperationException(
+                    $"Many-to-many Include on '{rightMapping.Type.Name}' failed: entity has no primary key columns.");
+            var rightPkCol = rightMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var rightInClause = $"({string.Join(", ", rightParamNames)})";
 
             // If the right entity table also has a tenant column, filter right entities by tenant
@@ -138,7 +156,7 @@ namespace nORM.Query
             {
                 cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause}";
             }
-            cmd2.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText).TotalSeconds;
+            cmd2.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText);
 
             var rightEntitiesByPk = new Dictionary<object, object>();
             var rightMat = _materializerFactory.CreateSyncMaterializer(rightMapping, jtm.RightType);
@@ -176,15 +194,7 @@ namespace nORM.Query
                 // Try direct PK lookup, then coerced lookup (SQLite returns Int64 for int PKs)
                 if (!joinRows.TryGetValue(leftPk, out var rightPks))
                 {
-                    // Try converting leftPk type (SQLite returns Int64 for int PKs)
-                    foreach (var candidate in joinRows.Keys)
-                    {
-                        if (Convert.ToString(candidate) == Convert.ToString(leftPk))
-                        {
-                            rightPks = joinRows[candidate];
-                            break;
-                        }
-                    }
+                    rightPks = CoercedLookup(joinRows, leftPk);
                 }
 
                 if (rightPks == null) continue;
@@ -194,14 +204,7 @@ namespace nORM.Query
                     // Try direct lookup, then coerced
                     if (!rightEntitiesByPk.TryGetValue(rPk, out var rightEntity))
                     {
-                        foreach (var candidate in rightEntitiesByPk.Keys)
-                        {
-                            if (Convert.ToString(candidate) == Convert.ToString(rPk))
-                            {
-                                rightEntity = rightEntitiesByPk[candidate];
-                                break;
-                            }
-                        }
+                        rightEntity = CoercedLookup(rightEntitiesByPk, rPk);
                     }
                     if (rightEntity != null)
                         collection.Add(rightEntity);
@@ -257,8 +260,12 @@ namespace nORM.Query
             var tenantId = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             var leftMapping = _ctx.GetMapping(jtm.LeftType);
             var leftTenantCol = leftMapping.TenantColumn;
-            var leftPkCol = leftMapping.KeyColumns.Length > 0 ? leftMapping.KeyColumns[0] : null;
-            var hasTenantFilter = tenantId != null && leftTenantCol != null && leftPkCol != null;
+            // M2M requires single-column PK on both sides; guard early.
+            if (leftMapping.KeyColumns.Length == 0)
+                throw new InvalidOperationException(
+                    $"Many-to-many Include on '{leftMapping.Type.Name}' failed: entity has no primary key columns.");
+            var leftPkCol = leftMapping.KeyColumns[0]; // single-PK required for M2M join table queries
+            var hasTenantFilter = tenantId != null && leftTenantCol != null;
 
             if (hasTenantFilter)
             {
@@ -270,7 +277,7 @@ namespace nORM.Query
             {
                 cmd.CommandText = $"SELECT {jtm.EscLeftFkColumn}, {jtm.EscRightFkColumn} FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} IN {inClause}";
             }
-            cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
+            cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
             var joinRows = new Dictionary<object, List<object>>();
             var allRightPks = new HashSet<object>();
@@ -299,7 +306,11 @@ namespace nORM.Query
                 cmd2.AddParam(pn, allRightPkList[i]!);
                 rightParamNames.Add(pn);
             }
-            var rightPkCol = rightMapping.KeyColumns[0];
+            // M2M requires single-column PK on the right side; guard early.
+            if (rightMapping.KeyColumns.Length == 0)
+                throw new InvalidOperationException(
+                    $"Many-to-many Include on '{rightMapping.Type.Name}' failed: entity has no primary key columns.");
+            var rightPkCol = rightMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var rightInClause = $"({string.Join(", ", rightParamNames)})";
 
             // If the right entity table also has a tenant column, filter right entities by tenant
@@ -314,7 +325,7 @@ namespace nORM.Query
             {
                 cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause}";
             }
-            cmd2.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText).TotalSeconds;
+            cmd2.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText);
 
             var rightEntitiesByPk = new Dictionary<object, object>();
             var rightMat = _materializerFactory.CreateSyncMaterializer(rightMapping, jtm.RightType);
@@ -350,14 +361,7 @@ namespace nORM.Query
 
                 if (!joinRows.TryGetValue(leftPk, out var rightPks))
                 {
-                    foreach (var candidate in joinRows.Keys)
-                    {
-                        if (Convert.ToString(candidate) == Convert.ToString(leftPk))
-                        {
-                            rightPks = joinRows[candidate];
-                            break;
-                        }
-                    }
+                    rightPks = CoercedLookup(joinRows, leftPk);
                 }
 
                 if (rightPks == null) continue;
@@ -366,14 +370,7 @@ namespace nORM.Query
                 {
                     if (!rightEntitiesByPk.TryGetValue(rPk, out var rightEntity))
                     {
-                        foreach (var candidate in rightEntitiesByPk.Keys)
-                        {
-                            if (Convert.ToString(candidate) == Convert.ToString(rPk))
-                            {
-                                rightEntity = rightEntitiesByPk[candidate];
-                                break;
-                            }
-                        }
+                        rightEntity = CoercedLookup(rightEntitiesByPk, rPk);
                     }
                     if (rightEntity != null)
                         collection.Add(rightEntity);
@@ -381,7 +378,7 @@ namespace nORM.Query
             }
         }
 
-        public IncludeProcessor(DbContext ctx) => _ctx = ctx;
+        public IncludeProcessor(DbContext ctx) => _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
 
         /// <summary>
         /// Eagerly loads all relations defined in the <paramref name="include"/> for the given <paramref name="parents"/>
@@ -432,7 +429,7 @@ namespace nORM.Query
             var maxParams = _ctx.Provider.MaxParameters;
             var maxPerBatch = maxParams == int.MaxValue
                 ? keys.Length
-                : Math.Max(1, (maxParams - 10) / Math.Max(1, include.Path.Count));
+                : Math.Max(1, (maxParams - ParameterReserve) / Math.Max(1, include.Path.Count));
 
             foreach (var keyBatch in keys.Chunk(maxPerBatch))
             {
@@ -450,7 +447,7 @@ namespace nORM.Query
                 }
 
                 cmd.CommandText = BuildSql(include.Path, mappings, paramNames, cmd);
-                cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
+                cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
 
@@ -515,7 +512,7 @@ namespace nORM.Query
             var maxParams = _ctx.Provider.MaxParameters;
             var maxPerBatch = maxParams == int.MaxValue
                 ? keys.Length
-                : Math.Max(1, (maxParams - 10) / Math.Max(1, include.Path.Count));
+                : Math.Max(1, (maxParams - ParameterReserve) / Math.Max(1, include.Path.Count));
 
             foreach (var keyBatch in keys.Chunk(maxPerBatch))
             {
@@ -531,7 +528,7 @@ namespace nORM.Query
                 }
 
                 cmd.CommandText = BuildSql(include.Path, mappings, paramNames, cmd);
-                cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
+                cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
                 using var reader = cmd.ExecuteReaderWithInterception(_ctx, System.Data.CommandBehavior.Default);
 
@@ -627,7 +624,10 @@ namespace nORM.Query
                         cmd.AddParam(tp, tenantId);
                     }
 
-                    sb.Append(';');
+                    // Separate multiple result-set statements with semicolons;
+                    // skip the trailing one so the final SQL is clean.
+                    if (i < path.Count - 1)
+                        sb.Append(';');
 
                     // Include all key columns (composite PK support for multi-level traversal).
                     var pkCols = string.Join(", ", map.KeyColumns.Select(k => k.EscCol));
@@ -637,7 +637,7 @@ namespace nORM.Query
                     current = $"(SELECT {pkCols} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current}{tenantPart})";
                 }
 
-                return sb.ToString().TrimEnd(';');
+                return sb.ToString();
             }
             finally
             {
@@ -710,6 +710,38 @@ namespace nORM.Query
             }
 
             return resultChildren;
+        }
+
+        /// <summary>
+        /// Performs a coerced lookup in a dictionary by comparing the string representation
+        /// of keys. This handles SQLite returning Int64 for int PKs and similar type mismatches.
+        /// Returns <c>default</c> if no match is found. Skips null string representations
+        /// to avoid false-positive matches between unrelated DBNull/null values.
+        /// </summary>
+        private static TValue? CoercedLookup<TValue>(Dictionary<object, TValue> dict, object key)
+        {
+            var keyStr = Convert.ToString(key);
+            if (keyStr == null) return default;
+            foreach (var candidate in dict.Keys)
+            {
+                var candidateStr = Convert.ToString(candidate);
+                if (candidateStr != null && candidateStr == keyStr)
+                    return dict[candidate];
+            }
+            return default;
+        }
+
+        /// <summary>
+        /// Computes a safe integer command timeout from the adaptive timeout provider,
+        /// clamping the result to [0, <see cref="int.MaxValue"/>] and treating NaN/negative
+        /// as zero (use provider default).
+        /// </summary>
+        private int SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType opType, string sql)
+        {
+            var totalSeconds = _ctx.GetAdaptiveTimeout(opType, sql).TotalSeconds;
+            if (double.IsNaN(totalSeconds) || totalSeconds < 0)
+                return 0;
+            return (int)Math.Min(totalSeconds, int.MaxValue);
         }
     }
 }

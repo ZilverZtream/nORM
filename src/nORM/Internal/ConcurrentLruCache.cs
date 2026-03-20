@@ -13,6 +13,13 @@ namespace nORM.Internal
     /// </summary>
     public class ConcurrentLruCache<TKey, TValue> : IDisposable where TKey : notnull
     {
+        /// <summary>Minimum number of tail entries sampled during eviction.</summary>
+        private const int MinEvictionSampleWindow = 20;
+        /// <summary>Maximum number of tail entries sampled during eviction.</summary>
+        private const int MaxEvictionSampleWindow = 100;
+        /// <summary>Fraction of cache size used for the eviction sample window (1/N).</summary>
+        private const int EvictionSampleDivisor = 10;
+
         private readonly ConcurrentDictionary<TKey, LinkedListNode<CacheItem>> _cache = new();
         private readonly LinkedList<CacheItem> _lruList = new();
         // ReaderWriterLockSlim allows multiple concurrent readers while writes are exclusive
@@ -177,7 +184,7 @@ namespace nORM.Internal
 
                 if (_lruList.Count > _maxSize)
                 {
-                    var sampleWindow = Math.Min(100, Math.Max(20, _maxSize / 10));
+                    var sampleWindow = Math.Min(MaxEvictionSampleWindow, Math.Max(MinEvictionSampleWindow, _maxSize / EvictionSampleDivisor));
                     LinkedListNode<CacheItem>? oldestNode = null;
                     long oldestTicks = long.MaxValue;
                     var cur = _lruList.Last;
@@ -237,7 +244,7 @@ namespace nORM.Internal
                 {
                     // Sample 10% of cache entries with min=20, max=100 for balanced performance
                     // This adapts to cache size: small caches sample more %, large caches cap at 100
-                    var sampleWindow = Math.Min(100, Math.Max(20, _maxSize / 10));
+                    var sampleWindow = Math.Min(MaxEvictionSampleWindow, Math.Max(MinEvictionSampleWindow, _maxSize / EvictionSampleDivisor));
 
                     LinkedListNode<CacheItem>? oldestNode = null;
                     long oldestTicks = long.MaxValue;
@@ -347,7 +354,7 @@ namespace nORM.Internal
             _isDisposed = true;
             _cache.Clear();
             _lruList.Clear();
-            _lock?.Dispose();
+            _lock.Dispose();
         }
         private int _disposeFlag;
     }

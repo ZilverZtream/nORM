@@ -1468,7 +1468,7 @@ CREATE TABLE IF NOT EXISTS MiscPost (Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogI
     // ── NavigationPropertyExtensions (static methods) ────────────────────────
 
     [Fact]
-    public void NavigationPropertyExtensions_EnableLazyLoading_NullEntity_ReturnsNull()
+    public void NavigationPropertyExtensions_EnableLazyLoading_NullEntity_ThrowsArgumentNullException()
     {
         var (ctx, cn) = CreateCtx();
         using (ctx) using (cn)
@@ -1477,8 +1477,9 @@ CREATE TABLE IF NOT EXISTS MiscPost (Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogI
             var method = typeof(NavigationPropertyExtensions)
                 .GetMethod("EnableLazyLoading")!
                 .MakeGenericMethod(typeof(MiscBlog));
-            var result = method.Invoke(null, new object?[] { null, ctx });
-            Assert.Null(result);
+            var ex = Assert.Throws<System.Reflection.TargetInvocationException>(
+                () => method.Invoke(null, new object?[] { null, ctx }));
+            Assert.IsType<ArgumentNullException>(ex.InnerException);
         }
     }
 
@@ -1522,10 +1523,10 @@ CREATE TABLE IF NOT EXISTS MiscPost (Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogI
     }
 
     [Fact]
-    public async Task NavigationPropertyExtensions_LoadAsync_NullEntity_ReturnsImmediately()
+    public async Task NavigationPropertyExtensions_LoadAsync_NullEntity_ThrowsArgumentNullException()
     {
-        // LoadAsync(null, ...) returns immediately per the null guard in source
-        await NavigationPropertyExtensions.LoadAsync<MiscBlog, string>(null!, b => b.Title);
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => NavigationPropertyExtensions.LoadAsync<MiscBlog, string>(null!, b => b.Title));
     }
 
     [Fact]

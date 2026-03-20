@@ -6,7 +6,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
-using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -17,7 +16,7 @@ namespace nORM.Query
 {
     internal static class FastPathQueryExecutor
     {
-        private readonly record struct WhereInfo(string Property, object Value);
+        private readonly record struct WhereInfo(string Property, object? Value);
 
         /// <summary>
         /// Cached delegates to avoid MakeGenericMethod and Invoke on every query,
@@ -140,7 +139,7 @@ namespace nORM.Query
                     return false;
                 expr = takeCall.Arguments[0];
             }
-            // Unwrap AsNoTracking between Take and Where so that
+            // Unwrap AsNoTracking/AsSplitQuery between Take and Where so that
             // queries like .Where(...).AsNoTracking().Take(10) hit the fast path.
             expr = Unwrap(expr);
             if (expr is not MethodCallExpression whereCall || whereCall.Method.Name != nameof(Queryable.Where))
@@ -167,13 +166,13 @@ namespace nORM.Query
                 if (!TryGetSimpleValue(be.Right, out var value))
                     return false;
 
-                info = new WhereInfo(me.Member.Name, value!);
+                info = new WhereInfo(me.Member.Name, value);
                 return true;
             }
             return false;
         }
         /// <summary>
-        /// REFACTOR (TASK 19): Use shared ExpressionValueExtractor utility.
+        /// Delegates to shared <see cref="ExpressionValueExtractor"/> utility.
         /// Eliminates duplicate logic and ensures consistent behavior across the codebase.
         /// </summary>
         private static bool TryGetSimpleValue(Expression expr, out object? value)
@@ -196,7 +195,7 @@ namespace nORM.Query
         {
             while (e is MethodCallExpression m)
             {
-                if (m.Method.Name == "AsNoTracking" && m.Arguments.Count == 1)
+                if (m.Method.Name is "AsNoTracking" or "AsSplitQuery" && m.Arguments.Count == 1)
                 {
                     e = m.Arguments[0];
                     continue;
@@ -242,7 +241,7 @@ namespace nORM.Query
         {
             var map = ctx.GetMapping(typeof(T));
             if (!map.ColumnsByName.TryGetValue(info.Property, out var column))
-                throw new InvalidOperationException("Fast path failed - unknown column");
+                throw new InvalidOperationException($"Fast path failed: column '{info.Property}' not found in mapping for '{typeof(T).Name}'.");
 
             // Cache full SQL (SELECT + WHERE + LIMIT) using ValueTuple key to avoid string allocation
             bool isNull = info.Value == null || info.Value == DBNull.Value;
@@ -294,9 +293,9 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             if (!isNull && !isBoolTrue && !isBoolFalse)
                 cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
-            var results = new List<T>(takeCount ?? 16);
+            var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
             var materializer = GetSyncMaterializer<T>(ctx);
-            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 results.Add(materializer(reader));
             // Load owned collections (OwnsMany) if configured
@@ -306,24 +305,12 @@ namespace nORM.Query
             return results;
         }
 
-        /// <summary>PERF: Fully sync materialization — no async state machine overhead for SQLite.</summary>
-        private static Task<object> ExecuteSimpleWhereMaterializeSync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount) where T : class, new()
-        {
-            var results = new List<T>(takeCount ?? 16);
-            var materializer = GetSyncMaterializer<T>(ctx);
-            using var command = cmd;
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
-                results.Add(materializer(reader));
-            return Task.FromResult<object>(results);
-        }
-
         /// <summary>Materializes WHERE results and loads owned collections (sync read + async owned-collection load).</summary>
         private static async Task<object> ExecuteSimpleWhereMaterializeWithOwnedAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, CancellationToken ct, bool sync) where T : class, new()
         {
-            var results = new List<T>(takeCount ?? 16);
+            var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
             var materializer = GetSyncMaterializer<T>(ctx);
-            using var command = cmd;
+            await using var command = cmd;
             if (sync)
             {
                 using var reader = command.ExecuteReader();
@@ -332,7 +319,7 @@ namespace nORM.Query
             }
             else
             {
-                await using var asyncReader = await command.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
+                await using var asyncReader = await command.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
                 while (await asyncReader.ReadAsync(ct).ConfigureAwait(false))
                     results.Add(materializer(asyncReader));
             }
@@ -345,10 +332,10 @@ namespace nORM.Query
 
         private static async Task<object> ExecuteSimpleWhereMaterializeAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
         {
-            var results = new List<T>(takeCount ?? 16);
+            var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
             var materializer = GetSyncMaterializer<T>(ctx);
             await using var command = cmd;
-            await using var reader = await command.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
+            await using var reader = await command.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 results.Add(materializer(reader));
 
@@ -374,9 +361,9 @@ namespace nORM.Query
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-            var results = new List<T>();
+            var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
             var materializer = GetSyncMaterializer<T>(ctx);
-            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
                 results.Add(materializer(reader));
@@ -395,6 +382,9 @@ namespace nORM.Query
             cmd.CommandText = sql;
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             var result = await cmd.ExecuteScalarWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+            // Guard against null/DBNull from empty tables or provider-specific edge cases
+            if (result == null || result is DBNull)
+                return (object)0;
             return (object)Convert.ToInt32(result);
         }
     }

@@ -56,7 +56,7 @@ namespace nORM.Core
                 {
                     throw; // Deliberate validation failures (e.g. invalid JSON path) must propagate.
                 }
-                catch
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     // Fall through to default if translation fails (e.g. unsupported expression).
                 }

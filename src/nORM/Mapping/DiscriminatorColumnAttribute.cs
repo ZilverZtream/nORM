@@ -18,6 +18,6 @@ namespace nORM.Mapping
         /// </summary>
         /// <param name="propertyName">Name of the property containing the discriminator value.</param>
         public DiscriminatorColumnAttribute(string propertyName)
-            => PropertyName = propertyName;
+            => PropertyName = propertyName ?? throw new ArgumentNullException(nameof(propertyName));
     }
 }

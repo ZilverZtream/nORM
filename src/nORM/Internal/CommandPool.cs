@@ -18,10 +18,11 @@ namespace nORM.Internal
         /// <returns>A freshly instantiated <see cref="DbCommand"/> ready for parameterization and execution.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection"/> or
         /// <paramref name="sql"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="sql"/> is empty or whitespace.</exception>
         public static DbCommand Get(DbConnection connection, string sql)
         {
             if (connection is null) throw new ArgumentNullException(nameof(connection));
-            if (sql is null) throw new ArgumentNullException(nameof(sql));
+            if (string.IsNullOrWhiteSpace(sql)) throw new ArgumentException("SQL text must not be null, empty, or whitespace.", nameof(sql));
 
             var cmd = connection.CreateCommand();
             cmd.Parameters.Clear();

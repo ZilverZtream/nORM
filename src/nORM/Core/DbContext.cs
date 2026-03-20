@@ -5,23 +5,23 @@ using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Runtime.CompilerServices;
 using System.Transactions;
-using System.Text;
-using nORM.Configuration;
-using nORM.Execution;
-using nORM.Mapping;
-using nORM.Providers;
-using nORM.Internal;
-using nORM.Navigation;
-using nORM.Versioning;
-using nORM.Scaffolding;
-using nORM.Enterprise;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using System.Reflection;
+using nORM.Configuration;
+using nORM.Enterprise;
+using nORM.Execution;
+using nORM.Internal;
+using nORM.Mapping;
+using nORM.Navigation;
+using nORM.Providers;
+using nORM.Scaffolding;
+using nORM.Versioning;
 #nullable enable
 namespace nORM.Core
 {
@@ -34,6 +34,21 @@ namespace nORM.Core
     /// </summary>
     public class DbContext : IDisposable, IAsyncDisposable
     {
+        /// <summary>Maximum SQL length (in chars) before falling back to length-based complexity estimation.</summary>
+        private const int SqlComplexityAnalysisMaxLength = 102_400; // 100 KB
+        /// <summary>Divisor for base complexity from SQL string length in the fallback path.</summary>
+        private const int SqlLengthComplexityDivisor = 100;
+        /// <summary>Divisor for length-based complexity when SQL exceeds <see cref="SqlComplexityAnalysisMaxLength"/>.</summary>
+        private const int LargeSqlLengthComplexityDivisor = 10_000;
+        /// <summary>Baseline complexity floor for extremely large SQL strings (>100 KB).</summary>
+        private const int LargeSqlBaselineComplexity = 20;
+        /// <summary>Maximum complexity score cap to prevent timeout inflation from false positives.</summary>
+        private const int MaxComplexityScore = 50;
+        /// <summary>Jitter range (±) applied to retry backoff delays to prevent thundering herd.</summary>
+        private const double RetryJitterRange = 0.2;
+        /// <summary>Maximum seconds to wait for the cleanup timer to drain during dispose.</summary>
+        private const int CleanupTimerDrainTimeoutSeconds = 5;
+
         private readonly DbConnection _cn;
         // When false, Dispose/DisposeAsync must NOT close or dispose the connection
         // because it was passed in by the caller who retains ownership.
@@ -42,13 +57,29 @@ namespace nORM.Core
         private readonly ConcurrentDictionary<Type, TableMapping> _m = new();
         /// <summary>Per-context fast-path SQL template cache. Keyed by entity type; stores provider+model-specific SELECT templates.</summary>
         internal readonly ConcurrentDictionary<Type, string> FastPathSqlCache = new();
+        /// <summary>Pre-compiled regex for identifier validation. Matches word characters and spaces only.</summary>
+        private static readonly System.Text.RegularExpressions.Regex s_safeIdentifierRegex =
+            new(@"^[\w\s]+$", System.Text.RegularExpressions.RegexOptions.Compiled);
+        /// <summary>Cached PropertyInfo for DbException.Number (provider-specific); avoids repeated reflection.</summary>
+        private static readonly ConcurrentDictionary<Type, PropertyInfo?> s_numberPropertyCache = new();
+        /// <summary>Cached MethodInfo for NormQueryable.Query&lt;T&gt;() generic method definition; avoids repeated reflection.</summary>
+        private static readonly Lazy<MethodInfo> s_queryMethodInfo = new(() =>
+            typeof(NormQueryable).GetMethods()
+                .SingleOrDefault(m => m.Name == nameof(NormQueryable.Query) && m.IsGenericMethodDefinition)
+                ?? throw new InvalidOperationException(
+                    $"Could not find generic method '{nameof(NormQueryable.Query)}' on type '{nameof(NormQueryable)}'. " +
+                    "The NormQueryable API surface may have changed."));
+        /// <summary>Cached MethodInfo for NavigationPropertyExtensions.EnableLazyLoading&lt;T&gt;(); avoids per-call GetMethod reflection.</summary>
+        private static readonly MethodInfo s_enableLazyLoadingMethod =
+            typeof(NavigationPropertyExtensions).GetMethod(nameof(NavigationPropertyExtensions.EnableLazyLoading))!;
         /// <summary>
-        /// Cached NormQueryProvider for this context. Avoids creating IncludeProcessor,
-        /// QueryExecutor, and BulkCudBuilder (3 heap allocations) on every Query&lt;T&gt;() call.
+        /// Cached NormQueryProvider for this context. Avoids creating NormQueryProvider,
+        /// IncludeProcessor, QueryExecutor, and BulkCudBuilder (4 heap allocations) on every Query&lt;T&gt;() call.
         /// </summary>
         private Query.NormQueryProvider? _cachedQueryProvider;
-        /// <summary>Cached mapping hash for plan cache fingerprinting. Computed lazily once per context.</summary>
-        private int _mappingHashCached;
+        /// <summary>Cached mapping hash for plan cache fingerprinting. Computed lazily once per context.
+        /// Volatile to ensure visibility across threads when read after _mappingHashComputed is true.</summary>
+        private volatile int _mappingHashCached;
         private volatile bool _mappingHashComputed;
         private readonly IExecutionStrategy _executionStrategy;
         private readonly AdaptiveTimeoutManager _timeoutManager;
@@ -112,16 +143,28 @@ namespace nORM.Core
             _cn = cn ?? throw new ArgumentNullException(nameof(cn));
             _ownsConnection = ownsConnection;
             _p = p ?? throw new ArgumentNullException(nameof(p));
+            // IMPORTANT: Options is treated as effectively immutable after construction.
+            // Mutating Options properties after the context is created leads to undefined behavior
+            // because cached plans, prepared commands, and internal state depend on the initial values.
             Options = options ?? new DbContextOptions();
             Options.Validate();
-            if (string.IsNullOrWhiteSpace(Options.TenantColumnName))
-                throw new ArgumentException("TenantColumnName cannot be null or empty");
+            // Only validate TenantColumnName when multi-tenancy is actually configured.
+            // Without a TenantProvider, the column name is unused and may safely be null.
+            if (Options.TenantProvider != null && string.IsNullOrWhiteSpace(Options.TenantColumnName))
+                throw new ArgumentException("TenantColumnName cannot be null or empty when TenantProvider is configured.");
             if (Options.CacheExpiration <= TimeSpan.Zero)
-                throw new ArgumentException("CacheExpiration must be positive");
-            if (Options.CommandInterceptors.Any(i => i == null))
-                throw new ArgumentException("CommandInterceptors cannot contain null entries");
-            if (Options.SaveChangesInterceptors.Any(i => i == null))
-                throw new ArgumentException("SaveChangesInterceptors cannot contain null entries");
+                throw new ArgumentException("CacheExpiration must be positive.");
+            // Avoid LINQ .Any() allocation on the constructor hot path; use index-based loop.
+            for (int i = 0; i < Options.CommandInterceptors.Count; i++)
+            {
+                if (Options.CommandInterceptors[i] == null)
+                    throw new ArgumentException("CommandInterceptors cannot contain null entries.");
+            }
+            for (int i = 0; i < Options.SaveChangesInterceptors.Count; i++)
+            {
+                if (Options.SaveChangesInterceptors[i] == null)
+                    throw new ArgumentException("SaveChangesInterceptors cannot contain null entries.");
+            }
             ChangeTracker = new ChangeTracker(Options);
             _modelBuilder = new ModelBuilder();
             Options.OnModelCreating?.Invoke(_modelBuilder);
@@ -233,8 +276,8 @@ namespace nORM.Core
                     if (!_temporalInitComplete)
                     {
                         // Pass _cn directly to avoid re-entering EnsureConnectionAsync
-                    // from within the bootstrap (which would deadlock on _temporalInitLock).
-                    _temporalInitTask = TemporalManager.InitializeAsync(this, _cn, ct);
+                        // from within the bootstrap (which would deadlock on _temporalInitLock).
+                        _temporalInitTask = TemporalManager.InitializeAsync(this, _cn, ct);
                         await _temporalInitTask.ConfigureAwait(false);
                         _temporalInitComplete = true;
                     }
@@ -266,9 +309,14 @@ namespace nORM.Core
                 }
             }
             // A1/X1: Parity with EnsureConnectionSlowAsync — run temporal bootstrap on
-            // sync entry paths too. Safe in .NET 8 because all async code in
-            // TemporalManager.InitializeAsync uses ConfigureAwait(false), so there is no
-            // captured SynchronizationContext to deadlock against.
+            // sync entry paths too.
+            //
+            // Sync-over-async (.GetAwaiter().GetResult()) is safe here because:
+            // 1. All async code in TemporalManager.InitializeAsync uses ConfigureAwait(false),
+            //    so there is no captured SynchronizationContext to deadlock against.
+            // 2. .NET 8 console/server apps have no SynchronizationContext by default.
+            // 3. ASP.NET Core uses a thread-pool SynchronizationContext that does not marshal
+            //    back to a specific thread, so blocking is safe.
             if (Options.IsTemporalVersioningEnabled && !_temporalInitComplete)
             {
                 _temporalInitLock.Wait();
@@ -316,16 +364,16 @@ namespace nORM.Core
                 //
                 // Skip detailed analysis for extremely large SQL (>100KB) to avoid severe
                 // slowdown from scanning multi-megabyte strings with Contains/IndexOf.
-                if (sql.Length > 102400) // 100KB threshold
+                if (sql.Length > SqlComplexityAnalysisMaxLength)
                 {
-                    baseComplexity = 20 + Math.Min(30, sql.Length / 10000);
+                    baseComplexity = LargeSqlBaselineComplexity + Math.Min(MaxComplexityScore - LargeSqlBaselineComplexity, sql.Length / LargeSqlLengthComplexityDivisor);
                     Options.Logger?.LogDebug(
                         "Skipping detailed complexity analysis for large SQL ({Length} chars). Using length-based estimate: {Complexity}",
                         sql.Length, baseComplexity);
                 }
                 else
                 {
-                    baseComplexity = 1 + (sql.Length / 100);
+                    baseComplexity = 1 + (sql.Length / SqlLengthComplexityDivisor);
 
                     int joinCount = CountOccurrences(sql, "JOIN", StringComparison.OrdinalIgnoreCase);
                     if (joinCount > 0) baseComplexity += 2 * joinCount;
@@ -350,7 +398,7 @@ namespace nORM.Core
                     if (sql.Contains("WITH", StringComparison.OrdinalIgnoreCase) && sql.Contains("AS(", StringComparison.OrdinalIgnoreCase)) baseComplexity += 2;
                 }
 
-                baseComplexity = Math.Min(baseComplexity, 50);
+                baseComplexity = Math.Min(baseComplexity, MaxComplexityScore);
             }
             else
             {
@@ -418,12 +466,6 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Creates a <see cref="DbCommand"/> for the current connection and automatically
-        /// binds the active transaction so that every command participates in the ongoing
-        /// unit-of-work. Prefer this over <c>Connection.CreateCommand()</c> inside nORM
-        /// code so that transaction binding is never accidentally omitted.
-        /// </summary>
-        /// <summary>
         /// Returns a cached NormQueryProvider for this context, avoiding 4 heap allocations per query.
         /// </summary>
         internal Query.NormQueryProvider GetQueryProvider()
@@ -431,6 +473,12 @@ namespace nORM.Core
             return _cachedQueryProvider ??= new Query.NormQueryProvider(this);
         }
 
+        /// <summary>
+        /// Creates a <see cref="DbCommand"/> for the current connection and automatically
+        /// binds the active transaction so that every command participates in the ongoing
+        /// unit-of-work. Prefer this over <c>Connection.CreateCommand()</c> inside nORM
+        /// code so that transaction binding is never accidentally omitted.
+        /// </summary>
         internal DbCommand CreateCommand()
         {
             var cmd = Connection.CreateCommand();
@@ -505,10 +553,12 @@ namespace nORM.Core
                 // breaks proper async cancellation patterns.
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
             {
                 // Log exceptions instead of silently swallowing them; silent failures
                 // make debugging connection issues nearly impossible.
+                // Fatal exceptions (OutOfMemoryException, StackOverflowException) are
+                // excluded so they propagate and terminate the process as intended.
                 Options.Logger?.LogWarning(ex, "Health check failed: {Message}", ex.Message);
                 return false;
             }
@@ -679,8 +729,9 @@ namespace nORM.Core
                 return false;
 
             // Inner content must be strictly word characters and spaces only
-            // (no brackets, quotes, semicolons, hyphens, or other special chars)
-            return System.Text.RegularExpressions.Regex.IsMatch(inner, @"^[\w\s]+$");
+            // (no brackets, quotes, semicolons, hyphens, or other special chars).
+            // Uses pre-compiled static regex to avoid per-call regex compilation overhead.
+            return s_safeIdentifierRegex.IsMatch(inner);
         }
 
         /// <summary>
@@ -723,9 +774,7 @@ namespace nORM.Core
             // generation happens only once per table, so the overhead is minimal.
             var entityType = Task.Run(async () => await lazyTask.Value.ConfigureAwait(false)).GetAwaiter().GetResult();
 
-            var method = typeof(NormQueryable).GetMethods()
-                .Single(m => m.Name == nameof(NormQueryable.Query) && m.IsGenericMethodDefinition);
-            var generic = method.MakeGenericMethod(entityType);
+            var generic = s_queryMethodInfo.Value.MakeGenericMethod(entityType);
             return (IQueryable)generic.Invoke(null, new object[] { this })!;
         }
 
@@ -807,7 +856,8 @@ namespace nORM.Core
 
             // Check if entity is already tracked before returning entry.
             // Auto-attaching untracked entities is dangerous — it silently modifies tracking state.
-            var existingEntry = ChangeTracker.Entries.FirstOrDefault(e => ReferenceEquals(e.Entity, entity));
+            // Uses O(1) identity-map lookup via _entriesByReference dictionary.
+            var existingEntry = ChangeTracker.GetEntryOrDefault(entity);
             if (existingEntry == null)
             {
                 throw new InvalidOperationException(
@@ -815,9 +865,15 @@ namespace nORM.Core
                     "Use context.Attach() to explicitly attach the entity before calling Entry().");
             }
 
-            // Ensure lazy loading is enabled for the tracked entity
-            var method = typeof(NavigationPropertyExtensions).GetMethod(nameof(NavigationPropertyExtensions.EnableLazyLoading))!;
-            method.MakeGenericMethod(entity.GetType()).Invoke(null, new object[] { entity, this });
+            // Ensure lazy loading is enabled for the tracked entity (cached MethodInfo avoids repeated reflection)
+            try
+            {
+                s_enableLazyLoadingMethod.MakeGenericMethod(entity.GetType()).Invoke(null, new object[] { entity, this });
+            }
+            catch (System.Reflection.TargetInvocationException tie) when (tie.InnerException != null)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(tie.InnerException).Throw();
+            }
 
             return existingEntry;
         }
@@ -838,7 +894,10 @@ namespace nORM.Core
                 ShouldRetry = ex =>
                 {
                     if (ex is DbException dbEx)
-                        return (int?)dbEx.GetType().GetProperty("Number")?.GetValue(dbEx) == 1205;
+                    {
+                        var prop = s_numberPropertyCache.GetOrAdd(dbEx.GetType(), t => t.GetProperty("Number"));
+                        return (int?)prop?.GetValue(dbEx) == 1205;
+                    }
                     return false;
                 }
             };
@@ -925,7 +984,7 @@ namespace nORM.Core
                     // Only retry pre-commit transient failures — if commit was attempted, the outcome
                     // is unknown and retrying could produce duplicate rows.
                     var backoffMs = baseDelay.TotalMilliseconds * Math.Pow(2, attempt);
-                    var jitter = 1 + (rand.NextDouble() * 0.4 - 0.2); // ±20%
+                    var jitter = 1 + (rand.NextDouble() * 2 * RetryJitterRange - RetryJitterRange);
                     var delay = TimeSpan.FromMilliseconds(backoffMs * jitter);
                     await Task.Delay(delay, ct).ConfigureAwait(false);
                 }
@@ -1026,7 +1085,13 @@ namespace nORM.Core
                     await using var cmd = commandScope.CreateCommand();
                     var sql = new StringBuilder(templateLength * batchSize);
 
-                    // For Deleted: delete owned collections and M2M join rows BEFORE the owner is deleted
+                    // Owned/M2M timing asymmetry:
+                    // - DELETE: owned collections and M2M join rows must be removed BEFORE the owner
+                    //   entity is deleted, because the child rows hold FK references to the owner.
+                    //   Deleting the owner first would violate FK constraints.
+                    // - INSERT/UPDATE: owned collections and M2M join rows are saved AFTER the owner
+                    //   entity is persisted, because the child rows need the owner's (possibly
+                    //   DB-generated) primary key value to populate their FK columns.
                     if (state == EntityState.Deleted)
                     {
                         foreach (var entry in entries)
@@ -1043,7 +1108,8 @@ namespace nORM.Core
 
                     for (int start = 0; start < entries.Count; start += batchSize)
                     {
-                        var batch = entries.Skip(start).Take(Math.Min(batchSize, entries.Count - start)).ToList();
+                        var batchCount = Math.Min(batchSize, entries.Count - start);
+                        var batch = entries.GetRange(start, batchCount);
                         // Clear for reuse
                         sql.Clear();
                         cmd.Parameters.Clear();
@@ -1431,13 +1497,24 @@ namespace nORM.Core
                 }
                 if (ownerByPk.Count == 0) continue;
                 // SELECT owned cols + fk_col FROM child_table WHERE fk_col IN (@p0, @p1, ...)
-                var colSql = string.Join(", ", ownedMap.Columns.Select(c => c.EscCol));
-                if (colSql.Length > 0) colSql += ", ";
-                colSql += ownedMap.EscForeignKeyColumn;
-
                 var pks = ownerByPk.Keys.ToArray();
-                var inParams = string.Join(", ", pks.Select((_, i) => _p.ParamPrefix + "lpk" + i));
-                var querySql = $"SELECT {colSql} FROM {ownedMap.EscTable} WHERE {ownedMap.EscForeignKeyColumn} IN ({inParams})";
+                var sqlBuilder = new StringBuilder();
+                sqlBuilder.Append("SELECT ");
+                for (int ci = 0; ci < ownedMap.Columns.Length; ci++)
+                {
+                    if (ci > 0) sqlBuilder.Append(", ");
+                    sqlBuilder.Append(ownedMap.Columns[ci].EscCol);
+                }
+                if (ownedMap.Columns.Length > 0) sqlBuilder.Append(", ");
+                sqlBuilder.Append(ownedMap.EscForeignKeyColumn);
+                sqlBuilder.Append(" FROM ").Append(ownedMap.EscTable)
+                          .Append(" WHERE ").Append(ownedMap.EscForeignKeyColumn).Append(" IN (");
+                for (int pi = 0; pi < pks.Length; pi++)
+                {
+                    if (pi > 0) sqlBuilder.Append(", ");
+                    sqlBuilder.Append(_p.ParamPrefix).Append("lpk").Append(pi);
+                }
+                sqlBuilder.Append(')');
 
                 // X1: Scope SELECT to current tenant when multi-tenancy is configured
                 // on the owned child table, preventing cross-tenant data leakage.
@@ -1445,11 +1522,13 @@ namespace nORM.Core
                 if (Options.TenantProvider != null && Options.TenantColumnName != null)
                     ownedTenantColLoad = ownedMap.Columns.FirstOrDefault(c => c.PropName == Options.TenantColumnName);
                 if (ownedTenantColLoad != null)
-                    querySql += $" AND {ownedTenantColLoad.EscCol} = {_p.ParamPrefix}tenantId";
+                    sqlBuilder.Append(" AND ").Append(ownedTenantColLoad.EscCol)
+                              .Append(" = ").Append(_p.ParamPrefix).Append("tenantId");
+                var querySql = sqlBuilder.ToString();
 
                 await using var cmd = CreateCommand();
                 cmd.CommandText = querySql;
-                cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+                cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
                 for (int i = 0; i < pks.Length; i++)
                 {
                     var p = cmd.CreateParameter();
@@ -1493,12 +1572,16 @@ namespace nORM.Core
                         col.Setter(item, converted);
                     }
 
-                    // Read FK and assign to owner
+                    // Read FK and assign to owner.
+                    // Type coercion fallback: ADO.NET providers may return the FK value in a different
+                    // numeric type than the CLR PK property (e.g. SQLite returns Int64 for all integers
+                    // while the PK property may be Int32). The initial TryGetValue uses the raw provider
+                    // type for a zero-allocation fast path; on miss, ConvertSimple coerces to the PK
+                    // property type so the dictionary lookup succeeds across type-width mismatches.
                     if (reader.IsDBNull(fkOrdinal)) continue;
                     var fkVal = reader.GetValue(fkOrdinal);
                     if (!ownerByPk.TryGetValue(fkVal, out var ownerEntity))
                     {
-                        // Try type coercion (e.g. int64 vs int32)
                         fkVal = ConvertSimple(fkVal, pkCol.Prop.PropertyType)!;
                         if (fkVal == null || !ownerByPk.TryGetValue(fkVal, out ownerEntity)) continue;
                     }
@@ -1517,7 +1600,21 @@ namespace nORM.Core
             var underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
             if (raw.GetType() == underlying) return raw;
             try { return Convert.ChangeType(raw, underlying); }
-            catch { return raw; }
+            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException) { return raw; }
+        }
+
+        /// <summary>
+        /// Returns true if any key column in the array has <c>IsDbGenerated == true</c>.
+        /// Uses a for-loop to avoid LINQ enumerator allocation on the insert hot path.
+        /// </summary>
+        internal static bool HasDbGeneratedKey(Column[] keyColumns)
+        {
+            for (int i = 0; i < keyColumns.Length; i++)
+            {
+                if (keyColumns[i].IsDbGenerated)
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -1544,7 +1641,7 @@ namespace nORM.Core
             if (batch.Count > 1)
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
-            if (map.KeyColumns.Any(k => k.IsDbGenerated))
+            if (HasDbGeneratedKey(map.KeyColumns))
             {
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, ct).ConfigureAwait(false);
                 int i = 0;
@@ -1571,11 +1668,15 @@ namespace nORM.Core
                 // If DB returned fewer keys than entities, identity map is corrupt.
                 // Throwing here triggers the SaveChanges catch block → rollback.
                 if (keysAssigned != batch.Count)
+                {
+                    var identitySql = _p.GetIdentityRetrievalString(map);
                     throw new InvalidOperationException(
                         $"Generated key mismatch: expected {batch.Count} keys for inserted " +
                         $"'{map.Type.Name}' entities but only {keysAssigned} were assigned. " +
+                        $"Identity retrieval SQL: '{identitySql}'. " +
                         "Possible causes: trigger interference, driver quirk, or partial batch execution. " +
                         "The transaction will be rolled back.");
+                }
 
                 return reader.RecordsAffected;
             }
@@ -1761,6 +1862,16 @@ namespace nORM.Core
         /// </summary>
         private async Task VerifyUpdateOccAsync(DbCommand batchCmd, TableMapping map, List<EntityEntry> batch, CancellationToken ct)
         {
+            // Guard: each entity consumes (KeyColumns.Length + 1) parameters for the OCC verify
+            // query, plus 1 optional tenant parameter. Ensure we don't exceed the provider's limit.
+            var paramsPerEntity = map.KeyColumns.Length + 1; // PK columns + timestamp token
+            var totalParams = paramsPerEntity * batch.Count
+                + (Options.TenantProvider != null && map.TenantColumn != null ? 1 : 0);
+            if (_p.MaxParameters != int.MaxValue && totalParams > _p.MaxParameters)
+                throw new InvalidOperationException(
+                    $"OCC verification for '{map.Type.Name}' requires {totalParams} parameters " +
+                    $"but the provider allows at most {_p.MaxParameters}. Reduce batch size.");
+
             await using var cmd = _cn.CreateCommand();
             if (batchCmd.Transaction != null)
                 cmd.Transaction = batchCmd.Transaction;
@@ -1803,7 +1914,9 @@ namespace nORM.Core
 
             cmd.CommandText = sb.ToString();
 
-            var matchCount = Convert.ToInt32(await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false));
+            // Guard against null scalar result — Convert.ToInt32(null) throws ArgumentNullException
+            var scalarResult = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            var matchCount = scalarResult == null || scalarResult is DBNull ? 0 : Convert.ToInt32(scalarResult);
             if (matchCount != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
         }
@@ -2086,11 +2199,11 @@ namespace nORM.Core
             };
             // Simple INSERT/UPDATE/DELETE have no JOINs/subqueries — use base timeout
             // to avoid SQL string scanning in GetAdaptiveTimeout.
-            cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+            cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
             var originalToken = ChangeTracker.GetEntryOrDefault(entity)?.OriginalToken;
             AddParametersOptimized(cmd, map, entity, operation, originalToken);
 
-            if (operation == WriteOperation.Insert && map.KeyColumns.Any(k => k.IsDbGenerated))
+            if (operation == WriteOperation.Insert && HasDbGeneratedKey(map.KeyColumns))
             {
                 var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
                 if (newId != null && newId != DBNull.Value)
@@ -2137,6 +2250,11 @@ namespace nORM.Core
                     {
                         // Use the original snapshot token (not the current possibly-mutated property value)
                         // to match the concurrency predicate parity of the batched SaveChanges path.
+                        // Fallback to current property value when originalToken is null — this happens
+                        // for entities that were attached without going through full snapshot tracking
+                        // (e.g. manual Attach() or first-time tracked entities where no snapshot was
+                        // captured yet). In that case the current property value is the best available
+                        // token for the WHERE predicate.
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue);
                     }
@@ -2151,7 +2269,8 @@ namespace nORM.Core
                     }
                     if (map.TimestampColumn != null)
                     {
-                        // Use the original snapshot token.
+                        // Fallback: use current property value when originalToken is null (same
+                        // rationale as the Update case above — entities attached without snapshot).
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue);
                     }
@@ -2178,9 +2297,13 @@ namespace nORM.Core
                 if (inProgress.Contains(node))
                 {
                     var cycleStart = path.IndexOf(node);
-                    var cyclePath = path.Skip(cycleStart).Append(node);
+                    var cyclePath = path.Skip(cycleStart).Append(node).ToList();
+                    const int maxCycleDisplay = 5;
+                    var displayNames = cyclePath.Count <= maxCycleDisplay + 1
+                        ? cyclePath.Select(m => m.Type.Name)
+                        : cyclePath.Take(maxCycleDisplay).Select(m => m.Type.Name).Append("...");
                     throw new NormConfigurationException(
-                        $"Circular FK dependency detected: {string.Join(" -> ", cyclePath.Select(m => m.Type.Name))}");
+                        $"Circular FK dependency detected: {string.Join(" -> ", displayNames)}");
                 }
                 if (!visited.Add(node)) return;
                 inProgress.Add(node);
@@ -2218,7 +2341,7 @@ namespace nORM.Core
         {
             // INS-1: Only append identity retrieval when at least one key column is DB-generated.
             // For natural-key entities the fragment is wasteful and potentially wrong across providers.
-            var identityFragment = map.KeyColumns.Any(k => k.IsDbGenerated)
+            var identityFragment = HasDbGeneratedKey(map.KeyColumns)
                 ? _p.GetIdentityRetrievalString(map)
                 : string.Empty;
             var cols = map.InsertColumns;
@@ -2261,6 +2384,10 @@ namespace nORM.Core
             if (map.TimestampColumn != null)
             {
                 var tc = map.TimestampColumn;
+                // Null-safe equality: handles the case where the concurrency token is a nullable column.
+                // Optimization opportunity: when the column is known non-nullable at mapping time,
+                // the OR branch is unreachable and could be elided to produce simpler SQL. Currently
+                // we always emit the full null-safe form for correctness across all column definitions.
                 whereParts.Add($"({tc.EscCol}={_p.ParamPrefix}p{idx} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}p{idx} IS NULL))");
                 idx++;
             }
@@ -2348,6 +2475,10 @@ namespace nORM.Core
             return index;
         }
 
+        // TODO: Consider replacing the tuple array with parallel name[] and value[] arrays
+        // to reduce per-element overhead. ValueTuple<string, object> boxes the object on every
+        // iteration. Two flat arrays (string[] names, object[] values) would avoid the tuple
+        // allocation and improve cache locality for the SetParametersFast hot path.
         private IReadOnlyDictionary<string, object> AddParametersFast(DbCommand cmd, object[] parameters)
         {
             var span = new (string name, object value)[parameters.Length];
@@ -2559,18 +2690,23 @@ namespace nORM.Core
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
                 NormValidator.ValidateRawSql(sql, paramDict);
 
-                // Use MaterializerFactory for fast compiled materialization instead of slow reflection.
-                // MaterializerFactory generates IL.Emit or Expression-based materializers that are
-                // significantly faster than reflection for large result sets.
+                // Materialization uses mapping-driven property setters (compiled delegates from
+                // TableMapping.Columns[].Setter) rather than raw PropertyInfo.SetValue reflection.
+                // This is faster than pure reflection but does not use the full MaterializerFactory
+                // pipeline (which is reserved for LINQ query execution via NormQueryProvider).
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
                 
                 // Get or create mapping for type T - this supports both mapped entities and ad-hoc types
                 var mapping = ctx.GetMapping(typeof(T));
 
-                // Build a name→ordinal map from the actual reader schema so columns are always
+                // Build a name->ordinal map from the actual reader schema so columns are always
                 // read by name, not by position. Reading by position would silently populate the
                 // wrong properties when raw SQL returns columns in a different order than the mapping.
+                //
+                // OrdinalIgnoreCase lookup: column names from different providers may differ in casing
+                // (e.g. PostgreSQL lowercases unquoted identifiers, SQL Server preserves original case).
+                // Case-insensitive comparison ensures the mapping resolves regardless of provider casing.
                 var fieldCount = reader.FieldCount;
                 var nameToOrdinal = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
                 for (int i = 0; i < fieldCount; i++)
@@ -2660,6 +2796,9 @@ namespace nORM.Core
                 if (raw is string s) return TimeSpan.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
             }
 
+            // Many database providers (SQLite, MySQL, Postgres) store CHAR(1) columns as
+            // single-character strings. Convert.ChangeType does not handle string→char,
+            // so we extract the first character explicitly when the CLR property is char.
             if (propType == typeof(char) && raw is string str && str.Length > 0)
                 return str[0];
 
@@ -2872,7 +3011,7 @@ namespace nORM.Core
                     if (!IsSafeIdentifier(op.Name))
                         throw new NormUsageException($"Invalid output parameter name: '{op.Name}'. " +
                             "Parameter names must contain only alphanumeric characters, underscores, and periods.");
-                    var pName = _p.ParamPrefix + op.Name;
+                    var pName = ctx._p.ParamPrefix + op.Name;
                     var p = cmd.CreateParameter();
                     p.ParameterName = pName;
                     p.DbType = op.DbType;
@@ -2945,7 +3084,10 @@ namespace nORM.Core
                 var coerced = Convert.ChangeType(b, a.GetType());
                 return Equals(a, coerced);
             }
-            catch { return false; }
+            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
+            {
+                return false;
+            }
         }
 
         /// <summary>
@@ -3078,7 +3220,7 @@ namespace nORM.Core
                     cmd.Transaction = transaction;
 
                 cmd.CommandText = _p.BuildInsert(mapping, hydrateGeneratedKeys);
-                cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+                cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
 
                 foreach (var col in mapping.InsertColumns)
                 {
@@ -3137,14 +3279,14 @@ namespace nORM.Core
             {
                 // Use Dispose(WaitHandle) to ensure timer callbacks complete before proceeding.
                 // Prevents ObjectDisposedException if a callback fires concurrently with Dispose.
-                if (_cleanupTimer != null)
                 {
                     var waitHandle = new ManualResetEvent(false);
                     _cleanupTimer.Dispose(waitHandle);
-                    waitHandle.WaitOne();
+                    waitHandle.WaitOne(TimeSpan.FromSeconds(CleanupTimerDrainTimeoutSeconds));
                     waitHandle.Dispose();
                 }
-                _providerInitLock?.Dispose();
+                _providerInitLock.Dispose();
+                _temporalInitLock.Dispose();
                 DisposePreparedInsertCache();
 
                 // Copy disposables to a local list inside the lock, then dispose outside the lock.
@@ -3165,16 +3307,20 @@ namespace nORM.Core
                     }
                 }
 
-                // Dispose items outside the lock to prevent deadlocks
+                // Dispose items outside the lock to prevent deadlocks.
+                // Exceptions are logged (not swallowed silently) so that resource-leak
+                // failures surface in diagnostics, but disposal continues for remaining items.
                 foreach (var d in toDispose)
                 {
                     try
                     {
                         d.Dispose();
                     }
-                    catch
+                    catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
                     {
-                        // Suppress exceptions during disposal
+                        Options.Logger?.LogDebug(ex,
+                            "Exception during disposal of tracked resource {ResourceType}.",
+                            d.GetType().Name);
                     }
                 }
 
@@ -3273,18 +3419,21 @@ namespace nORM.Core
             {
                 // Use WaitHandle pattern to safely stop the timer, preventing a race condition
                 // where the timer callback fires concurrently with disposal.
-                if (_cleanupTimer != null)
                 {
                     var waitHandle = new ManualResetEvent(false);
                     _cleanupTimer.Dispose(waitHandle);
-                    // Use Task.Run to avoid blocking the async context
-                    await Task.Run(() => waitHandle.WaitOne()).ConfigureAwait(false);
+                    // Use Task.Run with timeout to avoid blocking the async context indefinitely
+                    // if a timer callback deadlocks or takes too long.
+                    await Task.Run(() => waitHandle.WaitOne(TimeSpan.FromSeconds(CleanupTimerDrainTimeoutSeconds))).ConfigureAwait(false);
                     waitHandle.Dispose();
                 }
-                _providerInitLock?.Dispose();
+                _providerInitLock.Dispose();
+                _temporalInitLock.Dispose();
                 await DisposePreparedInsertCacheAsync().ConfigureAwait(false);
                 await CleanupDisposablesAsync().ConfigureAwait(false);
                 // Only dispose the connection when this context owns it.
+                // _cn is always non-null (set in constructor with null-guard), so the null
+                // check is defensive only against theoretical subclass tampering.
                 if (_ownsConnection && _cn != null)
                     await _cn.DisposeAsync().ConfigureAwait(false);
                 _disposed = true;
@@ -3366,7 +3515,7 @@ namespace nORM.Core
             _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
             _context = context ?? throw new ArgumentNullException(nameof(context));
             BoundTransaction = boundTransaction;
-            _hydrateGeneratedKeys = hydrateGeneratedKeys && _mapping.KeyColumns.Any(k => k.IsDbGenerated);
+            _hydrateGeneratedKeys = hydrateGeneratedKeys && DbContext.HasDbGeneratedKey(_mapping.KeyColumns);
 
             var insertCols = _mapping.InsertColumns;
             _bindings = new (DbParameter, Mapping.Column)[insertCols.Length];
@@ -3376,6 +3525,10 @@ namespace nORM.Core
             {
                 var col = insertCols[i];
                 var paramName = prefix + col.PropName;
+                if (!_command.Parameters.Contains(paramName))
+                    throw new InvalidOperationException(
+                        $"Prepared INSERT command is missing expected parameter '{paramName}' " +
+                        $"for column '{col.EscCol}' on table '{mapping.TableName}'.");
                 _bindings[i] = (_command.Parameters[paramName], col);
             }
         }

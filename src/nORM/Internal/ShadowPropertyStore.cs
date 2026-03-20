@@ -18,6 +18,8 @@ namespace nORM.Internal
         /// <param name="value">The value to store.</param>
         public static void Set(object entity, string name, object? value)
         {
+            if (entity is null) throw new ArgumentNullException(nameof(entity));
+            if (string.IsNullOrEmpty(name)) throw new ArgumentException("Shadow property name must not be null or empty.", nameof(name));
             var dict = _values.GetOrCreateValue(entity);
             dict[name] = value;
         }
@@ -30,6 +32,8 @@ namespace nORM.Internal
         /// <returns>The stored value, or <c>null</c> if no value has been set.</returns>
         public static object? Get(object entity, string name)
         {
+            if (entity is null) throw new ArgumentNullException(nameof(entity));
+            if (string.IsNullOrEmpty(name)) throw new ArgumentException("Shadow property name must not be null or empty.", nameof(name));
             return _values.TryGetValue(entity, out var dict) && dict.TryGetValue(name, out var val) ? val : null;
         }
     }

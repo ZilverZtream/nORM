@@ -35,12 +35,8 @@ namespace nORM.Core
         /// Commits the underlying database transaction and disposes this wrapper
         /// instance. After calling this method the transaction can no longer be used
         /// and the context's current transaction reference is cleared.
-        /// </summary>
-        /// <summary>
-        /// T-1: try/finally guarantees Dispose() (and therefore ClearTransaction) always
-        /// runs even when Commit() throws. Without the finally block, an exception during
-        /// commit leaves CurrentTransaction non-null and poisons the context for any
-        /// subsequent BeginTransactionAsync call.
+        /// Uses try/finally so that Dispose (and therefore ClearTransaction) always
+        /// runs even when Commit throws, preventing a poisoned CurrentTransaction reference.
         /// </summary>
         public void Commit()
         {

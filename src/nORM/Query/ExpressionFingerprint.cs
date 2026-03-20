@@ -150,7 +150,7 @@ namespace nORM.Query
                         // 1 = null, 0 = non-null. Different nullability → different plan shape.
                         AppendInt(capturedValue is null ? 1 : 0);
                     }
-                    catch
+                    catch (Exception ex) when (ex is MemberAccessException or TargetInvocationException or InvalidOperationException or NotSupportedException)
                     {
                         // If we can't read the value, conservatively treat it as potentially null.
                         AppendInt(1);
@@ -295,7 +295,7 @@ namespace nORM.Query
                 // PERFORMANCE OPTIMIZATION 11: Use larger stack buffer to reduce encoding calls
                 // Most type names fit in 512 bytes, avoiding heap allocation
                 const int MaxStackBufferSize = 512;
-                int maxByteCount = value.Length * 3; // UTF-8 worst case is 3 bytes per char for BMP
+                int maxByteCount = value.Length * 3; // UTF-8 worst case is 3 bytes per BMP char (sufficient for .NET type names)
 
                 if (maxByteCount <= MaxStackBufferSize)
                 {

@@ -39,8 +39,10 @@ namespace nORM.Scaffolding
             if (provider is null) throw new ArgumentNullException(nameof(provider));
             if (outputDirectory is null) throw new ArgumentNullException(nameof(outputDirectory));
             if (namespaceName is null) throw new ArgumentNullException(nameof(namespaceName));
+            if (string.IsNullOrWhiteSpace(contextName)) throw new ArgumentException("Value cannot be null or whitespace.", nameof(contextName));
 
-            if (connection.State != ConnectionState.Open)
+            var connectionWasOpen = connection.State == ConnectionState.Open;
+            if (!connectionWasOpen)
                 await connection.OpenAsync().ConfigureAwait(false);
 
             try
@@ -72,7 +74,9 @@ namespace nORM.Scaffolding
             }
             finally
             {
-                await connection.CloseAsync().ConfigureAwait(false);
+                // Only close the connection if we opened it
+                if (!connectionWasOpen)
+                    await connection.CloseAsync().ConfigureAwait(false);
             }
         }
 
@@ -99,10 +103,11 @@ namespace nORM.Scaffolding
                 sb.AppendLine();
                 sb.AppendLine($"namespace {namespaceName};");
                 sb.AppendLine();
-                // Class-level [Table] with schema (if available)
+                // Class-level [Table] with schema (if available); escape quotes to prevent code injection
+                var safeTableName = tableName.Replace("\\", "\\\\").Replace("\"", "\\\"");
                 var tableAttr = schemaName is not null
-                    ? $"[Table(\"{tableName}\", Schema = \"{schemaName}\")]"
-                    : $"[Table(\"{tableName}\")]";
+                    ? $"[Table(\"{safeTableName}\", Schema = \"{schemaName.Replace("\\", "\\\\").Replace("\"", "\\\"")}\")]"
+                    : $"[Table(\"{safeTableName}\")]";
                 sb.AppendLine(tableAttr);
                 sb.AppendLine($"public class {EscapeCSharpIdentifier(entityName)}");
                 sb.AppendLine("{");
@@ -142,7 +147,7 @@ namespace nORM.Scaffolding
                         sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
                     if (maxLength.HasValue)
                         sb.AppendLine($"    [MaxLength({maxLength.Value})]");
-                    sb.AppendLine($"    [Column(\"{colName}\")]");
+                    sb.AppendLine($"    [Column(\"{colName.Replace("\\", "\\\\").Replace("\"", "\\\"")}\")]");
                     sb.AppendLine($"    public {typeName} {propName} {{ get; set; }}");
                     sb.AppendLine();
                 }
@@ -214,12 +219,7 @@ namespace nORM.Scaffolding
             // Add '?' if the DB allows nulls (for both value types and reference types)
             if (allowNull)
             {
-                if (name.EndsWith("[]", StringComparison.Ordinal))
-                    name += "?";
-                else if (type.IsValueType || type == typeof(string))
-                    name += "?";
-                else
-                    name += "?";
+                name += "?";
             }
 
             return name;
@@ -253,42 +253,10 @@ namespace nORM.Scaffolding
         }
 
         /// <summary>
-        /// Combines schema and table names into a single unescaped string.
-        /// </summary>
-        private static string EscapeQualified(string schema, string table) => $"{schema}.{table}";
-
-        /// <summary>
-        /// Returns a schema-qualified table name if a schema is provided; otherwise returns the
-        /// table name without modification.
-        /// </summary>
-        private static string EscapeQualifiedIfNeeded(string? schema, string table) =>
-            string.IsNullOrEmpty(schema) ? table : $"{schema}.{table}";
-
-        /// <summary>
         /// Escapes schema and table identifiers using the given provider's rules.
         /// </summary>
         private static string EscapeQualified(DatabaseProvider provider, string? schema, string table)
             => string.IsNullOrEmpty(schema) ? provider.Escape(table) : $"{provider.Escape(schema!)}.{provider.Escape(table)}";
-
-        /// <summary>
-        /// Escapes a potentially schema-qualified identifier by quoting each part according to
-        /// the database connection type.
-        /// </summary>
-        private static string EscapeIdentifier(DbConnection connection, string identifier)
-        {
-            // Support schema-qualified names by escaping each part separately.
-            var parts = identifier.Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries);
-            var name = connection.GetType().Name.ToLowerInvariant();
-            string Quote(string id) => name switch
-            {
-                var n when n.Contains("sqlconnection") => $"[{id}]",
-                var n when n.Contains("sqlite") => $"\"{id}\"",
-                var n when n.Contains("npgsql") => $"\"{id}\"",
-                var n when n.Contains("mysql") => $"`{id}`",
-                _ => id
-            };
-            return string.Join(".", parts.Select(Quote));
-        }
 
         /// <summary>
         /// Escapes an identifier so it is valid in generated C# code, prefixing with '@' if it is
@@ -302,25 +270,6 @@ namespace nORM.Scaffolding
                            || !(char.IsLetter(identifier[0]) || identifier[0] == '_')
                            || identifier.Any(ch => !(char.IsLetterOrDigit(ch) || ch == '_'));
             return needsAt ? "@" + identifier : identifier;
-        }
-
-        /// <summary>
-        /// Extracts the unqualified name component from a schema-qualified identifier.
-        /// </summary>
-        private static string GetUnqualifiedName(string identifier)
-        {
-            var idx = identifier.LastIndexOf('.');
-            return idx >= 0 ? identifier[(idx + 1)..] : identifier;
-        }
-
-        /// <summary>
-        /// Retrieves the schema portion of a qualified identifier, or <c>null</c> if none exists.
-        /// </summary>
-        private static string? GetSchemaNameOrNull(string identifier)
-        {
-            var idx = identifier.LastIndexOf('.');
-            if (idx <= 0) return null;
-            return identifier[..idx];
         }
 
         private static readonly HashSet<string> _csharpKeywords = new(StringComparer.Ordinal)

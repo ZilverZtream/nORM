@@ -18,6 +18,6 @@ namespace nORM.Mapping
         /// </summary>
         /// <param name="value">Value stored in the discriminator column for this type.</param>
         public DiscriminatorValueAttribute(object value)
-            => Value = value;
+            => Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 }

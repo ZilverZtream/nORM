@@ -245,7 +245,11 @@ namespace nORM.Mapping
             il.Emit(OpCodes.Brtrue_S, hasValue);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Castclass, owner.DeclaringType!);
-            il.Emit(OpCodes.Newobj, owner.PropertyType.GetConstructor(Type.EmptyTypes)!);
+            var ownedCtor = owner.PropertyType.GetConstructor(Type.EmptyTypes)
+                ?? throw new InvalidOperationException(
+                    $"Owned type '{owner.PropertyType.Name}' must have a public parameterless constructor " +
+                    "to be used with owned property setter generation.");
+            il.Emit(OpCodes.Newobj, ownedCtor);
             il.Emit(OpCodes.Dup);
             il.Emit(OpCodes.Stloc, ownedVar);
             il.Emit(OpCodes.Callvirt, owner.GetSetMethod()!);

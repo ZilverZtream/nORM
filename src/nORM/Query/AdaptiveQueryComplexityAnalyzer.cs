@@ -17,6 +17,27 @@ namespace nORM.Query
         private readonly ConcurrentDictionary<ExpressionFingerprint, QueryComplexityInfo> _analysisCache = new();
         private const int DefaultEnumerationLimit = 2000;
         private const int MaxCacheSize = 10000;
+
+        // Memory-factor scaling constants used by CalculateAdaptiveLimits.
+        private const long BytesPerGigabyte = 1024L * 1024L * 1024L;
+        private const int MinMemoryFactorGb = 1;
+        private const int MaxMemoryFactorGb = 16;
+        private const int BaseJoinDepthPerGb = 10;
+        private const int BaseWhereConditionsPerGb = 50;
+        private const int BaseParameterCountPerGb = 2000;
+        private const int BaseMaxEstimatedCostPerGb = 10000;
+        private const int BaseHighCostThresholdPerGb = 5000;
+
+        // Cost weights for query complexity estimation.
+        private const int BaseCost = 100;
+        private const int JoinCostMultiplier = 500;
+        private const int WhereCostMultiplier = 50;
+        private const int CartesianPenalty = 5000;
+        private const int NestingCostMultiplier = 200;
+        private const int OrderByCost = 100;
+        private const int SelectManyCostMultiplier = 500;
+        private const int NestedSelectDepthCartesianThreshold = 5;
+        private const int JoinCostPerOccurrence = 1000;
         public AdaptiveQueryComplexityAnalyzer(IMemoryMonitor memoryMonitor)
         {
             _memoryMonitor = memoryMonitor;
@@ -124,15 +145,15 @@ namespace nORM.Query
         }
         private static AdaptiveLimits CalculateAdaptiveLimits(long availableMemory, DbContextOptions options)
         {
-            // Scale limits based on available memory in GB, clamped between 1 and 16
-            var memoryFactor = Math.Clamp((int)(availableMemory / (1024L * 1024L * 1024L)), 1, 16);
+            // Scale limits based on available memory in GB, clamped between MinMemoryFactorGb and MaxMemoryFactorGb
+            var memoryFactor = Math.Clamp((int)(availableMemory / BytesPerGigabyte), MinMemoryFactorGb, MaxMemoryFactorGb);
             return new AdaptiveLimits
             {
-                MaxJoinDepth = 10 * memoryFactor,
-                MaxWhereConditions = 50 * memoryFactor,
-                MaxParameterCount = 2000 * memoryFactor,
-                MaxEstimatedCost = 10000 * memoryFactor,
-                HighCostThreshold = 5000 * memoryFactor
+                MaxJoinDepth = BaseJoinDepthPerGb * memoryFactor,
+                MaxWhereConditions = BaseWhereConditionsPerGb * memoryFactor,
+                MaxParameterCount = BaseParameterCountPerGb * memoryFactor,
+                MaxEstimatedCost = BaseMaxEstimatedCostPerGb * memoryFactor,
+                HighCostThreshold = BaseHighCostThresholdPerGb * memoryFactor
             };
         }
         private static void ValidateAgainstAdaptiveLimits(QueryComplexityInfo info, AdaptiveLimits limits)
@@ -183,7 +204,7 @@ namespace nORM.Query
                     case "OrderByDescending":
                     case "ThenBy":
                     case "ThenByDescending":
-                        _complexity.EstimatedCost += 100;
+                        _complexity.EstimatedCost += OrderByCost;
                         break;
                 }
                 return base.VisitMethodCall(node);
@@ -252,25 +273,32 @@ namespace nORM.Query
                 }
                 _joinedTypes.Add(outerType);
                 _joinedTypes.Add(innerType);
-                _complexity.EstimatedCost += _complexity.JoinCount * 1000;
+                _complexity.EstimatedCost += _complexity.JoinCount * JoinCostPerOccurrence;
             }
             private void AnalyzeWhere(MethodCallExpression node)
             {
-                if (node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression lambda)
+                if (node.Arguments.Count > 1)
                 {
-                    var conditionCount = CountConditions(lambda.Body);
-                    _complexity.WhereConditionCount += conditionCount;
+                    // Handle quoted lambdas: LINQ expression trees may wrap lambda args in UnaryExpression(Quote).
+                    var arg = node.Arguments[1];
+                    while (arg is UnaryExpression { NodeType: ExpressionType.Quote } q)
+                        arg = q.Operand;
+                    if (arg is LambdaExpression lambda)
+                    {
+                        var conditionCount = CountConditions(lambda.Body);
+                        _complexity.WhereConditionCount += conditionCount;
+                    }
                 }
             }
             private void AnalyzeSelectMany(MethodCallExpression node)
             {
                 _nestedSelectDepth++;
-                if (_nestedSelectDepth > 5)
+                if (_nestedSelectDepth > NestedSelectDepthCartesianThreshold)
                 {
                     _complexity.HasCartesianProduct = true;
                     _complexity.WarningMessages.Add("Deep SelectMany nesting detected - potential performance issue");
                 }
-                _complexity.EstimatedCost += _nestedSelectDepth * 500;
+                _complexity.EstimatedCost += _nestedSelectDepth * SelectManyCostMultiplier;
             }
             private static int CountConditions(Expression expression)
             {
@@ -285,11 +313,11 @@ namespace nORM.Query
             }
             private int CalculateEstimatedCost()
             {
-                var baseCost = 100;
-                var joinCost = _complexity.JoinCount * _complexity.JoinCount * 500;
-                var whereCost = _complexity.WhereConditionCount * 50;
-                var cartesianPenalty = _complexity.HasCartesianProduct ? 5000 : 0;
-                var nestingPenalty = _nestedSelectDepth * _nestedSelectDepth * 200;
+                var baseCost = BaseCost;
+                var joinCost = _complexity.JoinCount * _complexity.JoinCount * JoinCostMultiplier;
+                var whereCost = _complexity.WhereConditionCount * WhereCostMultiplier;
+                var cartesianPenalty = _complexity.HasCartesianProduct ? CartesianPenalty : 0;
+                var nestingPenalty = _nestedSelectDepth * _nestedSelectDepth * NestingCostMultiplier;
                 return baseCost + joinCost + whereCost + cartesianPenalty + nestingPenalty;
             }
             private static Type GetElementType(Expression expression)

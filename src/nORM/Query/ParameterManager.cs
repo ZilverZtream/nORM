@@ -145,8 +145,8 @@ namespace nORM.Query
 
             if (type == typeof(float))
             {
-                p.DbType = System.Data.DbType.Double;
-                p.Value = (double)(float)v;
+                p.DbType = System.Data.DbType.Single;
+                p.Value = v;
                 return;
             }
 

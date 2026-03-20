@@ -45,12 +45,12 @@ namespace nORM.Migration
         /// <summary>Columns on the principal table being referenced (usually the PK). Order matches DependentColumns.</summary>
         public string[] PrincipalColumns { get; set; } = Array.Empty<string>();
         /// <summary>
-        /// Referential action on DELETE (NO ACTION, CASCADE, SET NULL, RESTRICT).
+        /// Referential action on DELETE (NO ACTION, CASCADE, SET NULL, RESTRICT, SET DEFAULT).
         /// "NO ACTION" is the default and causes no ON DELETE clause to be emitted.
         /// </summary>
         public string OnDelete { get; set; } = "NO ACTION";
         /// <summary>
-        /// Referential action on UPDATE (NO ACTION, CASCADE, SET NULL, RESTRICT).
+        /// Referential action on UPDATE (NO ACTION, CASCADE, SET NULL, RESTRICT, SET DEFAULT).
         /// "NO ACTION" is the default and causes no ON UPDATE clause to be emitted.
         /// </summary>
         public string OnUpdate { get; set; } = "NO ACTION";
@@ -75,6 +75,8 @@ namespace nORM.Migration
         public string? IndexName { get; set; }
         /// <summary>SQL literal default value for ADD COLUMN NOT NULL migrations (e.g. "''" or "0").</summary>
         public string? DefaultValue { get; set; }
+        /// <summary>True when the column has identity/autoincrement semantics (e.g. [DatabaseGenerated(Identity)]).</summary>
+        public bool IsIdentity { get; set; }
     }
 
     /// <summary>
@@ -92,6 +94,8 @@ namespace nORM.Migration
         /// <returns>A snapshot describing the tables and columns inferred from the assembly.</returns>
         public static SchemaSnapshot Build(Assembly assembly)
         {
+            ArgumentNullException.ThrowIfNull(assembly);
+
             var snapshot = new SchemaSnapshot();
             foreach (var type in GetEntityCandidates(assembly))
             {
@@ -164,6 +168,7 @@ namespace nORM.Migration
                     var colAttr = prop.GetCustomAttribute<ColumnAttribute>();
                     var clr = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
                     var isPk = pkNames.Contains(prop.Name);
+                    var dbGenAttr = prop.GetCustomAttribute<DatabaseGeneratedAttribute>();
                     var column = new ColumnSchema
                     {
                         Name = colAttr?.Name ?? prop.Name,
@@ -172,7 +177,8 @@ namespace nORM.Migration
                         // G1: populate PK / index metadata from attributes or convention
                         IsPrimaryKey = isPk,
                         IsUnique = isPk,   // PKs are implicitly unique; non-PK unique indexes require a future attribute
-                        IndexName = isPk ? "PK_" + table.Name : null
+                        IndexName = isPk ? "PK_" + table.Name : null,
+                        IsIdentity = dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity
                     };
                     table.Columns.Add(column);
                 }
@@ -193,6 +199,7 @@ namespace nORM.Migration
         /// <returns>A snapshot reflecting the fully-merged runtime model.</returns>
         public static SchemaSnapshot Build(DbContext ctx)
         {
+            ArgumentNullException.ThrowIfNull(ctx);
             return BuildFromMappings(ctx.GetAllMappings());
         }
 
@@ -201,6 +208,8 @@ namespace nORM.Migration
         /// </summary>
         private static SchemaSnapshot BuildFromMappings(IEnumerable<TableMapping> mappings)
         {
+            ArgumentNullException.ThrowIfNull(mappings);
+
             var snapshot = new SchemaSnapshot();
             var allMappings = mappings as IReadOnlyList<TableMapping> ?? mappings.ToList();
 
@@ -217,11 +226,12 @@ namespace nORM.Migration
                     table.Columns.Add(new ColumnSchema
                     {
                         Name         = col.Name,
-                        ClrType      = clrType.FullName!,
+                        ClrType      = clrType.FullName ?? clrType.Name,
                         IsNullable   = isNullable,
                         IsPrimaryKey = col.IsKey,
                         IsUnique     = col.IsKey,
                         IndexName    = col.IsKey ? $"PK_{map.TableName}" : null,
+                        IsIdentity   = col.IsDbGenerated,
                     });
                 }
                 snapshot.Tables.Add(table);
@@ -250,14 +260,30 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// Returns entity candidate types from the assembly: public, non-abstract classes
-        /// that carry a <see cref="TableAttribute"/> or at least one <see cref="KeyAttribute"/> property.
+        /// Returns entity candidate types from the assembly: non-abstract classes (including
+        /// nested types) that carry a <see cref="TableAttribute"/> or at least one
+        /// <see cref="KeyAttribute"/> property. No visibility filter is applied because nested
+        /// public types report <c>IsNestedPublic</c> rather than <c>IsPublic</c>.
         /// </summary>
-        private static IEnumerable<Type> GetEntityCandidates(Assembly assembly) =>
-            assembly.GetTypes().Where(t =>
+        private static IEnumerable<Type> GetEntityCandidates(Assembly assembly)
+        {
+            Type[] types;
+            try
+            {
+                types = assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                // Some types in the assembly may fail to load (e.g. missing dependencies).
+                // Use the successfully loaded subset rather than failing the entire snapshot.
+                types = ex.Types.Where(t => t != null).ToArray()!;
+            }
+
+            return types.Where(t =>
                 t.IsClass && !t.IsAbstract &&
                 (t.GetCustomAttribute<TableAttribute>() != null ||
                  t.GetProperties().Any(p => p.GetCustomAttribute<KeyAttribute>() != null)));
+        }
 
         /// <summary>
         /// MG-1: Returns true for types that map to database scalar columns.
@@ -327,6 +353,9 @@ namespace nORM.Migration
         /// <returns>A <see cref="SchemaDiff"/> describing the operations required to transform the schema.</returns>
         public static SchemaDiff Diff(SchemaSnapshot oldSnapshot, SchemaSnapshot newSnapshot)
         {
+            ArgumentNullException.ThrowIfNull(oldSnapshot);
+            ArgumentNullException.ThrowIfNull(newSnapshot);
+
             var diff = new SchemaDiff();
             foreach (var newTable in newSnapshot.Tables)
             {
@@ -347,7 +376,8 @@ namespace nORM.Migration
                         || oldCol.IsPrimaryKey != col.IsPrimaryKey
                         || oldCol.IsUnique != col.IsUnique
                         || !string.Equals(oldCol.IndexName, col.IndexName, StringComparison.OrdinalIgnoreCase)
-                        || !string.Equals(oldCol.DefaultValue, col.DefaultValue, StringComparison.Ordinal))  // M1: detect DEFAULT changes
+                        || !string.Equals(oldCol.DefaultValue, col.DefaultValue, StringComparison.Ordinal)  // M1: detect DEFAULT changes
+                        || oldCol.IsIdentity != col.IsIdentity)  // X1: detect identity changes
                         diff.AlteredColumns.Add((newTable, col, oldCol));
                 }
 
@@ -423,13 +453,23 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// MG-1: Builds a name-keyed map of FK constraints for a table.
+        /// Builds a name-keyed map of FK constraints for a table.
+        /// Duplicate constraint names are detected and cause an <see cref="InvalidOperationException"/>.
         /// </summary>
-        private static Dictionary<string, ForeignKeySchema> BuildFkMap(TableSchema table) =>
-            table.ForeignKeys.ToDictionary(fk => fk.ConstraintName, StringComparer.OrdinalIgnoreCase);
+        private static Dictionary<string, ForeignKeySchema> BuildFkMap(TableSchema table)
+        {
+            var map = new Dictionary<string, ForeignKeySchema>(table.ForeignKeys.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var fk in table.ForeignKeys)
+            {
+                if (!map.TryAdd(fk.ConstraintName, fk))
+                    throw new InvalidOperationException(
+                        $"Duplicate FK constraint name '{fk.ConstraintName}' on table '{table.Name}'.");
+            }
+            return map;
+        }
 
         /// <summary>
-        /// MG-1: Returns true when two FK schemas represent the same constraint definition.
+        /// Returns true when two FK schemas represent the same constraint definition.
         /// Column order within each array is significant.
         /// </summary>
         private static bool FkEqual(ForeignKeySchema a, ForeignKeySchema b) =>
@@ -444,12 +484,13 @@ namespace nORM.Migration
                 string.Equals(x, y, StringComparison.OrdinalIgnoreCase)).All(eq => eq);
 
         /// <summary>
-        /// G1: Builds a map of index name → (IsUnique, column names[]) from the columns of a table.
-        /// Only columns that carry an <see cref="ColumnSchema.IndexName"/> are included.
+        /// G1: Builds a map of index name to (IsUnique, column names[]) from the columns of a table.
+        /// Only columns that carry an <see cref="ColumnSchema.IndexName"/> or are PK/Unique are included.
         /// </summary>
         private static Dictionary<string, (bool IsUnique, string[] ColumnNames)> BuildIndexMap(TableSchema table)
         {
-            var map = new Dictionary<string, (bool, string[])>(StringComparer.OrdinalIgnoreCase);
+            // Use a List<string> intermediary to avoid O(n^2) Append().ToArray() per column
+            var intermediate = new Dictionary<string, (bool IsUnique, List<string> Columns)>(StringComparer.OrdinalIgnoreCase);
             foreach (var col in table.Columns)
             {
                 // Include columns that have an explicit IndexName, or are unique/PK (implicit constraint).
@@ -464,11 +505,16 @@ namespace nORM.Migration
                     else
                         continue;
                 }
-                if (!map.TryGetValue(indexKey, out var entry))
-                    entry = (col.IsUnique || col.IsPrimaryKey, Array.Empty<string>());
-                entry = (entry.Item1 || col.IsUnique || col.IsPrimaryKey, entry.Item2.Append(col.Name).ToArray());
-                map[indexKey] = entry;
+                if (!intermediate.TryGetValue(indexKey, out var entry))
+                    entry = (col.IsUnique || col.IsPrimaryKey, new List<string>());
+                entry.IsUnique = entry.IsUnique || col.IsUnique || col.IsPrimaryKey;
+                entry.Columns.Add(col.Name);
+                intermediate[indexKey] = entry;
             }
+
+            var map = new Dictionary<string, (bool IsUnique, string[] ColumnNames)>(intermediate.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, (isUnique, columns)) in intermediate)
+                map[key] = (isUnique, columns.ToArray());
             return map;
         }
     }

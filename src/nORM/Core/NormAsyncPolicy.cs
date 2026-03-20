@@ -12,6 +12,6 @@ namespace nORM.Core
         /// Set environment variable NORM_PRESERVE_CONTEXT to "true" to preserve context.
         /// </summary>
         public static readonly bool SuppressExecutionContextFlow =
-            !Environment.GetEnvironmentVariable("NORM_PRESERVE_CONTEXT")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
+            !(Environment.GetEnvironmentVariable("NORM_PRESERVE_CONTEXT")?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false);
     }
 }

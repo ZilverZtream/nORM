@@ -9,16 +9,22 @@ using System.Runtime.CompilerServices;
 namespace nORM.Internal
 {
     /// <summary>
-    /// PERFORMANCE OPTIMIZATION: Expanded type map from 7 to 25+ types.
-    /// Reduces fallback to DbType.Object which can cause inefficient query plans.
-    /// </summary>
-    /// <summary>
     /// Provides optimized parameter binding with provider-aware type coercion.
-    /// Public to allow source-generated compile-time query methods to use the same
-    /// parameter binding logic as runtime queries (SG1 fix).
+    /// Expanded type map from 7 to 30+ types reduces fallback to DbType.Object
+    /// which can cause inefficient query plans. Public to allow source-generated
+    /// compile-time query methods to use the same parameter binding logic as
+    /// runtime queries (SG1 fix).
     /// </summary>
     public static class ParameterOptimizer
     {
+        /// <summary>
+        /// String parameters shorter than or equal to this threshold use their exact length
+        /// as the <see cref="DbParameter.Size"/>. Longer strings use <c>-1</c> (unlimited)
+        /// to avoid provider-specific truncation or buffer pre-allocation issues.
+        /// 4000 matches the SQL Server NVARCHAR(MAX) threshold and is a common provider boundary.
+        /// </summary>
+        private const int MaxInlineStringSize = 4000;
+
         private static readonly ConcurrentDictionary<Type, DbType> _typeMap = new()
         {
             // Original 7 types
@@ -45,6 +51,13 @@ namespace nORM.Internal
             // Date/time types
             [typeof(DateTimeOffset)] = DbType.DateTimeOffset,
             [typeof(TimeSpan)] = DbType.Time,
+
+            // Additional date/time types (.NET 6+)
+            [typeof(DateOnly)] = DbType.Date,
+            [typeof(TimeOnly)] = DbType.Time,
+
+            // Character type
+            [typeof(char)] = DbType.StringFixedLength,
 
             // Binary data
             [typeof(byte[])] = DbType.Binary,
@@ -126,7 +139,7 @@ namespace nORM.Internal
                 {
                     param.DbType = DbType.String;
                     var str = (string)value;
-                    param.Size = str.Length <= 4000 ? str.Length : -1;
+                    param.Size = str.Length <= MaxInlineStringSize ? str.Length : -1;
                 }
                 else if (valueType == typeof(long))
                 {

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
@@ -27,6 +28,7 @@ namespace nORM.Internal
 
         internal BoundedCache(int maxSize, IEqualityComparer<TKey>? comparer = null)
         {
+            if (maxSize <= 0) throw new ArgumentOutOfRangeException(nameof(maxSize), maxSize, "Maximum size must be greater than zero.");
             _maxSize = maxSize;
             _dict = comparer != null
                 ? new ConcurrentDictionary<TKey, TValue>(comparer)
@@ -41,7 +43,7 @@ namespace nORM.Internal
 
         /// <summary>
         /// Adds the entry if the key is not already present, then evicts the oldest entries
-        /// until the dictionary is within <see cref="MaxSize"/>. O(1) amortized.
+        /// until the dictionary count is within the configured maximum size. O(1) amortized.
         /// </summary>
         internal void Set(TKey key, TValue value)
         {

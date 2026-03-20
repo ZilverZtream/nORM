@@ -30,7 +30,10 @@ namespace nORM.Migration
         internal const string HistoryTableName = "__NormMigrationsHistory";
         internal const string MigrationLockResource = "__NormMigrationsLock";
         internal const int MigrationLockTimeoutMs = 30_000;
-        private bool _disposed = false;
+        /// <summary>SQL Server error 208: Invalid object name (table/view not found).</summary>
+        private const int SqlServerErrorInvalidObjectName = 208;
+
+        private volatile bool _disposed;
 
         /// <summary>
         /// Creates a new migration runner for SQL Server.
@@ -41,8 +44,8 @@ namespace nORM.Migration
         /// <param name="logger">Optional logger for drift warnings and diagnostics.</param>
         public SqlServerMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null, ILogger? logger = null)
         {
-            _connection = connection;
-            _migrationsAssembly = migrationsAssembly;
+            _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            _migrationsAssembly = migrationsAssembly ?? throw new ArgumentNullException(nameof(migrationsAssembly));
             _logger = logger;
             if (options != null && options.CommandInterceptors.Count > 0)
             {
@@ -60,6 +63,7 @@ namespace nORM.Migration
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             // Ensure the connection is open before calling BeginTransactionAsync.
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
@@ -69,7 +73,7 @@ namespace nORM.Migration
             {
                 await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
                 var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-                if (!pending.Any()) return;
+                if (pending.Count == 0) return;
 
                 await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
                 foreach (var migration in pending)
@@ -121,9 +125,9 @@ EXEC sp_releaseapplock
     @Resource  = '{MigrationLockResource}',
     @LockOwner = 'Session';";
             try { await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false); }
-            catch (Exception ex)
+            catch (DbException ex)
             {
-                // M1: Best-effort release; surface failure for diagnostics rather than silently swallowing.
+                // Best-effort release; surface failure for diagnostics rather than silently swallowing.
                 // Do not propagate — throwing from a finally block would mask the original exception.
                 _logger?.LogWarning(
                     "nORM: SQL Server migration advisory-lock release failed: {Message}. " +
@@ -139,11 +143,12 @@ EXEC sp_releaseapplock
         /// <returns><c>true</c> if pending migrations exist; otherwise <c>false</c>.</returns>
         public async Task<bool> HasPendingMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
             var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-            return pending.Any();
+            return pending.Count > 0;
         }
 
         /// <summary>
@@ -153,6 +158,7 @@ EXEC sp_releaseapplock
         /// <returns>An array containing the pending migration identifiers.</returns>
         public async Task<string[]> GetPendingMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
@@ -217,10 +223,11 @@ EXEC sp_releaseapplock
         }
 
         /// <summary>
-        /// Retrieves the set of migration versions that have already been applied to the database.
+        /// Retrieves the dictionary of migration versions and names that have already been applied
+        /// to the database.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
-        /// <returns>A set containing the version numbers of applied migrations.</returns>
+        /// <returns>A dictionary mapping version numbers to migration names.</returns>
         private async Task<Dictionary<long, string>> GetAppliedMigrationsAsync(CancellationToken ct)
         {
             var applied = new Dictionary<long, string>();
@@ -236,7 +243,7 @@ EXEC sp_releaseapplock
             }
             catch (DbException ex) when (IsTableNotFoundError(ex))
             {
-                // MG-1: History table doesn't exist yet (first run) — return empty dict.
+                // History table doesn't exist yet (first run) — return empty dict.
                 // All other DbException (transient failures, permission errors, etc.) propagate.
             }
             return applied;
@@ -252,7 +259,7 @@ EXEC sp_releaseapplock
         {
             // Check by error number when the exception exposes it (Microsoft.Data.SqlClient.SqlException)
             var numberProp = ex.GetType().GetProperty("Number");
-            if (numberProp != null && numberProp.GetValue(ex) is int number && number == 208)
+            if (numberProp != null && numberProp.GetValue(ex) is int number && number == SqlServerErrorInvalidObjectName)
                 return true;
             // Fallback: check the message text
             return ex.Message.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase);
@@ -288,6 +295,15 @@ EXEC sp_releaseapplock
             => _context != null ? cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct) : cmd.ExecuteReaderAsync(ct);
 
         /// <summary>
+        /// Throws <see cref="ObjectDisposedException"/> if this runner has been disposed.
+        /// </summary>
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(SqlServerMigrationRunner));
+        }
+
+        /// <summary>
         /// Asynchronously disposes the internal <see cref="DbContext"/> created for interceptors.
         /// </summary>
         public async ValueTask DisposeAsync()
@@ -301,6 +317,7 @@ EXEC sp_releaseapplock
                     _context = null;
                 }
             }
+            GC.SuppressFinalize(this);
         }
 
         /// <summary>
@@ -317,6 +334,7 @@ EXEC sp_releaseapplock
                     _context = null;
                 }
             }
+            GC.SuppressFinalize(this);
         }
     }
 }

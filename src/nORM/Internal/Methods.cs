@@ -23,6 +23,9 @@ namespace nORM.Internal
         public static readonly MethodInfo GetDateTime = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetDateTime))!;
         public static readonly MethodInfo GetGuid = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetGuid))!;
         public static readonly MethodInfo GetString = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetString))!;
+        // Note: IDataRecord.GetBytes has a different signature (returns long, requires buffer args),
+        // so we use GetValue which returns the raw object for byte[] columns. The caller handles
+        // the conversion from object to byte[].
         public static readonly MethodInfo GetBytes = typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetValue))!;
         public static readonly MethodInfo GetFieldValue = typeof(DbDataReader).GetMethod(nameof(DbDataReader.GetFieldValue))!;
         public static readonly MethodInfo SetShadowValue = typeof(ShadowPropertyStore).GetMethod(nameof(ShadowPropertyStore.Set))!;

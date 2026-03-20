@@ -18,30 +18,35 @@ namespace nORM.Core
         private readonly string _correlationId;
 
         /// <summary>
+        /// Length of the truncated GUID used as a correlation identifier.
+        /// </summary>
+        private const int CorrelationIdLength = 8;
+
+        /// <summary>
         /// Creates a new <see cref="NormExceptionHandler"/> that uses the specified logger for diagnostics.
         /// </summary>
         /// <param name="logger">Logger used to record successes and failures.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="logger"/> is <c>null</c>.</exception>
         public NormExceptionHandler(ILogger logger)
         {
-            _logger = logger;
-            _correlationId = Guid.NewGuid().ToString("N")[..8];
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _correlationId = Guid.NewGuid().ToString("N")[..CorrelationIdLength];
         }
 
         /// <summary>
-        /// Executes the provided operation and wraps any thrown exception into a <see cref="NormException"/> with
-        /// additional context information and logging.
+        /// Synchronous overload that executes the provided operation and wraps any thrown
+        /// exception into a <see cref="NormException"/> with additional context information
+        /// and logging. <see cref="OperationCanceledException"/> and <see cref="NormException"/>
+        /// are re-thrown without wrapping.
         /// </summary>
         /// <typeparam name="T">Type of the result returned by the operation.</typeparam>
-        /// <param name="operation">The asynchronous operation to execute.</param>
+        /// <param name="operation">The synchronous operation to execute.</param>
         /// <param name="operationName">Human-readable name of the operation for logging.</param>
         /// <param name="context">Optional additional context values.</param>
         /// <returns>The result of the operation if successful.</returns>
-        /// <summary>
-        /// Truly synchronous overload — no async machinery involved.
-        /// Use this on the synchronous execution paths to avoid sync-over-async.
-        /// </summary>
         public T ExecuteWithExceptionHandlingSync<T>(Func<T> operation, string operationName, Dictionary<string, object>? context = null)
         {
+            ArgumentNullException.ThrowIfNull(operation);
             var stopwatch = Stopwatch.StartNew();
             try
             {
@@ -51,6 +56,8 @@ namespace nORM.Core
                     operationName, stopwatch.ElapsedMilliseconds, _correlationId);
                 return result;
             }
+            catch (OperationCanceledException) { throw; }
+            catch (NormException) { throw; }
             catch (Exception ex)
             {
                 stopwatch.Stop();
@@ -71,8 +78,20 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Executes the provided asynchronous operation and wraps any thrown exception into a
+        /// <see cref="NormException"/> with additional context information and logging.
+        /// <see cref="OperationCanceledException"/> and <see cref="NormException"/> are
+        /// re-thrown without wrapping.
+        /// </summary>
+        /// <typeparam name="T">Type of the result returned by the operation.</typeparam>
+        /// <param name="operation">The asynchronous operation to execute.</param>
+        /// <param name="operationName">Human-readable name of the operation for logging.</param>
+        /// <param name="context">Optional additional context values.</param>
+        /// <returns>The result of the operation if successful.</returns>
         public async Task<T> ExecuteWithExceptionHandling<T>(Func<Task<T>> operation, string operationName, Dictionary<string, object>? context = null)
         {
+            ArgumentNullException.ThrowIfNull(operation);
             var stopwatch = Stopwatch.StartNew();
             try
             {
@@ -82,6 +101,13 @@ namespace nORM.Core
                     operationName, stopwatch.ElapsedMilliseconds, _correlationId);
                 return result;
             }
+            catch (OperationCanceledException)
+            {
+                // Let cancellation propagate without wrapping -- callers depend on OCE semantics
+                // for timeout detection and CancellationToken-based cooperative cancellation.
+                throw;
+            }
+            catch (NormException) { throw; }
             catch (Exception ex)
             {
                 stopwatch.Stop();
@@ -118,19 +144,19 @@ namespace nORM.Core
                 SqlException sqlEx => new NormDatabaseException(
                     $"Database operation failed: {sqlEx.Message}",
                     context.TryGetValue("Sql", out var sql) ? sql?.ToString() : null,
-                    context.Where(kvp => kvp.Key.StartsWith("Param")).ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    context.Where(kvp => kvp.Key.StartsWith("Param", StringComparison.Ordinal)).ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                     sqlEx),
 
                 TimeoutException timeoutEx => new NormTimeoutException(
                     $"Operation timed out after {context.GetValueOrDefault("Duration", "unknown")}ms",
                     context.TryGetValue("Sql", out var sql2) ? sql2?.ToString() : null,
-                    context.Where(kvp => kvp.Key.StartsWith("Param")).ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    context.Where(kvp => kvp.Key.StartsWith("Param", StringComparison.Ordinal)).ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                     timeoutEx),
 
                 _ => new NormException(
                     $"Unexpected error in {context.GetValueOrDefault("Operation", "unknown operation")}: {originalException.Message}",
                     context.TryGetValue("Sql", out var sql3) ? sql3?.ToString() : null,
-                    context.Where(kvp => kvp.Key.StartsWith("Param")).ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    context.Where(kvp => kvp.Key.StartsWith("Param", StringComparison.Ordinal)).ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                     originalException)
             };
         }

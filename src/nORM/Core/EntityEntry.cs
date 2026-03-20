@@ -16,13 +16,20 @@ namespace nORM.Core
     /// An <see cref="EntityEntry"/> keeps the original values and state required to
     /// compute database updates when <c>SaveChanges</c> is invoked.
     /// </summary>
-    /// <summary>
+    /// <remarks>
     /// PERFORMANCE OPTIMIZATION: Deferred initialization of tracking arrays.
-    /// Arrays are null until InitializeTracking() is called, reducing memory overhead
-    /// for read-only or short-lived entities by ~200-500 bytes per entity.
-    /// </summary>
+    /// Arrays are null until <see cref="InitializeTracking"/> is called, reducing
+    /// memory overhead for read-only or short-lived entities (approximately 200-500
+    /// bytes per entity depending on column count).
+    /// </remarks>
     public class EntityEntry
     {
+        /// <summary>Initial seed for the polynomial byte-array hash in <see cref="ContentHashCode"/>.</summary>
+        private const int ByteArrayHashSeed = 17;
+
+        /// <summary>Multiplier for the polynomial byte-array hash in <see cref="ContentHashCode"/>.</summary>
+        private const int ByteArrayHashMultiplier = 31;
+
         private readonly TableMapping _mapping;
         // PERFORMANCE: Use null instead of Array.Empty to truly defer allocation
         private Column[]? _nonKeyColumns;
@@ -110,18 +117,24 @@ namespace nORM.Core
 
         internal EntityEntry(object entity, EntityState state, TableMapping mapping, DbContextOptions options, Action<EntityEntry>? markDirty = null, bool lazy = false)
         {
-            Entity = entity;
+            Entity = entity ?? throw new ArgumentNullException(nameof(entity));
             State = state;
-            _mapping = mapping;
-            _options = options;
+            _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
+            _options = options ?? throw new ArgumentNullException(nameof(options));
             _markDirty = markDirty;
             _isInitialized = false;
 
             // Capture original PK at attach time so mutations can be detected.
             OriginalKey = CaptureKey(entity, mapping);
 
-            // PERFORMANCE: Only initialize immediately if not lazy
-            // This saves ~200-500 bytes per entity for read-only scenarios
+            // PERFORMANCE: Only initialize immediately if not lazy.
+            // This saves ~200-500 bytes per entity for read-only scenarios.
+            // When lazy=true, OriginalToken capture is deferred until
+            // UpgradeToFullTracking() / InitializeTracking() is called
+            // (triggered by the first DetectChanges or AcceptChanges).
+            // This means OriginalToken may be null for lazily-tracked entities
+            // until they are first inspected for changes — callers that read
+            // OriginalToken must handle null (see AddParametersOptimized).
             if (!lazy)
             {
                 InitializeTracking();
@@ -163,8 +176,8 @@ namespace nORM.Core
             {
                 unchecked
                 {
-                    int h = 17;
-                    foreach (var by in b) h = h * 31 + by;
+                    int h = ByteArrayHashSeed;
+                    foreach (var by in b) h = h * ByteArrayHashMultiplier + by;
                     return h;
                 }
             }
@@ -242,13 +255,14 @@ namespace nORM.Core
         /// <param name="e">Event arguments describing the property change.</param>
         private void PropertyChangedHandler(object? _, PropertyChangedEventArgs e)
         {
-            if (State is EntityState.Added or EntityState.Deleted) return;
+            if (State is EntityState.Added or EntityState.Deleted or EntityState.Detached) return;
             if (!_isInitialized) return; // PERFORMANCE: Skip if not yet initialized
 
             var currentEntity = Entity;
             if (currentEntity is null) return;
 
-            if (e.PropertyName != null && _propertyIndex!.TryGetValue(e.PropertyName, out var idx))
+            if (_propertyIndex == null) return;
+            if (e.PropertyName != null && _propertyIndex.TryGetValue(e.PropertyName, out var idx))
             {
                 var currentValue = _getValues![idx](currentEntity);
                 var changed = !ValuesEqual(currentValue, _originalValues![idx]);
@@ -275,6 +289,8 @@ namespace nORM.Core
             }
 
             _hasNotifiedChange = true;
+            // State transition is not under a lock — this is by design because DbContext
+            // is single-threaded. Callers must not raise PropertyChanged from other threads.
             State = hasAnyChanges ? EntityState.Modified : EntityState.Unchanged;
             _markDirty?.Invoke(this);
         }
@@ -297,8 +313,6 @@ namespace nORM.Core
         /// </summary>
         private void CaptureOriginalValues()
         {
-            if (!_isInitialized) return; // PERFORMANCE: Skip if not initialized
-
             var entity = Entity;
             if (entity is null)
             {
@@ -343,6 +357,14 @@ namespace nORM.Core
                 }
                 else
                 {
+                    // Hash-first detection strategy: compare hash codes first as a
+                    // cheap O(1) divergence check. When hashes differ, the value has
+                    // definitely changed (true positive). When hashes MATCH, we still
+                    // fall through to a precise value comparison because GetHashCode
+                    // collisions can produce false negatives (two different values
+                    // with the same hash would be incorrectly treated as unchanged).
+                    // This gives us the performance of hash comparison in the common
+                    // "unchanged" case while guaranteeing correctness via the fallback.
                     var currentHash = _getHashCodes![i](entity);
                     if (currentHash != _originalHashes![i])
                     {
@@ -350,7 +372,7 @@ namespace nORM.Core
                     }
                     else
                     {
-                        // Hash collision - verify using precise comparison
+                        // Hash collision guard - verify using precise comparison
                         var currentValue = _getValues![i](entity);
                         changed = !ValuesEqual(currentValue, _originalValues![i]);
                     }
@@ -395,9 +417,23 @@ namespace nORM.Core
         {
             State = EntityState.Detached;
             var entity = Entity;
+            if (entity is INotifyPropertyChanged notify)
+                notify.PropertyChanged -= PropertyChangedHandler;
             if (entity != null)
                 NavigationPropertyExtensions.CleanupNavigationContext(entity);
             Entity = null;
+
+            // Reset tracking state so a detached entry cannot leak stale snapshots.
+            _isInitialized = false;
+            _nonKeyColumns = null;
+            _originalHashes = null;
+            _originalValues = null;
+            _changedProperties = null;
+            _getHashCodes = null;
+            _getValues = null;
+            _propertyIndex = null;
+            _hasNotifiedChange = false;
+            ManyToManySnapshots = null;
         }
     }
 }

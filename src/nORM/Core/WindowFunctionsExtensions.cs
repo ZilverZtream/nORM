@@ -16,6 +16,8 @@ namespace nORM.Core
         public static IQueryable<TResult> WithRowNumber<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, int, TResult>> resultSelector)
             where TSource : class
         {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(resultSelector);
             if (source.Provider is Query.NormQueryProvider provider)
             {
                 var method = ((MethodInfo)MethodBase.GetCurrentMethod()!).MakeGenericMethod(typeof(TSource), typeof(TResult));
@@ -32,6 +34,8 @@ namespace nORM.Core
         public static IQueryable<TResult> WithRank<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, int, TResult>> resultSelector)
             where TSource : class
         {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(resultSelector);
             if (source.Provider is Query.NormQueryProvider provider)
             {
                 var method = ((MethodInfo)MethodBase.GetCurrentMethod()!).MakeGenericMethod(typeof(TSource), typeof(TResult));
@@ -48,6 +52,8 @@ namespace nORM.Core
         public static IQueryable<TResult> WithDenseRank<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, int, TResult>> resultSelector)
             where TSource : class
         {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(resultSelector);
             if (source.Provider is Query.NormQueryProvider provider)
             {
                 var method = ((MethodInfo)MethodBase.GetCurrentMethod()!).MakeGenericMethod(typeof(TSource), typeof(TResult));
@@ -69,6 +75,11 @@ namespace nORM.Core
             Expression<Func<TSource, TValue>>? defaultValue = null)
             where TSource : class
         {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(valueSelector);
+            ArgumentNullException.ThrowIfNull(resultSelector);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), offset, "LAG offset must be non-negative.");
             if (source.Provider is Query.NormQueryProvider provider)
             {
                 var method = ((MethodInfo)MethodBase.GetCurrentMethod()!).MakeGenericMethod(typeof(TSource), typeof(TValue), typeof(TResult));
@@ -98,6 +109,11 @@ namespace nORM.Core
             Expression<Func<TSource, TValue>>? defaultValue = null)
             where TSource : class
         {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(valueSelector);
+            ArgumentNullException.ThrowIfNull(resultSelector);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), offset, "LEAD offset must be non-negative.");
             if (source.Provider is Query.NormQueryProvider provider)
             {
                 var method = ((MethodInfo)MethodBase.GetCurrentMethod()!).MakeGenericMethod(typeof(TSource), typeof(TValue), typeof(TResult));

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.Extensions.ObjectPool;
@@ -40,6 +41,7 @@ internal static class PooledStringBuilder
     /// <returns>The concatenated string.</returns>
     public static string Join(IEnumerable<string> values, string separator = ", ")
     {
+        if (values is null) throw new ArgumentNullException(nameof(values));
         var sb = Rent();
         try
         {

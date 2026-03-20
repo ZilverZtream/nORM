@@ -34,6 +34,16 @@ namespace nORM.Query
         /// <summary>True when an aggregate (Sum/Count/Min/Max/Average) was used.</summary>
         public bool HasAggregates;
 
+        private const int BaseScore = 1;
+        private const int JoinWeight = 2;
+        private const int GroupByWeight = 2;
+        private const int OrderByWeight = 2;
+        private const int SubqueryWeight = 2;
+        private const int DistinctWeight = 1;
+        private const int AggregateWeight = 1;
+        private const int PredicateDivisor = 5;
+        private const int MaxComplexityScore = 50;
+
         /// <summary>
         /// Derives a scalar complexity score for use with
         /// <see cref="nORM.Execution.AdaptiveTimeoutManager"/>.
@@ -42,16 +52,16 @@ namespace nORM.Query
         /// </summary>
         public int ToComplexityScore()
         {
-            int score = 1;
-            score += JoinCount * 2;
-            if (HasGroupBy) score += 2;
-            if (HasOrderBy) score += 2;
-            score += SubqueryDepth * 2;
-            if (HasDistinct) score += 1;
-            if (HasAggregates) score += 1;
+            int score = BaseScore;
+            score += JoinCount * JoinWeight;
+            if (HasGroupBy) score += GroupByWeight;
+            if (HasOrderBy) score += OrderByWeight;
+            score += SubqueryDepth * SubqueryWeight;
+            if (HasDistinct) score += DistinctWeight;
+            if (HasAggregates) score += AggregateWeight;
             // Each predicate contributes a tiny amount
-            score += PredicateCount / 5;
-            return Math.Min(score, 50); // cap matches DbContext.GetAdaptiveTimeout
+            score += PredicateCount / PredicateDivisor;
+            return Math.Min(score, MaxComplexityScore);
         }
     }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Linq.Expressions;
 
 #nullable enable
@@ -11,8 +12,8 @@ namespace nORM.Internal
 
         public ParameterReplacer(ParameterExpression parameter, Expression replacement)
         {
-            _parameter = parameter;
-            _replacement = replacement;
+            _parameter = parameter ?? throw new ArgumentNullException(nameof(parameter));
+            _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
         }
 
         protected override Expression VisitParameter(ParameterExpression node)

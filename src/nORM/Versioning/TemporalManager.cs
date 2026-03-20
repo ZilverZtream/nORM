@@ -82,9 +82,11 @@ namespace nORM.Versioning
             // All other exceptions (non-DbException, permission errors, connectivity) propagate.
         }
 
+        private static readonly NormExceptionHandler s_ddlHandler = new(NullLogger.Instance);
+
         private static async Task ExecuteDdlAsync(DbContext context, DbConnection conn, string sql, CancellationToken ct)
         {
-            var handler = new NormExceptionHandler(NullLogger.Instance);
+            var handler = s_ddlHandler;
 
             // S6-1: Split on both T-SQL GO batch separators and MySQL trigger delimiters.
             // MySQL's CREATE TRIGGER ... BEGIN ... END blocks must be sent as individual
@@ -122,11 +124,10 @@ namespace nORM.Versioning
 
         private static bool IsValidDdl(string ddl)
         {
-            var lower = ddl.ToLowerInvariant();
-            return lower.StartsWith("create")
-                || lower.StartsWith("alter")
-                || lower.StartsWith("drop")
-                || lower.StartsWith("if");   // SQL Server: IF OBJECT_ID(...) IS NULL CREATE TABLE
+            return ddl.StartsWith("create", StringComparison.OrdinalIgnoreCase)
+                || ddl.StartsWith("alter", StringComparison.OrdinalIgnoreCase)
+                || ddl.StartsWith("drop", StringComparison.OrdinalIgnoreCase)
+                || ddl.StartsWith("if", StringComparison.OrdinalIgnoreCase);   // SQL Server: IF OBJECT_ID(...) IS NULL CREATE TABLE
         }
     }
 }
