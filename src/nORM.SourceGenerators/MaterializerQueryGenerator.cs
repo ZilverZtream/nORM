@@ -363,14 +363,13 @@ namespace nORM.SourceGenerators
             sb.AppendLine($"        await using var cmd = await {ctxParam}.CreateCompiledQueryCommandAsync({ctArg}).ConfigureAwait(false);");
             var escapedSql = sql.Replace("\"", "\"\"");
             sb.AppendLine($"        cmd.CommandText = @\"{escapedSql}\";");
+            // SG1 fix: route parameter binding through AddOptimizedParam (the same binder
+            // used by runtime queries) so that DateOnly, TimeOnly, char, enum, and typed-null
+            // coercions are applied uniformly. Previously generated code set DbParameter.Value
+            // directly, bypassing provider-aware type coercion.
             foreach (var p in queryParams)
             {
-                sb.AppendLine($"        var p_{p.Name} = cmd.CreateParameter();");
-                // DIALECT FIX (TASK 8): Use provider's parameter prefix instead of hard-coding "@"
-                // Different databases use different prefixes: SQL Server (@), PostgreSQL ($), Oracle (:)
-                sb.AppendLine($"        p_{p.Name}.ParameterName = $\"{{{ctxParam}.Provider.ParamPrefix}}{p.Name}\";");
-                sb.AppendLine($"        p_{p.Name}.Value = {GetParameterValueExpression(p)};");
-                sb.AppendLine($"        cmd.Parameters.Add(p_{p.Name});");
+                sb.AppendLine($"        nORM.Internal.ParameterOptimizer.AddOptimizedParam(cmd, $\"{{{ctxParam}.Provider.ParamPrefix}}{p.Name}\", {GetParameterValueExpression(p)});");
             }
             // SG1 fix: pass compile-time-resolved table name so multi-model scenarios
             // correctly retrieve the materializer registered under the right table key.
