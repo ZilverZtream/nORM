@@ -72,8 +72,26 @@ namespace nORM.Query
             }
             var inClause = $"({string.Join(", ", paramNames)})";
 
-            // Query: SELECT left_fk, right_fk FROM join_table WHERE left_fk IN (...)
-            cmd.CommandText = $"SELECT {jtm.EscLeftFkColumn}, {jtm.EscRightFkColumn} FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} IN {inClause}";
+            // Determine tenant filtering for the join table query and right entity query.
+            // When multi-tenancy is active on the left entity, scope the join table query to
+            // only return rows whose left FK belongs to the current tenant.
+            var tenantId = _ctx.Options.TenantProvider?.GetCurrentTenantId();
+            var leftMapping = _ctx.GetMapping(jtm.LeftType);
+            var leftTenantCol = leftMapping.TenantColumn;
+            var leftPkCol = leftMapping.KeyColumns.Length > 0 ? leftMapping.KeyColumns[0] : null;
+            var hasTenantFilter = tenantId != null && leftTenantCol != null && leftPkCol != null;
+
+            // Query: SELECT jt.left_fk, jt.right_fk FROM join_table jt [INNER JOIN left_table lt ON ...] WHERE jt.left_fk IN (...)
+            if (hasTenantFilter)
+            {
+                var tp = $"{_ctx.Provider.ParamPrefix}jttenant";
+                cmd.CommandText = $"SELECT jt.{jtm.EscLeftFkColumn}, jt.{jtm.EscRightFkColumn} FROM {jtm.EscTableName} jt INNER JOIN {leftMapping.EscTable} lt ON jt.{jtm.EscLeftFkColumn} = lt.{leftPkCol!.EscCol} WHERE lt.{leftTenantCol!.EscCol} = {tp} AND jt.{jtm.EscLeftFkColumn} IN {inClause}";
+                cmd.AddParam(tp, tenantId!);
+            }
+            else
+            {
+                cmd.CommandText = $"SELECT {jtm.EscLeftFkColumn}, {jtm.EscRightFkColumn} FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} IN {inClause}";
+            }
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
 
             // Read all join rows: leftPk → list of rightPks
@@ -107,7 +125,19 @@ namespace nORM.Query
             }
             var rightPkCol = rightMapping.KeyColumns[0];
             var rightInClause = $"({string.Join(", ", rightParamNames)})";
-            cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause}";
+
+            // If the right entity table also has a tenant column, filter right entities by tenant
+            var rightTenantCol = rightMapping.TenantColumn;
+            if (tenantId != null && rightTenantCol != null)
+            {
+                var rtp = $"{_ctx.Provider.ParamPrefix}jrtenant";
+                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause} AND {rightTenantCol.EscCol} = {rtp}";
+                cmd2.AddParam(rtp, tenantId);
+            }
+            else
+            {
+                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause}";
+            }
             cmd2.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText).TotalSeconds;
 
             var rightEntitiesByPk = new Dictionary<object, object>();
@@ -223,7 +253,23 @@ namespace nORM.Query
             }
             var inClause = $"({string.Join(", ", paramNames)})";
 
-            cmd.CommandText = $"SELECT {jtm.EscLeftFkColumn}, {jtm.EscRightFkColumn} FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} IN {inClause}";
+            // Determine tenant filtering for the join table query and right entity query.
+            var tenantId = _ctx.Options.TenantProvider?.GetCurrentTenantId();
+            var leftMapping = _ctx.GetMapping(jtm.LeftType);
+            var leftTenantCol = leftMapping.TenantColumn;
+            var leftPkCol = leftMapping.KeyColumns.Length > 0 ? leftMapping.KeyColumns[0] : null;
+            var hasTenantFilter = tenantId != null && leftTenantCol != null && leftPkCol != null;
+
+            if (hasTenantFilter)
+            {
+                var tp = $"{_ctx.Provider.ParamPrefix}jttenant";
+                cmd.CommandText = $"SELECT jt.{jtm.EscLeftFkColumn}, jt.{jtm.EscRightFkColumn} FROM {jtm.EscTableName} jt INNER JOIN {leftMapping.EscTable} lt ON jt.{jtm.EscLeftFkColumn} = lt.{leftPkCol!.EscCol} WHERE lt.{leftTenantCol!.EscCol} = {tp} AND jt.{jtm.EscLeftFkColumn} IN {inClause}";
+                cmd.AddParam(tp, tenantId!);
+            }
+            else
+            {
+                cmd.CommandText = $"SELECT {jtm.EscLeftFkColumn}, {jtm.EscRightFkColumn} FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} IN {inClause}";
+            }
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText).TotalSeconds;
 
             var joinRows = new Dictionary<object, List<object>>();
@@ -255,7 +301,19 @@ namespace nORM.Query
             }
             var rightPkCol = rightMapping.KeyColumns[0];
             var rightInClause = $"({string.Join(", ", rightParamNames)})";
-            cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause}";
+
+            // If the right entity table also has a tenant column, filter right entities by tenant
+            var rightTenantCol = rightMapping.TenantColumn;
+            if (tenantId != null && rightTenantCol != null)
+            {
+                var rtp = $"{_ctx.Provider.ParamPrefix}jrtenant";
+                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause} AND {rightTenantCol.EscCol} = {rtp}";
+                cmd2.AddParam(rtp, tenantId);
+            }
+            else
+            {
+                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause}";
+            }
             cmd2.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText).TotalSeconds;
 
             var rightEntitiesByPk = new Dictionary<object, object>();

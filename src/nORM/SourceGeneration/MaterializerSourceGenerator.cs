@@ -140,12 +140,16 @@ public class MaterializerSourceGenerator : ISourceGenerator
             var semanticModel = compilation.GetSemanticModel(classDeclaration.SyntaxTree);
             var classSymbol = semanticModel.GetDeclaredSymbol(classDeclaration) as INamedTypeSymbol;
             
-            if (classSymbol?.GetAttributes().Any(attr => 
+            if (classSymbol?.GetAttributes().Any(attr =>
                 SymbolEqualityComparer.Default.Equals(attr.AttributeClass, materializerAttribute)) == true)
             {
                 var fullName = classSymbol.ToDisplayString();
                 var className = classSymbol.Name;
-                sb.AppendLine($"            CompiledMaterializerStore.Add<{fullName}>({className}Materializer.Materialize);");
+                // SG1 fix: pass compile-time-resolved table name so multi-model scenarios
+                // where the same CLR type maps to different tables each get their own materializer.
+                var tableName = GetTableNameForType(classSymbol);
+                var escapedTableName = tableName.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                sb.AppendLine($"            CompiledMaterializerStore.Add<{fullName}>(\"{escapedTableName}\", {className}Materializer.Materialize);");
             }
         }
 
@@ -154,6 +158,25 @@ public class MaterializerSourceGenerator : ISourceGenerator
         sb.AppendLine("}");
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Returns the database table name for an entity type, honouring
+    /// <c>[System.ComponentModel.DataAnnotations.Schema.Table("name")]</c> when present.
+    /// Falls back to the CLR type name, matching <c>CompiledMaterializerStore.GetTableName</c>.
+    /// </summary>
+    private static string GetTableNameForType(INamedTypeSymbol type)
+    {
+        foreach (var attr in type.GetAttributes())
+        {
+            var cls = attr.AttributeClass?.ToDisplayString();
+            if (cls == "System.ComponentModel.DataAnnotations.Schema.TableAttribute"
+                && attr.ConstructorArguments.Length > 0
+                && attr.ConstructorArguments[0].Value is string tblName
+                && !string.IsNullOrEmpty(tblName))
+                return tblName;
+        }
+        return type.Name;
     }
 
     /// <summary>

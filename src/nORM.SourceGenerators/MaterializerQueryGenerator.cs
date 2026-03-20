@@ -107,6 +107,25 @@ namespace nORM.SourceGenerators
         }
 
         /// <summary>
+        /// Returns the database table name for an entity type, honouring
+        /// <c>[System.ComponentModel.DataAnnotations.Schema.Table("name")]</c> when present.
+        /// Falls back to the CLR type name, matching <c>CompiledMaterializerStore.GetTableName</c>.
+        /// </summary>
+        private static string GetTableNameForType(INamedTypeSymbol type)
+        {
+            foreach (var attr in type.GetAttributes())
+            {
+                var cls = attr.AttributeClass?.ToDisplayString();
+                if (cls == "System.ComponentModel.DataAnnotations.Schema.TableAttribute"
+                    && attr.ConstructorArguments.Length > 0
+                    && attr.ConstructorArguments[0].Value is string tblName
+                    && !string.IsNullOrEmpty(tblName))
+                    return tblName;
+            }
+            return type.Name;
+        }
+
+        /// <summary>
         /// SG1: Returns the database column name for a property, honouring
         /// <c>[System.ComponentModel.DataAnnotations.Schema.Column("name")]</c> when present.
         /// Fluent <c>HasColumnName</c> is runtime-only and cannot be resolved at compile time;
@@ -182,7 +201,11 @@ namespace nORM.SourceGenerators
             sb.AppendLine("    [global::System.Runtime.CompilerServices.ModuleInitializer]");
             sb.AppendLine("    public static void Register()");
             sb.AppendLine("    {");
-            sb.AppendLine($"        CompiledMaterializerStore.Add<{typeName}>(reader =>");
+            // SG1 fix: pass compile-time-resolved table name so multi-model scenarios
+            // where the same CLR type maps to different tables each get their own materializer.
+            var resolvedTableName = GetTableNameForType(type);
+            var escapedTableName = resolvedTableName.Replace("\"", "\\\"");
+            sb.AppendLine($"        CompiledMaterializerStore.Add<{typeName}>(\"{escapedTableName}\", reader =>");
             sb.AppendLine("        {");
             sb.AppendLine($"            var entity = new {typeName}();");
 
@@ -349,7 +372,11 @@ namespace nORM.SourceGenerators
                 sb.AppendLine($"        p_{p.Name}.Value = {GetParameterValueExpression(p)};");
                 sb.AppendLine($"        cmd.Parameters.Add(p_{p.Name});");
             }
-            sb.AppendLine($"        var materializer = CompiledMaterializerStore.Get<{entityTypeName}>();");
+            // SG1 fix: pass compile-time-resolved table name so multi-model scenarios
+            // correctly retrieve the materializer registered under the right table key.
+            var queryTableName = GetTableNameForType(entity!);
+            var escapedQueryTableName = queryTableName.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            sb.AppendLine($"        var materializer = CompiledMaterializerStore.Get<{entityTypeName}>(\"{escapedQueryTableName}\");");
             // X1 fix: use ExecuteCompiledQueryListAsync instead of cmd.ExecuteReaderAsync so that
             // command interceptors (logging, tracing, auditing) are invoked.
             sb.AppendLine($"        return await {ctxParam}.ExecuteCompiledQueryListAsync(cmd, materializer, {ctArg}).ConfigureAwait(false);");

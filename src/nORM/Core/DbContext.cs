@@ -1200,11 +1200,27 @@ namespace nORM.Core
                     // INSERT command below starts fully fresh (no prepared-statement residue).
                     await using var delScope = new CommandScope(Connection, transaction);
                     await using var delCmd = delScope.CreateCommand();
-                    delCmd.CommandText = $"DELETE FROM {ownedMap.EscTable} WHERE {ownedMap.EscForeignKeyColumn} = @ownerPk";
+                    var delSql = $"DELETE FROM {ownedMap.EscTable} WHERE {ownedMap.EscForeignKeyColumn} = @ownerPk";
                     var dp = delCmd.CreateParameter();
                     dp.ParameterName = "@ownerPk";
                     dp.Value = ownerKey;
                     delCmd.Parameters.Add(dp);
+
+                    // X1: Scope DELETE to current tenant when multi-tenancy is configured
+                    // on the owned child table, preventing cross-tenant data destruction.
+                    Column? ownedTenantCol = null;
+                    if (Options.TenantProvider != null && Options.TenantColumnName != null)
+                        ownedTenantCol = ownedMap.Columns.FirstOrDefault(c => c.PropName == Options.TenantColumnName);
+                    if (ownedTenantCol != null)
+                    {
+                        delSql += $" AND {ownedTenantCol.EscCol} = @tenantId";
+                        var tp = delCmd.CreateParameter();
+                        tp.ParameterName = "@tenantId";
+                        tp.Value = Options.TenantProvider!.GetCurrentTenantId();
+                        delCmd.Parameters.Add(tp);
+                    }
+
+                    delCmd.CommandText = delSql;
                     await delCmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
                 }
 
@@ -1286,19 +1302,35 @@ namespace nORM.Core
         private async Task ExecuteJoinTableSyncAsync(object entity, EntityEntry entry, DbTransaction? transaction, CancellationToken ct)
         {
             var map = entry.Mapping;
+            // Build tenant subquery fragment once if multi-tenancy is active on the left entity.
+            // This ensures join table DELETE operations are scoped to rows whose left FK belongs to
+            // the current tenant, preventing cross-tenant join row modification when different tenants
+            // share the same PK space.
+            var tenantId = Options.TenantProvider?.GetCurrentTenantId();
+            var leftTenantCol = map.TenantColumn;
+            var leftPkCol = map.KeyColumns.Length > 0 ? map.KeyColumns[0] : null;
+            var hasTenantFilter = tenantId != null && leftTenantCol != null && leftPkCol != null;
+
             foreach (var jtm in map.ManyToManyJoins)
             {
                 var leftPk = jtm.LeftPkGetter(entity);
                 if (leftPk == null) continue;
+
+                // Tenant-scoped subquery: ensures the left FK belongs to the current tenant
+                var tenantFilter = hasTenantFilter
+                    ? $" AND {jtm.EscLeftFkColumn} IN (SELECT {leftPkCol!.EscCol} FROM {map.EscTable} WHERE {leftPkCol.EscCol} = {_p.ParamPrefix}lpk AND {leftTenantCol!.EscCol} = {_p.ParamPrefix}jtenant)"
+                    : "";
 
                 await using var cmdScope = new CommandScope(Connection, transaction);
                 await using var cmd = cmdScope.CreateCommand();
 
                 if (entry.State == EntityState.Deleted)
                 {
-                    // Delete all join rows for this entity
-                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} = {_p.ParamPrefix}lpk";
+                    // Delete all join rows for this entity, scoped to current tenant
+                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} = {_p.ParamPrefix}lpk{tenantFilter}";
                     cmd.AddParam($"{_p.ParamPrefix}lpk", leftPk);
+                    if (hasTenantFilter)
+                        cmd.AddParam($"{_p.ParamPrefix}jtenant", tenantId!);
                     await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
                     continue;
                 }
@@ -1333,13 +1365,20 @@ namespace nORM.Core
                 var toAdd = currentSet.Except(snapshot).ToList();
                 var toRemove = snapshot.Except(currentSet).ToList();
 
-                // DELETE removed join rows
+                // Tenant filter for individual deletes uses the same lpk param name
+                var tenantFilterIndiv = hasTenantFilter
+                    ? $" AND {jtm.EscLeftFkColumn} IN (SELECT {leftPkCol!.EscCol} FROM {map.EscTable} WHERE {leftPkCol.EscCol} = {_p.ParamPrefix}lp AND {leftTenantCol!.EscCol} = {_p.ParamPrefix}jtenant)"
+                    : "";
+
+                // DELETE removed join rows, scoped to current tenant
                 foreach (var removedPk in toRemove)
                 {
-                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} = {_p.ParamPrefix}lp AND {jtm.EscRightFkColumn} = {_p.ParamPrefix}rp";
+                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} = {_p.ParamPrefix}lp AND {jtm.EscRightFkColumn} = {_p.ParamPrefix}rp{tenantFilterIndiv}";
                     cmd.Parameters.Clear();
                     cmd.AddParam($"{_p.ParamPrefix}lp", leftPk);
                     cmd.AddParam($"{_p.ParamPrefix}rp", removedPk);
+                    if (hasTenantFilter)
+                        cmd.AddParam($"{_p.ParamPrefix}jtenant", tenantId!);
                     await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
                 }
 
@@ -1389,6 +1428,14 @@ namespace nORM.Core
                 var inParams = string.Join(", ", pks.Select((_, i) => _p.ParamPrefix + "lpk" + i));
                 var querySql = $"SELECT {colSql} FROM {ownedMap.EscTable} WHERE {ownedMap.EscForeignKeyColumn} IN ({inParams})";
 
+                // X1: Scope SELECT to current tenant when multi-tenancy is configured
+                // on the owned child table, preventing cross-tenant data leakage.
+                Column? ownedTenantColLoad = null;
+                if (Options.TenantProvider != null && Options.TenantColumnName != null)
+                    ownedTenantColLoad = ownedMap.Columns.FirstOrDefault(c => c.PropName == Options.TenantColumnName);
+                if (ownedTenantColLoad != null)
+                    querySql += $" AND {ownedTenantColLoad.EscCol} = {_p.ParamPrefix}tenantId";
+
                 await using var cmd = CreateCommand();
                 cmd.CommandText = querySql;
                 cmd.CommandTimeout = (int)Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
@@ -1398,6 +1445,13 @@ namespace nORM.Core
                     p.ParameterName = _p.ParamPrefix + "lpk" + i;
                     p.Value = pks[i];
                     cmd.Parameters.Add(p);
+                }
+                if (ownedTenantColLoad != null)
+                {
+                    var tp = cmd.CreateParameter();
+                    tp.ParameterName = _p.ParamPrefix + "tenantId";
+                    tp.Value = Options.TenantProvider!.GetCurrentTenantId();
+                    cmd.Parameters.Add(tp);
                 }
 
                 // Initialize empty collections on all owners first

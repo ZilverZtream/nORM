@@ -344,4 +344,265 @@ public class AmbientTransactionPolicyDurabilityTests : IDisposable
         opts.AmbientTransactionPolicy = AmbientTransactionEnlistmentPolicy.FailFast;
         Assert.Equal(AmbientTransactionEnlistmentPolicy.FailFast, opts.AmbientTransactionPolicy);
     }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // T1 fix: when EnlistTransaction(null) throws an unexpected exception
+    // under Ignore policy, ShouldAcceptChanges must be false so the tracker
+    // does NOT advance (tracker/DB durability divergence prevention).
+    // ══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// When EnlistTransaction(null) throws an unexpected exception (not
+    /// NotSupportedException or InvalidOperationException), the T1 fix
+    /// sets shouldAcceptChanges = false. This test uses a wrapper connection
+    /// that throws ApplicationException on EnlistTransaction(null) to simulate
+    /// a provider where de-enlistment fails unexpectedly while the connection
+    /// may still be enlisted in the ambient scope.
+    /// </summary>
+    [Fact]
+    public async Task T1_Ignore_DeEnlistUnexpectedFailure_TrackerDoesNotAdvance()
+    {
+        var cn = new DeEnlistFailingConnection(_cs);
+        await using var ctx = new DbContext(cn, new PermissiveSqliteProvider(), new DbContextOptions
+        {
+            AmbientTransactionPolicy = AmbientTransactionEnlistmentPolicy.Ignore
+        });
+
+        using (var scope = new TransactionScope(TransactionScopeOption.Required,
+                   TransactionScopeAsyncFlowOption.Enabled))
+        {
+            ctx.Add(new DurabilityItem { Id = 200, Label = "deenlist-unexpected-fail" });
+            await ctx.SaveChangesAsync();
+
+            // T1 assertion: entity state must NOT be Unchanged because de-enlistment
+            // failed with an unexpected exception and the connection may still be
+            // scope-bound. The tracker must stay dirty.
+            var entry = ctx.ChangeTracker.Entries.FirstOrDefault(e => e.Entity is DurabilityItem);
+            Assert.NotNull(entry);
+            Assert.NotEqual(nORM.Core.EntityState.Unchanged, entry!.State);
+
+            scope.Complete();
+        }
+    }
+
+    /// <summary>
+    /// Baseline: when de-enlistment succeeds (normal SqliteConnection) or throws
+    /// NotSupportedException/InvalidOperationException (provider doesn't support it),
+    /// the tracker MUST advance to Unchanged. This proves the T1 fix is conditional
+    /// on unexpected errors only.
+    /// </summary>
+    [Fact]
+    public async Task T1_Ignore_DeEnlistSucceedsOrExpectedError_TrackerAdvances()
+    {
+        await using var ctx = CreateLazyContext(AmbientTransactionEnlistmentPolicy.Ignore);
+
+        using (var scope = new TransactionScope(TransactionScopeOption.Required,
+                   TransactionScopeAsyncFlowOption.Enabled))
+        {
+            ctx.Add(new DurabilityItem { Id = 201, Label = "deenlist-ok-or-expected" });
+            await ctx.SaveChangesAsync();
+
+            // Whether de-enlistment succeeded or threw NotSupportedException/
+            // InvalidOperationException, shouldAcceptChanges = true.
+            var entry = ctx.ChangeTracker.Entries.FirstOrDefault(e => e.Entity is DurabilityItem);
+            Assert.NotNull(entry);
+            Assert.Equal(nORM.Core.EntityState.Unchanged, entry!.State);
+
+            scope.Complete();
+        }
+    }
+
+    // ── DeEnlistFailingConnection: throws ApplicationException on EnlistTransaction(null) ──
+
+    /// <summary>
+    /// SqliteProvider subclass that accepts any DbConnection type, not just SqliteConnection.
+    /// Needed because the test uses a wrapper connection (DeEnlistFailingConnection) that is
+    /// not a SqliteConnection, but we still need SQLite-compatible SQL generation.
+    /// </summary>
+    private sealed class PermissiveSqliteProvider : SqliteProvider
+    {
+        protected override void ValidateConnection(System.Data.Common.DbConnection connection)
+        {
+            // Skip the SqliteConnection type check — accept any DbConnection.
+            if (connection.State != System.Data.ConnectionState.Open)
+            {
+                // Let base handle the "not open" case (but don't call base.ValidateConnection
+                // which would also check for SqliteConnection).
+            }
+        }
+    }
+
+    /// <summary>
+    /// Wrapper DbConnection that delegates everything to a SqliteConnection but throws
+    /// ApplicationException on EnlistTransaction(null) to simulate a provider where
+    /// de-enlistment fails with an unexpected error.
+    /// </summary>
+    private sealed class DeEnlistFailingConnection : System.Data.Common.DbConnection
+    {
+        private readonly SqliteConnection _inner;
+
+        public DeEnlistFailingConnection(string connectionString)
+        {
+            _inner = new SqliteConnection(connectionString);
+        }
+
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public override string ConnectionString
+        {
+            get => _inner.ConnectionString;
+            set => _inner.ConnectionString = value!;
+        }
+
+        public override string Database => _inner.Database;
+        public override string DataSource => _inner.DataSource;
+        public override string ServerVersion => _inner.ServerVersion;
+        public override System.Data.ConnectionState State => _inner.State;
+
+        public override void ChangeDatabase(string databaseName) => _inner.ChangeDatabase(databaseName);
+        public override void Close() => _inner.Close();
+        public override void Open() => _inner.Open();
+        public override Task OpenAsync(System.Threading.CancellationToken cancellationToken)
+            => _inner.OpenAsync(cancellationToken);
+
+        public override void EnlistTransaction(System.Transactions.Transaction? transaction)
+        {
+            if (transaction == null)
+                throw new ApplicationException("Simulated unexpected de-enlistment failure.");
+            _inner.EnlistTransaction(transaction);
+        }
+
+        protected override System.Data.Common.DbTransaction BeginDbTransaction(System.Data.IsolationLevel isolationLevel)
+            => _inner.BeginTransaction(isolationLevel);
+
+        protected override async ValueTask<System.Data.Common.DbTransaction> BeginDbTransactionAsync(
+            System.Data.IsolationLevel isolationLevel, System.Threading.CancellationToken cancellationToken)
+        {
+            var tx = await _inner.BeginTransactionAsync(isolationLevel, cancellationToken).ConfigureAwait(false);
+            return new DeEnlistPassthroughTransaction((SqliteTransaction)tx, this);
+        }
+
+        protected override System.Data.Common.DbCommand CreateDbCommand()
+        {
+            var innerCmd = _inner.CreateCommand();
+            return new DeEnlistPassthroughCommand(innerCmd, this);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await _inner.DisposeAsync().ConfigureAwait(false);
+            await base.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private sealed class DeEnlistPassthroughTransaction : System.Data.Common.DbTransaction
+    {
+        private readonly SqliteTransaction _inner;
+        private readonly System.Data.Common.DbConnection _connection;
+
+        public DeEnlistPassthroughTransaction(SqliteTransaction inner, System.Data.Common.DbConnection connection)
+        {
+            _inner = inner;
+            _connection = connection;
+        }
+
+        protected override System.Data.Common.DbConnection? DbConnection => _connection;
+        public override System.Data.IsolationLevel IsolationLevel => _inner.IsolationLevel;
+        public override void Commit() => _inner.Commit();
+        public override void Rollback() => _inner.Rollback();
+        public override Task CommitAsync(System.Threading.CancellationToken cancellationToken)
+            => _inner.CommitAsync(cancellationToken);
+        public override Task RollbackAsync(System.Threading.CancellationToken cancellationToken)
+            => _inner.RollbackAsync(cancellationToken);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await _inner.DisposeAsync().ConfigureAwait(false);
+            await base.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private sealed class DeEnlistPassthroughCommand : System.Data.Common.DbCommand
+    {
+        private readonly SqliteCommand _inner;
+        private readonly DeEnlistFailingConnection _conn;
+
+        public DeEnlistPassthroughCommand(SqliteCommand inner, DeEnlistFailingConnection conn)
+        {
+            _inner = inner;
+            _conn = conn;
+        }
+
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public override string CommandText { get => _inner.CommandText; set => _inner.CommandText = value!; }
+        public override int CommandTimeout { get => _inner.CommandTimeout; set => _inner.CommandTimeout = value; }
+        public override System.Data.CommandType CommandType { get => _inner.CommandType; set => _inner.CommandType = value; }
+        public override bool DesignTimeVisible { get => false; set { } }
+        public override System.Data.UpdateRowSource UpdatedRowSource { get => _inner.UpdatedRowSource; set => _inner.UpdatedRowSource = value; }
+
+        protected override System.Data.Common.DbConnection? DbConnection
+        {
+            get => _conn;
+            set { /* always bound to _conn */ }
+        }
+
+        protected override System.Data.Common.DbParameterCollection DbParameterCollection => _inner.Parameters;
+
+        protected override System.Data.Common.DbTransaction? DbTransaction
+        {
+            get => _inner.Transaction;
+            set
+            {
+                if (value is DeEnlistPassthroughTransaction pt)
+                {
+                    var field = typeof(DeEnlistPassthroughTransaction)
+                        .GetField("_inner", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    _inner.Transaction = (SqliteTransaction?)field?.GetValue(pt);
+                }
+                else
+                {
+                    _inner.Transaction = (SqliteTransaction?)value;
+                }
+            }
+        }
+
+        public override void Cancel() => _inner.Cancel();
+        public override int ExecuteNonQuery() => _inner.ExecuteNonQuery();
+        public override object? ExecuteScalar() => _inner.ExecuteScalar();
+        public override void Prepare() => _inner.Prepare();
+        protected override System.Data.Common.DbParameter CreateDbParameter() => _inner.CreateParameter();
+
+        protected override System.Data.Common.DbDataReader ExecuteDbDataReader(System.Data.CommandBehavior behavior)
+            => _inner.ExecuteReader(behavior);
+
+        public override Task<int> ExecuteNonQueryAsync(System.Threading.CancellationToken cancellationToken)
+            => _inner.ExecuteNonQueryAsync(cancellationToken);
+
+        public override Task<object?> ExecuteScalarAsync(System.Threading.CancellationToken cancellationToken)
+            => _inner.ExecuteScalarAsync(cancellationToken);
+
+        protected override async Task<System.Data.Common.DbDataReader> ExecuteDbDataReaderAsync(
+            System.Data.CommandBehavior behavior, System.Threading.CancellationToken cancellationToken)
+        {
+            System.Data.Common.DbDataReader r = await _inner.ExecuteReaderAsync(behavior, cancellationToken).ConfigureAwait(false);
+            return r;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
+    }
 }
