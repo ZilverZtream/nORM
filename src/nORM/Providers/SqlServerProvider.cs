@@ -33,7 +33,12 @@ namespace nORM.Providers
         /// <summary>
         /// Maximum length of a single SQL statement supported by SQL Server.
         /// </summary>
-        public override int MaxSqlLength => 8_000;
+        /// SQL Server supports batch sizes up to 65,536 * 4,096 bytes of network packet data.
+        /// The previous value of 8,000 was incorrectly derived from the max row size, not the
+        /// max query text size. SQL Server's actual query text limit is governed by
+        /// max_recursion and memory, not a fixed character count. Using 256 MB as a safe ceiling
+        /// matches MySQL's practical limit and avoids rejecting valid wide/complex queries.
+        public override int MaxSqlLength => 268_435_456;
 
         /// <summary>
         /// Maximum number of parameters allowed in a single SQL Server command.

@@ -64,6 +64,36 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<(Type Type, int Offset), Action<object, DbDataReader>[]> _setterCache = new();
         private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _propertiesCache = new();
 
+        /// <summary>
+        /// X1 fix: Detects whether the runtime mapping has fluent-only column renames that the
+        /// source generator couldn't see at compile time. Returns true if any column's Name
+        /// (runtime-resolved) differs from its PropName (attribute-resolved default).
+        /// When true, the compiled materializer must be skipped to avoid GetOrdinal failures.
+        /// </summary>
+        private static bool HasFluentColumnRenames(Type targetType, TableMapping mapping)
+        {
+            foreach (var col in mapping.Columns)
+            {
+                // Column.Name is the runtime column name (from fluent config or attribute).
+                // Column.PropName is the C# property name (default if no [Column] attribute).
+                // The source generator uses [Column] attribute → if present, Name == attribute value.
+                // If Name != PropName AND there's no [Column] attribute on the property, it's a fluent rename.
+                var prop = targetType.GetProperty(col.PropName);
+                if (prop == null) continue;
+
+                var columnAttr = prop.GetCustomAttribute(
+                    typeof(System.ComponentModel.DataAnnotations.Schema.ColumnAttribute));
+
+                if (columnAttr == null && col.Name != col.PropName)
+                {
+                    // Fluent-only rename detected: runtime column name differs from property name
+                    // and there's no [Column] attribute to explain it to the source generator.
+                    return true;
+                }
+            }
+            return false;
+        }
+
         // Pre-computed type conversion delegates for better performance
         private static readonly ConcurrentDictionary<(Type From, Type To), Func<object, object>> _conversionCache = new();
 
@@ -482,7 +512,11 @@ namespace nORM.Query
 
             // CHECK FOR COMPILED MATERIALIZER FIRST — use mapping.TableName to discriminate
             // between the same CLR type registered under different model mappings.
-            if (projection == null && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled))
+            // X1 fix: skip compiled materializer if the runtime mapping has fluent-only column
+            // renames that the source generator couldn't see at compile time. The generator uses
+            // [Column] attributes only; fluent HasColumnName overrides are invisible to it.
+            if (projection == null && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled)
+                && !HasFluentColumnRenames(targetType, mapping))
             {
                 // Wrap the compiled materializer to return strongly-typed result
                 return async (reader, ct) => (T)(await compiled(reader, ct).ConfigureAwait(false));
@@ -518,7 +552,9 @@ namespace nORM.Query
 
             // CHECK FOR COMPILED MATERIALIZER FIRST — use mapping.TableName to discriminate
             // between the same CLR type registered under different model mappings.
-            if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled))
+            // X1 fix: skip compiled materializer when fluent-only column renames are present.
+            if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled)
+                && !HasFluentColumnRenames(targetType, mapping))
             {
                 return compiled;
             }
@@ -565,8 +601,9 @@ namespace nORM.Query
             ArgumentNullException.ThrowIfNull(targetType);
 
             // For simple cases without JOINs, use regular materializer.
-            // Use mapping.TableName to discriminate same CLR type across different model mappings.
-            if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled))
+            // X1 fix: skip compiled materializer when fluent-only column renames are present.
+            if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled)
+                && !HasFluentColumnRenames(targetType, mapping))
             {
                 return compiled;
             }

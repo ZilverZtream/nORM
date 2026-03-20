@@ -129,6 +129,36 @@ namespace nORM.Internal
                 {
                     param.DbType = DbType.DateTime2;
                 }
+                else if (valueType == typeof(DateOnly))
+                {
+                    // P1: DateOnly requires explicit conversion to DateTime for providers
+                    // that don't natively support DateOnly (SQL Server < 2022, MySQL, etc.)
+                    var d = (DateOnly)value;
+                    param.Value = d.ToDateTime(TimeOnly.MinValue);
+                    param.DbType = DbType.Date;
+                }
+                else if (valueType == typeof(TimeOnly))
+                {
+                    // P1: TimeOnly requires explicit conversion to TimeSpan for most providers
+                    var t = (TimeOnly)value;
+                    param.Value = t.ToTimeSpan();
+                    param.DbType = DbType.Time;
+                }
+                else if (valueType == typeof(char))
+                {
+                    // P1: Char must be converted to string for correct provider binding
+                    param.Value = value.ToString();
+                    param.DbType = DbType.StringFixedLength;
+                }
+                else if (valueType.IsEnum)
+                {
+                    // P1: Enums must be converted to their underlying integral type
+                    // to avoid provider-specific ToString() coercion issues
+                    var underlying = Enum.GetUnderlyingType(valueType);
+                    param.Value = Convert.ChangeType(value, underlying);
+                    if (_typeMap.TryGetValue(underlying, out var enumDbType))
+                        param.DbType = enumDbType;
+                }
                 else if (_typeMap.TryGetValue(valueType, out var mappedType))
                 {
                     param.DbType = mappedType;

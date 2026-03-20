@@ -1320,10 +1320,12 @@ public class ProviderCoverageExtendedTests
     // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void SqlServerProvider_MaxSqlLength_Is8000()
+    public void SqlServerProvider_MaxSqlLength_AllowsLargeQueries()
     {
+        // SQL1 fix: removed the 8k ceiling that rejected valid SQL Server queries.
         var p = new SqlServerProvider();
-        Assert.Equal(8_000, p.MaxSqlLength);
+        Assert.True(p.MaxSqlLength > 8_000);
+        Assert.Equal(268_435_456, p.MaxSqlLength);
     }
 
     [Fact]
