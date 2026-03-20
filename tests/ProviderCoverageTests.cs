@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
 using nORM.Navigation;
@@ -688,9 +690,12 @@ public class SqlServerProviderTests
     }
 
     [Fact]
-    public void MaxSqlLength_Is8000()
+    public void MaxSqlLength_IsLargeEnoughForRealQueries()
     {
-        Assert.Equal(8_000, _provider.MaxSqlLength);
+        // SQL1 fix: SQL Server's actual query text limit is much larger than 8,000 characters.
+        // The previous 8k ceiling was incorrectly derived from the max row size, not query text.
+        Assert.True(_provider.MaxSqlLength > 8_000, "MaxSqlLength should be > 8000 to allow valid wide queries");
+        Assert.Equal(268_435_456, _provider.MaxSqlLength);
     }
 
     [Fact]
@@ -894,6 +899,78 @@ public class SqlServerProviderTests
     {
         var sql = _provider.NullSafeEqual("col", "@p0");
         Assert.Contains("IS NULL", sql);
+    }
+
+    // ── SQL1: MaxSqlLength is no longer 8000 ────────────────────────────────
+
+    [Fact]
+    public void SQL1_MaxSqlLength_IsNot8000()
+    {
+        // SQL1 fix verified: the old 8000-char limit was incorrectly derived from
+        // the max row size, not the query text limit. The current value must exceed
+        // 8000 to allow legitimate wide queries.
+        Assert.NotEqual(8_000, _provider.MaxSqlLength);
+        Assert.True(_provider.MaxSqlLength > 8_000);
+    }
+
+    [Fact]
+    public void SQL1_WideQuery_ExceedingOld8kLimit_DoesNotThrow()
+    {
+        // Build a SELECT statement that exceeds 8000 characters (the old limit).
+        // It should NOT throw InvalidOperationException with the corrected MaxSqlLength.
+        var columns = string.Join(", ", Enumerable.Range(1, 500)
+            .Select(i => $"[Column{i:D4}_With_A_Long_Name]"));
+        var sql = $"SELECT {columns} FROM [WideTable] WHERE [Id] = @p0";
+        Assert.True(sql.Length > 8_000, $"Test SQL should exceed 8000 chars but was {sql.Length}");
+
+        // Verify QueryPlanValidator accepts this plan under SqlServerProvider
+        var plan = new QueryPlan(
+            sql,
+            new Dictionary<string, object> { ["@p0"] = 1 },
+            new List<string>(),
+            (r, ct) => Task.FromResult<object>(0),
+            r => (object)0,
+            typeof(int),
+            false, false, false,
+            string.Empty,
+            new List<IncludePlan>(),
+            null,
+            Array.Empty<string>(),
+            true,
+            TimeSpan.FromSeconds(30),
+            false,
+            null);
+
+        // Must not throw — 8k+ SQL is valid for SQL Server
+        var ex = Record.Exception(() => QueryPlanValidator.Validate(plan, _provider));
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void SQL1_QueryPlanValidator_AcceptsPlansUpToNewLimit()
+    {
+        // A plan with SQL just under the new limit should be accepted.
+        // We don't allocate a full 256 MB string — just verify that a 10k SQL passes.
+        var sql = new string('x', 10_000);
+        var plan = new QueryPlan(
+            sql,
+            new Dictionary<string, object>(),
+            new List<string>(),
+            (r, ct) => Task.FromResult<object>(0),
+            r => (object)0,
+            typeof(int),
+            false, false, false,
+            string.Empty,
+            new List<IncludePlan>(),
+            null,
+            Array.Empty<string>(),
+            true,
+            TimeSpan.FromSeconds(30),
+            false,
+            null);
+
+        var ex = Record.Exception(() => QueryPlanValidator.Validate(plan, _provider));
+        Assert.Null(ex);
     }
 }
 
