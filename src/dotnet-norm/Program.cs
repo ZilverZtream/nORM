@@ -187,7 +187,36 @@ add.SetAction((ParseResult result) =>
             ? JsonSerializer.Deserialize<SchemaSnapshot>(File.ReadAllText(snapshotPath)) ?? new SchemaSnapshot()
             : new SchemaSnapshot();
 
-        var newSnap = SchemaSnapshotBuilder.Build(assembly);
+        // M1 fix: try to find a DbContext subclass in the assembly and use Build(DbContext)
+        // so fluent model configuration (ToTable, HasColumnName, HasKey, relationships) is
+        // included in the snapshot. Falls back to Build(assembly) for attribute-only models.
+        SchemaSnapshot newSnap;
+        var ctxType = assembly.GetTypes()
+            .FirstOrDefault(t => t.IsClass && !t.IsAbstract && typeof(DbContext).IsAssignableFrom(t));
+        if (ctxType != null)
+        {
+            try
+            {
+                // Try to instantiate the DbContext with a minimal in-memory SQLite connection
+                // just to extract the model configuration.
+                using var modelCn = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
+                modelCn.Open();
+                var provider = new nORM.Providers.SqliteProvider();
+                using var modelCtx = (DbContext)Activator.CreateInstance(ctxType, modelCn, provider)!;
+                newSnap = SchemaSnapshotBuilder.Build(modelCtx);
+                Console.WriteLine($"Using fluent model from {ctxType.Name}.");
+            }
+            catch
+            {
+                // DbContext may require constructor args we can't provide — fall back
+                newSnap = SchemaSnapshotBuilder.Build(assembly);
+                Console.WriteLine("Warning: Could not instantiate DbContext for fluent model; using attribute-only snapshot.");
+            }
+        }
+        else
+        {
+            newSnap = SchemaSnapshotBuilder.Build(assembly);
+        }
         var diff = SchemaDiffer.Diff(oldSnap, newSnap);
         if (!diff.HasChanges)
         {

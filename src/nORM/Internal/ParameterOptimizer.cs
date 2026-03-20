@@ -12,7 +12,12 @@ namespace nORM.Internal
     /// PERFORMANCE OPTIMIZATION: Expanded type map from 7 to 25+ types.
     /// Reduces fallback to DbType.Object which can cause inefficient query plans.
     /// </summary>
-    internal static class ParameterOptimizer
+    /// <summary>
+    /// Provides optimized parameter binding with provider-aware type coercion.
+    /// Public to allow source-generated compile-time query methods to use the same
+    /// parameter binding logic as runtime queries (SG1 fix).
+    /// </summary>
+    public static class ParameterOptimizer
     {
         private static readonly ConcurrentDictionary<Type, DbType> _typeMap = new()
         {
