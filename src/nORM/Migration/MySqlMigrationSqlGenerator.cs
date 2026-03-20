@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace nORM.Migration
 {
@@ -23,7 +24,18 @@ namespace nORM.Migration
             { typeof(decimal).FullName!, "DECIMAL(18,2)" },
             { typeof(double).FullName!, "DOUBLE" },
             { typeof(float).FullName!, "FLOAT" },
-            { typeof(Guid).FullName!, "CHAR(36)" }
+            { typeof(Guid).FullName!, "CHAR(36)" },
+            // X2: expanded type map
+            { typeof(byte[]).FullName!, "BLOB" },
+            { typeof(DateOnly).FullName!, "DATE" },
+            { typeof(TimeOnly).FullName!, "TIME" },
+            { typeof(DateTimeOffset).FullName!, "DATETIME" },
+            { typeof(TimeSpan).FullName!, "TIME" },
+            { typeof(char).FullName!, "CHAR(1)" },
+            { typeof(sbyte).FullName!, "TINYINT" },
+            { typeof(ushort).FullName!, "SMALLINT UNSIGNED" },
+            { typeof(uint).FullName!, "INT UNSIGNED" },
+            { typeof(ulong).FullName!, "BIGINT UNSIGNED" }
         };
 
         // Escape MySQL identifiers to prevent SQL injection via identifier names.
@@ -168,7 +180,21 @@ namespace nORM.Migration
         /// <param name="column">The column metadata describing the CLR type.</param>
         /// <returns>The corresponding MySQL data type.</returns>
         private static string GetSqlType(ColumnSchema column)
-            => TypeMap.TryGetValue(column.ClrType, out var sql) ? sql : "LONGTEXT";
+        {
+            // X2: handle enum types by mapping to their underlying integral type
+            if (!TypeMap.TryGetValue(column.ClrType, out var sql))
+            {
+                var clrType = ResolveType(column.ClrType);
+                if (clrType != null && clrType.IsEnum)
+                {
+                    var underlying = Enum.GetUnderlyingType(clrType);
+                    if (TypeMap.TryGetValue(underlying.FullName!, out sql))
+                        return sql;
+                }
+                return "LONGTEXT";
+            }
+            return sql;
+        }
 
         // M1/X1: Allowlist for FK referential action tokens.
         private static readonly HashSet<string> _validFkActions =
@@ -198,6 +224,19 @@ namespace nORM.Migration
             if (!string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
                 sql += $" ON UPDATE {onUpdate}";
             return sql;
+        }
+
+        // X2: resolve type by name, scanning loaded assemblies when Type.GetType fails
+        private static Type? ResolveType(string typeName)
+        {
+            var t = Type.GetType(typeName);
+            if (t != null) return t;
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                t = asm.GetType(typeName);
+                if (t != null) return t;
+            }
+            return null;
         }
     }
 }

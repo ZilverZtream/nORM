@@ -17,6 +17,7 @@ namespace nORM.Internal
         private readonly LinkedList<CacheItem> _lruList = new();
         // ReaderWriterLockSlim allows multiple concurrent readers while writes are exclusive
         private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.NoRecursion);
+        private volatile bool _isDisposed;
 
         private int _maxSize;
         private readonly TimeSpan? _timeToLive;
@@ -48,6 +49,7 @@ namespace nORM.Internal
         public void SetMaxSize(int maxSize)
         {
             if (maxSize <= 0) throw new ArgumentOutOfRangeException(nameof(maxSize));
+            if (_isDisposed) throw new ObjectDisposedException(nameof(ConcurrentLruCache<TKey, TValue>));
             _lock.EnterWriteLock();
             try
             {
@@ -70,6 +72,7 @@ namespace nORM.Internal
         /// </summary>
         public void Clear()
         {
+            if (_isDisposed) return;
             _lock.EnterWriteLock();
             try
             {
@@ -93,6 +96,11 @@ namespace nORM.Internal
         /// <returns><c>true</c> if the value was found in the cache; otherwise <c>false</c>.</returns>
         public bool TryGet(TKey key, out TValue value)
         {
+            if (_isDisposed)
+            {
+                value = default!;
+                return false;
+            }
             // Lock-free read path with Interlocked timestamp update allows
             // thousands of concurrent reads without blocking
             if (_cache.TryGetValue(key, out var node))
@@ -142,6 +150,7 @@ namespace nORM.Internal
         public TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
         {
             if (valueFactory is null) throw new ArgumentNullException(nameof(valueFactory));
+            if (_isDisposed) throw new ObjectDisposedException(nameof(ConcurrentLruCache<TKey, TValue>));
             if (TryGet(key, out var existing))
                 return existing;
 
@@ -199,6 +208,7 @@ namespace nORM.Internal
         /// </summary>
         public void Set(TKey key, TValue value, TimeSpan? ttlOverride = null, IReadOnlyList<string>? dependencies = null)
         {
+            if (_isDisposed) return;
             var nowUtc = DateTimeOffset.UtcNow;
             var item = new CacheItem(key, value, nowUtc, ttlOverride, nowUtc.UtcDateTime.Ticks);
 
@@ -330,6 +340,10 @@ namespace nORM.Internal
         /// </summary>
         public void Dispose()
         {
+            if (_isDisposed) return;
+            _isDisposed = true;
+            _cache.Clear();
+            _lruList.Clear();
             _lock?.Dispose();
         }
     }

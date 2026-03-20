@@ -1776,6 +1776,15 @@ namespace nORM.Core
             }
 
             sb.Append(string.Join(" OR ", conditions));
+
+            // X1: Tenant isolation — restrict the SELECT COUNT(*) to the current tenant
+            // to mirror the WHERE predicate used in BuildUpdateBatch/BuildDeleteBatch.
+            if (Options.TenantProvider != null && map.TenantColumn != null)
+            {
+                sb.Append($" AND {map.TenantColumn.EscCol} = {_p.ParamPrefix}tenantVerify");
+                cmd.AddParam($"{_p.ParamPrefix}tenantVerify", Options.TenantProvider.GetCurrentTenantId());
+            }
+
             cmd.CommandText = sb.ToString();
 
             var matchCount = Convert.ToInt32(await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false));
@@ -2899,10 +2908,28 @@ namespace nORM.Core
                 throw new InvalidOperationException($"Tenant ID is required for {operation} operation but was null. " +
                     "Explicitly set the tenant ID on the entity before saving. Auto-injection has been disabled for security.");
             }
-            else if (!Equals(entityTenant, tenantId))
+            // X1 fix: use coercion-aware comparison matching the query filter path
+            else if (!TenantIdsEqual(entityTenant, tenantId))
             {
                 throw new InvalidOperationException("Tenant context mismatch");
             }
+        }
+
+        /// <summary>
+        /// X1 fix: Compares two tenant ID values with type coercion to match the query filter path.
+        /// The query path uses Convert.ChangeType, so ValidateTenantContext must also tolerate
+        /// type mismatches (e.g., long provider ID vs int entity column).
+        /// </summary>
+        private static bool TenantIdsEqual(object a, object b)
+        {
+            if (Equals(a, b)) return true;
+            // Coerce types like the query path does (e.g., long tenant ID vs int column)
+            try
+            {
+                var coerced = Convert.ChangeType(b, a.GetType());
+                return Equals(a, coerced);
+            }
+            catch { return false; }
         }
 
         /// <summary>

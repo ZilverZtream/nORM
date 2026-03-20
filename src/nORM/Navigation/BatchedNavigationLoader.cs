@@ -266,7 +266,10 @@ namespace nORM.Navigation
         /// <param name="entity">The entity whose pending navigation loads should be cleared.</param>
         internal void RemovePendingLoadsForEntity(object entity)
         {
-            lock (_syncLock)
+            // C1 fix: use the same semaphore as LoadNavigationAsync/ProcessBatchAsync
+            // to prevent concurrent Dictionary mutation across different lock domains
+            _batchSemaphore.Wait();
+            try
             {
                 foreach (var key in _pendingLoads.Keys.ToList())
                 {
@@ -275,6 +278,10 @@ namespace nORM.Navigation
                     if (list.Count == 0)
                         _pendingLoads.Remove(key);
                 }
+            }
+            finally
+            {
+                _batchSemaphore.Release();
             }
         }
 
