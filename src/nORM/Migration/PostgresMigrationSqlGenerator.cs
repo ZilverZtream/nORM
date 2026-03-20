@@ -21,7 +21,18 @@ namespace nORM.Migration
             { typeof(decimal).FullName!, "DECIMAL(18,2)" },
             { typeof(double).FullName!, "DOUBLE PRECISION" },
             { typeof(float).FullName!, "REAL" },
-            { typeof(Guid).FullName!, "UUID" }
+            { typeof(Guid).FullName!, "UUID" },
+            // X2: expanded type map
+            { typeof(byte[]).FullName!, "BYTEA" },
+            { typeof(DateOnly).FullName!, "DATE" },
+            { typeof(TimeOnly).FullName!, "TIME" },
+            { typeof(DateTimeOffset).FullName!, "TIMESTAMPTZ" },
+            { typeof(TimeSpan).FullName!, "INTERVAL" },
+            { typeof(char).FullName!, "CHAR(1)" },
+            { typeof(sbyte).FullName!, "SMALLINT" },
+            { typeof(ushort).FullName!, "INTEGER" },
+            { typeof(uint).FullName!, "BIGINT" },
+            { typeof(ulong).FullName!, "NUMERIC(20,0)" }
         };
 
         // Escape PostgreSQL identifiers to prevent SQL injection via identifier names.
@@ -183,7 +194,21 @@ namespace nORM.Migration
         /// <param name="column">The column metadata describing the desired CLR type.</param>
         /// <returns>The PostgreSQL data type name.</returns>
         private static string GetSqlType(ColumnSchema column)
-            => TypeMap.TryGetValue(column.ClrType, out var sql) ? sql : "TEXT";
+        {
+            // X2: handle enum types by mapping to their underlying integral type
+            if (!TypeMap.TryGetValue(column.ClrType, out var sql))
+            {
+                var clrType = ResolveType(column.ClrType);
+                if (clrType != null && clrType.IsEnum)
+                {
+                    var underlying = Enum.GetUnderlyingType(clrType);
+                    if (TypeMap.TryGetValue(underlying.FullName!, out sql))
+                        return sql;
+                }
+                return "TEXT";
+            }
+            return sql;
+        }
 
         // M1/X1: Allowlist for FK referential action tokens.
         private static readonly HashSet<string> _validFkActions =
@@ -213,6 +238,19 @@ namespace nORM.Migration
             if (!string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
                 sql += $" ON UPDATE {onUpdate}";
             return sql;
+        }
+
+        // X2: resolve type by name, scanning loaded assemblies when Type.GetType fails
+        private static Type? ResolveType(string typeName)
+        {
+            var t = Type.GetType(typeName);
+            if (t != null) return t;
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                t = asm.GetType(typeName);
+                if (t != null) return t;
+            }
+            return null;
         }
     }
 }

@@ -148,6 +148,29 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// MM1 fix: Converts a boxed DB value to <see cref="DateOnly"/>. Called from IL-emitted
+        /// materializers where <c>Convert.ChangeType</c> cannot handle DateOnly.
+        /// </summary>
+        internal static DateOnly ConvertToDateOnly(object value)
+        {
+            if (value is DateTime dt) return DateOnly.FromDateTime(dt);
+            if (value is string s) return DateOnly.Parse(s);
+            return DateOnly.FromDateTime(Convert.ToDateTime(value));
+        }
+
+        /// <summary>
+        /// MM1 fix: Converts a boxed DB value to <see cref="TimeOnly"/>. Called from IL-emitted
+        /// materializers where <c>Convert.ChangeType</c> cannot handle TimeOnly.
+        /// </summary>
+        internal static TimeOnly ConvertToTimeOnly(object value)
+        {
+            if (value is TimeSpan ts) return TimeOnly.FromTimeSpan(ts);
+            if (value is DateTime dt) return TimeOnly.FromDateTime(dt);
+            if (value is string s) return TimeOnly.Parse(s);
+            return TimeOnly.FromTimeSpan((TimeSpan)Convert.ChangeType(value, typeof(TimeSpan)));
+        }
+
+        /// <summary>
         /// Computes a 64-bit projection hash by combining two independent 32-bit hashes
         /// from the <see cref="ExpressionFingerprint"/>. This reduces collision probability
         /// compared to a single 32-bit hash (roughly 1-in-2^64 vs 1-in-2^32 per pair).
@@ -198,6 +221,21 @@ namespace nORM.Query
                 var enumUnderlying = Enum.GetUnderlyingType(underlyingType);
                 var enumConverted = Convert.ChangeType(dbValue, enumUnderlying);
                 return Enum.ToObject(underlyingType, enumConverted);
+            }
+
+            // MM1 fix: DateOnly/TimeOnly require explicit conversion because Convert.ChangeType doesn't handle them
+            if (underlyingType == typeof(DateOnly))
+            {
+                if (dbValue is DateTime dt) return DateOnly.FromDateTime(dt);
+                if (dbValue is string s) return DateOnly.Parse(s);
+                return DateOnly.FromDateTime(Convert.ToDateTime(dbValue));
+            }
+            if (underlyingType == typeof(TimeOnly))
+            {
+                if (dbValue is TimeSpan ts) return TimeOnly.FromTimeSpan(ts);
+                if (dbValue is DateTime dt) return TimeOnly.FromDateTime(dt);
+                if (dbValue is string s) return TimeOnly.Parse(s);
+                return TimeOnly.FromTimeSpan((TimeSpan)Convert.ChangeType(dbValue, typeof(TimeSpan)));
             }
 
             // Use cached conversion delegate for better performance
@@ -280,6 +318,16 @@ namespace nORM.Query
                                     .MakeGenericMethod(underlying);
                                 il.Emit(OpCodes.Call, enumConvertMethod);
                             }
+                            else if (underlying == typeof(DateOnly))
+                            {
+                                // MM1 fix: Nullable<DateOnly> — Convert.ChangeType doesn't support DateOnly
+                                il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateOnly), BindingFlags.NonPublic | BindingFlags.Static)!);
+                            }
+                            else if (underlying == typeof(TimeOnly))
+                            {
+                                // MM1 fix: Nullable<TimeOnly> — Convert.ChangeType doesn't support TimeOnly
+                                il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.NonPublic | BindingFlags.Static)!);
+                            }
                             else
                             {
                                 il.Emit(OpCodes.Ldtoken, underlying);
@@ -302,6 +350,22 @@ namespace nORM.Query
                         var enumConvertMethod = typeof(MaterializerFactory).GetMethod(nameof(ConvertToEnum), BindingFlags.NonPublic | BindingFlags.Static)!
                             .MakeGenericMethod(pType);
                         il.Emit(OpCodes.Call, enumConvertMethod);
+                    }
+                    else if (pType == typeof(DateOnly))
+                    {
+                        // MM1 fix: DateOnly — Convert.ChangeType doesn't support DateOnly
+                        if (readerMethod.ReturnType == typeof(object))
+                        {
+                            il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateOnly), BindingFlags.NonPublic | BindingFlags.Static)!);
+                        }
+                    }
+                    else if (pType == typeof(TimeOnly))
+                    {
+                        // MM1 fix: TimeOnly — Convert.ChangeType doesn't support TimeOnly
+                        if (readerMethod.ReturnType == typeof(object))
+                        {
+                            il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.NonPublic | BindingFlags.Static)!);
+                        }
                     }
                     else if (pType.IsValueType)
                     {
@@ -832,6 +896,8 @@ namespace nORM.Query
                        underlyingExpected == typeof(DateTime) ||
                        underlyingExpected == typeof(DateTimeOffset) ||
                        underlyingExpected == typeof(TimeSpan) ||
+                       underlyingExpected == typeof(DateOnly) ||   // MM1: SQLite stores DateOnly as TEXT
+                       underlyingExpected == typeof(TimeOnly) ||   // MM1: SQLite stores TimeOnly as TEXT
                        underlyingExpected == typeof(bool); // SQLite stores bools as strings sometimes
             }
 
@@ -1442,6 +1508,12 @@ namespace nORM.Query
         private static readonly MethodInfo _convertToEnumOpenMethod =
             typeof(MaterializerFactory).GetMethod(nameof(ConvertToEnum), BindingFlags.NonPublic | BindingFlags.Static)!;
 
+        private static readonly MethodInfo _convertToDateOnlyMethod =
+            typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateOnly), BindingFlags.NonPublic | BindingFlags.Static)!;
+
+        private static readonly MethodInfo _convertToTimeOnlyMethod =
+            typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.NonPublic | BindingFlags.Static)!;
+
         private static Expression GetOptimizedReaderCall(ParameterExpression reader, Type propertyType, int index)
         {
             var underlyingType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
@@ -1454,6 +1526,18 @@ namespace nORM.Query
                 var enumConvertMethod = _convertToEnumOpenMethod.MakeGenericMethod(underlyingType);
                 var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
                 call = Expression.Call(enumConvertMethod, getRawValue);
+            }
+            else if (underlyingType == typeof(DateOnly))
+            {
+                // MM1 fix: DateOnly — Convert.ChangeType and Expression.Convert don't support DateOnly
+                var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
+                call = Expression.Call(_convertToDateOnlyMethod, getRawValue);
+            }
+            else if (underlyingType == typeof(TimeOnly))
+            {
+                // MM1 fix: TimeOnly — Convert.ChangeType and Expression.Convert don't support TimeOnly
+                var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
+                call = Expression.Call(_convertToTimeOnlyMethod, getRawValue);
             }
             else
             {

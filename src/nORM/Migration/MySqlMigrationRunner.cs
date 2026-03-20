@@ -114,7 +114,15 @@ namespace nORM.Migration
         protected internal virtual async Task AcquireAdvisoryLockAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"SELECT GET_LOCK('{MigrationLockName}', {MigrationLockTimeoutSeconds})";
+            cmd.CommandText = "SELECT GET_LOCK(@lockName, @lockTimeout)";
+            var pName = cmd.CreateParameter();
+            pName.ParameterName = "@lockName";
+            pName.Value = MigrationLockName;
+            cmd.Parameters.Add(pName);
+            var pTimeout = cmd.CreateParameter();
+            pTimeout.ParameterName = "@lockTimeout";
+            pTimeout.Value = MigrationLockTimeoutSeconds;
+            cmd.Parameters.Add(pTimeout);
             var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
             if (result == null || result == DBNull.Value || Convert.ToInt32(result) != 1)
                 throw new InvalidOperationException(
@@ -128,7 +136,11 @@ namespace nORM.Migration
         protected internal virtual async Task ReleaseAdvisoryLockAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"DO RELEASE_LOCK('{MigrationLockName}')";
+            cmd.CommandText = "DO RELEASE_LOCK(@lockName)";
+            var pName = cmd.CreateParameter();
+            pName.ParameterName = "@lockName";
+            pName.Value = MigrationLockName;
+            cmd.Parameters.Add(pName);
             try { await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false); }
             catch (Exception ex)
             {

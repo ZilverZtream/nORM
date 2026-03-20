@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace nORM.Migration
 {
@@ -21,7 +22,18 @@ namespace nORM.Migration
             { typeof(decimal).FullName!, "NUMERIC" },
             { typeof(double).FullName!, "REAL" },
             { typeof(float).FullName!, "REAL" },
-            { typeof(Guid).FullName!, "TEXT" }
+            { typeof(Guid).FullName!, "TEXT" },
+            // X2: expanded type map
+            { typeof(byte[]).FullName!, "BLOB" },
+            { typeof(DateOnly).FullName!, "TEXT" },
+            { typeof(TimeOnly).FullName!, "TEXT" },
+            { typeof(DateTimeOffset).FullName!, "TEXT" },
+            { typeof(TimeSpan).FullName!, "TEXT" },
+            { typeof(char).FullName!, "TEXT" },
+            { typeof(sbyte).FullName!, "INTEGER" },
+            { typeof(ushort).FullName!, "INTEGER" },
+            { typeof(uint).FullName!, "INTEGER" },
+            { typeof(ulong).FullName!, "INTEGER" }
         };
 
         // Escape SQLite identifiers to prevent SQL injection via identifier names.
@@ -297,6 +309,33 @@ namespace nORM.Migration
         }
 
         private static string GetSqlType(ColumnSchema column)
-            => TypeMap.TryGetValue(column.ClrType, out var sql) ? sql : "TEXT";
+        {
+            // X2: handle enum types by mapping to their underlying integral type
+            if (!TypeMap.TryGetValue(column.ClrType, out var sql))
+            {
+                var clrType = ResolveType(column.ClrType);
+                if (clrType != null && clrType.IsEnum)
+                {
+                    var underlying = Enum.GetUnderlyingType(clrType);
+                    if (TypeMap.TryGetValue(underlying.FullName!, out sql))
+                        return sql;
+                }
+                return "TEXT";
+            }
+            return sql;
+        }
+
+        // X2: resolve type by name, scanning loaded assemblies when Type.GetType fails
+        private static Type? ResolveType(string typeName)
+        {
+            var t = Type.GetType(typeName);
+            if (t != null) return t;
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                t = asm.GetType(typeName);
+                if (t != null) return t;
+            }
+            return null;
+        }
     }
 }
