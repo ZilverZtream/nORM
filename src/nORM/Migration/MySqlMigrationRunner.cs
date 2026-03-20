@@ -78,10 +78,18 @@ namespace nORM.Migration
                 // manually inspecting / completing the schema, then rerun.
                 foreach (var migration in pending)
                 {
-                    // Write durable Partial checkpoint before any DDL runs.
-                    await InsertMigrationCheckpointAsync(migration, ct).ConfigureAwait(false);
-
+                    // M1 fix: start the transaction BEFORE writing the Partial checkpoint.
+                    // Previously, the checkpoint was written first and then the transaction opened.
+                    // If BeginTransactionAsync failed, a Partial row remained with no actual schema
+                    // change, falsely blocking all future reruns. By starting the transaction first,
+                    // a pre-DDL failure rolls back the checkpoint too (MySQL auto-commits DDL but
+                    // the checkpoint INSERT is DML and participates in the transaction).
                     await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+
+                    // Write durable Partial checkpoint inside the transaction.
+                    // If the migration fails, the Partial row persists (auto-committed DDL),
+                    // but if BeginTransactionAsync fails, no Partial row is created.
+                    await InsertMigrationCheckpointAsync(migration, ct).ConfigureAwait(false);
                     try
                     {
                         migration.Up(_connection, (DbTransaction)transaction, ct);

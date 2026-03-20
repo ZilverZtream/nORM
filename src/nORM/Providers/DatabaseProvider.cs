@@ -25,7 +25,9 @@ namespace nORM.Providers
     /// </summary>
     public abstract class DatabaseProvider : IFastProvider
     {
-        private readonly ConcurrentLruCache<(Type Type, string Operation), string> _sqlCache = new(maxSize: 1000);
+        // S1/Save1 fix: cache key includes table name to prevent cross-context DML contamination
+        // when the same provider instance is shared across contexts with different mappings.
+        private readonly ConcurrentLruCache<(Type Type, string TableName, string Operation), string> _sqlCache = new(maxSize: 1000);
 
         /// <summary>
         /// Utility used to dynamically determine optimal batch sizes for bulk
@@ -781,7 +783,7 @@ namespace nORM.Providers
         {
             var includeIdentityRetrieval = hydrateGeneratedKeys && m.KeyColumns.Any(k => k.IsDbGenerated);
             var cacheKey = includeIdentityRetrieval ? "INSERT" : "INSERT_PLAIN";
-            return _sqlCache.GetOrAdd((m.Type, cacheKey), _ => {
+            return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheKey), _ => {
                 var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
                 var identityFragment = includeIdentityRetrieval
                     ? GetIdentityRetrievalString(m)
@@ -808,7 +810,7 @@ namespace nORM.Providers
                 throw new NormConfigurationException(
                     $"Entity '{m.Type.Name}' has no mutable columns to update. Add at least one non-key, non-timestamp property.");
 
-            return _sqlCache.GetOrAdd((m.Type, "UPDATE"), _ =>
+            return _sqlCache.GetOrAdd((m.Type, m.TableName, "UPDATE"), _ =>
             {
                 var set = string.Join(", ", m.UpdateColumns
                     .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}"));
@@ -834,7 +836,7 @@ namespace nORM.Providers
         /// <returns>A <c>DELETE</c> SQL statement.</returns>
         public string BuildDelete(TableMapping m)
         {
-            return _sqlCache.GetOrAdd((m.Type, "DELETE"), _ =>
+            return _sqlCache.GetOrAdd((m.Type, m.TableName, "DELETE"), _ =>
             {
                 var whereCols = m.KeyColumns
                     .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}").ToList();

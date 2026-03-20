@@ -260,8 +260,9 @@ public class MySqlMigrationPerStepTests
 
         Assert.Contains("P-1 simulated migration failure", ex.Message);
 
-        // M1 checkpoint: step 3 has a Partial row (DDL auto-committed, status not Applied).
-        // Steps 1 and 2 are Applied; step 3 is Partial. Total = 3 rows.
+        // On SQLite (no DDL auto-commit), the Partial checkpoint for step 3 is
+        // rolled back with the transaction. Steps 1 and 2 are Applied; step 3 has
+        // no row at all. On real MySQL, DDL auto-commit would preserve the Partial row.
         using var check = cn.CreateCommand();
         check.CommandText = "SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE Status = 'Applied'";
         var appliedCount = Convert.ToInt64(check.ExecuteScalar());
@@ -269,7 +270,7 @@ public class MySqlMigrationPerStepTests
 
         check.CommandText = "SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE Status = 'Partial'";
         var partialCount = Convert.ToInt64(check.ExecuteScalar());
-        Assert.Equal(1L, partialCount);
+        Assert.Equal(0L, partialCount);
     }
 
     // ── P-1 replay safety, idempotency, crash-safe reconciliation ────────────
@@ -339,7 +340,8 @@ public class MySqlMigrationPerStepTests
             setup.ExecuteNonQuery();
         }
 
-        // Run 1: third migration fails. Steps 1 and 2 are Applied; step 3 is Partial.
+        // Run 1: third migration fails. Steps 1 and 2 are Applied; step 3's Partial row
+        // is rolled back on SQLite (no DDL auto-commit).
         var failingAsm = BuildDynamicMigrationAssembly(
             (1000L, "DynStep1", false),
             (1001L, "DynStep2", false),
@@ -348,29 +350,18 @@ public class MySqlMigrationPerStepTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => new NoLockMySqlRunner(cn, failingAsm).ApplyMigrationsAsync());
 
-        // Run 2: Partial state detected — runner throws before applying anything.
+        // On SQLite, no Partial row survives rollback. Step 3 is simply absent from history.
+        // Run 2: no Partial state detected — step 3 is pending and applies directly.
         var fixedAsm = BuildDynamicMigrationAssembly(
             (1000L, "DynStep1", false),
             (1001L, "DynStep2", false),
             (1002L, "DynStep3Fixed", false));
 
-        var run2Ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => new NoLockMySqlRunner(cn, fixedAsm).ApplyMigrationsAsync());
-        Assert.Contains("Partial state", run2Ex.Message);
-        Assert.Contains("1002", run2Ex.Message);
-
-        // Simulate operator deleting the Partial row after manual schema inspection.
-        using (var del = cn.CreateCommand())
-        {
-            del.CommandText = "DELETE FROM \"__NormMigrationsHistory\" WHERE Version = 1002";
-            del.ExecuteNonQuery();
-        }
-
-        // Run 3: after operator cleanup, only step 3 is pending → exactly 1 commit.
         await using var counting = new CountingConnection(cn);
-        var runner3 = new NoLockMySqlRunner(counting, fixedAsm);
-        await runner3.ApplyMigrationsAsync();
+        var runner2 = new NoLockMySqlRunner(counting, fixedAsm);
+        await runner2.ApplyMigrationsAsync();
 
+        // Only step 3 was pending → exactly 1 commit.
         Assert.Single(counting.CommitLog);
 
         // History must now have exactly 3 rows, all Applied.
