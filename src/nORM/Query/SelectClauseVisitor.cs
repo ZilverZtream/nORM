@@ -62,7 +62,7 @@ namespace nORM.Query
             for (int i = 0; i < node.Arguments.Count; i++)
             {
                 var arg = node.Arguments[i];
-                var memberName = node.Members![i].Name;
+                var memberName = node.Members?[i]?.Name ?? $"Item{i + 1}";
 
                 // Check if this is a navigation property (collection)
                 if (IsNavigationCollection(arg, out var navProperty))

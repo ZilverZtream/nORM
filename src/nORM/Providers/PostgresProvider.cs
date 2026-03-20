@@ -321,16 +321,25 @@ namespace nORM.Providers
         private static System.Array CreateTypedArray(IReadOnlyList<object?> values)
         {
             Type? commonType = null;
+            bool hasNull = false;
             foreach (var v in values)
             {
-                if (v == null) continue;
+                if (v == null) { hasNull = true; continue; }
                 var t = v.GetType();
                 if (commonType == null) { commonType = t; }
                 else if (commonType != t) { commonType = null; break; }
             }
             if (commonType == null)
                 return values.ToArray(); // mixed or all-null — object[] fallback
-            var arr = System.Array.CreateInstance(commonType, values.Count);
+
+            // P1 fix: when the collection contains nulls AND the common type is a non-nullable
+            // value type (e.g., int), use Nullable<T> as the array element type. Otherwise
+            // Array.SetValue(null, i) throws InvalidCastException on value-type arrays.
+            var elementType = (hasNull && commonType.IsValueType && Nullable.GetUnderlyingType(commonType) == null)
+                ? typeof(Nullable<>).MakeGenericType(commonType)
+                : commonType;
+
+            var arr = System.Array.CreateInstance(elementType, values.Count);
             for (int i = 0; i < values.Count; i++)
                 arr.SetValue(values[i], i);
             return arr;

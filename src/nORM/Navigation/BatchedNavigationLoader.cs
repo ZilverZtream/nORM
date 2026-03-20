@@ -58,7 +58,6 @@ namespace nORM.Navigation
             var key = (entityType, propertyName);
             var tcs = new TaskCompletionSource<object>();
 
-            bool shouldScheduleTimer = false;
             await _batchSemaphore.WaitAsync(ct).ConfigureAwait(false);
             try
             {
@@ -80,18 +79,16 @@ namespace nORM.Navigation
                         totalCount += kvp.Value.Count;
                         if (totalCount > 1) break; // Early exit
                     }
-                    shouldScheduleTimer = totalCount == 1;
+                    // Fix: create timer INSIDE the lock to prevent TOCTOU race
+                    // where ProcessBatchAsync disposes/nulls _batchTimer between
+                    // the check and the assignment.
+                    if (totalCount == 1)
+                        _batchTimer = new Timer(TimerTick, null, BatchDelayMs, Timeout.Infinite);
                 }
             }
             finally
             {
                 _batchSemaphore.Release();
-            }
-
-            // Schedule timer outside the lock to reduce lock contention
-            if (shouldScheduleTimer)
-            {
-                _batchTimer = new Timer(TimerTick, null, BatchDelayMs, Timeout.Infinite);
             }
 
             return (List<object>)await tcs.Task.WaitAsync(ct).ConfigureAwait(false);

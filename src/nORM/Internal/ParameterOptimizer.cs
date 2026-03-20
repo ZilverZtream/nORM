@@ -61,7 +61,17 @@ namespace nORM.Internal
             [typeof(float?)] = DbType.Single,
             [typeof(double?)] = DbType.Double,
             [typeof(DateTimeOffset?)] = DbType.DateTimeOffset,
-            [typeof(TimeSpan?)] = DbType.Time
+            [typeof(TimeSpan?)] = DbType.Time,
+
+            // Nullable versions of unsigned/signed integers and temporal types
+            // Missing these causes null params to bind as DbType.Object on non-SQLite providers
+            [typeof(sbyte?)] = DbType.SByte,
+            [typeof(ushort?)] = DbType.UInt16,
+            [typeof(uint?)] = DbType.UInt32,
+            [typeof(ulong?)] = DbType.UInt64,
+            [typeof(DateOnly?)] = DbType.Date,
+            [typeof(TimeOnly?)] = DbType.Time,
+            [typeof(char?)] = DbType.StringFixedLength
         };
 
         /// <summary>

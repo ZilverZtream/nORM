@@ -175,6 +175,9 @@ namespace nORM.Query
             if (type == typeof(DateOnly))
             {
                 p.DbType = System.Data.DbType.Date;
+                // Keep DateOnly as-is for ParameterAssign path. SQLite binds DateOnly as TEXT
+                // which enables correct text comparison in WHERE clauses. The AddOptimizedParam
+                // path converts to DateTime for non-SQLite providers that need it.
                 p.Value = v;
                 return;
             }

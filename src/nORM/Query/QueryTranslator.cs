@@ -673,7 +673,7 @@ namespace nORM.Query
                 {
                     if (i > 0) sb.Append(", ");
                     var arg = ne.Arguments[i];
-                    var alias = ne.Members![i].Name;
+                    var alias = ne.Members?[i]?.Name ?? $"Item{i + 1}";
                     if (arg is MemberExpression me)
                     {
                         var col = _mapping.ColumnsByName[me.Member.Name];
@@ -1202,7 +1202,7 @@ namespace nORM.Query
                     if (!_correlatedParams.ContainsKey(filterParam))
                         _correlatedParams[filterParam] = (innerMapping, innerAlias);
 
-                    var vctxFilter = new VisitorContext(_ctx, innerMapping, _provider, filterParam, innerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                    var vctxFilter = new VisitorContext(_ctx, innerMapping, _provider, filterParam, innerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                     var filterVisitor = FastExpressionVisitorPool.Get(in vctxFilter);
                     var filterSql = filterVisitor.Translate(filterPredicate.Body);
 

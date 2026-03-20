@@ -605,7 +605,8 @@ END;";
                 throw new NormConfigurationException($"Cannot delete from '{m.EscTable}': no key columns defined.");
 
             var operationKey = $"MySql_BulkDelete_{m.Type.Name}";
-            var paramsPerEntity = keyCols.Count;
+            var hasTenant = ctx.Options.TenantProvider != null && m.TenantColumn != null;
+            var paramsPerEntity = keyCols.Count + (hasTenant ? 1 : 0);
             var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
             var maxBatchForProvider = MaxParameters / Math.Max(1, paramsPerEntity);
             var batchSize = Math.Max(1, Math.Min(sizing.OptimalBatchSize, maxBatchForProvider));

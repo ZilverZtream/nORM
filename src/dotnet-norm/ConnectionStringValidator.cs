@@ -49,7 +49,7 @@ namespace nORM.Security
                     EnforceSqlServerSecurity(builder);
                 }
 
-                return builder.ConnectionString;
+                return sanitized.ConnectionString;
             }
             catch (Exception ex)
             {

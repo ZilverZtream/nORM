@@ -5,6 +5,7 @@ using nORM.Providers;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
@@ -295,7 +296,7 @@ namespace nORM.Query
                 cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
             var results = new List<T>(takeCount ?? 16);
             var materializer = GetSyncMaterializer<T>(ctx);
-            await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 results.Add(materializer(reader));
             // Load owned collections (OwnsMany) if configured
@@ -331,7 +332,7 @@ namespace nORM.Query
             }
             else
             {
-                await using var asyncReader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                await using var asyncReader = await command.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
                 while (await asyncReader.ReadAsync(ct).ConfigureAwait(false))
                     results.Add(materializer(asyncReader));
             }
@@ -347,7 +348,7 @@ namespace nORM.Query
             var results = new List<T>(takeCount ?? 16);
             var materializer = GetSyncMaterializer<T>(ctx);
             await using var command = cmd;
-            await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            await using var reader = await command.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 results.Add(materializer(reader));
 
@@ -375,7 +376,7 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             var results = new List<T>();
             var materializer = GetSyncMaterializer<T>(ctx);
-            await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
                 results.Add(materializer(reader));
@@ -393,7 +394,7 @@ namespace nORM.Query
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-            var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            var result = await cmd.ExecuteScalarWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
             return (object)Convert.ToInt32(result);
         }
     }
