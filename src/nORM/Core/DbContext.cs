@@ -73,7 +73,7 @@ namespace nORM.Core
         private DbTransaction? _currentTransaction; // Access via Interlocked.* only
         // ConcurrentDictionary eliminates lock contention on the insert fast path.
         private readonly ConcurrentDictionary<(Type EntityType, bool HydrateGeneratedKeys), PreparedInsertCommand> _preparedInsertCache = new();
-        private bool _disposed;
+        private volatile bool _disposed;
 
         /// <summary>
         /// Gets the configuration options that control the behavior of this context
@@ -1775,14 +1775,19 @@ namespace nORM.Core
                 conditions.Add($"({string.Join(" AND ", pkConds)})");
             }
 
-            sb.Append(string.Join(" OR ", conditions));
-
-            // X1: Tenant isolation — restrict the SELECT COUNT(*) to the current tenant
-            // to mirror the WHERE predicate used in BuildUpdateBatch/BuildDeleteBatch.
+            // X1 fix: Parenthesize the OR-chain so the tenant predicate applies to ALL
+            // disjuncts, not just the last one. Without parens, SQL AND binds tighter than OR,
+            // causing the tenant restriction to apply only to the final row condition.
             if (Options.TenantProvider != null && map.TenantColumn != null)
             {
-                sb.Append($" AND {map.TenantColumn.EscCol} = {_p.ParamPrefix}tenantVerify");
+                sb.Append('(');
+                sb.Append(string.Join(" OR ", conditions));
+                sb.Append($") AND {map.TenantColumn.EscCol} = {_p.ParamPrefix}tenantVerify");
                 cmd.AddParam($"{_p.ParamPrefix}tenantVerify", Options.TenantProvider.GetCurrentTenantId());
+            }
+            else
+            {
+                sb.Append(string.Join(" OR ", conditions));
             }
 
             cmd.CommandText = sb.ToString();

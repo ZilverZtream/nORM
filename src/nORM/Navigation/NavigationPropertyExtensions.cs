@@ -283,6 +283,7 @@ namespace nORM.Navigation
 
         private static async Task LoadRelationshipAsync(object entity, PropertyInfo property, TableMapping.Relation relation, NavigationContext context, CancellationToken ct)
         {
+            if (relation.PrincipalKey == null) return;
             var principalKeyValue = relation.PrincipalKey.Getter(entity);
             if (principalKeyValue == null) return;
             

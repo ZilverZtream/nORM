@@ -201,6 +201,7 @@ namespace nORM.Query
         /// <returns>The current builder instance.</returns>
         public OptimizedSqlBuilder Insert(int index, string value)
         {
+            if (index < 0 || index > _position) throw new ArgumentOutOfRangeException(nameof(index));
             var span = value.AsSpan();
             EnsureCapacity(span.Length);
             _buffer.AsSpan(index, _position - index).CopyTo(_buffer.AsSpan(index + span.Length));

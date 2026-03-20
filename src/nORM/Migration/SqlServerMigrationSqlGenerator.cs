@@ -78,7 +78,8 @@ namespace nORM.Migration
                 // M1: Emit DEFAULT constraint changes when DefaultValue differs.
                 if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
                 {
-                    up.Add($"DECLARE @__df_{table.Name}_{newCol.Name} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_column_id,column_id)='{EscLiteral(newCol.Name)}') IF @__df_{table.Name}_{newCol.Name} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+@__df_{table.Name}_{newCol.Name}+']')");
+                    var upVar = $"@__df_{Math.Abs((table.Name + "_" + newCol.Name).GetHashCode()):X8}";
+                    up.Add($"DECLARE {upVar} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_column_id,column_id)='{EscLiteral(newCol.Name)}') IF {upVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{upVar}+']')");
                     if (newCol.DefaultValue != null)
                         up.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{newCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(newCol.DefaultValue)}) FOR {Esc(newCol.Name)}");
                 }
@@ -146,7 +147,8 @@ namespace nORM.Migration
 
                 if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
                 {
-                    down.Add($"DECLARE @__df_{table.Name}_{oldCol.Name} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_column_id,column_id)='{EscLiteral(oldCol.Name)}') IF @__df_{table.Name}_{oldCol.Name} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+@__df_{table.Name}_{oldCol.Name}+']')");
+                    var downVar = $"@__df_{Math.Abs((table.Name + "_" + oldCol.Name).GetHashCode()):X8}";
+                    down.Add($"DECLARE {downVar} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_column_id,column_id)='{EscLiteral(oldCol.Name)}') IF {downVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{downVar}+']')");
                     if (oldCol.DefaultValue != null)
                         down.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{oldCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(oldCol.DefaultValue)}) FOR {Esc(oldCol.Name)}");
                 }

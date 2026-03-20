@@ -750,6 +750,11 @@ namespace nORM.Query
                 return ExecuteCompiledInternalArrayCachedAsync<TResult>(plan, parameterValues, ct);
             }
 
+            // Ensure connection is ready (fast no-op when already open).
+            var ensureTask = _ctx.EnsureConnectionAsync(ct);
+            if (!ensureTask.IsCompletedSuccessfully)
+                return ExecuteCompiledInternalArraySlowAsync<TResult>(ensureTask, plan, parameterValues, ct);
+
             // Build command synchronously, then delegate to materialization.
             // This avoids an async state machine for the command setup work.
             var cmd = _ctx.CreateCommand();
@@ -791,6 +796,49 @@ namespace nORM.Query
             }
 
             return ExecuteCompiledMaterializeAsync<TResult>(plan, cmd, ct);
+        }
+
+        private async Task<TResult> ExecuteCompiledInternalArraySlowAsync<TResult>(Task<DbConnection> ensureTask, QueryPlan plan, object?[] parameterValues, CancellationToken ct)
+        {
+            await ensureTask.ConfigureAwait(false);
+
+            var cmd = _ctx.CreateCommand();
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+            cmd.CommandText = plan.Sql;
+
+            var compiledParams = plan.CompiledParameters;
+            if (compiledParams.Count == 0)
+            {
+                foreach (var p in plan.Parameters)
+                    cmd.AddOptimizedParam(p.Key, p.Value);
+            }
+            else
+            {
+                if (!_compiledParamSets.TryGet(plan, out var compiledSet))
+                {
+                    compiledSet = new HashSet<string>(compiledParams, StringComparer.Ordinal);
+                    _compiledParamSets.Set(plan, compiledSet);
+                }
+
+                foreach (var p in plan.Parameters)
+                {
+                    if (!compiledSet.Contains(p.Key))
+                        cmd.AddOptimizedParam(p.Key, p.Value);
+                }
+            }
+
+            var count = Math.Min(compiledParams.Count, parameterValues.Length);
+            for (int i = 0; i < count; i++)
+            {
+                cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
+            }
+
+            if (!plan.IsScalar && typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
+            {
+                return (TResult)(object)await _executor.MaterializeAsObjectListAsync(plan, cmd, ct).ConfigureAwait(false);
+            }
+
+            return await ExecuteCompiledMaterializeAsync<TResult>(plan, cmd, ct).ConfigureAwait(false);
         }
 
         /// <summary>

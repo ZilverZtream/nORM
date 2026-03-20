@@ -100,14 +100,25 @@ public class MaterializerSourceGenerator : ISourceGenerator
             sb.AppendLine("            {");
 
             var readerMethod = GetReaderMethod(underlyingType);
+            var underlyingName = underlyingType.ToDisplayString();
             if (readerMethod != null)
             {
                 sb.AppendLine($"                entity.{prop.Name} = reader.{readerMethod}({ordVar});");
             }
+            else if (underlyingName == "System.DateOnly" || underlyingName == "global::System.DateOnly")
+            {
+                // SG1 fix: DateOnly requires explicit conversion — providers return DateTime/string
+                sb.AppendLine($"                entity.{prop.Name} = nORM.Query.MaterializerFactory.ConvertToDateOnly(reader.GetValue({ordVar}));");
+            }
+            else if (underlyingName == "System.TimeOnly" || underlyingName == "global::System.TimeOnly")
+            {
+                // SG1 fix: TimeOnly requires explicit conversion — providers return TimeSpan/string
+                sb.AppendLine($"                entity.{prop.Name} = nORM.Query.MaterializerFactory.ConvertToTimeOnly(reader.GetValue({ordVar}));");
+            }
             else
             {
                 sb.AppendLine($"                var value = reader.GetValue({ordVar});");
-                sb.AppendLine($"                entity.{prop.Name} = ({propType.ToDisplayString()})Convert.ChangeType(value, typeof({underlyingType.ToDisplayString()}));");
+                sb.AppendLine($"                entity.{prop.Name} = ({propType.ToDisplayString()})Convert.ChangeType(value, typeof({underlyingName}));");
             }
 
             sb.AppendLine("            }");

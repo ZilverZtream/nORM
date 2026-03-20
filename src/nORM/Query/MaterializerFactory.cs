@@ -151,7 +151,11 @@ namespace nORM.Query
         /// MM1 fix: Converts a boxed DB value to <see cref="DateOnly"/>. Called from IL-emitted
         /// materializers where <c>Convert.ChangeType</c> cannot handle DateOnly.
         /// </summary>
-        internal static DateOnly ConvertToDateOnly(object value)
+        /// <summary>
+        /// Converts a boxed DB value to <see cref="DateOnly"/>. Public so source-generated
+        /// materializers can call it (SG1 fix).
+        /// </summary>
+        public static DateOnly ConvertToDateOnly(object value)
         {
             if (value is DateTime dt) return DateOnly.FromDateTime(dt);
             if (value is string s) return DateOnly.Parse(s);
@@ -162,7 +166,11 @@ namespace nORM.Query
         /// MM1 fix: Converts a boxed DB value to <see cref="TimeOnly"/>. Called from IL-emitted
         /// materializers where <c>Convert.ChangeType</c> cannot handle TimeOnly.
         /// </summary>
-        internal static TimeOnly ConvertToTimeOnly(object value)
+        /// <summary>
+        /// Converts a boxed DB value to <see cref="TimeOnly"/>. Public so source-generated
+        /// materializers can call it (SG1 fix).
+        /// </summary>
+        public static TimeOnly ConvertToTimeOnly(object value)
         {
             if (value is TimeSpan ts) return TimeOnly.FromTimeSpan(ts);
             if (value is DateTime dt) return TimeOnly.FromDateTime(dt);
@@ -321,12 +329,12 @@ namespace nORM.Query
                             else if (underlying == typeof(DateOnly))
                             {
                                 // MM1 fix: Nullable<DateOnly> — Convert.ChangeType doesn't support DateOnly
-                                il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateOnly), BindingFlags.NonPublic | BindingFlags.Static)!);
+                                il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateOnly), BindingFlags.Public | BindingFlags.Static)!);
                             }
                             else if (underlying == typeof(TimeOnly))
                             {
                                 // MM1 fix: Nullable<TimeOnly> — Convert.ChangeType doesn't support TimeOnly
-                                il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.NonPublic | BindingFlags.Static)!);
+                                il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.Public | BindingFlags.Static)!);
                             }
                             else
                             {
@@ -356,7 +364,7 @@ namespace nORM.Query
                         // MM1 fix: DateOnly — Convert.ChangeType doesn't support DateOnly
                         if (readerMethod.ReturnType == typeof(object))
                         {
-                            il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateOnly), BindingFlags.NonPublic | BindingFlags.Static)!);
+                            il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateOnly), BindingFlags.Public | BindingFlags.Static)!);
                         }
                     }
                     else if (pType == typeof(TimeOnly))
@@ -364,7 +372,7 @@ namespace nORM.Query
                         // MM1 fix: TimeOnly — Convert.ChangeType doesn't support TimeOnly
                         if (readerMethod.ReturnType == typeof(object))
                         {
-                            il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.NonPublic | BindingFlags.Static)!);
+                            il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.Public | BindingFlags.Static)!);
                         }
                     }
                     else if (pType.IsValueType)
@@ -1509,10 +1517,10 @@ namespace nORM.Query
             typeof(MaterializerFactory).GetMethod(nameof(ConvertToEnum), BindingFlags.NonPublic | BindingFlags.Static)!;
 
         private static readonly MethodInfo _convertToDateOnlyMethod =
-            typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateOnly), BindingFlags.NonPublic | BindingFlags.Static)!;
+            typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateOnly), BindingFlags.Public | BindingFlags.Static)!;
 
         private static readonly MethodInfo _convertToTimeOnlyMethod =
-            typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.NonPublic | BindingFlags.Static)!;
+            typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.Public | BindingFlags.Static)!;
 
         private static Expression GetOptimizedReaderCall(ParameterExpression reader, Type propertyType, int index)
         {

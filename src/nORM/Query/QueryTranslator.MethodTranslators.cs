@@ -233,7 +233,7 @@ namespace nORM.Query
                         info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
                         t._correlatedParams[param] = info;
                     }
-                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth);
+                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
                     var sql = visitor.Translate(keySelector.Body);
                     // Use node.Method.Name instead of t._methodName: visiting the source expression
@@ -889,6 +889,11 @@ namespace nORM.Query
                             var parentMap = t.TrackMapping(lastRelation.DependentType);
                             if (parentMap.Relations.TryGetValue(propName, out var relation))
                             {
+                                // Guard against composite-PK dependents early at translation time.
+                                var depMap = t._ctx.GetMapping(relation.DependentType);
+                                if (depMap.KeyColumns.Length > 1)
+                                    throw new NotSupportedException(
+                                        $"Include with composite primary key is not supported for '{relation.DependentType.Name}'.");
                                 lastInclude.Path.Add(relation);
                                 t.TrackMapping(relation.DependentType);
                             }

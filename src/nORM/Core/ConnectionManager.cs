@@ -372,18 +372,25 @@ namespace nORM.Core
         /// <param name="token">Token that cancels the loop and any in-progress checks.</param>
         private async Task HealthCheckLoopAsync(CancellationToken token)
         {
-            try
+            while (true)
             {
-                await PerformHealthChecksAsync(token).ConfigureAwait(false);
-
-                while (await _healthCheckTimer.WaitForNextTickAsync(token).ConfigureAwait(false))
+                try
                 {
                     await PerformHealthChecksAsync(token).ConfigureAwait(false);
+
+                    if (!await _healthCheckTimer.WaitForNextTickAsync(token).ConfigureAwait(false))
+                        break;
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected during shutdown
+                catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+                {
+                    break; // Normal shutdown
+                }
+                catch (Exception ex)
+                {
+                    // Log and continue — don't let health check loop die silently
+                    try { _logger?.LogWarning("Health check loop error: {Message}", ex.Message); }
+                    catch { /* logging must not throw */ }
+                }
             }
         }
 

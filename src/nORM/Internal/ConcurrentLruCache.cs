@@ -340,11 +340,15 @@ namespace nORM.Internal
         /// </summary>
         public void Dispose()
         {
-            if (_isDisposed) return;
+            // Thread-safe dispose: use Interlocked to ensure only one thread executes disposal.
+            // Volatile read/write on _isDisposed is insufficient — two threads can both pass
+            // the check and race on _lock.Dispose().
+            if (Interlocked.Exchange(ref _disposeFlag, 1) != 0) return;
             _isDisposed = true;
             _cache.Clear();
             _lruList.Clear();
             _lock?.Dispose();
         }
+        private int _disposeFlag;
     }
 }

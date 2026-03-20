@@ -249,7 +249,10 @@ namespace nORM.SourceGenerators
         private static string BuildAssignmentExpression(IPropertySymbol prop, string ordVar)
         {
             var read = GetReaderExpression(prop.Type, ordVar);
-            var needsNullCheck = prop.Type.IsReferenceType || prop.NullableAnnotation == NullableAnnotation.Annotated;
+            var typeName = prop.Type.ToDisplayString();
+            var needsNullCheck = prop.Type.IsReferenceType
+                || prop.NullableAnnotation == NullableAnnotation.Annotated
+                || typeName.Contains("DateOnly") || typeName.Contains("TimeOnly");
             return needsNullCheck
                 ? $"            if (!reader.IsDBNull({ordVar})) entity.{prop.Name} = {read};"
                 : $"            entity.{prop.Name} = {read};";
@@ -261,7 +264,10 @@ namespace nORM.SourceGenerators
         private static string BuildOwnedAssignmentExpression(IPropertySymbol owner, IPropertySymbol ownedProp, INamedTypeSymbol ownedType, string ordVar)
         {
             var read = GetReaderExpression(ownedProp.Type, ordVar);
-            var needsNullCheck = ownedProp.Type.IsReferenceType || ownedProp.NullableAnnotation == NullableAnnotation.Annotated;
+            var ownedPropTypeName = ownedProp.Type.ToDisplayString();
+            var needsNullCheck = ownedProp.Type.IsReferenceType
+                || ownedProp.NullableAnnotation == NullableAnnotation.Annotated
+                || ownedPropTypeName.Contains("DateOnly") || ownedPropTypeName.Contains("TimeOnly");
             var ownedTypeName = ownedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var ensureOwner = $"if (entity.{owner.Name} == null) entity.{owner.Name} = new {ownedTypeName}(); ";
             return needsNullCheck
@@ -303,6 +309,14 @@ namespace nORM.SourceGenerators
                 return $"reader.GetGuid({ordVar})";
             if (typeName == "global::System.Byte[]")
                 return $"reader.GetFieldValue<byte[]>({ordVar})";
+
+            // SG1 fix: DateOnly/TimeOnly require explicit conversion because providers may
+            // return DateTime, TimeSpan, or string rather than native DateOnly/TimeOnly.
+            // This matches the runtime materializer's ConvertToDateOnly/ConvertToTimeOnly helpers.
+            if (typeName == "global::System.DateOnly")
+                return $"nORM.Query.MaterializerFactory.ConvertToDateOnly(reader.GetValue({ordVar}))";
+            if (typeName == "global::System.TimeOnly")
+                return $"nORM.Query.MaterializerFactory.ConvertToTimeOnly(reader.GetValue({ordVar}))";
 
             return $"reader.GetFieldValue<{typeName}>({ordVar})";
         }

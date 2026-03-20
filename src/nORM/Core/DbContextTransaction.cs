@@ -22,7 +22,7 @@ namespace nORM.Core
         internal DbContextTransaction(DbTransaction? transaction, DbContext context)
         {
             _transaction = transaction;
-            _context = context;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
         /// <summary>
