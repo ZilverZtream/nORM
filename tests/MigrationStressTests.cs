@@ -234,7 +234,7 @@ public class MigrationStressTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task MySQL_PartialFailure_GoodMigrationsApplied_BadLeavePartial()
+    public async Task MySQL_PartialFailure_GoodMigrationsApplied_BadRolledBack()
     {
         await using var cn = OpenSqlite();
         CreateMysqlHistory(cn);
@@ -243,48 +243,42 @@ public class MigrationStressTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => new NoLockMysql(cn, asm).ApplyMigrationsAsync());
 
-        // S1 Applied, S2 Partial
+        // S1 Applied; S2's Partial row is rolled back on SQLite (no DDL auto-commit).
         Assert.Equal(1L, CountMysqlHistory(cn, " WHERE Status='Applied'"));
-        Assert.Equal(1L, CountMysqlHistory(cn, " WHERE Status='Partial'"));
+        Assert.Equal(0L, CountMysqlHistory(cn, " WHERE Status='Partial'"));
     }
 
     [Fact]
-    public async Task MySQL_PartialStateBlocks_NextRun()
+    public async Task MySQL_FailedStep_RetrySucceeds_OnSQLiteShim()
     {
         await using var cn = OpenSqlite();
         CreateMysqlHistory(cn);
 
-        // Step 1 fails
+        // Step 1 fails; Partial row is rolled back on SQLite (no DDL auto-commit).
         var failAsm = BuildAsm((1L, "Step1Fail", true));
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => new NoLockMysql(cn, failAsm).ApplyMigrationsAsync());
 
-        // Second run: Partial state detected → throws
+        // Second run: no Partial row survives on SQLite, so retry just applies the migration.
         var fixedAsm = BuildAsm((1L, "Step1Fail", false));
-        var ex2 = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => new NoLockMysql(cn, fixedAsm).ApplyMigrationsAsync());
-        Assert.Contains("Partial state", ex2.Message);
+        await new NoLockMysql(cn, fixedAsm).ApplyMigrationsAsync();
+
+        Assert.Equal(1L, CountMysqlHistory(cn, " WHERE Status='Applied'"));
     }
 
     [Fact]
-    public async Task MySQL_PartialState_OperatorDeletesThenResumes()
+    public async Task MySQL_FailedStep2_ResumeSucceeds_OnSQLiteShim()
     {
         await using var cn = OpenSqlite();
         CreateMysqlHistory(cn);
 
-        // Fail step 2
+        // Fail step 2; Partial row is rolled back on SQLite (no DDL auto-commit).
         var failAsm = BuildAsm((1L, "S1", false), (2L, "S2Fail", true));
         await Assert.ThrowsAnyAsync<Exception>(
             () => new NoLockMysql(cn, failAsm).ApplyMigrationsAsync());
 
-        // Operator deletes Partial row
-        using (var del = cn.CreateCommand())
-        {
-            del.CommandText = "DELETE FROM `__NormMigrationsHistory` WHERE Status='Partial'";
-            del.ExecuteNonQuery();
-        }
-
-        // Resume with fixed step 2
+        // On SQLite, no Partial row survives — no operator cleanup needed.
+        // Resume with fixed step 2.
         var fixedAsm = BuildAsm((1L, "S1", false), (2L, "S2Fixed", false));
         await new NoLockMysql(cn, fixedAsm).ApplyMigrationsAsync();
 
@@ -293,7 +287,7 @@ public class MigrationStressTests
     }
 
     [Fact]
-    public async Task MySQL_FirstStepFails_Partial_PreventsRerun()
+    public async Task MySQL_FirstStepFails_NoPartial_RetrySucceeds_OnSQLiteShim()
     {
         await using var cn = OpenSqlite();
         CreateMysqlHistory(cn);
@@ -302,34 +296,27 @@ public class MigrationStressTests
         await Assert.ThrowsAnyAsync<Exception>(
             () => new NoLockMysql(cn, asm).ApplyMigrationsAsync());
 
-        // Partial row exists
-        Assert.Equal(1L, CountMysqlHistory(cn, " WHERE Status='Partial'"));
+        // On SQLite, Partial row is rolled back (no DDL auto-commit).
+        Assert.Equal(0L, CountMysqlHistory(cn, " WHERE Status='Partial'"));
 
-        // Rerun throws about Partial state
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => new NoLockMysql(cn, BuildAsm((1L, "OnlyStep", false))).ApplyMigrationsAsync());
-        Assert.Contains("Partial state", ex.Message);
+        // Retry succeeds since no Partial row blocks it.
+        await new NoLockMysql(cn, BuildAsm((1L, "OnlyStep", false))).ApplyMigrationsAsync();
+        Assert.Equal(1L, CountMysqlHistory(cn, " WHERE Status='Applied'"));
     }
 
     [Fact]
-    public async Task MySQL_Retry_AfterOperatorCleanup_AllThreeApplied()
+    public async Task MySQL_Retry_Step3Fixed_AllThreeApplied_OnSQLiteShim()
     {
         await using var cn = OpenSqlite();
         CreateMysqlHistory(cn);
 
-        // Run 1: step 3 fails
+        // Run 1: step 3 fails; Partial row is rolled back on SQLite.
         var failAsm = BuildAsm((1L, "A", false), (2L, "B", false), (3L, "CFail", true));
         await Assert.ThrowsAnyAsync<Exception>(
             () => new NoLockMysql(cn, failAsm).ApplyMigrationsAsync());
 
-        // Cleanup Partial for step 3
-        using (var del = cn.CreateCommand())
-        {
-            del.CommandText = "DELETE FROM `__NormMigrationsHistory` WHERE Status='Partial'";
-            del.ExecuteNonQuery();
-        }
-
-        // Run 2: step 3 fixed
+        // On SQLite, no Partial row survives — no operator cleanup needed.
+        // Run 2: step 3 fixed, applies directly.
         var fixedAsm = BuildAsm((1L, "A", false), (2L, "B", false), (3L, "CFixed", false));
         await new NoLockMysql(cn, fixedAsm).ApplyMigrationsAsync();
 

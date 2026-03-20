@@ -544,7 +544,18 @@ namespace nORM.Core
             if (_mappingHashComputed) return _mappingHashCached;
             int h = 0;
             foreach (var mapping in GetAllMappings())
+            {
+                // Q1/C1/Cache1 fix: include full mapping shape — not just Type+TableName.
+                // Column names, converter fingerprint, shadow fingerprint, tenant column,
+                // and timestamp column all affect SQL generation and materialization.
+                // Without these, divergent fluent configurations sharing the same CLR type
+                // and table name can poison the global static plan/fast-path caches.
                 h = HashCode.Combine(h, mapping.TableName, mapping.Type);
+                h = HashCode.Combine(h, mapping.ConverterFingerprint, mapping.ShadowFingerprint);
+                h = HashCode.Combine(h, mapping.TenantColumn?.Name, mapping.TimestampColumn?.Name);
+                foreach (var col in mapping.Columns)
+                    h = HashCode.Combine(h, col.Name, col.PropName);
+            }
             _mappingHashCached = h;
             _mappingHashComputed = true;
             return h;

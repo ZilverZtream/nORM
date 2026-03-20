@@ -342,7 +342,7 @@ public class MigrationRunnerCoverageTests
     }
 
     [Fact]
-    public async Task MySQL_ApplyMigrationsAsync_FailingMigration_ThrowsAndLeavesPartial()
+    public async Task MySQL_ApplyMigrationsAsync_FailingMigration_ThrowsAndRollsBackPartial()
     {
         await using var cn = OpenSqlite();
         CreateMysqlHistoryTable(cn);
@@ -352,13 +352,15 @@ public class MigrationRunnerCoverageTests
             () => new NoLockMysql(cn, asm).ApplyMigrationsAsync());
         Assert.Contains("CoverageTest_simulated_Up_failure", ex.Message);
 
-        // Good migration should be Applied; bad should have a Partial checkpoint
+        // Good migration should be Applied; bad migration's Partial checkpoint is
+        // rolled back on SQLite (no DDL auto-commit). On real MySQL, DDL auto-commit
+        // would preserve the Partial row.
         using var check = cn.CreateCommand();
         check.CommandText = "SELECT COUNT(*) FROM `__NormMigrationsHistory` WHERE Status = 'Applied'";
         Assert.Equal(1L, Convert.ToInt64(check.ExecuteScalar()));
 
         check.CommandText = "SELECT COUNT(*) FROM `__NormMigrationsHistory` WHERE Status = 'Partial'";
-        Assert.Equal(1L, Convert.ToInt64(check.ExecuteScalar()));
+        Assert.Equal(0L, Convert.ToInt64(check.ExecuteScalar()));
     }
 
     [Fact]
