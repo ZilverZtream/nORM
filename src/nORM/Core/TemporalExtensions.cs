@@ -19,6 +19,7 @@ namespace nORM.Core
         /// <returns>A queryable that yields entity values at the given timestamp.</returns>
         public static IQueryable<T> AsOf<T>(this IQueryable<T> source, DateTime timestamp)
         {
+            ArgumentNullException.ThrowIfNull(source);
             var method = ((MethodInfo)MethodBase.GetCurrentMethod()!).MakeGenericMethod(typeof(T));
             var call = Expression.Call(null, method, source.Expression, Expression.Constant(timestamp));
             return source.Provider.CreateQuery<T>(call);
@@ -33,6 +34,8 @@ namespace nORM.Core
         /// <returns>A queryable filtered by the specified temporal tag.</returns>
         public static IQueryable<T> AsOf<T>(this IQueryable<T> source, string tagName)
         {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentException.ThrowIfNullOrWhiteSpace(tagName);
             var method = ((MethodInfo)MethodBase.GetCurrentMethod()!).MakeGenericMethod(typeof(T));
             var call = Expression.Call(null, method, source.Expression, Expression.Constant(tagName));
             return source.Provider.CreateQuery<T>(call);

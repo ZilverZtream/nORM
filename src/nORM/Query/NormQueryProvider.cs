@@ -1,31 +1,42 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
+using System.Globalization;
+using System.IO.Hashing;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Text;
-using System.IO.Hashing;
-using System.Runtime.CompilerServices;
-using System.Globalization;
-using System.Buffers;
+using Microsoft.Extensions.Logging;
 using nORM.Core;
 using nORM.Execution;
 using nORM.Internal;
-using nORM.Navigation;
 using nORM.Mapping;
-using Microsoft.Extensions.Logging;
+using nORM.Navigation;
 #nullable enable
 namespace nORM.Query
 {
     internal sealed class NormQueryProvider : IQueryProvider, IDisposable
     {
+        /// <summary>Default initial capacity for list materialization when no Take hint is available.</summary>
+        private const int DefaultListCapacity = 16;
+        /// <summary>Maximum string parameter length that gets an explicit Size hint (avoids NVARCHAR(MAX) on SQL Server).</summary>
+        private const int MaxInlineStringSize = 4000;
+        /// <summary>Threshold below which UTF-8 encoding uses stackalloc instead of ArrayPool rental.</summary>
+        private const int StackAllocUtf8Threshold = 256;
+        /// <summary>Fallback average plan size in bytes when no samples have been collected yet.</summary>
+        private const int FallbackAvgPlanSizeBytes = 16 * 1024;
+        /// <summary>Maximum bytes the plan cache is allowed to consume.</summary>
+        private const long MaxPlanCacheBytes = 64L * 1024 * 1024;
+
         internal readonly DbContext _ctx;
         private static readonly ConcurrentLruCache<ExpressionFingerprint, QueryPlan> _planCache =
             new(maxSize: CalculateInitialPlanCacheSize(), timeToLive: TimeSpan.FromHours(1));
@@ -68,7 +79,7 @@ namespace nORM.Query
         public void Dispose()
         {
             foreach (var entry in _pooledCountCommands.Values)
-                try { entry.Cmd.Dispose(); } catch { }
+                try { entry.Cmd.Dispose(); } catch (ObjectDisposedException) { /* already disposed — safe to ignore */ }
             _pooledCountCommands.Clear();
 
             // C1: stop background timers when the last provider is disposed so the process
@@ -82,7 +93,10 @@ namespace nORM.Query
         }
         public IQueryable CreateQuery(Expression expression)
         {
-            var elementType = expression.Type.GetGenericArguments()[0];
+            var typeArgs = expression.Type.GetGenericArguments();
+            if (typeArgs.Length == 0)
+                throw new ArgumentException($"Expression type '{expression.Type}' has no generic arguments. Expected IQueryable<T>.", nameof(expression));
+            var elementType = typeArgs[0];
             return CreateQueryInternal(elementType, expression);
         }
         public IQueryable<TElement> CreateQuery<TElement>(Expression expression)
@@ -120,25 +134,6 @@ namespace nORM.Query
             });
 
             return factory(this, expression);
-        }
-        /// <summary>
-        /// Cached check for whether a type can use constrained queryable.
-        /// GetConstructor is expensive reflection that's called for every query creation.
-        /// </summary>
-        private static bool CanUseConstrainedQueryable(Type elementType)
-        {
-            return _constrainedQueryableCache.GetOrAdd(elementType, static t =>
-            {
-                // Check if type is a class and has a public parameterless constructor
-                if (!t.IsClass)
-                    return false;
-                // Anonymous types start with '<>' and don't have public parameterless constructors
-                if (t.Name.StartsWith("<>"))
-                    return false;
-                // Check for public parameterless constructor
-                var defaultConstructor = t.GetConstructor(Type.EmptyTypes);
-                return defaultConstructor != null && defaultConstructor.IsPublic;
-            });
         }
         /// <summary>
         /// PERFORMANCE OPTIMIZATION: Enhanced cache lock cleanup.
@@ -197,10 +192,9 @@ namespace nORM.Query
         {
             var samples = Volatile.Read(ref _planSizeSamples);
             var avgPlanSize = samples == 0
-                ? 16 * 1024 // fallback to 16KB if no samples yet
+                ? FallbackAvgPlanSizeBytes
                 : (int)(Volatile.Read(ref _totalPlanSize) / samples);
-            const long maxCacheBytes = 64L * 1024 * 1024; // limit to 64MB overall
-            var cacheBytes = Math.Min(info.TotalAvailableMemoryBytes / 100, maxCacheBytes);
+            var cacheBytes = Math.Min(info.TotalAvailableMemoryBytes / 100, MaxPlanCacheBytes);
             var size = (int)(cacheBytes / avgPlanSize);
             return Math.Clamp(size, 100, 10000);
         }
@@ -304,7 +298,7 @@ namespace nORM.Query
                         return true;
                     }
                 }
-                catch
+                catch (NotSupportedException)
                 {
                     // ignore and fall back to full translation path
                 }
@@ -341,6 +335,11 @@ namespace nORM.Query
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static TResult ConvertScalarResult<TResult>(object result)
         {
+            // Guard: null/DBNull should have been handled by callers (ExecuteScalarPlan*),
+            // but defend here to avoid NullReferenceException in the Convert paths below.
+            if (result is null || result is DBNull)
+                return default!;
+
             // Direct cast for reference types.
             if (typeof(TResult).IsClass || typeof(TResult).IsInterface)
             {
@@ -437,7 +436,7 @@ namespace nORM.Query
         }
 
         /// <summary>PERF: Slow path — connection needs initialization.</summary>
-        private async Task<TResult> ExecuteQueryFromPlanSlowAsync<TResult>(Task<System.Data.Common.DbConnection> ensureTask, QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
+        private async Task<TResult> ExecuteQueryFromPlanSlowAsync<TResult>(Task<DbConnection> ensureTask, QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
         {
             await ensureTask.ConfigureAwait(false);
             var cmd = _ctx.CreateCommand();
@@ -622,15 +621,15 @@ namespace nORM.Query
             return ExecuteCompiledInternalArrayAsync<TResult>(plan, parameterValues, ct);
         }
 
-        // Overload that accepts pre-computed compiledParamSet + fixedParams to avoid:
+        // Overload that accepts pre-computed fixedParams to avoid:
         // 1. Expensive QueryPlan.GetHashCode() in _compiledParamSets ConcurrentDictionary on every call
         //    (QueryPlan is a sealed record with 20+ properties — auto-generated GetHashCode costs ~200ns)
         // 2. HashSet.Contains per parameter on every call (fixed params pre-filtered at compile time)
-        internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, object?[] parameterValues, HashSet<string> compiledParamSet, KeyValuePair<string, object>[]? fixedParams, CancellationToken ct)
+        internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, object?[] parameterValues, KeyValuePair<string, object>[]? fixedParams, CancellationToken ct)
         {
             if (_ctx.Options.RetryPolicy != null)
-                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteCompiledPreparedAsync<TResult>(plan, parameterValues, compiledParamSet, fixedParams, token), ct);
-            return ExecuteCompiledPreparedAsync<TResult>(plan, parameterValues, compiledParamSet, fixedParams, ct);
+                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteCompiledPreparedAsync<TResult>(plan, parameterValues, fixedParams, token), ct);
+            return ExecuteCompiledPreparedAsync<TResult>(plan, parameterValues, fixedParams, ct);
         }
 
         internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters, CancellationToken ct)
@@ -842,12 +841,12 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// Optimized compiled query execution that accepts pre-computed compiledParamSet and fixedParams.
+        /// Optimized compiled query execution that accepts pre-computed fixedParams.
         /// Avoids: (1) _compiledParamSets ConcurrentDictionary lookup (QueryPlan.GetHashCode on every call),
         /// (2) HashSet.Contains per param (fixed params pre-filtered at compile time).
         /// Routes through the same execution path as non-compiled queries for consistent JIT optimization.
         /// </summary>
-        private Task<TResult> ExecuteCompiledPreparedAsync<TResult>(QueryPlan plan, object?[] parameterValues, HashSet<string> compiledParamSet, KeyValuePair<string, object>[]? fixedParams, CancellationToken ct)
+        private Task<TResult> ExecuteCompiledPreparedAsync<TResult>(QueryPlan plan, object?[] parameterValues, KeyValuePair<string, object>[]? fixedParams, CancellationToken ct)
         {
             // For the caching path (rare), fall back to standard compiled path.
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
@@ -908,7 +907,7 @@ namespace nORM.Query
             }
             else
             {
-                // Fallback: no compiled params, just add all parameters
+                // Fallback: no pre-computed fixedParams available, add all plan parameters unfiltered
                 foreach (var p in plan.Parameters)
                     cmd.AddOptimizedParam(p.Key, p.Value);
             }
@@ -950,7 +949,7 @@ namespace nORM.Query
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteCompiledPooledSlowAsync<TResult>(ensureTask, plan, parameterValues, fixedParams, state, ct);
 
-            // Q1 fix: dequeue from pool (or create new if pool is empty)
+            // Q1 fix: reuse pooled prepared command to avoid repeated allocations; create new if pool is empty
             if (!state.CommandPool.TryDequeue(out var cmd))
                 cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
 
@@ -979,7 +978,7 @@ namespace nORM.Query
             CompiledQueryState state, CancellationToken ct)
         {
             await ensureTask.ConfigureAwait(false);
-            // Q1 fix: dequeue from pool or create
+            // Q1 fix: reuse pooled prepared command to avoid repeated allocations; create new if pool is empty
             if (!state.CommandPool.TryDequeue(out var cmd))
                 cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
             UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
@@ -1013,9 +1012,17 @@ namespace nORM.Query
                     p.Value = fixedParams[i].Value;
                     // Set DbType from value for optimal binding
                     if (fixedParams[i].Value is int) p.DbType = DbType.Int32;
-                    else if (fixedParams[i].Value is string s) { p.DbType = DbType.String; p.Size = s.Length <= 4000 ? s.Length : -1; }
+                    else if (fixedParams[i].Value is string s) { p.DbType = DbType.String; p.Size = s.Length <= MaxInlineStringSize ? s.Length : -1; }
                     else if (fixedParams[i].Value is long) p.DbType = DbType.Int64;
                     else if (fixedParams[i].Value is bool) p.DbType = DbType.Boolean;
+                    else if (fixedParams[i].Value is decimal) p.DbType = DbType.Decimal;
+                    else if (fixedParams[i].Value is DateTime) p.DbType = DbType.DateTime2;
+                    else if (fixedParams[i].Value is Guid) p.DbType = DbType.Guid;
+                    else if (fixedParams[i].Value is double) p.DbType = DbType.Double;
+                    else if (fixedParams[i].Value is float) p.DbType = DbType.Single;
+                    else if (fixedParams[i].Value is short) p.DbType = DbType.Int16;
+                    else if (fixedParams[i].Value is byte) p.DbType = DbType.Byte;
+                    else if (fixedParams[i].Value is byte[]) p.DbType = DbType.Binary;
                     cmd.Parameters.Add(p);
                 }
                 fixedCount = fixedParams.Length;
@@ -1042,8 +1049,9 @@ namespace nORM.Query
                 cmd.Parameters.Add(p);
             }
 
-            // Prepare the command — compiles SQL once, subsequent executions skip sqlite3_prepare_v2
-            try { cmd.Prepare(); } catch { /* Prepare() is optional — some providers don't support it */ }
+            // Prepare the command — compiles SQL once, subsequent executions skip sqlite3_prepare_v2.
+            // Prepare() is optional — some providers (e.g., in-memory) throw NotSupportedException.
+            try { cmd.Prepare(); } catch (NotSupportedException) { } catch (InvalidOperationException) { }
 
             state.FixedParamCount = fixedCount;
             return cmd;
@@ -1068,7 +1076,7 @@ namespace nORM.Query
         /// </summary>
         private Task<TResult> ExecutePooledListSync<TResult>(QueryPlan plan, DbCommand cmd)
         {
-            var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
+            var capacity = plan.SingleResult ? 1 : (plan.Take ?? DefaultListCapacity);
             var list = _executor.CreateListForType(plan.ElementType, capacity);
             var materializer = plan.SyncMaterializer;
 
@@ -1093,7 +1101,7 @@ namespace nORM.Query
                 return Task.FromResult((TResult)HandleSingleResult(plan, list));
 
             // Handle List<object> covariant case (e.g., join queries returning anonymous types)
-            if (typeof(TResult) == typeof(List<object>) && list is System.Collections.IList nonGenericList && list.GetType() != typeof(List<object>))
+            if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
             {
                 var countList = nonGenericList.Count;
                 var covariantList = new List<object>(countList);
@@ -1105,10 +1113,10 @@ namespace nORM.Query
             return Task.FromResult((TResult)(object)list);
         }
 
-        /// <summary>Q1 fix: awaits work then returns the command to the pool.</summary>
+        /// <summary>Awaits the materializer task then returns the pooled command for reuse.</summary>
         private static async Task<TResult> ReturnCommandToPool<TResult>(
-            System.Collections.Concurrent.ConcurrentQueue<System.Data.Common.DbCommand> pool,
-            System.Data.Common.DbCommand cmd, Task<TResult> work)
+            ConcurrentQueue<DbCommand> pool,
+            DbCommand cmd, Task<TResult> work)
         {
             try { return await work.ConfigureAwait(false); }
             finally { pool.Enqueue(cmd); }
@@ -1147,7 +1155,7 @@ namespace nORM.Query
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
 
             // Sync materialization — no async state machine overhead
-            var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
+            var capacity = plan.SingleResult ? 1 : (plan.Take ?? DefaultListCapacity);
             var list = _executor.CreateListForType(plan.ElementType, capacity);
             var materializer = plan.SyncMaterializer;
 
@@ -1168,7 +1176,7 @@ namespace nORM.Query
                 list.Add(materializer(reader));
 
             // Handle List<object> covariant case
-            if (typeof(TResult) == typeof(List<object>) && list is System.Collections.IList nonGenericList && list.GetType() != typeof(List<object>))
+            if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
             {
                 var countList = nonGenericList.Count;
                 var covariantList = new List<object>(countList);
@@ -1183,7 +1191,7 @@ namespace nORM.Query
         /// <summary>PERF: Inline list materialization for pooled commands (not disposed).</summary>
         private async Task<TResult> ExecutePooledListAsync<TResult>(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
-            var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
+            var capacity = plan.SingleResult ? 1 : (plan.Take ?? DefaultListCapacity);
             var list = _executor.CreateListForType(plan.ElementType, capacity);
             var materializer = plan.SyncMaterializer;
 
@@ -1216,7 +1224,7 @@ namespace nORM.Query
         /// <summary>PERF: Materialization into List&lt;object&gt; for pooled commands (handles covariant anonymous types).</summary>
         private async Task<List<object>> ExecutePooledObjectListAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
-            var capacity = plan.Take ?? 16;
+            var capacity = plan.Take ?? DefaultListCapacity;
             var list = new List<object>(capacity);
             var materializer = plan.SyncMaterializer;
 
@@ -1478,7 +1486,10 @@ namespace nORM.Query
             return true;
         }
 
-        // Reusable empty dictionary to avoid allocation when count has no parameters
+        // Reusable empty dictionary to avoid allocation when count has no parameters.
+        // INVARIANT: _emptyParams must NEVER be mutated. It is shared across all callers as a
+        // sentinel for "no parameters". Code that needs to add entries must first check
+        // ReferenceEquals(parameters, _emptyParams) and allocate a new Dictionary before writing.
         private static readonly Dictionary<string, object> _emptyParams = new();
         // Cached empty includes list and table name lists for simple query path
         private static readonly List<IncludePlan> _emptyIncludes = new();
@@ -1651,6 +1662,17 @@ namespace nORM.Query
             (e is UnaryExpression { NodeType: ExpressionType.Convert } ue &&
              ue.Operand is ConstantExpression { Value: null });
 
+        /// <summary>
+        /// Builds a WHERE clause for count queries from a simple lambda predicate.
+        /// <para>
+        /// NOTE on the <c>ref parameters</c> pattern: the <paramref name="parameters"/> argument is passed
+        /// by-ref so that this method can replace the caller's <see cref="_emptyParams"/> sentinel with a
+        /// freshly-allocated dictionary when the predicate requires a parameter binding. Callers must not
+        /// cache the dictionary reference across calls — each invocation may replace it. The <c>out whereClause</c>
+        /// is always set (to <see cref="string.Empty"/> on failure) so callers can safely ignore it when the
+        /// method returns <c>false</c>.
+        /// </para>
+        /// </summary>
         private bool TryBuildCountWhereClause(LambdaExpression lambda, TableMapping map, ref Dictionary<string, object> parameters, out string whereClause, bool populateParameters)
         {
             whereClause = string.Empty;
@@ -1729,7 +1751,8 @@ namespace nORM.Query
                 {
                     var c = ctx.CreateCommand();
                     c.CommandText = s;
-                    try { c.Prepare(); } catch { }
+                    // Prepare() is optional — some providers throw NotSupportedException or InvalidOperationException.
+                    try { c.Prepare(); } catch (NotSupportedException) { } catch (InvalidOperationException) { }
                     return (c, new object());
                 }, _ctx);
 
@@ -1777,7 +1800,7 @@ namespace nORM.Query
             return ExecuteCountFinalizeAsync<TResult>(scalarTask, cmd);
         }
 
-        private async Task<TResult> ExecuteCountFastSlowAsync<TResult>(Task<System.Data.Common.DbConnection> ensureTask, string sql, Dictionary<string, object> parameters, CancellationToken ct)
+        private async Task<TResult> ExecuteCountFastSlowAsync<TResult>(Task<DbConnection> ensureTask, string sql, Dictionary<string, object> parameters, CancellationToken ct)
         {
             await ensureTask.ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
@@ -2000,12 +2023,12 @@ namespace nORM.Query
                 cmd.CommandText = plan.Sql;
                 var compiledParamsSync = plan.CompiledParameters;
                 foreach (var p in plan.Parameters)
-                    if (compiledParamsSync == null || !compiledParamsSync.Contains(p.Key))
+                    if (compiledParamsSync.Count == 0 || !compiledParamsSync.Contains(p.Key))
                         cmd.AddOptimizedParam(p.Key, p.Value);
 
                 if (paramValues != null)
                 {
-                    for (int i = 0; i < compiledParamsSync!.Count; i++)
+                    for (int i = 0; i < compiledParamsSync.Count; i++)
                     {
                         var name = compiledParamsSync[i];
                         var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
@@ -2158,12 +2181,16 @@ namespace nORM.Query
             var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             if (_ctx.Options.TenantProvider != null)
             {
-                if (tenant == null)
-                    throw new InvalidOperationException("Tenant context required but not available");
+                // Null tenant is allowed when the tenant column is nullable (ApplyGlobalFilters
+                // emits IS NULL in that case). Use a distinct cache key segment so null-tenant
+                // results are never confused with non-null-tenant results.
                 AppendUtf8(hasher, "|TENANT:".AsSpan());
-                AppendUtf8(hasher, tenant.ToString()!.AsSpan());
+                AppendUtf8(hasher, (tenant?.ToString() ?? "<null>").AsSpan());
             }
-            foreach (var kvp in parameters.OrderBy(k => k.Key))
+            // Sort parameters deterministically so identical parameter sets produce the same hash
+            // regardless of insertion order.
+            var sortedParams = parameters.OrderBy(k => k.Key, StringComparer.Ordinal).ToList();
+            foreach (var kvp in sortedParams)
             {
                 AppendByte(hasher, (byte)'|');
                 AppendUtf8(hasher, kvp.Key.AsSpan());
@@ -2229,7 +2256,7 @@ namespace nORM.Query
             if (value.IsEmpty)
                 return;
             var byteCount = Encoding.UTF8.GetByteCount(value);
-            if (byteCount <= 256)
+            if (byteCount <= StackAllocUtf8Threshold)
             {
                 Span<byte> buffer = stackalloc byte[byteCount];
                 Encoding.UTF8.GetBytes(value, buffer);
@@ -2240,8 +2267,8 @@ namespace nORM.Query
                 var rented = ArrayPool<byte>.Shared.Rent(byteCount);
                 try
                 {
-                    Encoding.UTF8.GetBytes(value, rented);
-                    hasher.Append(rented.AsSpan(0, byteCount));
+                    var bytesWritten = Encoding.UTF8.GetBytes(value, rented);
+                    hasher.Append(new ReadOnlySpan<byte>(rented, 0, bytesWritten));
                 }
                 finally
                 {
@@ -2266,7 +2293,8 @@ namespace nORM.Query
         /// <returns>The count of rows removed from the database.</returns>
         private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
         {
-            var sw = Stopwatch.StartNew();
+            // Only allocate Stopwatch when logger is active
+            var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             if (plan.Tables.Count != 1)
                 throw new NotSupportedException("ExecuteDeleteAsync only supports single table queries.");
@@ -2296,7 +2324,8 @@ namespace nORM.Query
         }
         private async Task<int> ExecuteUpdateInternalAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
         {
-            var sw = Stopwatch.StartNew();
+            // Only allocate Stopwatch when logger is active
+            var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             if (plan.Tables.Count != 1)
                 throw new NotSupportedException("ExecuteUpdateAsync only supports single table queries.");
@@ -2334,7 +2363,8 @@ namespace nORM.Query
         {
             // Execute in true streaming mode so only one row is materialized at a time.
             var plan = GetPlan(expression, out _, out var paramValues);
-            var sw = Stopwatch.StartNew();
+            // Only allocate Stopwatch when logger is active
+            var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;

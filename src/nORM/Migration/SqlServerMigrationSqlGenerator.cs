@@ -10,6 +10,12 @@ namespace nORM.Migration
     /// </summary>
     public class SqlServerMigrationSqlGenerator : IMigrationSqlGenerator
     {
+        /// <summary>Maximum length for NVARCHAR variable used in dynamic default-constraint lookup.</summary>
+        private const int ConstraintNameVarMaxLength = 200;
+
+        /// <summary>Default SQL Server fallback type for unmapped CLR types.</summary>
+        private const string FallbackSqlType = "NVARCHAR(MAX)";
+
         private static readonly Dictionary<string, string> TypeMap = new()
         {
             { typeof(int).FullName!, "INT" },
@@ -37,10 +43,18 @@ namespace nORM.Migration
         };
 
         // Escape SQL Server identifiers to prevent SQL injection via identifier names.
-        private static string Esc(string id) => $"[{id.Replace("]", "]]")}]";
+        private static string Esc(string id)
+        {
+            ArgumentNullException.ThrowIfNull(id);
+            return $"[{id.Replace("]", "]]")}]";
+        }
 
         // Escape a value interpolated inside a SQL single-quoted string literal.
-        private static string EscLiteral(string s) => s.Replace("'", "''");
+        private static string EscLiteral(string s)
+        {
+            ArgumentNullException.ThrowIfNull(s);
+            return s.Replace("'", "''");
+        }
 
         /// <summary>
         /// Generates SQL Server specific statements for applying the provided schema changes.
@@ -49,6 +63,8 @@ namespace nORM.Migration
         /// <returns>The SQL statements to upgrade and downgrade the database schema.</returns>
         public MigrationSqlStatements GenerateSql(SchemaDiff diff)
         {
+            ArgumentNullException.ThrowIfNull(diff);
+
             var up = new List<string>();
             var down = new List<string>();
 
@@ -78,8 +94,8 @@ namespace nORM.Migration
                 // M1: Emit DEFAULT constraint changes when DefaultValue differs.
                 if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
                 {
-                    var upVar = $"@__df_{Math.Abs((table.Name + "_" + newCol.Name).GetHashCode()):X8}";
-                    up.Add($"DECLARE {upVar} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_column_id,column_id)='{EscLiteral(newCol.Name)}') IF {upVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{upVar}+']')");
+                    var upVar = $"@__df_{(table.Name + "_" + newCol.Name).GetHashCode() & 0x7FFFFFFF:X8}";
+                    up.Add($"DECLARE {upVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(newCol.Name)}') IF {upVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{upVar}+']')");
                     if (newCol.DefaultValue != null)
                         up.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{newCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(newCol.DefaultValue)}) FOR {Esc(newCol.Name)}");
                 }
@@ -89,7 +105,13 @@ namespace nORM.Migration
             foreach (var table in diff.AddedTables)
             {
                 var colDefs = table.Columns.Select(c =>
-                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                {
+                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
+                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
+                        : "";
+                    var identityPart = c.IsIdentity ? " IDENTITY(1,1)" : "";
+                    return $"{Esc(c.Name)} {GetSqlType(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+                }).ToList();
 
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
@@ -147,8 +169,8 @@ namespace nORM.Migration
 
                 if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
                 {
-                    var downVar = $"@__df_{Math.Abs((table.Name + "_" + oldCol.Name).GetHashCode()):X8}";
-                    down.Add($"DECLARE {downVar} NVARCHAR(200) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_column_id,column_id)='{EscLiteral(oldCol.Name)}') IF {downVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{downVar}+']')");
+                    var downVar = $"@__df_{(table.Name + "_" + oldCol.Name).GetHashCode() & 0x7FFFFFFF:X8}";
+                    down.Add($"DECLARE {downVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(oldCol.Name)}') IF {downVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{downVar}+']')");
                     if (oldCol.DefaultValue != null)
                         down.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{oldCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(oldCol.DefaultValue)}) FOR {Esc(oldCol.Name)}");
                 }
@@ -165,7 +187,13 @@ namespace nORM.Migration
             foreach (var table in diff.DroppedTables)
             {
                 var colDefs = table.Columns.Select(c =>
-                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                {
+                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
+                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
+                        : "";
+                    var identityPart = c.IsIdentity ? " IDENTITY(1,1)" : "";
+                    return $"{Esc(c.Name)} {GetSqlType(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+                }).ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
@@ -194,6 +222,8 @@ namespace nORM.Migration
         /// <returns>The SQL Server data type name.</returns>
         private static string GetSqlType(ColumnSchema column)
         {
+            ArgumentNullException.ThrowIfNull(column);
+
             // X2: handle enum types by mapping to their underlying integral type
             if (!TypeMap.TryGetValue(column.ClrType, out var sql))
             {
@@ -204,7 +234,7 @@ namespace nORM.Migration
                     if (TypeMap.TryGetValue(underlying.FullName!, out sql))
                         return sql;
                 }
-                return "NVARCHAR(MAX)";
+                return FallbackSqlType;
             }
             return sql;
         }
@@ -215,6 +245,7 @@ namespace nORM.Migration
 
         private static string ValidateFkAction(string action, string constraintName)
         {
+            ArgumentNullException.ThrowIfNull(action);
             if (!_validFkActions.Contains(action))
                 throw new ArgumentException(
                     $"Invalid FK referential action '{action}' in constraint '{constraintName}'. " +
@@ -223,10 +254,11 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// MG-1: Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.
+        /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.
         /// </summary>
         private static string BuildFkConstraintSql(ForeignKeySchema fk)
         {
+            ArgumentNullException.ThrowIfNull(fk);
             var depCols = string.Join(", ", fk.DependentColumns.Select(Esc));
             var refCols = string.Join(", ", fk.PrincipalColumns.Select(Esc));
             var onDelete = ValidateFkAction(fk.OnDelete, fk.ConstraintName);
@@ -239,9 +271,11 @@ namespace nORM.Migration
             return sql;
         }
 
-        // X2: resolve type by name, scanning loaded assemblies when Type.GetType fails
+        // Resolve a CLR type by its full name, scanning loaded assemblies when Type.GetType fails.
         private static Type? ResolveType(string typeName)
         {
+            if (string.IsNullOrEmpty(typeName))
+                return null;
             var t = Type.GetType(typeName);
             if (t != null) return t;
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())

@@ -14,10 +14,15 @@ namespace nORM.Providers
     /// </summary>
     public class DynamicBatchSizer
     {
-        private const int MaxMemoryPerBatch = 16 * 1024 * 1024; // 16MB
-        private const int MinBatchSize = 10;
-        private const int MaxBatchSize = 10000;
-        private const int DefaultTargetBatchTime = 2000; // 2 seconds
+        private const int MaxMemoryPerBatch = 16 * 1024 * 1024; // 16 MB — conservative ceiling for in-memory batch assembly
+        private const int MinBatchSize = 10;               // Floor to avoid excessive round-trip overhead
+        private const int MaxBatchSize = 10000;            // Ceiling to bound memory and parameter counts
+        private const int BaseObjectOverhead = 100;         // Estimated fixed per-record overhead in bytes (CLR object header + refs)
+        private const int DefaultFallbackSize = 100;        // Fallback byte estimate for complex/unserializable types
+        private const int AssumedBandwidthBytesPerSec = 12_500_000; // 100 Mbps network — conservative for cloud/local scenarios
+        private const double TargetTransferTimeSec = 1.5;   // Target network transfer window per batch
+        private const int HistoricalBaseBatchSize = 2000;   // Starting point before column/index adjustments
+        private const int MaxHistoryEntries = 20;           // Sliding window for performance history
 
         /// <summary>
         /// Represents the outcome of a batch size calculation including various
@@ -29,7 +34,7 @@ namespace nORM.Providers
             public int OptimalBatchSize { get; set; }
 
             /// <summary>Estimated memory consumption for a batch of the chosen size.</summary>
-            public int EstimatedMemoryUsage { get; set; }
+            public long EstimatedMemoryUsage { get; set; }
 
             /// <summary>Estimated time required to process a batch of the chosen size.</summary>
             public TimeSpan EstimatedBatchTime { get; set; }
@@ -65,12 +70,14 @@ namespace nORM.Providers
             int totalRecords = -1) where T : class
         {
             var sampleList = sample.Take(100).ToList();
-            if (!sampleList.Any())
+            if (sampleList.Count == 0)
                 return new BatchSizingResult { OptimalBatchSize = MinBatchSize };
 
             var cacheEntry = _entityBatchSizeCache.GetOrAdd(typeof(T), _ =>
             {
-                var size = EstimateRecordSize(sampleList.First(), mapping);
+                var size = EstimateRecordSize(sampleList[0], mapping);
+                // Guard against zero/negative size: ensure at least BaseObjectOverhead
+                size = Math.Max(size, BaseObjectOverhead);
                 var memorySize = Math.Max(MinBatchSize, MaxMemoryPerBatch / size);
                 return (size, memorySize);
             });
@@ -78,7 +85,7 @@ namespace nORM.Providers
             var recordSize = cacheEntry.RecordSize;
             var memoryBasedBatchSize = cacheEntry.MemoryBasedBatchSize;
 
-            var historicalOptimal = GetHistoricalOptimalBatchSize(operationKey, recordSize);
+            var historicalOptimal = GetHistoricalOptimalBatchSize(operationKey);
 
             var networkOptimal = EstimateNetworkOptimalBatchSize(recordSize);
             var databaseOptimal = EstimateDatabaseOptimalBatchSize(mapping);
@@ -91,7 +98,8 @@ namespace nORM.Providers
             return new BatchSizingResult
             {
                 OptimalBatchSize = optimalSize,
-                EstimatedMemoryUsage = optimalSize * recordSize,
+                // Use long multiplication to avoid int overflow for large batch sizes
+                EstimatedMemoryUsage = (long)optimalSize * recordSize,
                 EstimatedBatchTime = EstimateBatchTime(optimalSize, recordSize, operationKey),
                 Strategy = $"Memory:{memoryBasedBatchSize}, Historical:{historicalOptimal}, Network:{networkOptimal}, DB:{databaseOptimal}"
             };
@@ -99,7 +107,7 @@ namespace nORM.Providers
 
         private int EstimateRecordSize<T>(T sampleRecord, TableMapping mapping) where T : class
         {
-            var baseSize = 100;
+            var baseSize = BaseObjectOverhead;
             var columnSizes = 0;
 
             foreach (var column in mapping.Columns)
@@ -123,6 +131,7 @@ namespace nORM.Providers
                 long => 8,
                 decimal => 16,
                 DateTime => 8,
+                DateTimeOffset => 12,
                 Guid => 16,
                 bool => 1,
                 float => 4,
@@ -140,42 +149,58 @@ namespace nORM.Providers
                 var json = System.Text.Json.JsonSerializer.Serialize(value);
                 return json.Length * 2;
             }
-            catch
+            catch (System.Text.Json.JsonException)
             {
-                return 100;
+                // Unserializable type (circular refs, unsupported converters) -- use fallback
+                return DefaultFallbackSize;
+            }
+            catch (NotSupportedException)
+            {
+                return DefaultFallbackSize;
+            }
+            catch (InvalidOperationException)
+            {
+                // JsonSerializer can throw InvalidOperationException for certain type configurations
+                return DefaultFallbackSize;
             }
         }
 
-        private int GetHistoricalOptimalBatchSize(string operationKey, int recordSize)
+        private int GetHistoricalOptimalBatchSize(string operationKey)
         {
             if (!_performanceHistory.TryGetValue(operationKey, out var history))
                 return 1000;
 
-            if (history.History.Count < 3)
-                return history.OptimalBatchSize;
-
-            var bestThroughput = 0.0;
-            var bestBatchSize = 1000;
-
-            foreach (var entry in history.History.TakeLast(10))
+            // Lock to read History safely — it is mutated under lock in RecordBatchPerformance
+            lock (history.History)
             {
-                var throughput = entry.RecordCount / entry.Duration.TotalSeconds;
-                if (throughput > bestThroughput)
-                {
-                    bestThroughput = throughput;
-                    bestBatchSize = entry.BatchSize;
-                }
-            }
+                if (history.History.Count < 3)
+                    return history.OptimalBatchSize;
 
-            return bestBatchSize;
+                var bestThroughput = 0.0;
+                var bestBatchSize = 1000;
+
+                foreach (var entry in history.History.TakeLast(10))
+                {
+                    // Guard against zero-duration entries that would produce Infinity throughput
+                    if (entry.Duration.TotalSeconds <= 0 || entry.RecordCount <= 0)
+                        continue;
+                    var throughput = entry.RecordCount / entry.Duration.TotalSeconds;
+                    if (throughput > bestThroughput)
+                    {
+                        bestThroughput = throughput;
+                        bestBatchSize = entry.BatchSize;
+                    }
+                }
+
+                return bestBatchSize;
+            }
         }
 
         private int EstimateNetworkOptimalBatchSize(int recordSize)
         {
-            var assumedBandwidthBytesPerSecond = 12_500_000;
-            var targetTransferTime = 1.5;
-
-            var maxBytesPerBatch = (int)(assumedBandwidthBytesPerSecond * targetTransferTime);
+            // Guard against zero recordSize to avoid division by zero
+            if (recordSize <= 0) return MaxBatchSize;
+            var maxBytesPerBatch = (int)(AssumedBandwidthBytesPerSec * TargetTransferTimeSec);
             return Math.Max(MinBatchSize, maxBytesPerBatch / recordSize);
         }
 
@@ -184,11 +209,13 @@ namespace nORM.Providers
             var columnCount = mapping.Columns.Length;
             var indexCount = mapping.KeyColumns.Length;
 
-            var columnFactor = Math.Max(0.1, 1.0 - (columnCount - 5) * 0.1);
-            var indexFactor = Math.Max(0.1, 1.0 - (indexCount - 1) * 0.2);
+            // Scale down from HistoricalBaseBatchSize as column/index counts grow.
+            // Columns <= 5 and indexes <= 1 keep a factor of 1.0 (no inflation above base).
+            // Each column beyond 5 reduces by 10%; each index beyond 1 reduces by 20%.
+            var columnFactor = Math.Max(0.1, Math.Min(1.0, 1.0 - (columnCount - 5) * 0.1));
+            var indexFactor = Math.Max(0.1, Math.Min(1.0, 1.0 - (indexCount - 1) * 0.2));
 
-            var baseBatchSize = 2000;
-            return (int)(baseBatchSize * columnFactor * indexFactor);
+            return (int)(HistoricalBaseBatchSize * columnFactor * indexFactor);
         }
 
         private int AdjustForDataCharacteristics<T>(int baseBatchSize, List<T> sample, TableMapping mapping, int totalRecords) where T : class
@@ -210,7 +237,8 @@ namespace nORM.Providers
 
             if (totalRecords > 0 && totalRecords < 1000)
             {
-                adjustedSize = Math.Min(adjustedSize, totalRecords / 4);
+                // Ensure totalRecords / 4 is at least MinBatchSize to avoid clamping to zero
+                adjustedSize = Math.Min(adjustedSize, Math.Max(MinBatchSize, totalRecords / 4));
             }
 
             return Math.Max(MinBatchSize, Math.Min(MaxBatchSize, adjustedSize));
@@ -219,7 +247,7 @@ namespace nORM.Providers
         private double CalculateAverageStringLength<T>(List<T> sample, TableMapping mapping) where T : class
         {
             var stringColumns = mapping.Columns.Where(c => c.Prop.PropertyType == typeof(string)).ToArray();
-            if (!stringColumns.Any()) return 0;
+            if (stringColumns.Length == 0) return 0;
 
             var totalLength = 0;
             var totalCount = 0;
@@ -241,11 +269,21 @@ namespace nORM.Providers
 
         private TimeSpan EstimateBatchTime(int batchSize, int recordSize, string operationKey)
         {
-            if (_performanceHistory.TryGetValue(operationKey, out var history) && history.History.Any())
+            if (_performanceHistory.TryGetValue(operationKey, out var history))
             {
-                var recentEntry = history.History.Last();
-                var timePerRecord = recentEntry.Duration.TotalMilliseconds / recentEntry.RecordCount;
-                return TimeSpan.FromMilliseconds(timePerRecord * batchSize);
+                // Lock to read History safely — it is mutated under lock in RecordBatchPerformance
+                lock (history.History)
+                {
+                    if (history.History.Count > 0)
+                    {
+                        var recentEntry = history.History[history.History.Count - 1];
+                        if (recentEntry.RecordCount > 0)
+                        {
+                            var timePerRecord = recentEntry.Duration.TotalMilliseconds / recentEntry.RecordCount;
+                            return TimeSpan.FromMilliseconds(timePerRecord * batchSize);
+                        }
+                    }
+                }
             }
 
             var estimatedMs = (batchSize * recordSize) / 1024.0;
@@ -269,15 +307,19 @@ namespace nORM.Providers
                 history.History.Add((batchSize, duration, recordCount));
                 history.LastUpdate = DateTime.UtcNow;
 
-                if (history.History.Count > 20)
+                if (history.History.Count > MaxHistoryEntries)
                 {
-                    history.History.RemoveRange(0, history.History.Count - 20);
+                    history.History.RemoveRange(0, history.History.Count - MaxHistoryEntries);
                 }
 
                 if (history.History.Count >= 3)
                 {
-                    var bestEntry = history.History.OrderByDescending(e => (double)e.RecordCount / e.Duration.TotalSeconds).First();
-                    history.OptimalBatchSize = bestEntry.BatchSize;
+                    var bestEntry = history.History
+                        .Where(e => e.Duration.TotalSeconds > 0 && e.RecordCount > 0)
+                        .OrderByDescending(e => (double)e.RecordCount / e.Duration.TotalSeconds)
+                        .FirstOrDefault();
+                    if (bestEntry.BatchSize > 0)
+                        history.OptimalBatchSize = bestEntry.BatchSize;
                 }
             }
         }

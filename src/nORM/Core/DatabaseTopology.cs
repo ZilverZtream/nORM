@@ -10,6 +10,11 @@ namespace nORM.Core
     public class DatabaseTopology
     {
         /// <summary>
+        /// Default number of seconds to wait before initiating failover to a secondary node.
+        /// </summary>
+        private const int DefaultFailoverTimeoutSeconds = 30;
+
+        /// <summary>
         /// Describes a single database node participating in the topology.
         /// </summary>
         public class DatabaseNode
@@ -81,7 +86,7 @@ namespace nORM.Core
         /// <summary>
         /// Amount of time to wait before failing over to a secondary node.
         /// </summary>
-        public TimeSpan FailoverTimeout { get; set; } = TimeSpan.FromSeconds(30);
+        public TimeSpan FailoverTimeout { get; set; } = TimeSpan.FromSeconds(DefaultFailoverTimeoutSeconds);
 
         /// <summary>
         /// Whether automatic failover is enabled.

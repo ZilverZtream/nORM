@@ -183,11 +183,6 @@ namespace nORM.Query
                 // Build server-side projection: select only the columns we need
                 var parameter = originalProjection.Parameters[0];
 
-                if (extractor.AccessedMembers.Count == 0)
-                {
-                    return false;
-                }
-
                 // Create a tuple or simple structure to hold the intermediate values
                 // We'll use the actual entity type as intermediate, just fetching specific columns
                 // This is simpler than dynamic type creation
@@ -218,7 +213,7 @@ namespace nORM.Query
 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or NotSupportedException or MemberAccessException)
             {
                 // If we can't split the projection, fall back to letting the SQL translator
                 // try (and likely fail with a better error message)

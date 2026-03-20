@@ -960,14 +960,12 @@ public class LazyNavigationReferenceTests
 public class EnableLazyLoadingTests
 {
     [Fact]
-    public void EnableLazyLoading_NullEntity_ReturnsNull()
+    public void EnableLazyLoading_NullEntity_ThrowsArgumentNullException()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         using var ctx = new DbContext(cn, new SqliteProvider());
-        // Use a non-null reference typed as the concrete class to call through the extension method.
-        // The null case is tested by creating a wrapper so the compiler sees T=SanParent (not SanParent?).
-        var result = NavigationPropertyExtensions.EnableLazyLoading<SanParent>(null!, ctx);
-        Assert.Null(result);
+        Assert.Throws<ArgumentNullException>(
+            () => NavigationPropertyExtensions.EnableLazyLoading<SanParent>(null!, ctx));
     }
 
     [Fact]

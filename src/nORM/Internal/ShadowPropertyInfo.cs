@@ -14,9 +14,9 @@ namespace nORM.Internal
 
         public ShadowPropertyInfo(string name, Type propertyType, Type declaringType)
         {
-            _name = name;
-            _propertyType = propertyType;
-            _declaringType = declaringType;
+            _name = name ?? throw new ArgumentNullException(nameof(name));
+            _propertyType = propertyType ?? throw new ArgumentNullException(nameof(propertyType));
+            _declaringType = declaringType ?? throw new ArgumentNullException(nameof(declaringType));
         }
 
         public override string Name => _name;

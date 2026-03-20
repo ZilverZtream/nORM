@@ -12,6 +12,9 @@ namespace nORM.Migration
     /// </summary>
     public class MySqlMigrationSqlGenerator : IMigrationSqlGenerator
     {
+        /// <summary>Default MySQL fallback type for unmapped CLR types.</summary>
+        private const string FallbackSqlType = "LONGTEXT";
+
         private static readonly Dictionary<string, string> TypeMap = new()
         {
             { typeof(int).FullName!, "INT" },
@@ -39,7 +42,11 @@ namespace nORM.Migration
         };
 
         // Escape MySQL identifiers to prevent SQL injection via identifier names.
-        private static string Esc(string id) => $"`{id.Replace("`", "``")}`";
+        private static string Esc(string id)
+        {
+            ArgumentNullException.ThrowIfNull(id);
+            return $"`{id.Replace("`", "``")}`";
+        }
 
         /// <summary>
         /// Generates MySQL-specific SQL statements that apply the schema changes described by the provided diff.
@@ -48,6 +55,8 @@ namespace nORM.Migration
         /// <returns>A pair of SQL statement lists for migrating up and rolling back.</returns>
         public MigrationSqlStatements GenerateSql(SchemaDiff diff)
         {
+            ArgumentNullException.ThrowIfNull(diff);
+
             var up = new List<string>();
             var down = new List<string>();
 
@@ -82,7 +91,13 @@ namespace nORM.Migration
             foreach (var table in diff.AddedTables)
             {
                 var colDefs = table.Columns.Select(c =>
-                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                {
+                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
+                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
+                        : "";
+                    var identityPart = c.IsIdentity ? " AUTO_INCREMENT" : "";
+                    return $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}";
+                }).ToList();
 
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
@@ -151,7 +166,13 @@ namespace nORM.Migration
             foreach (var table in diff.DroppedTables)
             {
                 var colDefs = table.Columns.Select(c =>
-                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                {
+                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
+                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
+                        : "";
+                    var identityPart = c.IsIdentity ? " AUTO_INCREMENT" : "";
+                    return $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}";
+                }).ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
@@ -181,6 +202,8 @@ namespace nORM.Migration
         /// <returns>The corresponding MySQL data type.</returns>
         private static string GetSqlType(ColumnSchema column)
         {
+            ArgumentNullException.ThrowIfNull(column);
+
             // X2: handle enum types by mapping to their underlying integral type
             if (!TypeMap.TryGetValue(column.ClrType, out var sql))
             {
@@ -191,7 +214,7 @@ namespace nORM.Migration
                     if (TypeMap.TryGetValue(underlying.FullName!, out sql))
                         return sql;
                 }
-                return "LONGTEXT";
+                return FallbackSqlType;
             }
             return sql;
         }
@@ -202,6 +225,7 @@ namespace nORM.Migration
 
         private static string ValidateFkAction(string action, string constraintName)
         {
+            ArgumentNullException.ThrowIfNull(action);
             if (!_validFkActions.Contains(action))
                 throw new ArgumentException(
                     $"Invalid FK referential action '{action}' in constraint '{constraintName}'. " +
@@ -210,10 +234,11 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// MG-1: Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.
+        /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.
         /// </summary>
         private static string BuildFkConstraintSql(ForeignKeySchema fk)
         {
+            ArgumentNullException.ThrowIfNull(fk);
             var depCols = string.Join(", ", fk.DependentColumns.Select(Esc));
             var refCols = string.Join(", ", fk.PrincipalColumns.Select(Esc));
             var onDelete = ValidateFkAction(fk.OnDelete, fk.ConstraintName);
@@ -226,9 +251,11 @@ namespace nORM.Migration
             return sql;
         }
 
-        // X2: resolve type by name, scanning loaded assemblies when Type.GetType fails
+        // Resolve a CLR type by its full name, scanning loaded assemblies when Type.GetType fails.
         private static Type? ResolveType(string typeName)
         {
+            if (string.IsNullOrEmpty(typeName))
+                return null;
             var t = Type.GetType(typeName);
             if (t != null) return t;
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())

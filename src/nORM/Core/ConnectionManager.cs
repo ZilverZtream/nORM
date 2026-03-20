@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -31,6 +30,12 @@ namespace nORM.Core
     /// </remarks>
     public class ConnectionManager : IDisposable
     {
+        // ── Named constants ─────────────────────────────────────────────────
+        private const int DisposeWaitTimeoutSeconds = 10;
+        private const int RedactedHashPrefixLength = 8;
+        private const int MaxExponentialBackoffExponent = 30;
+        private const string HealthCheckPingSql = "SELECT 1";
+
         private readonly DatabaseTopology _topology;
         private readonly DatabaseProvider _provider;
         private readonly ILogger _logger;
@@ -40,14 +45,15 @@ namespace nORM.Core
         private readonly SemaphoreSlim _healthCheckSemaphore = new(1, 1);
         private readonly CancellationTokenSource _disposeCts = new();
 
-        private bool _disposed;
+        private volatile bool _disposed;
 
         private volatile DatabaseTopology.DatabaseNode? _currentPrimary;
         private volatile List<DatabaseTopology.DatabaseNode> _availableReadReplicas = new();
         private int _readReplicaIndex;
 
         private readonly object _circuitBreakerLock = new();
-        // RACE CONDITION FIX (TASK 11): Lock for safe access to _availableReadReplicas
+        // Synchronizes writes to _availableReadReplicas so concurrent readers always
+        // observe a fully constructed list reference (publish/acquire pattern).
         private readonly object _replicaListLock = new();
         private int _consecutiveFailures;
         private DateTime _nextRetry = DateTime.MinValue;
@@ -67,6 +73,9 @@ namespace nORM.Core
             _topology = topology ?? throw new ArgumentNullException(nameof(topology));
             _provider = provider ?? throw new ArgumentNullException(nameof(provider));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+            if (_topology.Nodes.Count == 0)
+                _logger.LogWarning("ConnectionManager created with an empty topology; no nodes are available");
 
             DeterminePrimaryNode();
             UpdateAvailableReadReplicas();
@@ -106,7 +115,8 @@ namespace nORM.Core
         /// </summary>
         private void UpdateAvailableReadReplicas()
         {
-            // RACE CONDITION FIX (TASK 11): Synchronize write to _availableReadReplicas
+            // Synchronize write to _availableReadReplicas so concurrent readers always
+            // observe a fully constructed list reference.
             lock (_replicaListLock)
             {
                 _availableReadReplicas = _topology.Nodes
@@ -117,15 +127,27 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Throws <see cref="ObjectDisposedException"/> if this instance has been disposed.
+        /// </summary>
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(ConnectionManager));
+        }
+
+        /// <summary>
         /// Retrieves an open connection to the primary node for write operations.
         /// Implements a simple circuit breaker and failover mechanism.
         /// The caller must dispose the returned connection.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>An open <see cref="DbConnection"/> suitable for write operations.</returns>
+        /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
         /// <exception cref="InvalidOperationException">Thrown when no primary node is available.</exception>
         public async Task<DbConnection> GetWriteConnectionAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
+
             lock (_circuitBreakerLock)
             {
                 if (DateTime.UtcNow < _nextRetry)
@@ -151,15 +173,14 @@ namespace nORM.Core
             }
             catch (OperationCanceledException)
             {
-                // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
-                // Don't trip circuit breaker on timeout/cancellation.
-                // Timeout is a query-level issue, not a connection-level failure.
+                // Dispose failed connection before re-throwing.
+                // Don't trip circuit breaker on timeout/cancellation —
+                // timeout is a query-level issue, not a connection-level failure.
                 cn?.Dispose();
                 throw;
             }
             catch (DbException ex)
             {
-                // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
                 cn?.Dispose();
                 // Trip the circuit breaker for all database connection errors
                 RegisterFailure();
@@ -168,7 +189,6 @@ namespace nORM.Core
             }
             catch (System.Net.Sockets.SocketException ex)
             {
-                // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
                 cn?.Dispose();
                 // Detect network failures by exception type
                 RegisterFailure();
@@ -177,16 +197,14 @@ namespace nORM.Core
             }
             catch (System.IO.IOException ex) when (IsNetworkIOException(ex))
             {
-                // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
                 cn?.Dispose();
-                // Some network errors manifest as IOException
+                // Some network errors manifest as IOException with a SocketException inner
                 RegisterFailure();
                 _logger.LogError(ex, "Failed to acquire write connection due to network I/O error");
                 throw;
             }
             catch (Exception ex)
             {
-                // CONNECTION LEAK FIX: Dispose failed connection before re-throwing
                 cn?.Dispose();
                 // Other exceptions (e.g., application errors, auth failures) don't trip the circuit breaker
                 _logger.LogError(ex, "Failed to acquire write connection (non-connection error)");
@@ -201,9 +219,19 @@ namespace nORM.Core
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <returns>An open <see cref="DbConnection"/> suitable for read operations.</returns>
+        /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
         public async Task<DbConnection> GetReadConnectionAsync(CancellationToken ct = default)
         {
-            // Synchronize read of _availableReadReplicas
+            ThrowIfDisposed();
+
+            // Snapshot the current replica list reference under the lock. The snapshot
+            // is intentionally stale after this point: a concurrent health-check thread
+            // may swap _availableReadReplicas to a new list while we iterate. This is
+            // safe because (1) List<T> is never mutated in-place — updates always publish
+            // a new list instance, (2) the worst case is selecting a replica that was
+            // just marked unhealthy, which will fail-and-fallback to the primary below,
+            // and (3) avoiding a lock around the entire connection attempt prevents
+            // head-of-line blocking when a replica is slow to respond.
             List<DatabaseTopology.DatabaseNode> replicas;
             lock (_replicaListLock)
             {
@@ -225,13 +253,13 @@ namespace nORM.Core
             }
             catch (OperationCanceledException)
             {
-                // CONNECTION LEAK FIX (TASK 2): Dispose failed connection before re-throwing
+                // Dispose failed connection before re-throwing
                 cn?.Dispose();
                 throw;
             }
             catch (Exception ex)
             {
-                // CONNECTION LEAK FIX (TASK 2): Dispose failed connection before falling back
+                // Dispose failed connection before falling back to primary
                 cn?.Dispose();
                 _logger.LogWarning(ex, "Failed to acquire connection from read replica {Replica}", RedactConnectionString(replica.ConnectionString));
                 replica.IsHealthy = false;
@@ -247,12 +275,15 @@ namespace nORM.Core
         /// </summary>
         /// <param name="replicas">The list of currently available replicas.</param>
         /// <returns>The selected replica node.</returns>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="replicas"/> is empty.</exception>
         private DatabaseTopology.DatabaseNode SelectOptimalReadReplica(IReadOnlyList<DatabaseTopology.DatabaseNode> replicas)
         {
-            // INTEGER OVERFLOW FIX: Cast to uint to handle overflow (negative numbers) gracefully
+            var count = replicas.Count;
+            if (count == 0)
+                throw new ArgumentException("Replica list must not be empty.", nameof(replicas));
+
             // After ~2.1 billion increments, _readReplicaIndex overflows to negative.
             // Casting to uint treats it as unsigned, preventing negative modulo results.
-            var count = replicas.Count; // Cache count to prevent multiple property access
             var index = (uint)Interlocked.Increment(ref _readReplicaIndex);
             return replicas[(int)(index % (uint)count)];
         }
@@ -262,7 +293,14 @@ namespace nORM.Core
             lock (_circuitBreakerLock)
             {
                 _consecutiveFailures++;
-                var delay = TimeSpan.FromMilliseconds(Math.Min(_baseDelay.TotalMilliseconds * Math.Pow(2, _consecutiveFailures), _maxDelay.TotalMilliseconds));
+                // Cap the exponent to prevent Math.Pow overflow: 2^31 exceeds
+                // int.MaxValue and at 2^1024 double overflows to Infinity. With
+                // _baseDelay=1s, 2^30 already far exceeds _maxDelay so the Math.Min
+                // clamp is the effective bound, but capping the exponent avoids
+                // degenerate floating-point behavior if _consecutiveFailures wraps
+                // negative after int overflow (Math.Pow(2, negative) -> near-zero delay).
+                var cappedFailures = Math.Min(_consecutiveFailures, MaxExponentialBackoffExponent);
+                var delay = TimeSpan.FromMilliseconds(Math.Min(_baseDelay.TotalMilliseconds * Math.Pow(2, cappedFailures), _maxDelay.TotalMilliseconds));
                 _nextRetry = DateTime.UtcNow + delay;
             }
         }
@@ -277,12 +315,14 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Determines if a database exception represents a transient error that should trip the circuit breaker.
-        /// Uses error codes instead of message parsing for robust detection.
+        /// Determines if a database exception represents a transient error (network,
+        /// timeout, or service-unavailable). Checks SQL Server error codes via
+        /// reflection, then falls back to walking the inner-exception chain for
+        /// <see cref="System.Net.Sockets.SocketException"/>.
         /// </summary>
         /// <param name="ex">The database exception to check.</param>
         /// <returns>True if the exception represents a transient connection/network error.</returns>
-        private static bool IsTransientDatabaseError(DbException ex)
+        internal static bool IsTransientDatabaseError(DbException ex)
         {
             // Check for SQL Server specific errors
             if (ex.GetType().Name == "SqlException")
@@ -310,15 +350,16 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Checks if an IOException represents a network-related error.
+        /// Checks whether an <see cref="System.IO.IOException"/> is caused by a network
+        /// error by walking its inner-exception chain for a
+        /// <see cref="System.Net.Sockets.SocketException"/>.
         /// </summary>
         private static bool IsNetworkIOException(System.IO.IOException ex)
         {
-            // Check if inner exception is a SocketException
             return HasSocketExceptionInChain(ex);
         }
 
-        // ── T1: connection-string credential redaction ────────────────────────
+        // ── Connection-string credential redaction ──────────────────────────
 
         private static readonly HashSet<string> _sensitiveConnStrKeys = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -332,6 +373,9 @@ namespace nORM.Core
         /// </summary>
         internal static string RedactConnectionString(string connectionString)
         {
+            if (string.IsNullOrEmpty(connectionString))
+                return string.Empty;
+
             try
             {
                 var builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
@@ -342,17 +386,26 @@ namespace nORM.Core
                 }
                 return builder.ConnectionString;
             }
-            catch
+            catch (ArgumentException)
             {
-                // Malformed connection string — emit a hash rather than the raw value.
+                // Malformed connection string -- emit a SHA-256 hash prefix rather than the raw value.
                 var hash = SHA256.HashData(Encoding.UTF8.GetBytes(connectionString));
-                return $"[redacted:{Convert.ToHexString(hash)[..8]}]";
+                return $"[redacted:{Convert.ToHexString(hash)[..RedactedHashPrefixLength]}]";
+            }
+            catch (FormatException)
+            {
+                // Some providers throw FormatException for invalid connection strings.
+                var hash = SHA256.HashData(Encoding.UTF8.GetBytes(connectionString));
+                return $"[redacted:{Convert.ToHexString(hash)[..RedactedHashPrefixLength]}]";
             }
         }
 
         /// <summary>
-        /// Recursively checks the exception chain for a SocketException.
+        /// Walks the inner-exception chain looking for a
+        /// <see cref="System.Net.Sockets.SocketException"/>.
         /// </summary>
+        /// <param name="ex">The root exception to inspect.</param>
+        /// <returns><c>true</c> if a <see cref="System.Net.Sockets.SocketException"/> is found in the chain.</returns>
         private static bool HasSocketExceptionInChain(Exception ex)
         {
             var current = ex;
@@ -387,9 +440,9 @@ namespace nORM.Core
                 }
                 catch (Exception ex)
                 {
-                    // Log and continue — don't let health check loop die silently
-                    try { _logger?.LogWarning("Health check loop error: {Message}", ex.Message); }
-                    catch { /* logging must not throw */ }
+                    // Log and continue -- don't let health check loop die silently
+                    try { _logger.LogWarning(ex, "Health check loop encountered an error"); }
+                    catch { /* logging itself must not kill the loop */ }
                 }
             }
         }
@@ -411,7 +464,7 @@ namespace nORM.Core
                         using var cn = CreateConnection(node.ConnectionString);
                         await cn.OpenAsync(token).ConfigureAwait(false);
                         using var pingCmd = cn.CreateCommand();
-                        pingCmd.CommandText = "SELECT 1";
+                        pingCmd.CommandText = HealthCheckPingSql;
                         pingCmd.CommandType = CommandType.Text;
                         using var reader = await pingCmd.ExecuteReaderAsync(token).ConfigureAwait(false);
                         while (await reader.ReadAsync(token).ConfigureAwait(false)) { }
@@ -424,11 +477,12 @@ namespace nORM.Core
                     {
                         throw;
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         sw.Stop();
                         node.IsHealthy = false;
                         node.LastHealthCheck = DateTime.UtcNow;
+                        _logger.LogDebug(ex, "Health check failed for node {Node}", RedactConnectionString(node.ConnectionString));
                     }
                 }
 
@@ -495,26 +549,32 @@ namespace nORM.Core
                 // Use Task.WaitAsync instead of Task.Wait to avoid potential deadlock.
                 // Task.Wait() can deadlock in certain SynchronizationContext scenarios (e.g., WPF, WinForms).
                 // WaitAsync with timeout is safer and works correctly in all contexts.
-                _healthCheckTask.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+                _healthCheckTask.WaitAsync(TimeSpan.FromSeconds(DisposeWaitTimeoutSeconds)).GetAwaiter().GetResult();
             }
             catch (TimeoutException)
             {
                 // Task didn't complete in time, but we've already canceled it.
                 // The cancellation token will eventually cause it to exit.
             }
-            catch
+            catch (OperationCanceledException)
             {
-                // Ignore exceptions during shutdown (task was likely canceled)
+                // Expected during normal shutdown -- the health-check task was cancelled.
+            }
+            catch (Exception ex)
+            {
+                // Unexpected error during shutdown; log at debug level rather than swallowing silently.
+                try { _logger.LogDebug(ex, "Exception during ConnectionManager health-check task shutdown"); }
+                catch { /* logging must not throw during dispose */ }
             }
 
             _disposeCts.Dispose();
 
-            // No need to dispose connection pools - we rely on ADO.NET provider pooling now.
+            // No need to dispose connection pools -- we rely on ADO.NET provider pooling now.
             // Connections are disposed by callers, which returns them to the provider pool.
 
             // Only dispose semaphores when the health task has actually terminated.
             // If the task is still running (timed out above), it holds references to both
-            // semaphores and will call Release() in its finally block — disposing them here
+            // semaphores and will call Release() in its finally block -- disposing them here
             // would produce ObjectDisposedException in the still-running background code.
             // SemaphoreSlim is a tiny managed object; GC handles it safely in the rare timeout path.
             if (_healthCheckTask.IsCompleted)
@@ -522,6 +582,8 @@ namespace nORM.Core
                 _failoverSemaphore.Dispose();
                 _healthCheckSemaphore.Dispose();
             }
+
+            GC.SuppressFinalize(this);
         }
     }
 }

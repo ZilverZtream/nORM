@@ -10,6 +10,9 @@ namespace nORM.Migration
     /// </summary>
     public class SqliteMigrationSqlGenerator : IMigrationSqlGenerator
     {
+        /// <summary>Default SQLite fallback type for unmapped CLR types.</summary>
+        private const string FallbackSqlType = "TEXT";
+
         private static readonly Dictionary<string, string> TypeMap = new()
         {
             { typeof(int).FullName!, "INTEGER" },
@@ -37,16 +40,22 @@ namespace nORM.Migration
         };
 
         // Escape SQLite identifiers to prevent SQL injection via identifier names.
-        private static string Esc(string id) => $"\"{id.Replace("\"", "\"\"")}\"";
+        private static string Esc(string id)
+        {
+            ArgumentNullException.ThrowIfNull(id);
+            return $"\"{id.Replace("\"", "\"\"")}\"";
+        }
 
         /// <summary>
         /// Creates SQLite SQL statements for the operations described by the schema diff.
-        /// MG-2: PRAGMA foreign_keys=off/on are returned in PreTransactionUp/Down and PostTransactionUp/Down
+        /// PRAGMA foreign_keys=off/on are returned in PreTransactionUp/Down and PostTransactionUp/Down
         /// segments so callers can execute them outside the migration transaction. The Up/Down lists
         /// contain only transactional DDL statements (no PRAGMA).
         /// </summary>
         public MigrationSqlStatements GenerateSql(SchemaDiff diff)
         {
+            ArgumentNullException.ThrowIfNull(diff);
+
             var up = new List<string>();
             var down = new List<string>();
             bool needsUpFkPragma = false;
@@ -55,12 +64,24 @@ namespace nORM.Migration
             foreach (var table in diff.AddedTables)
             {
                 var colDefs = table.Columns.Select(c =>
-                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                {
+                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
+                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
+                        : "";
+                    // SQLite AUTOINCREMENT requires inline "INTEGER PRIMARY KEY AUTOINCREMENT" on the column definition
+                    if (c.IsIdentity && c.IsPrimaryKey)
+                        return $"{Esc(c.Name)} {GetSqlType(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
+                    return $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+                }).ToList();
 
                 // Emit PRIMARY KEY constraint for PK columns.
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
-                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
+                {
+                    // SQLite AUTOINCREMENT requires "INTEGER PRIMARY KEY AUTOINCREMENT" inline, not table-level constraint
+                    if (!pkCols.Any(c => c.IsIdentity))
+                        colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
+                }
 
                 // Emit UNIQUE constraint for unique non-PK columns.
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
@@ -126,10 +147,20 @@ namespace nORM.Migration
                 up.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
                 // Down: recreate the table with full constraint metadata
                 var colDefs = table.Columns.Select(c =>
-                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                {
+                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
+                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
+                        : "";
+                    if (c.IsIdentity && c.IsPrimaryKey)
+                        return $"{Esc(c.Name)} {GetSqlType(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
+                    return $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+                }).ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
-                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
+                {
+                    if (!pkCols.Any(c => c.IsIdentity))
+                        colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
+                }
                 var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
                 if (uniqueNonPkCols.Count > 0)
                     colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
@@ -248,12 +279,23 @@ namespace nORM.Migration
 
             // Build column definitions with full constraint metadata (same as AddedTables path).
             var colDefs = cols.Select(c =>
-                $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+            {
+                var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
+                    ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
+                    : "";
+                if (c.IsIdentity && c.IsPrimaryKey)
+                    return $"{Esc(c.Name)} {GetSqlType(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
+                return $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+            }).ToList();
 
             // Emit PRIMARY KEY constraint for PK columns.
             var pkCols = cols.Where(c => c.IsPrimaryKey).ToList();
             if (pkCols.Count > 0)
-                colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
+            {
+                // SQLite AUTOINCREMENT requires "INTEGER PRIMARY KEY AUTOINCREMENT" inline, not table-level constraint
+                if (!pkCols.Any(c => c.IsIdentity))
+                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
+            }
 
             // Emit UNIQUE constraint for unique non-PK columns.
             var uniqueNonPkCols = cols.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
@@ -284,6 +326,7 @@ namespace nORM.Migration
 
         private static string ValidateFkAction(string action, string constraintName)
         {
+            ArgumentNullException.ThrowIfNull(action);
             if (!_validFkActions.Contains(action))
                 throw new ArgumentException(
                     $"Invalid FK referential action '{action}' in constraint '{constraintName}'. " +
@@ -292,10 +335,11 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// MG-1: Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE statement.
+        /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE statement.
         /// </summary>
         private static string BuildFkConstraintSql(ForeignKeySchema fk)
         {
+            ArgumentNullException.ThrowIfNull(fk);
             var depCols = string.Join(", ", fk.DependentColumns.Select(Esc));
             var refCols = string.Join(", ", fk.PrincipalColumns.Select(Esc));
             var onDelete = ValidateFkAction(fk.OnDelete, fk.ConstraintName);
@@ -310,6 +354,8 @@ namespace nORM.Migration
 
         private static string GetSqlType(ColumnSchema column)
         {
+            ArgumentNullException.ThrowIfNull(column);
+
             // X2: handle enum types by mapping to their underlying integral type
             if (!TypeMap.TryGetValue(column.ClrType, out var sql))
             {
@@ -320,14 +366,16 @@ namespace nORM.Migration
                     if (TypeMap.TryGetValue(underlying.FullName!, out sql))
                         return sql;
                 }
-                return "TEXT";
+                return FallbackSqlType;
             }
             return sql;
         }
 
-        // X2: resolve type by name, scanning loaded assemblies when Type.GetType fails
+        // Resolve a CLR type by its full name, scanning loaded assemblies when Type.GetType fails.
         private static Type? ResolveType(string typeName)
         {
+            if (string.IsNullOrEmpty(typeName))
+                return null;
             var t = Type.GetType(typeName);
             if (t != null) return t;
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())

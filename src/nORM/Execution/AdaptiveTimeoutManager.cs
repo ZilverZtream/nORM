@@ -87,6 +87,17 @@ namespace nORM.Execution
 
         private readonly TimeoutConfiguration _config;
 
+        /// <summary>Threshold below which historical success rate triggers a timeout increase.</summary>
+        private const double LowSuccessRateThreshold = 0.95;
+        /// <summary>Multiplier applied when the success rate falls below <see cref="LowSuccessRateThreshold"/>.</summary>
+        private const double LowSuccessRateMultiplier = 1.5;
+        /// <summary>Multiplier applied to the average execution time to derive a suggested timeout.</summary>
+        private const double AverageTimeToTimeoutMultiplier = 3.0;
+        /// <summary>Maximum timeout ceiling to prevent runaway timeouts.</summary>
+        private static readonly TimeSpan MaxTimeout = TimeSpan.FromMinutes(30);
+        /// <summary>Fraction of the timeout at which a near-timeout warning is emitted.</summary>
+        private const double NearTimeoutThreshold = 0.8;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="AdaptiveTimeoutManager"/> class.
         /// </summary>
@@ -94,8 +105,8 @@ namespace nORM.Execution
         /// <param name="logger">Logger used to record diagnostic information.</param>
         public AdaptiveTimeoutManager(TimeoutConfiguration config, ILogger logger)
         {
-            _config = config;
-            _logger = logger;
+            _config = config ?? throw new ArgumentNullException(nameof(config));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <summary>
@@ -130,13 +141,13 @@ namespace nORM.Execution
             var historicalMultiplier = 1.0;
             if (operationKey != null && _operationStats.TryGetValue(operationKey, out var stats))
             {
-                if (stats.SuccessRate < 0.95)
+                if (stats.SuccessRate < LowSuccessRateThreshold)
                 {
-                    historicalMultiplier = 1.5;
+                    historicalMultiplier = LowSuccessRateMultiplier;
                 }
                 else if (stats.AverageExecutionTime > TimeSpan.Zero)
                 {
-                    var suggestedTimeout = TimeSpan.FromMilliseconds(stats.AverageExecutionTime.TotalMilliseconds * 3);
+                    var suggestedTimeout = TimeSpan.FromMilliseconds(stats.AverageExecutionTime.TotalMilliseconds * AverageTimeToTimeoutMultiplier);
                     if (suggestedTimeout > baseTimeout)
                     {
                         historicalMultiplier = suggestedTimeout.TotalMilliseconds / baseTimeout.TotalMilliseconds;
@@ -147,8 +158,7 @@ namespace nORM.Execution
             var finalTimeout = TimeSpan.FromMilliseconds(
                 baseTimeout.TotalMilliseconds * recordMultiplier * complexityMultiplier * historicalMultiplier);
 
-            var maxTimeout = TimeSpan.FromMinutes(30);
-            return finalTimeout > maxTimeout ? maxTimeout : finalTimeout;
+            return finalTimeout > MaxTimeout ? MaxTimeout : finalTimeout;
         }
 
         /// <summary>
@@ -203,7 +213,7 @@ namespace nORM.Execution
 
                 UpdateOperationStatistics(operationKey, stopwatch.Elapsed, success: true);
 
-                var threshold = TimeSpan.FromMilliseconds(timeout.TotalMilliseconds * 0.8);
+                var threshold = TimeSpan.FromMilliseconds(timeout.TotalMilliseconds * NearTimeoutThreshold);
                 if (stopwatch.Elapsed > threshold)
                 {
                     _logger.LogWarning("Operation {OperationKey} completed but used {Percentage:P} of available timeout",

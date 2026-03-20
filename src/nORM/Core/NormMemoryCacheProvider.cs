@@ -13,13 +13,25 @@ namespace nORM.Core
     /// </summary>
     public class NormMemoryCacheProvider : IDbCacheProvider, IDisposable
     {
+        /// <summary>
+        /// Maximum number of entries allowed in the in-memory cache before eviction occurs.
+        /// </summary>
+        private const int DefaultCacheSizeLimit = 10240;
+
+        /// <summary>
+        /// Maximum number of attempts to register an expiration token for a single tag
+        /// before giving up (the tag is being invalidated faster than we can cache).
+        /// </summary>
+        private const int MaxTagTokenRetries = 3;
+
         private readonly MemoryCache _cache = new(new MemoryCacheOptions
         {
-            SizeLimit = 10240
+            SizeLimit = DefaultCacheSizeLimit
         });
 
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _tagTokens = new();
         private readonly Func<object?>? _getTenantId;
+        private volatile bool _disposed;
 
         /// <summary>
         /// Creates a new <see cref="NormMemoryCacheProvider"/> optionally scoped by tenant.
@@ -57,6 +69,7 @@ namespace nORM.Core
         /// <returns><c>true</c> if the item was found; otherwise <c>false</c>.</returns>
         public bool TryGet<T>(string key, out T? value)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             return _cache.TryGetValue(key, out value);
         }
 
@@ -70,6 +83,7 @@ namespace nORM.Core
         /// <typeparam name="T">Type of the value being cached.</typeparam>
         public void Set<T>(string key, T value, TimeSpan expiration, IEnumerable<string> tags)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             var options = new MemoryCacheEntryOptions()
                 .SetSize(1)
                 .SetAbsoluteExpiration(expiration);
@@ -82,7 +96,6 @@ namespace nORM.Core
                 // If InvalidateTag disposes the CTS between GetOrAdd and accessing .Token,
                 // we retry with a new token. After max retries, skip caching (tag is churning).
                 int retryCount = 0;
-                const int maxRetries = 3;
 
                 while (true)
                 {
@@ -99,7 +112,7 @@ namespace nORM.Core
                     {
                         // The CTS was disposed by InvalidateTag - retry with a new token
                         retryCount++;
-                        if (retryCount >= maxRetries)
+                        if (retryCount >= MaxTagTokenRetries)
                         {
                             // After max retries, the tag is being invalidated too frequently
                             // Skip caching this entry (it would be immediately invalidated anyway)
@@ -119,6 +132,7 @@ namespace nORM.Core
         /// <param name="tag">Tag identifying the cached items to invalidate.</param>
         public void InvalidateTag(string tag)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             var qualified = QualifyTag(tag);
             if (_tagTokens.TryRemove(qualified, out var tokenSource))
             {
@@ -132,6 +146,8 @@ namespace nORM.Core
         /// </summary>
         public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
             _cache.Dispose();
 
             // MEMORY LEAK FIX: Dispose all CancellationTokenSource instances to prevent handle leaks
@@ -143,9 +159,9 @@ namespace nORM.Core
                 {
                     tokenSource.Dispose();
                 }
-                catch
+                catch (ObjectDisposedException)
                 {
-                    // Ignore disposal errors (token source may already be disposed)
+                    // Token source was already disposed by a concurrent InvalidateTag call
                 }
             }
             _tagTokens.Clear();

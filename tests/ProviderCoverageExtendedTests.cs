@@ -330,8 +330,9 @@ public class ProviderCoverageExtendedTests
         var mapping = ctx.GetMapping(typeof(TimestampEntity));
         var p = new SqliteProvider();
         var sql = p.BuildUpdate(mapping);
-        // Null-safe concurrency token should use OR-based IS NULL pattern
-        Assert.Contains("IS NULL", sql, StringComparison.OrdinalIgnoreCase);
+        // Null-safe concurrency token: SQLite uses "col IS @param" via NullSafeEqual override;
+        // other providers use the OR-based "(col=@p OR (col IS NULL AND @p IS NULL))" expansion.
+        Assert.Contains("IS", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

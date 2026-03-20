@@ -39,12 +39,30 @@ namespace nORM.Execution
                     var normEx = ex is NormException ? ex as NormException : new NormException(ex.Message, null, null, ex);
                     _ctx.Options.Logger?.LogError(normEx!, retryCount);
 
-                    if (retryCount >= _policy.MaxRetries || !_policy.ShouldRetry(ex))
+                    bool shouldRetry;
+                    try
+                    {
+                        shouldRetry = _policy.ShouldRetry(ex);
+                    }
+                    catch
+                    {
+                        // If the retry predicate itself throws, treat the error as non-retryable
+                        // to avoid masking the original exception.
+                        throw normEx!;
+                    }
+
+                    if (retryCount >= _policy.MaxRetries || !shouldRetry)
                     {
                         throw normEx!;
                     }
-                    var delay = TimeSpan.FromMilliseconds(_policy.BaseDelay.TotalMilliseconds * Math.Pow(2, retryCount));
-                    await Task.Delay(delay, ct).ConfigureAwait(false);
+                    // Cap exponent at 30 to prevent unreasonably long delays (2^30 * 1s = ~12 days).
+                    // With MaxRetries defaulting to 3 this cap is rarely reached, but it protects
+                    // against misconfigured policies with very high MaxRetries values.
+                    var cappedRetry = Math.Min(retryCount, 30);
+                    var delayMs = Math.Min(
+                        _policy.BaseDelay.TotalMilliseconds * Math.Pow(2, cappedRetry),
+                        TimeSpan.FromMinutes(5).TotalMilliseconds);
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMs), ct).ConfigureAwait(false);
                     retryCount++;
                 }
             }

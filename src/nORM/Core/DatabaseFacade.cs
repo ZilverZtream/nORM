@@ -15,7 +15,7 @@ namespace nORM.Core
 
         internal DatabaseFacade(DbContext context)
         {
-            _context = context;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
         /// <summary>

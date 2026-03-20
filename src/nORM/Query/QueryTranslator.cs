@@ -66,6 +66,19 @@ namespace nORM.Query
     /// </remarks>
     internal sealed partial class QueryTranslator : ExpressionVisitor, IDisposable
     {
+        /// <summary>Default initial capacity for cross-join SQL builders.</summary>
+        private const int CrossJoinSqlInitialCapacity = 256;
+        /// <summary>Divisor applied to complexity cost to compute the timeout multiplier.</summary>
+        private const double ComplexityCostDivisor = 1000.0;
+        /// <summary>
+        /// Fraction of <see cref="_maxRecursionDepth"/> beyond which a warning is logged.
+        /// The actual threshold is <c>min(DeepRecursionWarningAbsolute, maxDepth / 2)</c>.
+        /// </summary>
+        private const int DeepRecursionWarningAbsolute = 15;
+        /// <summary>Static empty dictionary used to avoid allocations when logging without parameters.</summary>
+        private static readonly IReadOnlyDictionary<string, object> EmptyParamDict =
+            new Dictionary<string, object>();
+
         private DbContext _ctx = null!;
         private SqlBuilder _clauses = new();
         private readonly object _syncRoot = new();
@@ -102,7 +115,7 @@ namespace nORM.Query
         private QueryComplexityMetrics _complexityMetrics;
         // Recursion depth limit is read from DbContextOptions.MaxRecursionDepth (default 50).
         // The effective limit is cached on the QueryTranslator instance so that options changes mid-query have no effect.
-        private int _maxRecursionDepth = 50; // Updated from _ctx.Options during Initialize()
+        private int _maxRecursionDepth = 50; // Updated from _ctx.Options during Reset()
         private int _recursionDepth;
         private OptimizedSqlBuilder _sql => _clauses.Sql;
         private OptimizedSqlBuilder _where => _clauses.Where;
@@ -232,6 +245,7 @@ namespace nORM.Query
                 _rootType = null;
                 _parameterManager.Reset();
                 _projection = null;
+                _clientProjection = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _groupJoinInfo = null;
@@ -312,9 +326,9 @@ namespace nORM.Query
                 if (complexityInfo.WarningMessages.Any())
                 {
                     var warnings = string.Join("; ", complexityInfo.WarningMessages);
-                    _t._ctx.Options.Logger?.LogQuery($"-- WARN: {warnings}", new Dictionary<string, object>(), TimeSpan.Zero, 0);
+                    _t._ctx.Options.Logger?.LogQuery($"-- WARN: {warnings}", EmptyParamDict, TimeSpan.Zero, 0);
                 }
-                var timeoutMultiplier = Math.Max(1.0, complexityInfo.EstimatedCost / 1000.0);
+                var timeoutMultiplier = Math.Max(1.0, complexityInfo.EstimatedCost / ComplexityCostDivisor);
                 var adjustedTimeout = TimeSpan.FromMilliseconds(_t._ctx.Options.TimeoutConfiguration.BaseTimeout.TotalMilliseconds * timeoutMultiplier);
                 _t._estimatedTimeout = adjustedTimeout;
                 // Reset complexity metrics so they accumulate cleanly during the upcoming
@@ -417,7 +431,9 @@ namespace nORM.Query
                         object ReadScalarValue(object dbValue)
                         {
                             try { return Convert.ChangeType(dbValue, underlyingType); }
-                            catch { return dbValue; }
+                            catch (InvalidCastException) { return dbValue; }
+                            catch (FormatException) { return dbValue; }
+                            catch (OverflowException) { return dbValue; }
                         }
 
                         object HandleNull()
@@ -769,7 +785,7 @@ namespace nORM.Query
                     $"You can also increase the limit via DbContextOptions.MaxRecursionDepth (current: {_maxRecursionDepth}, max: 200).");
 
             // Log deep recursion for monitoring.
-            if (_recursionDepth > Math.Min(15, _maxRecursionDepth / 2))
+            if (_recursionDepth > Math.Min(DeepRecursionWarningAbsolute, _maxRecursionDepth / 2))
             {
                 _ctx.Options.Logger?.LogWarning(
                     "Query translation depth is {Depth} (max: {MaxDepth}). " +
@@ -793,6 +809,8 @@ namespace nORM.Query
         /// <exception cref="NormQueryException">Thrown if the tag does not exist.</exception>
         private async Task<DateTime> GetTimestampForTagAsync(string tagName, CancellationToken ct = default)
         {
+            if (string.IsNullOrWhiteSpace(tagName))
+                throw new ArgumentException("Tag name must not be null or empty.", nameof(tagName));
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
             var pName = _provider.ParamPrefix + "p0";
@@ -809,12 +827,9 @@ namespace nORM.Query
         /// </summary>
         public void Dispose()
         {
-            lock (_syncRoot)
-            {
-                SqlBuilder? oldClauses = Interlocked.Exchange(ref _clauses, null!);
-                oldClauses?.Dispose();
-                Clear();
-            }
+            // Clear() already performs Interlocked.Exchange + Dispose on _clauses,
+            // so delegate directly to avoid a redundant SqlBuilder allocation.
+            Clear();
         }
         private sealed class QueryTranslatorPooledObjectPolicy : PooledObjectPolicy<QueryTranslator>
         {
@@ -1156,7 +1171,7 @@ namespace nORM.Query
                     }
                     wroteColumns = true;
                 }
-                else if (resultSelector.Body is System.Linq.Expressions.NewExpression resultNewExpr)
+                else if (resultSelector.Body is NewExpression resultNewExpr)
                 {
                     var neededCols = JoinBuilder.ExtractNeededColumns(resultNewExpr, outerMapping, innerMapping, outerAlias, innerAlias);
                     if (neededCols.Count > 0)
@@ -1239,7 +1254,7 @@ namespace nORM.Query
                 if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
                     _correlatedParams[resultSelector.Parameters[1]] = (crossMapping, crossAlias);
             }
-            using var crossSql = new OptimizedSqlBuilder(256);
+            using var crossSql = new OptimizedSqlBuilder(CrossJoinSqlInitialCapacity);
             if (_projection?.Body is NewExpression crossNew)
             {
                 var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, outerMapping, crossMapping, outerAlias, crossAlias);
@@ -1300,12 +1315,17 @@ namespace nORM.Query
             _isAggregate = true;
             _singleResult = true;
             var source = node.Arguments[0];
-            var elementType = source.Type.GetGenericArguments().First();
-            if (node.Method.Name == nameof(Queryable.Any) && node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression anyPred)
+            var genericArgs = source.Type.GetGenericArguments();
+            if (genericArgs.Length == 0)
+                throw new NormQueryException(
+                    string.Format(ErrorMessages.QueryTranslationFailed,
+                    $"Expected a generic IQueryable<T> source type but found '{source.Type.Name}'."));
+            var elementType = genericArgs[0];
+            if (node.Method.Name == nameof(Queryable.Any) && node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression anyPred)
             {
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(anyPred));
             }
-            else if (node.Method.Name == nameof(Queryable.All) && node.Arguments.Count > 1 && node.Arguments[1] is LambdaExpression allPred)
+            else if (node.Method.Name == nameof(Queryable.All) && node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression allPred)
             {
                 var param = allPred.Parameters[0];
                 var notBody = Expression.Not(allPred.Body);
@@ -1873,7 +1893,8 @@ namespace nORM.Query
                             return $"SUM({columnSql})";
                         }
                     }
-                    return "SUM(*)";
+                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
+                        "SUM requires a selector expression (e.g., g.Sum(x => x.Amount)). SUM(*) is not valid SQL."));
                 case "Average":
                     if (methodCall.Arguments.Count > 0)
                     {
@@ -1891,7 +1912,8 @@ namespace nORM.Query
                             return $"AVG({columnSql})";
                         }
                     }
-                    return "AVG(*)";
+                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
+                        "AVG requires a selector expression (e.g., g.Average(x => x.Amount)). AVG(*) is not valid SQL."));
                 case "Min":
                     {
                         // Extension method form: Enumerable.Min(source, selector) — selector at [1]
@@ -2009,7 +2031,6 @@ namespace nORM.Query
         private static Func<object, object> CreateObjectKeySelector(LambdaExpression keySelector)
         {
             var parameterType = keySelector.Parameters[0].Type;
-            var returnType = keySelector.ReturnType;
             var objParam = Expression.Parameter(typeof(object), "obj");
             var castParam = Expression.Convert(objParam, parameterType);
             var body = new ParameterReplacer(keySelector.Parameters[0], castParam).Visit(keySelector.Body)!;
@@ -2024,11 +2045,7 @@ namespace nORM.Query
                 try
                 {
                     var result = invoker(obj);
-                    if (result == null)
-                        return DBNull.Value;
-                    if (returnType.IsValueType && result.GetType() != typeof(object))
-                        return result;
-                    return result;
+                    return result ?? (object)DBNull.Value;
                 }
                 catch (Exception ex)
                 {
@@ -2042,7 +2059,12 @@ namespace nORM.Query
             var outerParam = Expression.Parameter(typeof(object), "outer");
             var innerParam = Expression.Parameter(typeof(IEnumerable<object>), "inners");
             var castOuter = Expression.Convert(outerParam, resultSelector.Parameters[0].Type);
-            var innerElementType = resultSelector.Parameters[1].Type.GetGenericArguments()[0];
+            var innerParamType = resultSelector.Parameters[1].Type;
+            var innerGenericArgs = innerParamType.GetGenericArguments();
+            if (innerGenericArgs.Length == 0)
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
+                    $"GroupJoin result selector parameter '{resultSelector.Parameters[1].Name}' must be a generic IEnumerable<T>, but was '{innerParamType.Name}'."));
+            var innerElementType = innerGenericArgs[0];
             var castMethod = typeof(Enumerable).GetMethod("Cast")!.MakeGenericMethod(innerElementType);
             var castInner = Expression.Call(castMethod, innerParam);
             Expression body = resultSelector.Body;

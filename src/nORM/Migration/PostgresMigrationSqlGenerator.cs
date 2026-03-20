@@ -9,6 +9,9 @@ namespace nORM.Migration
     /// </summary>
     public class PostgresMigrationSqlGenerator : IMigrationSqlGenerator
     {
+        /// <summary>Default PostgreSQL fallback type for unmapped CLR types.</summary>
+        private const string FallbackSqlType = "TEXT";
+
         private static readonly Dictionary<string, string> TypeMap = new()
         {
             { typeof(int).FullName!, "INTEGER" },
@@ -36,7 +39,11 @@ namespace nORM.Migration
         };
 
         // Escape PostgreSQL identifiers to prevent SQL injection via identifier names.
-        private static string Esc(string id) => $"\"{id.Replace("\"", "\"\"")}\"";
+        private static string Esc(string id)
+        {
+            ArgumentNullException.ThrowIfNull(id);
+            return $"\"{id.Replace("\"", "\"\"")}\"";
+        }
 
         /// <summary>
         /// Produces PostgreSQL-compatible SQL statements to transition between schema versions.
@@ -45,6 +52,8 @@ namespace nORM.Migration
         /// <returns>A set of statements to apply the changes and to revert them.</returns>
         public MigrationSqlStatements GenerateSql(SchemaDiff diff)
         {
+            ArgumentNullException.ThrowIfNull(diff);
+
             var up = new List<string>();
             var down = new List<string>();
 
@@ -87,7 +96,14 @@ namespace nORM.Migration
             foreach (var table in diff.AddedTables)
             {
                 var colDefs = table.Columns.Select(c =>
-                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                {
+                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
+                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
+                        : "";
+                    var sqlType = c.IsIdentity ? GetIdentitySqlType(c) : GetSqlType(c);
+                    var identityPart = c.IsIdentity ? " GENERATED ALWAYS AS IDENTITY" : "";
+                    return $"{Esc(c.Name)} {sqlType} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}";
+                }).ToList();
 
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
@@ -165,7 +181,14 @@ namespace nORM.Migration
             foreach (var table in diff.DroppedTables)
             {
                 var colDefs = table.Columns.Select(c =>
-                    $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}").ToList();
+                {
+                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
+                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
+                        : "";
+                    var sqlType = c.IsIdentity ? GetIdentitySqlType(c) : GetSqlType(c);
+                    var identityPart = c.IsIdentity ? " GENERATED ALWAYS AS IDENTITY" : "";
+                    return $"{Esc(c.Name)} {sqlType} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}";
+                }).ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
@@ -187,6 +210,18 @@ namespace nORM.Migration
         }
 
         /// <summary>
+        /// Returns the appropriate PostgreSQL integer type for an identity column.
+        /// BIGINT for long/ulong, INTEGER for everything else.
+        /// Used with GENERATED ALWAYS AS IDENTITY instead of SERIAL/BIGSERIAL.
+        /// </summary>
+        private static string GetIdentitySqlType(ColumnSchema column)
+        {
+            if (column.ClrType == typeof(long).FullName || column.ClrType == typeof(ulong).FullName)
+                return "BIGINT";
+            return "INTEGER";
+        }
+
+        /// <summary>
         /// Maps a <see cref="ColumnSchema"/> instance to the appropriate PostgreSQL column
         /// type. When a CLR type is not explicitly mapped, <c>TEXT</c> is used as a safe
         /// default.
@@ -195,6 +230,8 @@ namespace nORM.Migration
         /// <returns>The PostgreSQL data type name.</returns>
         private static string GetSqlType(ColumnSchema column)
         {
+            ArgumentNullException.ThrowIfNull(column);
+
             // X2: handle enum types by mapping to their underlying integral type
             if (!TypeMap.TryGetValue(column.ClrType, out var sql))
             {
@@ -205,17 +242,18 @@ namespace nORM.Migration
                     if (TypeMap.TryGetValue(underlying.FullName!, out sql))
                         return sql;
                 }
-                return "TEXT";
+                return FallbackSqlType;
             }
             return sql;
         }
 
-        // M1/X1: Allowlist for FK referential action tokens.
+        // Allowlist for FK referential action tokens (NO ACTION, CASCADE, SET NULL, RESTRICT, SET DEFAULT).
         private static readonly HashSet<string> _validFkActions =
             new(StringComparer.OrdinalIgnoreCase) { "NO ACTION", "CASCADE", "SET NULL", "RESTRICT", "SET DEFAULT" };
 
         private static string ValidateFkAction(string action, string constraintName)
         {
+            ArgumentNullException.ThrowIfNull(action);
             if (!_validFkActions.Contains(action))
                 throw new ArgumentException(
                     $"Invalid FK referential action '{action}' in constraint '{constraintName}'. " +
@@ -224,10 +262,11 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// MG-1: Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.
+        /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.
         /// </summary>
         private static string BuildFkConstraintSql(ForeignKeySchema fk)
         {
+            ArgumentNullException.ThrowIfNull(fk);
             var depCols = string.Join(", ", fk.DependentColumns.Select(Esc));
             var refCols = string.Join(", ", fk.PrincipalColumns.Select(Esc));
             var onDelete = ValidateFkAction(fk.OnDelete, fk.ConstraintName);
@@ -240,9 +279,11 @@ namespace nORM.Migration
             return sql;
         }
 
-        // X2: resolve type by name, scanning loaded assemblies when Type.GetType fails
+        // Resolve a CLR type by its full name, scanning loaded assemblies when Type.GetType fails.
         private static Type? ResolveType(string typeName)
         {
+            if (string.IsNullOrEmpty(typeName))
+                return null;
             var t = Type.GetType(typeName);
             if (t != null) return t;
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())

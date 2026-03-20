@@ -1,17 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
-using nORM.Query;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
-using System.Data.Common;
+using Microsoft.Extensions.Logging;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
-using Microsoft.Extensions.Logging;
+using nORM.Query;
 
 #nullable enable
 
@@ -23,7 +23,22 @@ namespace nORM.Providers
     /// </summary>
     public sealed class SqlServerProvider : BulkOperationProvider
     {
-        private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: 100);
+        /// <summary>Maximum number of cached DataTable schemas used for bulk-delete key tables.</summary>
+        private const int KeyTableSchemaCacheSize = 100;
+
+        /// <summary>
+        /// Minimum SQL Server version required (13.0 = SQL Server 2016).
+        /// SQL Server 2016 introduced JSON_VALUE, STRING_SPLIT, and other features used by this provider.
+        /// </summary>
+        private static readonly Version MinimumSqlServerVersion = new(13, 0);
+
+        /// <summary>Number of entities sampled for dynamic batch sizing heuristics.</summary>
+        private const int BatchSizingSampleCount = 100;
+
+        /// <summary>SQL Server error number for "Invalid object name" (table/view does not exist).</summary>
+        private const int SqlErrorObjectNotFound = 208;
+
+        private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: KeyTableSchemaCacheSize);
 
         /// <summary>
         /// SQL Server uses TOP(n)/OFFSET-FETCH paging syntax rather than LIMIT.
@@ -33,11 +48,13 @@ namespace nORM.Providers
         /// <summary>
         /// Maximum length of a single SQL statement supported by SQL Server.
         /// </summary>
-        /// SQL Server supports batch sizes up to 65,536 * 4,096 bytes of network packet data.
+        /// <remarks>
+        /// SQL Server supports batch sizes up to 65,536 x 4,096 bytes of network packet data.
         /// The previous value of 8,000 was incorrectly derived from the max row size, not the
         /// max query text size. SQL Server's actual query text limit is governed by
         /// max_recursion and memory, not a fixed character count. Using 256 MB as a safe ceiling
-        /// matches MySQL's practical limit and avoids rejecting valid wide/complex queries.
+        /// avoids rejecting valid wide or complex queries.
+        /// </remarks>
         public override int MaxSqlLength => 268_435_456;
 
         /// <summary>
@@ -103,7 +120,7 @@ namespace nORM.Providers
                     sb.Append(" FETCH NEXT ").Append(limit.Value).Append(" ROWS ONLY");
             }
         }
-        
+
         /// <summary>
         /// Returns <c>true</c> if the SQL string contains an <c>ORDER BY</c> clause at the
         /// top-level scope (depth-0 parentheses). Uses a mini-lexer that skips:
@@ -167,7 +184,7 @@ namespace nORM.Providers
                     continue;
                 }
 
-                // Skip bracket-quoted identifiers ([...]) — SQL Server specific
+                // Skip bracket-quoted identifiers ([...]) -- SQL Server specific
                 // Q1 fix: handle escaped ]] inside brackets (]] represents a literal ] character).
                 // Without this, [a]]ORDER BYb] would terminate at the first ] and expose
                 // "ORDER BYb]" to the ORDER BY scanner, producing a false positive.
@@ -179,7 +196,7 @@ namespace nORM.Providers
                         if (sql[i] == ']')
                         {
                             i++;
-                            // ]] is an escaped literal ] — continue scanning inside the identifier
+                            // ]] is an escaped literal ] -- continue scanning inside the identifier
                             if (i < len && sql[i] == ']') { i++; continue; }
                             // Single ] closes the identifier
                             break;
@@ -205,11 +222,11 @@ namespace nORM.Providers
         /// <summary>
         /// Returns SQL for retrieving the last identity value generated in the current scope.
         /// </summary>
-        /// <param name="m">The table mapping for which an insert occurred.</param>
+        /// <param name="m">The table mapping (unused for SQL Server; SCOPE_IDENTITY() is table-agnostic).</param>
         /// <returns>SQL fragment appended after the insert to obtain the identity value.</returns>
         public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT SCOPE_IDENTITY();";
 
-        /// <summary>SQL Server uses MERGE or WHERE NOT EXISTS for idempotent join-table inserts.</summary>
+        /// <summary>SQL Server uses IF NOT EXISTS for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
             => $"IF NOT EXISTS (SELECT 1 FROM {escTable} WHERE {escC1} = {p1} AND {escC2} = {p2}) INSERT INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2})";
 
@@ -219,19 +236,18 @@ namespace nORM.Providers
         /// <param name="name">Parameter name including prefix.</param>
         /// <param name="value">Value to assign to the parameter; <c>null</c> becomes <see cref="DBNull.Value"/>.</param>
         /// <returns>A configured <see cref="SqlParameter"/>.</returns>
-        public override System.Data.Common.DbParameter CreateParameter(string name, object? value)
-        {
-            var param = new SqlParameter(name, value ?? DBNull.Value);
-            return param;
-        }
+        public override DbParameter CreateParameter(string name, object? value)
+            => new SqlParameter(name, value ?? DBNull.Value);
 
         /// <summary>
         /// Escapes special characters in a pattern used with SQL Server's <c>LIKE</c> operator.
         /// </summary>
         /// <param name="value">The pattern to escape.</param>
         /// <returns>The escaped pattern.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="value"/> is null.</exception>
         public override string EscapeLikePattern(string value)
         {
+            ArgumentNullException.ThrowIfNull(value);
             var escaped = base.EscapeLikePattern(value);
             var esc = LikeEscapeChar.ToString();
             return escaped
@@ -247,8 +263,11 @@ namespace nORM.Providers
         /// <param name="declaringType">Type that defines the method.</param>
         /// <param name="args">SQL representations of the method arguments.</param>
         /// <returns>The SQL translation or <c>null</c> if unsupported.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="args"/> is null.</exception>
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)
         {
+            ArgumentNullException.ThrowIfNull(args);
+
             if (declaringType == typeof(string))
             {
                 return name switch
@@ -282,7 +301,7 @@ namespace nORM.Providers
                     nameof(Math.Ceiling) => $"CEILING({args[0]})",
                     nameof(Math.Floor) => $"FLOOR({args[0]})",
                     nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
-                    nameof(Math.Round) => $"ROUND({args[0]})",
+                    nameof(Math.Round) => $"ROUND({args[0]}, 0)",
                     _ => null
                 };
             }
@@ -296,23 +315,12 @@ namespace nORM.Providers
         /// <param name="columnName">The JSON column to access.</param>
         /// <param name="jsonPath">JSON path pointing to the desired element.</param>
         /// <returns>SQL fragment that retrieves the JSON value.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="columnName"/> or <paramref name="jsonPath"/> is null.</exception>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
-            => $"JSON_VALUE({columnName}, '{jsonPath}')";
-
-        /// <summary>
-        /// Builds a parameterized <c>IN</c> clause for SQL Server using one parameter per value.
-        /// Previously this used STRING_SPLIT which broke for values containing commas and was
-        /// not type-safe. Per-parameter approach is correct for all value types and collection sizes.
-        /// Empty collections emit <c>(1=0)</c> — a never-true predicate — instead of invalid SQL.
-        /// </summary>
-        /// <param name="cmd">Command to which parameters are added.</param>
-        /// <param name="columnName">Column to search within.</param>
-        /// <param name="values">Values to test for membership.</param>
-        /// <returns>SQL fragment implementing the containment test.</returns>
-        public override string BuildContainsClause(DbCommand cmd, string columnName, IReadOnlyList<object?> values)
         {
-            // Delegate to the base implementation which uses per-value parameters and handles empty collections.
-            return base.BuildContainsClause(cmd, columnName, values);
+            ArgumentNullException.ThrowIfNull(columnName);
+            ArgumentNullException.ThrowIfNull(jsonPath);
+            return $"JSON_VALUE({columnName}, '{jsonPath}')";
         }
 
         /// <summary>
@@ -322,10 +330,11 @@ namespace nORM.Providers
         /// </summary>
         public override string GetCreateTagsTableSql()
         {
+            var table = Escape("__NormTemporalTags");
             var tagCol = Escape("TagName");
             var tsCol = Escape("Timestamp");
             return $@"IF OBJECT_ID(N'__NormTemporalTags', N'U') IS NULL
-CREATE TABLE [__NormTemporalTags] ({tagCol} NVARCHAR(450) NOT NULL, {tsCol} DATETIME2 NOT NULL, PRIMARY KEY ({tagCol}))";
+CREATE TABLE {table} ({tagCol} NVARCHAR(450) NOT NULL, {tsCol} DATETIME2 NOT NULL, PRIMARY KEY ({tagCol}))";
         }
 
         /// <summary>
@@ -339,7 +348,7 @@ CREATE TABLE [__NormTemporalTags] ({tagCol} NVARCHAR(450) NOT NULL, {tsCol} DATE
         /// This is a definitive schema error, not a permission or connectivity failure.
         /// </summary>
         public override bool IsObjectNotFoundError(DbException ex)
-            => ex is SqlException sqlEx && sqlEx.Number == 208;
+            => ex is SqlException sqlEx && sqlEx.Number == SqlErrorObjectNotFound;
 
         /// <summary>
         /// Introspects live column definitions via INFORMATION_SCHEMA.COLUMNS.
@@ -374,8 +383,12 @@ ORDER BY c.ORDINAL_POSITION";
 
                     var sqlType = dataType switch
                     {
-                        "nvarchar" or "varchar" or "char" or "nchar" =>
-                            charMax == -1 ? $"{dataType}(max)" : $"{dataType}({charMax})",
+                        "nvarchar" or "varchar" or "char" or "nchar" or "varbinary" or "binary" when charMax == -1 =>
+                            $"{dataType}(max)",
+                        "nvarchar" or "varchar" or "char" or "nchar" or "varbinary" or "binary" when charMax.HasValue =>
+                            $"{dataType}({charMax})",
+                        "nvarchar" or "varchar" or "char" or "nchar" or "varbinary" or "binary" =>
+                            dataType, // null charMax: legacy types (text/ntext/image) or unknown length
                         "decimal" or "numeric" =>
                             (numPrec.HasValue && numScale.HasValue) ? $"{dataType}({numPrec},{numScale})" : dataType,
                         _ => dataType
@@ -385,7 +398,7 @@ ORDER BY c.ORDINAL_POSITION";
             }
             catch (DbException dbEx) when (IsObjectNotFoundError(dbEx))
             {
-                // Table does not exist yet — return empty list.
+                // Table does not exist yet -- return empty list.
             }
             return result;
         }
@@ -422,10 +435,10 @@ ORDER BY c.ORDINAL_POSITION";
             }));
 
             return $@"CREATE TABLE {historyTable} (
-    [__VersionId] BIGINT IDENTITY(1,1) PRIMARY KEY,
-    [__ValidFrom] DATETIME2 NOT NULL,
-    [__ValidTo] DATETIME2 NOT NULL,
-    [__Operation] CHAR(1) NOT NULL,
+    {Escape("__VersionId")} BIGINT IDENTITY(1,1) PRIMARY KEY,
+    {Escape("__ValidFrom")} DATETIME2 NOT NULL,
+    {Escape("__ValidTo")} DATETIME2 NOT NULL,
+    {Escape("__Operation")} CHAR(1) NOT NULL,
     {columns}
 );";
         }
@@ -504,7 +517,7 @@ END;";
 
         /// <summary>
         /// Checks whether the SQL Server provider can operate by connecting to a local instance
-        /// and verifying the server version.
+        /// and verifying the server version meets the minimum requirement (SQL Server 2016+).
         /// </summary>
         /// <returns><c>true</c> if SQL Server is reachable and meets the minimum version; otherwise, <c>false</c>.</returns>
         public override async Task<bool> IsAvailableAsync()
@@ -517,17 +530,17 @@ END;";
                 "Server=localhost;Database=master;Integrated Security=true;TrustServerCertificate=True;Connect Timeout=1";
             try
             {
-                await cn.OpenAsync();
+                await cn.OpenAsync().ConfigureAwait(false);
                 await using var cmd = cn.CreateCommand();
                 cmd.CommandText = "SELECT CAST(SERVERPROPERTY('ProductVersion') AS VARCHAR(20))";
-                var result = await cmd.ExecuteScalarAsync();
+                var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
                 if (result is not string versionStr)
                     throw new NormDatabaseException("Unable to retrieve database version.", cmd.CommandText, null, null);
                 var parts = versionStr.Split('.');
                 var version = new Version(int.Parse(parts[0]), int.Parse(parts[1]));
-                return version >= new Version(13, 0);
+                return version >= MinimumSqlServerVersion;
             }
-            catch
+            catch (Exception)
             {
                 return false;
             }
@@ -543,7 +556,7 @@ END;";
         /// <param name="ct">Cancellation token.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken -- a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             if (transaction is SqlTransaction sqlTransaction)
@@ -565,7 +578,7 @@ END;";
         /// <param name="ct">Cancellation token.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken -- a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             if (transaction is SqlTransaction sqlTransaction)
@@ -594,11 +607,10 @@ END;";
             var sw = Stopwatch.StartNew();
 
             var entityList = entities.ToList();
-            if (!entityList.Any()) return 0;
+            if (entityList.Count == 0) return 0;
 
             var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
             var operationKey = $"SqlServer_BulkInsert_{m.Type.Name}";
-            // Logger does not expose informational log, so we skip logging batch strategy here.
 
             var totalInserted = await ExecuteBulkOperationAsync(ctx, m, entityList, operationKey,
                 async (batch, tx, token) =>
@@ -611,9 +623,6 @@ END;";
                         BulkCopyTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds
                     };
 
-                    // BULK INSERT SCHEMA MISMATCH FIX: Properly unescape SQL Server identifiers
-                    // Trim('[', ']') fails for names with brackets: [My[Special]Column] becomes My[Special]Column (wrong!)
-                    // Proper unescaping: remove outer brackets only
                     foreach (var col in insertableCols)
                     {
                         var unescapedName = UnescapeSqlServerIdentifier(col.EscCol);
@@ -625,7 +634,7 @@ END;";
                     return reader.RecordsProcessed;
                 }, ct).ConfigureAwait(false);
 
-            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2: Invalidate query cache after bulk write to prevent stale reads
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
             return totalInserted;
         }
@@ -645,8 +654,9 @@ END;";
             if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct).ConfigureAwait(false);
 
             var sw = Stopwatch.StartNew();
-            var tempTableName = $"#BulkUpdate_{Guid.NewGuid():N}";
             var nonKeyCols = m.Columns.Where(c => !c.IsKey).ToList();
+            if (nonKeyCols.Count == 0) return 0;
+            var tempTableName = $"#BulkUpdate_{Guid.NewGuid():N}";
             var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetSqlType(c.Prop.PropertyType)}"));
 
             var tempCreated = false;
@@ -697,11 +707,14 @@ END;";
                         dropCmd.CommandText = $"IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL DROP TABLE {tempTableName}";
                         await dropCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
                     }
-                    catch { /* best-effort cleanup */ }
+                    catch (Exception ex)
+                    {
+                        Trace.TraceWarning($"SqlServerProvider: Failed to drop temp table {tempTableName} during BulkUpdate cleanup: {ex.Message}");
+                    }
                 }
             }
 
-            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2: Invalidate query cache after bulk write to prevent stale reads
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, updatedCount, sw.Elapsed);
             return updatedCount;
         }
@@ -710,15 +723,15 @@ END;";
         {
             var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
             var entityList = entities.ToList();
-            if (!entityList.Any()) return 0;
+            if (entityList.Count == 0) return 0;
 
             var operationKey = $"SqlServer_BulkInsert_{destinationTableName}";
-            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(BatchSizingSampleCount), m, operationKey, entityList.Count);
 
             var totalInserted = 0;
             for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
             {
-                var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
+                var batch = entityList.GetRange(i, Math.Min(sizing.OptimalBatchSize, entityList.Count - i));
                 using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
                 {
                     DestinationTableName = destinationTableName,
@@ -728,7 +741,7 @@ END;";
                 };
 
                 foreach (var col in insertableCols)
-                    bulkCopy.ColumnMappings.Add(col.PropName, col.EscCol.Trim('[', ']'));
+                    bulkCopy.ColumnMappings.Add(col.PropName, UnescapeSqlServerIdentifier(col.EscCol));
 
                 using var reader = new EntityDataReader<T>(batch, insertableCols);
                 var batchSw = Stopwatch.StartNew();
@@ -823,11 +836,14 @@ END;";
                         dropCmd.CommandText = $"IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL DROP TABLE {tempTableName}";
                         await dropCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
                     }
-                    catch { /* best-effort cleanup */ }
+                    catch (Exception ex)
+                    {
+                        Trace.TraceWarning($"SqlServerProvider: Failed to drop temp table {tempTableName} during BulkDelete cleanup: {ex.Message}");
+                    }
                 }
             }
 
-            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2: Invalidate query cache after bulk write to prevent stale reads
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, deletedCount, sw.Elapsed);
             return deletedCount;
         }
@@ -835,23 +851,37 @@ END;";
         private static string GetSqlType(Type t)
         {
             t = Nullable.GetUnderlyingType(t) ?? t;
+            if (t.IsEnum) t = Enum.GetUnderlyingType(t);
             if (t == typeof(int)) return "INT";
             if (t == typeof(long)) return "BIGINT";
+            if (t == typeof(short)) return "SMALLINT";
+            if (t == typeof(byte)) return "TINYINT";
             if (t == typeof(string)) return "NVARCHAR(MAX)";
             if (t == typeof(DateTime)) return "DATETIME2";
+            if (t == typeof(DateOnly)) return "DATE";
+            if (t == typeof(TimeOnly)) return "TIME";
+            if (t == typeof(DateTimeOffset)) return "DATETIMEOFFSET";
+            if (t == typeof(TimeSpan)) return "TIME";
             if (t == typeof(bool)) return "BIT";
             if (t == typeof(decimal)) return "DECIMAL(18,2)";
+            if (t == typeof(double)) return "FLOAT";
+            if (t == typeof(float)) return "REAL";
             if (t == typeof(Guid)) return "UNIQUEIDENTIFIER";
             if (t == typeof(byte[])) return "VARBINARY(MAX)";
+            if (t == typeof(char)) return "NCHAR(1)";
+            if (t == typeof(sbyte)) return "SMALLINT";
+            if (t == typeof(ushort)) return "INT";
+            if (t == typeof(uint)) return "BIGINT";
+            if (t == typeof(ulong)) return "DECIMAL(20,0)";
             return "NVARCHAR(MAX)";
         }
 
         /// <summary>
-        /// Properly unescapes a SQL Server identifier by removing outer brackets.
-        /// Handles edge cases like nested brackets correctly.
+        /// Unescapes a SQL Server bracket-quoted identifier by removing outer brackets
+        /// and reversing the <c>]]</c> to <c>]</c> escape applied by <see cref="Escape"/>.
         /// </summary>
-        /// <param name="escapedIdentifier">The escaped identifier (e.g., [ColumnName] or [My[Special]Column])</param>
-        /// <returns>The unescaped identifier</returns>
+        /// <param name="escapedIdentifier">The escaped identifier (e.g., <c>[ColumnName]</c> or <c>[My]]Column]</c>).</param>
+        /// <returns>The unescaped identifier (e.g., <c>ColumnName</c> or <c>My]Column</c>).</returns>
         private static string UnescapeSqlServerIdentifier(string escapedIdentifier)
         {
             if (string.IsNullOrEmpty(escapedIdentifier))
@@ -860,7 +890,9 @@ END;";
             // Remove outer brackets only if present
             if (escapedIdentifier.StartsWith("[") && escapedIdentifier.EndsWith("]") && escapedIdentifier.Length >= 2)
             {
-                return escapedIdentifier.Substring(1, escapedIdentifier.Length - 2);
+                var inner = escapedIdentifier.Substring(1, escapedIdentifier.Length - 2);
+                // Reverse the ]] escape applied by Escape()
+                return inner.Replace("]]", "]");
             }
 
             return escapedIdentifier;
@@ -955,7 +987,14 @@ END;";
             /// <summary>
             /// Returns the zero-based column ordinal given the column name.
             /// </summary>
-            public int GetOrdinal(string name) => _columns.FindIndex(c => c.PropName == name);
+            /// <exception cref="IndexOutOfRangeException">Thrown when the column name is not found.</exception>
+            public int GetOrdinal(string name)
+            {
+                var index = _columns.FindIndex(c => c.PropName == name);
+                if (index < 0)
+                    throw new IndexOutOfRangeException($"Column '{name}' not found in the reader.");
+                return index;
+            }
 
             /// <summary>
             /// Determines whether the column at the specified ordinal is set to <see cref="DBNull"/>.

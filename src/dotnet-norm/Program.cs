@@ -5,6 +5,7 @@ using System.Data;
 using System.Data.Common;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -13,6 +14,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
+using nORM.Core;
 using nORM.Migration;
 using nORM.Providers;
 using nORM.Scaffolding;
@@ -142,7 +144,8 @@ drop.SetAction(async (ParseResult result, CancellationToken _) =>
                 : $"{provider.Escape(tableSchema!)}.{provider.Escape(tableName!)}";
             using var cmd = connection.CreateCommand();
             cmd.CommandText = $"DROP TABLE {full}";
-            try { await cmd.ExecuteNonQueryAsync(); } catch (DbException) { }
+            try { await cmd.ExecuteNonQueryAsync(); }
+            catch (DbException ex) { Console.Error.WriteLine($"  Warning: DROP TABLE {full} failed: {ex.Message}"); }
         }
         Console.WriteLine("Database dropped successfully.");
     }
@@ -206,11 +209,11 @@ add.SetAction((ParseResult result) =>
                 newSnap = SchemaSnapshotBuilder.Build(modelCtx);
                 Console.WriteLine($"Using fluent model from {ctxType.Name}.");
             }
-            catch
+            catch (Exception ex) when (ex is MissingMethodException or TargetInvocationException or InvalidOperationException or MemberAccessException)
             {
                 // DbContext may require constructor args we can't provide — fall back
                 newSnap = SchemaSnapshotBuilder.Build(assembly);
-                Console.WriteLine("Warning: Could not instantiate DbContext for fluent model; using attribute-only snapshot.");
+                Console.WriteLine($"Warning: Could not instantiate DbContext for fluent model ({ex.GetType().Name}: {ex.Message}); using attribute-only snapshot.");
             }
         }
         else

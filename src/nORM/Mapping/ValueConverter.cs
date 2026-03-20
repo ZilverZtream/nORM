@@ -43,18 +43,36 @@ namespace nORM.Mapping
 
         object? IValueConverter.ConvertToProvider(object? modelValue)
         {
-            if (modelValue == null) return null;
+            if (modelValue == null || modelValue is DBNull) return null;
             if (modelValue is TModel typed) return ConvertToProvider(typed);
-            // Safe cross-type conversion (e.g., boxed int when TModel=long)
-            return ConvertToProvider((TModel)System.Convert.ChangeType(modelValue, typeof(TModel)));
+            // Cross-type conversion (e.g., boxed int when TModel=long)
+            try
+            {
+                return ConvertToProvider((TModel)System.Convert.ChangeType(modelValue, typeof(TModel)));
+            }
+            catch (InvalidCastException ex)
+            {
+                throw new InvalidCastException(
+                    $"Cannot convert model value of type '{modelValue.GetType().Name}' to '{typeof(TModel).Name}' " +
+                    $"for converter '{GetType().Name}'.", ex);
+            }
         }
 
         object? IValueConverter.ConvertFromProvider(object? providerValue)
         {
-            if (providerValue == null) return null;
+            if (providerValue == null || providerValue is DBNull) return null;
             if (providerValue is TProvider typed) return ConvertFromProvider(typed);
-            // Safe cross-type conversion (e.g., SQLite returns long for INTEGER, TProvider=int)
-            return ConvertFromProvider((TProvider)System.Convert.ChangeType(providerValue, typeof(TProvider)));
+            // Cross-type conversion (e.g., SQLite returns long for INTEGER, TProvider=int)
+            try
+            {
+                return ConvertFromProvider((TProvider)System.Convert.ChangeType(providerValue, typeof(TProvider)));
+            }
+            catch (InvalidCastException ex)
+            {
+                throw new InvalidCastException(
+                    $"Cannot convert provider value of type '{providerValue.GetType().Name}' to '{typeof(TProvider).Name}' " +
+                    $"for converter '{GetType().Name}'.", ex);
+            }
         }
     }
 }

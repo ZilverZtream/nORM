@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
 using nORM.Core;
 using nORM.Enterprise;
@@ -47,16 +46,33 @@ namespace nORM.Configuration
     /// </summary>
     public class DbContextOptions
     {
-        private int _bulkBatchSize = 1000;
-        private bool _temporalVersioningEnabled = false;
-        // MEMORY SAFETY FIX: Reduced default from 100,000 to 10,000 to prevent OOM
-        // 10 concurrent GroupJoins × 10k records × 1KB/record = ~100MB (safe for most environments)
-        // Previous default (100k) could cause 1GB+ memory usage with concurrent queries
-        private int _maxGroupJoinSize = 10000;
+        /// <summary>Default number of records per bulk operation batch.</summary>
+        internal const int DefaultBulkBatchSize = 1000;
+        /// <summary>Maximum allowed bulk batch size.</summary>
+        internal const int MaxBulkBatchSize = 10_000;
+        /// <summary>Default maximum child entities per GroupJoin group (memory safety bound).</summary>
+        internal const int DefaultMaxGroupJoinSize = 10_000;
+        /// <summary>Default LINQ expression tree translation recursion depth limit.</summary>
+        internal const int DefaultMaxRecursionDepth = 50;
+        /// <summary>Absolute ceiling for recursion depth to prevent stack overflows from adversarial inputs.</summary>
+        internal const int AbsoluteMaxRecursionDepth = 200;
+        /// <summary>Maximum allowed retry attempts for transient failure recovery.</summary>
+        internal const int MaxRetryAttempts = 10;
+        /// <summary>Maximum allowed base timeout to prevent unbounded command durations.</summary>
+        internal static readonly TimeSpan MaxBaseTimeout = TimeSpan.FromHours(1);
+        /// <summary>Default cache entry expiration period.</summary>
+        internal static readonly TimeSpan DefaultCacheExpiration = TimeSpan.FromMinutes(5);
+
+        private int _bulkBatchSize = DefaultBulkBatchSize;
+        private bool _temporalVersioningEnabled;
+        // MEMORY SAFETY: Reduced default from 100,000 to 10,000 to prevent OOM.
+        // 10 concurrent GroupJoins x 10k records x 1KB/record = ~100MB (safe for most environments).
+        // Previous default (100k) could cause 1GB+ memory usage with concurrent queries.
+        private int _maxGroupJoinSize = DefaultMaxGroupJoinSize;
         // Configurable recursion depth. Default 50 accommodates legitimate deep LINQ trees
         // built by report composers or dynamic filter builders.
         // Maximum 200 to prevent stack overflows from adversarial inputs.
-        private int _maxRecursionDepth = 50;
+        private int _maxRecursionDepth = DefaultMaxRecursionDepth;
 
         /// <summary>
         /// Gets or sets the timeout configuration used when executing database commands.
@@ -76,9 +92,9 @@ namespace nORM.Configuration
             get => _maxRecursionDepth;
             set
             {
-                if (value < 1 || value > 200)
-                    throw new ArgumentOutOfRangeException(nameof(value),
-                        "MaxRecursionDepth must be between 1 and 200. " +
+                if (value < 1 || value > AbsoluteMaxRecursionDepth)
+                    throw new ArgumentOutOfRangeException(nameof(value), value,
+                        $"MaxRecursionDepth must be between 1 and {AbsoluteMaxRecursionDepth}. " +
                         "If you need deeper nesting, consider breaking the query into multiple queries.");
                 _maxRecursionDepth = value;
             }
@@ -123,8 +139,9 @@ namespace nORM.Configuration
             get => _bulkBatchSize;
             set
             {
-                if (value <= 0 || value > 10000)
-                    throw new ArgumentOutOfRangeException(nameof(value), "BulkBatchSize must be between 1 and 10000");
+                if (value <= 0 || value > MaxBulkBatchSize)
+                    throw new ArgumentOutOfRangeException(nameof(value), value,
+                        $"BulkBatchSize must be between 1 and {MaxBulkBatchSize}.");
                 _bulkBatchSize = value;
             }
         }
@@ -163,13 +180,13 @@ namespace nORM.Configuration
         /// Gets or sets a value indicating whether bulk operations should be executed
         /// using smaller batched statements instead of a single large statement.
         /// </summary>
-        public bool UseBatchedBulkOps { get; set; } = false;
+        public bool UseBatchedBulkOps { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the change tracker should capture
         /// original values for all properties to allow precise change detection.
         /// </summary>
-        public bool UsePreciseChangeTracking { get; set; } = false;
+        public bool UsePreciseChangeTracking { get; set; }
 
         /// <summary>
         /// Gets or sets a value determining whether entities should be marked as
@@ -200,13 +217,13 @@ namespace nORM.Configuration
         /// Gets or sets the cache provider used to cache query results. When null,
         /// caching is disabled.
         /// </summary>
-        public IDbCacheProvider? CacheProvider { get; set; } = null;
+        public IDbCacheProvider? CacheProvider { get; set; }
 
         /// <summary>
         /// Gets or sets the time period after which cached entries expire when
         /// <see cref="CacheProvider"/> is configured.
         /// </summary>
-        public TimeSpan CacheExpiration { get; set; } = TimeSpan.FromMinutes(5);
+        public TimeSpan CacheExpiration { get; set; } = DefaultCacheExpiration;
 
         /// <summary>
         /// Enables the built-in in-memory cache for query results using
@@ -284,6 +301,7 @@ namespace nORM.Configuration
         /// <returns>The current <see cref="DbContextOptions"/> instance for chaining.</returns>
         public DbContextOptions AddGlobalFilter<TEntity>(Expression<Func<DbContext, TEntity, bool>> filter)
         {
+            ArgumentNullException.ThrowIfNull(filter);
             // C1: copy-on-write so the query pipeline never sees a list mutated in place.
             _globalFilters.AddOrUpdate(
                 typeof(TEntity),
@@ -300,6 +318,7 @@ namespace nORM.Configuration
         /// <returns>The current <see cref="DbContextOptions"/> instance for chaining.</returns>
         public DbContextOptions AddGlobalFilter<TEntity>(Expression<Func<TEntity, bool>> filter)
         {
+            ArgumentNullException.ThrowIfNull(filter);
             var ctxParam = Expression.Parameter(typeof(DbContext), "ctx");
             var lambda = Expression.Lambda<Func<DbContext, TEntity, bool>>(filter.Body, ctxParam, filter.Parameters[0]);
             return AddGlobalFilter(lambda);
@@ -314,26 +333,32 @@ namespace nORM.Configuration
         {
             if (RetryPolicy != null)
             {
-                if (RetryPolicy.MaxRetries < 0 || RetryPolicy.MaxRetries > 10)
-                    throw new InvalidOperationException("MaxRetries must be between 0 and 10");
+                if (RetryPolicy.MaxRetries < 0 || RetryPolicy.MaxRetries > MaxRetryAttempts)
+                    throw new InvalidOperationException($"MaxRetries must be between 0 and {MaxRetryAttempts}.");
                 if (RetryPolicy.BaseDelay <= TimeSpan.Zero)
-                    throw new InvalidOperationException("BaseDelay must be positive");
+                    throw new InvalidOperationException("BaseDelay must be positive.");
             }
 
-            if (TimeoutConfiguration.BaseTimeout <= TimeSpan.Zero || TimeoutConfiguration.BaseTimeout > TimeSpan.FromHours(1))
-                throw new InvalidOperationException("BaseTimeout must be between 1 second and 1 hour");
+            if (TimeoutConfiguration.BaseTimeout <= TimeSpan.Zero || TimeoutConfiguration.BaseTimeout > MaxBaseTimeout)
+                throw new InvalidOperationException($"BaseTimeout must be positive and at most {MaxBaseTimeout.TotalHours} hour(s).");
 
             if (string.IsNullOrWhiteSpace(TenantColumnName))
-                throw new InvalidOperationException("TenantColumnName cannot be null or empty");
+                throw new InvalidOperationException("TenantColumnName cannot be null or empty.");
 
             if (CacheExpiration <= TimeSpan.Zero)
-                throw new InvalidOperationException("CacheExpiration must be positive");
+                throw new InvalidOperationException("CacheExpiration must be positive.");
 
-            if (CommandInterceptors.Any(i => i == null))
-                throw new InvalidOperationException("CommandInterceptors cannot contain null entries");
-
-            if (SaveChangesInterceptors.Any(i => i == null))
-                throw new InvalidOperationException("SaveChangesInterceptors cannot contain null entries");
+            // Avoid LINQ allocation: iterate the list directly for null checks.
+            foreach (var interceptor in CommandInterceptors)
+            {
+                if (interceptor == null)
+                    throw new InvalidOperationException("CommandInterceptors cannot contain null entries.");
+            }
+            foreach (var interceptor in SaveChangesInterceptors)
+            {
+                if (interceptor == null)
+                    throw new InvalidOperationException("SaveChangesInterceptors cannot contain null entries.");
+            }
         }
     }
 }

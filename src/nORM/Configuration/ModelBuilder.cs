@@ -38,8 +38,12 @@ namespace nORM.Configuration
         /// The <see cref="IEntityTypeConfiguration"/> for the specified type, or <c>null</c> if the type
         /// has not been configured.
         /// </returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="type"/> is null.</exception>
         internal IEntityTypeConfiguration? GetConfiguration(Type type)
-            => _configurations.TryGetValue(type, out var config) ? config : null;
+        {
+            ArgumentNullException.ThrowIfNull(type);
+            return _configurations.TryGetValue(type, out var config) ? config : null;
+        }
 
         /// <summary>
         /// Enumerates all entity CLR types that have been explicitly configured

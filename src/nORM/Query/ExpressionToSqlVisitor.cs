@@ -34,10 +34,10 @@ namespace nORM.Query
         private bool _suppressNullCheck = false;
         // Outer translator's recursion depth so BuildExists/BuildIn pass depth+1 to sub-translators.
         private int _recursionDepth = 0;
-        private const int _constParamMapLimit = 1024;
+        private const int ConstParamMapLimit = 1024;
         private readonly Dictionary<ConstKey, string> _constParamMap = new();
         private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
-        private static readonly Expression _emptyExpression = Expression.Empty();
+        private static readonly Expression s_emptyExpression = Expression.Empty();
         private readonly Dictionary<ParameterExpression, string> _groupingKeys = new();
         // String methods (Contains, StartsWith, EndsWith) are handled via _fastMethodHandlers
         // for better performance, avoiding a redundant _translators dictionary lookup.
@@ -104,6 +104,7 @@ namespace nORM.Query
         {
             _sql = null!;
             _params.Clear();
+            _paramSink = null!;
             _paramIndex = 0;
             _parameterMappings.Clear();
             _ownedCompiledParams.Clear();
@@ -165,7 +166,7 @@ namespace nORM.Query
                 if (TryInlineBoolLiteral(node))
                     return node;
 
-                // Q1: Nullable column-vs-column comparison needs three-valued logic.
+                // Nullable column-vs-column comparison needs three-valued logic.
                 // A plain = or <> is incorrect when either side can be NULL at runtime.
                 // For Nullable<T> value types: always expand (runtime null possible).
                 // For reference types (string, class): only expand when BOTH sides could be null
@@ -283,14 +284,19 @@ namespace nORM.Query
                         me.Member is PropertyInfo pi ? pi.GetValue(closure.Value) : null;
                     return val is null;
                 }
-                catch { return false; }
+                catch (Exception ex) when (ex is TargetInvocationException or MemberAccessException or InvalidOperationException or ArgumentException)
+                {
+                    // Reflection failures (getter throws, access denied, etc.) — conservatively
+                    // report as non-null so the caller does not emit an incorrect IS NULL predicate.
+                    return false;
+                }
             }
             return false;
         }
 
         /// <summary>
         /// Returns <c>true</c> when <paramref name="t"/> is <c>Nullable&lt;T&gt;</c>.
-        /// Used by Q1 to detect when column-vs-column comparisons need three-valued logic.
+        /// Used to detect when column-vs-column comparisons need three-valued logic.
         /// </summary>
         private static bool IsNullableValueType(Type t) =>
             t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>);
@@ -322,6 +328,8 @@ namespace nORM.Query
                 return true;
 
             // Reference types: asymmetric rule for Equal vs NotEqual.
+            // At least one side is a reference type (the condition below is true when
+            // either left or right is not a value type, via De Morgan on the negation).
             // A "known non-null" side is one that is:
             //   - A non-null compile-time constant (ConstantExpression with non-null value)
             //   - A closure capture whose value we can verify is non-null at expression-build time
@@ -350,6 +358,13 @@ namespace nORM.Query
         /// (they will never produce SQL NULL on the right-hand side of a comparison).
         /// Column references (member accesses on query parameters) are always potentially nullable.
         /// </summary>
+        /// <remarks>
+        /// This method does not distinguish C# nullable reference types (NRTs) from non-nullable
+        /// reference types. The NRT annotation (e.g., <c>string?</c> vs <c>string</c>) is erased
+        /// at runtime and is not present in expression trees. At the CLR level all reference types
+        /// can be null, so this method conservatively returns <c>true</c> for any reference-typed
+        /// column or method-call expression.
+        /// </remarks>
         private static bool CouldBeNull(Expression expr)
         {
             // Non-null compile-time constant: cannot be null
@@ -370,7 +385,12 @@ namespace nORM.Query
                         me.Member is PropertyInfo pi ? pi.GetValue(closure.Value) : null;
                     return val is null;  // non-null captured value → not nullable
                 }
-                catch { return true; }
+                catch (Exception ex) when (ex is TargetInvocationException or MemberAccessException or InvalidOperationException or ArgumentException)
+                {
+                    // Reflection failures (getter throws, access denied, etc.) — assume nullable
+                    // to preserve correctness.
+                    return true;
+                }
             }
 
             // Everything else (column references, method calls, etc.) could be null
@@ -477,6 +497,8 @@ namespace nORM.Query
                 return node;
             }
             if (!IsTranslatableMethod(node.Method))
+                // ErrorMessages.QueryTranslationFailed is "Failed to translate LINQ query to SQL: {0}".
+                // The {0} argument below is a detail message, not a duplicate prefix.
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Method '{node.Method.Name}' cannot be translated to SQL"));
             if (!_suppressNullCheck && RequiresNullCheck(node))
             {
@@ -514,7 +536,11 @@ namespace nORM.Query
                             "JSON paths must not contain single-quote, double-quote, semicolon, or backslash.");
                     }
 
-                    // Limit path length to prevent potential DoS
+                    // Limit path length to prevent potential DoS.
+                    // TODO: The 500-char limit is a conservative default. Provider-specific JSON path
+                    // length limits vary (e.g., SQL Server's JSON_VALUE path is limited to 128 nesting
+                    // levels; MySQL/PostgreSQL have no documented path length cap). Consider delegating
+                    // to _provider.MaxJsonPathLength for provider-aware validation.
                     if (jsonPath.Length > 500)
                     {
                         throw new NormQueryException(
@@ -658,6 +684,13 @@ namespace nORM.Query
 
                     // Optimizer batching (1000 items per IN clause for DB plan efficiency).
                     // This is decoupled from parameter limits.
+                    // NOTE: When the collection exceeds MaxInClauseItems, each batch re-visits
+                    // valueExpr to emit the column reference (e.g., "T0.[Col] IN (...) OR T0.[Col] IN (...)").
+                    // This means the SQL string grows linearly with the number of batches (one column
+                    // reference per batch). For very large collections this is a deliberate tradeoff:
+                    // multiple smaller IN clauses let the query optimizer produce better plans than a
+                    // single massive IN list, at the cost of a slightly larger SQL string and plan
+                    // cache variance (different collection sizes produce different SQL shapes).
                     const int MaxInClauseItems = 1000;
                     if (nonNullItems.Count > MaxInClauseItems)
                     {
@@ -717,8 +750,10 @@ namespace nORM.Query
                         BuildExists(node.Arguments[0], node.Arguments.Count > 1 ? StripQuotes(node.Arguments[1]) as LambdaExpression : null, negate: false);
                         return node;
                     case nameof(Queryable.All):
+                        if (node.Arguments.Count < 2)
+                            throw new NormQueryException("All() requires a predicate argument.");
                         var pred = StripQuotes(node.Arguments[1]) as LambdaExpression;
-                        if (pred == null) throw new ArgumentException("All requires a predicate");
+                        if (pred == null) throw new NormQueryException("All() requires a predicate lambda expression.");
                         var param = pred.Parameters[0];
                         var notBody = Expression.Not(pred.Body);
                         var lambda = Expression.Lambda(notBody, param);
@@ -948,12 +983,15 @@ namespace nORM.Query
             }
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
             _sql.AppendParameterizedValue(paramName, value, _paramSink);
-            if (_constParamMap.Count >= _constParamMapLimit)
+            if (_constParamMap.Count >= ConstParamMapLimit)
                 _constParamMap.Clear();
             _constParamMap[key] = paramName;
         }
         private Expression CreateSafeParameter(object? value)
         {
+            // TODO: The 8000-byte limit is SQL Server's non-MAX threshold. Provider-specific limits
+            // differ (e.g., SQLite has no inherent limit; MySQL's max_allowed_packet default is 64 MB;
+            // PostgreSQL has a 1 GB bytea limit). Consider delegating to _provider.MaxParameterSize.
             if (value is string str && str.Length > 8000)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "String parameter exceeds maximum length"));
             if (value is byte[] bytes && bytes.Length > 8000)
@@ -964,7 +1002,7 @@ namespace nORM.Query
             // actual value has already been written directly to the
             // parameter collection in AppendConstant, so no further
             // expression tree representation is required here.
-            return _emptyExpression;
+            return s_emptyExpression;
         }
         private enum LikeOperation
         {

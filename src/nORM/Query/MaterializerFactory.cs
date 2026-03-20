@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using nORM.Internal;
 using nORM.Mapping;
 using nORM.SourceGeneration;
+using System.Globalization;
 using nORM.Core;
 
 namespace nORM.Query
@@ -41,18 +42,32 @@ namespace nORM.Query
     /// </remarks>
     internal sealed class MaterializerFactory
     {
-        private const int DefaultCacheSize = 2000; // Increased for JOIN scenarios
+        /// <summary>Maximum entries in each materializer LRU cache (sync, async, schema).</summary>
+        private const int DefaultCacheSize = 2000;
 
-        // Separate caches for sync and async materializers.
+        /// <summary>TTL for materializer caches (sync and async).</summary>
+        private static readonly TimeSpan MaterializerCacheTtl = TimeSpan.FromMinutes(15);
+
+        /// <summary>TTL for schema-mapping cache (longer because schema changes are rare).</summary>
+        private static readonly TimeSpan SchemaCacheTtl = TimeSpan.FromMinutes(30);
+
+        /// <summary>Sentinel ordinal value indicating an unmapped column.</summary>
+        private const int UnmappedOrdinal = -1;
+
+        // Dual cache design: _syncCache stores Func<DbDataReader, object> delegates used directly
+        // by synchronous query paths (no Task allocation). _asyncCache stores async wrappers that
+        // delegate to the same underlying sync materializer but return Task<object>. Keeping them
+        // separate avoids the overhead of wrapping/unwrapping Tasks on the sync hot path, while
+        // still sharing the core materializer logic via CreateMaterializerInternal.
         private static readonly ConcurrentLruCache<MaterializerCacheKey, Func<DbDataReader, object>> _syncCache
-            = new(maxSize: DefaultCacheSize, timeToLive: TimeSpan.FromMinutes(15));
+            = new(maxSize: DefaultCacheSize, timeToLive: MaterializerCacheTtl);
 
         private static readonly ConcurrentLruCache<MaterializerCacheKey, Func<DbDataReader, CancellationToken, Task<object>>> _asyncCache
-            = new(maxSize: DefaultCacheSize, timeToLive: TimeSpan.FromMinutes(15));
+            = new(maxSize: DefaultCacheSize, timeToLive: MaterializerCacheTtl);
 
         // Separate cache for schema-specific mappings to avoid conflicts
         private static readonly ConcurrentLruCache<SchemaCacheKey, OrdinalMapping> _schemaCache
-            = new(maxSize: DefaultCacheSize, timeToLive: TimeSpan.FromMinutes(30));
+            = new(maxSize: DefaultCacheSize, timeToLive: SchemaCacheTtl);
 
         // Cache constructor info and delegates to avoid repeated reflection in hot paths
         private static readonly ConcurrentDictionary<Type, ConstructorInfo> _constructorCache = new();
@@ -63,6 +78,17 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<Type, Func<DbDataReader, object>> _fastMaterializers = new();
         private static readonly ConcurrentDictionary<(Type Type, int Offset), Action<object, DbDataReader>[]> _setterCache = new();
         private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _propertiesCache = new();
+
+        // Cached NullabilityInfoContext instance shared across all materializer creations.
+        // NullabilityInfoContext is thread-safe for reads and expensive to construct repeatedly,
+        // so we create it once and reuse. Falls back to null if the runtime doesn't support it.
+        private static readonly NullabilityInfoContext? _nullabilityInfoContext = CreateNullabilityInfoContext();
+        private static NullabilityInfoContext? CreateNullabilityInfoContext()
+        {
+            try { return new NullabilityInfoContext(); }
+            catch (InvalidOperationException) { return null; } // trimmed assemblies
+            catch (PlatformNotSupportedException) { return null; } // AOT / unsupported runtimes
+        }
 
         /// <summary>
         /// X1 fix: Detects whether the runtime mapping has fluent-only column renames that the
@@ -148,34 +174,28 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// MM1 fix: Converts a boxed DB value to <see cref="DateOnly"/>. Called from IL-emitted
+        /// Converts a boxed DB value to <see cref="DateOnly"/>. Called from IL-emitted
         /// materializers where <c>Convert.ChangeType</c> cannot handle DateOnly.
-        /// </summary>
-        /// <summary>
-        /// Converts a boxed DB value to <see cref="DateOnly"/>. Public so source-generated
-        /// materializers can call it (SG1 fix).
+        /// Public so source-generated materializers can call it (SG1 fix).
         /// </summary>
         public static DateOnly ConvertToDateOnly(object value)
         {
             if (value is DateTime dt) return DateOnly.FromDateTime(dt);
-            if (value is string s) return DateOnly.Parse(s);
-            return DateOnly.FromDateTime(Convert.ToDateTime(value));
+            if (value is string s) return DateOnly.Parse(s, CultureInfo.InvariantCulture);
+            return DateOnly.FromDateTime(Convert.ToDateTime(value, CultureInfo.InvariantCulture));
         }
 
         /// <summary>
-        /// MM1 fix: Converts a boxed DB value to <see cref="TimeOnly"/>. Called from IL-emitted
+        /// Converts a boxed DB value to <see cref="TimeOnly"/>. Called from IL-emitted
         /// materializers where <c>Convert.ChangeType</c> cannot handle TimeOnly.
-        /// </summary>
-        /// <summary>
-        /// Converts a boxed DB value to <see cref="TimeOnly"/>. Public so source-generated
-        /// materializers can call it (SG1 fix).
+        /// Public so source-generated materializers can call it (SG1 fix).
         /// </summary>
         public static TimeOnly ConvertToTimeOnly(object value)
         {
             if (value is TimeSpan ts) return TimeOnly.FromTimeSpan(ts);
             if (value is DateTime dt) return TimeOnly.FromDateTime(dt);
-            if (value is string s) return TimeOnly.Parse(s);
-            return TimeOnly.FromTimeSpan((TimeSpan)Convert.ChangeType(value, typeof(TimeSpan)));
+            if (value is string s) return TimeOnly.Parse(s, CultureInfo.InvariantCulture);
+            return TimeOnly.FromTimeSpan((TimeSpan)Convert.ChangeType(value, typeof(TimeSpan), CultureInfo.InvariantCulture));
         }
 
         /// <summary>
@@ -235,18 +255,20 @@ namespace nORM.Query
             if (underlyingType == typeof(DateOnly))
             {
                 if (dbValue is DateTime dt) return DateOnly.FromDateTime(dt);
-                if (dbValue is string s) return DateOnly.Parse(s);
-                return DateOnly.FromDateTime(Convert.ToDateTime(dbValue));
+                if (dbValue is string s) return DateOnly.Parse(s, CultureInfo.InvariantCulture);
+                return DateOnly.FromDateTime(Convert.ToDateTime(dbValue, CultureInfo.InvariantCulture));
             }
             if (underlyingType == typeof(TimeOnly))
             {
                 if (dbValue is TimeSpan ts) return TimeOnly.FromTimeSpan(ts);
                 if (dbValue is DateTime dt) return TimeOnly.FromDateTime(dt);
-                if (dbValue is string s) return TimeOnly.Parse(s);
-                return TimeOnly.FromTimeSpan((TimeSpan)Convert.ChangeType(dbValue, typeof(TimeSpan)));
+                if (dbValue is string s) return TimeOnly.Parse(s, CultureInfo.InvariantCulture);
+                return TimeOnly.FromTimeSpan((TimeSpan)Convert.ChangeType(dbValue, typeof(TimeSpan), CultureInfo.InvariantCulture));
             }
 
-            // Use cached conversion delegate for better performance
+            // Use cached conversion delegate for better performance.
+            // Cache key uses dbValue.GetType() (runtime type): correct because the same runtime type
+            // always produces the same conversion path to the target type.
             var conversionKey = (dbValue.GetType(), underlyingType);
             var converter = _conversionCache.GetOrAdd(conversionKey, key =>
             {
@@ -262,9 +284,14 @@ namespace nORM.Query
                         typeof(object));
                     return Expression.Lambda<Func<object, object>>(convert, param).Compile();
                 }
-                catch
+                catch (InvalidCastException)
                 {
-                    // Fallback to runtime conversion
+                    // Fallback to runtime conversion when expression tree compilation fails
+                    return value => Convert.ChangeType(value, to);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Fallback to runtime conversion when expression tree compilation fails
                     return value => Convert.ChangeType(value, to);
                 }
             });
@@ -273,7 +300,7 @@ namespace nORM.Query
             {
                 return converter(dbValue);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
             {
                 throw new InvalidOperationException(
                     $"Failed to convert {dbValue.GetType().Name} value '{dbValue}' to {underlyingType.Name}: {ex.Message}", ex);
@@ -322,19 +349,17 @@ namespace nORM.Query
                             if (underlying.IsEnum)
                             {
                                 // MM-2: Nullable<TEnum> — convert via enum helper to avoid InvalidCastException
-                                var enumConvertMethod = typeof(MaterializerFactory).GetMethod(nameof(ConvertToEnum), BindingFlags.NonPublic | BindingFlags.Static)!
-                                    .MakeGenericMethod(underlying);
-                                il.Emit(OpCodes.Call, enumConvertMethod);
+                                il.Emit(OpCodes.Call, _convertToEnumOpenMethod.MakeGenericMethod(underlying));
                             }
                             else if (underlying == typeof(DateOnly))
                             {
                                 // MM1 fix: Nullable<DateOnly> — Convert.ChangeType doesn't support DateOnly
-                                il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateOnly), BindingFlags.Public | BindingFlags.Static)!);
+                                il.Emit(OpCodes.Call, _convertToDateOnlyMethod);
                             }
                             else if (underlying == typeof(TimeOnly))
                             {
                                 // MM1 fix: Nullable<TimeOnly> — Convert.ChangeType doesn't support TimeOnly
-                                il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.Public | BindingFlags.Static)!);
+                                il.Emit(OpCodes.Call, _convertToTimeOnlyMethod);
                             }
                             else
                             {
@@ -355,16 +380,14 @@ namespace nORM.Query
                     {
                         // MM-2: Enum types — call our helper which handles Int64→int→enum conversion
                         // that Convert.ChangeType cannot do directly (throws InvalidCastException).
-                        var enumConvertMethod = typeof(MaterializerFactory).GetMethod(nameof(ConvertToEnum), BindingFlags.NonPublic | BindingFlags.Static)!
-                            .MakeGenericMethod(pType);
-                        il.Emit(OpCodes.Call, enumConvertMethod);
+                        il.Emit(OpCodes.Call, _convertToEnumOpenMethod.MakeGenericMethod(pType));
                     }
                     else if (pType == typeof(DateOnly))
                     {
                         // MM1 fix: DateOnly — Convert.ChangeType doesn't support DateOnly
                         if (readerMethod.ReturnType == typeof(object))
                         {
-                            il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateOnly), BindingFlags.Public | BindingFlags.Static)!);
+                            il.Emit(OpCodes.Call, _convertToDateOnlyMethod);
                         }
                     }
                     else if (pType == typeof(TimeOnly))
@@ -372,7 +395,7 @@ namespace nORM.Query
                         // MM1 fix: TimeOnly — Convert.ChangeType doesn't support TimeOnly
                         if (readerMethod.ReturnType == typeof(object))
                         {
-                            il.Emit(OpCodes.Call, typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.Public | BindingFlags.Static)!);
+                            il.Emit(OpCodes.Call, _convertToTimeOnlyMethod);
                         }
                     }
                     else if (pType.IsValueType)
@@ -705,7 +728,7 @@ namespace nORM.Query
 
                 // Only use schema-aware logic for complex projections
                 OrdinalMapping? cachedMapping = null;
-                var mappingComputed = false;
+                int mappingComputedFlag = 0; // 0=not computed, 1=computed; Interlocked for thread safety
 
                 return (DbDataReader reader, CancellationToken ct) =>
                 {
@@ -718,11 +741,10 @@ namespace nORM.Query
                     }
                     catch (FormatException)
                     {
-                        // Only on format exception, compute schema mapping once
-                        if (!mappingComputed)
+                        // Only on format exception, compute schema mapping once (thread-safe)
+                        if (Interlocked.CompareExchange(ref mappingComputedFlag, 1, 0) == 0)
                         {
                             cachedMapping = CreateOrdinalMapping(reader, mapping);
-                            mappingComputed = true;
                         }
 
                         if (cachedMapping?.IsValid == true)
@@ -735,10 +757,10 @@ namespace nORM.Query
                         // This fails faster than waiting for DbException with better diagnostics
                         if (cachedMapping != null && !cachedMapping.Value.IsValid)
                         {
-                            var missingColumns = new System.Collections.Generic.List<string>();
+                            var missingColumns = new List<string>();
                             for (int i = 0; i < cachedMapping.Value.Ordinals.Length; i++)
                             {
-                                if (cachedMapping.Value.Ordinals[i] == -1)
+                                if (cachedMapping.Value.Ordinals[i] == UnmappedOrdinal)
                                 {
                                     missingColumns.Add(mapping.Columns[i].PropName);
                                 }
@@ -770,6 +792,11 @@ namespace nORM.Query
             var isValid = true;
 
             // Build quick lookup for field names (case-insensitive), detecting duplicates.
+            // Case-insensitive (OrdinalIgnoreCase) is a deliberate design choice: SQL column names are
+            // case-insensitive in ANSI SQL and in all four supported providers (SQLite, SQL Server,
+            // MySQL, PostgreSQL with quoted identifiers). Using OrdinalIgnoreCase here ensures that
+            // C# property "Name" matches SQL column "name" or "NAME" without requiring exact casing,
+            // which is especially important for cross-provider portability.
             // Duplicate column names (e.g., two JOINed tables both having "Id") are tracked in
             // the ambiguous set and excluded from name-based lookup to prevent silent wrong-table binding.
             var nameCount = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
@@ -805,7 +832,7 @@ namespace nORM.Query
                 var column = mapping.Columns[i];
                 var propName = column.PropName;
                 var expectedType = column.Prop.PropertyType;
-                var foundOrdinal = -1;
+                var foundOrdinal = UnmappedOrdinal;
 
                 // Try direct property name match first
                 if (nameToOrdinal.TryGetValue(propName, out foundOrdinal))
@@ -816,7 +843,7 @@ namespace nORM.Query
                         continue;
                     }
                     // Type mismatch, continue searching
-                    foundOrdinal = -1;
+                    foundOrdinal = UnmappedOrdinal;
                 }
 
                 // Try table-qualified names for JOIN scenarios
@@ -840,28 +867,28 @@ namespace nORM.Query
                                 ordinals[i] = foundOrdinal;
                                 break;
                             }
-                            foundOrdinal = -1;
+                            foundOrdinal = UnmappedOrdinal;
                         }
                     }
                 }
 
-                // Try escaped column name
-                if (foundOrdinal == -1 && !string.IsNullOrEmpty(column.EscCol))
+                // Try escaped column name (strip bracket, backtick, and double-quote delimiters)
+                if (foundOrdinal == UnmappedOrdinal && !string.IsNullOrEmpty(column.EscCol))
                 {
-                    var normalizedEscCol = column.EscCol.Trim('[', ']', '`', '"', '\'');
+                    var normalizedEscCol = column.EscCol.Trim('[', ']', '`', '"');
                     if (nameToOrdinal.TryGetValue(normalizedEscCol, out foundOrdinal))
                     {
                         if (!IsTypeCompatible(fieldTypes[foundOrdinal], expectedType))
                         {
-                            foundOrdinal = -1;
+                            foundOrdinal = UnmappedOrdinal;
                         }
                     }
                 }
 
-                if (foundOrdinal == -1)
+                if (foundOrdinal == UnmappedOrdinal)
                 {
                     // Column not found or type incompatible - this mapping may not be suitable for this schema
-                    ordinals[i] = -1;
+                    ordinals[i] = UnmappedOrdinal;
                     isValid = false;
                 }
                 else
@@ -884,12 +911,8 @@ namespace nORM.Query
             if (underlyingField == underlyingExpected)
                 return true;
 
-            // Allow numeric conversions
+            // Allow numeric conversions (e.g., Int64 field for Int32 property)
             if (IsNumericType(underlyingField) && IsNumericType(underlyingExpected))
-                return true;
-
-            // Allow string to string only (don't allow string to numeric - causes format errors)
-            if (underlyingField == typeof(string) && underlyingExpected == typeof(string))
                 return true;
 
             // Allow object type (can be converted)
@@ -933,7 +956,12 @@ namespace nORM.Query
                     kvp =>
                     {
                         var dmap = kvp.Value;
-                        var indices = dmap.Columns.Select(c => startOffset + Array.IndexOf(mapping.Columns, mapping.ColumnsByName[c.Prop.Name])).ToArray();
+                        var indices = dmap.Columns.Select(c =>
+                        {
+                            if (mapping.ColumnsByName.TryGetValue(c.Prop.Name, out var baseCol))
+                                return startOffset + Array.IndexOf(mapping.Columns, baseCol);
+                            return UnmappedOrdinal; // column not found in base mapping
+                        }).ToArray();
                         var getters = dmap.Columns.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, indices[i], 0)).ToArray();
                         var ctor = _parameterlessCtorDelegates.GetOrAdd(dmap.Type, t =>
                         {
@@ -958,7 +986,8 @@ namespace nORM.Query
                 return reader =>
                 {
                     var disc = reader.GetValue(discIndex);
-                    if (disc != null && derivedMats.TryGetValue(disc, out var mat))
+                    // reader.GetValue returns DBNull.Value (not null) for SQL NULL columns
+                    if (disc is not null and not DBNull && derivedMats.TryGetValue(disc, out var mat))
                         return mat(reader);
                     return baseMat(reader);
                 };
@@ -1021,7 +1050,8 @@ namespace nORM.Query
                             var col = colsSnapshot[i];
                             int ordinal;
                             try { ordinal = reader.GetOrdinal(col.Name); }
-                            catch (Exception) { continue; } // skip unmapped columns (incl. validation reader)
+                            catch (IndexOutOfRangeException) { continue; } // column not found (ADO.NET standard)
+                            catch (ArgumentOutOfRangeException) { continue; } // column not found (Microsoft.Data.Sqlite variant)
                             if (reader.IsDBNull(ordinal)) continue;
                             var rawValue = reader.GetValue(ordinal);
                             try
@@ -1033,10 +1063,14 @@ namespace nORM.Query
                                     value = ConvertDbValue(rawValue, col.Prop.PropertyType);
                                 col.Setter(entity, value);
                             }
-                            catch (Exception)
+                            catch (InvalidCastException)
                             {
                                 // skip columns that cannot be converted (e.g., no converter configured
                                 // but DB type doesn't match property type)
+                            }
+                            catch (FormatException)
+                            {
+                                // skip columns with format mismatches during conversion
                             }
                         }
                         return entity!;
@@ -1083,11 +1117,13 @@ namespace nORM.Query
                             // column doesn't exist in the result set (e.g., SELECT * without the column).
                             int ord;
                             try { ord = reader.GetOrdinal(col.Name); }
-                            catch (Exception) { continue; }
+                            catch (IndexOutOfRangeException) { continue; } // column not found (ADO.NET standard)
+                            catch (ArgumentOutOfRangeException) { continue; } // column not found (Microsoft.Data.Sqlite variant)
                             if (reader.IsDBNull(ord)) continue;
                             var rawVal = reader.GetValue(ord);
                             try { col.Setter(entity, ConvertDbValue(rawVal, col.Prop.PropertyType)); }
-                            catch (Exception) { }
+                            catch (InvalidCastException) { }
+                            catch (FormatException) { }
                         }
                         else
                         {
@@ -1122,7 +1158,17 @@ namespace nORM.Query
                                 $"DB column returned NULL for non-nullable constructor parameter '{ctorParams[i].Name}' " +
                                 $"of type '{paramType.Name}'. Mark the parameter type as nullable or fix the data source.");
                         }
-                        args[i] = paramType.IsValueType ? Activator.CreateInstance(paramType) : default;
+                        try
+                        {
+                            args[i] = paramType.IsValueType ? Activator.CreateInstance(paramType) : default;
+                        }
+                        catch (MissingMethodException)
+                        {
+                            throw new InvalidOperationException(
+                                $"Cannot create default value for constructor parameter '{ctorParams[i].Name}' " +
+                                $"of type '{paramType.Name}': type has no parameterless constructor. " +
+                                $"Mark the parameter as nullable or provide a default value.");
+                        }
                         continue;
                     }
                     args[i] = paramGetters[i](reader);
@@ -1156,7 +1202,9 @@ namespace nORM.Query
                                 return false;
                         }
                         return true;
-                    }) ?? throw new InvalidOperationException($"No suitable constructor for {type}");
+                    }) ?? throw new InvalidOperationException(
+                        $"No suitable constructor for {t.FullName ?? t.Name}. " +
+                        $"Expected constructor signature: ({string.Join(", ", columns.Select(c => $"{c.Prop.PropertyType.Name} {c.Prop.Name}"))}).");
             });
         }
 
@@ -1203,6 +1251,22 @@ namespace nORM.Query
             return (Func<object?[], object>)method.CreateDelegate(typeof(Func<object?[], object>));
         }
 
+        /// <summary>
+        /// Extracts the set of columns referenced by a projection expression.
+        /// </summary>
+        /// <remarks>
+        /// <b>Limitations:</b> This method only handles two expression node types inside
+        /// <see cref="NewExpression.Arguments"/>:
+        /// <list type="bullet">
+        ///   <item><see cref="MemberExpression"/> -- direct property access (e.g. <c>x.Name</c>).</item>
+        ///   <item><see cref="ParameterExpression"/> -- the entire entity passed as a constructor arg.</item>
+        /// </list>
+        /// Other expression forms (method calls, conditional expressions, binary expressions, etc.)
+        /// are silently skipped, causing the resulting column array to omit those members. If the
+        /// projection body is not a <see cref="NewExpression"/> at all, the method falls back to
+        /// returning all columns from the mapping. Callers that need richer projection support
+        /// should extend this method accordingly.
+        /// </remarks>
         private static Column[] ExtractColumnsFromProjection(TableMapping mapping, LambdaExpression projection)
         {
             if (projection.Body is NewExpression newExpr)
@@ -1283,10 +1347,9 @@ namespace nORM.Query
                 Expression.Assign(entityVar, Expression.New(targetType))
             };
 
-            // Use NullabilityInfoContext to detect non-nullable reference types (NRT).
+            // Use the class-level cached NullabilityInfoContext to detect non-nullable reference types (NRT).
             // This lets us skip IsDBNull for non-nullable strings etc., saving ~47ns per call.
-            NullabilityInfoContext? nullabilityCtx = null;
-            try { nullabilityCtx = new NullabilityInfoContext(); } catch { /* edge-case fallback */ }
+            var nullabilityCtx = _nullabilityInfoContext;
 
             for (int i = 0; i < columns.Length; i++)
             {
@@ -1309,9 +1372,17 @@ namespace nORM.Query
                         var nullabilityInfo = nullabilityCtx.Create(column.Prop);
                         skipIsDbNull = nullabilityInfo.WriteState == NullabilityState.NotNull;
                     }
-                    catch
+                    catch (InvalidOperationException)
                     {
-                        skipIsDbNull = false; // fallback: keep IsDBNull check
+                        // NullabilityInfoContext.Create can throw for dynamic/emitted properties.
+                        // Fallback: conservatively keep IsDBNull check for this column.
+                        skipIsDbNull = false;
+                    }
+                    catch (ArgumentException)
+                    {
+                        // NullabilityInfoContext.Create can throw ArgumentException for unsupported property metadata.
+                        // Fallback: conservatively keep IsDBNull check for this column.
+                        skipIsDbNull = false;
                     }
                 }
                 else
@@ -1341,23 +1412,26 @@ namespace nORM.Query
 
         private static void ValidateMaterializer(Func<DbDataReader, object> materializer, TableMapping mapping, Type targetType)
         {
-            _ = targetType;
             using var reader = new ValidationDbDataReader(mapping.Columns.Length);
             try
             {
                 materializer(reader);
             }
             catch (Exception ex) when (
-                ex is InvalidOperationException || ex is InvalidCastException)
+                ex is InvalidOperationException or InvalidCastException or FormatException or IndexOutOfRangeException)
             {
                 // MAP-4: Expected during validation — the validation reader purposely sends DBNull to
-                // every column to test the structural correctness of the materializer.  A NULL-for-non-nullable
+                // every column to test the structural correctness of the materializer. A NULL-for-non-nullable
                 // exception here means the materializer code path was reached and will throw appropriately
-                // during real execution.  This is NOT a materializer defect; suppress it.
+                // during real execution. FormatException/IndexOutOfRangeException can occur when the
+                // validation reader's synthetic column names don't match GetOrdinal expectations.
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"Materializer validation failed for type {targetType.Name}: {ex.Message}", ex);
+                var columnInfo = string.Join(", ", mapping.Columns.Select((c, i) => $"[{i}]={c.Name}({c.Prop.PropertyType.Name})"));
+                throw new InvalidOperationException(
+                    $"Materializer validation failed for type {targetType.Name} " +
+                    $"with {mapping.Columns.Length} column(s): {columnInfo}. Error: {ex.Message}", ex);
             }
         }
 
@@ -1408,7 +1482,10 @@ namespace nORM.Query
                 if (name.StartsWith("Field_", StringComparison.Ordinal) &&
                     int.TryParse(name.AsSpan(6), out var ordinal))
                     return ordinal;
-                throw new IndexOutOfRangeException($"Column name '{name}' was not found in the reader.");
+                var available = string.Join(", ", Enumerable.Range(0, _fieldCount).Select(i => $"Field_{i}"));
+                throw new IndexOutOfRangeException(
+                    $"Column name '{name}' was not found in the validation reader. " +
+                    $"Available columns ({_fieldCount}): {available}.");
             }
             public override string GetDataTypeName(int ordinal) => nameof(Object);
             public override Type GetFieldType(int ordinal) => typeof(object);
@@ -1595,6 +1672,10 @@ namespace nORM.Query
 
             var isDbNull = Expression.Call(readerParam, Methods.IsDbNull, Expression.Constant(index));
             var getValue = GetOptimizedReaderCall(readerParam, property.PropertyType, index);
+            // Cast target to property.DeclaringType (not the concrete entity type) because the
+            // property's setter MethodInfo is bound to its declaring type. For inherited properties,
+            // DeclaringType is the base class, and calling the setter on a derived-type expression
+            // without this cast would throw an ArgumentException from Expression.Call.
             var assign = Expression.Call(Expression.Convert(targetParam, property.DeclaringType!), property.GetSetMethod()!, getValue);
             var body = Expression.IfThen(Expression.Not(isDbNull), assign);
 
@@ -1615,7 +1696,7 @@ namespace nORM.Query
 
             private int MapOrdinal(int ordinal)
             {
-                if ((uint)ordinal >= (uint)_mapping.Ordinals.Length) return -1;
+                if ((uint)ordinal >= (uint)_mapping.Ordinals.Length) return UnmappedOrdinal;
                 return _mapping.Ordinals[ordinal];
             }
 
@@ -1712,7 +1793,15 @@ namespace nORM.Query
             /// </summary>
             /// <param name="values">Destination array for the values.</param>
             /// <returns>The number of values copied.</returns>
-            public override int GetValues(object[] values) => _inner.GetValues(values);
+            public override int GetValues(object[] values)
+            {
+                var count = Math.Min(values.Length, _mapping.Ordinals.Length);
+                for (int i = 0; i < count; i++)
+                {
+                    values[i] = GetValue(i);
+                }
+                return count;
+            }
             public override object this[int ordinal] => GetValue(ordinal);
             public override object this[string name] => _inner[name];
             /// <summary>
@@ -1721,7 +1810,11 @@ namespace nORM.Query
             /// </summary>
             /// <param name="ordinal">The column ordinal.</param>
             /// <returns>The database-specific type name.</returns>
-            public override string GetDataTypeName(int ordinal) => _inner.GetDataTypeName(MapOrdinal(ordinal));
+            public override string GetDataTypeName(int ordinal)
+            {
+                var mapped = MapOrdinal(ordinal);
+                return mapped >= 0 ? _inner.GetDataTypeName(mapped) : nameof(Object);
+            }
             /// <summary>
             /// Returns an enumerator that iterates through the rows of the data
             /// reader.
@@ -1763,7 +1856,10 @@ namespace nORM.Query
             /// <param name="length">The maximum number of bytes to read.</param>
             /// <returns>The actual number of bytes read.</returns>
             public override long GetBytes(int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length)
-                => _inner.GetBytes(MapOrdinal(ordinal), dataOffset, buffer, bufferOffset, length);
+            {
+                var mapped = MapOrdinal(ordinal);
+                return mapped >= 0 ? _inner.GetBytes(mapped, dataOffset, buffer, bufferOffset, length) : 0;
+            }
 
             /// <summary>
             /// Retrieves a single character value from the mapped column.
@@ -1786,7 +1882,10 @@ namespace nORM.Query
             /// <param name="length">The maximum number of characters to read.</param>
             /// <returns>The actual number of characters read.</returns>
             public override long GetChars(int ordinal, long dataOffset, char[]? buffer, int bufferOffset, int length)
-                => _inner.GetChars(MapOrdinal(ordinal), dataOffset, buffer, bufferOffset, length);
+            {
+                var mapped = MapOrdinal(ordinal);
+                return mapped >= 0 ? _inner.GetChars(mapped, dataOffset, buffer, bufferOffset, length) : 0;
+            }
 
             /// <summary>
             /// Retrieves a <see cref="Guid"/> value using the mapped ordinal.
@@ -1871,7 +1970,9 @@ namespace nORM.Query
                 if (_inner.GetFieldType(mapped) == typeof(string) && !_inner.IsDBNull(mapped))
                 {
                     var stringValue = _inner.GetString(mapped);
-                    return decimal.Parse(stringValue); // Throws FormatException on invalid data
+                    // Use InvariantCulture to ensure consistent parsing regardless of the
+                    // current thread's culture (e.g., '.' is always the decimal separator).
+                    return decimal.Parse(stringValue, CultureInfo.InvariantCulture);
                 }
                 return _inner.GetDecimal(mapped); // Throws FormatException on invalid data
             }
@@ -1901,7 +2002,11 @@ namespace nORM.Query
             public override int VisibleFieldCount => Math.Max(_inner.VisibleFieldCount, _mapping.Ordinals.Length);
         }
 
-        // Value types for better cache performance.
+        // MaterializerCacheKey is a readonly struct to guarantee immutability: once constructed,
+        // its fields cannot be modified. This is critical for correctness as a dictionary/cache key
+        // because mutable keys would break hash-based lookups if mutated after insertion. The
+        // readonly constraint is enforced by the compiler -- all fields are readonly and the struct
+        // itself is declared readonly, preventing any post-construction mutation.
         // Uses actual Type references instead of hash codes to prevent collision between
         // different types that happen to produce the same hash code.
         // ProjectionHash is 64-bit to prevent hash collisions between distinct projection

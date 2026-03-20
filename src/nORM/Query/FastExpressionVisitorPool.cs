@@ -115,15 +115,18 @@ internal static class FastExpressionVisitorPool
     /// evaluated.</returns>
     public static object? GetMemberValue(MemberInfo member, object? instance)
     {
+        if (member.DeclaringType == null)
+            throw new InvalidOperationException($"Cannot access member '{member.Name}' with null declaring type.");
+
         if (!_memberAccessorCache.TryGetValue(member, out var del))
         {
             var objParam = Expression.Parameter(typeof(object), "obj");
-            var typedParam = Expression.Convert(objParam, member.DeclaringType!);
+            var typedParam = Expression.Convert(objParam, member.DeclaringType);
             Expression body = member switch
             {
                 PropertyInfo pi => Expression.Property(typedParam, pi),
                 FieldInfo fi => Expression.Field(typedParam, fi),
-                _ => throw new NotSupportedException("Member must be a field or property.")
+                _ => throw new NotSupportedException($"Member type '{member.MemberType}' is not supported; must be a field or property.")
             };
             body = Expression.Convert(body, typeof(object));
             var lambda = Expression.Lambda<Func<object?, object?>>(body, objParam);

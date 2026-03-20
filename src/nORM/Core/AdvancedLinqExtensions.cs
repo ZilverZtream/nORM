@@ -264,6 +264,8 @@ namespace nORM.Core
         private static Task<TResult> ExecuteAggregateAsync<TSource, TResult>(INormQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, string aggregateFunction, CancellationToken ct)
             where TSource : class, new()
         {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(selector);
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
                 var aggregateExpression = CreateAggregateExpression(source.Expression, selector, aggregateFunction);
@@ -276,6 +278,8 @@ namespace nORM.Core
         private static Task<TResult> ExecuteQueryableAggregateAsync<TSource, TResult>(IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, string aggregateFunction, CancellationToken ct)
             where TSource : class
         {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(selector);
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
                 var aggregateExpression = CreateAggregateExpression(source.Expression, selector, aggregateFunction);

@@ -16,77 +16,99 @@ namespace nORM.Scaffolding
 {
     /// <summary>
     /// Generates entity types at runtime based on database schema information.
-    /// MEMORY LEAK FIX: Reuses a single ModuleBuilder instead of creating new assemblies per type.
+    /// Reuses a single shared <see cref="ModuleBuilder"/> to prevent unloadable assembly
+    /// accumulation when types are evicted from cache.
     /// </summary>
     public class DynamicEntityTypeGenerator
     {
         private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool IsKey, bool IsAuto, int? MaxLength);
 
-        // MEMORY LEAK FIX: Shared static AssemblyBuilder and ModuleBuilder for all generated types
-        // This prevents unloadable assembly accumulation when types are evicted from cache
+        /// <summary>Namespace prefix used for all dynamically generated entity types.</summary>
+        private const string DynamicTypeNamespace = "nORM.Dynamic";
+
+        /// <summary>Name of the shared dynamic assembly that hosts all generated entity types.</summary>
+        private const string DynamicAssemblyName = "nORM.Dynamic.Entities";
+
+        /// <summary>Name of the dynamic module within the shared assembly.</summary>
+        private const string DynamicModuleName = "MainModule";
+
+        /// <summary>
+        /// Number of leading bytes from the SHA-256 hash used as the schema signature.
+        /// 16 bytes yields a 32-character hex string with negligible collision probability.
+        /// </summary>
+        private const int SchemaSignatureTruncationBytes = 16;
+
+        // Shared static AssemblyBuilder and ModuleBuilder for all generated types,
+        // preventing unloadable assembly accumulation when types are evicted from cache.
         private static readonly AssemblyBuilder _sharedAssembly;
         private static readonly ModuleBuilder _sharedModule;
-        private static int _typeCounter = 0;
+        private static long _typeCounter;
 
         static DynamicEntityTypeGenerator()
         {
-            // Initialize shared assembly and module once for all dynamic types
-            var assemblyName = new AssemblyName("nORM.Dynamic.Entities");
+            var assemblyName = new AssemblyName(DynamicAssemblyName);
             _sharedAssembly = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
-            _sharedModule = _sharedAssembly.DefineDynamicModule("MainModule");
+            _sharedModule = _sharedAssembly.DefineDynamicModule(DynamicModuleName);
         }
 
         /// <summary>
         /// Generates a CLR type representing the specified table asynchronously.
-        /// MEMORY LEAK FIX: Uses shared ModuleBuilder instead of creating new assemblies.
+        /// Uses the shared <see cref="ModuleBuilder"/> to avoid per-type assembly allocation.
         /// </summary>
-        /// <param name="connection">Database connection.</param>
+        /// <param name="connection">Database connection. Will be opened if not already open.</param>
         /// <param name="tableName">Name of the table to generate. May include schema (schema.table).</param>
         /// <returns>The generated <see cref="Type"/>.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="tableName"/> is null or whitespace.</exception>
         public async Task<Type> GenerateEntityTypeAsync(DbConnection connection, string tableName)
         {
-            if (connection == null) throw new ArgumentNullException(nameof(connection));
+            ArgumentNullException.ThrowIfNull(connection);
             if (string.IsNullOrWhiteSpace(tableName)) throw new ArgumentException("Value cannot be null or whitespace.", nameof(tableName));
             if (connection.State != ConnectionState.Open)
                 await connection.OpenAsync().ConfigureAwait(false);
 
             var (schemaName, bareTable) = SplitSchema(tableName);
-            var columns = GetTableSchema(connection, schemaName, bareTable);
+            // Materialize columns eagerly so the reader is closed before type building begins.
+            var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
 
             return BuildDynamicType(tableName, columns);
         }
 
         /// <summary>
-        /// Generates a CLR type representing the specified table.
-        /// MEMORY LEAK FIX: Uses shared ModuleBuilder instead of creating new assemblies.
+        /// Generates a CLR type representing the specified table synchronously.
+        /// Uses the shared <see cref="ModuleBuilder"/> to avoid per-type assembly allocation.
         /// </summary>
         /// <param name="connection">Open database connection.</param>
         /// <param name="tableName">Name of the table to generate. May include schema (schema.table).</param>
         /// <returns>The generated <see cref="Type"/>.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="tableName"/> is null or whitespace.</exception>
         public Type GenerateEntityType(DbConnection connection, string tableName)
         {
-            if (connection == null) throw new ArgumentNullException(nameof(connection));
+            ArgumentNullException.ThrowIfNull(connection);
             if (string.IsNullOrWhiteSpace(tableName)) throw new ArgumentException("Value cannot be null or whitespace.", nameof(tableName));
             if (connection.State != ConnectionState.Open)
                 connection.Open();
 
             var (schemaName, bareTable) = SplitSchema(tableName);
-            var columns = GetTableSchema(connection, schemaName, bareTable);
+            // Materialize columns eagerly so the reader is closed before type building begins.
+            var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
 
             return BuildDynamicType(tableName, columns);
         }
 
         /// <summary>
-        /// MEMORY LEAK FIX: Builds a dynamic type using the shared ModuleBuilder.
-        /// All generated types reuse the same assembly and module, preventing memory leaks.
+        /// Builds a dynamic CLR type from the given column descriptors using the shared <see cref="ModuleBuilder"/>.
+        /// Each invocation generates a uniquely-named type to prevent conflicts when the same table
+        /// is regenerated after a schema change.
         /// </summary>
-        private static Type BuildDynamicType(string tableName, IEnumerable<ColumnInfo> columns)
+        private static Type BuildDynamicType(string tableName, IReadOnlyList<ColumnInfo> columns)
         {
             var className = EscapeCSharpIdentifier(ToPascalCase(GetUnqualifiedName(tableName)));
 
             // Generate unique type name to avoid conflicts when same table is regenerated
             var typeId = Interlocked.Increment(ref _typeCounter);
-            var uniqueTypeName = $"nORM.Dynamic.{className}_{typeId}";
+            var uniqueTypeName = $"{DynamicTypeNamespace}.{className}_{typeId}";
 
             // Create type using shared module
             var typeBuilder = _sharedModule.DefineType(
@@ -95,7 +117,7 @@ namespace nORM.Scaffolding
                 typeof(object));
 
             // Add parameterless constructor
-            var ctor = typeBuilder.DefineDefaultConstructor(
+            typeBuilder.DefineDefaultConstructor(
                 MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName);
 
             // Add properties for each column
@@ -105,12 +127,12 @@ namespace nORM.Scaffolding
                 var fieldBuilder = typeBuilder.DefineField($"_{col.PropertyName}", propertyType, FieldAttributes.Private);
                 var propertyBuilder = typeBuilder.DefineProperty(col.PropertyName, PropertyAttributes.HasDefault, propertyType, null);
 
-                // Add [Column] attribute
+                // Add [Column] attribute mapping to the original database column name
                 var columnAttrCtor = typeof(ColumnAttribute).GetConstructor(new[] { typeof(string) })!;
                 var columnAttr = new CustomAttributeBuilder(columnAttrCtor, new object[] { col.ColumnName });
                 propertyBuilder.SetCustomAttribute(columnAttr);
 
-                // Add [Key] attribute if needed
+                // Add [Key] attribute for primary key columns
                 if (col.IsKey)
                 {
                     var keyAttrCtor = typeof(KeyAttribute).GetConstructor(Type.EmptyTypes)!;
@@ -118,7 +140,7 @@ namespace nORM.Scaffolding
                     propertyBuilder.SetCustomAttribute(keyAttr);
                 }
 
-                // Add [DatabaseGenerated] attribute if needed
+                // Add [DatabaseGenerated(Identity)] attribute for auto-increment columns
                 if (col.IsAuto)
                 {
                     var dbGenAttrCtor = typeof(DatabaseGeneratedAttribute).GetConstructor(new[] { typeof(DatabaseGeneratedOption) })!;
@@ -126,7 +148,7 @@ namespace nORM.Scaffolding
                     propertyBuilder.SetCustomAttribute(dbGenAttr);
                 }
 
-                // Add [MaxLength] attribute if needed
+                // Add [MaxLength] attribute for string columns with a known size
                 if (col.MaxLength.HasValue)
                 {
                     var maxLenAttrCtor = typeof(MaxLengthAttribute).GetConstructor(new[] { typeof(int) })!;
@@ -168,30 +190,31 @@ namespace nORM.Scaffolding
 
         /// <summary>
         /// Computes a stable hash string that represents the schema of the specified table.
-        /// The signature is derived from the ordered column names and their CLR types.
-        /// Including this in the dynamic-type cache key ensures that schema changes (added
-        /// columns, changed types) produce a new cache entry rather than returning a stale type.
-        ///
-        /// Note: the cache will accumulate entries as schemas evolve. Old entries become
-        /// unreachable (no live reference to the generated CLR Type) and are eligible for
-        /// eviction by the LRU cache policy.
+        /// The signature is derived from ordered column names, their CLR types, primary-key status,
+        /// and nullability. Including this in the dynamic-type cache key ensures that schema changes
+        /// (added columns, changed types) produce a new cache entry rather than returning a stale type.
+        /// Uses SHA-256 truncated to <see cref="SchemaSignatureTruncationBytes"/> bytes (32-char hex)
+        /// for negligible collision probability.
         /// </summary>
         /// <param name="connection">Open database connection used to probe the schema.</param>
         /// <param name="tableName">Possibly schema-qualified table name.</param>
-        /// <returns>A hex string fingerprint of the column name+type pairs in ordinal order.</returns>
+        /// <returns>A hex string fingerprint of the column descriptors in ordinal order.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="tableName"/> is null or whitespace.</exception>
         public string ComputeSchemaSignature(DbConnection connection, string tableName)
         {
+            ArgumentNullException.ThrowIfNull(connection);
+            if (string.IsNullOrWhiteSpace(tableName)) throw new ArgumentException("Value cannot be null or whitespace.", nameof(tableName));
             if (connection.State != ConnectionState.Open)
                 connection.Open();
             var (schemaName, bareTable) = SplitSchema(tableName);
             var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
-            // C-1: Include IsNullable and IsPrimaryKey in descriptor so different nullability/key
-            // configs produce different signatures. Use SHA-256 truncated to 16 bytes (32-char hex)
-            // to eliminate the 32-bit FNV-1a collision risk.
+            // Include IsNullable and IsPrimaryKey in descriptor so different nullability/key
+            // configs produce different signatures.
             var descriptor = string.Join(",", columns.Select(c =>
                 $"{c.ColumnName}:{c.PropertyType.FullName}:{(c.IsKey ? "PK" : "C")}:{(IsNullableType(c.PropertyType) ? "N" : "NN")}"));
             var hash = SHA256.HashData(Encoding.UTF8.GetBytes(descriptor));
-            return Convert.ToHexString(hash[..16]);
+            return Convert.ToHexString(hash[..SchemaSignatureTruncationBytes]);
         }
 
         private static IEnumerable<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
@@ -200,15 +223,19 @@ namespace nORM.Scaffolding
             using var cmd = connection.CreateCommand();
             cmd.CommandText = $"SELECT * FROM {qualified} WHERE 1=0";
             using var reader = cmd.ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo);
-            var schema = reader.GetSchemaTable()!;
+            var schema = reader.GetSchemaTable();
+            if (schema is null)
+                yield break;
             foreach (DataRow row in schema.Rows)
             {
-                var colName = row["ColumnName"]!.ToString()!;
+                var colName = row["ColumnName"]?.ToString();
+                if (string.IsNullOrEmpty(colName))
+                    continue;
                 var propName = EscapeCSharpIdentifier(ToPascalCase(colName));
-                var clrType = (Type)row["DataType"]!;
+                if (row["DataType"] is not Type clrType)
+                    continue;
                 var allowNull = row["AllowDBNull"] is bool b && b;
 
-                // MEMORY LEAK FIX: Return actual Type instead of string
                 var propertyType = GetPropertyType(clrType, allowNull);
 
                 var isKey = schema.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
@@ -217,7 +244,7 @@ namespace nORM.Scaffolding
                 int? maxLength = null;
                 if (clrType == typeof(string) && schema.Columns.Contains("ColumnSize") && row["ColumnSize"] != DBNull.Value)
                 {
-                    if (int.TryParse(row["ColumnSize"]!.ToString(), out var size) && size > 0)
+                    if (int.TryParse(row["ColumnSize"]?.ToString(), out var size) && size > 0)
                         maxLength = size;
                 }
 
@@ -228,7 +255,7 @@ namespace nORM.Scaffolding
         private static (string? schema, string table) SplitSchema(string identifier)
         {
             var idx = identifier.LastIndexOf('.');
-            if (idx > 0)
+            if (idx > 0 && idx < identifier.Length - 1)
                 return (identifier[..idx], identifier[(idx + 1)..]);
             return (null, identifier);
         }
@@ -240,16 +267,20 @@ namespace nORM.Scaffolding
                 : $"{EscapeIdentifier(connection, schema!)}.{EscapeIdentifier(connection, table)}";
         }
 
+        /// <summary>
+        /// Wraps a raw SQL identifier in the appropriate quoting characters for the provider.
+        /// Strips the quoting character from within the value to prevent SQL injection via
+        /// crafted table or schema names.
+        /// </summary>
         private static string EscapeIdentifier(DbConnection connection, string identifier)
         {
-            // Support schema-qualified parts by escaping each component if needed.
             var name = connection.GetType().Name.ToLowerInvariant();
             return name switch
             {
-                var n when n.Contains("sqlconnection") => $"[{identifier}]",
-                var n when n.Contains("sqlite") => $"\"{identifier}\"",
-                var n when n.Contains("npgsql") => $"\"{identifier}\"",
-                var n when n.Contains("mysql") => $"`{identifier}`",
+                var n when n.Contains("sqlconnection") => $"[{identifier.Replace("]", "")}]",
+                var n when n.Contains("sqlite") => $"\"{identifier.Replace("\"", "")}\"",
+                var n when n.Contains("npgsql") => $"\"{identifier.Replace("\"", "")}\"",
+                var n when n.Contains("mysql") => $"`{identifier.Replace("`", "")}`",
                 _ => identifier
             };
         }
@@ -261,22 +292,17 @@ namespace nORM.Scaffolding
         }
 
         /// <summary>
-        /// MEMORY LEAK FIX: Returns actual Type for properties instead of string representation.
-        /// This allows TypeBuilder to work with actual types.
+        /// Maps a CLR type and its nullability to the property type for the generated entity.
+        /// Value types that allow null are wrapped in <see cref="Nullable{T}"/>; reference types
+        /// are returned as-is since nullability is implicit.
         /// </summary>
         private static Type GetPropertyType(Type type, bool allowNull)
         {
-            // For reference types (including string), nullability is implicit
             if (!type.IsValueType)
-            {
                 return type;
-            }
 
-            // For value types that allow null, wrap in Nullable<T>
             if (allowNull)
-            {
                 return typeof(Nullable<>).MakeGenericType(type);
-            }
 
             return type;
         }
@@ -287,37 +313,51 @@ namespace nORM.Scaffolding
         private static string ToPascalCase(string name)
         {
             var parts = name.Split(new[] { '_', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            var result = string.Empty;
+            var sb = new StringBuilder(name.Length);
             foreach (var part in parts)
             {
                 if (part.Length > 0)
                 {
-                    result += char.ToUpperInvariant(part[0]);
+                    sb.Append(char.ToUpperInvariant(part[0]));
                     if (part.Length > 1)
-                        result += part[1..].ToLowerInvariant();
+                        sb.Append(part[1..].ToLowerInvariant());
                 }
             }
-            return result;
+            return sb.ToString();
         }
 
+        /// <summary>
+        /// Escapes a candidate C# identifier so it is valid syntax. Reserved keywords and common
+        /// contextual keywords are prefixed with <c>@</c>. Identifiers that start with a digit or
+        /// contain non-alphanumeric characters are also prefixed. An empty or null input returns
+        /// <c>"_"</c> as a safe fallback since an empty string is not a valid C# identifier.
+        /// </summary>
         private static string EscapeCSharpIdentifier(string identifier)
         {
-            if (string.IsNullOrEmpty(identifier)) return identifier;
+            if (string.IsNullOrEmpty(identifier)) return "_";
             bool needsAt = _csharpKeywords.Contains(identifier)
                            || !(char.IsLetter(identifier[0]) || identifier[0] == '_')
                            || identifier.Any(ch => !(char.IsLetterOrDigit(ch) || ch == '_'));
             return needsAt ? "@" + identifier : identifier;
         }
 
+        /// <summary>
+        /// Set of C# reserved keywords and common contextual keywords that require escaping
+        /// with the <c>@</c> verbatim prefix when used as identifiers.
+        /// </summary>
         private static readonly HashSet<string> _csharpKeywords = new(StringComparer.Ordinal)
         {
+            // Reserved keywords
             "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const",
             "continue","decimal","default","delegate","do","double","else","enum","event","explicit","extern",
             "false","finally","fixed","float","for","foreach","goto","if","implicit","in","int","interface",
             "internal","is","lock","long","namespace","new","null","object","operator","out","override","params",
             "private","protected","public","readonly","ref","return","sbyte","sealed","short","sizeof","stackalloc",
             "static","string","struct","switch","this","throw","true","try","typeof","uint","ulong","unchecked",
-            "unsafe","ushort","using","virtual","void","volatile","while","record","partial","var","dynamic"
+            "unsafe","ushort","using","virtual","void","volatile","while",
+            // Contextual keywords commonly used as identifiers in database column names
+            "record","partial","var","dynamic","async","await","nameof","when","and","or","not","with",
+            "init","required","file","scoped","global","managed","unmanaged","nint","nuint","value","yield"
         };
     }
 }

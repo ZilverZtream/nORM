@@ -1,8 +1,9 @@
+using System;
 using System.Threading;
 
 namespace nORM.Internal;
 
-internal sealed class LockFreeObjectPool<T> where T : class, new()
+internal sealed class LockFreeObjectPool<T> : IDisposable where T : class, new()
 {
     private readonly ThreadLocal<T?> _threadLocal = new();
 
@@ -28,5 +29,13 @@ internal sealed class LockFreeObjectPool<T> where T : class, new()
         // Item stays in thread-local storage
         if (item is IResettable resettable)
             resettable.Reset();
+    }
+
+    /// <summary>
+    /// Disposes the underlying <see cref="ThreadLocal{T}"/> to release thread-local storage.
+    /// </summary>
+    public void Dispose()
+    {
+        _threadLocal.Dispose();
     }
 }

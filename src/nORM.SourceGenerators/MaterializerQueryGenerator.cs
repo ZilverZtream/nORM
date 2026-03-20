@@ -8,9 +8,20 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace nORM.SourceGenerators
 {
+    /// <summary>
+    /// Roslyn source generator that produces materializer registrations for
+    /// <c>[GenerateMaterializer]</c>-annotated entity types and compiled query
+    /// implementations for <c>[CompileTimeQuery]</c>-annotated partial methods.
+    /// </summary>
     [Generator]
     public sealed class MaterializerQueryGenerator : ISourceGenerator
     {
+        /// <summary>
+        /// Minimum number of parameters required on a <c>[CompileTimeQuery]</c> method.
+        /// The first parameter must be a <c>DbContext</c>.
+        /// </summary>
+        private const int MinQueryMethodParameters = 1;
+
 #pragma warning disable RS2008 // Enable analyzer release tracking
         private static readonly DiagnosticDescriptor SG001 = new DiagnosticDescriptor(
             id: "nORMSG001",
@@ -44,7 +55,8 @@ namespace nORM.SourceGenerators
 
             public void OnVisitSyntaxNode(GeneratorSyntaxContext context)
             {
-                if (context.Node is ClassDeclarationSyntax cds)
+                // Only collect classes that have at least one attribute (potential [GenerateMaterializer] targets)
+                if (context.Node is ClassDeclarationSyntax cds && cds.AttributeLists.Count > 0)
                 {
                     if (context.SemanticModel.GetDeclaredSymbol(cds) is INamedTypeSymbol typeSymbol)
                     {
@@ -126,7 +138,7 @@ namespace nORM.SourceGenerators
         }
 
         /// <summary>
-        /// SG1: Returns the database column name for a property, honouring
+        /// Returns the database column name for a property, honouring
         /// <c>[System.ComponentModel.DataAnnotations.Schema.Column("name")]</c> when present.
         /// Fluent <c>HasColumnName</c> is runtime-only and cannot be resolved at compile time;
         /// entities that rely solely on fluent renames must not use <c>[GenerateMaterializer]</c>.
@@ -155,7 +167,7 @@ namespace nORM.SourceGenerators
                 .OrderBy(p => p.Name)
                 .ToList();
 
-            // MAP1 fix: emit diagnostic when type has no public parameterless constructor.
+            // Emit diagnostic when type has no public parameterless constructor.
             var hasParameterlessCtor = type.Constructors.Any(c =>
                 c.Parameters.Length == 0 &&
                 c.DeclaredAccessibility == Microsoft.CodeAnalysis.Accessibility.Public);
@@ -170,7 +182,7 @@ namespace nORM.SourceGenerators
 
             // Collect (ordinalVarName, columnName) pairs first so we can emit
             // reader.GetOrdinal("ColumnName") lookups instead of hardcoded positional indices.
-            // SG1 fix: use mapped column name from [Column] attribute when present, else prop.Name.
+            // Use mapped column name from [Column] attribute when present, else prop.Name.
             // For owned types: use {ownerColumnName}_{ownedColumnName} (mirrors runtime convention).
             var ordinalEntries = new List<(string VarName, string ColName)>();
             foreach (var prop in props)
@@ -201,15 +213,15 @@ namespace nORM.SourceGenerators
             sb.AppendLine("    [global::System.Runtime.CompilerServices.ModuleInitializer]");
             sb.AppendLine("    public static void Register()");
             sb.AppendLine("    {");
-            // SG1 fix: pass compile-time-resolved table name so multi-model scenarios
+            // Pass compile-time-resolved table name so multi-model scenarios
             // where the same CLR type maps to different tables each get their own materializer.
             var resolvedTableName = GetTableNameForType(type);
-            var escapedTableName = resolvedTableName.Replace("\"", "\\\"");
+            var escapedTableName = resolvedTableName.Replace("\\", "\\\\").Replace("\"", "\\\"");
             sb.AppendLine($"        CompiledMaterializerStore.Add<{typeName}>(\"{escapedTableName}\", reader =>");
             sb.AppendLine("        {");
             sb.AppendLine($"            var entity = new {typeName}();");
 
-            // Emit ordinal resolution — name-based, correct for any column order
+            // Emit ordinal resolution - name-based, correct for any column order
             foreach (var (varName, colName) in ordinalEntries)
                 sb.AppendLine($"            int {varName} = reader.GetOrdinal(\"{colName}\");");
 
@@ -238,7 +250,7 @@ namespace nORM.SourceGenerators
             sb.AppendLine("    }");
             sb.AppendLine("}");
 
-            // SG2 fix: use fully-qualified type name as hint to avoid collisions when two classes
+            // Use fully-qualified type name as hint to avoid collisions when two classes
             // share the same simple name but live in different namespaces.
             var hintName = ns != null
                 ? $"{ns.Replace(".", "_")}_{simpleName}_Materializer.g.cs"
@@ -250,8 +262,12 @@ namespace nORM.SourceGenerators
         {
             var read = GetReaderExpression(prop.Type, ordVar);
             var typeName = prop.Type.ToDisplayString();
+            var isNullableValueType = prop.Type is INamedTypeSymbol nts
+                && nts.IsGenericType
+                && nts.ConstructedFrom.SpecialType == SpecialType.System_Nullable_T;
             var needsNullCheck = prop.Type.IsReferenceType
                 || prop.NullableAnnotation == NullableAnnotation.Annotated
+                || isNullableValueType
                 || typeName.Contains("DateOnly") || typeName.Contains("TimeOnly");
             return needsNullCheck
                 ? $"            if (!reader.IsDBNull({ordVar})) entity.{prop.Name} = {read};"
@@ -265,8 +281,12 @@ namespace nORM.SourceGenerators
         {
             var read = GetReaderExpression(ownedProp.Type, ordVar);
             var ownedPropTypeName = ownedProp.Type.ToDisplayString();
+            var isNullableValueType = ownedProp.Type is INamedTypeSymbol nvt
+                && nvt.IsGenericType
+                && nvt.ConstructedFrom.SpecialType == SpecialType.System_Nullable_T;
             var needsNullCheck = ownedProp.Type.IsReferenceType
                 || ownedProp.NullableAnnotation == NullableAnnotation.Annotated
+                || isNullableValueType
                 || ownedPropTypeName.Contains("DateOnly") || ownedPropTypeName.Contains("TimeOnly");
             var ownedTypeName = ownedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var ensureOwner = $"if (entity.{owner.Name} == null) entity.{owner.Name} = new {ownedTypeName}(); ";
@@ -310,7 +330,7 @@ namespace nORM.SourceGenerators
             if (typeName == "global::System.Byte[]")
                 return $"reader.GetFieldValue<byte[]>({ordVar})";
 
-            // SG1 fix: DateOnly/TimeOnly require explicit conversion because providers may
+            // DateOnly/TimeOnly require explicit conversion because providers may
             // return DateTime, TimeSpan, or string rather than native DateOnly/TimeOnly.
             // This matches the runtime materializer's ConvertToDateOnly/ConvertToTimeOnly helpers.
             if (typeName == "global::System.DateOnly")
@@ -328,7 +348,7 @@ namespace nORM.SourceGenerators
             var className = cls.Name;
             var methodName = method.Name;
 
-            // SG1 fix: emit diagnostic for unsupported return types
+            // Emit diagnostic for unsupported return types
             if (!TryGetEntityType(method.ReturnType, out var entity))
             {
                 context.ReportDiagnostic(Diagnostic.Create(
@@ -339,7 +359,7 @@ namespace nORM.SourceGenerators
                 return;
             }
 
-            // SG1 fix: emit diagnostic for unsupported containing type shapes
+            // Emit diagnostic for unsupported containing type shapes
             if (cls.ContainingType != null || !cls.IsStatic || cls.DeclaredAccessibility != Microsoft.CodeAnalysis.Accessibility.Public)
             {
                 context.ReportDiagnostic(Diagnostic.Create(
@@ -350,6 +370,10 @@ namespace nORM.SourceGenerators
             }
 
             var entityTypeName = entity!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+            // Guard: the first parameter must be the DbContext; methods with zero parameters are invalid.
+            if (method.Parameters.Length < MinQueryMethodParameters)
+                return;
 
             var ctxParam = method.Parameters[0].Name;
             var ctSymbol = method.Parameters.FirstOrDefault(p => p.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == "global::System.Threading.CancellationToken");
@@ -371,26 +395,25 @@ namespace nORM.SourceGenerators
             sb.AppendLine("{");
             sb.AppendLine($"    public static async partial System.Threading.Tasks.Task<System.Collections.Generic.List<{entityTypeName}>> {methodName}({paramList})");
             sb.AppendLine("    {");
-            // X1 fix: use CreateCompiledQueryCommandAsync instead of ctx.Connection.CreateCommand()
+            // Use CreateCompiledQueryCommandAsync instead of ctx.Connection.CreateCommand()
             // so that connection initialisation, transaction binding, and interceptors all fire.
             var ctArg = ctParam ?? "System.Threading.CancellationToken.None";
             sb.AppendLine($"        await using var cmd = await {ctxParam}.CreateCompiledQueryCommandAsync({ctArg}).ConfigureAwait(false);");
             var escapedSql = sql.Replace("\"", "\"\"");
             sb.AppendLine($"        cmd.CommandText = @\"{escapedSql}\";");
-            // SG1 fix: route parameter binding through AddOptimizedParam (the same binder
+            // Route parameter binding through AddOptimizedParam (the same binder
             // used by runtime queries) so that DateOnly, TimeOnly, char, enum, and typed-null
-            // coercions are applied uniformly. Previously generated code set DbParameter.Value
-            // directly, bypassing provider-aware type coercion.
+            // coercions are applied uniformly.
             foreach (var p in queryParams)
             {
                 sb.AppendLine($"        nORM.Internal.ParameterOptimizer.AddOptimizedParam(cmd, $\"{{{ctxParam}.Provider.ParamPrefix}}{p.Name}\", {GetParameterValueExpression(p)});");
             }
-            // SG1 fix: pass compile-time-resolved table name so multi-model scenarios
+            // Pass compile-time-resolved table name so multi-model scenarios
             // correctly retrieve the materializer registered under the right table key.
             var queryTableName = GetTableNameForType(entity!);
             var escapedQueryTableName = queryTableName.Replace("\\", "\\\\").Replace("\"", "\\\"");
             sb.AppendLine($"        var materializer = CompiledMaterializerStore.Get<{entityTypeName}>(\"{escapedQueryTableName}\");");
-            // X1 fix: use ExecuteCompiledQueryListAsync instead of cmd.ExecuteReaderAsync so that
+            // Use ExecuteCompiledQueryListAsync instead of cmd.ExecuteReaderAsync so that
             // command interceptors (logging, tracing, auditing) are invoked.
             sb.AppendLine($"        return await {ctxParam}.ExecuteCompiledQueryListAsync(cmd, materializer, {ctArg}).ConfigureAwait(false);");
             sb.AppendLine("    }");
@@ -439,4 +462,3 @@ namespace nORM.SourceGenerators
         }
     }
 }
-

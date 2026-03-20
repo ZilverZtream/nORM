@@ -7,7 +7,8 @@ namespace nORM.Security
     {
         private static readonly string[] ForbiddenKeywords =
         {
-            "xp_cmdshell", "sp_configure", "openrowset", "opendatasource"
+            "xp_cmdshell", "sp_configure", "openrowset", "opendatasource",
+            "bulk insert", "xp_regread", "xp_regwrite", "sp_oacreate"
         };
 
         private static readonly string[] RequiredSqlServerSettings =
@@ -51,7 +52,11 @@ namespace nORM.Security
 
                 return sanitized.ConnectionString;
             }
-            catch (Exception ex)
+            catch (ArgumentException)
+            {
+                throw; // Re-throw our own forbidden keyword exceptions
+            }
+            catch (Exception ex) when (ex is FormatException or InvalidOperationException or System.Collections.Generic.KeyNotFoundException)
             {
                 throw new ArgumentException("Invalid connection string format", ex);
             }
@@ -61,7 +66,9 @@ namespace nORM.Security
         {
             return key.ToLowerInvariant() switch
             {
-                "password" or "pwd" or "user id" or "uid" => true,
+                "password" or "pwd" or "user id" or "uid"
+                    or "user password" or "access token" or "accesstoken"
+                    or "token" or "secret" => true,
                 _ => false
             };
         }
@@ -69,13 +76,17 @@ namespace nORM.Security
         private static void EnforceSqlServerSecurity(DbConnectionStringBuilder builder)
         {
             // Enforce encryption
-            if (!builder.ContainsKey("Encrypt") || !bool.Parse(builder["Encrypt"].ToString()!))
+            if (!builder.ContainsKey("Encrypt") ||
+                !bool.TryParse(builder["Encrypt"]?.ToString(), out var encrypt) || !encrypt)
             {
                 builder["Encrypt"] = "True";
             }
 
             // Enforce certificate validation in production
-            if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") != "Development")
+            if (!string.Equals(
+                    Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+                    "Development",
+                    StringComparison.OrdinalIgnoreCase))
             {
                 builder["TrustServerCertificate"] = "False";
             }

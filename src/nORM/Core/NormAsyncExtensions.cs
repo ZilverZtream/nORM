@@ -19,6 +19,7 @@ namespace nORM.Core
         public static IAsyncEnumerable<T> AsAsyncEnumerable<T>(this IQueryable<T> source, CancellationToken ct = default)
             where T : class
         {
+            ArgumentNullException.ThrowIfNull(source);
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
                 return normProvider.AsAsyncEnumerable<T>(source.Expression, ct);
@@ -35,6 +36,7 @@ namespace nORM.Core
         public static Task<List<T>> ToListAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
             where T : class
         {
+            ArgumentNullException.ThrowIfNull(source);
             // Only works with nORM provider - this avoids conflicts with EF Core
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
@@ -53,6 +55,7 @@ namespace nORM.Core
         public static Task<int> CountAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
             where T : class
         {
+            ArgumentNullException.ThrowIfNull(source);
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
                 // Try direct count path first — avoids Expression.Call + Type[] allocation
@@ -80,6 +83,7 @@ namespace nORM.Core
         /// </summary>
         public static List<T> ToListSync<T>(this IQueryable<T> source) where T : class
         {
+            ArgumentNullException.ThrowIfNull(source);
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
                 return normProvider.ExecuteSync<List<T>>(source.Expression);
@@ -93,6 +97,7 @@ namespace nORM.Core
         /// </summary>
         public static int CountSync<T>(this IQueryable<T> source) where T : class
         {
+            ArgumentNullException.ThrowIfNull(source);
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
                 var countExpression = Expression.Call(
@@ -112,6 +117,7 @@ namespace nORM.Core
         public static async Task<T[]> ToArrayAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
             where T : class
         {
+            ArgumentNullException.ThrowIfNull(source);
             if (source.Provider is Query.NormQueryProvider)
             {
                 var list = await source.ToListAsync(ct).ConfigureAwait(false);
@@ -130,6 +136,7 @@ namespace nORM.Core
         public static async Task<bool> AnyAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
             where T : class
         {
+            ArgumentNullException.ThrowIfNull(source);
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
                 var anyExpression = Expression.Call(
@@ -152,6 +159,7 @@ namespace nORM.Core
         public static Task<T> FirstAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
             where T : class
         {
+            ArgumentNullException.ThrowIfNull(source);
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
                 var firstExpression = Expression.Call(
@@ -174,6 +182,7 @@ namespace nORM.Core
         public static Task<T?> FirstOrDefaultAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
             where T : class
         {
+            ArgumentNullException.ThrowIfNull(source);
             if (source.Provider is Query.NormQueryProvider normProvider)
             {
                 var firstOrDefaultExpression = Expression.Call(

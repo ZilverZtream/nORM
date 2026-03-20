@@ -45,10 +45,25 @@ namespace nORM.Query
                     return true;
 
                 case MemberExpression me:
+                    // Static member access (e.g., DateTime.Now, SomeClass.StaticField)
+                    if (me.Expression == null)
+                    {
+                        value = GetMemberValue(me.Member, null);
+                        return true;
+                    }
                     // Recursively evaluate the parent expression
-                    if (me.Expression != null && TryGetConstantValue(me.Expression, out var obj, visited))
+                    if (TryGetConstantValue(me.Expression, out var obj, visited))
                     {
                         value = GetMemberValue(me.Member, obj);
+                        return true;
+                    }
+                    break;
+
+                case UnaryExpression ue when ue.NodeType == ExpressionType.Convert || ue.NodeType == ExpressionType.ConvertChecked:
+                    // Handle nullable casts like (int?)null which appear as UnaryExpression(Convert(operand, T?))
+                    if (TryGetConstantValue(ue.Operand, out var operandVal, visited))
+                    {
+                        value = operandVal;
                         return true;
                     }
                     break;

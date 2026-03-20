@@ -1463,14 +1463,14 @@ public class CoverageBoostTests : TestBase
     }
 
     [Fact]
-    public void EnableLazyLoading_NullEntity_ReturnsNull()
+    public void EnableLazyLoading_NullEntity_ThrowsArgumentNullException()
     {
         using var cn = CreateItemDb();
         using var ctx = MakeCtx(cn);
 
         CovAuthor? author = null;
-        var result = author!.EnableLazyLoading(ctx);
-        Assert.Null(result);
+        Assert.Throws<ArgumentNullException>(
+            () => author!.EnableLazyLoading(ctx));
     }
 
     [Fact]
@@ -8284,7 +8284,7 @@ public class CoverageBoostGroup72Tests
     [Fact]
     public async Task ExecuteCompiledAsync_PreparedOverload_FastPath()
     {
-        // Covers ExecuteCompiledAsync(plan, paramValues, compiledParamSet, fixedParams, ct)
+        // Covers ExecuteCompiledAsync(plan, paramValues, fixedParams, ct)
         // lines 629-634 and ExecuteCompiledPreparedAsync fast path lines 802-829
         using var cn = CreateDb72();
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -8293,9 +8293,8 @@ public class CoverageBoostGroup72Tests
         var queryable = ctx.Query<CovItem>().Where(i => i.Value > 5);
         var plan = provider.GetPlan(queryable.Expression, out _, out _);
 
-        var compiledParamSet = new HashSet<string>(StringComparer.Ordinal);
         var result = await provider.ExecuteCompiledAsync<List<CovItem>>(
-            plan, Array.Empty<object?>(), compiledParamSet, null, default);
+            plan, Array.Empty<object?>(), null, default);
 
         Assert.Equal(3, result.Count);
     }

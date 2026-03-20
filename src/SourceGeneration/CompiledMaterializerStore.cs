@@ -10,7 +10,7 @@ using nORM.Internal;
 namespace nORM.SourceGeneration
 {
     /// <summary>
-    /// Provides a thread-safe cache for compiled data reader materializers used during
+    /// Provides a thread-safe LRU cache for compiled data reader materializers used during
     /// query execution. Materializers convert rows from a <see cref="DbDataReader"/> into
     /// strongly typed objects.
     /// </summary>
@@ -22,7 +22,12 @@ namespace nORM.SourceGeneration
     /// </remarks>
     public static class CompiledMaterializerStore
     {
-        private static readonly ConcurrentLruCache<(Type, string), (Delegate Typed, Func<DbDataReader, CancellationToken, Task<object>> Untyped)> _map = new(maxSize: 500);
+        /// <summary>
+        /// Maximum number of materializer entries retained in the LRU cache before eviction.
+        /// </summary>
+        private const int DefaultMaxCacheSize = 500;
+
+        private static readonly ConcurrentLruCache<(Type, string), (Delegate Typed, Func<DbDataReader, CancellationToken, Task<object>> Untyped)> _map = new(maxSize: DefaultMaxCacheSize);
 
         /// <summary>Returns the table name used as cache-key discriminator for <paramref name="type"/>.</summary>
         private static string GetTableName(Type type)
@@ -34,12 +39,17 @@ namespace nORM.SourceGeneration
         /// </summary>
         /// <param name="type">Entity type the materializer produces.</param>
         /// <param name="materializer">Function that converts a <see cref="DbDataReader"/> row into an entity instance.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="type"/> or <paramref name="materializer"/> is <c>null</c>.</exception>
         public static void Add(Type type, Func<DbDataReader, object> materializer)
-            => _map.GetOrAdd((type, GetTableName(type)), _ => (materializer, (reader, ct) =>
+        {
+            ArgumentNullException.ThrowIfNull(type);
+            ArgumentNullException.ThrowIfNull(materializer);
+            _map.GetOrAdd((type, GetTableName(type)), _ => (materializer, (reader, ct) =>
             {
                 ct.ThrowIfCancellationRequested();
                 return Task.FromResult(materializer(reader));
             }));
+        }
 
         /// <summary>
         /// Registers a materializer delegate for the generic entity type <typeparamref name="T"/>.
@@ -47,12 +57,16 @@ namespace nORM.SourceGeneration
         /// </summary>
         /// <typeparam name="T">Entity type the materializer produces.</typeparam>
         /// <param name="materializer">Function that converts a <see cref="DbDataReader"/> row into an entity instance.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="materializer"/> is <c>null</c>.</exception>
         public static void Add<T>(Func<DbDataReader, T> materializer)
-            => _map.GetOrAdd((typeof(T), GetTableName(typeof(T))), _ => (materializer, (reader, ct) =>
+        {
+            ArgumentNullException.ThrowIfNull(materializer);
+            _map.GetOrAdd((typeof(T), GetTableName(typeof(T))), _ => (materializer, (reader, ct) =>
             {
                 ct.ThrowIfCancellationRequested();
                 return Task.FromResult((object)materializer(reader)!);
             }));
+        }
 
         /// <summary>
         /// Registers a materializer delegate for the generic entity type <typeparamref name="T"/>
@@ -63,12 +77,17 @@ namespace nORM.SourceGeneration
         /// <typeparam name="T">Entity type the materializer produces.</typeparam>
         /// <param name="tableName">Table name used as the model discriminator in the cache key.</param>
         /// <param name="materializer">Function that converts a <see cref="DbDataReader"/> row into an entity instance.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="tableName"/> or <paramref name="materializer"/> is <c>null</c>.</exception>
         public static void Add<T>(string tableName, Func<DbDataReader, T> materializer)
-            => _map.GetOrAdd((typeof(T), tableName), _ => (materializer, (reader, ct) =>
+        {
+            ArgumentNullException.ThrowIfNull(tableName);
+            ArgumentNullException.ThrowIfNull(materializer);
+            _map.GetOrAdd((typeof(T), tableName), _ => (materializer, (reader, ct) =>
             {
                 ct.ThrowIfCancellationRequested();
                 return Task.FromResult((object)materializer(reader)!);
             }));
+        }
 
         /// <summary>
         /// Attempts to retrieve a previously registered untyped materializer for the given entity type,
@@ -77,8 +96,12 @@ namespace nORM.SourceGeneration
         /// <param name="type">Entity type to look up.</param>
         /// <param name="materializer">When this method returns, contains the materializer if found.</param>
         /// <returns><c>true</c> if a materializer is cached; otherwise, <c>false</c>.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="type"/> is <c>null</c>.</exception>
         public static bool TryGet(Type type, out Func<DbDataReader, CancellationToken, Task<object>> materializer)
-            => TryGet(type, GetTableName(type), out materializer);
+        {
+            ArgumentNullException.ThrowIfNull(type);
+            return TryGet(type, GetTableName(type), out materializer);
+        }
 
         /// <summary>
         /// Attempts to retrieve a previously registered untyped materializer for the given entity type
@@ -89,8 +112,11 @@ namespace nORM.SourceGeneration
         /// <param name="tableName">Table name used as the model discriminator.</param>
         /// <param name="materializer">When this method returns, contains the materializer if found.</param>
         /// <returns><c>true</c> if a materializer is cached for the given type/table combination; otherwise, <c>false</c>.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="type"/> or <paramref name="tableName"/> is <c>null</c>.</exception>
         public static bool TryGet(Type type, string tableName, out Func<DbDataReader, CancellationToken, Task<object>> materializer)
         {
+            ArgumentNullException.ThrowIfNull(type);
+            ArgumentNullException.ThrowIfNull(tableName);
             if (_map.TryGet((type, tableName), out var entry))
             {
                 materializer = entry.Untyped;
@@ -118,15 +144,20 @@ namespace nORM.SourceGeneration
         /// <typeparam name="T">Entity type to retrieve.</typeparam>
         /// <param name="tableName">Table name used as the model discriminator in the cache key.</param>
         /// <returns>A delegate that asynchronously materializes an entity of type <typeparamref name="T"/>.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="tableName"/> is <c>null</c>.</exception>
         /// <exception cref="KeyNotFoundException">Thrown if no materializer is registered for the given type/table combination.</exception>
+        /// <exception cref="InvalidCastException">Thrown if the registered materializer delegate type does not match <typeparamref name="T"/>.</exception>
         public static Func<DbDataReader, CancellationToken, Task<T>> Get<T>(string tableName)
         {
+            ArgumentNullException.ThrowIfNull(tableName);
             if (!_map.TryGet((typeof(T), tableName), out var entry))
                 throw new KeyNotFoundException($"Materializer for {typeof(T)} (table '{tableName}') not found.");
+            var typedDelegate = entry.Typed as Func<DbDataReader, T>
+                ?? throw new InvalidCastException($"Registered materializer for {typeof(T)} (table '{tableName}') has incompatible delegate type {entry.Typed.GetType()}.");
             return (reader, ct) =>
             {
                 ct.ThrowIfCancellationRequested();
-                return Task.FromResult(((Func<DbDataReader, T>)entry.Typed)(reader));
+                return Task.FromResult(typedDelegate(reader));
             };
         }
     }

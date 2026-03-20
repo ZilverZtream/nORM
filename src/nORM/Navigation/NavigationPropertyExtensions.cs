@@ -20,13 +20,17 @@ using nORM.Execution;
 namespace nORM.Navigation
 {
     /// <summary>
-    /// Advanced navigation property system with lazy loading, change tracking, and performance optimization
-    /// Provides EF Core-like experience without sacrificing nORM's performance characteristics
+    /// Provides extension methods for lazy loading and explicit loading of navigation properties.
+    /// Delivers an EF Core-like experience without sacrificing nORM's performance characteristics.
     /// </summary>
     public static class NavigationPropertyExtensions
     {
         internal static readonly ConditionalWeakTable<object, NavigationContext> _navigationContexts = new();
-        private static readonly ConcurrentLruCache<Type, List<NavigationPropertyInfo>> _navigationPropertyCache = new(maxSize: 1000);
+
+        /// <summary>Maximum number of entity types cached for navigation property discovery.</summary>
+        private const int NavigationPropertyCacheMaxSize = 1000;
+
+        private static readonly ConcurrentLruCache<Type, List<NavigationPropertyInfo>> _navigationPropertyCache = new(maxSize: NavigationPropertyCacheMaxSize);
         private static readonly ConditionalWeakTable<DbContext, BatchedNavigationLoader> _navigationLoaders = new();
         private static readonly ConcurrentDictionary<BatchedNavigationLoader, byte> _activeLoaders = new();
 
@@ -39,12 +43,15 @@ namespace nORM.Navigation
         internal static void UnregisterLoader(BatchedNavigationLoader loader) => _activeLoaders.TryRemove(loader, out _);
 
         /// <summary>
-        /// Enables lazy loading for an entity instance
+        /// Enables lazy loading for an entity instance by attaching lazy-loading proxies to
+        /// all eligible navigation properties.
         /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="entity"/> or <paramref name="context"/> is <c>null</c>.</exception>
         public static T EnableLazyLoading<T>(this T entity, DbContext context) where T : class
         {
-            if (entity == null) return null!;
-            
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            if (context == null) throw new ArgumentNullException(nameof(context));
+
             var navContext = _navigationContexts.GetValue(entity, _ => new NavigationContext(context, typeof(T)));
             
             // Initialize navigation properties with lazy loading proxies
@@ -75,7 +82,7 @@ namespace nORM.Navigation
         }
 
         /// <summary>
-        /// Loads a navigation property explicitly
+        /// Explicitly loads a reference navigation property from the database.
         /// </summary>
         public static async Task LoadAsync<T, TProperty>(this T entity,
             System.Linq.Expressions.Expression<Func<T, TProperty?>> navigationProperty,
@@ -83,25 +90,27 @@ namespace nORM.Navigation
             where T : class
             where TProperty : class
         {
-            if (entity == null || navigationProperty == null) return;
-            
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            if (navigationProperty == null) throw new ArgumentNullException(nameof(navigationProperty));
+
             if (!_navigationContexts.TryGetValue(entity, out var navContext))
                 throw new InvalidOperationException("Entity must be loaded from a DbContext or have lazy loading enabled to use LoadAsync");
-            
+
             var propertyInfo = GetPropertyInfo(navigationProperty);
             await LoadNavigationPropertyAsync(entity, propertyInfo, navContext, ct).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Loads a collection navigation property explicitly
+        /// Explicitly loads a collection navigation property from the database.
         /// </summary>
-        public static async Task LoadAsync<T, TProperty>(this T entity, 
-            System.Linq.Expressions.Expression<Func<T, ICollection<TProperty>?>> navigationProperty, 
-            CancellationToken ct = default) 
+        public static async Task LoadAsync<T, TProperty>(this T entity,
+            System.Linq.Expressions.Expression<Func<T, ICollection<TProperty>?>> navigationProperty,
+            CancellationToken ct = default)
             where T : class
             where TProperty : class
         {
-            if (entity == null || navigationProperty == null) return;
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            if (navigationProperty == null) throw new ArgumentNullException(nameof(navigationProperty));
             
             if (!_navigationContexts.TryGetValue(entity, out var navContext))
                 throw new InvalidOperationException("Entity must be loaded from a DbContext or have lazy loading enabled to use LoadAsync");
@@ -111,7 +120,7 @@ namespace nORM.Navigation
         }
 
         /// <summary>
-        /// Checks if a navigation property is loaded
+        /// Checks whether a navigation property has already been loaded for the given entity.
         /// </summary>
         public static bool IsLoaded<T, TProperty>(this T entity, 
             System.Linq.Expressions.Expression<Func<T, TProperty?>> navigationProperty) 
@@ -149,6 +158,10 @@ namespace nORM.Navigation
 
         internal static void LoadNavigationProperty(object entity, PropertyInfo property, NavigationContext context, CancellationToken ct)
         {
+            // Known limitation: sync-over-async is required here because this method is called from
+            // synchronous lazy-loading entry points (e.g., ICollection<T> accessors on LazyNavigationCollection,
+            // IEnumerator.GetEnumerator). The translator/materializer context is inherently synchronous,
+            // and there is no way to propagate async through the ICollection/IList interface contracts.
             LoadNavigationPropertyAsync(entity, property, context, ct)
                 .ConfigureAwait(false)
                 .GetAwaiter()
@@ -215,7 +228,9 @@ namespace nORM.Navigation
                         Type targetType;
                         if (isCollection)
                         {
-                            targetType = prop.PropertyType.GetGenericArguments()[0];
+                            var args = prop.PropertyType.GetGenericArguments();
+                            if (args.Length == 0) continue;
+                            targetType = args[0];
                         }
                         else if (prop.PropertyType.IsGenericType &&
                                  prop.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
@@ -273,11 +288,23 @@ namespace nORM.Navigation
 
         private static PropertyInfo GetPropertyInfo<T, TProperty>(System.Linq.Expressions.Expression<Func<T, TProperty>> expression)
         {
-            if (expression.Body is System.Linq.Expressions.MemberExpression memberExpression)
+            var body = expression.Body;
+
+            // Unwrap Convert/ConvertChecked nodes that the compiler may insert for
+            // covariant / interface property access expressions.
+            if (body is System.Linq.Expressions.UnaryExpression unary &&
+                (unary.NodeType == System.Linq.Expressions.ExpressionType.Convert ||
+                 unary.NodeType == System.Linq.Expressions.ExpressionType.ConvertChecked))
             {
-                return (PropertyInfo)memberExpression.Member;
+                body = unary.Operand;
             }
-            
+
+            if (body is System.Linq.Expressions.MemberExpression memberExpression &&
+                memberExpression.Member is PropertyInfo propertyInfo)
+            {
+                return propertyInfo;
+            }
+
             throw new ArgumentException("Expression must be a property access", nameof(expression));
         }
 
@@ -286,9 +313,7 @@ namespace nORM.Navigation
             if (relation.PrincipalKey == null) return;
             var principalKeyValue = relation.PrincipalKey.Getter(entity);
             if (principalKeyValue == null) return;
-            
-            var dependentMapping = context.DbContext.GetMapping(relation.DependentType);
-            
+
             if (property.PropertyType.IsGenericType && typeof(IEnumerable).IsAssignableFrom(property.PropertyType))
             {
                 // Collection navigation property
@@ -307,13 +332,29 @@ namespace nORM.Navigation
             else
             {
                 // Reference navigation property (one-to-one)
+                var dependentMapping = context.DbContext.GetMapping(relation.DependentType);
                 var result = await ExecuteSingleQueryAsync(context.DbContext, dependentMapping, relation.ForeignKey, principalKeyValue, relation.DependentType, ct).ConfigureAwait(false);
 
                 if (property.PropertyType.IsGenericType &&
                     property.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
                 {
-                    var reference = property.GetValue(entity);
-                    reference?.GetType().GetMethod("SetValue")?.Invoke(reference, new object?[] { result });
+                    try
+                    {
+                        var reference = property.GetValue(entity);
+                        reference?.GetType().GetMethod("SetValue")?.Invoke(reference, new object?[] { result });
+                    }
+                    catch (TargetInvocationException ex)
+                    {
+                        throw new InvalidOperationException(
+                            $"Failed to set navigation property '{property.Name}' on entity type '{entity.GetType().Name}'.",
+                            ex.InnerException ?? ex);
+                    }
+                    catch (Exception ex) when (ex is not InvalidOperationException)
+                    {
+                        throw new InvalidOperationException(
+                            $"Failed to set navigation property '{property.Name}' on entity type '{entity.GetType().Name}'.",
+                            ex);
+                    }
                 }
                 else
                 {
@@ -357,7 +398,8 @@ namespace nORM.Navigation
                 
             if (foreignKeyColumn != null)
             {
-                sourceMapping.Relations[property.Name] = new TableMapping.Relation(property, targetType, sourcePrimaryKey, foreignKeyColumn);
+                if (!sourceMapping.Relations.ContainsKey(property.Name))
+                    sourceMapping.Relations[property.Name] = new TableMapping.Relation(property, targetType, sourcePrimaryKey, foreignKeyColumn);
                 var loader = _navigationLoaders.GetValue(context.DbContext, ctx => new BatchedNavigationLoader(ctx));
                 if (property.PropertyType.IsGenericType && typeof(IEnumerable).IsAssignableFrom(property.PropertyType))
                 {
@@ -382,8 +424,23 @@ namespace nORM.Navigation
                     if (property.PropertyType.IsGenericType &&
                         property.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
                     {
-                        var reference = property.GetValue(entity);
-                        reference?.GetType()?.GetMethod("SetValue")?.Invoke(reference, new object?[] { result });
+                        try
+                        {
+                            var reference = property.GetValue(entity);
+                            reference?.GetType()?.GetMethod("SetValue")?.Invoke(reference, new object?[] { result });
+                        }
+                        catch (TargetInvocationException ex)
+                        {
+                            throw new InvalidOperationException(
+                                $"Failed to set navigation property '{property.Name}' on entity type '{entity.GetType().Name}'.",
+                                ex.InnerException ?? ex);
+                        }
+                        catch (Exception ex) when (ex is not InvalidOperationException)
+                        {
+                            throw new InvalidOperationException(
+                                $"Failed to set navigation property '{property.Name}' on entity type '{entity.GetType().Name}'.",
+                                ex);
+                        }
                     }
                     else
                     {
@@ -400,7 +457,7 @@ namespace nORM.Navigation
 
             var paramName = context.Provider.ParamPrefix + "fk";
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {foreignKey.EscCol} = {paramName}";
-            cmd.CommandTimeout = (int)context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.SimpleSelect, cmd.CommandText).TotalSeconds;
+            cmd.CommandTimeout = ToSecondsClamped(context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.SimpleSelect, cmd.CommandText));
             cmd.AddParam(paramName, keyValue);
 
             // Apply LIMIT 1 for single result
@@ -429,10 +486,24 @@ namespace nORM.Navigation
             
             return null;
         }
+
+        /// <summary>
+        /// Converts a <see cref="TimeSpan"/> to whole seconds suitable for
+        /// <see cref="System.Data.Common.DbCommand.CommandTimeout"/>, clamping to a minimum of 1
+        /// and guarding against overflow. Mirrors the helper used by <see cref="DbContext"/>.
+        /// </summary>
+        private static int ToSecondsClamped(TimeSpan t)
+        {
+            if (t.TotalSeconds > int.MaxValue)
+                return int.MaxValue;
+
+            return Math.Max(1, (int)Math.Ceiling(t.TotalSeconds));
+        }
     }
 
     /// <summary>
-    /// Holds navigation context for an entity instance
+    /// Tracks which navigation properties have been loaded for a particular entity instance,
+    /// along with the owning <see cref="DbContext"/> and entity type.
     /// </summary>
     public sealed class NavigationContext : IDisposable
     {
@@ -453,10 +524,11 @@ namespace nORM.Navigation
         /// </summary>
         /// <param name="dbContext">The associated context.</param>
         /// <param name="entityType">The entity type this context relates to.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="dbContext"/> or <paramref name="entityType"/> is <c>null</c>.</exception>
         public NavigationContext(DbContext dbContext, Type entityType)
         {
-            DbContext = dbContext;
-            EntityType = entityType;
+            DbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            EntityType = entityType ?? throw new ArgumentNullException(nameof(entityType));
         }
         
         /// <summary>
@@ -479,18 +551,19 @@ namespace nORM.Navigation
         public void MarkAsUnloaded(string propertyName) => _loadedProperties.TryRemove(propertyName, out _);
 
         /// <summary>
-        /// Clears the loaded-property cache.
+        /// Clears the loaded-property tracking state. Safe to call multiple times.
         /// </summary>
         public void Dispose() => _loadedProperties.Clear();
     }
 
     /// <summary>
-    /// Information about a navigation property
+    /// Metadata describing a discovered navigation property: its reflection handle, the related
+    /// entity type, and whether it represents a collection or reference navigation.
     /// </summary>
     public sealed record NavigationPropertyInfo(PropertyInfo Property, Type TargetType, bool IsCollection);
 
     /// <summary>
-    /// Lazy loading collection that loads data on first enumeration
+    /// Lazy loading collection that defers database access until first enumeration or mutation.
     /// </summary>
     public sealed class LazyNavigationCollection<T> : ICollection<T>, IList<T>, IAsyncEnumerable<T> where T : class
     {
@@ -504,11 +577,12 @@ namespace nORM.Navigation
         /// <param name="parent">Entity that owns the navigation property.</param>
         /// <param name="property">Reflection metadata describing the navigation.</param>
         /// <param name="context">Navigation loading context.</param>
+        /// <exception cref="ArgumentNullException">Any argument is <c>null</c>.</exception>
         public LazyNavigationCollection(object parent, PropertyInfo property, NavigationContext context)
         {
-            _parent = parent;
-            _property = property;
-            _context = context;
+            _parent = parent ?? throw new ArgumentNullException(nameof(parent));
+            _property = property ?? throw new ArgumentNullException(nameof(property));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
         private ICollection<T> GetOrLoadCollection()
@@ -616,7 +690,7 @@ namespace nORM.Navigation
     }
 
     /// <summary>
-    /// Lazy loading reference that loads data on first access
+    /// Lazy loading reference that defers database access until the value is first requested.
     /// </summary>
     public sealed class LazyNavigationReference<T> where T : class
     {
@@ -633,11 +707,12 @@ namespace nORM.Navigation
         /// <param name="parent">Entity that owns the navigation property.</param>
         /// <param name="property">Reflection metadata describing the navigation.</param>
         /// <param name="context">Navigation loading context.</param>
+        /// <exception cref="ArgumentNullException">Any argument is <c>null</c>.</exception>
         public LazyNavigationReference(object parent, PropertyInfo property, NavigationContext context)
         {
-            _parent = parent;
-            _property = property;
-            _context = context;
+            _parent = parent ?? throw new ArgumentNullException(nameof(parent));
+            _property = property ?? throw new ArgumentNullException(nameof(property));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
             _isLoaded = false;
         }
 
@@ -671,6 +746,11 @@ namespace nORM.Navigation
         /// <summary>
         /// Implicitly converts the reference to a task that retrieves the value.
         /// </summary>
-        public static implicit operator Task<T?>(LazyNavigationReference<T> reference) => reference.GetValueAsync();
+        /// <exception cref="ArgumentNullException"><paramref name="reference"/> is <c>null</c>.</exception>
+        public static implicit operator Task<T?>(LazyNavigationReference<T> reference)
+        {
+            if (reference == null) throw new ArgumentNullException(nameof(reference));
+            return reference.GetValueAsync();
+        }
     }
 }

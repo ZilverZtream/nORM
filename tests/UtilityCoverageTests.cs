@@ -987,10 +987,12 @@ public class RetryPolicyTests
     }
 
     [Fact]
-    public void RetryPolicy_ShouldRetry_TimeoutException_ReturnsTrue()
+    public void RetryPolicy_ShouldRetry_TimeoutException_ReturnsFalse()
     {
+        // TimeoutException is deliberately NOT retryable — retrying a timed-out write
+        // can duplicate data because the write may have succeeded before the timeout.
         var policy = new RetryPolicy();
-        Assert.True(policy.ShouldRetry(new TimeoutException()));
+        Assert.False(policy.ShouldRetry(new TimeoutException()));
     }
 
     [Fact]
@@ -1412,18 +1414,13 @@ public class NavigationPropertyExtensionsTests
     }
 
     [Fact]
-    public void EnableLazyLoading_NullEntity_ReturnsNull()
+    public void EnableLazyLoading_NullEntity_ThrowsArgumentNullException()
     {
         using var cn = OpenDb();
         using var ctx = new DbContext(cn, new SqliteProvider());
-        // null entity: EnableLazyLoading is a no-op when entity is null
-        var ex = Record.Exception(() =>
-        {
-            UctGadget? nullGadget = null;
-            nullGadget!.EnableLazyLoading(ctx);
-        });
-        // Either succeeds (no-op) or throws NullRef — either is acceptable
-        Assert.True(ex == null || ex is NullReferenceException);
+        UctGadget? nullGadget = null;
+        Assert.Throws<ArgumentNullException>(
+            () => nullGadget!.EnableLazyLoading(ctx));
     }
 
     [Fact]
@@ -1511,15 +1508,11 @@ public class NavigationPropertyExtensionsTests
     }
 
     [Fact]
-    public async Task LoadAsync_NullEntity_DoesNotThrow()
+    public async Task LoadAsync_NullEntity_ThrowsArgumentNullException()
     {
-        var ex = await Record.ExceptionAsync(async () =>
-        {
-            UctGadget? n = null;
-            await n!.LoadAsync<UctGadget, object>(g => null!);
-        });
-        // Either null (no-op) or NullReferenceException from null entity
-        Assert.True(ex == null || ex is NullReferenceException || ex is InvalidOperationException);
+        UctGadget? n = null;
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => n!.LoadAsync<UctGadget, object>(g => null!));
     }
 
     [Fact]

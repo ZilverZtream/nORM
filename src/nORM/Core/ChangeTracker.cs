@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Reflection;
 using Microsoft.Extensions.Logging;
 using nORM.Configuration;
 using nORM.Mapping;
@@ -23,17 +24,33 @@ namespace nORM.Core
         private readonly ConcurrentDictionary<EntityEntry, byte> _dirtyNonNotifyingEntries = new();
         private readonly ConcurrentDictionary<EntityEntry, byte> _dirtyEntries = new();
         private readonly DbContextOptions _options;
-        private readonly object _trackLock = new object(); // Synchronizes Track operations to prevent TOCTOU races
+
+        // Synchronizes Track and Remove operations to prevent TOCTOU races between
+        // reference-check, PK-lookup, and dictionary mutation sequences.
+        private readonly object _trackLock = new object();
+
+        /// <summary>
+        /// Maximum depth for cascade-delete graph traversal. 10 levels accommodates
+        /// legitimate entity hierarchies while catching infinite cycles early.
+        /// </summary>
+        private const int MaxCascadeDepth = 10;
+
+        // Hash seed primes for CompositeKey.GetHashCode (FNV-style polynomial hash).
+        private const int HashSeed = 17;
+        private const int HashMultiplier = 23;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ChangeTracker"/> class using the
         /// specified context options.
         /// </summary>
         /// <param name="options">Options that influence change-tracking behavior.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="options"/> is <c>null</c>.</exception>
         public ChangeTracker(DbContextOptions options)
         {
+            ArgumentNullException.ThrowIfNull(options);
             _options = options;
         }
+
         /// <summary>
         /// Begins tracking the specified entity instance and associates it with the
         /// provided <paramref name="mapping"/>. If the entity is already being tracked
@@ -44,8 +61,12 @@ namespace nORM.Core
         /// <param name="state">The initial state to assign to the entity.</param>
         /// <param name="mapping">Mapping information for the entity type.</param>
         /// <returns>The <see cref="EntityEntry"/> representing the tracked entity.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="entity"/> or <paramref name="mapping"/> is <c>null</c>.</exception>
         internal EntityEntry Track(object entity, EntityState state, TableMapping mapping)
         {
+            ArgumentNullException.ThrowIfNull(entity);
+            ArgumentNullException.ThrowIfNull(mapping);
+
             // Lock the entire operation to prevent TOCTOU between reference check and PK operations.
             // Prevents two threads from tracking the same entity concurrently and causing state corruption.
             lock (_trackLock)
@@ -79,7 +100,7 @@ namespace nORM.Core
 
                 var pk = GetPrimaryKeyValue(entity, mapping);
 
-                // Use GetOrAdd to atomically check and insert by PK, preventing race conditions
+                // Check-and-insert by PK under the outer lock, preventing race conditions
                 // where two threads tracking the same entity by PK might both create entries.
                 if (pk != null)
                 {
@@ -87,7 +108,7 @@ namespace nORM.Core
                         mapping.Type,
                         _ => new ConcurrentDictionary<object, EntityEntry>());
 
-                    // Atomically get or create entry for this PK
+                    // Get or create entry for this PK (lock guarantees single-writer)
                     var pkEntry = typeEntries.GetOrAdd(pk, _ =>
                     {
                         // Create entry only if not already tracked by PK
@@ -140,7 +161,9 @@ namespace nORM.Core
                     return entry;
                 }
 
-                // Another thread added it between check and add
+                // Under the lock this path is reachable only if the ConcurrentDictionary was
+                // mutated by Remove on another thread between our earlier TryGetValue and TryAdd.
+                // Retrieve the winner and apply state-update rules.
                 if (_entriesByReference.TryGetValue(entity, out var raceEntry))
                 {
                     // Don't downgrade from dirty states
@@ -152,7 +175,11 @@ namespace nORM.Core
                     return raceEntry;
                 }
 
-                // Fallback: return the one we created (shouldn't normally reach here)
+                // Defensive fallback: the entity was removed between TryAdd and TryGetValue.
+                // Re-add the entry we already constructed.
+                _entriesByReference.TryAdd(entity, entry);
+                if (entity is not INotifyPropertyChanged)
+                    _nonNotifyingEntries.TryAdd(entry, 0);
                 return entry;
             }
         }
@@ -171,9 +198,7 @@ namespace nORM.Core
             // Minimal entry that defers property change setup
             return new EntityEntry(entity, EntityState.Unchanged, mapping, _options, MarkDirty, lazy: true);
         }
-        // CASCADE DELETE PROTECTION FIX: Reduced from 100 to 20, then further to 10 to prevent excessive memory usage
-        // and catch potential cycles earlier. 10 levels is sufficient for legitimate hierarchies.
-        private const int MaxCascadeDepth = 10;
+
         /// <summary>
         /// Removes an entity from the change tracker, optionally cascading the removal
         /// to related entities that are configured for cascade delete.
@@ -181,29 +206,34 @@ namespace nORM.Core
         /// <param name="entity">The entity instance to stop tracking.</param>
         /// <param name="cascade">If <c>true</c>, related entities configured with cascade
         /// delete will also be detached.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="entity"/> is <c>null</c>.</exception>
         internal void Remove(object entity, bool cascade = false)
         {
-            if (_entriesByReference.TryRemove(entity, out var entry))
+            ArgumentNullException.ThrowIfNull(entity);
+            lock (_trackLock)
             {
-                entry.DetachEntity();
-                _nonNotifyingEntries.TryRemove(entry, out _);
-                _dirtyNonNotifyingEntries.TryRemove(entry, out _);
-                _dirtyEntries.TryRemove(entry, out _);
-                // EntityEntry.OriginalKey stores composite keys as object?[] (CaptureKey shape),
-                // but _entriesByKey is keyed by tuples/(CompositeKey) (GetPrimaryKeyValue shape).
-                // Convert OriginalKey to the lookup shape; fall back to reading current PK when null.
-                var pk = entry.OriginalKey != null
-                    ? ToLookupKey(entry.OriginalKey, entry.Mapping)
-                    : GetPrimaryKeyValue(entity, entry.Mapping);
-                if (pk != null && _entriesByKey.TryGetValue(entry.Mapping.Type, out var typeEntries))
+                if (_entriesByReference.TryRemove(entity, out var entry))
                 {
-                    typeEntries.TryRemove(pk, out _);
-                    if (typeEntries.IsEmpty)
-                        _entriesByKey.TryRemove(entry.Mapping.Type, out _);
-                }
-                if (cascade)
-                {
-                    CascadeDelete(entity, entry.Mapping);
+                    entry.DetachEntity();
+                    _nonNotifyingEntries.TryRemove(entry, out _);
+                    _dirtyNonNotifyingEntries.TryRemove(entry, out _);
+                    _dirtyEntries.TryRemove(entry, out _);
+                    // EntityEntry.OriginalKey stores composite keys as object?[] (CaptureKey shape),
+                    // but _entriesByKey is keyed by tuples/(CompositeKey) (GetPrimaryKeyValue shape).
+                    // Convert OriginalKey to the lookup shape; fall back to reading current PK when null.
+                    var pk = entry.OriginalKey != null
+                        ? ToLookupKey(entry.OriginalKey, entry.Mapping)
+                        : GetPrimaryKeyValue(entity, entry.Mapping);
+                    if (pk != null && _entriesByKey.TryGetValue(entry.Mapping.Type, out var typeEntries))
+                    {
+                        typeEntries.TryRemove(pk, out _);
+                        if (typeEntries.IsEmpty)
+                            _entriesByKey.TryRemove(entry.Mapping.Type, out _);
+                    }
+                    if (cascade)
+                    {
+                        CascadeDelete(entity, entry.Mapping);
+                    }
                 }
             }
         }
@@ -214,7 +244,7 @@ namespace nORM.Core
         private static object? ToLookupKey(object? originalKey, TableMapping mapping)
         {
             if (originalKey == null) return null;
-            if (mapping.KeyColumns.Length <= 1) return originalKey; // single key — same shape
+            if (mapping.KeyColumns.Length <= 1) return originalKey; // single key - same shape
             if (originalKey is not object?[] arr) return originalKey; // already in lookup shape
             if (arr.Length == 2) return (arr[0], arr[1]);
             if (arr.Length == 3) return (arr[0], arr[1], arr[2]);
@@ -222,13 +252,18 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Recursively traverses the entity graph starting from
-        /// <paramref name="rootEntity"/> and detaches any dependent entities marked
-        /// for cascade deletion. This ensures that related entities do not remain
-        /// tracked when their parent is removed.
+        /// Traverses the entity graph starting from <paramref name="rootEntity"/> using
+        /// breadth-first search and detaches any dependent entities marked for cascade
+        /// deletion. This ensures that related entities do not remain tracked when their
+        /// parent is removed. The graph is traversed in two phases: discovery then removal,
+        /// to avoid mutating the tracker while walking navigation properties.
         /// </summary>
         /// <param name="rootEntity">The root entity being deleted.</param>
         /// <param name="rootMapping">Mapping information for the root entity.</param>
+        /// <remarks>
+        /// Caller must already hold <see cref="_trackLock"/>. Phase-2 removals use
+        /// <see cref="RemoveUnlocked"/> to avoid re-entrant lock acquisition.
+        /// </remarks>
         private void CascadeDelete(object rootEntity, TableMapping rootMapping)
         {
             // Collect all entities to delete first, then remove them to prevent premature removal
@@ -257,7 +292,27 @@ namespace nORM.Core
                 {
                     if (!relation.CascadeDelete)
                         continue;
-                    var navValue = relation.NavProp.GetValue(entity);
+                    object? navValue;
+                    try
+                    {
+                        navValue = relation.NavProp.GetValue(entity);
+                    }
+                    catch (TargetInvocationException ex)
+                    {
+                        // The getter itself threw - log and skip this navigation property
+                        _options.Logger?.LogWarning(ex,
+                            "Failed to read navigation property {NavProp} on entity type {EntityType} during cascade delete. Skipping this relation.",
+                            relation.NavProp.Name, entity.GetType().Name);
+                        continue;
+                    }
+                    catch (MemberAccessException ex)
+                    {
+                        // Access denied (e.g., security restriction) - log and skip
+                        _options.Logger?.LogWarning(ex,
+                            "Access denied reading navigation property {NavProp} on entity type {EntityType} during cascade delete. Skipping this relation.",
+                            relation.NavProp.Name, entity.GetType().Name);
+                        continue;
+                    }
                     if (navValue is IEnumerable collection)
                     {
                         foreach (var child in collection)
@@ -277,10 +332,9 @@ namespace nORM.Core
                     }
                     else if (navValue != null)
                     {
-                        // CASCADE DELETE PROTECTION FIX: Detect cycles early with better error message
+                        // Detect cycles: if already visited, this is a circular reference
                         if (!visited.Add(navValue))
                         {
-                            // Navigation value already visited - circular reference
                             throw new InvalidOperationException(
                                 $"Circular reference detected in cascade delete at depth {depth}. " +
                                 $"Entity type {navValue.GetType().Name} forms a cycle in the relationship graph. " +
@@ -295,12 +349,38 @@ namespace nORM.Core
                 }
             }
 
-            // Phase 2: Remove all collected entities (prevents graph traversal issues)
+            // Phase 2: Remove all collected entities. Uses RemoveUnlocked because the
+            // caller (Remove) already holds _trackLock.
             foreach (var entityToRemove in toRemove)
             {
-                Remove(entityToRemove, cascade: false);
+                RemoveUnlocked(entityToRemove);
             }
         }
+
+        /// <summary>
+        /// Internal removal that does NOT acquire <see cref="_trackLock"/>. Used by
+        /// <see cref="CascadeDelete"/> which is called while the lock is already held.
+        /// </summary>
+        private void RemoveUnlocked(object entity)
+        {
+            if (_entriesByReference.TryRemove(entity, out var entry))
+            {
+                entry.DetachEntity();
+                _nonNotifyingEntries.TryRemove(entry, out _);
+                _dirtyNonNotifyingEntries.TryRemove(entry, out _);
+                _dirtyEntries.TryRemove(entry, out _);
+                var pk = entry.OriginalKey != null
+                    ? ToLookupKey(entry.OriginalKey, entry.Mapping)
+                    : GetPrimaryKeyValue(entity, entry.Mapping);
+                if (pk != null && _entriesByKey.TryGetValue(entry.Mapping.Type, out var typeEntries))
+                {
+                    typeEntries.TryRemove(pk, out _);
+                    if (typeEntries.IsEmpty)
+                        _entriesByKey.TryRemove(entry.Mapping.Type, out _);
+                }
+            }
+        }
+
         /// <summary>
         /// Gets an enumeration of the <see cref="EntityEntry"/> instances currently
         /// tracked by the context.
@@ -312,43 +392,41 @@ namespace nORM.Core
         /// </summary>
         internal EntityEntry? GetEntryOrDefault(object entity) =>
             _entriesByReference.TryGetValue(entity, out var entry) ? entry : null;
-        /// <summary>
-        /// Forces change detection for all entities that have been marked as dirty,
-        /// updating their <see cref="EntityState"/> based on current property values.
-        /// </summary>
-        /// <remarks>
-        /// This method is called automatically on every SaveChanges() call.
-        /// It performs snapshot-based comparison of ALL tracked entities, iterating through all properties
-        /// and comparing current values against original snapshots. This is O(entities × properties) complexity.
-        ///
-        /// Performance considerations:
-        /// - Avoid calling SaveChanges() in tight loops with many tracked entities
-        /// - Consider using batch operations (InsertBulkAsync, UpdateBulkAsync) for bulk changes
-        /// - For read-only queries, use AsNoTracking() to avoid change tracking overhead
-        /// - If tracking thousands of entities, consider periodically detaching unchanged entities
-        ///
-        /// This design matches Entity Framework Core semantics where change detection is snapshot-based
-        /// and happens automatically. For entities implementing INotifyPropertyChanged, the overhead is
-        /// reduced as changes are tracked incrementally.
-        /// </remarks>
+
         /// <summary>
         /// Detects changes only for entities that were explicitly marked dirty via
-        /// <see cref="MarkDirty"/>. For snapshot-based detection of all POCO entities,
+        /// <see cref="MarkDirty"/>. For snapshot-based detection of all non-INPC entities,
         /// use <see cref="DetectAllChanges"/> (called internally from SaveChanges).
         /// </summary>
         internal void DetectChanges()
             => DetectChangesCore(allNonNotifying: false);
 
         /// <summary>
-        /// Detects changes in ALL tracked POCO entities by comparing current values against
-        /// original snapshots. Called automatically by SaveChanges.
+        /// Detects changes in all tracked non-INotifyPropertyChanged entities by
+        /// comparing current property values against original snapshots, plus any
+        /// INPC entities that were explicitly marked dirty. Called automatically by
+        /// SaveChanges.
         /// </summary>
+        /// <remarks>
+        /// This method performs snapshot-based comparison of all non-INPC tracked
+        /// entities, iterating through all properties and comparing current values
+        /// against original snapshots. This is O(entities x properties) complexity.
+        /// Entities implementing <see cref="System.ComponentModel.INotifyPropertyChanged"/>
+        /// are NOT scanned here unless they were explicitly marked dirty - their
+        /// changes are tracked incrementally via property-change events.
+        ///
+        /// Performance considerations:
+        /// - Avoid calling SaveChanges() in tight loops with many tracked entities
+        /// - Consider using batch operations (BulkInsertAsync, BulkUpdateAsync) for bulk changes
+        /// - For read-only queries, use AsNoTracking() to avoid change tracking overhead
+        /// - If tracking thousands of entities, consider periodically detaching unchanged entities
+        /// </remarks>
         internal void DetectAllChanges()
             => DetectChangesCore(allNonNotifying: true);
 
         private void DetectChangesCore(bool allNonNotifying)
         {
-            var failures = new List<(object Entity, Exception Exception)>();
+            List<(object Entity, Exception Exception)>? failures = null;
             var source = allNonNotifying ? _nonNotifyingEntries.Keys : (IEnumerable<EntityEntry>)_dirtyNonNotifyingEntries.Keys;
 
             foreach (var entry in source)
@@ -358,6 +436,7 @@ namespace nORM.Core
                     try { entry.DetectChanges(); }
                     catch (Exception ex)
                     {
+                        failures ??= new List<(object Entity, Exception Exception)>();
                         failures.Add((entry.Entity, ex));
                         _options.Logger?.LogError(ex,
                             "Error detecting changes for entity {EntityType}. Entity will be skipped for this SaveChanges operation.",
@@ -373,6 +452,7 @@ namespace nORM.Core
                     try { entry.DetectChanges(); }
                     catch (Exception ex)
                     {
+                        failures ??= new List<(object Entity, Exception Exception)>();
                         failures.Add((entry.Entity, ex));
                         _options.Logger?.LogError(ex,
                             "Error detecting changes for entity {EntityType}. Entity will be skipped for this SaveChanges operation.",
@@ -384,11 +464,11 @@ namespace nORM.Core
             _dirtyNonNotifyingEntries.Clear();
             _dirtyEntries.Clear();
 
-            if (failures.Count > 0)
+            if (failures is { Count: > 0 })
             {
-                var exceptions = new List<Exception>(failures.Count);
-                foreach (var f in failures) exceptions.Add(f.Exception);
-                throw new AggregateException("DetectChanges encountered errors.", exceptions);
+                throw new AggregateException(
+                    "DetectChanges encountered errors.",
+                    failures.ConvertAll(f => f.Exception));
             }
         }
 
@@ -398,8 +478,18 @@ namespace nORM.Core
         /// tracked separately to ensure their changes are discovered.
         /// </summary>
         /// <param name="entry">The entry to mark as dirty.</param>
+        /// <remarks>
+        /// Thread-safety assumption: This method uses ConcurrentDictionary.TryAdd which
+        /// is individually thread-safe, but the ContainsKey-then-TryAdd sequence is NOT
+        /// atomic. A concurrent Attach could add the entry to _nonNotifyingEntries after
+        /// the ContainsKey check, causing the entry to be routed to _dirtyEntries instead.
+        /// This is acceptable because DetectChangesCore processes BOTH collections, so
+        /// the entry will still be detected - it may just take a full DetectAllChanges
+        /// cycle rather than a targeted DetectChanges cycle.
+        /// </remarks>
         internal void MarkDirty(EntityEntry entry)
         {
+            ArgumentNullException.ThrowIfNull(entry);
             entry.UpgradeToFullTracking();
             if (_nonNotifyingEntries.ContainsKey(entry))
             {
@@ -410,6 +500,7 @@ namespace nORM.Core
                 _dirtyEntries.TryAdd(entry, 0);
             }
         }
+
         /// <summary>
         /// Removes all tracked entity entries and resets the change tracker to an empty state.
         /// </summary>
@@ -421,27 +512,40 @@ namespace nORM.Core
             _dirtyNonNotifyingEntries.Clear();
             _dirtyEntries.Clear();
         }
+
+        /// <summary>
+        /// Returns <c>true</c> when <paramref name="value"/> represents the CLR default
+        /// for common DB-generated key types (0 for integer types, <see cref="Guid.Empty"/>
+        /// for GUIDs, <c>null</c> for any type).
+        /// </summary>
         private static bool IsDefaultKeyValue(object? value, Type type)
         {
             if (value is null) return true;
             var underlying = Nullable.GetUnderlyingType(type) ?? type;
             if (underlying == typeof(int)   || underlying == typeof(long)  ||
-                underlying == typeof(short) || underlying == typeof(byte))
+                underlying == typeof(short) || underlying == typeof(byte) ||
+                underlying == typeof(uint)  || underlying == typeof(sbyte) ||
+                underlying == typeof(ushort))
                 return Convert.ToInt64(value) == 0L;
+            if (underlying == typeof(ulong))
+                return (ulong)value == 0UL;
             if (underlying == typeof(Guid))
                 return (Guid)value == Guid.Empty;
             return false;
         }
 
         /// <summary>
-        /// M2: After a DB-generated key has been assigned to an entity (post-INSERT),
+        /// After a DB-generated key has been assigned to an entity (post-INSERT),
         /// adds the entity to the key-based identity map so subsequent lookups by PK
         /// find the correct entry rather than creating a duplicate.
         /// </summary>
         /// <param name="entity">The entity whose key was just assigned by the database.</param>
         /// <param name="mapping">Mapping information for the entity type.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="entity"/> or <paramref name="mapping"/> is <c>null</c>.</exception>
         internal void ReindexAfterInsert(object entity, TableMapping mapping)
         {
+            ArgumentNullException.ThrowIfNull(entity);
+            ArgumentNullException.ThrowIfNull(mapping);
             if (!_entriesByReference.TryGetValue(entity, out var entry)) return;
             var pk = GetPrimaryKeyValue(entity, mapping);
             if (pk == null) return;
@@ -458,15 +562,26 @@ namespace nORM.Core
         /// <param name="mapping">Mapping information describing the key columns.</param>
         /// <returns>
         /// The key value, a composite key object when multiple key columns exist, or
-        /// <c>null</c> if the entity type does not define a primary key.
+        /// <c>null</c> if the entity type does not define a primary key or a DB-generated
+        /// key column is still at its default value (not yet assigned by the database).
         /// </returns>
+        /// <remarks>
+        /// Composite key default detection uses OR semantics: if ANY DB-generated column
+        /// in the composite key is at its default value (0 for int, Guid.Empty for Guid,
+        /// etc.), the entire key is treated as unassigned (returns null). This prevents
+        /// identity map collisions when multiple new entities share partially-assigned
+        /// composite keys. The trade-off is that a legitimately assigned composite key
+        /// where one DB-generated column happens to hold its type's default value will
+        /// also be treated as unassigned - but this is vanishingly rare in practice since
+        /// DB-generated values (IDENTITY, NEWID) never produce defaults.
+        /// </remarks>
         private static object? GetPrimaryKeyValue(object entity, TableMapping mapping)
         {
             if (mapping.KeyColumns.Length == 1)
             {
                 var col   = mapping.KeyColumns[0];
                 var value = col.Getter(entity);
-                // DB-generated key at its default means "not yet assigned" — don't key the map
+                // DB-generated key at its default means "not yet assigned" - don't key the map
                 if (col.IsDbGenerated && IsDefaultKeyValue(value, col.Prop.PropertyType))
                     return null;
                 return value;
@@ -476,7 +591,7 @@ namespace nORM.Core
             {
                 var col0 = mapping.KeyColumns[0]; var col1 = mapping.KeyColumns[1];
                 var v0 = col0.Getter(entity);     var v1 = col1.Getter(entity);
-                // Unassigned DB-generated composite key → treat as null (not yet in identity map).
+                // Unassigned DB-generated composite key: treat as null (not yet in identity map).
                 if ((col0.IsDbGenerated && IsDefaultKeyValue(v0, col0.Prop.PropertyType)) ||
                     (col1.IsDbGenerated && IsDefaultKeyValue(v1, col1.Prop.PropertyType)))
                     return null;
@@ -487,7 +602,7 @@ namespace nORM.Core
             {
                 var col0 = mapping.KeyColumns[0]; var col1 = mapping.KeyColumns[1]; var col2 = mapping.KeyColumns[2];
                 var v0 = col0.Getter(entity);     var v1 = col1.Getter(entity);     var v2 = col2.Getter(entity);
-                // Unassigned DB-generated composite key → treat as null (not yet in identity map).
+                // Unassigned DB-generated composite key: treat as null (not yet in identity map).
                 if ((col0.IsDbGenerated && IsDefaultKeyValue(v0, col0.Prop.PropertyType)) ||
                     (col1.IsDbGenerated && IsDefaultKeyValue(v1, col1.Prop.PropertyType)) ||
                     (col2.IsDbGenerated && IsDefaultKeyValue(v2, col2.Prop.PropertyType)))
@@ -503,7 +618,7 @@ namespace nORM.Core
                 {
                     var col = mapping.KeyColumns[i];
                     var v = col.Getter(entity);
-                    // Unassigned DB-generated key component → entity not yet in identity map.
+                    // Unassigned DB-generated key component: entity not yet in identity map.
                     if (col.IsDbGenerated && IsDefaultKeyValue(v, col.Prop.PropertyType))
                         return null;
                     values[i] = v;
@@ -513,13 +628,23 @@ namespace nORM.Core
 
             return null;
         }
+
+        /// <summary>
+        /// Represents a composite primary key composed of more than three columns.
+        /// Provides structural equality and a stable hash code for use as a dictionary key.
+        /// </summary>
         private sealed class CompositeKey : IEquatable<CompositeKey>
         {
             private readonly object?[] _values;
+            private readonly int _cachedHashCode;
+
             public CompositeKey(object?[] values)
             {
+                ArgumentNullException.ThrowIfNull(values);
                 _values = values;
+                _cachedHashCode = ComputeHashCode(values);
             }
+
             /// <summary>
             /// Determines whether this composite key is equal to another composite key instance.
             /// </summary>
@@ -545,21 +670,29 @@ namespace nORM.Core
             public override bool Equals(object? obj) => Equals(obj as CompositeKey);
 
             /// <summary>
-            /// Computes a hash code based on the contained key values.
+            /// Returns the cached hash code computed at construction time.
             /// </summary>
             /// <returns>An integer hash code representing the composite key.</returns>
-            public override int GetHashCode()
+            public override int GetHashCode() => _cachedHashCode;
+
+            private static int ComputeHashCode(object?[] values)
             {
                 unchecked
                 {
-                    var hash = 17;
-                    foreach (var value in _values)
+                    var hash = HashSeed;
+                    foreach (var value in values)
                     {
-                        hash = hash * 23 + (value?.GetHashCode() ?? 0);
+                        hash = hash * HashMultiplier + (value?.GetHashCode() ?? 0);
                     }
                     return hash;
                 }
             }
+
+            /// <summary>
+            /// Returns a human-readable representation of the composite key for diagnostics.
+            /// </summary>
+            public override string ToString()
+                => $"CompositeKey({string.Join(", ", _values)})";
         }
     }
 }

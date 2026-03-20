@@ -1,11 +1,12 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.SqlServer.TransactSql.ScriptDom;
 using nORM.Providers;
@@ -25,10 +26,48 @@ namespace nORM.Core
         private const int MaxBulkOperationSize = 50000;
         private const int MaxParameterCount = 2000;
         private const int MaxSqlLength = 100000;
+        private const int MaxConnectionStringLength = 8192;
+        private const int MaxConnectionTimeoutSeconds = 300;
+
+        /// <summary>
+        /// Dangerous SQL patterns that indicate system-level commands or file operations.
+        /// Checked against the uppercased SQL input in <see cref="ValidateRawSql"/>.
+        /// </summary>
+        private static readonly string[] DangerousPatterns =
+        {
+            "XP_CMDSHELL", "SP_CONFIGURE", "OPENROWSET", "OPENDATASOURCE",
+            "INTO OUTFILE", "LOAD_FILE", "SCRIPT", "EXECUTE IMMEDIATE"
+        };
+
+        /// <summary>
+        /// Statement types allowed through the TSQL AST allowlist in <see cref="IsSafeRawSql"/>.
+        /// SelectStatement covers all SELECT queries; SetVariableStatement allows DECLARE/SET.
+        /// </summary>
+        private static readonly HashSet<Type> AllowedTSqlStatementTypes = new()
+        {
+            typeof(SelectStatement),
+            typeof(SetVariableStatement)
+        };
+
+        /// <summary>
+        /// Keys in a connection string that contain sensitive data and must be masked
+        /// before including the connection string in error messages or logs.
+        /// </summary>
+        private static readonly string[] SensitiveConnectionStringKeys =
+        {
+            "Password", "Pwd", "User Password",
+            "API Key", "ApiKey",
+            "Token", "AccessToken", "Access Token",
+            "Secret", "SecretKey", "Secret Key",
+            "AccessKey", "Access Key",
+            "PrivateKey", "Private Key",
+            "ClientSecret", "Client Secret"
+        };
+
+        private const string MaskedValue = "***";
 
         private static readonly ObjectPool<HashSet<object>> HashSetPool =
             new DefaultObjectPool<HashSet<object>>(new HashSetPolicy(), Environment.ProcessorCount * 2);
-        private static readonly ConcurrentDictionary<Type, PropertyInfo[]> PropertyCache = new();
 
         /// <summary>
         /// Validates a single entity instance to ensure it does not contain excessively deep
@@ -88,9 +127,6 @@ namespace nORM.Core
             }
         }
 
-        private static PropertyInfo[] GetCachedProperties(Type type)
-            => PropertyCache.GetOrAdd(type, t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance));
-
         /// <summary>
         /// Cache of properties whose declared type could contain entity graph references.
         /// Excludes value types and strings, avoiding ~90% of GetValue reflection calls
@@ -127,7 +163,7 @@ namespace nORM.Core
                         var itemType = item.GetType();
                         if (itemType.IsClass && itemType != typeof(string))
                         {
-                            // Don't increment depth for collection items at same level
+                            // Increment depth for collection items to count them as a deeper level in the graph
                             stack.Push((item, depth + 1, $"{path}[{itemType.Name}]"));
                         }
                     }
@@ -220,13 +256,8 @@ namespace nORM.Core
                 throw new ArgumentException($"SQL exceeds maximum length of {MaxSqlLength}");
 
             var upperSql = sql.ToUpperInvariant();
-            var dangerousPatterns = new[]
-            {
-                "XP_CMDSHELL", "SP_CONFIGURE", "OPENROWSET", "OPENDATASOURCE",
-                "INTO OUTFILE", "LOAD_FILE", "SCRIPT", "EXECUTE IMMEDIATE"
-            };
 
-            foreach (var pattern in dangerousPatterns)
+            foreach (var pattern in DangerousPatterns)
             {
                 if (upperSql.Contains(pattern))
                     throw new ArgumentException($"SQL contains dangerous pattern: {pattern}");
@@ -236,7 +267,8 @@ namespace nORM.Core
                 throw new ArgumentException($"Parameter count {parameters.Count} exceeds maximum of {MaxParameterCount}");
 
             // Check for common injection patterns that bypass keyword detection.
-            DetectInjectionPatterns(sql, parameters);
+            // Pass pre-computed upperSql to avoid redundant ToUpperInvariant call.
+            DetectInjectionPatterns(sql, upperSql, parameters);
         }
 
         /// <summary>
@@ -244,14 +276,22 @@ namespace nORM.Core
         /// comment-based injection, and embedded quotes without proper parameterization.
         /// </summary>
         /// <param name="sql">SQL string to validate.</param>
+        /// <param name="upperSql">Pre-computed uppercased SQL to avoid redundant ToUpperInvariant call.</param>
         /// <param name="parameters">Optional parameters dictionary.</param>
         /// <exception cref="NormUsageException">Thrown when suspicious patterns are detected.</exception>
-        private static void DetectInjectionPatterns(string sql, IReadOnlyDictionary<string, object>? parameters)
+        private static void DetectInjectionPatterns(string sql, string upperSql, IReadOnlyDictionary<string, object>? parameters)
         {
-            var upperSql = sql.ToUpperInvariant();
 
             // Pattern 1: UNION-based injection attempts
-            // Look for UNION SELECT that's not in a legitimate subquery context
+            // Look for UNION SELECT that's not in a legitimate subquery context.
+            // Limitation: This heuristic only detects the most common UNION injection
+            // pattern — a single quote appearing after the last WHERE keyword before
+            // the UNION keyword. It does NOT detect:
+            //   - UNION injections that avoid embedded quotes (e.g., numeric columns),
+            //   - UNION injections where the quote is inside a legitimate string literal,
+            //   - Multiple UNION clauses (only the first occurrence is inspected).
+            // For defense in depth, always use parameterized queries and the TSql AST
+            // allowlist (ValidateRawSql) in addition to this pattern-based check.
             if (upperSql.Contains("UNION") && upperSql.Contains("SELECT"))
             {
                 // Allow legitimate UNION queries but check for suspicious patterns
@@ -272,6 +312,12 @@ namespace nORM.Core
             // The injection vector is a statement terminator (;) BEFORE the --, not the -- itself.
             // Only reject when -- appears outside a string literal AND a ; precedes it outside string literals,
             // indicating a potential "'; malicious SQL --" injection pattern.
+            // Limitation: The escaped-quote detection below uses a simple parity check
+            // (odd count = inside string literal). This does NOT handle escaped single
+            // quotes within string literals (e.g., 'O''Brien' counts as 2 quotes, which
+            // looks like "outside a string" to the parity check). A full SQL lexer would
+            // be needed to handle all edge cases. The semicolon requirement provides an
+            // additional safety gate that reduces false negatives from this limitation.
             var doubleHyphenIndex = sql.IndexOf("--");
             if (doubleHyphenIndex >= 0)
             {
@@ -299,8 +345,11 @@ namespace nORM.Core
                         "Malformed SQL: block comment opened with '/*' but no matching '*/' found after it. " +
                         "Ensure block comments are properly closed.");
 
-                // Check if there are suspicious keywords inside the comment
-                var commentContent = sql.Substring(commentStart + 2, commentEnd - commentStart - 2).ToUpperInvariant();
+                // Check if there are suspicious keywords inside the comment.
+                // Guard against overlapping /* and */ (e.g. "/*/") where commentEnd < commentStart + 2,
+                // which would produce a negative Substring length.
+                var commentLength = Math.Max(0, commentEnd - commentStart - 2);
+                var commentContent = sql.Substring(commentStart + 2, commentLength).ToUpperInvariant();
                 if (commentContent.Contains("UNION") || commentContent.Contains("SELECT") ||
                     commentContent.Contains("INSERT") || commentContent.Contains("DELETE"))
                 {
@@ -311,8 +360,6 @@ namespace nORM.Core
             }
 
             // Pattern 4: Embedded quotes without proper parameterization
-            // Count parameter markers (@, $, :) and compare with quote usage
-            var paramMarkerCount = CountParameterMarkers(sql);
             var whereIndex = upperSql.IndexOf("WHERE");
 
             if (whereIndex >= 0)
@@ -321,7 +368,7 @@ namespace nORM.Core
                 var singleQuotes = wherePart.Count(c => c == '\'');
 
                 // If there are quotes in WHERE clause but no parameters passed, suspicious
-                if (singleQuotes >= 2 && (parameters == null || parameters.Count == 0) && paramMarkerCount == 0)
+                if (singleQuotes >= 2 && (parameters == null || parameters.Count == 0) && CountParameterMarkers(sql) == 0)
                 {
                     // Exception: allow simple constant queries like WHERE Status = 'Active'
                     // But warn if the value looks dynamic (contains spaces, numbers suggesting user input)
@@ -342,37 +389,17 @@ namespace nORM.Core
             var semiPositions = FindSemicolonPositionsOutsideTokens(sql);
             if (semiPositions.Count >= 1)
             {
-                // Multiple real statement terminators — extract statements and check for DDL.
+                // Real statement terminators found — extract statements and check for DDL.
                 int prev = 0;
                 foreach (var pos in semiPositions)
                 {
-                    var stmt = sql.Substring(prev, pos - prev).Trim();
-                    var upper = stmt.ToUpperInvariant();
-                    // If any statement is DDL or system procedure, it's suspicious in this context
-                    if (upper.StartsWith("DROP ") || upper.StartsWith("ALTER ") ||
-                        upper.StartsWith("CREATE ") || upper.StartsWith("EXEC "))
-                    {
-                        throw new NormUsageException(
-                            "Potential SQL injection detected: Multiple statements with DDL/EXEC commands. " +
-                            "FromSqlRaw should only execute SELECT queries, not administrative commands.");
-                    }
+                    CheckStatementFragmentForDdl(sql.Substring(prev, pos - prev));
                     prev = pos + 1;
                 }
                 // Check the last fragment after the final semicolon.
                 if (prev < sql.Length)
                 {
-                    var last = sql.Substring(prev).Trim();
-                    if (last.Length > 0)
-                    {
-                        var upper = last.ToUpperInvariant();
-                        if (upper.StartsWith("DROP ") || upper.StartsWith("ALTER ") ||
-                            upper.StartsWith("CREATE ") || upper.StartsWith("EXEC "))
-                        {
-                            throw new NormUsageException(
-                                "Potential SQL injection detected: Multiple statements with DDL/EXEC commands. " +
-                                "FromSqlRaw should only execute SELECT queries, not administrative commands.");
-                        }
-                    }
+                    CheckStatementFragmentForDdl(sql.Substring(prev));
                 }
             }
 
@@ -386,6 +413,84 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Checks a single statement fragment (text between semicolons) for DDL/EXEC commands
+        /// and throws <see cref="NormUsageException"/> if found.
+        /// </summary>
+        /// <param name="fragment">Raw SQL fragment to inspect.</param>
+        private static void CheckStatementFragmentForDdl(string fragment)
+        {
+            var trimmed = fragment.Trim();
+            if (trimmed.Length == 0) return;
+
+            var upper = trimmed.ToUpperInvariant();
+            if (upper.StartsWith("DROP ") || upper.StartsWith("ALTER ") ||
+                upper.StartsWith("CREATE ") || upper.StartsWith("EXEC "))
+            {
+                throw new NormUsageException(
+                    "Potential SQL injection detected: Multiple statements with DDL/EXEC commands. " +
+                    "FromSqlRaw should only execute SELECT queries, not administrative commands.");
+            }
+        }
+
+        /// <summary>
+        /// Advances the index past a SQL token (string literal, double-quoted identifier,
+        /// line comment, or block comment) starting at position <paramref name="i"/>.
+        /// Returns true if a token was skipped, false if the character at <paramref name="i"/>
+        /// is not the start of any skippable token.
+        /// </summary>
+        /// <param name="sql">The SQL string being lexed.</param>
+        /// <param name="i">Current position; updated to the position after the skipped token.</param>
+        /// <returns>True if a token was consumed and <paramref name="i"/> was advanced.</returns>
+        private static bool TrySkipSqlToken(string sql, ref int i)
+        {
+            var c = sql[i];
+
+            // Skip single-quoted literals ('...' with '' escape)
+            if (c == '\'')
+            {
+                i++;
+                while (i < sql.Length)
+                {
+                    if (sql[i] == '\'') { i++; if (i < sql.Length && sql[i] == '\'') i++; else break; }
+                    else i++;
+                }
+                return true;
+            }
+
+            // Skip double-quoted identifiers ("..." with "" escape)
+            if (c == '"')
+            {
+                i++;
+                while (i < sql.Length)
+                {
+                    if (sql[i] == '"') { i++; if (i < sql.Length && sql[i] == '"') i++; else break; }
+                    else i++;
+                }
+                return true;
+            }
+
+            // Skip line comments (-- to newline)
+            if (c == '-' && i + 1 < sql.Length && sql[i + 1] == '-')
+            {
+                i += 2;
+                while (i < sql.Length && sql[i] != '\n') i++;
+                return true;
+            }
+
+            // Skip block comments (/* ... */)
+            if (c == '/' && i + 1 < sql.Length && sql[i + 1] == '*')
+            {
+                i += 2;
+                while (i + 1 < sql.Length && !(sql[i] == '*' && sql[i + 1] == '/')) i++;
+                if (i + 1 < sql.Length) i += 2; // skip past */
+                else i = sql.Length; // unterminated block comment — advance to end
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Counts parameter markers in SQL string (@, $, :) to detect if parameterization is used.
         /// Uses a mini SQL lexer to skip string literals, double-quoted identifiers, line comments,
         /// and block comments so that @ inside 'user@example.com' is not counted.
@@ -396,44 +501,10 @@ namespace nORM.Core
             var i = 0;
             while (i < sql.Length)
             {
+                if (TrySkipSqlToken(sql, ref i))
+                    continue;
+
                 var c = sql[i];
-                // Skip single-quoted literals ('...' with '' escape)
-                if (c == '\'')
-                {
-                    i++;
-                    while (i < sql.Length)
-                    {
-                        if (sql[i] == '\'') { i++; if (i < sql.Length && sql[i] == '\'') i++; else break; }
-                        else i++;
-                    }
-                    continue;
-                }
-                // Skip double-quoted identifiers ("..." with "" escape)
-                if (c == '"')
-                {
-                    i++;
-                    while (i < sql.Length)
-                    {
-                        if (sql[i] == '"') { i++; if (i < sql.Length && sql[i] == '"') i++; else break; }
-                        else i++;
-                    }
-                    continue;
-                }
-                // Skip line comments (-- to newline)
-                if (c == '-' && i + 1 < sql.Length && sql[i + 1] == '-')
-                {
-                    i += 2;
-                    while (i < sql.Length && sql[i] != '\n') i++;
-                    continue;
-                }
-                // Skip block comments (/* ... */)
-                if (c == '/' && i + 1 < sql.Length && sql[i + 1] == '*')
-                {
-                    i += 2;
-                    while (i < sql.Length - 1 && !(sql[i] == '*' && sql[i + 1] == '/')) i++;
-                    i += 2;
-                    continue;
-                }
                 // Count parameter markers outside quoted/comment regions.
                 // Exclude PostgreSQL :: cast syntax.
                 // `::type` has the second `:` followed by a type-name (alphanumeric), which
@@ -462,45 +533,10 @@ namespace nORM.Core
             var i = 0;
             while (i < sql.Length)
             {
-                var c = sql[i];
-                // Skip single-quoted literals ('...' with '' escape)
-                if (c == '\'')
-                {
-                    i++;
-                    while (i < sql.Length)
-                    {
-                        if (sql[i] == '\'') { i++; if (i < sql.Length && sql[i] == '\'') i++; else break; }
-                        else i++;
-                    }
+                if (TrySkipSqlToken(sql, ref i))
                     continue;
-                }
-                // Skip double-quoted identifiers ("..." with "" escape)
-                if (c == '"')
-                {
-                    i++;
-                    while (i < sql.Length)
-                    {
-                        if (sql[i] == '"') { i++; if (i < sql.Length && sql[i] == '"') i++; else break; }
-                        else i++;
-                    }
-                    continue;
-                }
-                // Skip line comments (-- to newline)
-                if (c == '-' && i + 1 < sql.Length && sql[i + 1] == '-')
-                {
-                    i += 2;
-                    while (i < sql.Length && sql[i] != '\n') i++;
-                    continue;
-                }
-                // Skip block comments (/* ... */)
-                if (c == '/' && i + 1 < sql.Length && sql[i + 1] == '*')
-                {
-                    i += 2;
-                    while (i < sql.Length - 1 && !(sql[i] == '*' && sql[i + 1] == '/')) i++;
-                    i += 2;
-                    continue;
-                }
-                if (c == ';')
+
+                if (sql[i] == ';')
                     positions.Add(i);
                 i++;
             }
@@ -516,7 +552,7 @@ namespace nORM.Core
             // Extract string literals (content between quotes)
             var literals = new List<string>();
             var inString = false;
-            var currentLiteral = new System.Text.StringBuilder();
+            var currentLiteral = new StringBuilder();
 
             for (int i = 0; i < wherePart.Length; i++)
             {
@@ -547,12 +583,14 @@ namespace nORM.Core
                     return true;
 
                 // Suspicious: very long strings (likely user input, not constants)
-                if (literal.Length > 50)
+                const int MaxSafeLiteralLength = 50;
+                if (literal.Length > MaxSafeLiteralLength)
                     return true;
 
                 // Suspicious: mix of special characters suggesting user input
+                const int MaxSpecialCharCount = 3;
                 var specialCharCount = literal.Count(c => !char.IsLetterOrDigit(c) && c != ' ' && c != '_' && c != '-');
-                if (specialCharCount > 3)
+                if (specialCharCount > MaxSpecialCharCount)
                     return true;
             }
 
@@ -578,7 +616,7 @@ namespace nORM.Core
             if (string.IsNullOrEmpty(sql))
                 return string.Empty;
 
-            var sb = new System.Text.StringBuilder(sql.Length);
+            var sb = new StringBuilder(sql.Length);
             int i = 0;
             int len = sql.Length;
             // Tracks whether the last character appended to sb was a space,
@@ -589,6 +627,12 @@ namespace nORM.Core
             while (i < len)
             {
                 // Block comment removal (supports nesting).
+                // NOTE: Nested block comments (/* outer /* inner */ still in outer */)
+                // are a PostgreSQL-specific extension. Standard SQL and most other
+                // databases (SQL Server, MySQL, SQLite) treat the first */ as closing
+                // the entire comment. We handle nesting here defensively so that
+                // PostgreSQL-targeted SQL is normalized correctly; for other providers
+                // the depth counter simply never exceeds 1.
                 // Comments are removed WITHOUT inserting a space so that tokens
                 // immediately adjacent to a comment are concatenated:
                 //   DR/**/OP  → DROP   (rejected as DDL)
@@ -712,20 +756,18 @@ namespace nORM.Core
                     return IsSelectStatement(normalized);
                 }
 
-                var allowed = new HashSet<Type> { typeof(SelectStatement), typeof(SetVariableStatement) };
-
                 if (fragment is TSqlScript script)
                 {
                     foreach (var batch in script.Batches)
                         foreach (var statement in batch.Statements)
-                            if (!allowed.Contains(statement.GetType()))
+                            if (!AllowedTSqlStatementTypes.Contains(statement.GetType()))
                                 return false;
                     return true;
                 }
 
                 return false;
             }
-            catch (System.IO.FileNotFoundException)
+            catch (FileNotFoundException)
             {
                 // Microsoft.SqlServer.TransactSql.ScriptDom is not available.
                 // Fall back to the keyword denylist + SELECT-only structural gate.
@@ -851,7 +893,7 @@ namespace nORM.Core
         /// <summary>
         /// Returns true if the normalized SQL contains the given keyword as a whole token
         /// (i.e., surrounded by spaces, start-of-string, or end-of-string).
-        /// This prevents false positives like "reindex" matching "index".
+        /// This prevents false positives like "updated" matching "update" or "executor" matching "exec".
         /// </summary>
         private static bool ContainsDeniedKeyword(string normalizedSql, string keyword)
         {
@@ -861,11 +903,13 @@ namespace nORM.Core
                 idx = normalizedSql.IndexOf(keyword, idx, StringComparison.Ordinal);
                 if (idx < 0) return false;
 
-                // Check character before the keyword (must be start-of-string or space)
-                bool beforeOk = idx == 0 || normalizedSql[idx - 1] == ' ';
-                // Check character after the keyword (must be end-of-string or space)
+                // Check character before the keyword (must be start-of-string or a SQL word boundary).
+                // Alphanumerics, underscores, and quotes are "word" chars — quotes prevent matching
+                // keywords inside string literals (e.g. 'DROP' should NOT trigger the denylist).
+                bool beforeOk = idx == 0 || IsWordBoundary(normalizedSql[idx - 1]);
+                // Check character after the keyword (must be end-of-string or a SQL word boundary)
                 int afterIdx = idx + keyword.Length;
-                bool afterOk = afterIdx >= normalizedSql.Length || normalizedSql[afterIdx] == ' ';
+                bool afterOk = afterIdx >= normalizedSql.Length || IsWordBoundary(normalizedSql[afterIdx]);
 
                 if (beforeOk && afterOk)
                     return true;
@@ -874,7 +918,22 @@ namespace nORM.Core
             }
         }
 
-        private static readonly HashSet<char> AllowedLikeEscapeChars = new("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,-./:;<=>?@[]^_{|}~\\");
+        /// <summary>
+        /// Returns true if the character is a SQL word boundary (i.e. NOT part of an identifier or string literal).
+        /// Alphanumerics and underscores are SQL identifier characters; quotes indicate string literal context.
+        /// Everything else (spaces, semicolons, parentheses, etc.) is a valid word boundary.
+        /// </summary>
+        private static bool IsWordBoundary(char c)
+        {
+            return !char.IsLetterOrDigit(c) && c != '_' && c != '\'' && c != '"';
+        }
+
+        /// <summary>
+        /// Characters permitted for use as an SQL LIKE escape character.
+        /// Excludes SQL-dangerous characters (semicolons, quotes, null) which are
+        /// also rejected by the explicit guard in <see cref="ValidateLikeEscapeChar"/>.
+        /// </summary>
+        private static readonly HashSet<char> AllowedLikeEscapeChars = new("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,-./:<=>?@[]^_{|}~\\");
 
         /// <summary>
         /// Validates that the given character is permitted for use as an SQL LIKE escape character.
@@ -910,8 +969,11 @@ namespace nORM.Core
             if (string.IsNullOrWhiteSpace(connectionString))
                 throw new ArgumentException("Connection string cannot be null or empty");
 
-            if (connectionString.Length > 8192)
-                throw new ArgumentException("Connection string exceeds maximum length");
+            if (connectionString.Length > MaxConnectionStringLength)
+                throw new ArgumentException($"Connection string exceeds maximum length of {MaxConnectionStringLength}");
+
+            if (string.IsNullOrWhiteSpace(provider))
+                throw new ArgumentException("Provider name cannot be null or empty", nameof(provider));
 
             try
             {
@@ -927,7 +989,13 @@ namespace nORM.Core
                         break;
                 }
             }
-            catch (Exception ex)
+            catch (ArgumentException)
+            {
+                // Re-throw ArgumentException directly to avoid double-wrapping
+                // (the inner validation methods already throw ArgumentException).
+                throw;
+            }
+            catch (DbException ex)
             {
                 var safeConnStr = MaskSensitiveConnectionStringData(connectionString);
                 throw new ArgumentException($"Invalid connection string format: {safeConnStr}", ex);
@@ -940,29 +1008,21 @@ namespace nORM.Core
             try
             {
                 builder.ConnectionString = connectionString;
-                if (builder.ContainsKey("Password")) builder["Password"] = "***";
-                if (builder.ContainsKey("Pwd")) builder["Pwd"] = "***";
-                if (builder.ContainsKey("User Password")) builder["User Password"] = "***";
-                // Mask additional sensitive parameters: API keys, tokens, and secrets
-                // in extended connection string properties can leak in logs.
-                if (builder.ContainsKey("API Key")) builder["API Key"] = "***";
-                if (builder.ContainsKey("ApiKey")) builder["ApiKey"] = "***";
-                if (builder.ContainsKey("Token")) builder["Token"] = "***";
-                if (builder.ContainsKey("AccessToken")) builder["AccessToken"] = "***";
-                if (builder.ContainsKey("Access Token")) builder["Access Token"] = "***";
-                if (builder.ContainsKey("Secret")) builder["Secret"] = "***";
-                if (builder.ContainsKey("SecretKey")) builder["SecretKey"] = "***";
-                if (builder.ContainsKey("Secret Key")) builder["Secret Key"] = "***";
-                if (builder.ContainsKey("AccessKey")) builder["AccessKey"] = "***";
-                if (builder.ContainsKey("Access Key")) builder["Access Key"] = "***";
-                if (builder.ContainsKey("PrivateKey")) builder["PrivateKey"] = "***";
-                if (builder.ContainsKey("Private Key")) builder["Private Key"] = "***";
-                if (builder.ContainsKey("ClientSecret")) builder["ClientSecret"] = "***";
-                if (builder.ContainsKey("Client Secret")) builder["Client Secret"] = "***";
+                foreach (var key in SensitiveConnectionStringKeys)
+                {
+                    if (builder.ContainsKey(key))
+                        builder[key] = MaskedValue;
+                }
                 return builder.ConnectionString;
             }
-            catch
+            catch (ArgumentException)
             {
+                // Connection string is malformed and cannot be parsed
+                return "[INVALID_CONNECTION_STRING]";
+            }
+            catch (FormatException)
+            {
+                // Connection string has invalid format
                 return "[INVALID_CONNECTION_STRING]";
             }
         }
@@ -974,9 +1034,9 @@ namespace nORM.Core
 
             if (builder.TryGetValue("Connection Timeout", out var timeoutObj) &&
                 int.TryParse(timeoutObj?.ToString(), out var timeout) &&
-                (timeout < 0 || timeout > 300))
+                (timeout < 0 || timeout > MaxConnectionTimeoutSeconds))
             {
-                throw new ArgumentException("Connection Timeout must be between 0 and 300 seconds");
+                throw new ArgumentException($"Connection Timeout must be between 0 and {MaxConnectionTimeoutSeconds} seconds");
             }
         }
 
@@ -1004,8 +1064,19 @@ namespace nORM.Core
                 var directory = Path.GetDirectoryName(fullPath);
                 return Directory.Exists(directory) || Directory.Exists(Path.GetDirectoryName(directory));
             }
-            catch
+            catch (ArgumentException)
             {
+                // Path contains invalid characters
+                return false;
+            }
+            catch (NotSupportedException)
+            {
+                // Path contains a colon in an invalid position (Windows)
+                return false;
+            }
+            catch (PathTooLongException)
+            {
+                // Path exceeds system maximum length
                 return false;
             }
         }

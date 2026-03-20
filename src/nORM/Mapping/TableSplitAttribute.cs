@@ -19,7 +19,7 @@ namespace nORM.Mapping
         /// <param name="principalType">Type of the principal entity.</param>
         public TableSplitAttribute(Type principalType)
         {
-            PrincipalType = principalType;
+            PrincipalType = principalType ?? throw new ArgumentNullException(nameof(principalType));
         }
     }
 }

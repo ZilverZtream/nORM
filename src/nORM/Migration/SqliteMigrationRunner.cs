@@ -26,7 +26,11 @@ namespace nORM.Migration
         private DbContext? _context;
         private readonly ILogger? _logger;
         private const string HistoryTableName = "__NormMigrationsHistory";
-        private bool _disposed = false;
+
+        /// <summary>SQLite error code 1 (SQLITE_ERROR): generic schema error including "no such table".</summary>
+        private const int SqliteErrorGeneric = 1;
+
+        private volatile bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SqliteMigrationRunner"/> class.
@@ -37,8 +41,8 @@ namespace nORM.Migration
         /// <param name="logger">Optional logger for drift warnings and diagnostics.</param>
         public SqliteMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null, ILogger? logger = null)
         {
-            _connection = connection;
-            _migrationsAssembly = migrationsAssembly;
+            _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            _migrationsAssembly = migrationsAssembly ?? throw new ArgumentNullException(nameof(migrationsAssembly));
             _logger = logger;
             if (options != null && options.CommandInterceptors.Count > 0)
             {
@@ -59,6 +63,7 @@ namespace nORM.Migration
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             // Ensure the connection is open before calling BeginTransactionAsync.
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
@@ -74,7 +79,7 @@ namespace nORM.Migration
             // window: a second runner that was blocked on the lock will re-check here
             // and find no pending migrations after the first runner commits.
             var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-            if (!pending.Any())
+            if (pending.Count == 0)
             {
                 // Nothing to do; commit to release the exclusive lock.
                 await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
@@ -101,11 +106,12 @@ namespace nORM.Migration
         /// <returns><c>true</c> if migrations are pending; otherwise, <c>false</c>.</returns>
         public async Task<bool> HasPendingMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
             var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-            return pending.Any();
+            return pending.Count > 0;
         }
 
         /// <summary>
@@ -116,6 +122,7 @@ namespace nORM.Migration
         /// <returns>An array of pending migration identifiers.</returns>
         public async Task<string[]> GetPendingMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
@@ -133,7 +140,7 @@ namespace nORM.Migration
         {
             var all = _migrationsAssembly.GetTypes()
                 .Where(t => typeof(Migration).IsAssignableFrom(t) && !t.IsAbstract)
-                .Select(t => (Migration)Activator.CreateInstance(t)!)
+                .Select(t => (Migration)(Activator.CreateInstance(t) ?? throw new InvalidOperationException($"Failed to create instance of migration type {t.FullName}")))
                 .OrderBy(m => m.Version)
                 .ToList();
 
@@ -180,10 +187,11 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// Retrieves the set of migration versions that have already been applied to the database.
+        /// Retrieves the dictionary of migration versions and names that have already been applied
+        /// to the database.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
-        /// <returns>A set containing the version numbers of applied migrations.</returns>
+        /// <returns>A dictionary mapping version numbers to migration names.</returns>
         private async Task<Dictionary<long, string>> GetAppliedMigrationsAsync(CancellationToken ct)
         {
             var applied = new Dictionary<long, string>();
@@ -199,7 +207,7 @@ namespace nORM.Migration
             }
             catch (DbException ex) when (IsTableNotFoundError(ex))
             {
-                // MG-1: History table doesn't exist yet (first run) — return empty dict.
+                // History table doesn't exist yet (first run) — return empty dict.
                 // All other DbException (transient failures, permission errors, etc.) propagate.
             }
             return applied;
@@ -218,7 +226,7 @@ namespace nORM.Migration
         private static bool IsTableNotFoundError(DbException ex)
         {
             if (ex is Microsoft.Data.Sqlite.SqliteException sqliteEx)
-                return sqliteEx.SqliteErrorCode == 1 &&
+                return sqliteEx.SqliteErrorCode == SqliteErrorGeneric &&
                        ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
             // Fallback for other providers / future portability.
             return ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
@@ -260,6 +268,15 @@ namespace nORM.Migration
                 : cmd.ExecuteReaderAsync(ct);
 
         /// <summary>
+        /// Throws <see cref="ObjectDisposedException"/> if this runner has been disposed.
+        /// </summary>
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(SqliteMigrationRunner));
+        }
+
+        /// <summary>
         /// Asynchronously disposes the internal <see cref="DbContext"/> created for interceptors.
         /// </summary>
         public async ValueTask DisposeAsync()
@@ -273,6 +290,7 @@ namespace nORM.Migration
                     _context = null;
                 }
             }
+            GC.SuppressFinalize(this);
         }
 
         /// <summary>
@@ -289,6 +307,7 @@ namespace nORM.Migration
                     _context = null;
                 }
             }
+            GC.SuppressFinalize(this);
         }
     }
 }

@@ -29,7 +29,17 @@ namespace nORM.Migration
         // Stable int8 key used for pg_advisory_lock. Derived from FNV-1a of "__NormMigrationsLock"
         // so it is consistent across deployments and does not collide with application-defined lock keys.
         internal const long MigrationLockKey = unchecked((long)0x62C3B8F921A4D507L);
-        private bool _disposed = false;
+
+        /// <summary>PostgreSQL SqlState 42P01: undefined_table (table does not exist).</summary>
+        private const string PgSqlStateUndefinedTable = "42P01";
+
+        /// <summary>Default timeout for advisory lock acquisition retry loop.</summary>
+        private static readonly TimeSpan DefaultLockTimeout = TimeSpan.FromSeconds(30);
+
+        /// <summary>Delay between advisory lock acquisition retries, in milliseconds.</summary>
+        private const int LockRetryDelayMs = 250;
+
+        private volatile bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PostgresMigrationRunner"/> class.
@@ -40,8 +50,8 @@ namespace nORM.Migration
         /// <param name="logger">Optional logger for drift warnings and diagnostics.</param>
         public PostgresMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null, ILogger? logger = null)
         {
-            _connection = connection;
-            _migrationsAssembly = migrationsAssembly;
+            _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            _migrationsAssembly = migrationsAssembly ?? throw new ArgumentNullException(nameof(migrationsAssembly));
             _logger = logger;
             if (options != null && options.CommandInterceptors.Count > 0)
             {
@@ -53,12 +63,13 @@ namespace nORM.Migration
 
         /// <summary>
         /// Applies all pending migrations to the PostgreSQL database.
-        /// Acquires a session-level advisory lock (<c>pg_advisory_lock</c>) before reading the pending list,
-        /// preventing concurrent deployers from running the same DDL simultaneously.
+        /// Acquires a session-level advisory lock (<c>pg_try_advisory_lock</c>) before reading the
+        /// pending list, preventing concurrent deployers from running the same DDL simultaneously.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             // Ensure the connection is open before calling BeginTransactionAsync.
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
@@ -68,7 +79,7 @@ namespace nORM.Migration
             {
                 await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
                 var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-                if (!pending.Any()) return;
+                if (pending.Count == 0) return;
 
                 await using var transaction = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
                 foreach (var migration in pending)
@@ -89,18 +100,19 @@ namespace nORM.Migration
         /// Acquires a PostgreSQL session-level advisory lock using <c>pg_try_advisory_lock(bigint)</c>
         /// in a polling loop with bounded timeout.
         /// <para>
-        /// M1 fix: Replaced unbounded <c>pg_advisory_lock</c> with <c>pg_try_advisory_lock</c> + retry
-        /// loop to prevent indefinite blocking when a stale session holds the lock. The default timeout
-        /// (30 seconds) matches the operational expectations of automated deploys. MySQL and SQL Server
-        /// runners already have bounded lock acquisition; this brings PostgreSQL to parity.
+        /// Uses <c>pg_try_advisory_lock</c> (non-blocking) with a retry loop instead of the blocking
+        /// <c>pg_advisory_lock</c> to prevent indefinite blocking when a stale session holds the lock.
+        /// The default timeout (30 seconds) matches the operational expectations of automated deploys.
+        /// MySQL and SQL Server runners already have bounded lock acquisition; this brings PostgreSQL
+        /// to parity.
         /// </para>
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         /// <param name="timeout">Maximum time to wait for the lock. Defaults to 30 seconds.</param>
         internal async Task AcquireAdvisoryLockAsync(CancellationToken ct, TimeSpan? timeout = null)
         {
-            var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
-            const int retryDelayMs = 250;
+            var effectiveTimeout = timeout ?? DefaultLockTimeout;
+            var deadline = DateTime.UtcNow + effectiveTimeout;
 
             while (true)
             {
@@ -120,26 +132,28 @@ namespace nORM.Migration
                 if (DateTime.UtcNow >= deadline)
                     throw new TimeoutException(
                         $"Failed to acquire PostgreSQL migration advisory lock (key={MigrationLockKey}) " +
-                        $"within {(timeout ?? TimeSpan.FromSeconds(30)).TotalSeconds} seconds. " +
+                        $"within {effectiveTimeout.TotalSeconds} seconds. " +
                         "Another migration runner or stale session may be holding the lock.");
 
-                await Task.Delay(retryDelayMs, ct).ConfigureAwait(false);
+                await Task.Delay(LockRetryDelayMs, ct).ConfigureAwait(false);
             }
         }
 
         /// <summary>
         /// Releases the PostgreSQL session-level advisory lock acquired by
         /// <see cref="AcquireAdvisoryLockAsync"/>.
+        /// Uses <c>ExecuteScalarAsync</c> because <c>pg_advisory_unlock</c> returns a boolean result.
         /// </summary>
         internal async Task ReleaseAdvisoryLockAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
             cmd.CommandText = $"SELECT pg_advisory_unlock({MigrationLockKey})";
-            try { await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false); }
-            catch (Exception ex)
+            try { await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false); }
+            catch (DbException ex)
             {
-                // M1: Best-effort release; surface failure for diagnostics rather than silently swallowing.
+                // Best-effort release; surface failure for diagnostics rather than silently swallowing.
                 // Do not propagate — throwing from a finally block would mask the original exception.
+                // Narrowed to DbException so that fatal CLR errors (OutOfMemoryException etc.) propagate.
                 _logger?.LogWarning(
                     "nORM: PostgreSQL migration advisory-lock release failed: {Message}. " +
                     "A stale pg_advisory_lock entry may block future migrations until the session resets.",
@@ -154,11 +168,12 @@ namespace nORM.Migration
         /// <returns><c>true</c> if pending migrations exist; otherwise <c>false</c>.</returns>
         public async Task<bool> HasPendingMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
             var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-            return pending.Any();
+            return pending.Count > 0;
         }
 
         /// <summary>
@@ -168,6 +183,7 @@ namespace nORM.Migration
         /// <returns>An array containing the pending migration identifiers.</returns>
         public async Task<string[]> GetPendingMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
@@ -185,7 +201,7 @@ namespace nORM.Migration
         {
             var all = _migrationsAssembly.GetTypes()
                 .Where(t => typeof(Migration).IsAssignableFrom(t) && !t.IsAbstract)
-                .Select(t => (Migration)Activator.CreateInstance(t)!)
+                .Select(t => (Migration)(Activator.CreateInstance(t) ?? throw new InvalidOperationException($"Failed to create instance of migration type {t.FullName}")))
                 .OrderBy(m => m.Version)
                 .ToList();
 
@@ -232,10 +248,11 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// Retrieves the set of migration versions that have already been applied to the database.
+        /// Retrieves the dictionary of migration versions and names that have already been applied
+        /// to the database.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
-        /// <returns>A set containing the version numbers of applied migrations.</returns>
+        /// <returns>A dictionary mapping version numbers to migration names.</returns>
         private async Task<Dictionary<long, string>> GetAppliedMigrationsAsync(CancellationToken ct)
         {
             var applied = new Dictionary<long, string>();
@@ -251,14 +268,14 @@ namespace nORM.Migration
             }
             catch (DbException ex) when (IsTableNotFoundError(ex))
             {
-                // MG-1: History table doesn't exist yet (first run) — return empty dict.
+                // History table doesn't exist yet (first run) — return empty dict.
                 // All other DbException (transient failures, permission errors, etc.) propagate.
             }
             return applied;
         }
 
         /// <summary>
-        /// MG-1: Returns true only when the exception indicates the history table does not exist yet.
+        /// Returns true only when the exception indicates the history table does not exist yet.
         /// PostgreSQL SqlState 42P01 = "undefined_table".
         /// Transient errors (connection drops, permission failures, deadlocks) are NOT matched and
         /// will propagate to the caller.
@@ -268,7 +285,7 @@ namespace nORM.Migration
             // Check SqlState when the exception exposes it (Npgsql.PostgresException)
             var sqlStateProp = ex.GetType().GetProperty("SqlState");
             if (sqlStateProp != null && sqlStateProp.GetValue(ex) is string sqlState
-                && string.Equals(sqlState, "42P01", StringComparison.Ordinal))
+                && string.Equals(sqlState, PgSqlStateUndefinedTable, StringComparison.Ordinal))
                 return true;
             // Fallback: check the message text for common patterns
             return ex.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase)
@@ -304,6 +321,15 @@ namespace nORM.Migration
         private Task<DbDataReader> ExecuteReaderAsync(DbCommand cmd, CancellationToken ct)
             => _context != null ? cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct) : cmd.ExecuteReaderAsync(ct);
 
+        /// <summary>
+        /// Throws <see cref="ObjectDisposedException"/> if this runner has been disposed.
+        /// </summary>
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(PostgresMigrationRunner));
+        }
+
         /// <summary>Asynchronously disposes the internal <see cref="DbContext"/> created for interceptors.</summary>
         public async ValueTask DisposeAsync()
         {
@@ -316,6 +342,7 @@ namespace nORM.Migration
                     _context = null;
                 }
             }
+            GC.SuppressFinalize(this);
         }
 
         /// <summary>Synchronously disposes the internal <see cref="DbContext"/> created for interceptors.</summary>
@@ -330,6 +357,7 @@ namespace nORM.Migration
                     _context = null;
                 }
             }
+            GC.SuppressFinalize(this);
         }
 
         private sealed class GenericParameterFactory : IDbParameterFactory

@@ -83,6 +83,9 @@ namespace nORM.Query
             return this;
         }
 
+        /// <summary>
+        /// Appends the decimal representation of an integer using stack-allocated formatting.
+        /// </summary>
         public OptimizedSqlBuilder Append(int value)
         {
             Span<char> buf = stackalloc char[11]; // max int digits + sign

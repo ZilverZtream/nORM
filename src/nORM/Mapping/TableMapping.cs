@@ -265,6 +265,9 @@ namespace nORM.Mapping
         /// <param name="value">The key value produced by the database.</param>
         public void SetPrimaryKey(object entity, object value)
         {
+            if (entity is null) throw new ArgumentNullException(nameof(entity));
+            if (value is null) throw new ArgumentNullException(nameof(value));
+
             var keyCol = KeyColumns.FirstOrDefault(k => k.IsDbGenerated);
             if (keyCol != null)
             {

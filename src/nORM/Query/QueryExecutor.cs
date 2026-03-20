@@ -30,15 +30,41 @@ namespace nORM.Query
         private readonly NormExceptionHandler _exceptionHandler;
         private readonly ILogger<QueryExecutor> _logger;
 
+        /// <summary>
+        /// Default initial capacity for result lists when no Take hint is available.
+        /// Avoids resize for most small result sets without over-allocating.
+        /// </summary>
+        internal const int DefaultListCapacity = 16;
+
+        /// <summary>
+        /// Number of parameter slots reserved for framework use (tenant filters, OCC tokens, etc.)
+        /// when computing maximum batch size for dependent query IN clauses.
+        /// Aligned with <see cref="Providers.DatabaseProvider"/> ParameterReserve.
+        /// </summary>
+        private const int DependentQueryParameterReserve = 100;
+
         // Cached list factory delegates to avoid Activator.CreateInstance on every materialization.
         // Take values are now passed directly from the query plan rather than parsed via regex.
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Func<int, IList>> _listFactoryCache = new();
 
         /// <summary>
-        /// Singleton MaterializerFactory — wraps only static caches, no instance state.
+        /// Singleton MaterializerFactory -- wraps only static caches, no instance state.
         /// Eliminates heap allocation per dependent/group-join query.
         /// </summary>
         private static readonly MaterializerFactory _sharedMaterializerFactory = new();
+
+        /// <summary>
+        /// Pre-compiled regex for redacting single-quoted and N-prefixed string literals from SQL.
+        /// Covers ANSI SQL <c>'...'</c>, SQL Server <c>N'...'</c>, and escaped <c>''</c> pairs.
+        /// Static compilation avoids re-parsing the pattern on every log call.
+        /// </summary>
+        private static readonly Regex SingleQuoteLiteralRegex = new(@"N?'(?:[^']|'')*'", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Pre-compiled regex for redacting PostgreSQL dollar-quoted string literals from SQL.
+        /// Handles both bare <c>$$...$$</c> and tagged <c>$tag$...$tag$</c> forms via backreference.
+        /// </summary>
+        private static readonly Regex DollarQuoteLiteralRegex = new(@"\$(\w*)\$.*?\$\1\$", RegexOptions.Compiled | RegexOptions.Singleline);
 
         public QueryExecutor(DbContext ctx, IncludeProcessor includeProcessor, ILogger<QueryExecutor>? logger = null)
         {
@@ -62,11 +88,10 @@ namespace nORM.Query
         {
             if (string.IsNullOrEmpty(sql)) return sql;
             // N'...' (SQL Server national strings) and '...' (ANSI SQL, including escaped '' pairs).
-            var step1 = Regex.Replace(sql, @"N?'(?:[^']|'')*'", "'[redacted]'");
-            // S1 fix: $(\w*)$...$\1$ covers both bare $$...$$ (empty tag captured by \w*) and
+            var step1 = SingleQuoteLiteralRegex.Replace(sql, "'[redacted]'");
+            // Dollar-quote redaction covers both bare $$...$$ (empty tag captured by \w*) and
             // named tags ($func$...$func$, $body$...$body$, etc.) via the backreference \1.
-            // Without this fix a tagged literal like $secret$val$secret$ leaked to log sinks.
-            return Regex.Replace(step1, @"\$(\w*)\$.*?\$\1\$", "'[redacted]'", RegexOptions.Singleline);
+            return DollarQuoteLiteralRegex.Replace(step1, "'[redacted]'");
         }
 
         /// <summary>
@@ -76,7 +101,7 @@ namespace nORM.Query
         /// <param name="elementType">The element type for the list.</param>
         /// <param name="capacity">The initial capacity.</param>
         /// <returns>A new list instance.</returns>
-        /// <summary>Public-facing wrapper for use by NormQueryProvider's pooled command path.</summary>
+        /// <remarks>Internal wrapper exposed for use by NormQueryProvider's pooled command path.</remarks>
         internal IList CreateListForType(Type elementType, int capacity) => CreateList(elementType, capacity);
 
         private static IList CreateList(Type elementType, int capacity)
@@ -98,22 +123,19 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// Executes the supplied command and materializes the result set into a list of entities.
+        /// Materializes directly into <c>List&lt;object&gt;</c> to avoid covariant copy
+        /// when the caller needs <c>List&lt;object&gt;</c> but the plan's ElementType is a concrete type.
         /// </summary>
         /// <param name="plan">Query plan describing how to materialize results.</param>
         /// <param name="cmd">Prepared database command.</param>
         /// <param name="ct">Token used to cancel the operation.</param>
         /// <returns>A list containing the materialized entities.</returns>
-        /// <summary>
-        /// Overload that materializes directly into List&lt;object&gt; to avoid covariant copy
-        /// when the caller needs List&lt;object&gt; but the plan's ElementType is a concrete type.
-        /// </summary>
         public async Task<List<object>> MaterializeAsObjectListAsync(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
             await using var command = cmd;
             try
             {
-                var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
+                var capacity = plan.SingleResult ? 1 : Math.Max(1, plan.Take ?? DefaultListCapacity);
                 var list = new List<object>(capacity);
 
                 var trackable = !plan.NoTracking &&
@@ -176,11 +198,8 @@ namespace nORM.Query
                 if (plan.GroupJoinInfo != null)
                     return await MaterializeGroupJoinAsync(plan, command, ct).ConfigureAwait(false);
 
-                // PERFORMANCE OPTIMIZATION 15: Improved list capacity pre-sizing
-                // - SingleResult: capacity = 1
-                // - Take specified: use Take value
-                // - No Take: use heuristic (16 is typical small result set, avoids resize for most queries)
-                var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
+                // List capacity pre-sizing: SingleResult=1, Take=Take value, else DefaultListCapacity heuristic.
+                var capacity = plan.SingleResult ? 1 : Math.Max(1, plan.Take ?? DefaultListCapacity);
                 var list = CreateList(plan.ElementType, capacity);
 
                 var trackable = !plan.NoTracking &&
@@ -280,8 +299,8 @@ namespace nORM.Query
                 if (plan.GroupJoinInfo != null)
                     return MaterializeGroupJoin(plan, command);
 
-                // PERFORMANCE OPTIMIZATION 15: Improved list capacity pre-sizing
-                var capacity = plan.SingleResult ? 1 : (plan.Take ?? 16);
+                // List capacity pre-sizing: SingleResult=1, Take=Take value, else DefaultListCapacity heuristic.
+                var capacity = plan.SingleResult ? 1 : Math.Max(1, plan.Take ?? DefaultListCapacity);
                 var list = CreateList(plan.ElementType, capacity);
 
                 var trackable = !plan.NoTracking &&
@@ -414,7 +433,7 @@ namespace nORM.Query
             return await _exceptionHandler.ExecuteWithExceptionHandling(async () =>
             {
                 // Use cached list factory instead of Activator.CreateInstance.
-                var resultList = CreateList(info.ResultType, 16);
+                var resultList = CreateList(info.ResultType, DefaultListCapacity);
 
                 var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
                 var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith("<>") && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
@@ -423,7 +442,11 @@ namespace nORM.Query
                 var innerMap = _ctx.GetMapping(info.InnerType);
 
                 var outerColumnCount = outerMap.Columns.Length;
-                var innerKeyIndex = outerColumnCount + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
+                var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
+                if (innerKeyOffset < 0)
+                    throw new InvalidOperationException(
+                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
+                var innerKeyIndex = outerColumnCount + innerKeyOffset;
 
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
                     .ConfigureAwait(false);
@@ -432,9 +455,12 @@ namespace nORM.Query
                 object? currentKey = null;
                 List<object> currentChildren = [];
 
+                // Use sync materializer to avoid per-row Task allocation, consistent with MaterializeAsync.
+                var syncMaterializer = plan.SyncMaterializer;
+
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
-                    var outer = await plan.Materializer(reader, ct).ConfigureAwait(false);
+                    var outer = syncMaterializer(reader);
                     var key = info.OuterKeySelector(outer) ?? DBNull.Value;
 
                     if (currentOuter == null || !Equals(currentKey, key))
@@ -442,7 +468,7 @@ namespace nORM.Query
                         if (currentOuter != null)
                         {
                             var list = CreateListFromItems(info.InnerType, currentChildren);
-                            // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
+                            // ResultSelector expects IEnumerable<object>; .Cast<object>() provides the typed wrapper.
                             var result = info.ResultSelector(currentOuter, list.Cast<object>());
                             resultList.Add(result);
                             currentChildren = [];
@@ -489,13 +515,13 @@ namespace nORM.Query
                 if (currentOuter != null)
                 {
                     var list = CreateListFromItems(info.InnerType, currentChildren);
-                    // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
+                    // ResultSelector expects IEnumerable<object>; .Cast<object>() provides the typed wrapper.
                     var result = info.ResultSelector(currentOuter, list.Cast<object>());
                     resultList.Add(result);
                 }
 
                 return resultList;
-            }, "MaterializeGroupJoinAsync", new Dictionary<string, object> { ["Sql"] = cmd.CommandText }).ConfigureAwait(false);
+            }, "MaterializeGroupJoinAsync", new Dictionary<string, object> { ["Sql"] = RedactSqlForLogging(cmd.CommandText) }).ConfigureAwait(false);
 
             static object MaterializeEntity(DbDataReader reader, TableMapping map, int offset, CancellationToken ct)
             {
@@ -545,7 +571,7 @@ namespace nORM.Query
             // genuine synchronous delegate — no async state machine involved.
             return _exceptionHandler.ExecuteWithExceptionHandlingSync(() =>
             {
-                var resultList = CreateList(info.ResultType, 16);
+                var resultList = CreateList(info.ResultType, DefaultListCapacity);
 
                 var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
                 var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith("<>") && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
@@ -554,7 +580,11 @@ namespace nORM.Query
                 var innerMap = _ctx.GetMapping(info.InnerType);
 
                 var outerColumnCount = outerMap.Columns.Length;
-                var innerKeyIndex = outerColumnCount + Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
+                var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
+                if (innerKeyOffset < 0)
+                    throw new InvalidOperationException(
+                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
+                var innerKeyIndex = outerColumnCount + innerKeyOffset;
 
                 using var reader = cmd.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
 
@@ -573,7 +603,7 @@ namespace nORM.Query
                         if (currentOuter != null)
                         {
                             var list = CreateListFromItems(info.InnerType, currentChildren);
-                            // PERFORMANCE: Pass list directly instead of .Cast<object>() which creates unnecessary enumerator
+                            // ResultSelector expects IEnumerable<object>; .Cast<object>() provides the typed wrapper.
                             var result = info.ResultSelector(currentOuter, list.Cast<object>());
                             resultList.Add(result);
                             currentChildren = [];
@@ -624,7 +654,7 @@ namespace nORM.Query
                 }
 
                 return resultList;
-            }, "MaterializeGroupJoin", new Dictionary<string, object> { ["Sql"] = cmd.CommandText });
+            }, "MaterializeGroupJoin", new Dictionary<string, object> { ["Sql"] = RedactSqlForLogging(cmd.CommandText) });
 
             // SYNC-OVER-ASYNC FIX: MaterializeEntity now uses only synchronous ADO.NET.
             // CompiledMaterializerStore materializers are registered as Func<DbDataReader, object>
@@ -695,11 +725,9 @@ namespace nORM.Query
                     continue;
                 }
 
-                // Phase 2: Fetch children in batches (to handle SQL parameter limits)
-                // HARDCODED LIMIT FIX: Use provider's MaxParameters instead of hardcoding 2000
-                // Different databases have different limits: SQL Server=2100, Oracle=1000, PostgreSQL=65535
-                // Reserve 100 params for other query parts (WHERE, joins, etc.)
-                var maxBatchSize = Math.Max(100, _ctx.Provider.MaxParameters - 100);
+                // Phase 2: Fetch children in batches (to handle SQL parameter limits).
+                // Uses provider's MaxParameters minus DependentQueryParameterReserve for overhead.
+                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.Provider.MaxParameters - DependentQueryParameterReserve);
                 var allChildren = new List<object>();
 
                 var parentIdList = parentIds.ToList();
@@ -707,7 +735,8 @@ namespace nORM.Query
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    var batchIds = parentIdList.Skip(i).Take(maxBatchSize).ToList();
+                    var batchCount = Math.Min(maxBatchSize, parentIdList.Count - i);
+                    var batchIds = parentIdList.GetRange(i, batchCount);
                     var batchChildren = await FetchChildrenBatchAsync(depQuery, batchIds, noTracking, ct).ConfigureAwait(false);
                     allChildren.AddRange(batchChildren);
                 }
@@ -746,13 +775,14 @@ namespace nORM.Query
                     continue;
                 }
 
-                var maxBatchSize = Math.Max(100, _ctx.Provider.MaxParameters - 100);
+                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.Provider.MaxParameters - DependentQueryParameterReserve);
                 var allChildren = new List<object>();
 
                 var parentIdList = parentIds.ToList();
                 for (int i = 0; i < parentIdList.Count; i += maxBatchSize)
                 {
-                    var batchIds = parentIdList.Skip(i).Take(maxBatchSize).ToList();
+                    var batchCount = Math.Min(maxBatchSize, parentIdList.Count - i);
+                    var batchIds = parentIdList.GetRange(i, batchCount);
                     var batchChildren = FetchChildrenBatch(depQuery, batchIds, noTracking);
                     allChildren.AddRange(batchChildren);
                 }
@@ -856,15 +886,15 @@ namespace nORM.Query
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(
                 _ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
 
-            // Materialize children
-            var materializer = _sharedMaterializerFactory.CreateMaterializer(
+            // Use sync materializer to avoid per-row Task allocation, consistent with MaterializeAsync.
+            var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(
                 depQuery.TargetMapping,
                 depQuery.CollectionElementType);
 
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
                 ct.ThrowIfCancellationRequested();
-                var child = await materializer(reader, ct).ConfigureAwait(false);
+                var child = syncMaterializer(reader);
 
                 if (!noTracking)
                 {

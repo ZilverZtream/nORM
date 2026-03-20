@@ -27,7 +27,14 @@ namespace nORM.Migration
         private const string HistoryTableName = "__NormMigrationsHistory";
         internal const string MigrationLockName = "__NormMigrationsLock";
         internal const int MigrationLockTimeoutSeconds = 30;
-        private bool _disposed = false;
+
+        /// <summary>MySQL error 1146: Table doesn't exist.</summary>
+        private const int MySqlErrorTableNotFound = 1146;
+
+        /// <summary>MySQL error 1060: Duplicate column name.</summary>
+        private const int MySqlErrorDuplicateColumn = 1060;
+
+        private volatile bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MySqlMigrationRunner"/> class.
@@ -37,8 +44,8 @@ namespace nORM.Migration
         /// <param name="options">Optional DbContext configuration for interceptors.</param>
         public MySqlMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null)
         {
-            _connection = connection;
-            _migrationsAssembly = migrationsAssembly;
+            _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            _migrationsAssembly = migrationsAssembly ?? throw new ArgumentNullException(nameof(migrationsAssembly));
             if (options != null && options.CommandInterceptors.Count > 0)
             {
                 // Pass ownsConnection=false so the context does NOT dispose the
@@ -55,6 +62,7 @@ namespace nORM.Migration
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task ApplyMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             // Ensure the connection is open before calling BeginTransactionAsync.
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
@@ -64,7 +72,7 @@ namespace nORM.Migration
             {
                 await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
                 var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-                if (!pending.Any()) return;
+                if (pending.Count == 0) return;
 
                 // MySQL DDL (ALTER TABLE, CREATE TABLE, DROP TABLE, etc.) implicitly auto-commits,
                 // so a single wrapping transaction cannot roll back schema changes on failure.
@@ -89,7 +97,7 @@ namespace nORM.Migration
                     // Write durable Partial checkpoint inside the transaction.
                     // If the migration fails, the Partial row persists (auto-committed DDL),
                     // but if BeginTransactionAsync fails, no Partial row is created.
-                    await InsertMigrationCheckpointAsync(migration, ct).ConfigureAwait(false);
+                    await InsertMigrationCheckpointAsync(migration, (DbTransaction)transaction, ct).ConfigureAwait(false);
                     try
                     {
                         migration.Up(_connection, (DbTransaction)transaction, ct);
@@ -150,10 +158,11 @@ namespace nORM.Migration
             pName.Value = MigrationLockName;
             cmd.Parameters.Add(pName);
             try { await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false); }
-            catch (Exception ex)
+            catch (DbException ex)
             {
-                // M1: Best-effort release; surface failure for diagnostics rather than silently swallowing.
+                // Best-effort release; surface failure for diagnostics rather than silently swallowing.
                 // Do not propagate — throwing from a finally block would mask the original exception.
+                // Narrowed to DbException so that fatal CLR errors (OutOfMemoryException etc.) propagate.
                 var logger = _context?.Options?.Logger;
                 if (logger != null)
                     logger.LogWarning(
@@ -173,11 +182,12 @@ namespace nORM.Migration
         /// <returns><c>true</c> if pending migrations exist; otherwise <c>false</c>.</returns>
         public async Task<bool> HasPendingMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
             var pending = await GetPendingMigrationsInternalAsync(ct).ConfigureAwait(false);
-            return pending.Any();
+            return pending.Count > 0;
         }
 
         /// <summary>
@@ -187,6 +197,7 @@ namespace nORM.Migration
         /// <returns>An array containing the pending migration identifiers.</returns>
         public async Task<string[]> GetPendingMigrationsAsync(CancellationToken ct = default)
         {
+            ThrowIfDisposed();
             if (_connection.State != System.Data.ConnectionState.Open)
                 await _connection.OpenAsync(ct).ConfigureAwait(false);
             await EnsureHistoryTableAsync(ct).ConfigureAwait(false);
@@ -204,7 +215,7 @@ namespace nORM.Migration
         {
             var all = _migrationsAssembly.GetTypes()
                 .Where(t => typeof(Migration).IsAssignableFrom(t) && !t.IsAbstract)
-                .Select(t => (Migration)Activator.CreateInstance(t)!)
+                .Select(t => (Migration)(Activator.CreateInstance(t) ?? throw new InvalidOperationException($"Failed to create instance of migration type {t.FullName}")))
                 .OrderBy(m => m.Version)
                 .ToList();
 
@@ -252,14 +263,15 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// M1: Inserts a durable <c>Partial</c> checkpoint row for the migration BEFORE the
-        /// per-step transaction begins. If the step fails (including a mid-flight process kill),
+        /// M1: Inserts a durable <c>Partial</c> checkpoint row for the migration inside the
+        /// per-step transaction. If the step fails (including a mid-flight process kill),
         /// this row remains and is detected on the next run, triggering a loud error instead of
         /// silently re-applying already-partially-committed DDL.
         /// </summary>
-        private async Task InsertMigrationCheckpointAsync(Migration migration, CancellationToken ct)
+        private async Task InsertMigrationCheckpointAsync(Migration migration, DbTransaction transaction, CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
+            cmd.Transaction = transaction;
             cmd.CommandText = $"INSERT INTO `{HistoryTableName}` (`Version`, `Name`, `AppliedOn`, `Status`) VALUES (@Version, @Name, @AppliedOn, 'Partial');";
             cmd.AddParam("@Version", migration.Version);
             cmd.AddParam("@Name", migration.Name);
@@ -316,7 +328,7 @@ namespace nORM.Migration
         {
             // Check by error number when the exception exposes it (MySqlConnector.MySqlException)
             var numberProp = ex.GetType().GetProperty("Number");
-            if (numberProp != null && numberProp.GetValue(ex) is int number && number == 1146)
+            if (numberProp != null && numberProp.GetValue(ex) is int number && number == MySqlErrorTableNotFound)
                 return true;
             // Fallback: check the message text
             return ex.Message.Contains("doesn't exist", StringComparison.OrdinalIgnoreCase)
@@ -346,12 +358,12 @@ namespace nORM.Migration
 
         /// <summary>
         /// Returns <c>true</c> when the exception indicates that the column already exists.
-        /// MySQL error 1060 = "Duplicate column name"; SQLite message = "duplicate column name".
+        /// MySQL error 1060 = "Duplicate column name". Also matches by message text as a fallback.
         /// </summary>
         private static bool IsColumnAlreadyExistsError(DbException ex)
         {
             var numberProp = ex.GetType().GetProperty("Number");
-            if (numberProp?.GetValue(ex) is int n && n == 1060) return true;
+            if (numberProp?.GetValue(ex) is int n && n == MySqlErrorDuplicateColumn) return true;
             return ex.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase)
                 || ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase);
         }
@@ -374,6 +386,15 @@ namespace nORM.Migration
         private Task<DbDataReader> ExecuteReaderAsync(DbCommand cmd, CancellationToken ct)
             => _context != null ? cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct) : cmd.ExecuteReaderAsync(ct);
 
+        /// <summary>
+        /// Throws <see cref="ObjectDisposedException"/> if this runner has been disposed.
+        /// </summary>
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(MySqlMigrationRunner));
+        }
+
         /// <summary>Asynchronously disposes the internal <see cref="DbContext"/> created for interceptors.</summary>
         public async ValueTask DisposeAsync()
         {
@@ -386,6 +407,7 @@ namespace nORM.Migration
                     _context = null;
                 }
             }
+            GC.SuppressFinalize(this);
         }
 
         /// <summary>Synchronously disposes the internal <see cref="DbContext"/> created for interceptors.</summary>
@@ -400,6 +422,7 @@ namespace nORM.Migration
                     _context = null;
                 }
             }
+            GC.SuppressFinalize(this);
         }
 
         private sealed class GenericParameterFactory : IDbParameterFactory

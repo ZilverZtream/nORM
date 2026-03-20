@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using nORM.Providers;
@@ -16,9 +17,14 @@ namespace nORM.Core
         /// <param name="cmd">Command to which parameters will be added.</param>
         /// <param name="parameters">Parameter values in positional order.</param>
         /// <returns>A dictionary mapping generated parameter names to their values.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when any argument is <c>null</c>.</exception>
         public static Dictionary<string, object> AddParameters(DatabaseProvider provider, DbCommand cmd, object[] parameters)
         {
-            var paramDict = new Dictionary<string, object>();
+            ArgumentNullException.ThrowIfNull(provider);
+            ArgumentNullException.ThrowIfNull(cmd);
+            ArgumentNullException.ThrowIfNull(parameters);
+
+            var paramDict = new Dictionary<string, object>(parameters.Length);
             for (int i = 0; i < parameters.Length; i++)
             {
                 var pName = $"{provider.ParamPrefix}p{i}";

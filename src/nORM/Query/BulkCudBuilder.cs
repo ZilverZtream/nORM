@@ -62,7 +62,19 @@ namespace nORM.Query
             {
                 var after = sql.Substring(fromIndex + fromPattern.Length);
                 var tokens = after.TrimStart().Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                if (tokens.Length > 0)
+                // Only treat the first token as an alias if it is not a SQL keyword.
+                // Without this guard, "SELECT ... FROM [Table] WHERE ..." would assign "WHERE" as alias.
+                if (tokens.Length > 0 &&
+                    !tokens[0].Equals("WHERE", StringComparison.OrdinalIgnoreCase) &&
+                    !tokens[0].Equals("ORDER", StringComparison.OrdinalIgnoreCase) &&
+                    !tokens[0].Equals("GROUP", StringComparison.OrdinalIgnoreCase) &&
+                    !tokens[0].Equals("HAVING", StringComparison.OrdinalIgnoreCase) &&
+                    !tokens[0].Equals("INNER", StringComparison.OrdinalIgnoreCase) &&
+                    !tokens[0].Equals("LEFT", StringComparison.OrdinalIgnoreCase) &&
+                    !tokens[0].Equals("RIGHT", StringComparison.OrdinalIgnoreCase) &&
+                    !tokens[0].Equals("CROSS", StringComparison.OrdinalIgnoreCase) &&
+                    !tokens[0].Equals("JOIN", StringComparison.OrdinalIgnoreCase) &&
+                    !tokens[0].Equals("LIMIT", StringComparison.OrdinalIgnoreCase))
                     alias = tokens[0];
             }
             var whereIndex = sql.IndexOf(" WHERE", StringComparison.OrdinalIgnoreCase);
@@ -135,6 +147,7 @@ namespace nORM.Query
 
         public (string Sql, Dictionary<string, object> Params) BuildSetClause<T>(TableMapping mapping, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set)
         {
+            if (set == null) throw new ArgumentNullException(nameof(set));
             var assigns = new List<(string Column, object? Value)>();
             var call = set.Body as MethodCallExpression;
             while (call != null)

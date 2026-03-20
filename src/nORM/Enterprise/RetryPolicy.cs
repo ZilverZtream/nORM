@@ -24,7 +24,9 @@ namespace nORM.Enterprise
         /// <summary>
         /// Delegate that determines whether a given <see cref="Exception"/> is
         /// considered transient and should trigger a retry.
-        /// Now supports DbException, TimeoutException, IOException, and SocketException.
+        /// Supports DbException (SQL Server transient errors), IOException, and SocketException.
+        /// TimeoutException is NOT retried by default — retrying a timed-out write can duplicate
+        /// data because the write may have succeeded before the timeout was raised.
         /// </summary>
         public Func<Exception, bool> ShouldRetry { get; set; } = ex =>
         {
@@ -32,9 +34,8 @@ namespace nORM.Enterprise
             if (ex is SqlException sqlEx && sqlEx.Number is 4060 or 40197 or 40501 or 40613 or 49918 or 49919 or 49920 or 1205 or 1222)
                 return true;
 
-            // Command timeouts
-            if (ex is TimeoutException)
-                return true;
+            // TimeoutException deliberately excluded — retrying timeouts risks duplicate writes.
+            // Aligns with RetryingExecutionStrategy which also excludes timeouts.
 
             // Network-level failures
             if (ex is System.IO.IOException || ex is System.Net.Sockets.SocketException)

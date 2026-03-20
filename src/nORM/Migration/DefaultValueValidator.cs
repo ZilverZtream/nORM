@@ -56,14 +56,15 @@ namespace nORM.Migration
             if (value is null)
                 return null;
 
-            if (!_safe.IsMatch(value.Trim()))
+            var trimmed = value.Trim();
+            if (!_safe.IsMatch(trimmed))
                 throw new ArgumentException(
                     $"DefaultValue '{value}' is not a permitted SQL literal. " +
                     "Only numeric literals, single-quoted strings, boolean literals (TRUE/FALSE), NULL, " +
                     "and standard SQL functions (CURRENT_TIMESTAMP, NOW(), GETDATE(), NEWID(), UUID(), etc.) are allowed. " +
                     "Values containing semicolons, comments, or DML keywords are rejected.");
 
-            return value;
+            return trimmed;
         }
     }
 }

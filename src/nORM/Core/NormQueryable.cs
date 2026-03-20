@@ -52,9 +52,6 @@ namespace nORM.Core
     }
 
     /// <summary>
-    /// Defines a queryable data source with extended functionality like Include.
-    /// </summary>
-    /// <summary>
     /// Defines a queryable data source with extended functionality like eager-loading and
     /// asynchronous evaluation.
     /// </summary>
