@@ -120,6 +120,25 @@ namespace nORM.Query
             return false;
         }
 
+        /// <summary>
+        /// SG1 fix: Detects whether the mapping contains inline owned-navigation columns.
+        /// Owned scalar navigations (OwnsOne) contribute columns whose <c>PropName</c> includes an
+        /// owner-type prefix (e.g. <c>"Address_Street"</c>) while <c>Prop.Name</c> is just the
+        /// tail (<c>"Street"</c>). The source generator cannot reconstruct the nesting needed to
+        /// populate the owner navigation property, so the compiled materializer must be bypassed
+        /// when such columns are present.
+        /// </summary>
+        private static bool HasOwnedNavigationColumns(TableMapping mapping)
+        {
+            foreach (var col in mapping.Columns)
+            {
+                // Shadow columns are internal; only check mapped CLR properties.
+                if (!col.IsShadow && col.PropName != col.Prop.Name)
+                    return true;
+            }
+            return false;
+        }
+
         // Pre-computed type conversion delegates for better performance
         private static readonly ConcurrentDictionary<(Type From, Type To), Func<object, object>> _conversionCache = new();
 
@@ -181,7 +200,13 @@ namespace nORM.Query
         public static DateOnly ConvertToDateOnly(object value)
         {
             if (value is DateTime dt) return DateOnly.FromDateTime(dt);
-            if (value is string s) return DateOnly.Parse(s, CultureInfo.InvariantCulture);
+            if (value is string s)
+            {
+                // DateOnly.Parse handles "yyyy-MM-dd"; fall back to DateTime.Parse for
+                // "yyyy-MM-dd HH:mm:ss" strings that some providers emit for DbType.Date.
+                if (DateOnly.TryParse(s, CultureInfo.InvariantCulture, out var d)) return d;
+                return DateOnly.FromDateTime(DateTime.Parse(s, CultureInfo.InvariantCulture));
+            }
             return DateOnly.FromDateTime(Convert.ToDateTime(value, CultureInfo.InvariantCulture));
         }
 
@@ -255,7 +280,11 @@ namespace nORM.Query
             if (underlyingType == typeof(DateOnly))
             {
                 if (dbValue is DateTime dt) return DateOnly.FromDateTime(dt);
-                if (dbValue is string s) return DateOnly.Parse(s, CultureInfo.InvariantCulture);
+                if (dbValue is string s)
+                {
+                    if (DateOnly.TryParse(s, CultureInfo.InvariantCulture, out var d)) return d;
+                    return DateOnly.FromDateTime(DateTime.Parse(s, CultureInfo.InvariantCulture));
+                }
                 return DateOnly.FromDateTime(Convert.ToDateTime(dbValue, CultureInfo.InvariantCulture));
             }
             if (underlyingType == typeof(TimeOnly))
@@ -610,8 +639,14 @@ namespace nORM.Query
             // X1 fix: skip compiled materializer if the runtime mapping has fluent-only column
             // renames that the source generator couldn't see at compile time. The generator uses
             // [Column] attributes only; fluent HasColumnName overrides are invisible to it.
+            // X1/VC fix: skip compiled materializer when ValueConverters are registered — the
+            // source-generated delegate reads raw provider values without applying converters.
+            // SG1 fix: skip compiled materializer when owned scalar navigations (OwnsOne) are
+            // present — the generator cannot reconstruct the nested property assignment.
             if (projection == null && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled)
-                && !HasFluentColumnRenames(targetType, mapping))
+                && !HasFluentColumnRenames(targetType, mapping)
+                && mapping.ConverterFingerprint == 0
+                && !HasOwnedNavigationColumns(mapping))
             {
                 // Wrap the compiled materializer to return strongly-typed result
                 return async (reader, ct) => (T)(await compiled(reader, ct).ConfigureAwait(false));
@@ -648,8 +683,12 @@ namespace nORM.Query
             // CHECK FOR COMPILED MATERIALIZER FIRST — use mapping.TableName to discriminate
             // between the same CLR type registered under different model mappings.
             // X1 fix: skip compiled materializer when fluent-only column renames are present.
+            // X1/VC fix: skip when ValueConverters are registered.
+            // SG1 fix: skip when owned scalar navigations are present.
             if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled)
-                && !HasFluentColumnRenames(targetType, mapping))
+                && !HasFluentColumnRenames(targetType, mapping)
+                && mapping.ConverterFingerprint == 0
+                && !HasOwnedNavigationColumns(mapping))
             {
                 return compiled;
             }
@@ -697,8 +736,12 @@ namespace nORM.Query
 
             // For simple cases without JOINs, use regular materializer.
             // X1 fix: skip compiled materializer when fluent-only column renames are present.
+            // X1/VC fix: skip when ValueConverters are registered.
+            // SG1 fix: skip when owned scalar navigations are present.
             if (projection == null && startOffset == 0 && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled)
-                && !HasFluentColumnRenames(targetType, mapping))
+                && !HasFluentColumnRenames(targetType, mapping)
+                && mapping.ConverterFingerprint == 0
+                && !HasOwnedNavigationColumns(mapping))
             {
                 return compiled;
             }

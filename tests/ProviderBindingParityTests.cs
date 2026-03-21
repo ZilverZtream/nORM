@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
 using nORM.Core;
+using nORM.Mapping;
 using nORM.Migration;
 using nORM.Providers;
 using MigrationBase = nORM.Migration.Migration;
@@ -958,5 +959,338 @@ public class ProviderBindingParityTests
 
         var pending = await runner.GetPendingMigrationsAsync();
         Assert.Empty(pending);
+    }
+}
+
+// ── Entities for provider DateTime/enum/converter lock-step parity tests ─────
+
+[Table("G40DateRow")]
+file class G40DateRow
+{
+    [Key]
+    public int Id { get; set; }
+    public DateOnly BirthDate { get; set; }
+    public TimeOnly MeetTime { get; set; }
+}
+
+[Table("G40EnumRow")]
+file class G40EnumRow
+{
+    [Key]
+    public int Id { get; set; }
+    public string Label { get; set; } = string.Empty;
+    public G40Status Status { get; set; }
+}
+
+file enum G40Status
+{
+    Pending  = 0,
+    Active   = 1,
+    Archived = 2,
+}
+
+[Table("G40ConverterRow")]
+file class G40ConverterRow
+{
+    [Key]
+    public int Id { get; set; }
+    public int Points { get; set; }
+    public string Tag { get; set; } = string.Empty;
+}
+
+/// <summary>Negates the integer: model=42 ↔ db=-42.</summary>
+file sealed class G40NegatingConv : ValueConverter<int, int>
+{
+    public override object? ConvertToProvider(int v) => -v;
+    public override object? ConvertFromProvider(int v) => -v;
+}
+
+/// <summary>
+/// Lock-step parity for DateOnly, TimeOnly, enum, and ValueConverter-backed
+/// reads across SQLite, MySQL, and PostgreSQL providers.
+///
+/// "Lock-step" means the same SQLite in-memory engine is used for all providers.
+/// MySqlProvider/PostgresProvider are instantiated with SqliteParameterFactory
+/// so they create SQLite-compatible parameter objects while exercising their own
+/// dialect-level SQL generation paths.
+/// </summary>
+public class ProviderDateTimeEnumParityTests
+{
+    private static DatabaseProvider MakeProvider(string kind) => kind switch
+    {
+        "sqlite"   => new SqliteProvider(),
+        "mysql"    => new MySqlProvider(new SqliteParameterFactory()),
+        "postgres" => new PostgresProvider(new SqliteParameterFactory()),
+        _          => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
+
+    private static (SqliteConnection Cn, DbContext Ctx) Open(string kind, string ddl,
+        DbContextOptions? opts = null)
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = ddl;
+        cmd.ExecuteNonQuery();
+        return (cn, new DbContext(cn, MakeProvider(kind), opts ?? new DbContextOptions()));
+    }
+
+    private static void Exec(SqliteConnection cn, string sql)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
+    }
+
+    // ── 1. DateOnly / TimeOnly round-trip ────────────────────────────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task LockStep_DateOnly_TimeOnly_RoundTrip_AllProviders(string kind)
+    {
+        var (cn, ctx) = Open(kind,
+            "CREATE TABLE G40DateRow (Id INTEGER PRIMARY KEY, BirthDate TEXT NOT NULL, MeetTime TEXT NOT NULL)");
+        await using var _ = ctx; using var __ = cn;
+
+        var today   = new DateOnly(2024, 6, 15);
+        var timeVal = new TimeOnly(9, 30, 0);
+
+        ctx.Add(new G40DateRow { Id = 1, BirthDate = today, MeetTime = timeVal });
+        await ctx.SaveChangesAsync();
+
+        var rows = ctx.Query<G40DateRow>().ToList();
+
+        Assert.Single(rows);
+        Assert.Equal(today,   rows[0].BirthDate);
+        Assert.Equal(timeVal, rows[0].MeetTime);
+    }
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task LockStep_DateOnly_MultipleRows_OrderedCorrectly(string kind)
+    {
+        var (cn, ctx) = Open(kind,
+            "CREATE TABLE G40DateRow (Id INTEGER PRIMARY KEY, BirthDate TEXT NOT NULL, MeetTime TEXT NOT NULL)");
+        await using var _ = ctx; using var __ = cn;
+
+        ctx.Add(new G40DateRow { Id = 1, BirthDate = new DateOnly(2020, 1, 1),   MeetTime = new TimeOnly(8, 0) });
+        ctx.Add(new G40DateRow { Id = 2, BirthDate = new DateOnly(2021, 6, 15),  MeetTime = new TimeOnly(12, 30) });
+        ctx.Add(new G40DateRow { Id = 3, BirthDate = new DateOnly(2023, 12, 31), MeetTime = new TimeOnly(23, 59) });
+        await ctx.SaveChangesAsync();
+
+        var rows = ctx.Query<G40DateRow>().OrderBy(r => r.Id).ToList();
+
+        Assert.Equal(3, rows.Count);
+        Assert.Equal(new DateOnly(2020, 1, 1),   rows[0].BirthDate);
+        Assert.Equal(new DateOnly(2021, 6, 15),  rows[1].BirthDate);
+        Assert.Equal(new DateOnly(2023, 12, 31), rows[2].BirthDate);
+        Assert.Equal(new TimeOnly(8, 0),   rows[0].MeetTime);
+        Assert.Equal(new TimeOnly(23, 59), rows[2].MeetTime);
+    }
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task LockStep_DateOnly_Where_Filter_AllProviders(string kind)
+    {
+        var (cn, ctx) = Open(kind,
+            "CREATE TABLE G40DateRow (Id INTEGER PRIMARY KEY, BirthDate TEXT NOT NULL, MeetTime TEXT NOT NULL)");
+        await using var _ = ctx; using var __ = cn;
+
+        ctx.Add(new G40DateRow { Id = 1, BirthDate = new DateOnly(2020, 1, 1), MeetTime = new TimeOnly(8, 0) });
+        ctx.Add(new G40DateRow { Id = 2, BirthDate = new DateOnly(2025, 1, 1), MeetTime = new TimeOnly(9, 0) });
+        await ctx.SaveChangesAsync();
+
+        var target = new DateOnly(2025, 1, 1);
+        var rows = ctx.Query<G40DateRow>().Where(r => r.BirthDate == target).ToList();
+
+        Assert.Single(rows);
+        Assert.Equal(2, rows[0].Id);
+    }
+
+    // ── 2. Enum mapping (stored as INTEGER) ──────────────────────────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task LockStep_Enum_RoundTrip_AllProviders(string kind)
+    {
+        var (cn, ctx) = Open(kind,
+            "CREATE TABLE G40EnumRow (Id INTEGER PRIMARY KEY, Label TEXT NOT NULL, Status INTEGER NOT NULL)");
+        await using var _ = ctx; using var __ = cn;
+
+        ctx.Add(new G40EnumRow { Id = 1, Label = "pending-item",  Status = G40Status.Pending  });
+        ctx.Add(new G40EnumRow { Id = 2, Label = "active-item",   Status = G40Status.Active   });
+        ctx.Add(new G40EnumRow { Id = 3, Label = "archived-item", Status = G40Status.Archived });
+        await ctx.SaveChangesAsync();
+
+        var rows = ctx.Query<G40EnumRow>().OrderBy(r => r.Id).ToList();
+
+        Assert.Equal(3, rows.Count);
+        Assert.Equal(G40Status.Pending,  rows[0].Status);
+        Assert.Equal(G40Status.Active,   rows[1].Status);
+        Assert.Equal(G40Status.Archived, rows[2].Status);
+    }
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task LockStep_Enum_Where_Filter_AllProviders(string kind)
+    {
+        var (cn, ctx) = Open(kind,
+            "CREATE TABLE G40EnumRow (Id INTEGER PRIMARY KEY, Label TEXT NOT NULL, Status INTEGER NOT NULL)");
+        await using var _ = ctx; using var __ = cn;
+
+        ctx.Add(new G40EnumRow { Id = 1, Label = "a", Status = G40Status.Pending  });
+        ctx.Add(new G40EnumRow { Id = 2, Label = "b", Status = G40Status.Active   });
+        ctx.Add(new G40EnumRow { Id = 3, Label = "c", Status = G40Status.Active   });
+        ctx.Add(new G40EnumRow { Id = 4, Label = "d", Status = G40Status.Archived });
+        await ctx.SaveChangesAsync();
+
+        var active = G40Status.Active;
+        var rows = ctx.Query<G40EnumRow>().Where(r => r.Status == active).ToList();
+
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, r => Assert.Equal(G40Status.Active, r.Status));
+    }
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task LockStep_Enum_Update_PreservesValue_AllProviders(string kind)
+    {
+        var (cn, ctx) = Open(kind,
+            "CREATE TABLE G40EnumRow (Id INTEGER PRIMARY KEY, Label TEXT NOT NULL, Status INTEGER NOT NULL)");
+        await using var _ = ctx; using var __ = cn;
+
+        var item = new G40EnumRow { Id = 1, Label = "item", Status = G40Status.Pending };
+        ctx.Add(item);
+        await ctx.SaveChangesAsync();
+
+        item.Status = G40Status.Archived;
+        await ctx.SaveChangesAsync();
+
+        var result = ctx.Query<G40EnumRow>().Where(r => r.Id == 1).Single();
+        Assert.Equal(G40Status.Archived, result.Status);
+    }
+
+    // ── 3. ValueConverter-backed reads ───────────────────────────────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task LockStep_ValueConverter_Applied_OnRead_AllProviders(string kind)
+    {
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<G40ConverterRow>()
+                  .Property(r => r.Points)
+                  .HasConversion(new G40NegatingConv())
+        };
+        var (cn, ctx) = Open(kind,
+            "CREATE TABLE G40ConverterRow (Id INTEGER PRIMARY KEY, Points INTEGER NOT NULL, Tag TEXT NOT NULL)",
+            opts);
+        await using var _ = ctx; using var __ = cn;
+
+        Exec(cn, "INSERT INTO G40ConverterRow (Id, Points, Tag) VALUES (1, -55, 'x')");
+
+        var rows = ctx.Query<G40ConverterRow>().ToList();
+
+        Assert.Single(rows);
+        Assert.Equal(55, rows[0].Points);  // converter applied: -(-55) = 55
+    }
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task LockStep_ValueConverter_Applied_OnWrite_AllProviders(string kind)
+    {
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<G40ConverterRow>()
+                  .Property(r => r.Points)
+                  .HasConversion(new G40NegatingConv())
+        };
+        var (cn, ctx) = Open(kind,
+            "CREATE TABLE G40ConverterRow (Id INTEGER PRIMARY KEY, Points INTEGER NOT NULL, Tag TEXT NOT NULL)",
+            opts);
+        await using var _ = ctx; using var __ = cn;
+
+        ctx.Add(new G40ConverterRow { Id = 1, Points = 100, Tag = "write-test" });
+        await ctx.SaveChangesAsync();
+
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT Points FROM G40ConverterRow WHERE Id = 1";
+        var raw = Convert.ToInt32(cmd.ExecuteScalar());
+        Assert.Equal(-100, raw);
+    }
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task LockStep_ValueConverter_MultipleRows_AllProviders(string kind)
+    {
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<G40ConverterRow>()
+                  .Property(r => r.Points)
+                  .HasConversion(new G40NegatingConv())
+        };
+        var (cn, ctx) = Open(kind,
+            "CREATE TABLE G40ConverterRow (Id INTEGER PRIMARY KEY, Points INTEGER NOT NULL, Tag TEXT NOT NULL)",
+            opts);
+        await using var _ = ctx; using var __ = cn;
+
+        Exec(cn, "INSERT INTO G40ConverterRow (Id, Points, Tag) VALUES (1, -10, 'a'), (2, -20, 'b'), (3, -30, 'c')");
+
+        var rows = ctx.Query<G40ConverterRow>().OrderBy(r => r.Id).ToList();
+
+        Assert.Equal(3, rows.Count);
+        Assert.Equal(10, rows[0].Points);
+        Assert.Equal(20, rows[1].Points);
+        Assert.Equal(30, rows[2].Points);
+    }
+
+    // ── 4. Compiled query with enum parameter — all providers ─────────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task LockStep_CompiledQuery_Enum_Param_AllProviders(string kind)
+    {
+        var (cn, ctx) = Open(kind,
+            "CREATE TABLE G40EnumRow (Id INTEGER PRIMARY KEY, Label TEXT NOT NULL, Status INTEGER NOT NULL)");
+        await using var _ = ctx; using var __ = cn;
+
+        ctx.Add(new G40EnumRow { Id = 1, Label = "p1", Status = G40Status.Pending  });
+        ctx.Add(new G40EnumRow { Id = 2, Label = "a1", Status = G40Status.Active   });
+        ctx.Add(new G40EnumRow { Id = 3, Label = "a2", Status = G40Status.Active   });
+        await ctx.SaveChangesAsync();
+
+        var compiled = Norm.CompileQuery((DbContext c, G40Status s) =>
+            c.Query<G40EnumRow>().Where(r => r.Status == s));
+
+        var active = await compiled(ctx, G40Status.Active);
+        Assert.Equal(2, active.Count);
+        Assert.All(active, r => Assert.Equal(G40Status.Active, r.Status));
+
+        var pending = await compiled(ctx, G40Status.Pending);
+        Assert.Single(pending);
+        Assert.Equal(G40Status.Pending, pending[0].Status);
     }
 }

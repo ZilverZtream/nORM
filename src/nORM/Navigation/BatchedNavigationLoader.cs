@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -254,9 +255,10 @@ namespace nORM.Navigation
         }
 
         /// <summary>
-        /// Loads all related entities for the supplied foreign key values in a single query. The
-        /// method constructs an efficient <c>WHERE IN</c> clause using the provider's facilities
-        /// and materializes each record into an entity tracked by the current <see cref="DbContext"/>.
+        /// Loads all related entities for the supplied foreign key values. When the number of keys
+        /// exceeds the provider's parameter limit (e.g. 999 for SQLite, 2100 for SQL Server), the
+        /// keys are automatically split into chunks and multiple queries are issued, with results
+        /// merged before returning.
         /// </summary>
         /// <param name="relation">Metadata describing the relationship being loaded.</param>
         /// <param name="keys">The set of principal key values to retrieve related entities for.</param>
@@ -266,18 +268,49 @@ namespace nORM.Navigation
         {
             var mapping = _context.GetMapping(relation.DependentType);
             await _context.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            using var cmd = _context.CreateCommand();
 
-            var where = _context.Provider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, keys);
+            // X2 fix: Chunk keys by the provider's parameter limit to avoid provider-specific
+            // "too many variables" errors. SQLite allows ≤ 999 params, SQL Server ≤ 2100,
+            // PostgreSQL ≤ 32767. Reserve 10 params for any ambient predicates (e.g. tenant).
+            var maxParams = _context.Provider.MaxParameters;
+            var maxKeysPerChunk = maxParams == int.MaxValue ? keys.Count : Math.Max(1, maxParams - 10);
+
+            using var translator = Query.QueryTranslator.Rent(_context);
+            var materializer = translator.CreateMaterializer(mapping, relation.DependentType);
+
+            if (keys.Count <= maxKeysPerChunk)
+                return await ExecuteNavigationChunkAsync(mapping, materializer, relation, keys, ct).ConfigureAwait(false);
+
+            // Issue one query per chunk and merge all results.
+            var results = new List<object>(keys.Count);
+            for (int offset = 0; offset < keys.Count; offset += maxKeysPerChunk)
+            {
+                var chunk = keys.GetRange(offset, Math.Min(maxKeysPerChunk, keys.Count - offset));
+                var chunkResults = await ExecuteNavigationChunkAsync(mapping, materializer, relation, chunk, ct).ConfigureAwait(false);
+                results.AddRange(chunkResults);
+            }
+            return results;
+        }
+
+        /// <summary>
+        /// Executes a single <c>WHERE IN</c> query for a chunk of foreign key values and
+        /// materializes the results into tracked entities.
+        /// </summary>
+        private async Task<List<object>> ExecuteNavigationChunkAsync(
+            TableMapping mapping,
+            Func<DbDataReader, CancellationToken, Task<object>> materializer,
+            TableMapping.Relation relation,
+            List<object?> chunk,
+            CancellationToken ct)
+        {
+            using var cmd = _context.CreateCommand();
+            var where = _context.Provider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, chunk);
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";
 
             var timeout = _context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
             cmd.CommandTimeout = ToSecondsClamped(timeout);
 
-            using var translator = Query.QueryTranslator.Rent(_context);
-            var materializer = translator.CreateMaterializer(mapping, relation.DependentType);
             var results = new List<object>();
-
             using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_context, CommandBehavior.Default, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {

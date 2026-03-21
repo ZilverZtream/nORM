@@ -1088,3 +1088,431 @@ public class LockStepProviderParityStressTests
         Assert.Empty(errors);
     }
 }
+
+// ── Entities for extended provider fuzz tests ─────────────────────────────────
+
+[Table("G50FzItem")]
+file class G50FzItem
+{
+    [Key]
+    public int Id { get; set; }
+    public string Category { get; set; } = string.Empty;
+    public int Score { get; set; }
+    public string? Note { get; set; }
+}
+
+[Table("G50FzTenant")]
+file class G50FzTenant
+{
+    [Key]
+    public int Id { get; set; }
+    public string TenantId { get; set; } = string.Empty;
+    public string Payload { get; set; } = string.Empty;
+    public int Score { get; set; }
+}
+
+file sealed class FzTenantProvider : ITenantProvider
+{
+    private readonly string _id;
+    public FzTenantProvider(string id) => _id = id;
+    public object GetCurrentTenantId() => _id;
+}
+
+/// <summary>
+/// Extended lock-step provider fuzzing for translation/materialization/save parity
+/// across SQLite, MySQL, and PostgreSQL providers. Seed 0xCAFEBABE is fixed for
+/// deterministic, repeatable fuzz runs.
+/// </summary>
+public class ProviderFuzzTranslationTests
+{
+    private const string FzItemDdl =
+        "CREATE TABLE G50FzItem (Id INTEGER PRIMARY KEY, Category TEXT NOT NULL, " +
+        "Score INTEGER NOT NULL, Note TEXT)";
+
+    private static DatabaseProvider MakeProvider(string kind) => kind switch
+    {
+        "sqlite"   => new SqliteProvider(),
+        "mysql"    => new MySqlProvider(new SqliteParameterFactory()),
+        "postgres" => new PostgresProvider(new SqliteParameterFactory()),
+        _          => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
+
+    private static (SqliteConnection Cn, DbContext Ctx) CreateDb(string kind,
+        DbContextOptions? opts = null)
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = FzItemDdl;
+        cmd.ExecuteNonQuery();
+        return (cn, new DbContext(cn, MakeProvider(kind), opts ?? new DbContextOptions()));
+    }
+
+    // ── 1. 50 random Where/OrderBy/Skip/Take combinations ───────────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task Fuzz_50RandomQueryCombinations_AllCorrect_AllProviders(string kind)
+    {
+        var (cn, ctx) = CreateDb(kind);
+        await using var _ = ctx; using var __ = cn;
+
+        const int RowCount = 30;
+        var categories = new[] { "A", "B", "C" };
+
+        for (int i = 1; i <= RowCount; i++)
+            ctx.Add(new G50FzItem
+            {
+                Id       = i,
+                Category = categories[i % categories.Length],
+                Score    = i * 3,
+                Note     = i % 5 == 0 ? null : $"note{i}"
+            });
+        await ctx.SaveChangesAsync();
+
+        var rng = new Random(unchecked((int)0xCAFEBABEu));
+
+        for (int round = 0; round < 50; round++)
+        {
+            int minScore = rng.Next(0, 50);
+            int skip     = rng.Next(0, 10);
+            int take     = rng.Next(1, 8);
+            bool descend = rng.Next(2) == 0;
+
+            IQueryable<G50FzItem> q = ctx.Query<G50FzItem>()
+                .Where(x => x.Score >= minScore);
+
+            q = descend
+                ? q.OrderByDescending(x => x.Score).ThenBy(x => x.Id)
+                : q.OrderBy(x => x.Score).ThenBy(x => x.Id);
+
+            var results = q.Skip(skip).Take(take).ToList();
+
+            Assert.True(results.Count <= take,
+                $"Round {round}: count {results.Count} exceeds take={take}");
+            Assert.All(results, r => Assert.True(r.Score >= minScore,
+                $"Round {round}: Score={r.Score} < minScore={minScore}"));
+
+            for (int i = 1; i < results.Count; i++)
+            {
+                if (descend)
+                    Assert.True(results[i - 1].Score >= results[i].Score,
+                        $"Round {round}: Descending order violated at position {i}");
+                else
+                    Assert.True(results[i - 1].Score <= results[i].Score,
+                        $"Round {round}: Ascending order violated at position {i}");
+            }
+        }
+    }
+
+    // ── 2. 30 random aggregate (Count/Min/Max) combinations ─────────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task Fuzz_30RandomAggregates_AllCorrect_AllProviders(string kind)
+    {
+        var (cn, ctx) = CreateDb(kind);
+        await using var _ = ctx; using var __ = cn;
+
+        for (int i = 1; i <= 20; i++)
+            ctx.Add(new G50FzItem { Id = i, Category = i % 2 == 0 ? "even" : "odd",
+                                    Score = i, Note = null });
+        await ctx.SaveChangesAsync();
+
+        var rng = new Random(unchecked((int)0xDEADBEEFu));
+
+        for (int round = 0; round < 30; round++)
+        {
+            int threshold = rng.Next(0, 15);
+
+            var count    = await ctx.Query<G50FzItem>().Where(x => x.Score > threshold).CountAsync();
+            var minScore = ctx.Query<G50FzItem>().Where(x => x.Score > threshold).ToList()
+                            .Select(r => r.Score).DefaultIfEmpty(0).Min();
+            var maxScore = ctx.Query<G50FzItem>().Where(x => x.Score > threshold).ToList()
+                            .Select(r => r.Score).DefaultIfEmpty(0).Max();
+
+            int expectedCount = Enumerable.Range(1, 20).Count(i => i > threshold);
+            Assert.Equal(expectedCount, count);
+
+            if (expectedCount > 0)
+            {
+                Assert.Equal(threshold + 1, minScore);
+                Assert.Equal(20, maxScore);
+            }
+        }
+    }
+
+    // ── 3. All column types round-trip ───────────────────────────────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task Fuzz_AllColumnTypes_RoundTrip_AllProviders(string kind)
+    {
+        var (cn, ctx) = CreateDb(kind);
+        await using var _ = ctx; using var __ = cn;
+
+        var edge = new[]
+        {
+            new G50FzItem { Id = 1, Category = "",             Score = 0,           Note = null     },
+            new G50FzItem { Id = 2, Category = "normal",       Score = 100,         Note = "has note" },
+            new G50FzItem { Id = 3, Category = "'quoted'",     Score = -1,          Note = ""       },
+            new G50FzItem { Id = 4, Category = "tab\there",    Score = int.MaxValue, Note = null    },
+            new G50FzItem { Id = 5, Category = "unicode \u00e9", Score = int.MinValue, Note = "x"  },
+        };
+
+        foreach (var e in edge) ctx.Add(e);
+        await ctx.SaveChangesAsync();
+
+        var readBack = ctx.Query<G50FzItem>().OrderBy(x => x.Id).ToList();
+
+        Assert.Equal(edge.Length, readBack.Count);
+        for (int i = 0; i < edge.Length; i++)
+        {
+            Assert.Equal(edge[i].Id,       readBack[i].Id);
+            Assert.Equal(edge[i].Category, readBack[i].Category);
+            Assert.Equal(edge[i].Score,    readBack[i].Score);
+            Assert.Equal(edge[i].Note,     readBack[i].Note);
+        }
+    }
+
+    // ── 4. Insert/Update/Delete cycle across all providers ───────────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task Fuzz_SaveParity_InsertUpdateDelete_AllProviders(string kind)
+    {
+        var (cn, ctx) = CreateDb(kind);
+        await using var _ = ctx; using var __ = cn;
+
+        for (int i = 1; i <= 10; i++)
+            ctx.Add(new G50FzItem { Id = i, Category = "cat", Score = i, Note = $"n{i}" });
+        await ctx.SaveChangesAsync();
+
+        Assert.Equal(10, await ctx.Query<G50FzItem>().CountAsync());
+
+        var toUpdate = ctx.Query<G50FzItem>().Where(x => x.Id <= 5).ToList();
+        foreach (var r in toUpdate) r.Score *= 10;
+        await ctx.SaveChangesAsync();
+
+        var updated = ctx.Query<G50FzItem>().Where(x => x.Id <= 5).OrderBy(x => x.Id).ToList();
+        for (int i = 0; i < 5; i++)
+            Assert.Equal((i + 1) * 10, updated[i].Score);
+
+        var toDelete = ctx.Query<G50FzItem>().Where(x => x.Id > 5).ToList();
+        foreach (var r in toDelete) ctx.Remove(r);
+        await ctx.SaveChangesAsync();
+
+        Assert.Equal(5, await ctx.Query<G50FzItem>().CountAsync());
+    }
+}
+
+/// <summary>
+/// Adversarial multi-tenant tests across all lock-step providers: isolation,
+/// SQL injection in tenant ID, concurrent contexts, plan cache poisoning,
+/// and compiled query tenant isolation.
+/// </summary>
+public class AdversarialMultiTenantTests
+{
+    private const string TenantDdl =
+        "CREATE TABLE G50FzTenant (Id INTEGER PRIMARY KEY, TenantId TEXT NOT NULL, " +
+        "Payload TEXT NOT NULL, Score INTEGER NOT NULL)";
+
+    private static DatabaseProvider MakeProvider(string kind) => kind switch
+    {
+        "sqlite"   => new SqliteProvider(),
+        "mysql"    => new MySqlProvider(new SqliteParameterFactory()),
+        "postgres" => new PostgresProvider(new SqliteParameterFactory()),
+        _          => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
+
+    private static DbContextOptions TenantOpts(string tenantId) => new()
+    {
+        TenantProvider   = new FzTenantProvider(tenantId),
+        TenantColumnName = "TenantId"
+    };
+
+    // ── 5. Multi-tenant isolation across all providers ───────────────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task AdversarialTenant_IsolationBetweenTenants_AllProviders(string kind)
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var __ = cn;
+        using var init = cn.CreateCommand();
+        init.CommandText = TenantDdl;
+        init.ExecuteNonQuery();
+
+        using (var ins = cn.CreateCommand())
+        {
+            ins.CommandText =
+                "INSERT INTO G50FzTenant VALUES (1, 'TenantA', 'a-secret', 10), " +
+                "(2, 'TenantA', 'a-secret2', 20), " +
+                "(3, 'TenantB', 'b-secret', 30)";
+            ins.ExecuteNonQuery();
+        }
+
+        var provider = MakeProvider(kind);
+
+        await using var ctxA = new DbContext(cn, provider, TenantOpts("TenantA"));
+        await using var ctxB = new DbContext(cn, provider, TenantOpts("TenantB"));
+
+        var rowsA = ctxA.Query<G50FzTenant>().ToList();
+        var rowsB = ctxB.Query<G50FzTenant>().ToList();
+
+        Assert.Equal(2, rowsA.Count);
+        Assert.All(rowsA, r => Assert.Equal("TenantA", r.TenantId));
+        Assert.DoesNotContain(rowsA, r => r.Payload.Contains("b-secret"));
+
+        Assert.Single(rowsB);
+        Assert.Equal("TenantB", rowsB[0].TenantId);
+        Assert.DoesNotContain(rowsB, r => r.Payload.Contains("a-secret"));
+    }
+
+    // ── 6. SQL injection in tenant ID must not return wrong rows ────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task AdversarialTenant_SqlInjectionId_NoLeak_AllProviders(string kind)
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var __ = cn;
+        using var init = cn.CreateCommand();
+        init.CommandText = TenantDdl +
+            "; INSERT INTO G50FzTenant VALUES (1, 'safe', 'safe-data', 5)";
+        init.ExecuteNonQuery();
+
+        const string adversarial = "' OR '1'='1";
+        var provider = MakeProvider(kind);
+        await using var ctx = new DbContext(cn, provider, TenantOpts(adversarial));
+
+        var rows = ctx.Query<G50FzTenant>().ToList();
+        Assert.Empty(rows);
+    }
+
+    // ── 7. 20 concurrent tenant contexts — all isolated ──────────────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task AdversarialTenant_20ConcurrentContexts_AllIsolated_AllProviders(string kind)
+    {
+        const int Degree = 20;
+        var dbName = $"G50Fz_{Guid.NewGuid():N}";
+        var connStr = $"Data Source={dbName};Mode=Memory;Cache=Shared";
+
+        using var keeper = new SqliteConnection(connStr);
+        keeper.Open();
+        using (var setup = keeper.CreateCommand())
+        {
+            var inserts = string.Join(",", Enumerable.Range(1, Degree)
+                .Select(i => $"({i}, 'T{i}', 'secret-{i}', {i * 10})"));
+            setup.CommandText = TenantDdl + "; INSERT INTO G50FzTenant VALUES " + inserts;
+            setup.ExecuteNonQuery();
+        }
+
+        var provider = MakeProvider(kind);
+        var tasks = Enumerable.Range(1, Degree).Select(async i =>
+        {
+            using var cn = new SqliteConnection(connStr);
+            cn.Open();
+            using var ctx = new DbContext(cn, provider, TenantOpts($"T{i}"));
+            var rows = ctx.Query<G50FzTenant>().ToList();
+            Assert.Single(rows);
+            Assert.Equal($"T{i}", rows[0].TenantId);
+            Assert.Equal($"secret-{i}", rows[0].Payload);
+        });
+
+        await Task.WhenAll(tasks);
+    }
+
+    // ── 8. Shared plan cache with tenant — no cross-tenant data ──────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task AdversarialTenant_SharedPlanCache_NoCrossTenantData_AllProviders(string kind)
+    {
+        var dbName = $"G50FzSh_{Guid.NewGuid():N}";
+        var connStr = $"Data Source={dbName};Mode=Memory;Cache=Shared";
+
+        using var keeper = new SqliteConnection(connStr);
+        keeper.Open();
+        using (var setup = keeper.CreateCommand())
+        {
+            setup.CommandText = TenantDdl +
+                "; INSERT INTO G50FzTenant VALUES " +
+                "(1, 'X', 'x-data1', 10), (2, 'X', 'x-data2', 20), (3, 'Y', 'y-data', 30)";
+            setup.ExecuteNonQuery();
+        }
+
+        var provider = MakeProvider(kind);
+
+        for (int pass = 0; pass < 10; pass++)
+        {
+            foreach (var (tenant, expectedCount) in new[] { ("X", 2), ("Y", 1) })
+            {
+                using var cn = new SqliteConnection(connStr);
+                cn.Open();
+                using var ctx = new DbContext(cn, provider, TenantOpts(tenant));
+                var rows = ctx.Query<G50FzTenant>().ToList();
+                Assert.Equal(expectedCount, rows.Count);
+                Assert.All(rows, r => Assert.Equal(tenant, r.TenantId));
+            }
+        }
+    }
+
+    // ── 9. Compiled query with tenant — isolation maintained ─────────────────
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task AdversarialTenant_CompiledQuery_TenantIsolated_AllProviders(string kind)
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var __ = cn;
+        using var init = cn.CreateCommand();
+        init.CommandText = TenantDdl +
+            "; INSERT INTO G50FzTenant VALUES " +
+            "(1,'Alpha','alpha1',5),(2,'Alpha','alpha2',15),(3,'Beta','beta1',25)";
+        init.ExecuteNonQuery();
+
+        var provider = MakeProvider(kind);
+
+        var compiled = Norm.CompileQuery((DbContext c, int minScore) =>
+            c.Query<G50FzTenant>().Where(r => r.Score >= minScore).OrderBy(r => r.Id));
+
+        await using var ctxAlpha = new DbContext(cn, provider, TenantOpts("Alpha"));
+        await using var ctxBeta  = new DbContext(cn, provider, TenantOpts("Beta"));
+
+        var alphaResult = await compiled(ctxAlpha, 0);
+        Assert.Equal(2, alphaResult.Count);
+        Assert.All(alphaResult, r => Assert.Equal("Alpha", r.TenantId));
+
+        var betaResult = await compiled(ctxBeta, 0);
+        Assert.Single(betaResult);
+        Assert.Equal("Beta", betaResult[0].TenantId);
+
+        var alphaHigh = await compiled(ctxAlpha, 10);
+        Assert.Single(alphaHigh);
+        Assert.Equal(15, alphaHigh[0].Score);
+    }
+}
