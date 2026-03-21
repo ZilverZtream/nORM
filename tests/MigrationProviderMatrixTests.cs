@@ -370,3 +370,347 @@ public class MigrationProviderMatrixTests
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
 }
+
+// ── Fault-injection: SQL Server generator ────────────────────────────────────
+
+public class SqlServerMigrationSqlGeneratorFaultTests
+{
+    private static SchemaDiff BuildSimpleDiff(string tableName)
+    {
+        var t = new TableSchema { Name = tableName };
+        t.Columns.Add(new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!,    IsPrimaryKey = true });
+        t.Columns.Add(new ColumnSchema { Name = "Label", ClrType = typeof(string).FullName!, IsNullable = true });
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(t);
+        return diff;
+    }
+
+    private static TableSchema BuildFkTable(string table, string fkName, string principal,
+        string onDelete = "CASCADE", string onUpdate = "NO ACTION")
+    {
+        var fk = new ForeignKeySchema
+        {
+            ConstraintName   = fkName,
+            DependentColumns = ["ParentId"],
+            PrincipalTable   = principal,
+            PrincipalColumns = ["Id"],
+            OnDelete         = onDelete,
+            OnUpdate         = onUpdate,
+        };
+        var t = new TableSchema { Name = table };
+        t.Columns.Add(new ColumnSchema { Name = "Id",       ClrType = typeof(int).FullName!, IsPrimaryKey = true });
+        t.Columns.Add(new ColumnSchema { Name = "ParentId", ClrType = typeof(int).FullName!, IsNullable = true });
+        t.ForeignKeys.Add(fk);
+        return t;
+    }
+
+    [Fact]
+    public void SqlServer_ValidAddTable_ContainsCreateTable()
+    {
+        var stmts = new SqlServerMigrationSqlGenerator().GenerateSql(BuildSimpleDiff("SS_TestTable"));
+        var upSql = string.Join(" ", stmts.Up);
+        Assert.Contains("SS_TestTable", upSql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CREATE TABLE",  upSql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SqlServer_InvalidFkAction_ThrowsArgumentException()
+    {
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(BuildFkTable("SS_Child", "FK_SS", "SS_Parent",
+            onDelete: "CASCADE; DROP TABLE users --"));
+        Assert.Throws<ArgumentException>(() => new SqlServerMigrationSqlGenerator().GenerateSql(diff));
+    }
+
+    [Fact]
+    public void SqlServer_InjectionPayload_NeverInGeneratedSql()
+    {
+        const string payload = "CASCADE; DROP TABLE users --";
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(BuildFkTable("SS_Child2", "FK_SS2", "SS_Parent2", onDelete: payload));
+        var ex = Record.Exception(() => new SqlServerMigrationSqlGenerator().GenerateSql(diff));
+        Assert.NotNull(ex);
+        Assert.IsType<ArgumentException>(ex);
+    }
+
+    [Fact]
+    public void SqlServer_DefaultValueInjection_ThrowsArgumentException()
+    {
+        var diff = new SchemaDiff();
+        var t = new TableSchema { Name = "SS_DefaultInj" };
+        t.Columns.Add(new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!, IsPrimaryKey = true });
+        t.Columns.Add(new ColumnSchema { Name = "Score", ClrType = typeof(int).FullName!, IsNullable = false,
+                                         DefaultValue = "0); DROP TABLE users --" });
+        diff.AddedTables.Add(t);
+        Assert.Throws<ArgumentException>(() => new SqlServerMigrationSqlGenerator().GenerateSql(diff));
+    }
+
+    [Fact]
+    public void SqlServer_AddNotNullColumnNoDefault_ThrowsInvalidOperation()
+    {
+        var diff = new SchemaDiff();
+        var existingTable = new TableSchema { Name = "SS_ExistingTable" };
+        diff.AddedColumns.Add((existingTable, new ColumnSchema
+        {
+            Name = "NewCol", ClrType = typeof(int).FullName!, IsNullable = false,
+        }));
+        Assert.Throws<InvalidOperationException>(() => new SqlServerMigrationSqlGenerator().GenerateSql(diff));
+    }
+
+    [Fact]
+    public void SqlServer_DropOrdering_FkDroppedBeforeTable()
+    {
+        var diff = new SchemaDiff();
+        var childTable = new TableSchema { Name = "SS_Child" };
+        childTable.Columns.Add(new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsPrimaryKey = true });
+        diff.DroppedForeignKeys.Add((childTable, new ForeignKeySchema
+        {
+            ConstraintName = "FK_SS_Child", DependentColumns = ["ParentId"],
+            PrincipalTable = "SS_Parent",   PrincipalColumns = ["Id"],
+            OnDelete = "NO ACTION",          OnUpdate = "NO ACTION",
+        }));
+        diff.DroppedTables.Add(childTable);
+
+        var upSql = string.Join(" ", new SqlServerMigrationSqlGenerator().GenerateSql(diff).Up);
+        var fkPos    = upSql.IndexOf("DROP CONSTRAINT", StringComparison.OrdinalIgnoreCase);
+        var tablePos = upSql.IndexOf("DROP TABLE",      StringComparison.OrdinalIgnoreCase);
+        Assert.True(fkPos >= 0,       $"Expected DROP CONSTRAINT in UP sql: {upSql}");
+        Assert.True(tablePos >= 0,    $"Expected DROP TABLE in UP sql: {upSql}");
+        Assert.True(fkPos < tablePos, $"FK drop (pos={fkPos}) should precede table drop (pos={tablePos})");
+    }
+
+    [Fact]
+    public void SqlServer_ValidFkActions_AcceptedWithoutException()
+    {
+        foreach (var action in new[] { "CASCADE", "NO ACTION", "SET NULL", "SET DEFAULT" })
+        {
+            var diff = new SchemaDiff();
+            diff.AddedTables.Add(BuildFkTable($"SS_ValidFk_{action.Replace(" ", "_")}",
+                $"FK_{action.Replace(" ", "_")}", "SS_Parent", onDelete: action));
+            Assert.Null(Record.Exception(() => new SqlServerMigrationSqlGenerator().GenerateSql(diff)));
+        }
+    }
+
+    [Fact]
+    public async Task SqlServer_ConcurrentGeneration_NoContamination()
+    {
+        var gen = new SqlServerMigrationSqlGenerator();
+        var diff1 = BuildSimpleDiff("SS_ConcA");
+        var diff2 = BuildSimpleDiff("SS_ConcB");
+
+        var all = await Task.WhenAll(
+            Enumerable.Range(0, 50).Select(_ => Task.Run(() => gen.GenerateSql(diff1))).Concat(
+            Enumerable.Range(0, 50).Select(_ => Task.Run(() => gen.GenerateSql(diff2)))));
+
+        foreach (var r in all.Take(50))
+            Assert.DoesNotContain("SS_ConcB", string.Join(" ", r.Up));
+        foreach (var r in all.Skip(50))
+            Assert.DoesNotContain("SS_ConcA", string.Join(" ", r.Up));
+    }
+}
+
+// ── Fault-injection: MySQL generator ─────────────────────────────────────────
+
+public class MySqlMigrationSqlGeneratorFaultTests
+{
+    private static SchemaDiff BuildSimpleDiff(string tableName)
+    {
+        var t = new TableSchema { Name = tableName };
+        t.Columns.Add(new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!,    IsPrimaryKey = true });
+        t.Columns.Add(new ColumnSchema { Name = "Label", ClrType = typeof(string).FullName!, IsNullable = true });
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(t);
+        return diff;
+    }
+
+    private static TableSchema BuildFkTable(string table, string fkName, string principal,
+        string onDelete = "CASCADE")
+    {
+        var fk = new ForeignKeySchema
+        {
+            ConstraintName   = fkName,
+            DependentColumns = ["ParentId"],
+            PrincipalTable   = principal,
+            PrincipalColumns = ["Id"],
+            OnDelete         = onDelete,
+            OnUpdate         = "NO ACTION",
+        };
+        var t = new TableSchema { Name = table };
+        t.Columns.Add(new ColumnSchema { Name = "Id",       ClrType = typeof(int).FullName!, IsPrimaryKey = true });
+        t.Columns.Add(new ColumnSchema { Name = "ParentId", ClrType = typeof(int).FullName!, IsNullable = true });
+        t.ForeignKeys.Add(fk);
+        return t;
+    }
+
+    [Fact]
+    public void MySql_ValidAddTable_UsesBacktickEscaping()
+    {
+        var stmts = new MySqlMigrationSqlGenerator().GenerateSql(BuildSimpleDiff("MY_TestTable"));
+        var upSql = string.Join(" ", stmts.Up);
+        Assert.Contains("`MY_TestTable`", upSql);
+        Assert.Contains("CREATE TABLE",   upSql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MySql_InvalidFkAction_ThrowsArgumentException()
+    {
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(BuildFkTable("MY_Child", "FK_MY", "MY_Parent",
+            onDelete: "'; DROP TABLE admin; --"));
+        Assert.Throws<ArgumentException>(() => new MySqlMigrationSqlGenerator().GenerateSql(diff));
+    }
+
+    [Fact]
+    public void MySql_DefaultValueInjection_ThrowsArgumentException()
+    {
+        var diff = new SchemaDiff();
+        var t = new TableSchema { Name = "MY_DefaultInj" };
+        t.Columns.Add(new ColumnSchema { Name = "Id",  ClrType = typeof(int).FullName!,    IsPrimaryKey = true });
+        t.Columns.Add(new ColumnSchema { Name = "Col", ClrType = typeof(string).FullName!, IsNullable = false,
+                                         DefaultValue = "'; DROP TABLE users --" });
+        diff.AddedTables.Add(t);
+        Assert.Throws<ArgumentException>(() => new MySqlMigrationSqlGenerator().GenerateSql(diff));
+    }
+
+    [Fact]
+    public void MySql_AddNotNullColumnNoDefault_ThrowsInvalidOperation()
+    {
+        var diff = new SchemaDiff();
+        diff.AddedColumns.Add((new TableSchema { Name = "MY_ExistingTable" },
+            new ColumnSchema { Name = "NewCol", ClrType = typeof(int).FullName!, IsNullable = false }));
+        Assert.Throws<InvalidOperationException>(() => new MySqlMigrationSqlGenerator().GenerateSql(diff));
+    }
+
+    [Fact]
+    public void MySql_ValidFkActions_AcceptedWithoutException()
+    {
+        foreach (var action in new[] { "CASCADE", "NO ACTION", "SET NULL", "RESTRICT" })
+        {
+            var diff = new SchemaDiff();
+            diff.AddedTables.Add(BuildFkTable($"MY_ValidFk_{action.Replace(" ", "_")}",
+                $"FK_MY_{action.Replace(" ", "_")}", "MY_Parent", onDelete: action));
+            Assert.Null(Record.Exception(() => new MySqlMigrationSqlGenerator().GenerateSql(diff)));
+        }
+    }
+
+    [Fact]
+    public async Task MySql_ConcurrentGeneration_NoContamination()
+    {
+        var gen = new MySqlMigrationSqlGenerator();
+        var all = await Task.WhenAll(
+            Enumerable.Range(0, 50).Select(_ => Task.Run(() => gen.GenerateSql(BuildSimpleDiff("MY_ConcA")))).Concat(
+            Enumerable.Range(0, 50).Select(_ => Task.Run(() => gen.GenerateSql(BuildSimpleDiff("MY_ConcB"))))));
+
+        foreach (var r in all.Take(50))
+            Assert.DoesNotContain("MY_ConcB", string.Join(" ", r.Up));
+        foreach (var r in all.Skip(50))
+            Assert.DoesNotContain("MY_ConcA", string.Join(" ", r.Up));
+    }
+}
+
+// ── Fault-injection: PostgreSQL generator ────────────────────────────────────
+
+public class PostgresMigrationSqlGeneratorFaultTests
+{
+    private static SchemaDiff BuildSimpleDiff(string tableName)
+    {
+        var t = new TableSchema { Name = tableName };
+        t.Columns.Add(new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!,    IsPrimaryKey = true });
+        t.Columns.Add(new ColumnSchema { Name = "Label", ClrType = typeof(string).FullName!, IsNullable = true });
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(t);
+        return diff;
+    }
+
+    private static TableSchema BuildFkTable(string table, string fkName, string principal,
+        string onDelete = "CASCADE")
+    {
+        var fk = new ForeignKeySchema
+        {
+            ConstraintName   = fkName,
+            DependentColumns = ["ParentId"],
+            PrincipalTable   = principal,
+            PrincipalColumns = ["Id"],
+            OnDelete         = onDelete,
+            OnUpdate         = "NO ACTION",
+        };
+        var t = new TableSchema { Name = table };
+        t.Columns.Add(new ColumnSchema { Name = "Id",       ClrType = typeof(int).FullName!, IsPrimaryKey = true });
+        t.Columns.Add(new ColumnSchema { Name = "ParentId", ClrType = typeof(int).FullName!, IsNullable = true });
+        t.ForeignKeys.Add(fk);
+        return t;
+    }
+
+    [Fact]
+    public void Postgres_ValidAddTable_UsesDoubleQuoteEscaping()
+    {
+        var stmts = new PostgresMigrationSqlGenerator().GenerateSql(BuildSimpleDiff("PG_TestTable"));
+        var upSql = string.Join(" ", stmts.Up);
+        Assert.Contains("\"PG_TestTable\"", upSql);
+        Assert.Contains("CREATE TABLE",     upSql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Postgres_InvalidFkAction_ThrowsArgumentException()
+    {
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(BuildFkTable("PG_Child", "FK_PG", "PG_Parent",
+            onDelete: "CASCADE; SELECT pg_sleep(5) --"));
+        Assert.Throws<ArgumentException>(() => new PostgresMigrationSqlGenerator().GenerateSql(diff));
+    }
+
+    [Fact]
+    public void Postgres_DefaultValueInjection_ThrowsArgumentException()
+    {
+        var diff = new SchemaDiff();
+        var t = new TableSchema { Name = "PG_DefaultInj" };
+        t.Columns.Add(new ColumnSchema { Name = "Id",    ClrType = typeof(int).FullName!, IsPrimaryKey = true });
+        t.Columns.Add(new ColumnSchema { Name = "Score", ClrType = typeof(int).FullName!, IsNullable = false,
+                                         DefaultValue = "0); TRUNCATE users CASCADE --" });
+        diff.AddedTables.Add(t);
+        Assert.Throws<ArgumentException>(() => new PostgresMigrationSqlGenerator().GenerateSql(diff));
+    }
+
+    [Fact]
+    public void Postgres_AddNotNullColumnNoDefault_ThrowsInvalidOperation()
+    {
+        var diff = new SchemaDiff();
+        diff.AddedColumns.Add((new TableSchema { Name = "PG_ExistingTable" },
+            new ColumnSchema { Name = "NewCol", ClrType = typeof(int).FullName!, IsNullable = false }));
+        Assert.Throws<InvalidOperationException>(() => new PostgresMigrationSqlGenerator().GenerateSql(diff));
+    }
+
+    [Fact]
+    public void Postgres_ValidFkActions_AcceptedWithoutException()
+    {
+        foreach (var action in new[] { "CASCADE", "NO ACTION", "SET NULL", "SET DEFAULT", "RESTRICT" })
+        {
+            var diff = new SchemaDiff();
+            diff.AddedTables.Add(BuildFkTable($"PG_ValidFk_{action.Replace(" ", "_")}",
+                $"FK_PG_{action.Replace(" ", "_")}", "PG_Parent", onDelete: action));
+            Assert.Null(Record.Exception(() => new PostgresMigrationSqlGenerator().GenerateSql(diff)));
+        }
+    }
+
+    [Fact]
+    public void Postgres_UpThenDown_TableExistsThenDropped()
+    {
+        var stmts = new PostgresMigrationSqlGenerator().GenerateSql(BuildSimpleDiff("PG_RoundTripTable"));
+        Assert.Contains("CREATE TABLE", string.Join(" ", stmts.Up),   StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("DROP TABLE",   string.Join(" ", stmts.Down), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Postgres_ConcurrentGeneration_NoContamination()
+    {
+        var gen = new PostgresMigrationSqlGenerator();
+        var all = await Task.WhenAll(
+            Enumerable.Range(0, 50).Select(_ => Task.Run(() => gen.GenerateSql(BuildSimpleDiff("PG_ConcA")))).Concat(
+            Enumerable.Range(0, 50).Select(_ => Task.Run(() => gen.GenerateSql(BuildSimpleDiff("PG_ConcB"))))));
+
+        foreach (var r in all.Take(50))
+            Assert.DoesNotContain("PG_ConcB", string.Join(" ", r.Up));
+        foreach (var r in all.Skip(50))
+            Assert.DoesNotContain("PG_ConcA", string.Join(" ", r.Up));
+    }
+}
