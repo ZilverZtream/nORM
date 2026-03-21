@@ -35,7 +35,7 @@ namespace nORM.Core
         /// </summary>
         private const int MaxCascadeDepth = 10;
 
-        // Hash seed primes for CompositeKey.GetHashCode (FNV-style polynomial hash).
+        // Hash seed primes for CompositeKey.GetHashCode (Bernstein-style polynomial hash).
         private const int HashSeed = 17;
         private const int HashMultiplier = 23;
 
@@ -100,18 +100,23 @@ namespace nORM.Core
 
                 var pk = GetPrimaryKeyValue(entity, mapping);
 
-                // Check-and-insert by PK under the outer lock, preventing race conditions
-                // where two threads tracking the same entity by PK might both create entries.
+                // Check-and-insert by PK under the outer lock, preventing TOCTOU races
+                // between reference-check, PK-lookup, and dictionary mutation sequences.
                 if (pk != null)
                 {
                     var typeEntries = _entriesByKey.GetOrAdd(
                         mapping.Type,
                         _ => new ConcurrentDictionary<object, EntityEntry>());
 
-                    // Get or create entry for this PK (lock guarantees single-writer)
-                    var pkEntry = typeEntries.GetOrAdd(pk, _ =>
+                    // Attempt PK-based lookup before creating a new entry to avoid constructing
+                    // an EntityEntry that we immediately discard. Side effects (_entriesByReference
+                    // and _nonNotifyingEntries mutations) happen AFTER successful TryAdd, never inside
+                    // a GetOrAdd factory — factories may execute concurrently in ConcurrentDictionary
+                    // even when the outer lock serialises writers, and side-effectful factories are
+                    // fragile (the losing factory's side effects run but its result is discarded,
+                    // causing dangling entries in _nonNotifyingEntries).
+                    if (!typeEntries.TryGetValue(pk, out var pkEntry))
                     {
-                        // Create entry only if not already tracked by PK
                         var newEntry = state == EntityState.Unchanged && !_options.EagerChangeTracking
                             ? CreateLazyEntry(entity, mapping)
                             : new EntityEntry(entity, state, mapping, _options, MarkDirty);
@@ -123,26 +128,34 @@ namespace nORM.Core
                         if (state == EntityState.Modified)
                             newEntry.MarkExplicitlyModified();
 
-                        // Also track by reference
-                        _entriesByReference.TryAdd(entity, newEntry);
+                        if (typeEntries.TryAdd(pk, newEntry))
+                        {
+                            // We won the insertion race — register the side-effect collections.
+                            _entriesByReference.TryAdd(entity, newEntry);
+                            if (entity is not INotifyPropertyChanged)
+                                _nonNotifyingEntries.TryAdd(newEntry, 0);
+                            return newEntry;
+                        }
 
-                        // Set up additional tracking
-                        if (entity is not INotifyPropertyChanged)
-                            _nonNotifyingEntries.TryAdd(newEntry, 0);
+                        // Lost insertion race (concurrent writer with same PK despite outer lock —
+                        // should not occur in single-threaded use; defensive for unexpected re-entry).
+                        // Fall through to re-read the winning entry.
+                        pkEntry = typeEntries[pk];
+                    }
 
-                        return newEntry;
-                    });
-
-                    // If entry was created by another thread or different instance with same PK
+                    // An entry with this PK already existed (or was just inserted by another writer).
                     if (!ReferenceEquals(pkEntry.Entity, entity))
                     {
-                        // Different instance with same PK - update the tracked instance's state
-                        // but don't downgrade from dirty states
+                        // Different CLR instance with same PK — update state but don't downgrade
+                        // from a dirty state to Unchanged.
                         if (!(pkEntry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
                               && state == EntityState.Unchanged))
                         {
                             pkEntry.State = state;
                         }
+                        // Note: the new `entity` reference is NOT added to _entriesByReference here;
+                        // the winner's reference remains the canonical tracked instance for this PK.
+                        // Callers that need reference-based lookup should use the returned entry's Entity.
                     }
 
                     return pkEntry;
@@ -161,9 +174,9 @@ namespace nORM.Core
                     return entry;
                 }
 
-                // Under the lock this path is reachable only if the ConcurrentDictionary was
-                // mutated by Remove on another thread between our earlier TryGetValue and TryAdd.
-                // Retrieve the winner and apply state-update rules.
+                // Under the lock this path is unreachable in normal single-threaded usage of DbContext.
+                // It would only be reached if Clear() or another Remove() ran concurrently between the
+                // earlier TryGetValue (line above fast-path) and this TryAdd. Retrieve the winner entry.
                 if (_entriesByReference.TryGetValue(entity, out var raceEntry))
                 {
                     // Don't downgrade from dirty states
@@ -263,12 +276,17 @@ namespace nORM.Core
         /// <remarks>
         /// Caller must already hold <see cref="_trackLock"/>. Phase-2 removals use
         /// <see cref="RemoveUnlocked"/> to avoid re-entrant lock acquisition.
+        /// Cycles in the entity graph (bidirectional references) are silently skipped via
+        /// the <c>visited</c> set — not thrown as exceptions — because bidirectional 1:N
+        /// relationships (Parent → Children, Child.Parent back-ref) are common and should
+        /// not be treated as errors.
         /// </remarks>
         private void CascadeDelete(object rootEntity, TableMapping rootMapping)
         {
             // Collect all entities to delete first, then remove them to prevent premature removal
             // from blocking discovery of descendants during graph traversal.
             var queue = new Queue<(object Entity, TableMapping Mapping, int Depth)>();
+            // Use reference equality to avoid false cycle-detection when entities override Equals/GetHashCode.
             var visited = new HashSet<object>(RefComparer.Instance);
             var toRemove = new List<object>();
 
@@ -280,7 +298,8 @@ namespace nORM.Core
             {
                 var (entity, mapping, depth) = queue.Dequeue();
 
-                // Only add to removal list if this is not the root (root is already being removed by caller)
+                // Only add to removal list if this is not the root (root is already being removed by caller
+                // in Remove() before CascadeDelete is invoked).
                 if (depth > 0)
                     toRemove.Add(entity);
 
@@ -313,32 +332,54 @@ namespace nORM.Core
                             relation.NavProp.Name, entity.GetType().Name);
                         continue;
                     }
-                    if (navValue is IEnumerable collection)
+                    if (navValue is IEnumerable collection && navValue is not string)
                     {
-                        foreach (var child in collection)
+                        // Wrap enumeration in try/catch: collections may throw on GetEnumerator()
+                        // or MoveNext() (e.g. disposed lazy-load proxy, collection requiring DB access).
+                        // Partial traversal is safer than aborting cascade entirely.
+                        IEnumerator? enumerator = null;
+                        try
                         {
-                            if (child == null)
-                                continue;
-
-                            // Skip already-visited entities to handle circular references gracefully
-                            if (!visited.Add(child))
-                                continue;
-
-                            if (_entriesByReference.TryGetValue(child, out var childEntry))
+                            enumerator = collection.GetEnumerator();
+                            while (enumerator.MoveNext())
                             {
-                                queue.Enqueue((child, childEntry.Mapping, depth + 1));
+                                var child = enumerator.Current;
+                                if (child == null)
+                                    continue;
+
+                                // Skip already-visited entities to handle circular references gracefully
+                                if (!visited.Add(child))
+                                    continue;
+
+                                if (_entriesByReference.TryGetValue(child, out var childEntry))
+                                {
+                                    queue.Enqueue((child, childEntry.Mapping, depth + 1));
+                                }
                             }
+                        }
+                        catch (Exception ex)
+                        {
+                            _options.Logger?.LogWarning(ex,
+                                "Failed to enumerate collection navigation property {NavProp} on entity type {EntityType} during cascade delete. Skipping this collection.",
+                                relation.NavProp.Name, entity.GetType().Name);
+                        }
+                        finally
+                        {
+                            (enumerator as IDisposable)?.Dispose();
                         }
                     }
                     else if (navValue != null)
                     {
-                        // Detect cycles: if already visited, this is a circular reference
+                        // Skip already-visited entities to handle circular/bidirectional references gracefully.
+                        // Bidirectional 1:N relationships (Parent → Child.Parent back-ref) commonly produce
+                        // cycles; throwing here would break legitimate entity graphs. Log at debug level so
+                        // the traversal decision is visible without polluting production logs.
                         if (!visited.Add(navValue))
                         {
-                            throw new InvalidOperationException(
-                                $"Circular reference detected in cascade delete at depth {depth}. " +
-                                $"Entity type {navValue.GetType().Name} forms a cycle in the relationship graph. " +
-                                "Either remove the circular reference or disable cascade delete on one of the relationships.");
+                            _options.Logger?.LogDebug(
+                                "Cycle detected in cascade delete at depth {Depth}: entity type {EntityType} already visited. Skipping.",
+                                depth, navValue.GetType().Name);
+                            continue;
                         }
 
                         if (_entriesByReference.TryGetValue(navValue, out var childEntry))
@@ -385,6 +426,12 @@ namespace nORM.Core
         /// Gets an enumeration of the <see cref="EntityEntry"/> instances currently
         /// tracked by the context.
         /// </summary>
+        /// <remarks>
+        /// Returns a snapshot of the underlying collection. The <see cref="EntityEntry"/>
+        /// objects themselves are mutable; callers should not modify entry state (such as
+        /// <see cref="EntityEntry.State"/>) directly, as this bypasses change-tracker
+        /// invariants. Use <see cref="DbContext"/> APIs to transition entity state.
+        /// </remarks>
         public IEnumerable<EntityEntry> Entries => _entriesByReference.Values;
 
         /// <summary>
@@ -431,33 +478,47 @@ namespace nORM.Core
 
             foreach (var entry in source)
             {
-                if (entry.Entity != null)
+                var entity = entry.Entity;
+                if (entity != null)
                 {
                     try { entry.DetectChanges(); }
                     catch (Exception ex)
                     {
                         failures ??= new List<(object Entity, Exception Exception)>();
-                        failures.Add((entry.Entity, ex));
+                        failures.Add((entity, ex));
                         _options.Logger?.LogError(ex,
                             "Error detecting changes for entity {EntityType}. Entity will be skipped for this SaveChanges operation.",
-                            entry.Entity.GetType().Name);
+                            entity.GetType().Name);
                     }
+                }
+                else
+                {
+                    // Entry has been detached without going through Remove() — evict from stale sets
+                    // so they are not visited on every future DetectAllChanges cycle.
+                    _nonNotifyingEntries.TryRemove(entry, out _);
+                    _dirtyNonNotifyingEntries.TryRemove(entry, out _);
                 }
             }
 
             foreach (var entry in _dirtyEntries.Keys)
             {
-                if (entry.Entity != null)
+                var entity = entry.Entity;
+                if (entity != null)
                 {
                     try { entry.DetectChanges(); }
                     catch (Exception ex)
                     {
                         failures ??= new List<(object Entity, Exception Exception)>();
-                        failures.Add((entry.Entity, ex));
+                        failures.Add((entity, ex));
                         _options.Logger?.LogError(ex,
                             "Error detecting changes for entity {EntityType}. Entity will be skipped for this SaveChanges operation.",
-                            entry.Entity.GetType().Name);
+                            entity.GetType().Name);
                     }
+                }
+                else
+                {
+                    // Entry has been detached without going through Remove() — evict from dirty set.
+                    _dirtyEntries.TryRemove(entry, out _);
                 }
             }
 
@@ -504,6 +565,11 @@ namespace nORM.Core
         /// <summary>
         /// Removes all tracked entity entries and resets the change tracker to an empty state.
         /// </summary>
+        /// <remarks>
+        /// This method is not synchronized with <see cref="_trackLock"/>. Since
+        /// <see cref="DbContext"/> is single-threaded by design, callers must not invoke
+        /// <see cref="Clear"/> concurrently with <see cref="Track"/> or <see cref="Remove"/>.
+        /// </remarks>
         public void Clear()
         {
             _entriesByReference.Clear();
@@ -527,8 +593,11 @@ namespace nORM.Core
                 underlying == typeof(uint)  || underlying == typeof(sbyte) ||
                 underlying == typeof(ushort))
                 return Convert.ToInt64(value) == 0L;
+            // Use Convert.ToUInt64 rather than a direct (ulong) cast: the value is boxed as its
+            // actual runtime type (e.g. boxed uint, boxed ulong), and an unbox cast to ulong fails
+            // with InvalidCastException when the boxed type differs from ulong.
             if (underlying == typeof(ulong))
-                return (ulong)value == 0UL;
+                return Convert.ToUInt64(value) == 0UL;
             if (underlying == typeof(Guid))
                 return (Guid)value == Guid.Empty;
             return false;

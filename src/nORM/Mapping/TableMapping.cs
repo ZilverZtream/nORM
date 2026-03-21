@@ -271,7 +271,11 @@ namespace nORM.Mapping
             var keyCol = KeyColumns.FirstOrDefault(k => k.IsDbGenerated);
             if (keyCol != null)
             {
-                var convertedValue = Convert.ChangeType(value, keyCol.Prop.PropertyType);
+                // Use the underlying type for nullable value types (e.g., int?, long?) because
+                // Convert.ChangeType does not support Nullable<T> as a target type and would throw
+                // InvalidCastException. The setter's compiled lambda handles the implicit boxing.
+                var targetType = Nullable.GetUnderlyingType(keyCol.Prop.PropertyType) ?? keyCol.Prop.PropertyType;
+                var convertedValue = Convert.ChangeType(value, targetType);
                 keyCol.Setter(entity, convertedValue);
             }
         }
@@ -284,9 +288,6 @@ namespace nORM.Mapping
                 var navProp = kvp.Key;
                 var nav = kvp.Value;
 
-                // Determine element type from the collection navigation property
-                // (IEnumerable<TOwned> → TOwned, List<TOwned> → TOwned)
-                var collectionType = navProp.PropertyType;
                 var ownedType = nav.OwnedType;
 
                 // Build columns for the owned type (excluding the FK column itself)

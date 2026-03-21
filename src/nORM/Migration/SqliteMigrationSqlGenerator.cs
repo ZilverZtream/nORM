@@ -8,6 +8,14 @@ namespace nORM.Migration
     /// <summary>
     /// Generates SQLite-specific SQL statements to apply and roll back schema changes.
     /// </summary>
+    /// <remarks>
+    /// Provider: SQLite (double-quote-escaped identifiers). Uses INTEGER PRIMARY KEY AUTOINCREMENT
+    /// for identity columns. Because SQLite does not support ALTER COLUMN or DROP COLUMN on older
+    /// versions, schema changes use the standard table-recreation workaround (CREATE temp, INSERT,
+    /// DROP, RENAME). PRAGMA foreign_keys=off/on are returned in pre/post-transaction segments so
+    /// callers can execute them outside the migration transaction. FK referential actions are
+    /// validated against an allowlist before being interpolated into DDL.
+    /// </remarks>
     public class SqliteMigrationSqlGenerator : IMigrationSqlGenerator
     {
         /// <summary>Default SQLite fallback type for unmapped CLR types.</summary>
@@ -83,10 +91,9 @@ namespace nORM.Migration
                         colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
                 }
 
-                // Emit UNIQUE constraint for unique non-PK columns.
-                var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
-                if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
+                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
+                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
 
                 // MG-1: Emit inline FOREIGN KEY constraints
                 foreach (var fk in table.ForeignKeys)
@@ -94,9 +101,11 @@ namespace nORM.Migration
 
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
-                // Emit CREATE INDEX for columns with a named index (non-PK, non-unique).
-                foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    up.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
+                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
+                foreach (var idxGroup in table.Columns
+                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
+                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
+                    up.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
 
                 down.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
             }
@@ -161,15 +170,18 @@ namespace nORM.Migration
                     if (!pkCols.Any(c => c.IsIdentity))
                         colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
                 }
-                var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
-                if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
+                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
+                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
                 // MG-1: Restore FK constraints in Down recreation
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
                 down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
-                foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    down.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
+                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
+                foreach (var idxGroup in table.Columns
+                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
+                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
+                    down.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
             }
 
             // SD-8: Generate DROP COLUMN for columns removed in the new snapshot.
@@ -192,9 +204,13 @@ namespace nORM.Migration
                 needsUpFkPragma = true;
 
                 // Down: add the dropped columns back (SQLite ADD COLUMN is forward-compatible)
+                // C: include DefaultValue so NOT NULL columns can be restored to populated tables.
                 foreach (var droppedCol in droppedCols)
                 {
-                    var colDef = $"{Esc(droppedCol.Name)} {GetSqlType(droppedCol)} {(droppedCol.IsNullable ? "NULL" : "NOT NULL")}";
+                    var restoreDefault = !string.IsNullOrEmpty(droppedCol.DefaultValue)
+                        ? $" DEFAULT {DefaultValueValidator.Validate(droppedCol.DefaultValue)}"
+                        : "";
+                    var colDef = $"{Esc(droppedCol.Name)} {GetSqlType(droppedCol)} {(droppedCol.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
                     down.Add($"ALTER TABLE {Esc(newTable.Name)} ADD COLUMN {colDef}");
                 }
             }
@@ -275,7 +291,8 @@ namespace nORM.Migration
             if (overrides != null)
                 cols = cols.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
 
-            var names = cols.Select(c => Esc(c.Name));
+            // F: compute names AFTER overrides have been applied so the SELECT list uses the correct column set.
+            var names = cols.Select(c => Esc(c.Name)).ToList();
 
             // Build column definitions with full constraint metadata (same as AddedTables path).
             var colDefs = cols.Select(c =>
@@ -297,10 +314,9 @@ namespace nORM.Migration
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
             }
 
-            // Emit UNIQUE constraint for unique non-PK columns.
-            var uniqueNonPkCols = cols.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
-            if (uniqueNonPkCols.Count > 0)
-                colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+            // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
+            foreach (var uc in cols.Where(c => c.IsUnique && !c.IsPrimaryKey))
+                colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
 
             // MG-1: Emit inline FOREIGN KEY constraints (explicit list or fall back to table.ForeignKeys)
             foreach (var fk in fks ?? table.ForeignKeys)
@@ -308,19 +324,24 @@ namespace nORM.Migration
 
             // MG-2: No PRAGMA here — PRAGMA foreign_keys=off/on is returned in the pre/post transaction segments.
             var tempName = $"\"__temp__{table.Name.Replace("\"", "\"\"")}\"";
+            // G: Drop the temp table if it already exists (handles interrupted prior migration).
+            stmts.Add($"DROP TABLE IF EXISTS {tempName}");
             stmts.Add($"CREATE TABLE {tempName} ({string.Join(", ", colDefs)})");
             stmts.Add($"INSERT INTO {tempName} SELECT {string.Join(", ", names)} FROM {Esc(table.Name)}");
             stmts.Add($"DROP TABLE {Esc(table.Name)}");
             stmts.Add($"ALTER TABLE {tempName} RENAME TO {Esc(table.Name)}");
 
-            // Emit CREATE INDEX for columns with a named index (non-PK, non-unique).
-            foreach (var col in cols.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                stmts.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
+            // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
+            foreach (var idxGroup in cols
+                .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
+                .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
+                stmts.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
         }
 
         // M1/X1: Allowlist for FK referential action tokens. Free-form strings are not safe
         // to interpolate into DDL; an attacker-controlled OnDelete/OnUpdate could inject
         // arbitrary SQL into migration scripts.
+        // NOTE: Identical copy exists in the other three migration generators. If a shared base class is introduced, consolidate here.
         private static readonly HashSet<string> _validFkActions =
             new(StringComparer.OrdinalIgnoreCase) { "NO ACTION", "CASCADE", "SET NULL", "RESTRICT", "SET DEFAULT" };
 
@@ -371,19 +392,30 @@ namespace nORM.Migration
             return sql;
         }
 
+        // NOTE: identical copies of ResolveType and ValidateFkAction exist in the other three generators;
+        // consolidate into a shared base class or static helper if one is introduced in the future.
+
+        // Cache for ResolveType to avoid scanning all loaded assemblies on every call.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Type?> _resolveTypeCache
+            = new(StringComparer.Ordinal);
+
         // Resolve a CLR type by its full name, scanning loaded assemblies when Type.GetType fails.
+        // Results are cached in _resolveTypeCache to avoid repeated AppDomain scans.
         private static Type? ResolveType(string typeName)
         {
             if (string.IsNullOrEmpty(typeName))
                 return null;
-            var t = Type.GetType(typeName);
-            if (t != null) return t;
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            return _resolveTypeCache.GetOrAdd(typeName, static name =>
             {
-                t = asm.GetType(typeName);
+                var t = Type.GetType(name);
                 if (t != null) return t;
-            }
-            return null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    t = asm.GetType(name);
+                    if (t != null) return t;
+                }
+                return null;
+            });
         }
     }
 }

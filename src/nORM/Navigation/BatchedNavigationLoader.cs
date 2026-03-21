@@ -333,15 +333,31 @@ namespace nORM.Navigation
             _batchTimer?.Dispose();
             _batchTimer = null;
 
-            // Cancel any pending TCS entries so callers are not left waiting indefinitely.
-            foreach (var kvp in _pendingLoads)
+            // Drain and cancel pending TCS entries under the semaphore so that a concurrent
+            // RemovePendingLoadsForEntity (which also holds the semaphore) cannot race on
+            // _pendingLoads. Acquire with Wait() — Dispose is synchronous and called at most
+            // once (guarded by the _disposed flag above), so blocking here is safe.
+            // After the semaphore is released we do NOT call _batchSemaphore.Dispose()
+            // immediately — RemovePendingLoadsForEntity may still be in its own Wait().
+            // The semaphore is finalized by GC; SemaphoreSlim wraps a lightweight kernel
+            // object only if AvailableWaitHandle was accessed, which we do not do here.
+            _batchSemaphore.Wait();
+            try
             {
-                foreach (var (_, tcs, callerCt) in kvp.Value)
+                // Cancel any pending TCS entries so callers are not left waiting indefinitely.
+                foreach (var kvp in _pendingLoads)
                 {
-                    tcs.TrySetCanceled(callerCt.IsCancellationRequested ? callerCt : CancellationToken.None);
+                    foreach (var (_, tcs, callerCt) in kvp.Value)
+                    {
+                        tcs.TrySetCanceled(callerCt.IsCancellationRequested ? callerCt : CancellationToken.None);
+                    }
                 }
+                _pendingLoads.Clear();
             }
-            _pendingLoads.Clear();
+            finally
+            {
+                _batchSemaphore.Release();
+            }
 
             _batchSemaphore.Dispose();
         }

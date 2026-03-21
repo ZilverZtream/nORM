@@ -102,7 +102,6 @@ namespace nORM.Core
         // A1 fix: replaced Lazy<Task> with an explicit double-checked lock so that the
         // CancellationToken passed to EnsureConnectionAsync is forwarded to TemporalManager.
         // Lazy<Task> fixes the factory at creation time with no way to accept a later ct.
-        private volatile Task? _temporalInitTask;
         private readonly SemaphoreSlim _temporalInitLock = new(1, 1);
         private volatile bool _temporalInitComplete;
         private DbTransaction? _currentTransaction; // Access via Interlocked.* only
@@ -178,7 +177,7 @@ namespace nORM.Core
                 : new DefaultExecutionStrategy(this);
             _timeoutManager = new AdaptiveTimeoutManager(Options.TimeoutConfiguration,
                 Options.Logger ?? NullLogger.Instance);
-            // _temporalInitTask / _temporalInitLock initialized via field declarations above;
+            // _temporalInitLock initialized via field declarations above;
             // initialization happens lazily inside EnsureConnectionSlowAsync when ct is available.
             _cleanupTimer = new Timer(_ => CleanupDisposables(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
@@ -281,8 +280,7 @@ namespace nORM.Core
                     {
                         // Pass _cn directly to avoid re-entering EnsureConnectionAsync
                         // from within the bootstrap (which would deadlock on _temporalInitLock).
-                        _temporalInitTask = TemporalManager.InitializeAsync(this, _cn, ct);
-                        await _temporalInitTask.ConfigureAwait(false);
+                        await TemporalManager.InitializeAsync(this, _cn, ct).ConfigureAwait(false);
                         _temporalInitComplete = true;
                     }
                 }

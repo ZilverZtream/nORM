@@ -57,7 +57,14 @@ namespace nORM.Internal
         {
             if (maxSize <= 0) throw new ArgumentOutOfRangeException(nameof(maxSize));
             if (_isDisposed) throw new ObjectDisposedException(nameof(ConcurrentLruCache<TKey, TValue>));
-            _lock.EnterWriteLock();
+            try
+            {
+                _lock.EnterWriteLock();
+            }
+            catch (ObjectDisposedException)
+            {
+                throw new ObjectDisposedException(nameof(ConcurrentLruCache<TKey, TValue>));
+            }
             try
             {
                 _maxSize = maxSize;
@@ -80,7 +87,14 @@ namespace nORM.Internal
         public void Clear()
         {
             if (_isDisposed) return;
-            _lock.EnterWriteLock();
+            try
+            {
+                _lock.EnterWriteLock();
+            }
+            catch (ObjectDisposedException)
+            {
+                return; // disposed between check and lock acquisition — nothing to clear
+            }
             try
             {
                 _cache.Clear();
@@ -127,10 +141,14 @@ namespace nORM.Internal
                     return true;
                 }
 
-                // Expired: remove (requires write lock, but this is rare)
-                _lock.EnterWriteLock();
+                // Expired: remove (requires write lock, but this is rare).
+                // If the lock is already disposed (Dispose racing with this path) just skip
+                // the cleanup — the entry will be gone after Dispose completes.
+                bool lockAcquired = false;
                 try
                 {
+                    _lock.EnterWriteLock();
+                    lockAcquired = true;
                     // Re-check after acquiring lock (double-check pattern)
                     if (_cache.TryGetValue(key, out var nodeToRemove) && nodeToRemove.List != null)
                     {
@@ -138,9 +156,14 @@ namespace nORM.Internal
                         _cache.TryRemove(key, out _);
                     }
                 }
+                catch (ObjectDisposedException)
+                {
+                    // Dispose fired between the _isDisposed check and EnterWriteLock;
+                    // the cache is being torn down — skip expired-entry cleanup.
+                }
                 finally
                 {
-                    _lock.ExitWriteLock();
+                    if (lockAcquired) _lock.ExitWriteLock();
                 }
             }
 
@@ -161,7 +184,14 @@ namespace nORM.Internal
             if (TryGet(key, out var existing))
                 return existing;
 
-            _lock.EnterWriteLock();
+            try
+            {
+                _lock.EnterWriteLock();
+            }
+            catch (ObjectDisposedException)
+            {
+                throw new ObjectDisposedException(nameof(ConcurrentLruCache<TKey, TValue>));
+            }
             try
             {
                 // Double-check inside write lock: a racing thread may have inserted while we waited.
@@ -219,7 +249,14 @@ namespace nORM.Internal
             var nowUtc = DateTimeOffset.UtcNow;
             var item = new CacheItem(key, value, nowUtc, ttlOverride, nowUtc.UtcDateTime.Ticks);
 
-            _lock.EnterWriteLock();
+            try
+            {
+                _lock.EnterWriteLock();
+            }
+            catch (ObjectDisposedException)
+            {
+                return; // disposed between check and lock acquisition — drop the write silently
+            }
             try
             {
                 if (_cache.TryGetValue(key, out var existing))
@@ -352,8 +389,25 @@ namespace nORM.Internal
             // the check and race on _lock.Dispose().
             if (Interlocked.Exchange(ref _disposeFlag, 1) != 0) return;
             _isDisposed = true;
-            _cache.Clear();
-            _lruList.Clear();
+
+            // Acquire the write lock before clearing the linked list and dictionary so that
+            // any thread which passed the _isDisposed check and is already inside or waiting
+            // for the write lock can complete its critical section first.  After we release,
+            // the lock is disposed; subsequent callers will see _isDisposed == true and
+            // return/throw before ever touching the lock.  Any thread that passes the
+            // _isDisposed check after we set it but before EnterWriteLock here will find the
+            // lock disposed and get ObjectDisposedException from EnterWriteLock, which the
+            // callers catch and handle gracefully (return/rethrow as ObjectDisposedException).
+            _lock.EnterWriteLock();
+            try
+            {
+                _cache.Clear();
+                _lruList.Clear();
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
             _lock.Dispose();
         }
         private int _disposeFlag;

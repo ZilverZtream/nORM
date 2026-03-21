@@ -110,6 +110,14 @@ namespace nORM.Internal
             {
                 throw new TimeoutException("Expression compilation timed out", ex);
             }
+            catch (AggregateException ae) when (ae.InnerException is OperationCanceledException oce)
+            {
+                // task.Wait throws AggregateException when the task itself is canceled or
+                // faults with OperationCanceledException (e.g., _compileSemaphore.Wait(token)
+                // inside Task.Run threw OCE while the caller token fired). Unwrap and rethrow
+                // as TimeoutException to match the OperationCanceledException catch above.
+                throw new TimeoutException("Expression compilation timed out", oce);
+            }
 
             if (compileException != null)
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(compileException).Throw();

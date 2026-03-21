@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using nORM.Core;
@@ -10,12 +11,16 @@ using nORM.Mapping;
 namespace nORM.Migration
 {
     /// <summary>
-    /// Represents a snapshot of the database schema at a particular point in time.
+    /// Represents the desired database schema state derived from code mappings (attributes or
+    /// fluent configuration). This is NOT a live snapshot of an actual database — it reflects
+    /// what the schema <em>should</em> look like based on the current entity model.
+    /// Use <see cref="SchemaDiffer.Diff"/> to compare two snapshots and produce the migrations
+    /// required to bring an old schema up to date with a new one.
     /// </summary>
     public class SchemaSnapshot
     {
         /// <summary>Tables captured in the snapshot.</summary>
-        public List<TableSchema> Tables { get; set; } = new();
+        public List<TableSchema> Tables { get; init; } = new();
     }
 
     /// <summary>
@@ -26,13 +31,13 @@ namespace nORM.Migration
         /// <summary>Name of the table.</summary>
         public string Name { get; set; } = string.Empty;
         /// <summary>Columns defined on the table.</summary>
-        public List<ColumnSchema> Columns { get; set; } = new();
-        /// <summary>MG-1: Foreign key constraints defined on this table.</summary>
-        public List<ForeignKeySchema> ForeignKeys { get; set; } = new();
+        public List<ColumnSchema> Columns { get; init; } = new();
+        /// <summary>Foreign key constraints defined on this table.</summary>
+        public List<ForeignKeySchema> ForeignKeys { get; init; } = new();
     }
 
     /// <summary>
-    /// MG-1: Describes a foreign key constraint between a dependent (child) table and a principal (parent) table.
+    /// Describes a foreign key constraint between a dependent (child) table and a principal (parent) table.
     /// </summary>
     public class ForeignKeySchema
     {
@@ -63,15 +68,25 @@ namespace nORM.Migration
     {
         /// <summary>Name of the column.</summary>
         public string Name { get; set; } = string.Empty;
-        /// <summary>Full CLR type name of the column.</summary>
+        /// <summary>
+        /// Full CLR type name of the column (e.g. <c>System.Int32</c>).
+        /// An empty string is a recognizable placeholder meaning "unknown/unresolved type";
+        /// callers that produce <see cref="ColumnSchema"/> instances should always populate this
+        /// field — leaving it empty will cause all four SQL generators to fall back to their
+        /// default type (e.g. NVARCHAR(MAX) for SQL Server) and may suppress spurious alter
+        /// detections because two columns with an empty ClrType compare equal.
+        /// </summary>
+        // NOTE: the default is intentionally string.Empty (not null) so that null-safe string
+        // comparisons in SchemaDiffer.Diff do not require extra null guards. If ClrType is empty
+        // on a ColumnSchema produced by external code, treat it as a configuration concern.
         public string ClrType { get; set; } = string.Empty;
         /// <summary>Indicates whether the column allows <c>null</c> values.</summary>
         public bool IsNullable { get; set; }
-        /// <summary>G1: True when the column is (part of) the table's primary key.</summary>
+        /// <summary>True when the column is (part of) the table's primary key.</summary>
         public bool IsPrimaryKey { get; set; }
-        /// <summary>G1: True when the column has a UNIQUE index.</summary>
+        /// <summary>True when the column has a UNIQUE index.</summary>
         public bool IsUnique { get; set; }
-        /// <summary>G1: Non-null means the column is covered by a named index.</summary>
+        /// <summary>Non-null means the column is covered by a named index.</summary>
         public string? IndexName { get; set; }
         /// <summary>SQL literal default value for ADD COLUMN NOT NULL migrations (e.g. "''" or "0").</summary>
         public string? DefaultValue { get; set; }
@@ -92,6 +107,23 @@ namespace nORM.Migration
         /// </summary>
         /// <param name="assembly">The assembly containing the entity types to scan.</param>
         /// <returns>A snapshot describing the tables and columns inferred from the assembly.</returns>
+        /// <remarks>
+        /// <para>
+        /// <b>Differences from <see cref="Build(DbContext)"/>:</b>
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Uses reflection, <c>[Table]</c>/<c>[Column]</c>/<c>[Key]</c>/<c>[DatabaseGenerated]</c>
+        ///         attributes, and Id/TypeNameId conventions to discover entities and their columns.
+        ///         Fluent API overrides (e.g. <c>ToTable()</c>, <c>HasColumnName()</c>, <c>HasKey()</c>)
+        ///         are <b>not</b> visible here.</item>
+        ///   <item>Scans all non-abstract classes in the assembly that carry <c>[Table]</c> or a
+        ///         <c>[Key]</c>-annotated property. The context-based overload only includes types
+        ///         explicitly registered with the fluent model builder.</item>
+        ///   <item>Does not include foreign key constraints (no fluent Relation metadata available).</item>
+        ///   <item>May produce duplicate <c>TableSchema</c> entries if two entity types share the
+        ///         same <c>[Table]</c> name — see the duplicate-name guard for details.</item>
+        /// </list>
+        /// </remarks>
         public static SchemaSnapshot Build(Assembly assembly)
         {
             ArgumentNullException.ThrowIfNull(assembly);
@@ -106,21 +138,27 @@ namespace nORM.Migration
                     Name = tableAttr?.Name ?? type.Name
                 };
 
-                // G1: collect PK property names for the type using [Key] or convention
+                // Collect PK property names for the type using [Key] or convention.
+                // At most ONE convention PK is chosen: "Id" is checked first, then "{TypeName}Id".
                 var pkNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var p in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
                 {
                     if (p.GetCustomAttribute<KeyAttribute>() != null)
                         pkNames.Add(p.Name);
                 }
-                // Convention fallback: if no [Key] found, treat "Id" or "{TypeName}Id" as PK
+                // Convention fallback: if no [Key] found, try "Id" first, then "{TypeName}Id".
+                // Stop after finding the first match to avoid creating a spurious composite PK
+                // when a type happens to have both (e.g. Order with both "Id" and "OrderId").
                 if (pkNames.Count == 0)
                 {
                     if (type.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance) != null)
                         pkNames.Add("Id");
-                    var conventionName = type.Name + "Id";
-                    if (type.GetProperty(conventionName, BindingFlags.Public | BindingFlags.Instance) != null)
-                        pkNames.Add(conventionName);
+                    else
+                    {
+                        var conventionName = type.Name + "Id";
+                        if (type.GetProperty(conventionName, BindingFlags.Public | BindingFlags.Instance) != null)
+                            pkNames.Add(conventionName);
+                    }
                 }
 
                 foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
@@ -128,57 +166,49 @@ namespace nORM.Migration
                     // A property must be readable to be a column.
                     if (!prop.CanRead)
                         continue;
-                    // The old `!prop.CanWrite` check was wrong — it excluded init-only and
-                    // read-only properties that legitimately map to DB columns. The correct
-                    // exclusion criterion is the property's TYPE (navigation vs scalar), not
-                    // its writability. The navigation-property filters below handle exclusion.
+                    // Exclude properties with no setter at all — these are computed/expression-body
+                    // properties (e.g. public string FullName => FirstName + " " + LastName) and have
+                    // no backing database column. Note: init-only properties DO have a setter
+                    // (IsInitOnly=true), so CanWrite returns true for them and they are included.
+                    if (!prop.CanWrite)
+                        continue;
                     if (prop.GetCustomAttribute<NotMappedAttribute>() != null)
                         continue;
-                    // MG-1: Exclude collection/enumerable navigation properties (e.g. List<Post>, ICollection<T>)
+                    // Exclude collection/enumerable navigation properties (e.g. List<Post>, ICollection<T>)
                     if (typeof(System.Collections.IEnumerable).IsAssignableFrom(prop.PropertyType)
                         && prop.PropertyType != typeof(string))
                         continue;
-                    // MG-1: Exclude reference navigation properties (class types that are not mappable scalars)
+                    // Exclude reference navigation properties (class types that are not mappable scalars)
                     if (!IsMappableType(prop.PropertyType))
                         continue;
-                    // Exclude computed properties with no backing column — these are get-only
-                    // properties that have no setter AND no init accessor, meaning they are pure
-                    // expressions (e.g., public string FullName => FirstName + " " + LastName).
-                    // Properties with init-only setters DO have a SetMethod (IsInitOnly = true) and
-                    // are legitimate columns, so we must NOT exclude them here.
-                    if (!prop.CanWrite)
-                    {
-                        // Check if it's an init-only property (has a set accessor marked IsInitOnly)
-                        var setter = prop.GetSetMethod(nonPublic: true);
-                        bool isInitOnly = false;
-                        if (setter != null)
-                        {
-                            try
-                            {
-                                isInitOnly = setter.ReturnParameter.GetRequiredCustomModifiers()
-                                    .Contains(typeof(System.Runtime.CompilerServices.IsExternalInit));
-                            }
-                            catch (NotSupportedException) { /* dynamic/emitted types may not support modifier introspection */ }
-                        }
-                        // If no setter at all (not even init-only), it's a computed/expression property — exclude it
-                        if (!isInitOnly && setter == null)
-                            continue;
-                    }
 
                     var colAttr = prop.GetCustomAttribute<ColumnAttribute>();
                     var clr = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                    // Skip open generic type parameters (e.g. T in MyEntity<T>) — FullName is null
+                    // and the parameter name (e.g. "T") is ambiguous and not a valid SQL type.
+                    if (clr.IsGenericTypeParameter)
+                        continue;
                     var isPk = pkNames.Contains(prop.Name);
                     var dbGenAttr = prop.GetCustomAttribute<DatabaseGeneratedAttribute>();
                     var column = new ColumnSchema
                     {
                         Name = colAttr?.Name ?? prop.Name,
-                        ClrType = clr.FullName ?? clr.Name,
+                        // Use ToString() as fallback: for constructed generic types it returns the
+                        // full generic form (e.g. "System.Collections.Generic.List`1[System.Int32]")
+                        // which is unambiguous, unlike Name which gives just "List`1".
+                        ClrType = clr.FullName ?? clr.ToString(),
                         IsNullable = !prop.PropertyType.IsValueType || Nullable.GetUnderlyingType(prop.PropertyType) != null,
-                        // G1: populate PK / index metadata from attributes or convention
+                        // Populate PK / index metadata from attributes or convention.
+                        // IsUnique is only set for single-column PKs; composite PKs must NOT
+                        // emit per-column UNIQUE constraints.
                         IsPrimaryKey = isPk,
-                        IsUnique = isPk,   // PKs are implicitly unique; non-PK unique indexes require a future attribute
+                        IsUnique = isPk && pkNames.Count == 1,
                         IndexName = isPk ? "PK_" + table.Name : null,
+                        // Treat both Identity and Computed as server-managed columns for snapshot
+                        // purposes: both are excluded from INSERT/UPDATE, and both require the
+                        // migration generator to omit a NOT NULL constraint without a DEFAULT.
                         IsIdentity = dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity
+                                  || dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Computed
                     };
                     table.Columns.Add(column);
                 }
@@ -186,17 +216,58 @@ namespace nORM.Migration
                 snapshot.Tables.Add(table);
             }
 
+            // Detect duplicate table names: two entity types sharing the same table name produce
+            // two TableSchema entries with identical names, making migrations ambiguous.
+            // Build(Assembly) is a best-effort reflection scan so we warn (not throw) and keep
+            // the last entry for each name. Use Build(DbContext) for strict, fluent-config-aware
+            // snapshot building where table-name uniqueness is enforced by the ORM itself.
+            var seen = new Dictionary<string, TableSchema>(StringComparer.OrdinalIgnoreCase);
+            var deduped = new List<TableSchema>(snapshot.Tables.Count);
+            foreach (var tbl in snapshot.Tables)
+            {
+                if (seen.TryGetValue(tbl.Name, out _))
+                    System.Diagnostics.Trace.TraceWarning(
+                        $"[nORM SchemaSnapshot] Duplicate table name '{tbl.Name}' detected while scanning " +
+                        $"assembly '{assembly.GetName().Name}'. Only the last definition will be used. " +
+                        "Use [Table(\"UniqueName\")] to assign distinct names, or use Build(DbContext) " +
+                        "for conflict-free snapshots.");
+                seen[tbl.Name] = tbl;
+                deduped.Add(tbl);
+            }
+            snapshot.Tables.Clear();
+            foreach (var tbl in seen.Values) snapshot.Tables.Add(tbl);
+
             return snapshot;
         }
 
         /// <summary>
-        /// Builds a snapshot by merging fluent-configured types from the context with
-        /// attribute/convention-only types discovered in the context's assembly.
-        /// This ensures fluent <c>ToTable()</c>, <c>HasColumnName()</c>, and <c>HasKey()</c>
-        /// overrides are reflected in the snapshot.
+        /// Builds a snapshot using only the fluent-registered entity types from the provided
+        /// <see cref="DbContext"/>. Unlike <see cref="Build(Assembly)"/>, this method does NOT
+        /// scan the context's assembly; it operates exclusively on types that have been
+        /// explicitly configured via the fluent API (e.g. <c>modelBuilder.Entity&lt;T&gt;()</c>).
+        /// Fluent overrides such as <c>ToTable()</c>, <c>HasColumnName()</c>, and <c>HasKey()</c>
+        /// are reflected in the returned snapshot.
         /// </summary>
-        /// <param name="ctx">The context whose model and assembly are used.</param>
-        /// <returns>A snapshot reflecting the fully-merged runtime model.</returns>
+        /// <param name="ctx">The context whose fluent model is used to build the snapshot.</param>
+        /// <returns>A snapshot reflecting the fluent runtime model of the context.</returns>
+        /// <remarks>
+        /// <para>
+        /// <b>Differences from <see cref="Build(Assembly)"/>:</b>
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Uses the resolved <see cref="TableMapping"/> objects produced by the fluent model
+        ///         builder. Fluent overrides (<c>ToTable()</c>, <c>HasColumnName()</c>, <c>HasKey()</c>,
+        ///         <c>HasForeignKey()</c>, etc.) are fully reflected.</item>
+        ///   <item>Only includes entity types explicitly registered via
+        ///         <c>modelBuilder.Entity&lt;T&gt;()</c>. Types present in the assembly but not
+        ///         registered are silently excluded, preventing StackOverflowExceptions from
+        ///         circular navigation properties in test assemblies.</item>
+        ///   <item>Includes foreign key constraints derived from fluent <c>HasForeignKey()</c>
+        ///         / <c>HasOne()</c> / <c>HasMany()</c> configuration.</item>
+        ///   <item>Owned collection tables and many-to-many join tables are not included — see
+        ///         <see cref="BuildFromMappings"/> remarks for details.</item>
+        /// </list>
+        /// </remarks>
         public static SchemaSnapshot Build(DbContext ctx)
         {
             ArgumentNullException.ThrowIfNull(ctx);
@@ -206,6 +277,20 @@ namespace nORM.Migration
         /// <summary>
         /// Builds a <see cref="SchemaSnapshot"/> from a set of resolved <see cref="TableMapping"/> instances.
         /// </summary>
+        /// <remarks>
+        /// <b>Architectural limitations — tables not included in the snapshot:</b>
+        /// <list type="bullet">
+        ///   <item>
+        ///     <b>Owned collection tables</b> (configured via <c>OwnedCollectionMapping</c>) are not
+        ///     represented in <see cref="TableMapping"/> and are therefore absent from the snapshot.
+        ///     Migrations for owned collection tables must be managed manually.
+        ///   </item>
+        ///   <item>
+        ///     <b>Many-to-many join tables</b> (implicit or explicit) are not included.
+        ///     Migrations for join tables must be managed manually.
+        ///   </item>
+        /// </list>
+        /// </remarks>
         private static SchemaSnapshot BuildFromMappings(IEnumerable<TableMapping> mappings)
         {
             ArgumentNullException.ThrowIfNull(mappings);
@@ -218,6 +303,10 @@ namespace nORM.Migration
             foreach (var map in allMappings)
             {
                 var table = new TableSchema { Name = map.TableName };
+
+                // Count PK columns so that composite PKs do not produce per-column UNIQUE constraints.
+                var pkCount = map.Columns.Count(c => c.IsKey);
+
                 foreach (var col in map.Columns)
                 {
                     var clrType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
@@ -226,10 +315,14 @@ namespace nORM.Migration
                     table.Columns.Add(new ColumnSchema
                     {
                         Name         = col.Name,
-                        ClrType      = clrType.FullName ?? clrType.Name,
+                        // Use ToString() as fallback: for constructed generic types it returns the
+                        // full generic form, which is unambiguous, unlike Name which gives just "List`1".
+                        ClrType      = clrType.FullName ?? clrType.ToString(),
                         IsNullable   = isNullable,
                         IsPrimaryKey = col.IsKey,
-                        IsUnique     = col.IsKey,
+                        // Only mark IsUnique for single-column PKs; composite PKs must NOT
+                        // emit per-column UNIQUE constraints.
+                        IsUnique     = col.IsKey && pkCount == 1,
                         IndexName    = col.IsKey ? $"PK_{map.TableName}" : null,
                         IsIdentity   = col.IsDbGenerated,
                     });
@@ -243,7 +336,15 @@ namespace nORM.Migration
             {
                 foreach (var (_, rel) in map.Relations)
                 {
-                    if (!tableByType.TryGetValue(rel.DependentType, out var depTable)) continue;
+                    if (!tableByType.TryGetValue(rel.DependentType, out var depTable))
+                    {
+                        // Design: silently skipped — dependent type is not registered in this
+                        // context's mappings (e.g. it belongs to a different bounded context or
+                        // was not configured via modelBuilder.Entity<T>()). The FK cannot be
+                        // emitted without a known dependent table name.
+                        WarnSkippedDependentType(rel.DependentType.Name, map.TableName);
+                        continue;
+                    }
                     depTable.ForeignKeys.Add(new ForeignKeySchema
                     {
                         ConstraintName   = $"FK_{depTable.Name}_{map.TableName}_{rel.ForeignKey.Name}",
@@ -276,17 +377,18 @@ namespace nORM.Migration
             {
                 // Some types in the assembly may fail to load (e.g. missing dependencies).
                 // Use the successfully loaded subset rather than failing the entire snapshot.
-                types = ex.Types.Where(t => t != null).ToArray()!;
+                types = (ex.Types ?? Array.Empty<Type?>()).Where(t => t != null).Select(t => t!).ToArray();
             }
 
             return types.Where(t =>
                 t.IsClass && !t.IsAbstract &&
                 (t.GetCustomAttribute<TableAttribute>() != null ||
-                 t.GetProperties().Any(p => p.GetCustomAttribute<KeyAttribute>() != null)));
+                 t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                  .Any(p => p.GetCustomAttribute<KeyAttribute>() != null)));
         }
 
         /// <summary>
-        /// MG-1: Returns true for types that map to database scalar columns.
+        /// Returns true for types that map to database scalar columns.
         /// Reference navigation properties and collection properties return false.
         /// </summary>
         private static bool IsMappableType(Type t)
@@ -307,11 +409,32 @@ namespace nORM.Migration
             // All other reference types (class, interface) are navigation properties
             return false;
         }
+
+        /// <summary>
+        /// Emits a debug diagnostic when a FK's dependent type is not registered in the current
+        /// context's mappings and must be silently skipped during snapshot construction.
+        /// Active only in DEBUG builds; no-op in Release.
+        /// </summary>
+        [Conditional("DEBUG")]
+        private static void WarnSkippedDependentType(string dependentTypeName, string principalTableName)
+        {
+            Debug.WriteLine(
+                $"[SchemaSnapshot] FK skipped: dependent type '{dependentTypeName}' is not " +
+                $"registered in this context's mappings (principal table: '{principalTableName}'). " +
+                "Register the dependent type via modelBuilder.Entity<T>() to include its FK.");
+        }
     }
 
     /// <summary>
     /// Represents the differences between two <see cref="SchemaSnapshot"/> instances.
     /// </summary>
+    /// <remarks>
+    /// All list properties on this class are initialized to non-null empty lists and must
+    /// remain non-null throughout their lifetime. Individual entries within each list must
+    /// also be non-null; adding a null entry will cause downstream migration SQL generators
+    /// to throw a <see cref="NullReferenceException"/>. The lists themselves must never be
+    /// set to null — <see cref="HasChanges"/> and all four SQL generators assume non-null lists.
+    /// </remarks>
     public class SchemaDiff
     {
         /// <summary>Tables that exist in the new snapshot but not in the old.</summary>
@@ -320,17 +443,17 @@ namespace nORM.Migration
         public List<(TableSchema Table, ColumnSchema Column)> AddedColumns { get; } = new();
         /// <summary>Columns whose definition has changed between snapshots.</summary>
         public List<(TableSchema Table, ColumnSchema NewColumn, ColumnSchema OldColumn)> AlteredColumns { get; } = new();
-        /// <summary>G1: Indexes that appear in the new snapshot but not in the old.</summary>
+        /// <summary>Indexes that appear in the new snapshot but not in the old.</summary>
         public List<(TableSchema Table, string IndexName, bool IsUnique, string[] ColumnNames)> AddedIndexes { get; } = new();
-        /// <summary>G1: Indexes that appear in the old snapshot but not in the new.</summary>
+        /// <summary>Indexes that appear in the old snapshot but not in the new.</summary>
         public List<(TableSchema Table, string IndexName)> DroppedIndexes { get; } = new();
-        /// <summary>SD-8: Tables that exist in the old snapshot but not in the new (dropped tables).</summary>
+        /// <summary>Tables that exist in the old snapshot but not in the new (dropped tables).</summary>
         public List<TableSchema> DroppedTables { get; } = new();
-        /// <summary>SD-8: Columns that exist in the old snapshot but not in the new for a given table (dropped columns).</summary>
+        /// <summary>Columns that exist in the old snapshot but not in the new for a given table (dropped columns).</summary>
         public List<(TableSchema Table, ColumnSchema Column)> DroppedColumns { get; } = new();
-        /// <summary>MG-1: FK constraints present in the new snapshot but not the old for an existing table.</summary>
+        /// <summary>FK constraints present in the new snapshot but not the old for an existing table.</summary>
         public List<(TableSchema Table, ForeignKeySchema ForeignKey)> AddedForeignKeys { get; } = new();
-        /// <summary>MG-1: FK constraints present in the old snapshot but not the new for an existing table.</summary>
+        /// <summary>FK constraints present in the old snapshot but not the new for an existing table.</summary>
         public List<(TableSchema Table, ForeignKeySchema ForeignKey)> DroppedForeignKeys { get; } = new();
 
         /// <summary>Indicates whether the diff contains any schema changes.</summary>
@@ -356,39 +479,64 @@ namespace nORM.Migration
             ArgumentNullException.ThrowIfNull(oldSnapshot);
             ArgumentNullException.ThrowIfNull(newSnapshot);
 
+            if (oldSnapshot.Tables is null)
+                throw new ArgumentException("oldSnapshot.Tables must not be null.", nameof(oldSnapshot));
+            if (newSnapshot.Tables is null)
+                throw new ArgumentException("newSnapshot.Tables must not be null.", nameof(newSnapshot));
+
+            // Validate FK arrays on both snapshots before starting the diff.
+            foreach (var t in oldSnapshot.Tables)
+                foreach (var fk in t.ForeignKeys)
+                    ValidateFkSchema(fk, t.Name);
+            foreach (var t in newSnapshot.Tables)
+                foreach (var fk in t.ForeignKeys)
+                    ValidateFkSchema(fk, t.Name);
+
+            // Build O(1) lookup dictionaries to avoid O(n²) scans inside the loops.
+            // Use last-wins for duplicate table names to match the pre-existing FirstOrDefault behaviour.
+            var oldByName = new Dictionary<string, TableSchema>(StringComparer.OrdinalIgnoreCase);
+            foreach (var t in oldSnapshot.Tables) oldByName[t.Name] = t;
+            var newByName = new Dictionary<string, TableSchema>(StringComparer.OrdinalIgnoreCase);
+            foreach (var t in newSnapshot.Tables) newByName[t.Name] = t;
+
             var diff = new SchemaDiff();
             foreach (var newTable in newSnapshot.Tables)
             {
-                var oldTable = oldSnapshot.Tables.FirstOrDefault(t => string.Equals(t.Name, newTable.Name, StringComparison.OrdinalIgnoreCase));
-                if (oldTable == null)
+                if (!oldByName.TryGetValue(newTable.Name, out var oldTable))
                 {
                     diff.AddedTables.Add(newTable);
                     continue;
                 }
 
+                // Build O(1) column lookup for the old table.
+                var oldColByName = oldTable.Columns.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
+
                 foreach (var col in newTable.Columns)
                 {
-                    var oldCol = oldTable.Columns.FirstOrDefault(c => string.Equals(c.Name, col.Name, StringComparison.OrdinalIgnoreCase));
-                    if (oldCol == null)
+                    if (!oldColByName.TryGetValue(col.Name, out var oldCol))
                         diff.AddedColumns.Add((newTable, col));
                     else if (!string.Equals(oldCol.ClrType, col.ClrType, StringComparison.OrdinalIgnoreCase)
                         || oldCol.IsNullable != col.IsNullable
                         || oldCol.IsPrimaryKey != col.IsPrimaryKey
                         || oldCol.IsUnique != col.IsUnique
                         || !string.Equals(oldCol.IndexName, col.IndexName, StringComparison.OrdinalIgnoreCase)
-                        || !string.Equals(oldCol.DefaultValue, col.DefaultValue, StringComparison.Ordinal)  // M1: detect DEFAULT changes
-                        || oldCol.IsIdentity != col.IsIdentity)  // X1: detect identity changes
+                        || !string.Equals(oldCol.DefaultValue, col.DefaultValue, StringComparison.OrdinalIgnoreCase)  // OrdinalIgnoreCase: SQL keyword case differences like CURRENT_TIMESTAMP vs current_timestamp must not trigger spurious migrations
+                        || oldCol.IsIdentity != col.IsIdentity)  // detect identity changes
                         diff.AlteredColumns.Add((newTable, col, oldCol));
                 }
 
-                // SD-8: Detect dropped columns — columns present in old but not in new
+                // Build O(1) new-column lookup for dropped-column detection.
+                var newColByName = newTable.Columns.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
+
+                // Detect dropped columns — columns present in old but not in new.
+                // Use oldTable (not newTable) because the column existed in the OLD schema.
                 foreach (var oldCol in oldTable.Columns)
                 {
-                    if (!newTable.Columns.Any(c => string.Equals(c.Name, oldCol.Name, StringComparison.OrdinalIgnoreCase)))
-                        diff.DroppedColumns.Add((newTable, oldCol));
+                    if (!newColByName.ContainsKey(oldCol.Name))
+                        diff.DroppedColumns.Add((oldTable, oldCol));
                 }
 
-                // G1: Detect index changes — compare named indexes between old and new
+                // Detect index changes — compare named indexes between old and new
                 var oldIndexes = BuildIndexMap(oldTable);
                 var newIndexes = BuildIndexMap(newTable);
 
@@ -406,7 +554,8 @@ namespace nORM.Migration
                         var colsChanged = !oldCols.SequenceEqual(cols, StringComparer.OrdinalIgnoreCase);
                         if (oldIsUnique != isUnique || colsChanged)
                         {
-                            diff.DroppedIndexes.Add((newTable, name));
+                            // Use oldTable for DroppedIndexes (the index existed on the OLD table).
+                            diff.DroppedIndexes.Add((oldTable, name));
                             diff.AddedIndexes.Add((newTable, name, isUnique, cols));
                         }
                     }
@@ -415,10 +564,11 @@ namespace nORM.Migration
                 foreach (var (name, _) in oldIndexes)
                 {
                     if (!newIndexes.ContainsKey(name))
-                        diff.DroppedIndexes.Add((newTable, name));
+                        // Use oldTable for DroppedIndexes (the index existed on the OLD table).
+                        diff.DroppedIndexes.Add((oldTable, name));
                 }
 
-                // MG-1: Detect FK constraint changes — add/drop/alter foreign keys
+                // Detect FK constraint changes — add/drop/alter foreign keys
                 var oldFks = BuildFkMap(oldTable);
                 var newFks = BuildFkMap(newTable);
 
@@ -442,14 +592,32 @@ namespace nORM.Migration
                 }
             }
 
-            // SD-8: Detect dropped tables — tables present in old but not in new
+            // Detect dropped tables — tables present in old but not in new.
+            // Use the pre-built newByName dictionary for O(1) lookup.
             foreach (var oldTable in oldSnapshot.Tables)
             {
-                if (!newSnapshot.Tables.Any(t => string.Equals(t.Name, oldTable.Name, StringComparison.OrdinalIgnoreCase)))
+                if (!newByName.ContainsKey(oldTable.Name))
                     diff.DroppedTables.Add(oldTable);
             }
 
             return diff;
+        }
+
+        /// <summary>
+        /// Validates that a <see cref="ForeignKeySchema"/>'s column arrays are non-empty and
+        /// that the principal table name is non-blank. Throws <see cref="ArgumentException"/> on violation.
+        /// </summary>
+        private static void ValidateFkSchema(ForeignKeySchema fk, string owningTableName)
+        {
+            if (fk.DependentColumns == null || fk.DependentColumns.Length == 0)
+                throw new ArgumentException(
+                    $"FK '{fk.ConstraintName}' on table '{owningTableName}' has no DependentColumns.");
+            if (fk.PrincipalColumns == null || fk.PrincipalColumns.Length == 0)
+                throw new ArgumentException(
+                    $"FK '{fk.ConstraintName}' on table '{owningTableName}' has no PrincipalColumns.");
+            if (string.IsNullOrWhiteSpace(fk.PrincipalTable))
+                throw new ArgumentException(
+                    $"FK '{fk.ConstraintName}' on table '{owningTableName}' has no PrincipalTable.");
         }
 
         /// <summary>
@@ -472,6 +640,13 @@ namespace nORM.Migration
         /// Returns true when two FK schemas represent the same constraint definition.
         /// Column order within each array is significant.
         /// </summary>
+        /// <remarks>
+        /// Known limitation: <see cref="ForeignKeySchema.ConstraintName"/> is NOT compared here.
+        /// A pure FK rename (same columns/tables/actions, different name) is invisible to this
+        /// method and will not produce a DroppedForeignKey + AddedForeignKey pair in the diff.
+        /// If FK rename detection is needed in the future, a base-class or shared helper should
+        /// be introduced rather than duplicating the change across all four generators.
+        /// </remarks>
         private static bool FkEqual(ForeignKeySchema a, ForeignKeySchema b) =>
             string.Equals(a.PrincipalTable, b.PrincipalTable, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(a.OnDelete, b.OnDelete, StringComparison.OrdinalIgnoreCase) &&
@@ -484,7 +659,7 @@ namespace nORM.Migration
                 string.Equals(x, y, StringComparison.OrdinalIgnoreCase)).All(eq => eq);
 
         /// <summary>
-        /// G1: Builds a map of index name to (IsUnique, column names[]) from the columns of a table.
+        /// Builds a map of index name to (IsUnique, column names[]) from the columns of a table.
         /// Only columns that carry an <see cref="ColumnSchema.IndexName"/> or are PK/Unique are included.
         /// </summary>
         private static Dictionary<string, (bool IsUnique, string[] ColumnNames)> BuildIndexMap(TableSchema table)

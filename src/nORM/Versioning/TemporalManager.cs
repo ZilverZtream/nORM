@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging.Abstractions;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
@@ -27,9 +26,10 @@ namespace nORM.Versioning
         /// <returns>A task representing the initialization process.</returns>
         public static async Task InitializeAsync(DbContext context, DbConnection conn, CancellationToken ct = default)
         {
+            ArgumentNullException.ThrowIfNull(context);
+            ArgumentNullException.ThrowIfNull(conn);
             ct.ThrowIfCancellationRequested();
 
-            var provider = context.Provider;
             await CreateTagsTableIfNotExistsAsync(context, conn, ct).ConfigureAwait(false);
 
             foreach (var mapping in context.GetAllMappings())
@@ -41,13 +41,13 @@ namespace nORM.Versioning
 
                 // Introspect live column types before generating history DDL so that
                 // custom precision/length on main-table columns is mirrored in history table.
-                var liveColumns = await provider
+                var liveColumns = await context.Provider
                     .IntrospectTableColumnsAsync(conn, mapping.TableName, ct)
                     .ConfigureAwait(false);
-                var createHistoryTableSql = provider.GenerateCreateHistoryTableSql(mapping, liveColumns);
+                var createHistoryTableSql = context.Provider.GenerateCreateHistoryTableSql(mapping, liveColumns);
                 await ExecuteDdlAsync(context, conn, createHistoryTableSql, ct).ConfigureAwait(false);
 
-                var createTriggersSql = provider.GenerateTemporalTriggersSql(mapping);
+                var createTriggersSql = context.Provider.GenerateTemporalTriggersSql(mapping);
                 await ExecuteDdlAsync(context, conn, createTriggersSql, ct).ConfigureAwait(false);
             }
         }
@@ -82,25 +82,27 @@ namespace nORM.Versioning
             // All other exceptions (non-DbException, permission errors, connectivity) propagate.
         }
 
-        private static readonly NormExceptionHandler s_ddlHandler = new(NullLogger.Instance);
+        // S6-1: Split on both T-SQL GO batch separators and MySQL trigger delimiters.
+        // MySQL's CREATE TRIGGER ... BEGIN ... END blocks must be sent as individual
+        // DbCommand statements — the ADO.NET driver accepts BEGIN...END with internal
+        // semicolons in a single command, so we only need to separate multiple triggers.
+        // The "-- DELIMITER" marker (with surrounding newlines) is used by
+        // MySqlProvider.GenerateTemporalTriggersSql to separate individual CREATE TRIGGER statements.
+        // NOTE: The bare "-- DELIMITER" form (no surrounding newlines) is intentionally excluded
+        // to prevent accidental splits on inline comments within a single statement.
+        private static readonly string[] s_batchSeparators =
+        {
+            "\r\nGO\r\n", "\nGO\n", "\r\nGO\n", "\nGO\r\n", "\rGO\r", "\nGO\r",
+            "\n-- DELIMITER\n", "\r\n-- DELIMITER\r\n", "\r\n-- DELIMITER\n", "\n-- DELIMITER\r\n"
+        };
 
         private static async Task ExecuteDdlAsync(DbContext context, DbConnection conn, string sql, CancellationToken ct)
         {
-            var handler = s_ddlHandler;
+            // Use the context's configured logger so DDL failures surface in structured logs
+            // rather than being silently discarded by NullLogger.
+            var handler = new NormExceptionHandler(context.Options.Logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
 
-            // S6-1: Split on both T-SQL GO batch separators and MySQL trigger delimiters.
-            // MySQL's CREATE TRIGGER ... BEGIN ... END blocks must be sent as individual
-            // DbCommand statements — the ADO.NET driver accepts BEGIN...END with internal
-            // semicolons in a single command, so we only need to separate multiple triggers.
-            // The "-- DELIMITER" marker is used by MySqlProvider.GenerateTemporalTriggersSql
-            // to separate individual CREATE TRIGGER statements.
-            var batchSeparators = new[]
-            {
-                "\r\nGO\r\n", "\nGO\n", "\r\nGO\n", "\nGO\r\n", "\rGO\r", "\nGO\r",
-                "\n-- DELIMITER\n", "\r\n-- DELIMITER\r\n", "\r\n-- DELIMITER\n", "\n-- DELIMITER\r\n",
-                "-- DELIMITER"
-            };
-            var batches = sql.Split(batchSeparators, StringSplitOptions.RemoveEmptyEntries);
+            var batches = sql.Split(s_batchSeparators, StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var batch in batches)
             {
@@ -110,7 +112,12 @@ namespace nORM.Versioning
                 if (trimmed.Length == 0) continue;
 
                 if (!IsValidDdl(trimmed))
-                    throw new NormQueryException($"Invalid DDL: {trimmed}");
+                {
+                    // Truncate the DDL to avoid leaking potentially sensitive schema details
+                    // (table names, column names) in exception messages that may reach logs.
+                    var preview = trimmed.Length > 80 ? trimmed[..80] + "…" : trimmed;
+                    throw new NormQueryException($"Invalid DDL statement (must start with CREATE, ALTER, IF, DROP TRIGGER, DROP FUNCTION, or DROP PROCEDURE). Preview: {preview}");
+                }
 
                 await handler.ExecuteWithExceptionHandling(async () =>
                 {
@@ -124,10 +131,27 @@ namespace nORM.Versioning
 
         private static bool IsValidDdl(string ddl)
         {
-            return ddl.StartsWith("create", StringComparison.OrdinalIgnoreCase)
-                || ddl.StartsWith("alter", StringComparison.OrdinalIgnoreCase)
-                || ddl.StartsWith("drop", StringComparison.OrdinalIgnoreCase)
-                || ddl.StartsWith("if", StringComparison.OrdinalIgnoreCase);   // SQL Server: IF OBJECT_ID(...) IS NULL CREATE TABLE
+            if (ddl.StartsWith("create", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (ddl.StartsWith("alter", StringComparison.OrdinalIgnoreCase))
+                return true;
+            // IF OBJECT_ID(...) IS NULL ... — SQL Server conditional DDL.
+            // Require a non-alpha/non-underscore character after "IF" to reject identifiers
+            // like "IFERROR" or "INFORMATION_SCHEMA" that could begin a non-DDL statement.
+            if (ddl.Length >= 3
+                && ddl.StartsWith("if", StringComparison.OrdinalIgnoreCase)
+                && !char.IsLetterOrDigit(ddl[2]) && ddl[2] != '_')
+                return true;
+            // Only allow DROP TRIGGER / DROP FUNCTION / DROP PROCEDURE (needed for temporal trigger
+            // management, e.g. Postgres uses DROP TRIGGER IF EXISTS and DROP FUNCTION for idempotent
+            // trigger replacement).
+            // DROP TABLE, DROP DATABASE, DROP SCHEMA etc. are not legitimate temporal DDL
+            // and must not be generated by provider methods.
+            if (ddl.StartsWith("drop trigger", StringComparison.OrdinalIgnoreCase)
+                || ddl.StartsWith("drop function", StringComparison.OrdinalIgnoreCase)
+                || ddl.StartsWith("drop procedure", StringComparison.OrdinalIgnoreCase))
+                return true;
+            return false;
         }
     }
 }

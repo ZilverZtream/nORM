@@ -29,7 +29,9 @@ namespace nORM.Query
         /// <summary>Default initial capacity for list materialization when no Take hint is available.</summary>
         private const int DefaultListCapacity = 16;
         /// <summary>Maximum string parameter length that gets an explicit Size hint (avoids NVARCHAR(MAX) on SQL Server).</summary>
-        private const int MaxInlineStringSize = 4000;
+        // C-4/A-2 fix: reference the single authoritative constant from ParameterOptimizer
+        // instead of duplicating the magic value 4000 here.
+        private const int MaxInlineStringSize = ParameterOptimizer.MaxInlineStringSize;
         /// <summary>Threshold below which UTF-8 encoding uses stackalloc instead of ArrayPool rental.</summary>
         private const int StackAllocUtf8Threshold = 256;
         /// <summary>Fallback average plan size in bytes when no samples have been collected yet.</summary>

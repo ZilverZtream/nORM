@@ -26,10 +26,17 @@ namespace nORM.Configuration
             public Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; } = new();
             public List<RelationshipConfiguration> Relationships { get; } = new();
             public List<ConverterConfiguration> ConverterList { get; } = new();
+
+            // Explicit interface implementations for read-only surface of IEntityTypeConfiguration.
+            IReadOnlyList<PropertyInfo> IEntityTypeConfiguration.KeyProperties => KeyProperties;
+            IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnNames => ColumnNames;
+            IReadOnlyDictionary<PropertyInfo, OwnedNavigation> IEntityTypeConfiguration.OwnedNavigations => OwnedNavigations;
+            IReadOnlyDictionary<string, ShadowPropertyConfiguration> IEntityTypeConfiguration.ShadowProperties => ShadowProperties;
+            IReadOnlyList<RelationshipConfiguration> IEntityTypeConfiguration.Relationships => Relationships;
             IReadOnlyList<ConverterConfiguration> IEntityTypeConfiguration.Converters => ConverterList;
 
             public Dictionary<PropertyInfo, OwnedCollectionNavigation> OwnedCollectionNavigations { get; } = new();
-            Dictionary<PropertyInfo, OwnedCollectionNavigation> IEntityTypeConfiguration.OwnedCollectionNavigations => OwnedCollectionNavigations;
+            IReadOnlyDictionary<PropertyInfo, OwnedCollectionNavigation> IEntityTypeConfiguration.OwnedCollectionNavigations => OwnedCollectionNavigations;
 
             public List<ManyToManyConfiguration> ManyToManyList { get; } = new();
             IReadOnlyList<ManyToManyConfiguration> IEntityTypeConfiguration.ManyToManyRelationships => ManyToManyList;
@@ -207,14 +214,29 @@ namespace nORM.Configuration
         /// <param name="keyExpression">Expression selecting the key property or properties.</param>
         /// <returns>The same builder instance for fluent chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="keyExpression"/> is null.</exception>
+        /// <exception cref="ArgumentException">
+        /// Thrown when the expression selects no properties, or contains a non-property argument.
+        /// </exception>
         public EntityTypeBuilder<TEntity> HasKey(Expression<Func<TEntity, object>> keyExpression)
         {
             ArgumentNullException.ThrowIfNull(keyExpression);
             if (keyExpression.Body is NewExpression ne)
             {
+                if (ne.Arguments.Count == 0)
+                    throw new ArgumentException(
+                        "HasKey expression must select at least one property. " +
+                        "An empty anonymous object 'e => new { }' is not a valid key selector.",
+                        nameof(keyExpression));
                 foreach (var arg in ne.Arguments)
                 {
-                    var prop = GetProperty(arg);
+                    PropertyInfo prop;
+                    try { prop = GetProperty(arg); }
+                    catch (ArgumentException inner)
+                    {
+                        throw new ArgumentException(
+                            $"HasKey expression contains an invalid argument: {inner.Message}",
+                            nameof(keyExpression), inner);
+                    }
                     _config.AddKey(prop);
                 }
             }
@@ -291,11 +313,21 @@ namespace nORM.Configuration
         /// </summary>
         /// <typeparam name="TOwned">CLR element type of the owned collection.</typeparam>
         /// <param name="navigation">Expression selecting the collection navigation property.</param>
-        /// <param name="tableName">Name of the child table. Defaults to the owned type name.</param>
-        /// <param name="foreignKey">FK column name referencing owner's PK. Defaults to owner type name + "Id".</param>
+        /// <param name="tableName">
+        /// Name of the child table. Defaults to the owned type name.
+        /// Must be supplied explicitly when <typeparamref name="TOwned"/> is a generic type.
+        /// </param>
+        /// <param name="foreignKey">
+        /// FK column name referencing owner's PK. Defaults to owner type name + "Id".
+        /// Must be supplied explicitly when <typeparamref name="TEntity"/> is a generic type.
+        /// </param>
         /// <param name="buildAction">Optional configuration for the owned element type.</param>
         /// <returns>The same builder instance for chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="navigation"/> is null.</exception>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="tableName"/> is omitted and the owned type is generic,
+        /// or when <paramref name="foreignKey"/> is omitted and the owning type is generic.
+        /// </exception>
         public EntityTypeBuilder<TEntity> OwnsMany<TOwned>(
             Expression<Func<TEntity, IEnumerable<TOwned>>> navigation,
             string? tableName = null,
@@ -306,6 +338,18 @@ namespace nORM.Configuration
             var prop = GetProperty(navigation);
             var ownedBuilder = new EntityTypeBuilder<TOwned>();
             buildAction?.Invoke(ownedBuilder);
+
+            if (tableName == null && typeof(TOwned).Name.Contains('`'))
+                throw new ArgumentException(
+                    $"The owned type '{typeof(TOwned).Name}' is generic. " +
+                    "Provide an explicit tableName when calling OwnsMany on a generic type.",
+                    nameof(tableName));
+            if (foreignKey == null && typeof(TEntity).Name.Contains('`'))
+                throw new ArgumentException(
+                    $"The owning type '{typeof(TEntity).Name}' is generic. " +
+                    "Provide an explicit foreignKey when calling OwnsMany on a generic type.",
+                    nameof(foreignKey));
+
             var childTable = tableName ?? typeof(TOwned).Name;
             var fkCol = foreignKey ?? typeof(TEntity).Name + "Id";
             _config.AddOwnedCollection(prop, new OwnedCollectionNavigation(typeof(TOwned), childTable, fkCol, ownedBuilder.Configuration));
@@ -329,13 +373,40 @@ namespace nORM.Configuration
         private PropertyInfo GetProperty(Expression expression)
         {
             if (expression is MemberExpression me && me.Member is PropertyInfo meProp)
+            {
+                if (me.Expression is not ParameterExpression)
+                    throw new ArgumentException(
+                        $"Expression must be a direct property access (e => e.Property). " +
+                        $"Chained or nested access such as 'e => e.Navigation.Property' is not supported. " +
+                        $"Received expression tree: {expression}",
+                        nameof(expression));
                 return meProp;
-            if (expression is UnaryExpression ue && ue.Operand is MemberExpression ume && ume.Member is PropertyInfo umeProp)
+            }
+
+            if (expression is UnaryExpression ue &&
+                (ue.NodeType == System.Linq.Expressions.ExpressionType.Convert ||
+                 ue.NodeType == System.Linq.Expressions.ExpressionType.ConvertChecked) &&
+                ue.Operand is MemberExpression ume && ume.Member is PropertyInfo umeProp)
+            {
+                if (ume.Expression is not ParameterExpression)
+                    throw new ArgumentException(
+                        $"Expression must be a direct property access (e => e.Property). " +
+                        $"Chained access is not supported. Received expression tree: {expression}",
+                        nameof(expression));
                 return umeProp;
-            throw new ArgumentException("Expression must select a property (not a field or method). Received: " + expression.NodeType, nameof(expression));
+            }
+
+            throw new ArgumentException(
+                "Expression must select a single property (not a field, method call, or complex expression). " +
+                "Received: " + expression.NodeType,
+                nameof(expression));
         }
 
-        private PropertyInfo GetProperty(LambdaExpression expression) => GetProperty(expression.Body);
+        private PropertyInfo GetProperty(LambdaExpression expression)
+        {
+            if (expression is null) throw new ArgumentNullException(nameof(expression));
+            return GetProperty(expression.Body);
+        }
 
         /// <summary>
         /// Provides configuration options for a specific property on the entity type.
@@ -357,13 +428,13 @@ namespace nORM.Configuration
             /// Sets the database column name for the configured property.
             /// </summary>
             /// <param name="name">The column name to map the property to.</param>
-            /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
             /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is null or whitespace.</exception>
-            public EntityTypeBuilder<TEntity> HasColumnName(string name)
+            public PropertyBuilder HasColumnName(string name)
             {
                 // Validation delegated to SetColumnName
                 _parent._config.SetColumnName(_property, name);
-                return _parent;
+                return this;
             }
 
             /// <summary>
@@ -378,6 +449,11 @@ namespace nORM.Configuration
                 _parent._config.AddConverter(_property, converter);
                 return _parent;
             }
+
+            /// <summary>
+            /// Returns the parent <see cref="EntityTypeBuilder{TEntity}"/> to resume entity-level chaining.
+            /// </summary>
+            public EntityTypeBuilder<TEntity> Builder => _parent;
         }
 
         /// <summary>
@@ -434,12 +510,12 @@ namespace nORM.Configuration
         public class CollectionNavigationBuilder<TDependent> where TDependent : class
         {
             private readonly EntityTypeBuilder<TEntity> _parent;
-            internal readonly PropertyInfo PrincipalNavigation;
+            private readonly PropertyInfo _principalNavigation;
 
             internal CollectionNavigationBuilder(EntityTypeBuilder<TEntity> parent, PropertyInfo principalNavigation)
             {
                 _parent = parent;
-                PrincipalNavigation = principalNavigation;
+                _principalNavigation = principalNavigation;
             }
 
             /// <summary>
@@ -453,7 +529,7 @@ namespace nORM.Configuration
                 PropertyInfo? dependentNav = null;
                 if (navigation != null)
                     dependentNav = _parent.GetProperty(navigation);
-                return new ReferenceCollectionBuilder(_parent, PrincipalNavigation, dependentNav);
+                return new ReferenceCollectionBuilder(_parent, _principalNavigation, dependentNav);
             }
 
             /// <summary>
@@ -466,7 +542,7 @@ namespace nORM.Configuration
                 string? inverseNavName = null;
                 if (inverseNavigation != null)
                     inverseNavName = _parent.GetProperty(inverseNavigation).Name;
-                return new ManyToManyBuilder(_parent, PrincipalNavigation, inverseNavName);
+                return new ManyToManyBuilder(_parent, _principalNavigation, inverseNavName);
             }
 
             /// <summary>
@@ -492,7 +568,10 @@ namespace nORM.Configuration
                 /// <param name="leftFk">Column referencing this entity's PK.</param>
                 /// <param name="rightFk">Column referencing the related entity's PK.</param>
                 /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
-                /// <exception cref="ArgumentException">Thrown when any parameter is null or whitespace.</exception>
+                /// <exception cref="ArgumentException">
+                /// Thrown when any parameter is null or whitespace, or when <paramref name="leftFk"/>
+                /// and <paramref name="rightFk"/> are the same column name.
+                /// </exception>
                 public EntityTypeBuilder<TEntity> UsingTable(string joinTable, string leftFk, string rightFk)
                 {
                     if (string.IsNullOrWhiteSpace(joinTable))
@@ -501,6 +580,11 @@ namespace nORM.Configuration
                         throw new ArgumentException("Left FK column name cannot be null or whitespace.", nameof(leftFk));
                     if (string.IsNullOrWhiteSpace(rightFk))
                         throw new ArgumentException("Right FK column name cannot be null or whitespace.", nameof(rightFk));
+                    if (string.Equals(leftFk, rightFk, StringComparison.OrdinalIgnoreCase))
+                        throw new ArgumentException(
+                            $"The left FK column and right FK column in a many-to-many join table must be different. " +
+                            $"Both were specified as '{leftFk}'. Provide distinct column names.",
+                            nameof(rightFk));
                     _parent._config.AddManyToMany(new ManyToManyConfiguration(
                         _principalNavigation.Name,
                         typeof(TDependent),

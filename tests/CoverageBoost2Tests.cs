@@ -533,8 +533,15 @@ public class CoverageBoost2Tests : TestBase
     public void Property_non_generic_HasColumnName_sets_column()
     {
         var builder = new EntityTypeBuilder<CovItem>();
-        var result = builder.Property(e => (object)e.Value).HasColumnName("item_value");
-        Assert.Same(builder, result);
+        var propBuilder = builder.Property(e => (object)e.Value).HasColumnName("item_value");
+        // HasColumnName returns PropertyBuilder for intra-property chaining;
+        // use .Builder to navigate back to the EntityTypeBuilder.
+        Assert.Same(builder, propBuilder.Builder);
+        // Verify the column name was actually set.
+        var config = ((nORM.Configuration.IEntityTypeConfiguration)builder.Configuration);
+        var prop = typeof(CovItem).GetProperty(nameof(CovItem.Value))!;
+        Assert.True(config.ColumnNames.TryGetValue(prop, out var name));
+        Assert.Equal("item_value", name);
     }
 
     [Fact]

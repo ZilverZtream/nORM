@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using nORM.Configuration;
@@ -66,7 +67,7 @@ namespace nORM.Mapping
             Name = colName;
             EscCol = p.Escape(colName);
 
-            IsKey = (fluentConfig?.KeyProperties.Contains(info.Property) ?? false) || info.IsKey;
+            IsKey = (fluentConfig?.KeyProperties.Any(p => p == info.Property) ?? false) || info.IsKey;
             IsTimestamp = info.IsTimestamp;
             IsDbGenerated = info.IsDbGenerated;
             ForeignKeyPrincipalTypeName = info.ForeignKeyName;
@@ -118,7 +119,7 @@ namespace nORM.Mapping
             Name = colName;
             EscCol = p.Escape(colName);
 
-            IsKey = (fluentConfig?.KeyProperties.Contains(pi) ?? false) || pi.GetCustomAttribute<KeyAttribute>() != null;
+            IsKey = (fluentConfig?.KeyProperties.Any(p => p == pi) ?? false) || pi.GetCustomAttribute<KeyAttribute>() != null;
             IsTimestamp = pi.GetCustomAttribute<TimestampAttribute>() != null;
             IsDbGenerated = pi.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity;
             ForeignKeyPrincipalTypeName = pi.GetCustomAttribute<ForeignKeyAttribute>()?.Name;
