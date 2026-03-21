@@ -8,6 +8,12 @@ namespace nORM.Migration
     /// <summary>
     /// Generates SQL Server compatible migration scripts based on a schema diff.
     /// </summary>
+    /// <remarks>
+    /// Provider: Microsoft SQL Server (T-SQL dialect). Uses bracket-escaped identifiers,
+    /// IDENTITY(1,1) for auto-increment columns, and dynamic T-SQL for DEFAULT constraint
+    /// discovery and removal. FK referential actions are validated against an allowlist
+    /// before being interpolated into DDL.
+    /// </remarks>
     public class SqlServerMigrationSqlGenerator : IMigrationSqlGenerator
     {
         /// <summary>Maximum length for NVARCHAR variable used in dynamic default-constraint lookup.</summary>
@@ -82,22 +88,34 @@ namespace nORM.Migration
                 up.Add($"DROP TABLE {Esc(table.Name)}");
 
             // UP-3: Drop columns (safe — FKs on those columns are removed in UP-1).
+            // E: Before dropping a column, find and drop any DEFAULT constraint on it first.
             foreach (var (table, column) in diff.DroppedColumns)
+            {
+                var dropVar = $"@__drop_{new string(column.Name.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant()}";
+                // Truncate to a safe length for a T-SQL variable name (max 128 chars including @).
+                if (dropVar.Length > 128) dropVar = dropVar.Substring(0, 128);
+                up.Add($"DECLARE {dropVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(column.Name)}') IF {dropVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{dropVar}+']')");
                 up.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
+            }
 
             // UP-4: Alter existing columns.
-            foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
-                var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}";
-                up.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {newDef}");
-
-                // M1: Emit DEFAULT constraint changes when DefaultValue differs.
-                if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
+                int upAltIdx = 0;
+                foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
                 {
-                    var upVar = $"@__df_{(table.Name + "_" + newCol.Name).GetHashCode() & 0x7FFFFFFF:X8}";
-                    up.Add($"DECLARE {upVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(newCol.Name)}') IF {upVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{upVar}+']')");
-                    if (newCol.DefaultValue != null)
-                        up.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{newCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(newCol.DefaultValue)}) FOR {Esc(newCol.Name)}");
+                    var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}";
+                    up.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {newDef}");
+
+                    // M1: Emit DEFAULT constraint changes when DefaultValue differs.
+                    if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
+                    {
+                        // D: use sequential index for a deterministic, stable T-SQL variable name.
+                        var upVar = $"@__df_{upAltIdx}";
+                        up.Add($"DECLARE {upVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(newCol.Name)}') IF {upVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{upVar}+']')");
+                        if (newCol.DefaultValue != null)
+                            up.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{newCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(newCol.DefaultValue)}) FOR {Esc(newCol.Name)}");
+                    }
+                    upAltIdx++;
                 }
             }
 
@@ -117,17 +135,20 @@ namespace nORM.Migration
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
 
-                var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
-                if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
+                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
+                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
 
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
 
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
-                foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    up.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
+                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
+                foreach (var idxGroup in table.Columns
+                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
+                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
+                    up.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
             }
 
             // UP-6: Add columns to existing tables.
@@ -159,27 +180,36 @@ namespace nORM.Migration
 
             // DOWN-3: Drop tables that were created in UP-5.
             foreach (var table in diff.AddedTables)
-                down.Add($"DROP TABLE {Esc(table.Name)}");
+                down.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
 
             // DOWN-4: Reverse column alterations from UP-4.
-            foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
-                var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}";
-                down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {oldDef}");
-
-                if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
+                int downAltIdx = 0;
+                foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
                 {
-                    var downVar = $"@__df_{(table.Name + "_" + oldCol.Name).GetHashCode() & 0x7FFFFFFF:X8}";
-                    down.Add($"DECLARE {downVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(oldCol.Name)}') IF {downVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{downVar}+']')");
-                    if (oldCol.DefaultValue != null)
-                        down.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{oldCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(oldCol.DefaultValue)}) FOR {Esc(oldCol.Name)}");
+                    var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}";
+                    down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {oldDef}");
+
+                    if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
+                    {
+                        // D: use sequential index for a deterministic, stable T-SQL variable name.
+                        var downVar = $"@__df_{downAltIdx}";
+                        down.Add($"DECLARE {downVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(oldCol.Name)}') IF {downVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{downVar}+']')");
+                        if (oldCol.DefaultValue != null)
+                            down.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{oldCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(oldCol.DefaultValue)}) FOR {Esc(oldCol.Name)}");
+                    }
+                    downAltIdx++;
                 }
             }
 
             // DOWN-5: Restore columns that were dropped in UP-3.
+            // C: include DefaultValue in the column definition so NOT NULL restore doesn't fail.
             foreach (var (table, column) in diff.DroppedColumns)
             {
-                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
+                var restoreDefault = !string.IsNullOrEmpty(column.DefaultValue)
+                    ? $" DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
+                    : "";
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {colDef}");
             }
 
@@ -197,14 +227,17 @@ namespace nORM.Migration
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
-                var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
-                if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
+                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
+                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
                 down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
-                foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    down.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
+                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
+                foreach (var idxGroup in table.Columns
+                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
+                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
+                    down.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
             }
 
             // DOWN-7: Restore FK constraints that were dropped in UP-1.
@@ -240,6 +273,7 @@ namespace nORM.Migration
         }
 
         // M1/X1: Allowlist for FK referential action tokens.
+        // NOTE: Identical copy exists in the other three migration generators. If a shared base class is introduced, consolidate here.
         private static readonly HashSet<string> _validFkActions =
             new(StringComparer.OrdinalIgnoreCase) { "NO ACTION", "CASCADE", "SET NULL", "RESTRICT", "SET DEFAULT" };
 
@@ -271,19 +305,30 @@ namespace nORM.Migration
             return sql;
         }
 
+        // NOTE: identical copies of ResolveType and ValidateFkAction exist in the other three generators;
+        // consolidate into a shared base class or static helper if one is introduced in the future.
+
+        // Cache for ResolveType to avoid scanning all loaded assemblies on every call.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Type?> _resolveTypeCache
+            = new(StringComparer.Ordinal);
+
         // Resolve a CLR type by its full name, scanning loaded assemblies when Type.GetType fails.
+        // Results are cached in _resolveTypeCache to avoid repeated AppDomain scans.
         private static Type? ResolveType(string typeName)
         {
             if (string.IsNullOrEmpty(typeName))
                 return null;
-            var t = Type.GetType(typeName);
-            if (t != null) return t;
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            return _resolveTypeCache.GetOrAdd(typeName, static name =>
             {
-                t = asm.GetType(typeName);
+                var t = Type.GetType(name);
                 if (t != null) return t;
-            }
-            return null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    t = asm.GetType(name);
+                    if (t != null) return t;
+                }
+                return null;
+            });
         }
     }
 }

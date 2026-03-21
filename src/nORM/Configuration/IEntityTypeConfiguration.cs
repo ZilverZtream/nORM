@@ -21,12 +21,12 @@ namespace nORM.Configuration
         /// <summary>
         /// Gets the collection of properties that compose the primary key.
         /// </summary>
-        List<PropertyInfo> KeyProperties { get; }
+        IReadOnlyList<PropertyInfo> KeyProperties { get; }
 
         /// <summary>
         /// Gets a mapping of property infos to explicit column names.
         /// </summary>
-        Dictionary<PropertyInfo, string> ColumnNames { get; }
+        IReadOnlyDictionary<PropertyInfo, string> ColumnNames { get; }
 
         /// <summary>
         /// Gets the CLR type that this entity shares its table with, if any.
@@ -36,17 +36,17 @@ namespace nORM.Configuration
         /// <summary>
         /// Gets owned navigation properties configured for this entity.
         /// </summary>
-        Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; }
+        IReadOnlyDictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; }
 
         /// <summary>
         /// Gets the shadow properties defined for the entity type.
         /// </summary>
-        Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; }
+        IReadOnlyDictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; }
 
         /// <summary>
         /// Gets the relationship configurations defined for the entity type.
         /// </summary>
-        List<RelationshipConfiguration> Relationships { get; }
+        IReadOnlyList<RelationshipConfiguration> Relationships { get; }
 
         /// <summary>Gets value converter configurations for this entity type.</summary>
         IReadOnlyList<ConverterConfiguration> Converters { get; }
@@ -55,7 +55,7 @@ namespace nORM.Configuration
         /// Gets owned collection navigation properties configured for this entity.
         /// Key is the collection navigation property; value describes the owned element type and configuration.
         /// </summary>
-        Dictionary<PropertyInfo, OwnedCollectionNavigation> OwnedCollectionNavigations { get; }
+        IReadOnlyDictionary<PropertyInfo, OwnedCollectionNavigation> OwnedCollectionNavigations { get; }
 
         /// <summary>
         /// Gets the many-to-many relationship configurations defined for this entity type.

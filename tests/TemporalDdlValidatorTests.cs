@@ -53,13 +53,16 @@ public class TemporalDdlValidatorTests
     }
 
     /// <summary>
-    /// DROP TABLE must still pass.
+    /// Security guard — DROP TABLE must be rejected. No temporal provider generates
+    /// DROP TABLE as part of bootstrap; only DROP TRIGGER/FUNCTION/PROCEDURE are
+    /// legitimate temporal DDL. Allowing DROP TABLE would let arbitrary table
+    /// destruction pass through the DDL validator.
     /// </summary>
     [Fact]
-    public void IsValidDdl_DropTable_ReturnsTrue()
+    public void IsValidDdl_DropTable_ReturnsFalse()
     {
         const string sql = "DROP TABLE IF EXISTS \"__NormTemporalTags\"";
-        Assert.True(CallIsValidDdl(sql));
+        Assert.False(CallIsValidDdl(sql));
     }
 
     /// <summary>

@@ -199,11 +199,13 @@ public class MigrationFluentSnapshotTests
     public void M1_Build_DbContext_Multiple_Fluent_ColumnRenames()
     {
         using var ctx = CreateCtx(mb =>
-            mb.Entity<FluentUser>()
-              .ToTable("users")
-              .HasKey(u => u.Id)
-              .Property(u => u.DisplayName).HasColumnName("display_name")
-              .Property(u => u.Email).HasColumnName("email_address"));
+        {
+            var e = mb.Entity<FluentUser>()
+                .ToTable("users")
+                .HasKey(u => u.Id);
+            e.Property(u => u.DisplayName).HasColumnName("display_name");
+            e.Property(u => u.Email).HasColumnName("email_address");
+        });
 
         var snapshot = SchemaSnapshotBuilder.Build(ctx);
         var table = snapshot.Tables.First(t => t.Name == "users");

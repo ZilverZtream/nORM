@@ -10,6 +10,11 @@ namespace nORM.Migration
     /// This implementation translates high level <see cref="SchemaDiff"/> objects
     /// into SQL required to upgrade or downgrade a database.
     /// </summary>
+    /// <remarks>
+    /// Provider: MySQL (backtick-escaped identifiers). Uses AUTO_INCREMENT for identity columns,
+    /// MODIFY COLUMN for alterations, and DROP FOREIGN KEY (not DROP CONSTRAINT) for FK removal.
+    /// FK referential actions are validated against an allowlist before being interpolated into DDL.
+    /// </remarks>
     public class MySqlMigrationSqlGenerator : IMigrationSqlGenerator
     {
         /// <summary>Default MySQL fallback type for unmapped CLR types.</summary>
@@ -103,17 +108,20 @@ namespace nORM.Migration
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
 
-                var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
-                if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
+                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
+                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
 
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
 
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
-                foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    up.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
+                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
+                foreach (var idxGroup in table.Columns
+                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
+                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
+                    up.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
             }
 
             // UP-6: Add columns to existing tables.
@@ -145,7 +153,7 @@ namespace nORM.Migration
 
             // DOWN-3: Drop tables that were created in UP-5.
             foreach (var table in diff.AddedTables)
-                down.Add($"DROP TABLE {Esc(table.Name)}");
+                down.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
 
             // DOWN-4: Reverse column alterations from UP-4.
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
@@ -156,9 +164,13 @@ namespace nORM.Migration
             }
 
             // DOWN-5: Restore columns that were dropped in UP-3.
+            // C: include DefaultValue in the column definition so NOT NULL restore doesn't fail.
             foreach (var (table, column) in diff.DroppedColumns)
             {
-                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
+                var restoreDefault = column.DefaultValue != null
+                    ? $" DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
+                    : "";
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
             }
 
@@ -176,14 +188,17 @@ namespace nORM.Migration
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
-                var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
-                if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
+                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
+                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
                 down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
-                foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    down.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
+                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
+                foreach (var idxGroup in table.Columns
+                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
+                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
+                    down.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
             }
 
             // DOWN-7: Restore FK constraints that were dropped in UP-1.
@@ -220,6 +235,7 @@ namespace nORM.Migration
         }
 
         // M1/X1: Allowlist for FK referential action tokens.
+        // NOTE: Identical copy exists in the other three migration generators. If a shared base class is introduced, consolidate here.
         private static readonly HashSet<string> _validFkActions =
             new(StringComparer.OrdinalIgnoreCase) { "NO ACTION", "CASCADE", "SET NULL", "RESTRICT", "SET DEFAULT" };
 
@@ -251,19 +267,30 @@ namespace nORM.Migration
             return sql;
         }
 
+        // NOTE: identical copies of ResolveType and ValidateFkAction exist in the other three generators;
+        // consolidate into a shared base class or static helper if one is introduced in the future.
+
+        // Cache for ResolveType to avoid scanning all loaded assemblies on every call.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Type?> _resolveTypeCache
+            = new(StringComparer.Ordinal);
+
         // Resolve a CLR type by its full name, scanning loaded assemblies when Type.GetType fails.
+        // Results are cached in _resolveTypeCache to avoid repeated AppDomain scans.
         private static Type? ResolveType(string typeName)
         {
             if (string.IsNullOrEmpty(typeName))
                 return null;
-            var t = Type.GetType(typeName);
-            if (t != null) return t;
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            return _resolveTypeCache.GetOrAdd(typeName, static name =>
             {
-                t = asm.GetType(typeName);
+                var t = Type.GetType(name);
                 if (t != null) return t;
-            }
-            return null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    t = asm.GetType(name);
+                    if (t != null) return t;
+                }
+                return null;
+            });
         }
     }
 }

@@ -7,6 +7,12 @@ namespace nORM.Migration
     /// <summary>
     /// Generates PostgreSQL-specific SQL statements to apply and roll back schema changes.
     /// </summary>
+    /// <remarks>
+    /// Provider: PostgreSQL (double-quote-escaped identifiers). Uses GENERATED ALWAYS AS IDENTITY
+    /// for auto-increment columns, separate ALTER COLUMN statements for type and nullability changes,
+    /// and SET DEFAULT / DROP DEFAULT for default value alterations. FK referential actions are
+    /// validated against an allowlist before being interpolated into DDL.
+    /// </remarks>
     public class PostgresMigrationSqlGenerator : IMigrationSqlGenerator
     {
         /// <summary>Default PostgreSQL fallback type for unmapped CLR types.</summary>
@@ -79,6 +85,10 @@ namespace nORM.Migration
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
                 if (!string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal))
+                    // TODO: Add USING clause for explicit type cast when converting between incompatible types
+                    // (e.g. TEXT::integer). Without USING, PostgreSQL will reject the ALTER if an implicit
+                    // cast from the old type to the new type does not exist. Known limitation: callers must
+                    // handle type-coercion migrations manually for incompatible type changes.
                     up.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} TYPE {GetSqlType(newCol)}");
                 if (oldCol.IsNullable != newCol.IsNullable)
                     up.Add(newCol.IsNullable
@@ -109,17 +119,20 @@ namespace nORM.Migration
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
 
-                var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
-                if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
+                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
+                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
 
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
 
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
-                foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    up.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
+                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
+                foreach (var idxGroup in table.Columns
+                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
+                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
+                    up.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
             }
 
             // UP-6: Add columns to existing tables.
@@ -151,12 +164,13 @@ namespace nORM.Migration
 
             // DOWN-3: Drop tables that were created in UP-5.
             foreach (var table in diff.AddedTables)
-                down.Add($"DROP TABLE {Esc(table.Name)}");
+                down.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
 
             // DOWN-4: Reverse column alterations from UP-4.
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
                 if (!string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal))
+                    // TODO: Add USING clause for explicit type cast (see UP-4 comment above for details).
                     down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} TYPE {GetSqlType(oldCol)}");
                 if (oldCol.IsNullable != newCol.IsNullable)
                     down.Add(oldCol.IsNullable
@@ -171,9 +185,13 @@ namespace nORM.Migration
             }
 
             // DOWN-5: Restore columns that were dropped in UP-3.
+            // C: include DefaultValue in the column definition so NOT NULL restore doesn't fail.
             foreach (var (table, column) in diff.DroppedColumns)
             {
-                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
+                var restoreDefault = !string.IsNullOrEmpty(column.DefaultValue)
+                    ? $" DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
+                    : "";
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
             }
 
@@ -192,14 +210,17 @@ namespace nORM.Migration
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
                     colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
-                var uniqueNonPkCols = table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey).ToList();
-                if (uniqueNonPkCols.Count > 0)
-                    colDefs.Add($"UNIQUE ({string.Join(", ", uniqueNonPkCols.Select(c => Esc(c.Name)))})");
+                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
+                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
+                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
                 down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
-                foreach (var col in table.Columns.Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique))
-                    down.Add($"CREATE INDEX {Esc(col.IndexName!)} ON {Esc(table.Name)} ({Esc(col.Name)})");
+                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
+                foreach (var idxGroup in table.Columns
+                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
+                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
+                    down.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
             }
 
             // DOWN-7: Restore FK constraints that were dropped in UP-1.
@@ -209,15 +230,36 @@ namespace nORM.Migration
             return new MigrationSqlStatements(up, down);
         }
 
+        // Integer CLR type full names that map validly to PostgreSQL GENERATED ALWAYS AS IDENTITY.
+        private static readonly HashSet<string> _integerClrTypes = new(StringComparer.Ordinal)
+        {
+            typeof(int).FullName!,
+            typeof(long).FullName!,
+            typeof(short).FullName!,
+            typeof(byte).FullName!,
+            typeof(sbyte).FullName!,
+            typeof(ushort).FullName!,
+            typeof(uint).FullName!,
+            typeof(ulong).FullName!,
+        };
+
         /// <summary>
         /// Returns the appropriate PostgreSQL integer type for an identity column.
-        /// BIGINT for long/ulong, INTEGER for everything else.
-        /// Used with GENERATED ALWAYS AS IDENTITY instead of SERIAL/BIGSERIAL.
+        /// BIGINT for long/ulong, INTEGER for all other integer types.
+        /// Non-integer CLR types return INTEGER with a leading SQL warning comment because
+        /// GENERATED ALWAYS AS IDENTITY is only valid for integer types in PostgreSQL.
         /// </summary>
         private static string GetIdentitySqlType(ColumnSchema column)
         {
-            if (column.ClrType == typeof(long).FullName || column.ClrType == typeof(ulong).FullName)
+            if (string.Equals(column.ClrType, typeof(long).FullName, StringComparison.Ordinal)
+             || string.Equals(column.ClrType, typeof(ulong).FullName, StringComparison.Ordinal))
                 return "BIGINT";
+
+            if (!_integerClrTypes.Contains(column.ClrType))
+                // WARNING: GENERATED ALWAYS AS IDENTITY is only valid for integer types in PostgreSQL.
+                // The column CLR type is not an integer type; INTEGER is used as a fallback — verify the mapping is correct.
+                return "/* WARNING: GENERATED ALWAYS AS IDENTITY is only valid for integer types in PostgreSQL */ INTEGER";
+
             return "INTEGER";
         }
 
@@ -248,6 +290,7 @@ namespace nORM.Migration
         }
 
         // Allowlist for FK referential action tokens (NO ACTION, CASCADE, SET NULL, RESTRICT, SET DEFAULT).
+        // NOTE: Identical copy exists in the other three migration generators. If a shared base class is introduced, consolidate here.
         private static readonly HashSet<string> _validFkActions =
             new(StringComparer.OrdinalIgnoreCase) { "NO ACTION", "CASCADE", "SET NULL", "RESTRICT", "SET DEFAULT" };
 
@@ -279,19 +322,30 @@ namespace nORM.Migration
             return sql;
         }
 
+        // NOTE: identical copies of ResolveType and ValidateFkAction exist in the other three generators;
+        // consolidate into a shared base class or static helper if one is introduced in the future.
+
+        // Cache for ResolveType to avoid scanning all loaded assemblies on every call.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Type?> _resolveTypeCache
+            = new(StringComparer.Ordinal);
+
         // Resolve a CLR type by its full name, scanning loaded assemblies when Type.GetType fails.
+        // Results are cached in _resolveTypeCache to avoid repeated AppDomain scans.
         private static Type? ResolveType(string typeName)
         {
             if (string.IsNullOrEmpty(typeName))
                 return null;
-            var t = Type.GetType(typeName);
-            if (t != null) return t;
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            return _resolveTypeCache.GetOrAdd(typeName, static name =>
             {
-                t = asm.GetType(typeName);
+                var t = Type.GetType(name);
                 if (t != null) return t;
-            }
-            return null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    t = asm.GetType(name);
+                    if (t != null) return t;
+                }
+                return null;
+            });
         }
     }
 }

@@ -111,8 +111,10 @@ namespace nORM.Query
 
             protected override Expression VisitConstant(ConstantExpression node)
             {
-                // Use TypeHandle instead of FullName for type identity
-                AppendLong(node.Type.TypeHandle.Value.ToInt64());
+                // Note: node.Type is already committed by Visit() via AppendLong(node.Type.TypeHandle).
+                // Do NOT append it again here — a duplicate type-handle contribution makes the byte
+                // stream inconsistent with other node kinds (MemberExpression, ParameterExpression, etc.)
+                // which only receive the type handle once from Visit().
 
                 // Include whether the constant is null as a bit in the fingerprint.
                 // `x.NullableStr != null` and `x.NullableStr != "Alice"` generate completely different
@@ -150,9 +152,15 @@ namespace nORM.Query
                         // 1 = null, 0 = non-null. Different nullability → different plan shape.
                         AppendInt(capturedValue is null ? 1 : 0);
                     }
-                    catch (Exception ex) when (ex is MemberAccessException or TargetInvocationException or InvalidOperationException or NotSupportedException)
+                    catch (Exception ex) when (ex is MemberAccessException
+                                                    or TargetInvocationException
+                                                    or InvalidOperationException
+                                                    or NotSupportedException
+                                                    or UnauthorizedAccessException)
                     {
                         // If we can't read the value, conservatively treat it as potentially null.
+                        // UnauthorizedAccessException can be raised by PropertyInfo.GetValue in
+                        // security-restricted contexts or on security-critical properties.
                         AppendInt(1);
                     }
                 }
@@ -221,7 +229,7 @@ namespace nORM.Query
                         AppendString(s);
                         break;
                     case int v:    AppendInt(v); break;
-                    case uint v:   AppendInt((int)v); break;
+                    case uint v:   AppendLong(v); break; // zero-extend to 64 bits; (int)v would sign-flip values > int.MaxValue
                     case short v:  AppendInt(v); break;
                     case ushort v: AppendInt(v); break;
                     case byte v:   AppendInt(v); break;
@@ -284,39 +292,49 @@ namespace nORM.Query
             }
 
             // Optimized string hashing with reduced allocations.
+            // Format: [4-byte UTF-8 byte count LE] [UTF-8 bytes]
+            // The prefix is the UTF-8 byte count (not the UTF-16 char count) so that the
+            // stream is self-consistent: the prefix matches the number of bytes that follow.
             private void AppendString(string value)
             {
-                Span<byte> length = stackalloc byte[4];
-                BinaryPrimitives.WriteInt32LittleEndian(length, value.Length);
-                _hasher.Append(length);
-
-                if (value.Length == 0) return;
-
-                // PERFORMANCE OPTIMIZATION 11: Use larger stack buffer to reduce encoding calls
-                // Most type names fit in 512 bytes, avoiding heap allocation
-                const int MaxStackBufferSize = 512;
-                int maxByteCount = value.Length * 3; // UTF-8 worst case is 3 bytes per BMP char (sufficient for .NET type names)
-
-                if (maxByteCount <= MaxStackBufferSize)
+                if (value.Length == 0)
                 {
-                    // Fast path: fits on stack
+                    // Write a 4-byte zero length prefix and no body.
+                    Span<byte> zeroLen = stackalloc byte[4];
+                    BinaryPrimitives.WriteInt32LittleEndian(zeroLen, 0);
+                    _hasher.Append(zeroLen);
+                    return;
+                }
+
+                // UTF-8 worst case: 4 bytes per UTF-16 code unit. Surrogate pairs encode one
+                // supplementary codepoint as 4 UTF-8 bytes (= 2 bytes per UTF-16 char), but a
+                // lone BMP char can be up to 3 bytes. Therefore value.Length * 4 bytes is always
+                // sufficient for any valid UTF-16 input. Using * 3 was insufficient for strings
+                // composed entirely of supplementary-plane characters.
+                // The chunked slow path was also unsafe: slicing at a char boundary can split
+                // a surrogate pair, producing a lone surrogate that Encoding.UTF8 rejects.
+                const int MaxStackBufferSize = 512;
+
+                // Fast path: encode the full string in one shot if it fits on the stack.
+                if (value.Length * 4 <= MaxStackBufferSize)
+                {
                     Span<byte> buffer = stackalloc byte[MaxStackBufferSize];
                     int written = System.Text.Encoding.UTF8.GetBytes(value, buffer);
+                    // Write the actual UTF-8 byte count as prefix (not the char count).
+                    Span<byte> lengthPrefix = stackalloc byte[4];
+                    BinaryPrimitives.WriteInt32LittleEndian(lengthPrefix, written);
+                    _hasher.Append(lengthPrefix);
                     _hasher.Append(buffer[..written]);
+                    return;
                 }
-                else
-                {
-                    // Slow path: encode in chunks
-                    Span<byte> buffer = stackalloc byte[MaxStackBufferSize];
-                    int offset = 0;
-                    while (offset < value.Length)
-                    {
-                        int chunkSize = Math.Min(MaxStackBufferSize / 3, value.Length - offset);
-                        int written = System.Text.Encoding.UTF8.GetBytes(value.AsSpan(offset, chunkSize), buffer);
-                        _hasher.Append(buffer[..written]);
-                        offset += chunkSize;
-                    }
-                }
+
+                // Slow path: heap-allocate for strings longer than ~128 chars
+                // (rare — type names and SQL constant values are almost always short).
+                var bytes = System.Text.Encoding.UTF8.GetBytes(value);
+                Span<byte> slowLen = stackalloc byte[4];
+                BinaryPrimitives.WriteInt32LittleEndian(slowLen, bytes.Length);
+                _hasher.Append(slowLen);
+                _hasher.Append(bytes);
             }
         }
 
