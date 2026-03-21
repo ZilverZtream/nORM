@@ -36,13 +36,25 @@ namespace nORM.Query
         private const int FallbackAvgPlanSizeBytes = 16 * 1024;
         /// <summary>Maximum bytes the plan cache is allowed to consume.</summary>
         private const long MaxPlanCacheBytes = 64L * 1024 * 1024;
+        /// <summary>Percentage of total available memory to allocate for the plan cache (1%).</summary>
+        private const int MemoryBudgetDivisor = 100;
+        /// <summary>Minimum number of entries the plan cache will hold regardless of memory pressure.</summary>
+        private const int MinPlanCacheEntries = 100;
+        /// <summary>Maximum number of entries the plan cache will hold regardless of available memory.</summary>
+        private const int MaxPlanCacheEntries = 10_000;
+        /// <summary>Interval at which the plan cache monitor adjusts cache size based on memory pressure.</summary>
+        private static readonly TimeSpan PlanCacheMonitorInterval = TimeSpan.FromMinutes(1);
+        /// <summary>How long a plan stays in the LRU cache before expiry.</summary>
+        private static readonly TimeSpan PlanCacheTimeToLive = TimeSpan.FromHours(1);
+        /// <summary>Interval at which unused cache lock semaphores are cleaned up.</summary>
+        private static readonly TimeSpan CacheLockCleanupInterval = TimeSpan.FromHours(1);
 
         internal readonly DbContext _ctx;
         private static readonly ConcurrentLruCache<ExpressionFingerprint, QueryPlan> _planCache =
-            new(maxSize: CalculateInitialPlanCacheSize(), timeToLive: TimeSpan.FromHours(1));
-        private static readonly Timer _planCacheMonitor = new(AdjustPlanCacheSize, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+            new(maxSize: CalculateInitialPlanCacheSize(), timeToLive: PlanCacheTimeToLive);
+        private static readonly Timer _planCacheMonitor = new(AdjustPlanCacheSize, null, PlanCacheMonitorInterval, PlanCacheMonitorInterval);
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
-        private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
+        private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, CacheLockCleanupInterval, CacheLockCleanupInterval);
         // Cache GetElementType results to avoid repeated reflection.
         private static readonly ConcurrentDictionary<Type, Type> _elementTypeCache = new();
         // Singleton MaterializerFactory — only wraps static caches, no instance state.
@@ -72,8 +84,8 @@ namespace nORM.Query
             // C1: restart timers if they were stopped when a new provider is created.
             if (Interlocked.Increment(ref _activeProviderCount) == 1)
             {
-                _planCacheMonitor.Change(TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
-                _cacheLockCleanupTimer.Change(TimeSpan.FromHours(1), TimeSpan.FromHours(1));
+                _planCacheMonitor.Change(PlanCacheMonitorInterval, PlanCacheMonitorInterval);
+                _cacheLockCleanupTimer.Change(CacheLockCleanupInterval, CacheLockCleanupInterval);
             }
         }
         public void Dispose()
@@ -138,7 +150,7 @@ namespace nORM.Query
         /// <summary>
         /// PERFORMANCE OPTIMIZATION: Enhanced cache lock cleanup.
         /// - Limits cleanup to prevent unbounded growth
-        /// - Disposes unused semaphores to release resources
+        /// - Removes unused semaphores to allow GC collection
         /// - Processes locks in batches to reduce iteration overhead
         /// </summary>
         private static void CleanupCacheLocks(object? state)
@@ -194,9 +206,9 @@ namespace nORM.Query
             var avgPlanSize = samples == 0
                 ? FallbackAvgPlanSizeBytes
                 : (int)(Volatile.Read(ref _totalPlanSize) / samples);
-            var cacheBytes = Math.Min(info.TotalAvailableMemoryBytes / 100, MaxPlanCacheBytes);
+            var cacheBytes = Math.Min(info.TotalAvailableMemoryBytes / MemoryBudgetDivisor, MaxPlanCacheBytes);
             var size = (int)(cacheBytes / avgPlanSize);
-            return Math.Clamp(size, 100, 10000);
+            return Math.Clamp(size, MinPlanCacheEntries, MaxPlanCacheEntries);
         }
         public TResult Execute<TResult>(Expression expression)
             => ExecuteSync<TResult>(expression);
@@ -393,7 +405,7 @@ namespace nORM.Query
         {
             var parameterDictionary = EnsureParameterDictionary(plan, paramValues);
             Func<Task<TResult>> queryExecutorFactory = () => ExecuteQueryFromPlanAsync<TResult>(plan, paramValues, sw, ct);
-            var cacheKey = BuildCacheKeyWithValues<TResult>(plan, parameterDictionary);
+            var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, parameterDictionary);
             var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
             return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
         }
@@ -676,6 +688,7 @@ namespace nORM.Query
             if (plan.IsScalar)
             {
                 var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
+                sw?.Stop();
                 _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw?.Elapsed ?? default, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                 if (scalarResult == null || scalarResult is DBNull)
                 {
@@ -692,11 +705,13 @@ namespace nORM.Query
                 if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
                 {
                     var objectList = await _executor.MaterializeAsObjectListAsync(plan, cmd, ct).ConfigureAwait(false);
+                    sw?.Stop();
                     _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw?.Elapsed ?? default, objectList.Count);
                     return (TResult)(object)objectList;
                 }
 
                 var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
+                sw?.Stop();
                 _ctx.Options.Logger?.LogQuery(plan.Sql, finalParameters, sw?.Elapsed ?? default, list.Count);
                 if (plan.SingleResult)
                 {
@@ -866,7 +881,11 @@ namespace nORM.Query
 
             // Dispatch directly to the same materializer methods used by non-compiled queries.
             if (plan.IsScalar)
+            {
+                if (_ctx.Provider.PrefersSyncExecution)
+                    return ExecuteScalarPlanSync<TResult>(plan, cmd, null);
                 return ExecuteScalarPlanAsync<TResult>(plan, cmd, null, ct);
+            }
             // Sync materialization for providers without true async I/O
             if (_ctx.Provider.PrefersSyncExecution)
                 return ExecuteListPlanSyncWrapped<TResult>(plan, cmd, null);
@@ -884,7 +903,11 @@ namespace nORM.Query
             BindCompiledParameters(cmd, plan, parameterValues, fixedParams);
 
             if (plan.IsScalar)
+            {
+                if (_ctx.Provider.PrefersSyncExecution)
+                    return await ExecuteScalarPlanSync<TResult>(plan, cmd, null).ConfigureAwait(false);
                 return await ExecuteScalarPlanAsync<TResult>(plan, cmd, null, ct).ConfigureAwait(false);
+            }
             if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
                 return (TResult)(object)await ExecuteObjectListPlanAsync(plan, cmd, null, ct).ConfigureAwait(false);
             return await ExecuteListPlanAsync<TResult>(plan, cmd, null, ct).ConfigureAwait(false);
@@ -1335,7 +1358,7 @@ namespace nORM.Query
             for (int i = 0; i < plan.CompiledParameters.Count && i < parameterValues.Length; i++)
                 dict[plan.CompiledParameters[i]] = parameterValues[i] ?? DBNull.Value;
 
-            var cacheKey = BuildCacheKeyWithValues<TResult>(plan, dict);
+            var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, dict);
             var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
             return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration,
                 () => ExecuteCompiledInternalArrayAsync<TResult>(plan, parameterValues, ct), ct).ConfigureAwait(false);
@@ -1859,8 +1882,9 @@ namespace nORM.Query
                 cmd.AddOptimizedParam(p.Key, p.Value);
 
             var scalar = cmd.ExecuteScalarWithInterception(_ctx);
+            sw?.Stop();
             if (sw != null)
-                _ctx.Options.Logger?.LogQuery(sql, parameters, sw?.Elapsed ?? default, scalar == null || scalar is DBNull ? 0 : 1);
+                _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, scalar == null || scalar is DBNull ? 0 : 1);
             if (scalar == null || scalar is DBNull)
                 return default!;
 
@@ -1922,6 +1946,7 @@ namespace nORM.Query
             foreach (var p in parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
             var list = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
+            sw?.Stop();
             _ctx.Options.Logger?.LogQuery(sql, parameters, sw?.Elapsed ?? default, list.Count);
             if (returnsList)
             {
@@ -1988,6 +2013,7 @@ namespace nORM.Query
             foreach (var p in parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
             var list = _executor.Materialize(plan, cmd);
+            sw?.Stop();
             _ctx.Options.Logger?.LogQuery(sql, parameters, sw?.Elapsed ?? default, list.Count);
             if (returnsList)
             {
@@ -2021,25 +2047,13 @@ namespace nORM.Query
                 using var cmd = _ctx.CreateCommand();
                 cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
                 cmd.CommandText = plan.Sql;
-                var compiledParamsSync = plan.CompiledParameters;
-                foreach (var p in plan.Parameters)
-                    if (compiledParamsSync.Count == 0 || !compiledParamsSync.Contains(p.Key))
-                        cmd.AddOptimizedParam(p.Key, p.Value);
-
-                if (paramValues != null)
-                {
-                    for (int i = 0; i < compiledParamsSync.Count; i++)
-                    {
-                        var name = compiledParamsSync[i];
-                        var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
-                        cmd.AddOptimizedParam(name, value);
-                    }
-                }
+                BindPlanParameters(cmd, plan, paramValues);
 
                 object? result;
                 if (plan.IsScalar)
                 {
                     var scalarResult = cmd.ExecuteScalarWithInterception(_ctx);
+                    sw?.Stop();
                     _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw?.Elapsed ?? default, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                     if (scalarResult == null || scalarResult is DBNull)
                     {
@@ -2053,6 +2067,7 @@ namespace nORM.Query
                 else
                 {
                     var list = _executor.Materialize(plan, cmd);
+                    sw?.Stop();
                     _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw?.Elapsed ?? default, list.Count);
                     if (plan.SingleResult)
                     {
@@ -2092,7 +2107,7 @@ namespace nORM.Query
 
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
-                var cacheKey = BuildCacheKeyWithValues<TResult>(plan, GetParameterDictionary());
+                var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, GetParameterDictionary());
                 var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
                 return ExecuteWithCacheSync(cacheKey, plan.Tables, expiration, queryExecutorFactory);
             }
@@ -2189,8 +2204,7 @@ namespace nORM.Query
             }
             // Sort parameters deterministically so identical parameter sets produce the same hash
             // regardless of insertion order.
-            var sortedParams = parameters.OrderBy(k => k.Key, StringComparer.Ordinal).ToList();
-            foreach (var kvp in sortedParams)
+            foreach (var kvp in parameters.OrderBy(k => k.Key, StringComparer.Ordinal))
             {
                 AppendByte(hasher, (byte)'|');
                 AppendUtf8(hasher, kvp.Key.AsSpan());
@@ -2307,18 +2321,9 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             var finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
             cmd.CommandText = finalSql;
-            foreach (var p in plan.Parameters)
-                cmd.AddOptimizedParam(p.Key, p.Value);
-            if (paramValues != null)
-            {
-                for (int i = 0; i < plan.CompiledParameters.Count; i++)
-                {
-                    var name = plan.CompiledParameters[i];
-                    var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
-                    cmd.AddOptimizedParam(name, value);
-                }
-            }
+            BindPlanParameters(cmd, plan, paramValues);
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
+            sw?.Stop();
             _ctx.Options.Logger?.LogQuery(finalSql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, affected);
             return affected;
         }
@@ -2339,23 +2344,19 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             var finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
             cmd.CommandText = finalSql;
-            foreach (var p in plan.Parameters)
-                cmd.AddOptimizedParam(p.Key, p.Value);
-            if (paramValues != null)
-            {
-                for (int i = 0; i < plan.CompiledParameters.Count; i++)
-                {
-                    var name = plan.CompiledParameters[i];
-                    var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
-                    cmd.AddOptimizedParam(name, value);
-                }
-            }
+            BindPlanParameters(cmd, plan, paramValues);
             foreach (var p in setParams)
                 cmd.AddOptimizedParam(p.Key, p.Value);
-            var allParams = EnsureParameterDictionary(plan, paramValues).ToDictionary(k => k.Key, v => v.Value);
+            // EnsureParameterDictionary returns a new Dictionary when compiled params exist,
+            // or the plan's own Parameters dict when there are none. Only copy when needed.
+            var baseDict = EnsureParameterDictionary(plan, paramValues);
+            var allParams = baseDict is Dictionary<string, object> mutableDict && !ReferenceEquals(baseDict, plan.Parameters)
+                ? mutableDict
+                : new Dictionary<string, object>(baseDict);
             foreach (var p in setParams)
                 allParams[p.Key] = p.Value;
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
+            sw?.Stop();
             _ctx.Options.Logger?.LogQuery(finalSql, allParams, sw?.Elapsed ?? default, affected);
             return affected;
         }
@@ -2369,16 +2370,7 @@ namespace nORM.Query
             await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
-            foreach (var p in plan.Parameters) cmd.AddOptimizedParam(p.Key, p.Value);
-            if (paramValues != null)
-            {
-                for (int i = 0; i < plan.CompiledParameters.Count; i++)
-                {
-                    var name = plan.CompiledParameters[i];
-                    var value = i < paramValues.Count ? paramValues[i] : DBNull.Value;
-                    cmd.AddOptimizedParam(name, value);
-                }
-            }
+            BindPlanParameters(cmd, plan, paramValues);
             if (plan.Includes.Count > 0 || plan.GroupJoinInfo != null)
                 throw new NotSupportedException("AsAsyncEnumerable does not support Include or GroupJoin operations.");
             var trackable = !plan.NoTracking &&
@@ -2408,6 +2400,7 @@ namespace nORM.Query
                 count++;
                 yield return entity;
             }
+            sw?.Stop();
             _ctx.Options.Logger?.LogQuery(plan.Sql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, count);
         }
         /// <summary>
@@ -2459,16 +2452,6 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// DEPRECATED: Use overload with boundParameters out parameter for better performance.
-        /// </summary>
-        [Obsolete("Use overload with boundParameters out parameter")]
-        internal QueryPlan GetPlan(Expression expression, out Expression filtered)
-        {
-            var plan = GetPlan(expression, out filtered, out var parameterValues);
-            return plan with { Parameters = EnsureParameterDictionary(plan, parameterValues) };
-        }
-
-        /// <summary>
         /// Returns ONLY the extracted values, no Dictionary allocation.
         /// Reuses a thread-local extractor to avoid allocating a new visitor + List per query.
         /// </summary>
@@ -2509,10 +2492,6 @@ namespace nORM.Query
             }
 
             return parameters;
-        }
-        private string BuildCacheKeyWithValues<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
-        {
-            return BuildCacheKeyFromPlan<TResult>(plan, parameters);
         }
         private static Expression UnwrapQueryExpression(Expression expression)
         {

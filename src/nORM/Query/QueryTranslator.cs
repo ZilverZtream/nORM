@@ -79,6 +79,21 @@ namespace nORM.Query
         private static readonly IReadOnlyDictionary<string, object> EmptyParamDict =
             new Dictionary<string, object>();
 
+        /// <summary>Maps LINQ aggregate method names to their SQL function equivalents, avoiding <c>ToUpperInvariant()</c> allocations on each call.</summary>
+        private static readonly Dictionary<string, string> AggregateFunctionMap = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Sum", "SUM" },
+            { "Average", "AVG" },
+            { "Min", "MIN" },
+            { "Max", "MAX" },
+            { "Count", "COUNT" },
+            { "LongCount", "COUNT" },
+            { "InternalSumExpression", "SUM" },
+            { "InternalAverageExpression", "AVG" },
+            { "InternalMinExpression", "MIN" },
+            { "InternalMaxExpression", "MAX" }
+        };
+
         private DbContext _ctx = null!;
         private SqlBuilder _clauses = new();
         private readonly object _syncRoot = new();
@@ -127,9 +142,6 @@ namespace nORM.Query
         private string? _takeParam { get => _clauses.TakeParam; set => _clauses.TakeParam = value; }
         private string? _skipParam { get => _clauses.SkipParam; set => _clauses.SkipParam = value; }
         private bool _isDistinct { get => _clauses.IsDistinct; set => _clauses.IsDistinct = value; }
-#pragma warning disable CS0414
-        private bool _isPooled;
-#pragma warning restore CS0414
         private static readonly ObjectPool<QueryTranslator> _translatorPool =
             new DefaultObjectPool<QueryTranslator>(new QueryTranslatorPooledObjectPolicy());
         private static readonly ObjectPool<List<string>> _selectItemsPool =
@@ -141,7 +153,6 @@ namespace nORM.Query
         }
         public QueryTranslator(DbContext ctx)
         {
-            _isPooled = false;
             Reset(ctx);
         }
         private QueryTranslator(
@@ -156,7 +167,6 @@ namespace nORM.Query
             int joinStart = 0,
             int recursionDepth = 0)
         {
-            _isPooled = false;
             _ctx = ctx;
             _provider = ctx.Provider;
             _mapping = mapping;
@@ -187,7 +197,6 @@ namespace nORM.Query
         internal static QueryTranslator Rent(DbContext ctx)
         {
             var t = _translatorPool.Get();
-            t._isPooled = true;
             t.Reset(ctx);
             return t;
         }
@@ -237,8 +246,8 @@ namespace nORM.Query
                 _clauses = new SqlBuilder();
                 _includes = new List<IncludePlan>();
                 _m2mIncludes = new List<M2MIncludePlan>();
-                _correlatedParams?.Clear();
-                _tables?.Clear();
+                _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
+                _tables = new HashSet<string>();
                 _ctx = null!;
                 _provider = null!;
                 _mapping = null!;
@@ -323,7 +332,7 @@ namespace nORM.Query
                         $"Consider simplifying the query or breaking it into multiple queries. " +
                         $"You can also increase the limit via DbContextOptions.MaxRecursionDepth (current: {_t._maxRecursionDepth}, max: 200).");
                 var complexityInfo = _complexityAnalyzer.AnalyzeQuery(_expression, _t._ctx.Options);
-                if (complexityInfo.WarningMessages.Any())
+                if (complexityInfo.WarningMessages.Count > 0)
                 {
                     var warnings = string.Join("; ", complexityInfo.WarningMessages);
                     _t._ctx.Options.Logger?.LogQuery($"-- WARN: {warnings}", EmptyParamDict, TimeSpan.Zero, 0);
@@ -512,7 +521,7 @@ namespace nORM.Query
                         string select;
                         if (windowFuncs.Count > 0 && _t._projection != null)
                         {
-                            var orderByForOverClause = _t._orderBy.Any()
+                            var orderByForOverClause = _t._orderBy.Count > 0
                                 ? $"ORDER BY {PooledStringBuilder.JoinOrderBy(_t._orderBy)}"
                                 : "ORDER BY (SELECT NULL)";
                             select = _t.BuildSelectWithWindowFunctions(_t._projection, windowFuncs, orderByForOverClause);
@@ -533,7 +542,7 @@ namespace nORM.Query
                                 {
                                     var escapedCol = keyCol.EscCol;
                                     // Only add if not already present
-                                    if (!select.Contains(escapedCol))
+                                    if (!select.Contains(escapedCol, StringComparison.Ordinal))
                                     {
                                         keyColumns.Add($"{escapedCol} AS {_t._provider.Escape(keyCol.PropName)}");
                                     }
@@ -1223,7 +1232,7 @@ namespace nORM.Query
 
                     if (_where.Length > 0)
                         _where.Append(" AND ");
-                    _where.Append($"({filterSql})");
+                    _where.Append('(').Append(filterSql).Append(')');
 
                     foreach (var kvp in filterVisitor.GetParameters())
                         _params[kvp.Key] = kvp.Value;
@@ -1685,8 +1694,6 @@ namespace nORM.Query
             mc.Arguments.Count > 0
                 ? mc.Arguments[0]
                 : expression;
-        private static bool IsRecordType(Type type) =>
-            type.GetMethod("<Clone>$", BindingFlags.Instance | BindingFlags.NonPublic) != null;
         private static string? ExtractPropertyName(Expression expression)
         {
             return expression switch
@@ -1723,8 +1730,8 @@ namespace nORM.Query
             _isAggregate = true;
             _sql.Clear();
 
-            var sqlFunction = functionName.ToUpperInvariant();
-            if (sqlFunction == "AVERAGE") sqlFunction = "AVG";
+            if (!AggregateFunctionMap.TryGetValue(functionName, out var sqlFunction))
+                sqlFunction = functionName.ToUpperInvariant();
 
             _sql.AppendSelect(ReadOnlySpan<char>.Empty);
             _sql.AppendAggregateFunction(sqlFunction, columnSql);
@@ -1877,16 +1884,19 @@ namespace nORM.Query
                 case "LongCount":
                     return "COUNT(*)";
                 case "Sum":
-                    if (methodCall.Arguments.Count > 0)
                     {
-                        var selector = StripQuotes(methodCall.Arguments[0]) as LambdaExpression;
-                        if (selector != null)
+                        // Extension method form: Enumerable.Sum(source, selector) — selector at [1]
+                        // Instance method form: g.Sum(selector) — selector at [0]
+                        var sumSelectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
+                            ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
+                        var sumSelector = sumSelectorArg != null ? StripQuotes(sumSelectorArg) as LambdaExpression : null;
+                        if (sumSelector != null)
                         {
-                            if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
-                                _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                            if (!_correlatedParams.ContainsKey(sumSelector.Parameters[0]))
+                                _correlatedParams[sumSelector.Parameters[0]] = (_mapping, alias);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, sumSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
-                            var columnSql = visitor.Translate(selector.Body);
+                            var columnSql = visitor.Translate(sumSelector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 AddParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
@@ -1896,16 +1906,19 @@ namespace nORM.Query
                     throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
                         "SUM requires a selector expression (e.g., g.Sum(x => x.Amount)). SUM(*) is not valid SQL."));
                 case "Average":
-                    if (methodCall.Arguments.Count > 0)
                     {
-                        var selector = StripQuotes(methodCall.Arguments[0]) as LambdaExpression;
-                        if (selector != null)
+                        // Extension method form: Enumerable.Average(source, selector) — selector at [1]
+                        // Instance method form: g.Average(selector) — selector at [0]
+                        var avgSelectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
+                            ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
+                        var avgSelector = avgSelectorArg != null ? StripQuotes(avgSelectorArg) as LambdaExpression : null;
+                        if (avgSelector != null)
                         {
-                            if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
-                                _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                            if (!_correlatedParams.ContainsKey(avgSelector.Parameters[0]))
+                                _correlatedParams[avgSelector.Parameters[0]] = (_mapping, alias);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, avgSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
-                            var columnSql = visitor.Translate(selector.Body);
+                            var columnSql = visitor.Translate(avgSelector.Body);
                             foreach (var kvp in visitor.GetParameters())
                                 AddParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
@@ -1982,8 +1995,8 @@ namespace nORM.Query
                 _isAggregate = true;
                 _sql.Clear();
 
-                var sqlFunction = node.Method.Name.ToUpperInvariant();
-                if (sqlFunction == "AVERAGE") sqlFunction = "AVG";
+                if (!AggregateFunctionMap.TryGetValue(node.Method.Name, out var sqlFunction))
+                    sqlFunction = node.Method.Name.ToUpperInvariant();
 
                 // Build complete SELECT ... FROM ... so the sql-length guard in Generate()
                 // correctly skips the default SELECT/FROM assembly block.
@@ -2014,8 +2027,11 @@ namespace nORM.Query
             var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
             var visitor = FastExpressionVisitorPool.Get(in vctx2);
             var predicateSql = visitor.Translate(predicate.Body);
+            // All() predicate parameters are fixed constants (not closure captures),
+            // so add them only to _params (NOT _compiledParams) to ensure they are
+            // bound directly rather than relying on ParameterValueExtractor.
             foreach (var kvp in visitor.GetParameters())
-                AddParameter(kvp.Key, kvp.Value);
+                _params[kvp.Key] = kvp.Value ?? DBNull.Value;
             FastExpressionVisitorPool.Return(visitor);
 
             // Build the complete SQL inline so the predicate is inside the EXISTS subquery.

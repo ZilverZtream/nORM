@@ -44,6 +44,10 @@ namespace nORM.Core
         private const int LargeSqlBaselineComplexity = 20;
         /// <summary>Maximum complexity score cap to prevent timeout inflation from false positives.</summary>
         private const int MaxComplexityScore = 50;
+        /// <summary>SQL Server error number indicating a deadlock victim (used by <see cref="UseDeadlockResilientSaveChanges"/>).</summary>
+        private const int SqlServerDeadlockErrorNumber = 1205;
+        /// <summary>Number of parameters reserved for internal use (e.g. tenant, timestamp) when computing batch sizes.</summary>
+        private const int ParameterBudgetReserve = 10;
         /// <summary>Jitter range (±) applied to retry backoff delays to prevent thundering herd.</summary>
         private const double RetryJitterRange = 0.2;
         /// <summary>Maximum seconds to wait for the cleanup timer to drain during dispose.</summary>
@@ -896,7 +900,7 @@ namespace nORM.Core
                     if (ex is DbException dbEx)
                     {
                         var prop = s_numberPropertyCache.GetOrAdd(dbEx.GetType(), t => t.GetProperty("Number"));
-                        return (int?)prop?.GetValue(dbEx) == 1205;
+                        return (int?)prop?.GetValue(dbEx) == SqlServerDeadlockErrorNumber;
                     }
                     return false;
                 }
@@ -1238,7 +1242,7 @@ namespace nORM.Core
             var batchSize = totalEntries;
             if (_p.MaxParameters != int.MaxValue)
             {
-                var maxParams = Math.Max(1, _p.MaxParameters - 10);
+                var maxParams = Math.Max(1, _p.MaxParameters - ParameterBudgetReserve);
                 batchSize = Math.Max(1, maxParams / Math.Max(1, paramsPerEntity));
             }
             return batchSize;
@@ -1287,7 +1291,7 @@ namespace nORM.Core
                     // on the owned child table, preventing cross-tenant data destruction.
                     Column? ownedTenantCol = null;
                     if (Options.TenantProvider != null && Options.TenantColumnName != null)
-                        ownedTenantCol = ownedMap.Columns.FirstOrDefault(c => c.PropName == Options.TenantColumnName);
+                        ownedTenantCol = Array.Find(ownedMap.Columns, c => c.PropName == Options.TenantColumnName);
                     if (ownedTenantCol != null)
                     {
                         delSql += $" AND {ownedTenantCol.EscCol} = @tenantId";
@@ -1309,7 +1313,7 @@ namespace nORM.Core
                 var items = ((System.Collections.IEnumerable)collection).Cast<object>().ToList();
                 if (items.Count == 0) continue;
 
-                var insertCols = ownedMap.Columns.Where(c => !c.IsDbGenerated).ToArray();
+                var insertCols = Array.FindAll(ownedMap.Columns, c => !c.IsDbGenerated);
                 var colNames = string.Join(", ", insertCols.Select(c => c.EscCol).Prepend(ownedMap.EscForeignKeyColumn));
 
                 // INSERT each item individually — avoids multi-statement batch issues
@@ -1520,7 +1524,7 @@ namespace nORM.Core
                 // on the owned child table, preventing cross-tenant data leakage.
                 Column? ownedTenantColLoad = null;
                 if (Options.TenantProvider != null && Options.TenantColumnName != null)
-                    ownedTenantColLoad = ownedMap.Columns.FirstOrDefault(c => c.PropName == Options.TenantColumnName);
+                    ownedTenantColLoad = Array.Find(ownedMap.Columns, c => c.PropName == Options.TenantColumnName);
                 if (ownedTenantColLoad != null)
                     sqlBuilder.Append(" AND ").Append(ownedTenantColLoad.EscCol)
                               .Append(" = ").Append(_p.ParamPrefix).Append("tenantId");
@@ -2283,7 +2287,7 @@ namespace nORM.Core
             var all = mappings.ToList();
             var deps = all.ToDictionary(
                 m => m,
-                m => all.Where(other => other != m && m.Columns.Any(c =>
+                m => all.Where(other => other != m && Array.Exists(m.Columns, c =>
                     // FK-2: Match by full type name first (namespace-qualified) to avoid collisions
                     // between types with the same simple name in different namespaces.
                     MatchesPrincipalType(c.ForeignKeyPrincipalTypeName, other.Type))).ToList());

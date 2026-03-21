@@ -43,6 +43,11 @@ namespace nORM.Query
         /// </summary>
         private const int DependentQueryParameterReserve = 100;
 
+        /// <summary>
+        /// Prefix used by the C# compiler for anonymous type names.
+        /// </summary>
+        private const string AnonymousTypePrefix = "<>";
+
         // Cached list factory delegates to avoid Activator.CreateInstance on every materialization.
         // Take values are now passed directly from the query plan rather than parsed via regex.
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Func<int, IList>> _listFactoryCache = new();
@@ -104,7 +109,7 @@ namespace nORM.Query
         /// <remarks>Internal wrapper exposed for use by NormQueryProvider's pooled command path.</remarks>
         internal IList CreateListForType(Type elementType, int capacity) => CreateList(elementType, capacity);
 
-        private static IList CreateList(Type elementType, int capacity)
+        internal static IList CreateList(Type elementType, int capacity)
         {
             var factory = _listFactoryCache.GetOrAdd(elementType, t =>
             {
@@ -140,7 +145,7 @@ namespace nORM.Query
 
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
-                                 !plan.ElementType.Name.StartsWith("<>") &&
+                                 !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
                                  plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
                                  _ctx.IsMapped(plan.ElementType);
 
@@ -204,7 +209,7 @@ namespace nORM.Query
 
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
-                                 !plan.ElementType.Name.StartsWith("<>") &&
+                                 !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
                                  plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
                                  _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
 
@@ -225,7 +230,7 @@ namespace nORM.Query
                 var maxRows = plan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
                 if (plan.SingleResult)
                 {
-                    for (int _row = 0; _row < maxRows; _row++)
+                    for (int rowIndex = 0; rowIndex < maxRows; rowIndex++)
                     {
                         if (!await reader.ReadAsync(ct).ConfigureAwait(false)) break;
                         ct.ThrowIfCancellationRequested();
@@ -305,7 +310,7 @@ namespace nORM.Query
 
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
-                                 !plan.ElementType.Name.StartsWith("<>") &&
+                                 !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
                                  plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
                                  _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
 
@@ -322,7 +327,7 @@ namespace nORM.Query
                 var maxRows = plan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
                 if (plan.SingleResult)
                 {
-                    for (int _row = 0; _row < maxRows; _row++)
+                    for (int rowIndex = 0; rowIndex < maxRows; rowIndex++)
                     {
                         if (!reader.Read()) break;
                         var entity = syncMaterializer(reader);
@@ -435,8 +440,8 @@ namespace nORM.Query
                 // Use cached list factory instead of Activator.CreateInstance.
                 var resultList = CreateList(info.ResultType, DefaultListCapacity);
 
-                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
-                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith("<>") && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
+                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
+                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
 
                 var outerMap = _ctx.GetMapping(info.OuterType);
                 var innerMap = _ctx.GetMapping(info.InnerType);
@@ -573,8 +578,8 @@ namespace nORM.Query
             {
                 var resultList = CreateList(info.ResultType, DefaultListCapacity);
 
-                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith("<>") && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
-                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith("<>") && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
+                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
+                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
 
                 var outerMap = _ctx.GetMapping(info.OuterType);
                 var innerMap = _ctx.GetMapping(info.InnerType);

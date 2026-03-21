@@ -115,7 +115,8 @@ namespace nORM.Query
             if (countCall.Arguments.Count == 2)
             {
                 if (Unwrap(countCall.Arguments[0]) is not ConstantExpression) return false;
-                if (countCall.Arguments[1] is not LambdaExpression) return false;
+                // StripQuotes: LINQ wraps lambda args in UnaryExpression{Quote()}.
+                if (StripQuotes(countCall.Arguments[1]) is not LambdaExpression) return false;
                 hasPredicate = true;
                 return true;
             }
@@ -191,6 +192,13 @@ namespace nORM.Query
             }
             return false;
         }
+        /// <summary>
+        /// Unwraps a <see cref="UnaryExpression"/> with <see cref="ExpressionType.Quote"/> node type
+        /// to extract the inner lambda expression.
+        /// </summary>
+        private static Expression StripQuotes(Expression e)
+            => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
+
         private static Expression Unwrap(Expression e)
         {
             while (e is MethodCallExpression m)

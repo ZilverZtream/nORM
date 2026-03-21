@@ -30,7 +30,7 @@ namespace nORM.Providers
             CancellationToken ct) where T : class
         {
             var sizing = BatchSizer.CalculateOptimalBatchSize(
-                entityList.Take(100), mapping, operationKey, entityList.Count);
+                entityList.Take(BatchSizingSampleCount), mapping, operationKey, entityList.Count);
 
             var total = 0;
             // Reuse caller's transaction when one is already open on this context.

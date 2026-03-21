@@ -336,13 +336,11 @@ public class QueryExecutorExtendedCoverageTests
         };
         using var ctx = new DbContext(cn, new AsyncSqliteProvider(), opts);
 
-        // NormExceptionHandler wraps NormQueryException inside NormException
-        var ex = await Assert.ThrowsAsync<NormException>(async () =>
+        await Assert.ThrowsAsync<NormQueryException>(async () =>
             await ctx.Query<QexOuter>()
                 .GroupJoin(ctx.Query<QexInner>(), o => o.Id, i => i.OuterId,
                     (o, items) => new { Outer = o, Items = items.ToList() })
                 .ToListAsync());
-        Assert.IsType<NormQueryException>(ex.InnerException);
     }
 
     [Fact]
@@ -368,13 +366,11 @@ public class QueryExecutorExtendedCoverageTests
         };
         using var ctx = new DbContext(cn, new SqliteProvider(), opts);
 
-        // NormExceptionHandler wraps NormQueryException inside NormException
-        var ex = Assert.Throws<NormException>(() =>
+        Assert.Throws<NormQueryException>(() =>
             ctx.Query<QexOuter>()
                 .GroupJoin(ctx.Query<QexInner>(), o => o.Id, i => i.OuterId,
                     (o, items) => new { Outer = o, Items = items.ToList() })
                 .ToList());
-        Assert.IsType<NormQueryException>(ex.InnerException);
     }
 
     // ══════════════════════════════════════════════════════════════════════════

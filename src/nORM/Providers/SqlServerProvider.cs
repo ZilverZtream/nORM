@@ -32,9 +32,6 @@ namespace nORM.Providers
         /// </summary>
         private static readonly Version MinimumSqlServerVersion = new(13, 0);
 
-        /// <summary>Number of entities sampled for dynamic batch sizing heuristics.</summary>
-        private const int BatchSizingSampleCount = 100;
-
         /// <summary>SQL Server error number for "Invalid object name" (table/view does not exist).</summary>
         private const int SqlErrorObjectNotFound = 208;
 
@@ -540,7 +537,11 @@ END;";
                 var version = new Version(int.Parse(parts[0]), int.Parse(parts[1]));
                 return version >= MinimumSqlServerVersion;
             }
-            catch (Exception)
+            catch (DbException)
+            {
+                return false;
+            }
+            catch (InvalidOperationException)
             {
                 return false;
             }
@@ -707,7 +708,7 @@ END;";
                         dropCmd.CommandText = $"IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL DROP TABLE {tempTableName}";
                         await dropCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
                     }
-                    catch (Exception ex)
+                    catch (DbException ex)
                     {
                         Trace.TraceWarning($"SqlServerProvider: Failed to drop temp table {tempTableName} during BulkUpdate cleanup: {ex.Message}");
                     }
@@ -836,7 +837,7 @@ END;";
                         dropCmd.CommandText = $"IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL DROP TABLE {tempTableName}";
                         await dropCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
                     }
-                    catch (Exception ex)
+                    catch (DbException ex)
                     {
                         Trace.TraceWarning($"SqlServerProvider: Failed to drop temp table {tempTableName} during BulkDelete cleanup: {ex.Message}");
                     }

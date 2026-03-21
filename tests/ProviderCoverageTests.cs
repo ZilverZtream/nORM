@@ -1019,10 +1019,26 @@ public class DbConcurrencyExceptionTests
 
 // ── NavigationContext ─────────────────────────────────────────────────────────
 
-public class NavigationContextCovTests
+public class NavigationContextCovTests : IDisposable
 {
-    private static NavigationContext MakeContext() =>
-        new NavigationContext(null!, typeof(string));
+    private readonly SqliteConnection _cn;
+    private readonly DbContext _ctx;
+
+    public NavigationContextCovTests()
+    {
+        _cn = new SqliteConnection("Data Source=:memory:");
+        _cn.Open();
+        _ctx = new DbContext(_cn, new SqliteProvider());
+    }
+
+    public void Dispose()
+    {
+        _ctx.Dispose();
+        _cn.Dispose();
+    }
+
+    private NavigationContext MakeContext() =>
+        new NavigationContext(_ctx, typeof(string));
 
     [Fact]
     public void IsLoaded_Initially_ReturnsFalse()

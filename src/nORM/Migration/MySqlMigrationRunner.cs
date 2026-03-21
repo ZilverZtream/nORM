@@ -158,11 +158,12 @@ namespace nORM.Migration
             pName.Value = MigrationLockName;
             cmd.Parameters.Add(pName);
             try { await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false); }
-            catch (DbException ex)
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
             {
                 // Best-effort release; surface failure for diagnostics rather than silently swallowing.
                 // Do not propagate — throwing from a finally block would mask the original exception.
-                // Narrowed to DbException so that fatal CLR errors (OutOfMemoryException etc.) propagate.
+                // Catches DbException and InvalidOperationException (closed connection) alike.
+                // Fatal CLR errors (OutOfMemoryException, StackOverflowException) still propagate.
                 var logger = _context?.Options?.Logger;
                 if (logger != null)
                     logger.LogWarning(

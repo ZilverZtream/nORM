@@ -1122,8 +1122,8 @@ namespace nORM.Query
                             if (reader.IsDBNull(ord)) continue;
                             var rawVal = reader.GetValue(ord);
                             try { col.Setter(entity, ConvertDbValue(rawVal, col.Prop.PropertyType)); }
-                            catch (InvalidCastException) { }
-                            catch (FormatException) { }
+                            catch (InvalidCastException) { /* shadow column type mismatch — skip silently */ }
+                            catch (FormatException) { /* shadow column format mismatch — skip silently */ }
                         }
                         else
                         {
@@ -1185,7 +1185,7 @@ namespace nORM.Query
 
                 // Anonymous types (compiler-generated) use positional matching by parameter count
                 // since their constructor parameter names (camelCase) don't match column prop names
-                if (t.Namespace == null && t.Name.Contains("AnonymousType"))
+                if (t.Namespace == null && t.Name.Contains("AnonymousType", StringComparison.Ordinal))
                 {
                     return ctors.FirstOrDefault(c => c.GetParameters().Length == columns.Length)
                         ?? throw new InvalidOperationException($"No suitable constructor for {t}");

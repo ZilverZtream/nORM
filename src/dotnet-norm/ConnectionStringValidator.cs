@@ -5,15 +5,14 @@ namespace nORM.Security
 {
     public static class ConnectionStringValidator
     {
+        /// <summary>
+        /// Forbidden keywords stored in uppercase so Contains() against the uppercased
+        /// connection string does not allocate a new string on every call.
+        /// </summary>
         private static readonly string[] ForbiddenKeywords =
         {
-            "xp_cmdshell", "sp_configure", "openrowset", "opendatasource",
-            "bulk insert", "xp_regread", "xp_regwrite", "sp_oacreate"
-        };
-
-        private static readonly string[] RequiredSqlServerSettings =
-        {
-            "Encrypt=True", "TrustServerCertificate=False"
+            "XP_CMDSHELL", "SP_CONFIGURE", "OPENROWSET", "OPENDATASOURCE",
+            "BULK INSERT", "XP_REGREAD", "XP_REGWRITE", "SP_OACREATE"
         };
 
         public static string ValidateAndSanitize(string connectionString, string provider)
@@ -25,7 +24,7 @@ namespace nORM.Security
             var upperConnectionString = connectionString.ToUpperInvariant();
             foreach (var forbidden in ForbiddenKeywords)
             {
-                if (upperConnectionString.Contains(forbidden.ToUpperInvariant()))
+                if (upperConnectionString.Contains(forbidden, StringComparison.Ordinal))
                     throw new ArgumentException($"Connection string contains forbidden keyword: {forbidden}");
             }
 
