@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using nORM.Core;
 using nORM.Configuration;
 using nORM.Providers;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.ObjectPool;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -253,6 +254,58 @@ namespace nORM.Scaffolding
         }
 
         /// <summary>
+        /// Returns the last segment of a dot-delimited identifier.
+        /// </summary>
+        internal static string GetUnqualifiedName(string identifier)
+        {
+            var idx = identifier.LastIndexOf('.');
+            return idx >= 0 ? identifier[(idx + 1)..] : identifier;
+        }
+
+        /// <summary>
+        /// Returns the schema segment (before the first dot) or null if no dot or empty schema.
+        /// </summary>
+        internal static string? GetSchemaNameOrNull(string identifier)
+        {
+            var idx = identifier.IndexOf('.');
+            return idx > 0 ? identifier[..idx] : null;
+        }
+
+        /// <summary>
+        /// Combines schema and table with a dot separator when schema is present.
+        /// No SQL escaping is applied.
+        /// </summary>
+        internal static string EscapeQualifiedIfNeeded(string? schema, string table)
+            => string.IsNullOrEmpty(schema) ? table : $"{schema}.{table}";
+
+        /// <summary>
+        /// Escapes an identifier using the appropriate provider for the given connection.
+        /// For schema-qualified names (containing a dot), both parts are escaped.
+        /// </summary>
+        internal static string EscapeIdentifier(DbConnection connection, string identifier)
+        {
+            DatabaseProvider provider = connection switch
+            {
+                Microsoft.Data.Sqlite.SqliteConnection => new SqliteProvider(),
+                _ => new SqliteProvider() // default fallback
+            };
+            var dot = identifier.IndexOf('.');
+            if (dot >= 0)
+            {
+                var schema = identifier[..dot];
+                var table = identifier[(dot + 1)..];
+                return $"{provider.Escape(schema)}.{provider.Escape(table)}";
+            }
+            return provider.Escape(identifier);
+        }
+
+        /// <summary>
+        /// Combines schema and table with a dot separator. No SQL escaping.
+        /// </summary>
+        internal static string EscapeQualified(string schema, string table)
+            => $"{schema}.{table}";
+
+        /// <summary>
         /// Escapes schema and table identifiers using the given provider's rules.
         /// </summary>
         private static string EscapeQualified(DatabaseProvider provider, string? schema, string table)
@@ -274,13 +327,17 @@ namespace nORM.Scaffolding
 
         private static readonly HashSet<string> _csharpKeywords = new(StringComparer.Ordinal)
         {
+            // Reserved keywords
             "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const",
             "continue","decimal","default","delegate","do","double","else","enum","event","explicit","extern",
             "false","finally","fixed","float","for","foreach","goto","if","implicit","in","int","interface",
             "internal","is","lock","long","namespace","new","null","object","operator","out","override","params",
             "private","protected","public","readonly","ref","return","sbyte","sealed","short","sizeof","stackalloc",
             "static","string","struct","switch","this","throw","true","try","typeof","uint","ulong","unchecked",
-            "unsafe","ushort","using","virtual","void","volatile","while","record","partial","var","dynamic"
+            "unsafe","ushort","using","virtual","void","volatile","while",
+            // Contextual keywords commonly used as identifiers in database column names
+            "record","partial","var","dynamic","async","await","nameof","when","and","or","not","with",
+            "init","required","file","scoped","global","managed","unmanaged","nint","nuint","value","yield"
         };
     }
 }

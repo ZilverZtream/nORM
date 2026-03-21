@@ -29,6 +29,9 @@ namespace nORM.Providers
         // when the same provider instance is shared across contexts with different mappings.
         private readonly ConcurrentLruCache<(Type Type, string TableName, string Operation), string> _sqlCache = new(maxSize: 1000);
 
+        /// <summary>Number of entities sampled for dynamic batch sizing heuristics.</summary>
+        protected const int BatchSizingSampleCount = 100;
+
         /// <summary>
         /// Utility used to dynamically determine optimal batch sizes for bulk
         /// operations based on runtime metrics.
@@ -488,14 +491,14 @@ namespace nORM.Providers
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
-            if (!entityList.Any())
+            if (entityList.Count == 0)
             {
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, 0, sw.Elapsed);
                 return 0;
             }
 
             var operationKey = $"BulkInsert_{m.Type.Name}";
-            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(BatchSizingSampleCount), m, operationKey, entityList.Count);
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
             var maxBatchForProvider = MaxParameters == int.MaxValue
                 ? 1000
@@ -514,7 +517,7 @@ namespace nORM.Providers
                 if (await IsTransactionLogNearCapacityAsync(ctx, ct).ConfigureAwait(false))
                     effectiveBatchSize = Math.Max(1, effectiveBatchSize / 2);
 
-                var batch = entityList.Skip(index).Take(effectiveBatchSize).ToList();
+                var batch = entityList.GetRange(index, Math.Min(effectiveBatchSize, entityList.Count - index));
                 var batchSw = Stopwatch.StartNew();
                 recordsAffected += await ExecuteInsertBatch(ctx, m, batch, ct).ConfigureAwait(false);
                 batchSw.Stop();
@@ -668,9 +671,9 @@ namespace nORM.Providers
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
-            if (!entityList.Any()) return 0;
+            if (entityList.Count == 0) return 0;
 
-            if (!m.KeyColumns.Any())
+            if (m.KeyColumns.Length == 0)
                 throw new NormConfigurationException($"Cannot delete from '{m.EscTable}': no key columns defined.");
 
             var totalDeleted = 0;

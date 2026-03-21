@@ -1401,7 +1401,7 @@ public class ProviderCoverageExtendedTests
     {
         var p = new SqlServerProvider();
         var result = p.TranslateFunction(nameof(Math.Round), typeof(Math), "col");
-        Assert.Equal("ROUND(col)", result);
+        Assert.Equal("ROUND(col, 0)", result);
     }
 
     [Fact]

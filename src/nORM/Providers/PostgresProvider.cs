@@ -1,18 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Data;
+using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
-using nORM.Query;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Data.Common;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ObjectPool;
+using nORM.Query;
 
 #nullable enable
 
@@ -24,7 +23,20 @@ namespace nORM.Providers
     /// </summary>
     public sealed class PostgresProvider : BulkOperationProvider
     {
+        /// <summary>
+        /// Minimum PostgreSQL version required (9.5 introduced ON CONFLICT, UPSERT, and row-level security).
+        /// </summary>
+        private static readonly Version MinimumPostgresVersion = new(9, 5);
+
+        /// <summary>
+        /// PostgreSQL error code for "undefined_table" (error class 42P01).
+        /// </summary>
+        private const string PgErrorUndefinedTable = "42P01";
+
+        /// <summary>Factory used to create Npgsql-compatible <see cref="DbParameter"/> instances.</summary>
         private readonly IDbParameterFactory _parameterFactory;
+
+        /// <summary>Shared pool of <see cref="StringBuilder"/> instances to reduce allocations during SQL generation.</summary>
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
 
@@ -54,10 +66,11 @@ namespace nORM.Providers
         public override int MaxSqlLength => int.MaxValue;
 
         /// <inheritdoc />
-        /// PostgreSQL requires "true"/"false" literals; "1"/"0" cause type errors in boolean comparisons.
+        /// <remarks>PostgreSQL requires <c>true</c>/<c>false</c> literals; <c>1</c>/<c>0</c> cause type errors in boolean comparisons.</remarks>
         public override string BooleanTrueLiteral => "true";
 
         /// <inheritdoc />
+        /// <remarks>PostgreSQL uses <c>false</c> rather than the default <c>0</c>.</remarks>
         public override string BooleanFalseLiteral => "false";
 
         /// <summary>
@@ -74,8 +87,12 @@ namespace nORM.Providers
             => $"{left} IS DISTINCT FROM {right}";
 
         /// <inheritdoc />
+        /// <param name="id">Identifier to escape (e.g., <c>"table"</c> or <c>"schema.table"</c>).</param>
+        /// <returns>The escaped identifier with each segment wrapped in double quotes.</returns>
+        /// <remarks>
         /// Doubles embedded double-quote characters to prevent SQL injection via identifiers.
         /// Handles schema-qualified identifiers (schema.table) by escaping each part separately.
+        /// </remarks>
         public override string Escape(string id)
         {
             if (string.IsNullOrWhiteSpace(id))
@@ -88,6 +105,11 @@ namespace nORM.Providers
         /// <summary>
         /// Adds PostgreSQL-specific <c>LIMIT</c> and <c>OFFSET</c> clauses to the SQL builder.
         /// </summary>
+        /// <param name="sb">Builder receiving the clauses.</param>
+        /// <param name="limit">Maximum number of rows to return.</param>
+        /// <param name="offset">Number of rows to skip.</param>
+        /// <param name="limitParameterName">Name of the parameter supplying the limit.</param>
+        /// <param name="offsetParameterName">Name of the parameter supplying the offset.</param>
         public override void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
         {
             EnsureValidParameterName(limitParameterName, nameof(limitParameterName));
@@ -103,10 +125,13 @@ namespace nORM.Providers
             else if (offset.HasValue)
                 sb.Append(" OFFSET ").Append(offset.Value);
         }
-        
+
         /// <summary>
         /// Generates SQL for retrieving the value of an identity column after an insert.
+        /// Uses PostgreSQL's <c>RETURNING</c> clause for single-statement identity retrieval.
         /// </summary>
+        /// <param name="m">The mapping for the table being inserted into.</param>
+        /// <returns>A <c>RETURNING</c> clause if a DB-generated key exists; otherwise <see cref="string.Empty"/>.</returns>
         public override string GetIdentityRetrievalString(TableMapping m)
         {
             var keyCol = m.KeyColumns.FirstOrDefault(c => c.IsDbGenerated);
@@ -120,6 +145,9 @@ namespace nORM.Providers
         /// <summary>
         /// Creates a <see cref="DbParameter"/> instance for use with Npgsql commands.
         /// </summary>
+        /// <param name="name">Parameter name including prefix.</param>
+        /// <param name="value">Parameter value; <c>null</c> is passed through to the factory.</param>
+        /// <returns>A configured <see cref="DbParameter"/> from the Npgsql factory.</returns>
         public override DbParameter CreateParameter(string name, object? value) =>
             _parameterFactory.CreateParameter(name, value);
 
@@ -132,6 +160,8 @@ namespace nORM.Providers
         /// <returns>The translated SQL expression or <c>null</c> if the method is not supported.</returns>
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)
         {
+            ArgumentNullException.ThrowIfNull(args);
+
             if (declaringType == typeof(string))
             {
                 return name switch
@@ -191,6 +221,9 @@ namespace nORM.Providers
         /// </remarks>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
         {
+            ArgumentNullException.ThrowIfNull(columnName);
+            ArgumentNullException.ThrowIfNull(jsonPath);
+
             var sb = _stringBuilderPool.Get();
             try
             {
@@ -203,15 +236,14 @@ namespace nORM.Providers
                 if (startIndex > 0 && startIndex < jsonPath.Length && jsonPath[startIndex] == '.')
                     startIndex++;
 
-                // Q2 fix: root-only path "$" has no path segments after stripping the $.
+                // Root-only path "$" has no path segments after stripping the $.
                 // PostgreSQL's jsonb_extract_path_text requires at least one path argument.
                 // For root access, cast the column to text directly instead of using the function.
                 if (startIndex >= jsonPath.Length)
                 {
                     sb.Clear();
-                    sb.Append('(');
                     sb.Append(columnName);
-                    sb.Append(")::text");
+                    sb.Append(" #>> '{}'");
                     return sb.ToString();
                 }
 
@@ -307,18 +339,26 @@ namespace nORM.Providers
         /// <returns>SQL fragment implementing the containment check.</returns>
         public override string BuildContainsClause(DbCommand cmd, string columnName, IReadOnlyList<object?> values)
         {
+            ArgumentNullException.ThrowIfNull(cmd);
+            ArgumentNullException.ThrowIfNull(columnName);
+            ArgumentNullException.ThrowIfNull(values);
+
             var pName = ParamPrefix + "p0";
             var p = cmd.CreateParameter();
             p.ParameterName = pName;
-            // SQL1 fix: create a typed array so Npgsql can infer NpgsqlDbType correctly.
+            // Create a typed array so Npgsql can infer NpgsqlDbType correctly.
             // An untyped object[] causes binding failures for Guid, int, enum, nullable types on live PostgreSQL.
             p.Value = CreateTypedArray(values);
             cmd.Parameters.Add(p);
             return $"{columnName} = ANY({pName})";
         }
 
-        /// <summary>SQL1 fix: builds the strongest common-type array from values.</summary>
-        private static System.Array CreateTypedArray(IReadOnlyList<object?> values)
+        /// <summary>
+        /// Builds the strongest common-type array from the supplied values for Npgsql type inference.
+        /// </summary>
+        /// <param name="values">Values to convert into a typed array.</param>
+        /// <returns>A strongly-typed array when all non-null values share the same type; otherwise an <c>object[]</c>.</returns>
+        private static Array CreateTypedArray(IReadOnlyList<object?> values)
         {
             Type? commonType = null;
             bool hasNull = false;
@@ -330,22 +370,25 @@ namespace nORM.Providers
                 else if (commonType != t) { commonType = null; break; }
             }
             if (commonType == null)
-                return values.ToArray(); // mixed or all-null — object[] fallback
+                return values.ToArray(); // mixed or all-null -- object[] fallback
 
-            // P1 fix: when the collection contains nulls AND the common type is a non-nullable
+            // When the collection contains nulls AND the common type is a non-nullable
             // value type (e.g., int), use Nullable<T> as the array element type. Otherwise
             // Array.SetValue(null, i) throws InvalidCastException on value-type arrays.
             var elementType = (hasNull && commonType.IsValueType && Nullable.GetUnderlyingType(commonType) == null)
                 ? typeof(Nullable<>).MakeGenericType(commonType)
                 : commonType;
 
-            var arr = System.Array.CreateInstance(elementType, values.Count);
+            var arr = Array.CreateInstance(elementType, values.Count);
             for (int i = 0; i < values.Count; i++)
                 arr.SetValue(values[i], i);
             return arr;
         }
 
-        /// <summary>MIG1 fix: splits "schema.table" into parts; defaults to 'public' schema.</summary>
+        /// <summary>Splits "schema.table" into parts; defaults to the specified schema when unqualified.</summary>
+        /// <param name="tableName">Table name that may include a schema prefix separated by a dot.</param>
+        /// <param name="defaultSchema">Schema name to use when <paramref name="tableName"/> is unqualified.</param>
+        /// <returns>A tuple of (Schema, Table) with surrounding double-quote characters stripped.</returns>
         private static (string Schema, string Table) SplitSchemaTable(string tableName, string defaultSchema)
         {
             var dot = tableName.IndexOf('.');
@@ -400,7 +443,7 @@ ORDER BY ordinal_position";
             }
             catch (DbException dbEx) when (IsObjectNotFoundError(dbEx))
             {
-                // Table does not exist yet — return empty list.
+                // Table does not exist yet -- return empty list.
             }
             return result;
         }
@@ -488,6 +531,21 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         }
 
         /// <summary>
+        /// Determines whether a <see cref="DbException"/> represents a "table does not exist" error.
+        /// PostgreSQL uses SQLSTATE <c>42P01</c> ("undefined_table") for this condition.
+        /// Falls back to the base message-based heuristic when SqlState is unavailable.
+        /// </summary>
+        /// <param name="ex">The exception to inspect.</param>
+        /// <returns><c>true</c> when the error definitively indicates the table is missing; otherwise <c>false</c>.</returns>
+        public override bool IsObjectNotFoundError(DbException ex)
+        {
+            if (string.Equals(ex.SqlState, PgErrorUndefinedTable, StringComparison.Ordinal))
+                return true;
+
+            return base.IsObjectNotFoundError(ex);
+        }
+
+        /// <summary>
         /// Ensures that the provided connection is compatible with the PostgreSQL provider
         /// by verifying its runtime type.
         /// </summary>
@@ -497,7 +555,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         {
             base.ValidateConnection(connection);
             if (connection.GetType().FullName != "Npgsql.NpgsqlConnection")
-                throw new InvalidOperationException("A NpgsqlConnection is required for PostgresProvider.");
+                throw new InvalidOperationException("An NpgsqlConnection is required for PostgresProvider.");
         }
 
         /// <summary>
@@ -514,16 +572,20 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             cn.ConnectionString = "Host=localhost;Database=postgres;Username=postgres;Password=;Timeout=1";
             try
             {
-                await cn.OpenAsync();
+                await cn.OpenAsync().ConfigureAwait(false);
                 await using var cmd = cn.CreateCommand();
                 cmd.CommandText = "SHOW server_version";
-                var result = await cmd.ExecuteScalarAsync();
+                var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
                 if (result is not string versionStr)
                     throw new NormDatabaseException("Unable to retrieve database version.", cmd.CommandText, null, null);
                 var version = new Version(versionStr.Split(' ')[0]);
-                return version >= new Version(9, 5);
+                return version >= MinimumPostgresVersion;
             }
-            catch
+            catch (DbException)
+            {
+                return false;
+            }
+            catch (InvalidOperationException)
             {
                 return false;
             }
@@ -539,7 +601,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         /// <param name="ct">Cancellation token.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken -- a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) }) ??
@@ -574,7 +636,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         /// <param name="ct">Cancellation token.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken -- a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) }) ??
@@ -599,7 +661,6 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
 
-        // PostgreSQL-optimized bulk operations
         /// <summary>
         /// Inserts entities using PostgreSQL's <c>COPY</c> binary protocol when available, falling back to batched inserts otherwise.
         /// </summary>
@@ -614,10 +675,10 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
-            if (!entityList.Any()) return 0;
+            if (entityList.Count == 0) return 0;
 
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
-            if (!cols.Any()) return 0;
+            if (cols.Length == 0) return 0;
 
             var operationKey = $"Postgres_BulkInsert_{m.Type.Name}";
 
@@ -649,7 +710,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                     else if (importerObj is IDisposable id) id.Dispose();
                 }
                 BatchSizer.RecordBatchPerformance(operationKey, entityList.Count, sw.Elapsed, entityList.Count);
-                ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
+                ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // Invalidate query cache after bulk write to prevent stale reads
                 ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, entityList.Count, sw.Elapsed);
                 return entityList.Count;
             }
@@ -657,22 +718,24 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             var recordsAffected = await ExecuteBulkOperationAsync(ctx, m, entityList, operationKey,
                 (batch, tx, token) => ExecutePostgresBatchInsert(ctx, tx, m, cols, batch, token), ct).ConfigureAwait(false);
 
-            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // Invalidate query cache after bulk write to prevent stale reads
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, recordsAffected, sw.Elapsed);
             return recordsAffected;
         }
 
-        private async Task<int> ExecutePostgresBatchInsert<T>(DbContext ctx, System.Data.Common.DbTransaction transaction,
+        /// <summary>
+        /// Executes a single batch of inserts using PostgreSQL's multi-row VALUES syntax.
+        /// </summary>
+        private async Task<int> ExecutePostgresBatchInsert<T>(DbContext ctx, DbTransaction transaction,
             TableMapping mapping, Column[] cols, List<T> batch, CancellationToken ct) where T : class
         {
-            // Use PostgreSQL's multi-row VALUES syntax with RETURNING for identity columns
             var sql = BuildPostgresBatchInsertSql(mapping, cols, batch.Count);
-            
+
             await using var cmd = ctx.CreateCommand();
             cmd.Transaction = transaction;
             cmd.CommandText = sql;
-            cmd.CommandTimeout = 30;
-            
+            cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+
             var paramIndex = 0;
             foreach (var entity in batch)
             {
@@ -683,31 +746,35 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                     cmd.AddParam(paramName, value);
                 }
             }
-            
+
             return await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Builds a multi-row INSERT INTO ... VALUES statement with parameterized placeholders.
+        /// </summary>
         private string BuildPostgresBatchInsertSql(TableMapping mapping, Column[] cols, int batchSize)
         {
             var colNames = string.Join(", ", cols.Select(c => c.EscCol));
             var sb = _stringBuilderPool.Get();
             try
             {
-                sb.Append($"INSERT INTO {mapping.EscTable} ({colNames}) VALUES ");
+                sb.Append("INSERT INTO ").Append(mapping.EscTable)
+                  .Append(" (").Append(colNames).Append(") VALUES ");
 
                 var paramIndex = 0;
                 for (int i = 0; i < batchSize; i++)
                 {
                     if (i > 0) sb.Append(", ");
-                    sb.Append("(");
+                    sb.Append('(');
 
                     for (int j = 0; j < cols.Length; j++)
                     {
                         if (j > 0) sb.Append(", ");
-                        sb.Append($"{ParamPrefix}p{paramIndex++}");
+                        sb.Append(ParamPrefix).Append('p').Append(paramIndex++);
                     }
 
-                    sb.Append(")");
+                    sb.Append(')');
                 }
 
                 return sb.ToString();
@@ -735,7 +802,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
 
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
-            if (!entityList.Any()) return 0;
+            if (entityList.Count == 0) return 0;
 
             var nonKeyCols = m.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToList();
             var keyCols = m.KeyColumns.ToList();
@@ -744,21 +811,21 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
 
             var paramsPerEntity = valueCols.Count;
             var operationKey = $"Postgres_BulkUpdate_{m.Type.Name}";
-            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(BatchSizingSampleCount), m, operationKey, entityList.Count);
             var maxBatchForProvider = MaxParameters / Math.Max(1, paramsPerEntity);
             var batchSize = Math.Max(1, Math.Min(sizing.OptimalBatchSize, maxBatchForProvider));
 
             var totalUpdated = 0;
             for (int i = 0; i < entityList.Count; i += batchSize)
             {
-                var batch = entityList.Skip(i).Take(batchSize).ToList();
+                var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
                 await using var cmd = ctx.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
                 var sb = _stringBuilderPool.Get();
                 try
                 {
-                    sb.Append($"UPDATE {m.EscTable} AS t SET ");
+                    sb.Append("UPDATE ").Append(m.EscTable).Append(" AS t SET ");
                     sb.Append(string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = v.{c.EscCol}")));
                     sb.Append(" FROM (VALUES ");
 
@@ -785,7 +852,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                     if (m.TimestampColumn != null)
                         joinConditions.Add($"t.{m.TimestampColumn.EscCol} = v.{m.TimestampColumn.EscCol}");
                     sb.Append(string.Join(" AND ", joinConditions));
-                    // X1: Add tenant predicate to prevent cross-tenant bulk updates
+                    // Add tenant predicate to prevent cross-tenant bulk updates
                     if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
                     {
                         var tenantParam = $"{ParamPrefix}__tenant_bulk";
@@ -807,7 +874,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 }
             }
 
-            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // Invalidate query cache after bulk write to prevent stale reads
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, totalUpdated, sw.Elapsed);
             return totalUpdated;
         }
@@ -828,20 +895,20 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
 
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
-            if (!entityList.Any()) return 0;
+            if (entityList.Count == 0) return 0;
 
             if (m.KeyColumns.Length != 1)
                 return await base.BatchedDeleteAsync(ctx, m, entityList, ct).ConfigureAwait(false);
 
             var keyCol = m.KeyColumns[0];
             var operationKey = $"Postgres_BulkDelete_{m.Type.Name}";
-            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(BatchSizingSampleCount), m, operationKey, entityList.Count);
             var batchSize = Math.Max(1, sizing.OptimalBatchSize);
 
             var totalDeleted = 0;
             for (int i = 0; i < entityList.Count; i += batchSize)
             {
-                var batch = entityList.Skip(i).Take(batchSize).ToList();
+                var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
                 var keys = batch.Select(e => keyCol.Getter(e)).ToArray();
                 await using var cmd = ctx.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
@@ -851,7 +918,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 p.Value = keys;
                 cmd.Parameters.Add(p);
                 var deleteSql = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} = ANY({pName})";
-                // X1: Add tenant predicate to prevent cross-tenant bulk deletes
+                // Add tenant predicate to prevent cross-tenant bulk deletes
                 if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
                 {
                     var tenantParam = $"{ParamPrefix}__tenant_bulk";
@@ -868,18 +935,29 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                 BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
             }
 
-            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
+            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // Invalidate query cache after bulk write to prevent stale reads
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
             return totalDeleted;
         }
 
+        /// <summary>
+        /// Maps a CLR type to its PostgreSQL column type equivalent.
+        /// Used when generating history tables from CLR metadata without live introspection data.
+        /// </summary>
+        /// <param name="t">The CLR type to map (unwraps <see cref="Nullable{T}"/> and enum types internally).</param>
+        /// <returns>A PostgreSQL type name string (e.g., <c>"INTEGER"</c>, <c>"TEXT"</c>, <c>"UUID"</c>).</returns>
         private static string GetPostgresType(Type t)
         {
             t = Nullable.GetUnderlyingType(t) ?? t;
+            if (t.IsEnum) t = Enum.GetUnderlyingType(t);
             if (t == typeof(int)) return "INTEGER";
             if (t == typeof(long)) return "BIGINT";
             if (t == typeof(string)) return "TEXT";
             if (t == typeof(DateTime)) return "TIMESTAMP";
+            if (t == typeof(DateOnly)) return "DATE";
+            if (t == typeof(TimeOnly)) return "TIME";
+            if (t == typeof(DateTimeOffset)) return "TIMESTAMPTZ";
+            if (t == typeof(TimeSpan)) return "INTERVAL";
             if (t == typeof(bool)) return "BOOLEAN";
             if (t == typeof(decimal)) return "DECIMAL(18,2)";
             if (t == typeof(Guid)) return "UUID";
@@ -888,6 +966,11 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             if (t == typeof(double)) return "DOUBLE PRECISION";
             if (t == typeof(short)) return "SMALLINT";
             if (t == typeof(byte)) return "SMALLINT";
+            if (t == typeof(char)) return "CHAR(1)";
+            if (t == typeof(sbyte)) return "SMALLINT";
+            if (t == typeof(ushort)) return "INTEGER";
+            if (t == typeof(uint)) return "BIGINT";
+            if (t == typeof(ulong)) return "NUMERIC(20,0)";
             return "TEXT";
         }
     }

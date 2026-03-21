@@ -197,8 +197,8 @@ namespace nORM.Query
                         t._clientProjection = clientProjection;
 
                         t._ctx.Options.Logger?.LogQuery(
-                            $"-- CLIENT-EVAL: Projection split for client-side evaluation",
-                            new Dictionary<string, object>(),
+                            "-- CLIENT-EVAL: Projection split for client-side evaluation",
+                            EmptyParamDict,
                             TimeSpan.Zero,
                             0);
                     }
@@ -402,7 +402,7 @@ namespace nORM.Query
             {
                 var leftSql = t.TranslateSubExpression(node.Arguments[0]);
                 var rightSql = t.TranslateSubExpression(node.Arguments[1]);
-                var setOp = t._methodName switch
+                var setOp = node.Method.Name switch
                 {
                     "Union" => "UNION",
                     "Intersect" => "INTERSECT",
@@ -410,7 +410,7 @@ namespace nORM.Query
                     _ => throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "Set operation"))
                 };
                 t._sql.Clear();
-                t._sql.Append($"{leftSql} {setOp} {rightSql}");
+                t._sql.Append(leftSql).Append(' ').Append(setOp).Append(' ').Append(rightSql);
                 return node;
             }
         }

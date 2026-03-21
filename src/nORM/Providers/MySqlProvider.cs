@@ -23,7 +23,10 @@ namespace nORM.Providers
     /// </summary>
     public sealed class MySqlProvider : DatabaseProvider
     {
-        private static readonly ConcurrentLruCache<Type, DataTable> _tableSchemas = new(maxSize: 100);
+        /// <summary>Maximum number of cached DataTable schemas used for bulk insert data tables.</summary>
+        private const int TableSchemaCacheSize = 100;
+
+        private static readonly ConcurrentLruCache<Type, DataTable> _tableSchemas = new(maxSize: TableSchemaCacheSize);
         private readonly IDbParameterFactory _parameterFactory;
 
         /// <summary>
@@ -60,11 +63,14 @@ namespace nORM.Providers
         /// </summary>
         public override int MaxParameters => 65_535;
 
-        /// <inheritdoc />
+        /// <summary>
         /// Escapes an identifier using MySQL backtick delimiters.
         /// Handles multi-part identifiers (schema.table) by escaping each segment separately so
         /// that <c>`schema`.`table`</c> is produced rather than the invalid <c>`schema.table`</c>.
-        /// ID-7: Embedded backtick characters are doubled to prevent SQL injection via identifiers.
+        /// Embedded backtick characters are doubled to prevent SQL injection via identifiers.
+        /// </summary>
+        /// <param name="id">The identifier to escape.</param>
+        /// <returns>The escaped identifier.</returns>
         public override string Escape(string id)
         {
             if (string.IsNullOrWhiteSpace(id)) return id;
@@ -235,6 +241,9 @@ ORDER BY ORDINAL_POSITION";
             return result;
         }
 
+        /// <summary>
+        /// Splits a possibly schema-qualified table name into its schema and table components.
+        /// </summary>
         private static (string? Schema, string Table) SplitSchemaTable(string tableName)
         {
             var dot = tableName.IndexOf('.');
@@ -338,16 +347,20 @@ END;";
                 "Server=localhost;Database=test;User=root;Password=;Allow User Variables=true";
             try
             {
-                await cn.OpenAsync();
+                await cn.OpenAsync().ConfigureAwait(false);
                 await using var cmd = cn.CreateCommand();
                 cmd.CommandText = "SELECT VERSION()";
-                var result = await cmd.ExecuteScalarAsync();
+                var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
                 if (result is not string versionStr)
                     throw new NormDatabaseException("Unable to retrieve database version.", cmd.CommandText, null, null);
                 var version = new Version(versionStr.Split('-')[0]);
                 return version >= new Version(8, 0);
             }
-            catch
+            catch (DbException)
+            {
+                return false;
+            }
+            catch (InvalidOperationException)
             {
                 return false;
             }
@@ -444,11 +457,11 @@ END;";
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
-            if (!entityList.Any()) return 0;
+            if (entityList.Count == 0) return 0;
 
             var operationKey = $"MySql_BulkInsert_{m.Type.Name}";
             var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
-            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(BatchSizingSampleCount), m, operationKey, entityList.Count);
 
             var bulkCopyType = Type.GetType("MySqlConnector.MySqlBulkCopy, MySqlConnector");
             if (bulkCopyType != null && ctx.Connection.GetType().FullName == "MySqlConnector.MySqlConnection")
@@ -467,7 +480,7 @@ END;";
                     var totalInserted = 0;
                     for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
                     {
-                        var batch = entityList.Skip(i).Take(sizing.OptimalBatchSize).ToList();
+                        var batch = entityList.GetRange(i, Math.Min(sizing.OptimalBatchSize, entityList.Count - i));
                         using var table = GetDataTable(m, insertableCols);
                         foreach (var entity in batch)
                             table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
@@ -574,7 +587,10 @@ END;";
                         dropCmd.CommandText = $"DROP TEMPORARY TABLE IF EXISTS {tempTableName}";
                         await dropCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
                     }
-                    catch { /* best-effort cleanup */ }
+                    catch (DbException ex)
+                    {
+                        Trace.TraceWarning($"MySqlProvider: Failed to drop temp table {tempTableName} during BulkUpdate cleanup: {ex.Message}");
+                    }
                 }
             }
 
@@ -598,23 +614,23 @@ END;";
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
-            if (!entityList.Any()) return 0;
+            if (entityList.Count == 0) return 0;
 
             var keyCols = m.KeyColumns.ToList();
-            if (!keyCols.Any())
+            if (keyCols.Count == 0)
                 throw new NormConfigurationException($"Cannot delete from '{m.EscTable}': no key columns defined.");
 
             var operationKey = $"MySql_BulkDelete_{m.Type.Name}";
             var hasTenant = ctx.Options.TenantProvider != null && m.TenantColumn != null;
             var paramsPerEntity = keyCols.Count + (hasTenant ? 1 : 0);
-            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(100), m, operationKey, entityList.Count);
+            var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(BatchSizingSampleCount), m, operationKey, entityList.Count);
             var maxBatchForProvider = MaxParameters / Math.Max(1, paramsPerEntity);
             var batchSize = Math.Max(1, Math.Min(sizing.OptimalBatchSize, maxBatchForProvider));
 
             var totalDeleted = 0;
             for (int i = 0; i < entityList.Count; i += batchSize)
             {
-                var batch = entityList.Skip(i).Take(batchSize).ToList();
+                var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
                 await using var cmd = ctx.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
@@ -665,6 +681,9 @@ END;";
             return totalDeleted;
         }
 
+        /// <summary>
+        /// Maps a CLR type to its corresponding MySQL column type.
+        /// </summary>
         private static string GetSqlType(Type t)
         {
             t = Nullable.GetUnderlyingType(t) ?? t;
@@ -679,6 +698,10 @@ END;";
             return "TEXT";
         }
 
+        /// <summary>
+        /// Returns a cloned DataTable with the schema matching the specified columns.
+        /// Caches the schema per entity type to avoid repeated reflection.
+        /// </summary>
         private static DataTable GetDataTable(TableMapping m, List<Column> cols)
         {
             var schema = _tableSchemas.GetOrAdd(m.Type, _ =>

@@ -197,7 +197,7 @@ public class ParameterMetadataContaminationTests
         object[] numericValues = { (short)1, (byte)2, 3.0f, 4u, 5UL, (sbyte)6, (ushort)7 };
         var expectedTypes = new[]
         {
-            DbType.Int16, DbType.Byte, DbType.Double, DbType.UInt32,
+            DbType.Int16, DbType.Byte, DbType.Single, DbType.UInt32,
             DbType.UInt64, DbType.SByte, DbType.UInt16
         };
 

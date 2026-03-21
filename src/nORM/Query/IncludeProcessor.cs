@@ -64,8 +64,7 @@ namespace nORM.Query
             // context is used for both saving and querying).
             foreach (var p in parents.Cast<object>())
             {
-                var emptyList = (System.Collections.IList)Activator.CreateInstance(
-                    typeof(List<>).MakeGenericType(jtm.RightType))!;
+                var emptyList = QueryExecutor.CreateList(jtm.RightType, 0);
                 jtm.LeftCollectionSetter(p, emptyList);
             }
 
@@ -186,8 +185,7 @@ namespace nORM.Query
                 var collection = jtm.LeftCollectionGetter(p);
                 if (collection == null)
                 {
-                    collection = (System.Collections.IList)Activator.CreateInstance(
-                        typeof(List<>).MakeGenericType(jtm.RightType))!;
+                    collection = QueryExecutor.CreateList(jtm.RightType, 0);
                     jtm.LeftCollectionSetter(p, collection);
                 }
 
@@ -239,8 +237,7 @@ namespace nORM.Query
             // Reset collections to fresh empty lists before populating.
             foreach (var p in parents.Cast<object>())
             {
-                var emptyList = (IList)Activator.CreateInstance(
-                    typeof(List<>).MakeGenericType(jtm.RightType))!;
+                var emptyList = QueryExecutor.CreateList(jtm.RightType, 0);
                 jtm.LeftCollectionSetter(p, emptyList);
             }
 
@@ -354,8 +351,7 @@ namespace nORM.Query
                 var collection = jtm.LeftCollectionGetter(p);
                 if (collection == null)
                 {
-                    collection = (IList)Activator.CreateInstance(
-                        typeof(List<>).MakeGenericType(jtm.RightType))!;
+                    collection = QueryExecutor.CreateList(jtm.RightType, 0);
                     jtm.LeftCollectionSetter(p, collection);
                 }
 
@@ -578,8 +574,7 @@ namespace nORM.Query
             foreach (var p in parents.Cast<object>())
             {
                 var pk = relation.PrincipalKey.Getter(p);
-                var listType = typeof(List<>).MakeGenericType(relation.DependentType);
-                var childList = (IList)Activator.CreateInstance(listType)!;
+                var childList = QueryExecutor.CreateList(relation.DependentType, 0);
 
                 if (pk != null && childGroups.TryGetValue(pk, out var c))
                 {
@@ -595,8 +590,7 @@ namespace nORM.Query
 
         private static void AssignEmptyList(object parent, TableMapping.Relation relation)
         {
-            var listType = typeof(List<>).MakeGenericType(relation.DependentType);
-            var childList = (IList)Activator.CreateInstance(listType)!;
+            var childList = QueryExecutor.CreateList(relation.DependentType, 0);
             relation.NavProp.SetValue(parent, childList);
         }
 
@@ -697,8 +691,7 @@ namespace nORM.Query
             {
                 ct.ThrowIfCancellationRequested();
                 var pk = relation.PrincipalKey.Getter(p);
-                var listType = typeof(List<>).MakeGenericType(relation.DependentType);
-                var childList = (IList)Activator.CreateInstance(listType)!;
+                var childList = QueryExecutor.CreateList(relation.DependentType, 0);
 
                 if (pk != null && childGroups.TryGetValue(pk, out var c))
                 {
@@ -720,11 +713,11 @@ namespace nORM.Query
         /// </summary>
         private static TValue? CoercedLookup<TValue>(Dictionary<object, TValue> dict, object key)
         {
-            var keyStr = Convert.ToString(key);
+            var keyStr = Convert.ToString(key, System.Globalization.CultureInfo.InvariantCulture);
             if (keyStr == null) return default;
             foreach (var candidate in dict.Keys)
             {
-                var candidateStr = Convert.ToString(candidate);
+                var candidateStr = Convert.ToString(candidate, System.Globalization.CultureInfo.InvariantCulture);
                 if (candidateStr != null && candidateStr == keyStr)
                     return dict[candidate];
             }

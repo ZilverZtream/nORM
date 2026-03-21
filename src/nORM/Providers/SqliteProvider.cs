@@ -395,16 +395,20 @@ END;";
             cn.ConnectionString = "Data Source=:memory:";
             try
             {
-                await cn.OpenAsync();
+                await cn.OpenAsync().ConfigureAwait(false);
                 await using var cmd = cn.CreateCommand();
                 cmd.CommandText = "select sqlite_version()";
-                var result = await cmd.ExecuteScalarAsync();
+                var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
                 if (result is not string versionStr)
                     throw new NormDatabaseException("Unable to retrieve database version.", cmd.CommandText, null, null);
                 var version = new Version(versionStr);
                 return version >= new Version(3, 9);
             }
-            catch
+            catch (DbException)
+            {
+                return false;
+            }
+            catch (InvalidOperationException)
             {
                 return false;
             }
@@ -574,7 +578,7 @@ END;";
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
-            if (!entityList.Any()) return 0;
+            if (entityList.Count == 0) return 0;
 
             var tempTableName = $"\"BulkUpdate_{Guid.NewGuid():N}\"";
             var nonKeyCols = m.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToList();
@@ -692,6 +696,9 @@ END;";
             return totalUpdated;
         }
 
+        /// <summary>
+        /// Maps a CLR type to its corresponding SQLite type affinity.
+        /// </summary>
         private static string GetSqliteType(Type t)
         {
             t = Nullable.GetUnderlyingType(t) ?? t;
@@ -717,9 +724,9 @@ END;";
             ValidateConnection(ctx.Connection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
-            if (!entityList.Any()) return 0;
-            
-            if (!m.KeyColumns.Any())
+            if (entityList.Count == 0) return 0;
+
+            if (m.KeyColumns.Length == 0)
                 throw new NormConfigurationException($"Cannot delete from '{m.EscTable}': no key columns defined.");
             
             var totalDeleted = 0;
@@ -741,10 +748,10 @@ END;";
 
                     for (int i = 0; i < entityList.Count; i += batchSize)
                     {
-                        var batch = entityList.Skip(i).Take(batchSize).ToList();
+                        var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
                         await using var cmd = ctx.Connection.CreateCommand();
                         cmd.Transaction = transaction;
-                        cmd.CommandTimeout = 30;
+                        cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
                         var paramNames = new List<string>();
                         var paramIndex = 0;
@@ -792,7 +799,7 @@ END;";
                     await using var cmd = ctx.Connection.CreateCommand();
                     cmd.Transaction = transaction;
                     cmd.CommandText = compositeDeleteSql;
-                    cmd.CommandTimeout = 30;
+                    cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                     await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
                     foreach (var entity in entityList)

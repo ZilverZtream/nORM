@@ -35,6 +35,15 @@ namespace nORM.Query
         // Outer translator's recursion depth so BuildExists/BuildIn pass depth+1 to sub-translators.
         private int _recursionDepth = 0;
         private const int ConstParamMapLimit = 1024;
+        /// <summary>Maximum allowed length for a JSON path in <c>Json.Value()</c>.</summary>
+        private const int MaxJsonPathLength = 500;
+        /// <summary>SQL false literal used when a local collection is empty.</summary>
+        private const string SqlFalseLiteral = "(1=0)";
+        /// <summary>
+        /// Maximum length (in characters or bytes) for inline string/binary parameters.
+        /// Based on SQL Server's non-MAX varchar/varbinary threshold.
+        /// </summary>
+        private const int MaxInlineParameterLength = 8000;
         private readonly Dictionary<ConstKey, string> _constParamMap = new();
         private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
         private static readonly Expression s_emptyExpression = Expression.Empty();
@@ -490,7 +499,8 @@ namespace nORM.Query
         }
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
-            // ADD FAST PATH FOR COMMON METHODS
+            // Fast path: common string methods (Contains, StartsWith, EndsWith) are handled
+            // directly via pre-built delegates, bypassing the general method translation pipeline.
             if (_fastMethodHandlers.TryGetValue(node.Method, out var handler))
             {
                 handler(this, node);
@@ -536,15 +546,11 @@ namespace nORM.Query
                             "JSON paths must not contain single-quote, double-quote, semicolon, or backslash.");
                     }
 
-                    // Limit path length to prevent potential DoS.
-                    // TODO: The 500-char limit is a conservative default. Provider-specific JSON path
-                    // length limits vary (e.g., SQL Server's JSON_VALUE path is limited to 128 nesting
-                    // levels; MySQL/PostgreSQL have no documented path length cap). Consider delegating
-                    // to _provider.MaxJsonPathLength for provider-aware validation.
-                    if (jsonPath.Length > 500)
+                    // Limit path length to prevent potential DoS via pathological JSON path strings.
+                    if (jsonPath.Length > MaxJsonPathLength)
                     {
                         throw new NormQueryException(
-                            $"JSON path exceeds maximum length of 500 characters (actual: {jsonPath.Length}).");
+                            $"JSON path exceeds maximum length of {MaxJsonPathLength} characters (actual: {jsonPath.Length}).");
                     }
 
                     var jsonSql = _provider.TranslateJsonPathAccess(columnSql, jsonPath);
@@ -656,7 +662,7 @@ namespace nORM.Query
                         items.Add(item);
                     if (items.Count == 0)
                     {
-                        _sql.Append("(1=0)");
+                        _sql.Append(SqlFalseLiteral);
                         return node;
                     }
 
@@ -920,21 +926,32 @@ namespace nORM.Query
             _sql.Append(")");
         }
 
-        private bool IsTranslatableMethod(MethodInfo method)
+        /// <summary>
+        /// Declaring types whose methods can be translated to SQL. Frozen at startup
+        /// to avoid per-call allocation and to enable O(1) lookup.
+        /// </summary>
+        private static readonly FrozenSet<Type> s_safeDeclaringTypes = new HashSet<Type>
+        {
+            typeof(string), typeof(Math), typeof(DateTime), typeof(Convert),
+            typeof(Enumerable), typeof(Queryable), typeof(Json)
+        }.ToFrozenSet();
+
+        /// <summary>
+        /// Object-identity methods that must never be translated to SQL because they
+        /// rely on CLR runtime semantics with no SQL equivalent.
+        /// </summary>
+        private static readonly FrozenSet<string> s_untranslatableMethods = new HashSet<string>
+        {
+            nameof(object.GetType), nameof(object.ToString), nameof(object.GetHashCode)
+        }.ToFrozenSet();
+
+        private static bool IsTranslatableMethod(MethodInfo method)
         {
             if (method.GetCustomAttribute<SqlFunctionAttribute>() != null)
                 return true;
-            var safeDeclaringTypes = new HashSet<Type>
-            {
-                typeof(string), typeof(Math), typeof(DateTime), typeof(Convert), typeof(Enumerable), typeof(Queryable), typeof(Json)
-            };
-            if (method.DeclaringType == null || !safeDeclaringTypes.Contains(method.DeclaringType))
+            if (method.DeclaringType == null || !s_safeDeclaringTypes.Contains(method.DeclaringType))
                 return false;
-            var dangerousMethods = new HashSet<string>
-            {
-                "GetType", "ToString", "GetHashCode"
-            };
-            return !dangerousMethods.Contains(method.Name);
+            return !s_untranslatableMethods.Contains(method.Name);
         }
         private Expression TranslateWithNullCheck(MethodCallExpression node)
         {
@@ -956,13 +973,12 @@ namespace nORM.Query
                 return false;
             return !node.Object.Type.IsValueType || Nullable.GetUnderlyingType(node.Object.Type) != null;
         }
-        private bool TryGetConstantValueSafe(Expression expr, out object? value, int maxDepth = 5)
+        /// <summary>
+        /// Attempts to extract a compile-time constant from the expression, catching
+        /// expected reflection failures without propagating them to the caller.
+        /// </summary>
+        private static bool TryGetConstantValueSafe(Expression expr, out object? value)
         {
-            if (maxDepth <= 0)
-            {
-                value = null;
-                return false;
-            }
             try
             {
                 return TryGetConstantValue(expr, out value);
@@ -989,13 +1005,12 @@ namespace nORM.Query
         }
         private Expression CreateSafeParameter(object? value)
         {
-            // TODO: The 8000-byte limit is SQL Server's non-MAX threshold. Provider-specific limits
-            // differ (e.g., SQLite has no inherent limit; MySQL's max_allowed_packet default is 64 MB;
-            // PostgreSQL has a 1 GB bytea limit). Consider delegating to _provider.MaxParameterSize.
-            if (value is string str && str.Length > 8000)
-                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "String parameter exceeds maximum length"));
-            if (value is byte[] bytes && bytes.Length > 8000)
-                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Binary parameter exceeds maximum length"));
+            if (value is string str && str.Length > MaxInlineParameterLength)
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
+                    $"String parameter exceeds maximum length of {MaxInlineParameterLength} characters"));
+            if (value is byte[] bytes && bytes.Length > MaxInlineParameterLength)
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
+                    $"Binary parameter exceeds maximum length of {MaxInlineParameterLength} bytes"));
             AppendConstant(value, value?.GetType() ?? typeof(object));
             // Returning a cached empty expression avoids allocating a new
             // Expression instance for each constant value translated. The
@@ -1193,11 +1208,19 @@ namespace nORM.Query
             _paramSink = shared ?? _params;
         }
 
+        /// <summary>
+        /// Registers a SQL expression for the <c>Key</c> property of a grouping parameter,
+        /// so that subsequent <c>g.Key</c> accesses emit the correct SQL column reference.
+        /// </summary>
         public void RegisterGroupingKey(ParameterExpression parameter, string keySql)
         {
             _groupingKeys[parameter] = keySql;
         }
 
+        /// <summary>
+        /// Translates a <c>GroupBy</c> method call into the corresponding SQL <c>GROUP BY</c>
+        /// clause, registering grouping key bindings for downstream aggregate expressions.
+        /// </summary>
         private void HandleGroupByMethod(MethodCallExpression node)
         {
             var keySelector = StripQuotes(node.Arguments[1]) as LambdaExpression
@@ -1240,7 +1263,7 @@ namespace nORM.Query
         {
             if (_sql != null) _sql.Clear();
             _params.Clear();
-            if (!ReferenceEquals(_paramSink, _params))
+            if (_paramSink != null && !ReferenceEquals(_paramSink, _params))
                 _paramSink.Clear();
             _paramIndex = 0;
             _suppressNullCheck = false;
