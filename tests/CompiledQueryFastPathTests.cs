@@ -57,6 +57,14 @@ public class CompiledQueryFastPathTests
         public int    ReaderExecutingCallCount;
         public DbTransaction? CapturedTransaction;
 
+        // Sync hook — called from sync execution paths (e.g. compiled query fast path on SQLite)
+        public InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, DbContext ctx)
+        {
+            Interlocked.Increment(ref ReaderExecutingCallCount);
+            CapturedTransaction = command.Transaction;
+            return InterceptionResult<DbDataReader>.Continue();
+        }
+
         public Task<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand _, DbContext __, CancellationToken ___) =>
             Task.FromResult(InterceptionResult<int>.Continue());
         public Task NonQueryExecutedAsync(DbCommand _, DbContext __, int ___, TimeSpan ____, CancellationToken _____) =>

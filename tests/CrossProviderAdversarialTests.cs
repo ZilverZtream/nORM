@@ -368,6 +368,12 @@ public class CrossProviderAdversarialTests
             return Task.FromResult(InterceptionResult<DbDataReader>.Continue());
         }
 
+        public InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, DbContext context)
+        {
+            Capture(command);
+            return InterceptionResult<DbDataReader>.Continue();
+        }
+
         public Task ReaderExecutedAsync(DbCommand command, DbContext context, DbDataReader reader, TimeSpan duration, CancellationToken ct)
             => Task.CompletedTask;
 

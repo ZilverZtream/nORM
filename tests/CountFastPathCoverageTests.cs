@@ -93,11 +93,22 @@ public class CountFastPathCoverageTests
 
         public Task<InterceptionResult<object?>> ScalarExecutingAsync(DbCommand command, DbContext context, CancellationToken ct)
         {
+            Capture(command);
+            return Task.FromResult(InterceptionResult<object?>.Continue());
+        }
+
+        public InterceptionResult<object?> ScalarExecuting(DbCommand command, DbContext context)
+        {
+            Capture(command);
+            return InterceptionResult<object?>.Continue();
+        }
+
+        private void Capture(DbCommand command)
+        {
             LastCommandText = command.CommandText;
             LastParameters = command.Parameters
                 .Cast<DbParameter>()
                 .ToDictionary(parameter => parameter.ParameterName, parameter => parameter.Value);
-            return Task.FromResult(InterceptionResult<object?>.Continue());
         }
 
         public Task ScalarExecutedAsync(DbCommand command, DbContext context, object? result, TimeSpan duration, CancellationToken ct)

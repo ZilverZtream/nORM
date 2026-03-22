@@ -2563,6 +2563,7 @@ file sealed class SuppressingInterceptor : IDbCommandInterceptor
 {
     public int NonQueryResult { get; set; } = 42;
 
+    // Async hooks — called from async paths
     public Task<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand cmd, DbContext ctx, CancellationToken ct)
         => Task.FromResult(InterceptionResult<int>.SuppressWithResult(NonQueryResult));
 
@@ -2589,6 +2590,20 @@ file sealed class SuppressingInterceptor : IDbCommandInterceptor
 
     public Task CommandFailedAsync(DbCommand cmd, DbContext ctx, Exception exception, CancellationToken ct)
         => Task.CompletedTask;
+
+    // Sync hooks — called from synchronous paths (ToList, ExecuteNonQuery, etc.)
+    public InterceptionResult<int> NonQueryExecuting(DbCommand cmd, DbContext ctx)
+        => InterceptionResult<int>.SuppressWithResult(NonQueryResult);
+
+    public InterceptionResult<object?> ScalarExecuting(DbCommand cmd, DbContext ctx)
+        => InterceptionResult<object?>.SuppressWithResult((object?)"suppressed_scalar");
+
+    public InterceptionResult<DbDataReader> ReaderExecuting(DbCommand cmd, DbContext ctx)
+    {
+        var dt = new System.Data.DataTable();
+        dt.Columns.Add("Id", typeof(int));
+        return InterceptionResult<DbDataReader>.SuppressWithResult(dt.CreateDataReader());
+    }
 }
 
 /// <summary>
@@ -2599,6 +2614,7 @@ file sealed class ErrorCapturingInterceptor : IDbCommandInterceptor
 {
     public Exception? CapturedException { get; private set; }
 
+    // Async hooks — called from async paths
     public Task<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand cmd, DbContext ctx, CancellationToken ct)
         => Task.FromResult(InterceptionResult<int>.Continue());
 
@@ -2622,6 +2638,10 @@ file sealed class ErrorCapturingInterceptor : IDbCommandInterceptor
         CapturedException = exception;
         return Task.CompletedTask;
     }
+
+    // Sync hooks — called from synchronous paths
+    public void CommandFailed(DbCommand cmd, DbContext ctx, Exception exception)
+        => CapturedException = exception;
 }
 
 // ─── MinimalTestProvider — exercises DatabaseProvider base virtual methods ────

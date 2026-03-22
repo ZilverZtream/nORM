@@ -1918,7 +1918,8 @@ namespace nORM.Core
             cmd.CommandText = sb.ToString();
 
             // Guard against null scalar result — Convert.ToInt32(null) throws ArgumentNullException
-            var scalarResult = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            // X2: route through interceptor pipeline so observability tools see verification queries.
+            var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
             var matchCount = scalarResult == null || scalarResult is DBNull ? 0 : Convert.ToInt32(scalarResult);
             if (matchCount != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
@@ -1958,7 +1959,8 @@ namespace nORM.Core
             sb.Append(string.Join(" AND ", conditions));
             cmd.CommandText = sb.ToString();
 
-            var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            // X2: route through interceptor pipeline so observability tools see verification queries.
+            var result = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
             var count = result == null || result is DBNull ? 0 : Convert.ToInt32(result);
             // count=0 means the token is gone (stale); count=1 means same-value update (no conflict).
             if (count == 0)
