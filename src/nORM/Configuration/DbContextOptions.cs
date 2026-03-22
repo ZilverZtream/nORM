@@ -285,14 +285,17 @@ namespace nORM.Configuration
         // C1: backing store is ConcurrentDictionary so outer dict ops are thread-safe.
         // Inner lists are replaced atomically (copy-on-write) in AddGlobalFilter so
         // readers in the query translation path always see a stable snapshot.
-        private readonly ConcurrentDictionary<Type, List<LambdaExpression>> _globalFilters = new();
+        // X1: IReadOnlyList prevents callers from mutating the inner list through the public API,
+        // preserving the copy-on-write invariant that guards query-pipeline enumeration.
+        private readonly ConcurrentDictionary<Type, IReadOnlyList<LambdaExpression>> _globalFilters = new();
 
         /// <summary>
-        /// Gets a dictionary of global query filters keyed by entity type. Each entry
+        /// Gets a read-only view of global query filters keyed by entity type. Each entry
         /// contains a list of lambda expressions that will be applied to queries for the
-        /// corresponding entity.
+        /// corresponding entity. Use <see cref="AddGlobalFilter{TEntity}(Expression{Func{TEntity, bool}})"/>
+        /// to register new filters.
         /// </summary>
-        public IDictionary<Type, List<LambdaExpression>> GlobalFilters => _globalFilters;
+        public IReadOnlyDictionary<Type, IReadOnlyList<LambdaExpression>> GlobalFilters => _globalFilters;
 
         /// <summary>
         /// Registers a global query filter that has access to both the current

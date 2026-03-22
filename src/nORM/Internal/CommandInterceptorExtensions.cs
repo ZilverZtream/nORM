@@ -70,7 +70,9 @@ namespace nORM.Internal
 
         /// <summary>
         /// Executes <see cref="DbCommand.ExecuteNonQuery"/> while invoking registered command interceptors
-        /// before and after execution.
+        /// before and after execution. Interceptors are notified via their synchronous hooks
+        /// (<see cref="IDbCommandInterceptor.NonQueryExecuting"/>) to avoid deadlocking
+        /// single-threaded <see cref="System.Threading.SynchronizationContext"/> environments.
         /// </summary>
         /// <param name="command">The command to execute.</param>
         /// <param name="ctx">The current <see cref="DbContext"/>.</param>
@@ -85,11 +87,11 @@ namespace nORM.Internal
 
             foreach (var interceptor in interceptors)
             {
-                var interception = interceptor.NonQueryExecutingAsync(command, ctx, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+                var interception = interceptor.NonQueryExecuting(command, ctx);
                 if (interception.IsSuppressed)
                 {
                     foreach (var i in interceptors)
-                        i.NonQueryExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+                        i.NonQueryExecuted(command, ctx, interception.Result, TimeSpan.Zero);
                     return interception.Result;
                 }
             }
@@ -100,18 +102,14 @@ namespace nORM.Internal
                 var result = command.ExecuteNonQuery();
                 sw.Stop();
                 foreach (var interceptor in interceptors)
-                {
-                    interceptor.NonQueryExecutedAsync(command, ctx, result, sw.Elapsed, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
-                }
+                    interceptor.NonQueryExecuted(command, ctx, result, sw.Elapsed);
                 return result;
             }
             catch (Exception ex)
             {
                 sw.Stop();
                 foreach (var interceptor in interceptors)
-                {
-                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
-                }
+                    interceptor.CommandFailed(command, ctx, ex);
                 throw;
             }
         }
@@ -173,7 +171,9 @@ namespace nORM.Internal
 
         /// <summary>
         /// Executes <see cref="DbCommand.ExecuteScalar"/> while invoking registered command interceptors
-        /// before and after execution.
+        /// before and after execution. Interceptors are notified via their synchronous hooks
+        /// (<see cref="IDbCommandInterceptor.ScalarExecuting"/>) to avoid deadlocking
+        /// single-threaded <see cref="System.Threading.SynchronizationContext"/> environments.
         /// </summary>
         /// <param name="command">The command to execute.</param>
         /// <param name="ctx">The current <see cref="DbContext"/>.</param>
@@ -188,11 +188,11 @@ namespace nORM.Internal
 
             foreach (var interceptor in interceptors)
             {
-                var interception = interceptor.ScalarExecutingAsync(command, ctx, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+                var interception = interceptor.ScalarExecuting(command, ctx);
                 if (interception.IsSuppressed)
                 {
                     foreach (var i in interceptors)
-                        i.ScalarExecutedAsync(command, ctx, interception.Result, TimeSpan.Zero, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+                        i.ScalarExecuted(command, ctx, interception.Result, TimeSpan.Zero);
                     return interception.Result;
                 }
             }
@@ -203,18 +203,14 @@ namespace nORM.Internal
                 var result = command.ExecuteScalar();
                 sw.Stop();
                 foreach (var interceptor in interceptors)
-                {
-                    interceptor.ScalarExecutedAsync(command, ctx, result, sw.Elapsed, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
-                }
+                    interceptor.ScalarExecuted(command, ctx, result, sw.Elapsed);
                 return result;
             }
             catch (Exception ex)
             {
                 sw.Stop();
                 foreach (var interceptor in interceptors)
-                {
-                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
-                }
+                    interceptor.CommandFailed(command, ctx, ex);
                 throw;
             }
         }
@@ -277,18 +273,15 @@ namespace nORM.Internal
 
         /// <summary>
         /// Executes <see cref="DbCommand.ExecuteReader(CommandBehavior)"/> while wrapping the
-        /// call with the currently registered command interceptors. This allows interceptors
-        /// to observe, modify or suppress the command execution and to be notified about
-        /// success or failure.
+        /// call with the currently registered command interceptors. Interceptors are notified
+        /// via their synchronous hooks (<see cref="IDbCommandInterceptor.ReaderExecuting"/>) to
+        /// avoid deadlocking single-threaded <see cref="System.Threading.SynchronizationContext"/>
+        /// environments.
         /// </summary>
         /// <param name="command">The database command to execute.</param>
         /// <param name="ctx">The <see cref="DbContext"/> associated with the command.</param>
         /// <param name="behavior">Behavior flags that influence reader execution.</param>
         /// <returns>The <see cref="DbDataReader"/> returned by the command execution.</returns>
-        /// <remarks>
-        /// The method synchronously waits for any asynchronous interceptor callbacks and
-        /// therefore should only be used in fully synchronous flows.
-        /// </remarks>
         public static DbDataReader ExecuteReaderWithInterception(this DbCommand command, DbContext ctx, CommandBehavior behavior)
         {
             var interceptors = ctx.Options.CommandInterceptors;
@@ -299,11 +292,11 @@ namespace nORM.Internal
 
             foreach (var interceptor in interceptors)
             {
-                var interception = interceptor.ReaderExecutingAsync(command, ctx, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+                var interception = interceptor.ReaderExecuting(command, ctx);
                 if (interception.IsSuppressed)
                 {
                     foreach (var i in interceptors)
-                        i.ReaderExecutedAsync(command, ctx, interception.Result!, TimeSpan.Zero, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+                        i.ReaderExecuted(command, ctx, interception.Result!, TimeSpan.Zero);
                     return interception.Result!;
                 }
             }
@@ -314,18 +307,14 @@ namespace nORM.Internal
                 var reader = command.ExecuteReader(behavior);
                 sw.Stop();
                 foreach (var interceptor in interceptors)
-                {
-                    interceptor.ReaderExecutedAsync(command, ctx, reader, sw.Elapsed, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
-                }
+                    interceptor.ReaderExecuted(command, ctx, reader, sw.Elapsed);
                 return reader;
             }
             catch (Exception ex)
             {
                 sw.Stop();
                 foreach (var interceptor in interceptors)
-                {
-                    interceptor.CommandFailedAsync(command, ctx, ex, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
-                }
+                    interceptor.CommandFailed(command, ctx, ex);
                 throw;
             }
         }
