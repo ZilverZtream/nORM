@@ -89,7 +89,8 @@ namespace nORM.Query
         ///   $tag$...$tag$ (PostgreSQL tagged dollar-quoting, e.g. $func$...$func$)
         /// Identifiers, parameter placeholders (@p0), and SQL keywords are preserved.
         /// </summary>
-        private static string RedactSqlForLogging(string sql)
+        // I1: internal so BaseDbCommandInterceptor can apply the same redaction policy.
+        internal static string RedactSqlForLogging(string sql)
         {
             if (string.IsNullOrEmpty(sql)) return sql;
             // N'...' (SQL Server national strings) and '...' (ANSI SQL, including escaped '' pairs).
@@ -821,6 +822,16 @@ namespace nORM.Query
 
             sql.Append(')');
 
+            // X2: Apply tenant predicate to split-query child loading, matching the filter applied
+            // to the parent query by ApplyGlobalFilters. Without this, cross-tenant FK overlaps
+            // could cause a parent from tenant A to load children belonging to tenant B.
+            if (_ctx.Options.TenantProvider != null && depQuery.TargetMapping.TenantColumn != null)
+            {
+                var tenantParam = $"{_ctx.Provider.ParamPrefix}__tenant_child";
+                sql.Append($" AND {depQuery.TargetMapping.TenantColumn.EscCol}={tenantParam}");
+                cmd.AddParam(tenantParam, _ctx.Options.TenantProvider.GetCurrentTenantId());
+            }
+
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
                 AdaptiveTimeoutManager.OperationType.ComplexSelect,
@@ -879,6 +890,16 @@ namespace nORM.Query
             }
 
             sql.Append(')');
+
+            // X2: Apply tenant predicate to split-query child loading, matching the filter applied
+            // to the parent query by ApplyGlobalFilters. Without this, cross-tenant FK overlaps
+            // could cause a parent from tenant A to load children belonging to tenant B.
+            if (_ctx.Options.TenantProvider != null && depQuery.TargetMapping.TenantColumn != null)
+            {
+                var tenantParam = $"{_ctx.Provider.ParamPrefix}__tenant_child";
+                sql.Append($" AND {depQuery.TargetMapping.TenantColumn.EscCol}={tenantParam}");
+                cmd.AddParam(tenantParam, _ctx.Options.TenantProvider.GetCurrentTenantId());
+            }
 
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(

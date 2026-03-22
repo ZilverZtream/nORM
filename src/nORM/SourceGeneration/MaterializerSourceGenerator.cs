@@ -160,7 +160,15 @@ public class MaterializerSourceGenerator : ISourceGenerator
                 // where the same CLR type maps to different tables each get their own materializer.
                 var tableName = GetTableNameForType(classSymbol);
                 var escapedTableName = tableName.Replace("\\", "\\\\").Replace("\"", "\\\"");
-                sb.AppendLine($"            CompiledMaterializerStore.Add<{fullName}>(\"{escapedTableName}\", {className}Materializer.Materialize);");
+                // SG1 namespace fix: fully qualify the materializer class name so the registration
+                // compiles correctly for entities in non-global namespaces. The generated
+                // {ClassName}Materializer class lives in the same namespace as the entity, but
+                // MaterializerRegistration.g.cs is in nORM.Generated and has no using for the
+                // entity's namespace — an unqualified {ClassName}Materializer reference fails.
+                var materializerFullName = classSymbol.ContainingNamespace.IsGlobalNamespace
+                    ? $"{className}Materializer"
+                    : $"{classSymbol.ContainingNamespace.ToDisplayString()}.{className}Materializer";
+                sb.AppendLine($"            CompiledMaterializerStore.Add<{fullName}>(\"{escapedTableName}\", {materializerFullName}.Materialize);");
             }
         }
 

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using nORM.Core;
+using nORM.Query;
 
 #nullable enable
 
@@ -76,7 +77,9 @@ namespace nORM.Enterprise
         /// <inheritdoc />
         public virtual Task<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, DbContext context, CancellationToken cancellationToken)
         {
-            Logger.LogInformation("Executing non-query: {CommandText}", command.CommandText);
+            // I1: use the same SQL redaction policy applied by QueryExecutor to prevent
+            // credential / literal data leakage through log sinks.
+            Logger.LogInformation("Executing non-query: {CommandText}", QueryExecutor.RedactSqlForLogging(command.CommandText));
             return Task.FromResult(InterceptionResult<int>.Continue());
         }
 
@@ -90,7 +93,8 @@ namespace nORM.Enterprise
         /// <inheritdoc />
         public virtual Task<InterceptionResult<object?>> ScalarExecutingAsync(DbCommand command, DbContext context, CancellationToken cancellationToken)
         {
-            Logger.LogInformation("Executing scalar: {CommandText}", command.CommandText);
+            // I1: redact SQL before logging.
+            Logger.LogInformation("Executing scalar: {CommandText}", QueryExecutor.RedactSqlForLogging(command.CommandText));
             return Task.FromResult(InterceptionResult<object?>.Continue());
         }
 
@@ -104,7 +108,8 @@ namespace nORM.Enterprise
         /// <inheritdoc />
         public virtual Task<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, DbContext context, CancellationToken cancellationToken)
         {
-            Logger.LogInformation("Executing reader: {CommandText}", command.CommandText);
+            // I1: redact SQL before logging.
+            Logger.LogInformation("Executing reader: {CommandText}", QueryExecutor.RedactSqlForLogging(command.CommandText));
             return Task.FromResult(InterceptionResult<DbDataReader>.Continue());
         }
 
@@ -118,7 +123,8 @@ namespace nORM.Enterprise
         /// <inheritdoc />
         public virtual Task CommandFailedAsync(DbCommand command, DbContext context, Exception exception, CancellationToken cancellationToken)
         {
-            Logger.LogError(exception, "Command failed: {CommandText}", command.CommandText);
+            // I1: redact SQL before logging to prevent credential leakage in error logs.
+            Logger.LogError(exception, "Command failed: {CommandText}", QueryExecutor.RedactSqlForLogging(command.CommandText));
             return Task.CompletedTask;
         }
     }
