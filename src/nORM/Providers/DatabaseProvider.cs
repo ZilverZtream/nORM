@@ -662,9 +662,12 @@ namespace nORM.Providers
                 {
                     await using var cmd = ctx.CreateCommand();
                     cmd.Transaction = transaction;
-                    cmd.CommandText = BuildUpdate(m);
+                    var batchHasTenant = ctx.Options.TenantProvider != null && m.TenantColumn != null;
+                    cmd.CommandText = BuildUpdate(m, batchHasTenant);
                     foreach (var col in m.Columns.Where(c => !c.IsTimestamp)) cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
                     if (m.TimestampColumn != null) cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
+                    // X1: bind tenant param to match the WHERE predicate added when batchHasTenant is true.
+                    if (batchHasTenant) cmd.AddParam(ParamPrefix + m.TenantColumn!.PropName, ctx.Options.TenantProvider!.GetCurrentTenantId());
                     totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
                 // Use CancellationToken.None so a cancelled caller token after a successful commit
@@ -842,14 +845,18 @@ namespace nORM.Providers
         /// columns and filters by the entity's primary key (and timestamp when present).
         /// </summary>
         /// <param name="m">The table mapping describing the entity.</param>
+        /// <param name="includeTenant">When <c>true</c>, appends an AND predicate for the tenant
+        /// column so the statement can only modify the current tenant's rows.</param>
         /// <returns>An <c>UPDATE</c> SQL statement.</returns>
-        public string BuildUpdate(TableMapping m)
+        public string BuildUpdate(TableMapping m, bool includeTenant = false)
         {
             if (m.UpdateColumns.Length == 0)
                 throw new NormConfigurationException(
                     $"Entity '{m.Type.Name}' has no mutable columns to update. Add at least one non-key, non-timestamp property.");
 
-            return _sqlCache.GetOrAdd((m.Type, m.TableName, "UPDATE"), _ =>
+            // X1: cache key distinguishes tenant vs non-tenant SQL so both shapes can coexist.
+            var cacheOp = includeTenant ? "UPDATE_TENANT" : "UPDATE";
+            return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheOp), _ =>
             {
                 var set = string.Join(", ", m.UpdateColumns
                     .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}"));
@@ -861,6 +868,10 @@ namespace nORM.Providers
                     var tc = m.TimestampColumn;
                     whereCols.Add($"({tc.EscCol}={ParamPrefix}{tc.PropName} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{tc.PropName} IS NULL))");
                 }
+                // X1: include tenant column in WHERE so direct UpdateAsync cannot cross-write rows
+                // belonging to other tenants — parity with the batched SaveChangesAsync path.
+                if (includeTenant && m.TenantColumn != null)
+                    whereCols.Add($"{m.TenantColumn.EscCol}={ParamPrefix}{m.TenantColumn.PropName}");
                 var where = string.Join(" AND ", whereCols);
 
                 return $"UPDATE {m.EscTable} SET {set} WHERE {where}";
@@ -872,10 +883,14 @@ namespace nORM.Providers
         /// key (and timestamp when applicable) to ensure a single row is targeted.
         /// </summary>
         /// <param name="m">The table mapping describing the entity.</param>
+        /// <param name="includeTenant">When <c>true</c>, appends an AND predicate for the tenant
+        /// column so the statement can only delete the current tenant's rows.</param>
         /// <returns>A <c>DELETE</c> SQL statement.</returns>
-        public string BuildDelete(TableMapping m)
+        public string BuildDelete(TableMapping m, bool includeTenant = false)
         {
-            return _sqlCache.GetOrAdd((m.Type, m.TableName, "DELETE"), _ =>
+            // X1: cache key distinguishes tenant vs non-tenant SQL so both shapes can coexist.
+            var cacheOp = includeTenant ? "DELETE_TENANT" : "DELETE";
+            return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheOp), _ =>
             {
                 var whereCols = m.KeyColumns
                     .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}").ToList();
@@ -884,6 +899,10 @@ namespace nORM.Providers
                     var tc = m.TimestampColumn;
                     whereCols.Add($"({tc.EscCol}={ParamPrefix}{tc.PropName} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{tc.PropName} IS NULL))");
                 }
+                // X1: include tenant column in WHERE so direct DeleteAsync cannot cross-delete rows
+                // belonging to other tenants — parity with the batched SaveChangesAsync path.
+                if (includeTenant && m.TenantColumn != null)
+                    whereCols.Add($"{m.TenantColumn.EscCol}={ParamPrefix}{m.TenantColumn.PropName}");
                 var where = string.Join(" AND ", whereCols);
 
                 return $"DELETE FROM {m.EscTable} WHERE {where}";

@@ -1925,6 +1925,47 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// S1 — SELECT-then-verify for the single-entity direct UpdateAsync path on affected-row
+        /// semantics providers (e.g. MySQL). Called when <c>recordsAffected == 0</c> and
+        /// <c>UseAffectedRowsSemantics=true</c> to distinguish a same-value update (token still
+        /// present → no conflict) from a genuine stale-row conflict (token gone → throw).
+        /// </summary>
+        private async Task VerifySingleUpdateOccAsync<T>(
+            DbCommand writeCmd,
+            TableMapping map,
+            T entity,
+            object? originalToken,
+            CancellationToken ct) where T : class
+        {
+            var tc = map.TimestampColumn!;
+            await using var cmd = _cn.CreateCommand();
+            if (writeCmd.Transaction != null)
+                cmd.Transaction = writeCmd.Transaction;
+
+            int pi = 0;
+            var conditions = new List<string>(map.KeyColumns.Length + 1);
+            foreach (var kc in map.KeyColumns)
+            {
+                conditions.Add($"{kc.EscCol}={_p.ParamPrefix}v{pi}");
+                cmd.AddParam($"{_p.ParamPrefix}v{pi++}", kc.Getter(entity));
+            }
+            // Null-safe token equality mirrors the predicate in BuildUpdate/BuildUpdateBatch.
+            conditions.Add($"({tc.EscCol}={_p.ParamPrefix}v{pi} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}v{pi} IS NULL))");
+            var tok = originalToken ?? tc.Getter(entity);
+            cmd.AddParam($"{_p.ParamPrefix}v{pi++}", tok ?? (object)DBNull.Value);
+
+            var sb = new StringBuilder("SELECT COUNT(*) FROM ").Append(map.EscTable).Append(" WHERE ");
+            sb.Append(string.Join(" AND ", conditions));
+            cmd.CommandText = sb.ToString();
+
+            var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            var count = result == null || result is DBNull ? 0 : Convert.ToInt32(result);
+            // count=0 means the token is gone (stale); count=1 means same-value update (no conflict).
+            if (count == 0)
+                throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+        }
+
+        /// <summary>
         /// <see cref="TimeoutException"/> is intentionally NOT retried by default because a
         /// timed-out write operation may have already been partially applied by the database and
         /// retrying it could produce duplicate rows. Callers that want to retry on timeout must
@@ -2190,14 +2231,51 @@ namespace nORM.Core
             DbTransaction? transaction,
             CancellationToken ct) where T : class
         {
+            // S2: Guard against primary key mutation on tracked entities before executing the write.
+            // Mirrors the same guard in ExecuteUpdateBatch / ExecuteDeleteBatch.
+            if (operation is WriteOperation.Update or WriteOperation.Delete)
+            {
+                var trackerEntry = ChangeTracker.GetEntryOrDefault(entity);
+                if (trackerEntry?.OriginalKey != null && map.KeyColumns.Length > 0)
+                {
+                    object? currentKey;
+                    if (map.KeyColumns.Length == 1)
+                    {
+                        currentKey = map.KeyColumns[0].Getter(entity);
+                    }
+                    else
+                    {
+                        var vals = new object?[map.KeyColumns.Length];
+                        for (int i = 0; i < map.KeyColumns.Length; i++)
+                            vals[i] = map.KeyColumns[i].Getter(entity);
+                        currentKey = vals;
+                    }
+
+                    bool pkChanged;
+                    if (currentKey is object?[] currentArr && trackerEntry.OriginalKey is object?[] origArr)
+                        pkChanged = !currentArr.SequenceEqual(origArr);
+                    else
+                        pkChanged = !Equals(currentKey, trackerEntry.OriginalKey);
+
+                    if (pkChanged)
+                        throw new InvalidOperationException(
+                            $"Primary key mutation detected on entity '{map.Type.Name}'. " +
+                            "Primary keys cannot be changed after an entity is tracked. " +
+                            "Detach the entity, modify the key, then re-attach.");
+                }
+            }
+
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var commandScope = new CommandScope(Connection, transaction);
             await using var cmd = commandScope.CreateCommand();
+            // X1: pass includeTenant so the WHERE clause targets only the current tenant's rows,
+            // matching the predicate parity of the batched SaveChangesAsync path.
+            var includeTenant = Options.TenantProvider != null && map.TenantColumn != null;
             cmd.CommandText = operation switch
             {
                 WriteOperation.Insert => _p.BuildInsert(map),
-                WriteOperation.Update => _p.BuildUpdate(map),
-                WriteOperation.Delete => _p.BuildDelete(map),
+                WriteOperation.Update => _p.BuildUpdate(map, includeTenant),
+                WriteOperation.Delete => _p.BuildDelete(map, includeTenant),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation))
             };
             // Simple INSERT/UPDATE/DELETE have no JOINs/subqueries — use base timeout
@@ -2218,7 +2296,14 @@ namespace nORM.Core
             if ((operation is WriteOperation.Update or WriteOperation.Delete) &&
                 map.TimestampColumn != null && recordsAffected == 0)
             {
-                throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+                // S1: On affected-row semantics providers (e.g. MySQL default), 0 rows affected from
+                // an UPDATE can mean either a stale OCC token OR a same-value update (no columns
+                // actually changed). Disambiguate with a SELECT-then-verify, mirroring ExecuteUpdateBatch.
+                // DELETE has no same-value ambiguity — always a genuine conflict.
+                if (Provider.UseAffectedRowsSemantics && operation == WriteOperation.Update)
+                    await VerifySingleUpdateOccAsync(cmd, map, entity, originalToken, ct).ConfigureAwait(false);
+                else
+                    throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
             }
 
             return recordsAffected;
@@ -2261,6 +2346,13 @@ namespace nORM.Core
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue);
                     }
+                    // X1: bind tenant param to match the WHERE predicate added by BuildUpdate(includeTenant=true).
+                    // Skip if TenantColumn is already in UpdateColumns — same @PropName is already bound
+                    // for the SET clause, and SQLite/ADO.NET providers reuse named params by name, so
+                    // the SET-bound value is used for the WHERE predicate too. Adding it twice throws.
+                    if (Options.TenantProvider != null && map.TenantColumn != null
+                        && !map.UpdateColumns.Any(c => c.PropName == map.TenantColumn.PropName))
+                        cmd.AddParam(_p.ParamPrefix + map.TenantColumn.PropName, Options.TenantProvider.GetCurrentTenantId());
                     break;
 
                 case WriteOperation.Delete:
@@ -2277,6 +2369,9 @@ namespace nORM.Core
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue);
                     }
+                    // X1: bind tenant param to match the WHERE predicate added by BuildDelete(includeTenant=true).
+                    if (Options.TenantProvider != null && map.TenantColumn != null)
+                        cmd.AddParam(_p.ParamPrefix + map.TenantColumn.PropName, Options.TenantProvider.GetCurrentTenantId());
                     break;
             }
         }
