@@ -130,4 +130,89 @@ public class CommitCancellationTests
 
         Assert.True(entity.Id > 0);
     }
+
+    // ── DbContextTransaction.CommitAsync (T1 fix) ────────────────────────────
+
+    /// <summary>
+    /// DbContextTransaction.CommitAsync must commit the transaction even when the
+    /// caller's token is already cancelled. The T1 fix changed CommitAsync to use
+    /// CancellationToken.None internally, preventing spurious OperationCanceledException
+    /// on a token that fires after the database has already committed.
+    /// </summary>
+    [Fact]
+    public async Task TransactionWrapper_CommitAsync_PreCancelledToken_DataCommitted()
+    {
+        var (cn, ctx) = Create();
+        using var _ = cn;
+        await using var __ = ctx;
+
+        // Warm up provider so EnsureConnectionAsync returns synchronously on next call.
+        await ctx.InsertAsync(new CcItem { Name = "warmup" });
+
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+        await ctx.InsertAsync(new CcItem { Name = "in-tx" });
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel(); // pre-cancel before commit
+
+        // Before T1 fix: CommitAsync(ct) forwarded ct to DbTransaction.CommitAsync(ct)
+        // and a pre-cancelled token would raise OperationCanceledException even though
+        // the data was already written. After the fix: CancellationToken.None is used.
+        await tx.CommitAsync(cts.Token); // must NOT throw
+
+        using var check = cn.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM CcItem WHERE Name = 'in-tx'";
+        Assert.Equal(1L, (long)check.ExecuteScalar()!);
+    }
+
+    /// <summary>
+    /// After CommitAsync with a pre-cancelled token the context must remain usable
+    /// for subsequent insert/query operations.
+    /// </summary>
+    [Fact]
+    public async Task TransactionWrapper_CommitAsync_PreCancelledToken_ContextRemainsUsable()
+    {
+        var (cn, ctx) = Create();
+        using var _ = cn;
+        await using var __ = ctx;
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await using (var tx = await ctx.Database.BeginTransactionAsync())
+        {
+            await ctx.InsertAsync(new CcItem { Name = "first" });
+            await tx.CommitAsync(cts.Token); // must not throw
+        }
+
+        // Context must still be usable for further operations after the cancelled commit.
+        await ctx.InsertAsync(new CcItem { Name = "second" });
+
+        using var check = cn.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM CcItem";
+        Assert.Equal(2L, (long)check.ExecuteScalar()!);
+    }
+
+    /// <summary>
+    /// DbContextTransaction.Commit() (synchronous) must commit — the sync path uses
+    /// the underlying DbTransaction.Commit() which has no CancellationToken parameter.
+    /// Regression guard to confirm sync and async paths are consistent.
+    /// </summary>
+    [Fact]
+    public async Task TransactionWrapper_Commit_Sync_AlwaysCommits()
+    {
+        var (cn, ctx) = Create();
+        using var _ = cn;
+        await using var __ = ctx;
+
+        await ctx.InsertAsync(new CcItem { Name = "warmup" });
+
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+        await ctx.InsertAsync(new CcItem { Name = "in-sync-tx" });
+        tx.Commit(); // synchronous Commit() — no CancellationToken
+
+        using var check = cn.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM CcItem WHERE Name = 'in-sync-tx'";
+        Assert.Equal(1L, (long)check.ExecuteScalar()!);
+    }
 }

@@ -332,6 +332,49 @@ public class CoverageBoost2Tests : TestBase
         Assert.Contains("COUNT(*)", sql, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ── G1: Composite GroupBy key validation ─────────────────────────────────────
+
+    /// <summary>
+    /// GroupBy with a composite anonymous-type key (p => new { p.A, p.B }) must throw
+    /// NormQueryException with a clear message rather than generating invalid SQL.
+    ///
+    /// Root cause: ExpressionToSqlVisitor has no VisitNew override, so visiting a NewExpression
+    /// body concatenates column SQL fragments without separators, producing invalid GROUP BY SQL
+    /// (e.g., "GROUP BY T0.[Name]T0.[Value]").
+    ///
+    /// G1 fix: HandleGroupBy detects NewExpression key body and throws early.
+    /// </summary>
+    [Fact]
+    public void GroupBy_CompositeAnonymousTypeKey_ThrowsNormQueryException()
+    {
+        using var cn = OpenMemory();
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var query = ctx.Query<CovItem>();
+
+        // Build: query.GroupBy(p => new { p.Name, p.Value })
+        var param = Expression.Parameter(typeof(CovItem), "p");
+        var nameProp  = Expression.Property(param, nameof(CovItem.Name));
+        var valueProp = Expression.Property(param, nameof(CovItem.Value));
+        // Anonymous type constructor (2 args: Name string, Value int)
+        var anonType = new { Name = "", Value = 0 }.GetType();
+        var ctor = anonType.GetConstructors()[0];
+        var compositeKey = Expression.New(ctor, new Expression[] { nameProp, valueProp });
+        var keySelector = Expression.Lambda(compositeKey, param);
+        var groupByMethod = typeof(Queryable).GetMethods()
+            .First(m => m.Name == "GroupBy" && m.IsGenericMethodDefinition
+                        && m.GetParameters().Length == 2)
+            .MakeGenericMethod(typeof(CovItem), anonType);
+        var expr = Expression.Call(groupByMethod, query.Expression,
+            Expression.Quote(keySelector));
+
+        // TranslateDirectExpr uses reflection, so NormQueryException arrives wrapped
+        // in TargetInvocationException. Unwrap and verify the inner exception.
+        var wrapper = Assert.Throws<System.Reflection.TargetInvocationException>(
+            () => TranslateDirectExpr(expr, ctx));
+        var ex = Assert.IsType<nORM.Core.NormQueryException>(wrapper.InnerException);
+        Assert.Contains("Composite GroupBy", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── GROUP 80: TranslateGroupAggregateMethod — Sum/Min/Max/Average/LongCount ──
     // Each test uses a SCALAR result body (not a struct wrapper) so the materializer doesn't need
     // a registered entity mapping for the result type.

@@ -253,6 +253,16 @@ namespace nORM.Query
                         AppendLong(v.Ticks);
                         AppendLong(v.Offset.Ticks);
                         break;
+                    case DateOnly v:
+                        // G1: Use DayNumber (stable int) instead of ToString() (culture-dependent).
+                        // DateOnly(2024, 7, 15).ToString() returns "7/15/2024" in en-US but different
+                        // formats in other cultures, causing spurious cache misses across cultures.
+                        AppendInt(v.DayNumber);
+                        break;
+                    case TimeOnly v:
+                        // G1: Use Ticks (stable long) instead of ToString() (culture-dependent).
+                        AppendLong(v.Ticks);
+                        break;
                     case byte[] v:
                         AppendInt(v.Length);
                         _hasher.Append(v);

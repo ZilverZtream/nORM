@@ -223,6 +223,75 @@ public class MigrationAdvisoryLockTests
         }
     }
 
+    // ── M1 fix: ReleaseAdvisoryLock must not mask original exception ──────────
+
+    /// <summary>
+    /// SqlServerMigrationRunner.ReleaseAdvisoryLockAsync must not throw when the
+    /// connection is closed. Before the M1 fix, only DbException was caught; a closed
+    /// connection raises InvalidOperationException (not a DbException subtype) which
+    /// would escape the catch block and mask the original migration error.
+    /// </summary>
+    [Fact]
+    public async Task SqlServer_ReleaseAdvisoryLock_ClosedConnection_DoesNotThrow()
+    {
+        // Not opened — cmd.ExecuteNonQueryAsync throws InvalidOperationException
+        var cn = new SqliteConnection("Data Source=:memory:");
+        using var runner = new SqlServerMigrationRunner(cn, typeof(MigrationAdvisoryLockTests).Assembly);
+
+        // Must not throw. Before M1 fix: InvalidOperationException escaped catch(DbException).
+        await runner.ReleaseAdvisoryLockAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// PostgresMigrationRunner.ReleaseAdvisoryLockAsync must not throw when the
+    /// connection is closed, for the same reason as the SQL Server runner.
+    /// </summary>
+    [Fact]
+    public async Task Postgres_ReleaseAdvisoryLock_ClosedConnection_DoesNotThrow()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        using var runner = new PostgresMigrationRunner(cn, typeof(MigrationAdvisoryLockTests).Assembly);
+
+        await runner.ReleaseAdvisoryLockAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// MySQL's ReleaseAdvisoryLockAsync was already catching Exception (not DbException)
+    /// before the M1 fix. This test confirms the existing behaviour is preserved.
+    /// </summary>
+    [Fact]
+    public async Task MySql_ReleaseAdvisoryLock_ClosedConnection_DoesNotThrow()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        using var runner = new MySqlMigrationRunner(cn, typeof(MigrationAdvisoryLockTests).Assembly);
+
+        await runner.ReleaseAdvisoryLockAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Verifies that all three non-SQLite runners handle a closed connection
+    /// in ReleaseAdvisoryLockAsync without propagating any exception.
+    /// </summary>
+    [Theory]
+    [InlineData("sqlserver")]
+    [InlineData("postgres")]
+    [InlineData("mysql")]
+    public async Task AllNonSqliteRunners_ReleaseAdvisoryLock_ClosedConnection_DoesNotThrow(string kind)
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        var asm = typeof(MigrationAdvisoryLockTests).Assembly;
+
+        Func<Task> act = kind switch
+        {
+            "sqlserver" => () => new SqlServerMigrationRunner(cn, asm).ReleaseAdvisoryLockAsync(CancellationToken.None),
+            "postgres"  => () => new PostgresMigrationRunner(cn, asm).ReleaseAdvisoryLockAsync(CancellationToken.None),
+            "mysql"     => () => new MySqlMigrationRunner(cn, asm).ReleaseAdvisoryLockAsync(CancellationToken.None),
+            _           => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+
+        await act(); // must not throw
+    }
+
     // ── README / documentation contract ──────────────────────────────────────
 
     [Theory]

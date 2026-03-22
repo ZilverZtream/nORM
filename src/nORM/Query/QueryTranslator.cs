@@ -1746,6 +1746,17 @@ namespace nORM.Query
 
             if (keySelectorLambda == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "GroupBy key selector must be a lambda expression"));
+
+            // G1: Composite GroupBy keys (p => new { p.A, p.B }) are not supported.
+            // Visiting a NewExpression without a VisitNew override causes ExpressionToSqlVisitor to
+            // concatenate column SQL fragments without separators, producing invalid GROUP BY SQL
+            // (e.g., "GROUP BY T0.[Category]T0.[Price]"). Fail early with a clear message.
+            if (keySelectorLambda.Body is NewExpression)
+                throw new NormQueryException(
+                    "Composite GroupBy keys (e.g., p => new { p.A, p.B }) are not supported. " +
+                    "Use a single column as the GroupBy key (e.g., p => p.Category), or pre-project " +
+                    "to a scalar value before calling GroupBy.");
+
             Visit(sourceQuery);
 
             var param = keySelectorLambda.Parameters[0];

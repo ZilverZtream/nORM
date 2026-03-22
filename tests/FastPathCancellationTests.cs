@@ -105,4 +105,72 @@ public class FastPathCancellationTests
             Assert.Single(results);
         }
     }
+
+    // ── A1 fix: warm-context sync dispatch ignores pre-cancelled token ────────
+
+    /// <summary>
+    /// A warmed SQLite context (EnsureConnectionAsync returns synchronously) must still
+    /// honour a pre-cancelled CancellationToken when dispatching to the synchronous
+    /// materializer. Before the A1 fix, ExecuteQueryFromPlanAsync dispatched to
+    /// ExecuteListPlanSyncWrapped without checking the token, silently returning results
+    /// instead of raising OperationCanceledException.
+    /// </summary>
+    [Fact]
+    public async Task WarmContext_ListQuery_PreCancelledToken_ThrowsOperationCancelled()
+    {
+        using var ctx = CreateAndSeed(out var cn);
+        using (cn)
+        {
+            // First query warms the provider (sets _providerInitialized=true).
+            // After this, EnsureConnectionAsync returns Task.FromResult(cn) immediately
+            // without inspecting the CancellationToken.
+            await ctx.Query<Widget>().ToListAsync();
+
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            // Before A1 fix: no ct.ThrowIfCancellationRequested() before sync dispatch
+            // → silently returns results instead of throwing.
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => ctx.Query<Widget>().ToListAsync(cts.Token));
+        }
+    }
+
+    /// <summary>
+    /// Scalar queries (e.g., CountAsync) on a warmed context must also honour a
+    /// pre-cancelled token. Before the A1 fix, ExecuteScalarPlanSync was called
+    /// without checking the token on the warm sync path.
+    /// </summary>
+    [Fact]
+    public async Task WarmContext_ScalarQuery_PreCancelledToken_ThrowsOperationCancelled()
+    {
+        using var ctx = CreateAndSeed(out var cn);
+        using (cn)
+        {
+            await ctx.Query<Widget>().ToListAsync(); // warm
+
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => ctx.Query<Widget>().CountAsync(cts.Token));
+        }
+    }
+
+    /// <summary>
+    /// Regression guard: a non-cancelled token on a warmed context must still return
+    /// correct results after the A1 fix.
+    /// </summary>
+    [Fact]
+    public async Task WarmContext_ValidToken_ReturnsCorrectResults()
+    {
+        using var ctx = CreateAndSeed(out var cn);
+        using (cn)
+        {
+            await ctx.Query<Widget>().ToListAsync(); // warm
+
+            var results = await ctx.Query<Widget>().Where(w => w.IsEnabled).ToListAsync();
+            Assert.Single(results);
+        }
+    }
 }
