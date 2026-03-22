@@ -641,11 +641,13 @@ namespace nORM.Migration
         /// Column order within each array is significant.
         /// </summary>
         /// <remarks>
-        /// Known limitation: <see cref="ForeignKeySchema.ConstraintName"/> is NOT compared here.
-        /// A pure FK rename (same columns/tables/actions, different name) is invisible to this
-        /// method and will not produce a DroppedForeignKey + AddedForeignKey pair in the diff.
-        /// If FK rename detection is needed in the future, a base-class or shared helper should
-        /// be introduced rather than duplicating the change across all four generators.
+        /// <see cref="ForeignKeySchema.ConstraintName"/> is intentionally NOT compared inside this method.
+        /// FK rename detection is handled by the key-based lookup in <see cref="BuildFkMap"/>:
+        /// that method indexes FKs by <c>ConstraintName</c>, so a pure FK rename (same
+        /// columns/tables/actions, different name) produces two distinct dictionary entries —
+        /// the old name is "not in new" (DroppedForeignKeys) and the new name is "not in old"
+        /// (AddedForeignKeys). <c>FkEqual</c> is only called when the <em>same</em>
+        /// <c>ConstraintName</c> key is found in both maps, so the names are equal by definition.
         /// </remarks>
         private static bool FkEqual(ForeignKeySchema a, ForeignKeySchema b) =>
             string.Equals(a.PrincipalTable, b.PrincipalTable, StringComparison.OrdinalIgnoreCase) &&

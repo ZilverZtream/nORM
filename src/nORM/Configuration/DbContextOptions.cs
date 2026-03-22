@@ -264,19 +264,22 @@ namespace nORM.Configuration
             = AmbientTransactionEnlistmentPolicy.FailFast;
 
         /// <summary>
-        /// S1 enforcement: when <c>true</c>, <see cref="DbContext"/> will throw
-        /// <see cref="NormConfigurationException"/> if the provider uses affected-row semantics
-        /// (e.g. MySQL with <c>useAffectedRows=true</c>, the default) and an entity with an
-        /// optimistic-concurrency token (<c>[Timestamp]</c>) is saved. Affected-row semantics
-        /// cannot reliably detect conflicts where the concurrent writer sets the token to the
-        /// same value; matched-row semantics (set <c>useAffectedRows=false</c> in the MySQL
-        /// connection string and override the provider) are required for full OCC guarantees.
-        ///
-        /// <para>Default: <c>true</c> — throws <see cref="NormConfigurationException"/> when
-        /// affected-row semantics are used with OCC tokens. Set to <c>false</c> to suppress the
-        /// error and accept the known trade-off (S1), or add <c>useAffectedRows=false</c> to the
-        /// MySQL connection string for full OCC guarantees.</para>
+        /// When <see langword="true"/> (default), using <c>[Timestamp]</c> OCC columns with a
+        /// provider that uses affected-row semantics (e.g. MySQL with <c>useAffectedRows=true</c>)
+        /// causes <see cref="NormConfigurationException"/> to be thrown at save time, preventing
+        /// silent data-loss bugs.
         /// </summary>
+        /// <remarks>
+        /// <para><b>&#x26A0; ADVANCED UNSAFE MODE:</b> Setting this to <see langword="false"/> is an
+        /// explicit opt-in to weakened OCC semantics. With affected-row MySQL semantics, a
+        /// concurrent writer that updates a row to the <em>same</em> token value will NOT be
+        /// detected as a conflict — the update will silently succeed even though the row was
+        /// modified externally. This is a known data-integrity gap (audit finding SP1).</para>
+        /// <para>Only disable this if you have verified that your workload cannot produce same-value
+        /// token collisions, or if you are using a SELECT-then-verify strategy to compensate.
+        /// Add <c>useAffectedRows=false</c> to the MySQL connection string for full OCC guarantees
+        /// instead.</para>
+        /// </remarks>
         public bool RequireMatchedRowOccSemantics { get; set; } = true;
 
         // C1: backing store is ConcurrentDictionary so outer dict ops are thread-safe.

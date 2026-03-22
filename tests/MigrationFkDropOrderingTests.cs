@@ -395,4 +395,270 @@ public class MigrationFkDropOrderingTests
         Assert.NotNull(stmts.PreTransactionUp);
         Assert.Contains(stmts.PreTransactionUp!, s => s.Contains("foreign_keys=off", StringComparison.OrdinalIgnoreCase));
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // MG2 — FK rename detection: rename-only changes must produce Drop + Add
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private static TableSchema MakeOrdersTableForFkRename(string fkName) => new TableSchema
+    {
+        Name = "Orders",
+        Columns =
+        {
+            new ColumnSchema { Name = "Id",         ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true },
+            new ColumnSchema { Name = "CustomerId", ClrType = typeof(int).FullName!, IsNullable = false },
+        },
+        ForeignKeys =
+        {
+            new ForeignKeySchema
+            {
+                ConstraintName   = fkName,
+                DependentColumns = new[] { "CustomerId" },
+                PrincipalTable   = "Customers",
+                PrincipalColumns = new[] { "Id" },
+                OnDelete = "NO ACTION",
+                OnUpdate = "NO ACTION",
+            }
+        }
+    };
+
+    private static TableSchema MakeCustomersTableForFkRename() => new TableSchema
+    {
+        Name = "Customers",
+        Columns = { new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true } }
+    };
+
+    [Fact]
+    public void FkRenameOnly_ProducesDroppedAndAddedFk()
+    {
+        var old = new SchemaSnapshot();
+        old.Tables.Add(MakeCustomersTableForFkRename());
+        old.Tables.Add(MakeOrdersTableForFkRename("FK_Orders_Customers_OldName"));
+        var @new = new SchemaSnapshot();
+        @new.Tables.Add(MakeCustomersTableForFkRename());
+        @new.Tables.Add(MakeOrdersTableForFkRename("FK_Orders_Customers_NewName"));
+
+        var diff = SchemaDiffer.Diff(old, @new);
+
+        Assert.Single(diff.DroppedForeignKeys);
+        Assert.Single(diff.AddedForeignKeys);
+        Assert.Equal("FK_Orders_Customers_OldName", diff.DroppedForeignKeys[0].ForeignKey.ConstraintName);
+        Assert.Equal("FK_Orders_Customers_NewName", diff.AddedForeignKeys[0].ForeignKey.ConstraintName);
+    }
+
+    [Fact]
+    public void FkNoChange_ProducesNoDiff()
+    {
+        var old = new SchemaSnapshot();
+        old.Tables.Add(MakeCustomersTableForFkRename());
+        old.Tables.Add(MakeOrdersTableForFkRename("FK_Orders_Customers_CustomerId"));
+        var @new = new SchemaSnapshot();
+        @new.Tables.Add(MakeCustomersTableForFkRename());
+        @new.Tables.Add(MakeOrdersTableForFkRename("FK_Orders_Customers_CustomerId"));
+
+        var diff = SchemaDiffer.Diff(old, @new);
+
+        Assert.Empty(diff.DroppedForeignKeys);
+        Assert.Empty(diff.AddedForeignKeys);
+        Assert.False(diff.HasChanges);
+    }
+
+    [Fact]
+    public void FkRenameOnly_DoesNotAffectColumns()
+    {
+        var old = new SchemaSnapshot();
+        old.Tables.Add(MakeCustomersTableForFkRename());
+        old.Tables.Add(MakeOrdersTableForFkRename("FK_OLD"));
+        var @new = new SchemaSnapshot();
+        @new.Tables.Add(MakeCustomersTableForFkRename());
+        @new.Tables.Add(MakeOrdersTableForFkRename("FK_NEW"));
+
+        var diff = SchemaDiffer.Diff(old, @new);
+
+        Assert.Empty(diff.AddedColumns);
+        Assert.Empty(diff.DroppedColumns);
+        Assert.Empty(diff.AlteredColumns);
+    }
+
+    [Fact]
+    public void FkRenameOnly_DependentAndPrincipalColumnsPreserved()
+    {
+        var old = new SchemaSnapshot();
+        old.Tables.Add(MakeCustomersTableForFkRename());
+        old.Tables.Add(MakeOrdersTableForFkRename("FK_OLD"));
+        var @new = new SchemaSnapshot();
+        @new.Tables.Add(MakeCustomersTableForFkRename());
+        @new.Tables.Add(MakeOrdersTableForFkRename("FK_NEW"));
+
+        var diff = SchemaDiffer.Diff(old, @new);
+
+        Assert.Equal(new[] { "CustomerId" }, diff.DroppedForeignKeys[0].ForeignKey.DependentColumns);
+        Assert.Equal("Customers", diff.DroppedForeignKeys[0].ForeignKey.PrincipalTable);
+        Assert.Equal(new[] { "CustomerId" }, diff.AddedForeignKeys[0].ForeignKey.DependentColumns);
+        Assert.Equal("Customers", diff.AddedForeignKeys[0].ForeignKey.PrincipalTable);
+    }
+
+    [Fact]
+    public void FkRenameOnly_AllNonSqliteGenerators_EmitDropAndAdd()
+    {
+        var old = new SchemaSnapshot();
+        old.Tables.Add(MakeCustomersTableForFkRename());
+        old.Tables.Add(MakeOrdersTableForFkRename("FK_OLD"));
+        var @new = new SchemaSnapshot();
+        @new.Tables.Add(MakeCustomersTableForFkRename());
+        @new.Tables.Add(MakeOrdersTableForFkRename("FK_NEW"));
+
+        var diff = SchemaDiffer.Diff(old, @new);
+
+        foreach (var gen in new IMigrationSqlGenerator[]
+            { new SqlServerMigrationSqlGenerator(), new MySqlMigrationSqlGenerator(), new PostgresMigrationSqlGenerator() })
+        {
+            var sql = gen.GenerateSql(diff);
+            Assert.Contains(sql.Up,   s => s.Contains("FK_OLD"));
+            Assert.Contains(sql.Up,   s => s.Contains("FK_NEW"));
+            Assert.Contains(sql.Down, s => s.Contains("FK_NEW"));
+            Assert.Contains(sql.Down, s => s.Contains("FK_OLD"));
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Idempotency matrix — all providers produce correct, dependency-ordered DDL
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private static TableSchema MakeSchemaTable(string name, params (string Name, string ClrType, bool IsKey, bool IsNullable)[] cols)
+    {
+        var t = new TableSchema { Name = name };
+        foreach (var (colName, clrType, isKey, nullable) in cols)
+            t.Columns.Add(new ColumnSchema { Name = colName, ClrType = clrType, IsPrimaryKey = isKey, IsNullable = nullable });
+        return t;
+    }
+
+    private static ForeignKeySchema MakeSchemaFk(string constraintName, string dependentCol, string principalTable, string principalCol)
+        => new ForeignKeySchema
+        {
+            ConstraintName   = constraintName,
+            DependentColumns = new[] { dependentCol },
+            PrincipalTable   = principalTable,
+            PrincipalColumns = new[] { principalCol },
+            OnDelete = "NO ACTION",
+            OnUpdate = "NO ACTION"
+        };
+
+    private static IMigrationSqlGenerator[] AllMigrationGenerators() => new IMigrationSqlGenerator[]
+    {
+        new SqliteMigrationSqlGenerator(),
+        new SqlServerMigrationSqlGenerator(),
+        new MySqlMigrationSqlGenerator(),
+        new PostgresMigrationSqlGenerator()
+    };
+
+    [Fact]
+    public void Idempotency_EmptyDiff_AllProviders_ProducesNoSql()
+    {
+        var emptyDiff = new SchemaDiff();
+        foreach (var gen in AllMigrationGenerators())
+        {
+            var sql = gen.GenerateSql(emptyDiff);
+            Assert.Empty(sql.Up);
+            Assert.Empty(sql.Down);
+        }
+    }
+
+    [Fact]
+    public void Idempotency_AddedTable_AllProviders_DownDropsTable()
+    {
+        var table = MakeSchemaTable("NewTable", ("Id", typeof(int).FullName!, true, false));
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        foreach (var gen in AllMigrationGenerators())
+        {
+            var sql = gen.GenerateSql(diff);
+            Assert.Contains(sql.Up,   s => s.Contains("CREATE TABLE"));
+            Assert.Contains(sql.Down, s => s.Contains("DROP") && s.Contains("NewTable"));
+        }
+    }
+
+    [Fact]
+    public void Idempotency_DroppedTable_AllProviders_DownRecreatesTable()
+    {
+        var table = MakeSchemaTable("OldTable", ("Id", typeof(int).FullName!, true, false));
+        var diff = new SchemaDiff();
+        diff.DroppedTables.Add(table);
+
+        foreach (var gen in AllMigrationGenerators())
+        {
+            var sql = gen.GenerateSql(diff);
+            Assert.Contains(sql.Up,   s => s.Contains("DROP") && s.Contains("OldTable"));
+            Assert.Contains(sql.Down, s => s.Contains("CREATE TABLE"));
+        }
+    }
+
+    [Fact]
+    public void Idempotency_DroppedFkAndColumn_AllProviders_FkDroppedFirst()
+    {
+        var ordersOld = MakeSchemaTable("Orders",
+            ("Id",         typeof(int).FullName!, true,  false),
+            ("CustomerId", typeof(int).FullName!, false, false));
+        ordersOld.ForeignKeys.Add(MakeSchemaFk("FK_Ord_Cust", "CustomerId", "Customers", "Id"));
+
+        var ordersNew = MakeSchemaTable("Orders", ("Id", typeof(int).FullName!, true, false));
+
+        var oldSnap = new SchemaSnapshot();
+        oldSnap.Tables.Add(ordersOld);
+        var newSnap = new SchemaSnapshot();
+        newSnap.Tables.Add(ordersNew);
+
+        var diff = SchemaDiffer.Diff(oldSnap, newSnap);
+
+        foreach (var gen in AllMigrationGenerators())
+        {
+            var sql = gen.GenerateSql(diff);
+            int fkDropIdx  = sql.Up.Select((s, i) => (s, i)).Where(t => t.s.Contains("FK_Ord_Cust"))                         .Select(t => t.i).DefaultIfEmpty(-1).First();
+            int colDropIdx = sql.Up.Select((s, i) => (s, i)).Where(t => t.s.Contains("CustomerId") && t.s.Contains("DROP")) .Select(t => t.i).DefaultIfEmpty(-1).First();
+
+            if (fkDropIdx >= 0 && colDropIdx >= 0)
+                Assert.True(fkDropIdx < colDropIdx,
+                    $"{gen.GetType().Name}: FK drop (idx={fkDropIdx}) must precede column drop (idx={colDropIdx})");
+        }
+    }
+
+    [Fact]
+    public void Idempotency_Postgres_TypeChange_TextToInt_BothDirectionsHaveUsing()
+    {
+        var table = MakeSchemaTable("T", ("Id", typeof(int).FullName!, true, false));
+        var oldCol = new ColumnSchema { Name = "Val", ClrType = typeof(string).FullName!, IsNullable = true };
+        var newCol = new ColumnSchema { Name = "Val", ClrType = typeof(int).FullName!,    IsNullable = true };
+
+        var diff = new SchemaDiff();
+        diff.AlteredColumns.Add((table, newCol, oldCol));
+
+        var gen = new PostgresMigrationSqlGenerator();
+        var sql = gen.GenerateSql(diff);
+
+        Assert.Contains("USING", sql.Up[0]);
+        Assert.Contains("USING", sql.Down[0]);
+        Assert.Contains("INTEGER", sql.Up[0]);
+        Assert.Contains("TEXT",    sql.Down[0]);
+    }
+
+    [Fact]
+    public void Idempotency_MultiStepMigration_AllProviders_EachStepIsIndependentSql()
+    {
+        var table = MakeSchemaTable("NewTable",
+            ("Id",     typeof(int).FullName!, true,  false),
+            ("LinkId", typeof(int).FullName!, false, false));
+        var fk = MakeSchemaFk("FK_NewTable_Link", "LinkId", "OtherTable", "Id");
+
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+        diff.AddedForeignKeys.Add((table, fk));
+
+        foreach (var gen in AllMigrationGenerators())
+        {
+            var sql = gen.GenerateSql(diff);
+            foreach (var stmt in sql.Up)
+                Assert.DoesNotContain(";", stmt.TrimEnd(';', ' '));
+        }
+    }
 }

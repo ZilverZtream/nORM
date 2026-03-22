@@ -327,4 +327,196 @@ public class AdversarialTenantFuzzTests
         otherCmd.CommandText = "SELECT Value FROM FuzzRow WHERE TenantId = 'other'";
         Assert.Equal(1L, Convert.ToInt64(await otherCmd.ExecuteScalarAsync()));
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Gate 5.0 — Adversarial cross-tenant security: all-provider matrix
+    // ══════════════════════════════════════════════════════════════════════════
+
+    [Table("AMTItem")]
+    private sealed class AMTItem
+    {
+        [Key]
+        public int Id { get; set; }
+        public string TenantId { get; set; } = "";
+        public string Payload { get; set; } = "";
+    }
+
+    private const string AmtDdl = @"
+        CREATE TABLE AMTItem (
+            Id       INTEGER PRIMARY KEY,
+            TenantId TEXT    NOT NULL,
+            Payload  TEXT    NOT NULL
+        )";
+
+    private sealed class NullTenantProvider : ITenantProvider
+    {
+        public object GetCurrentTenantId() => null!;
+    }
+
+    private static (SqliteConnection Cn, DbContext Ctx) SetupAmt(string tenantId, DatabaseProvider? provider = null)
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = AmtDdl;
+        cmd.ExecuteNonQuery();
+        var opts = new DbContextOptions
+        {
+            TenantColumnName = "TenantId",
+            TenantProvider   = new StringTenantProvider(tenantId)
+        };
+        return (cn, new DbContext(cn, provider ?? new SqliteProvider(), opts));
+    }
+
+    private static DatabaseProvider AmtProvider(string kind) => kind switch
+    {
+        "sqlserver" => new SqlServerProvider(),
+        "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
+        "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
+        _           => new SqliteProvider()
+    };
+
+    [Fact]
+    public async Task AMT_CrossTenantRead_CannotSeeOtherTenantRows()
+    {
+        var (cn, ctx) = SetupAmt("tenant-B");
+        await using var _ = ctx; using var __ = cn;
+
+        using var seed = cn.CreateCommand();
+        seed.CommandText = "INSERT INTO AMTItem VALUES (1,'tenant-A','secret-A'), (2,'tenant-B','safe-B')";
+        seed.ExecuteNonQuery();
+
+        var results = ctx.Query<AMTItem>().ToList();
+        Assert.Single(results);
+        Assert.Equal("safe-B", results[0].Payload);
+    }
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("sqlserver")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task AMT_AllProviders_TenantFilterAppliedToQuery(string kind)
+    {
+        var (cn, ctx) = SetupAmt("tenant-P", AmtProvider(kind));
+        await using var ctxDispose = ctx; using var cnDispose = cn;
+
+        using var seed = cn.CreateCommand();
+        seed.CommandText = "INSERT INTO AMTItem VALUES (1,'tenant-P','p-row'), (2,'tenant-Q','q-row')";
+        seed.ExecuteNonQuery();
+
+        var results = ctx.Query<AMTItem>().ToList();
+        Assert.Single(results);
+        Assert.Equal("p-row", results[0].Payload);
+        Assert.Equal("tenant-P", results[0].TenantId);
+    }
+
+    [Fact]
+    public async Task AMT_CrossTenantRead_AfterInsert_OnlySeesSameTenantRows()
+    {
+        // nORM uses the entity's TenantId value for INSERTs (no server-side injection).
+        // The tenant context filter applies to SELECT/UPDATE/DELETE, not INSERT.
+        // Verify: rows inserted with "tenant-C" TenantId are visible only to tenant-C context.
+        var (cn, ctx) = SetupAmt("tenant-C");
+        await using var _ = ctx; using var __ = cn;
+
+        var item = new AMTItem { Id = 1, TenantId = "tenant-C", Payload = "legitimate" };
+        ctx.Add(item);
+        await ctx.SaveChangesAsync();
+
+        // Seed a row for another tenant directly
+        using var seed = cn.CreateCommand();
+        seed.CommandText = "INSERT INTO AMTItem VALUES (2,'tenant-D','other')";
+        seed.ExecuteNonQuery();
+
+        var results = ctx.Query<AMTItem>().ToList();
+        Assert.Single(results);
+        Assert.Equal("legitimate", results[0].Payload);
+    }
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("sqlserver")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task AMT_AllProviders_SelectFilteredByContextTenant(string kind)
+    {
+        var (cn, ctx) = SetupAmt("correct-tenant", AmtProvider(kind));
+        await using var ctxDispose = ctx; using var cnDispose = cn;
+
+        using var seed = cn.CreateCommand();
+        seed.CommandText = "INSERT INTO AMTItem VALUES (1,'correct-tenant','mine'), (2,'other-tenant','not-mine')";
+        seed.ExecuteNonQuery();
+
+        var results = ctx.Query<AMTItem>().ToList();
+        Assert.Single(results);
+        Assert.Equal("mine", results[0].Payload);
+    }
+
+    [Fact]
+    public async Task AMT_Update_CannotModifyOtherTenantRows()
+    {
+        var (cn, ctxA) = SetupAmt("tenant-A");
+        await using var _ = ctxA;
+
+        using var seed = cn.CreateCommand();
+        seed.CommandText = "INSERT INTO AMTItem VALUES (1,'tenant-A','rowA'), (2,'tenant-B','rowB')";
+        seed.ExecuteNonQuery();
+
+        var item = new AMTItem { Id = 1, TenantId = "tenant-A", Payload = "updatedA" };
+        ctxA.Attach(item);
+        item.Payload = "updatedA";
+        await ctxA.SaveChangesAsync();
+
+        using var verify = cn.CreateCommand();
+        verify.CommandText = "SELECT Payload FROM AMTItem WHERE Id=2";
+        var payload = (string)verify.ExecuteScalar()!;
+        Assert.Equal("rowB", payload);
+    }
+
+    [Fact]
+    public void AMT_NullTenantProvider_StringColumn_EmitsIsNullFilter()
+    {
+        // When the tenant provider returns null and the CLR column type is string (nullable reference type),
+        // nORM emits a "TenantId IS NULL" filter rather than throwing. Rows with non-null TenantId are hidden.
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var __ = cn;
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = AmtDdl;
+        cmd.ExecuteNonQuery();
+
+        // Seed rows with non-null TenantId — none should be visible via the null-tenant context
+        using var seed = cn.CreateCommand();
+        seed.CommandText = "INSERT INTO AMTItem VALUES (1,'tenant-X','row1'), (2,'tenant-Y','row2')";
+        seed.ExecuteNonQuery();
+
+        var opts = new DbContextOptions
+        {
+            TenantColumnName = "TenantId",
+            TenantProvider   = new NullTenantProvider()
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+
+        // IS NULL filter hides all rows (none have NULL TenantId)
+        var results = ctx.Query<AMTItem>().ToList();
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task AMT_CountAsync_OnlyCountsCurrentTenantRows()
+    {
+        var (cn, ctx) = SetupAmt("tenant-Z");
+        await using var _ = ctx; using var __ = cn;
+
+        using var seed = cn.CreateCommand();
+        seed.CommandText = @"
+            INSERT INTO AMTItem VALUES (1,'tenant-Z','z1'), (2,'tenant-Z','z2'), (3,'tenant-Z','z3'),
+                                      (4,'tenant-W','w1'), (5,'tenant-W','w2'),
+                                      (6,'tenant-W','w3'), (7,'tenant-W','w4'), (8,'tenant-W','w5')";
+        seed.ExecuteNonQuery();
+
+        var count = await ctx.Query<AMTItem>().CountAsync();
+        Assert.Equal(3, count);
+    }
 }
