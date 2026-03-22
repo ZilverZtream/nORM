@@ -85,11 +85,7 @@ namespace nORM.Migration
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
                 if (!string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal))
-                    // TODO: Add USING clause for explicit type cast when converting between incompatible types
-                    // (e.g. TEXT::integer). Without USING, PostgreSQL will reject the ALTER if an implicit
-                    // cast from the old type to the new type does not exist. Known limitation: callers must
-                    // handle type-coercion migrations manually for incompatible type changes.
-                    up.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} TYPE {GetSqlType(newCol)}");
+                    up.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} TYPE {GetSqlType(newCol)} USING {Esc(newCol.Name)}::{GetCastType(newCol)}");
                 if (oldCol.IsNullable != newCol.IsNullable)
                     up.Add(newCol.IsNullable
                         ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} DROP NOT NULL"
@@ -170,8 +166,7 @@ namespace nORM.Migration
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
                 if (!string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal))
-                    // TODO: Add USING clause for explicit type cast (see UP-4 comment above for details).
-                    down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} TYPE {GetSqlType(oldCol)}");
+                    down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} TYPE {GetSqlType(oldCol)} USING {Esc(oldCol.Name)}::{GetCastType(oldCol)}");
                 if (oldCol.IsNullable != newCol.IsNullable)
                     down.Add(oldCol.IsNullable
                         ? $"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} DROP NOT NULL"
@@ -261,6 +256,18 @@ namespace nORM.Migration
                 return "/* WARNING: GENERATED ALWAYS AS IDENTITY is only valid for integer types in PostgreSQL */ INTEGER";
 
             return "INTEGER";
+        }
+
+        /// <summary>
+        /// Returns the PostgreSQL base type name suitable for USING cast expressions.
+        /// Strips precision/scale/size parameters from the type name, e.g. "DECIMAL(18,2)" → "DECIMAL",
+        /// "CHAR(1)" → "CHAR", "NUMERIC(20,0)" → "NUMERIC". Types without parentheses are returned as-is.
+        /// </summary>
+        private static string GetCastType(ColumnSchema column)
+        {
+            var sqlType = GetSqlType(column);
+            var idx = sqlType.IndexOf('(');
+            return idx >= 0 ? sqlType[..idx].TrimEnd() : sqlType;
         }
 
         /// <summary>

@@ -1424,6 +1424,9 @@ namespace nORM.Query
             var map = _ctx.GetMapping(elementType);
             // Use structural key instead of full ToString() to avoid string allocation.
             // For simple predicates (member == value), the member name is sufficient.
+            // Include a :NULL suffix when the predicate compares to null so that null and
+            // non-null predicates are never folded into the same cached SQL entry —
+            // null requires IS NULL while non-null requires = @p0.
             string whereKey;
             if (whereCall == null)
                 whereKey = "";
@@ -1434,7 +1437,14 @@ namespace nORM.Query
                 if (wLambda.Body is MemberExpression wm)
                     whereKey = wm.Member.Name;
                 else if (wLambda.Body is BinaryExpression wb && wb.Left is MemberExpression wbm)
+                {
                     whereKey = wbm.Member.Name;
+                    // Peek at the RHS to tag the cache key when it is a null constant.
+                    if (wb.NodeType == ExpressionType.Equal
+                        && ExpressionValueExtractor.TryGetConstantValue(wb.Right, out var peekVal)
+                        && (peekVal == null || peekVal == DBNull.Value))
+                        whereKey += ":NULL";
+                }
                 else
                     whereKey = wLambda.Body.ToString(); // fallback for complex predicates
             }
@@ -1473,13 +1483,22 @@ namespace nORM.Query
                             return false;
                         if (!map.ColumnsByName.TryGetValue(me.Member.Name, out var column))
                             return false;
-                        var paramName = _ctx.Provider.ParamPrefix + "p0";
-                        whereClause = $" WHERE {column.EscCol} = {paramName}";
                         // Use ExpressionValueExtractor instead of Compile().DynamicInvoke();
                         // DynamicInvoke is significantly slower and poses RCE risks.
                         if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
                             return false;
-                        parameters = new Dictionary<string, object>(1) { [paramName] = value! };
+                        // Null value: emit IS NULL (SQL "col = NULL" is always UNKNOWN/false).
+                        if (value == null || value == DBNull.Value)
+                        {
+                            whereClause = $" WHERE {column.EscCol} IS NULL";
+                            // no parameters needed
+                        }
+                        else
+                        {
+                            var paramName = _ctx.Provider.ParamPrefix + "p0";
+                            whereClause = $" WHERE {column.EscCol} = {paramName}";
+                            parameters = new Dictionary<string, object>(1) { [paramName] = value };
+                        }
                     }
                 }
 
@@ -1502,10 +1521,14 @@ namespace nORM.Query
                 {
                     if (lambda.Body is not BinaryExpression be || be.NodeType != ExpressionType.Equal)
                         return false;
-                    var paramName = _ctx.Provider.ParamPrefix + "p0";
                     if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
                         return false;
-                    parameters = new Dictionary<string, object>(1) { [paramName] = value! };
+                    // IS NULL predicate: cache key includes :NULL, no parameter needed.
+                    if (value != null && value != DBNull.Value)
+                    {
+                        var paramName = _ctx.Provider.ParamPrefix + "p0";
+                        parameters = new Dictionary<string, object>(1) { [paramName] = value };
+                    }
                 }
             }
             return true;

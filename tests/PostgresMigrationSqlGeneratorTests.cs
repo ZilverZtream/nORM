@@ -205,4 +205,122 @@ public class PostgresMigrationSqlGeneratorTests
         Assert.Contains("NULL", sql.Up[0]);
         Assert.DoesNotContain("DEFAULT", sql.Up[0]);
     }
+
+// ─── MG1: ALTER COLUMN TYPE must include USING clause for PostgreSQL compatibility ───
+
+    [Fact]
+    public void AlteredColumn_TextToInteger_EmitsUsingClause()
+    {
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "Col", ClrType = typeof(int).FullName!, IsNullable = true });
+        var oldCol = new ColumnSchema { Name = "Col", ClrType = typeof(string).FullName!, IsNullable = true };
+        var newCol = new ColumnSchema { Name = "Col", ClrType = typeof(int).FullName!, IsNullable = true };
+
+        var diff = new SchemaDiff();
+        diff.AlteredColumns.Add((table, newCol, oldCol));
+
+        var sql = Gen.GenerateSql(diff);
+
+        Assert.Single(sql.Up);
+        Assert.Contains("USING", sql.Up[0]);
+        Assert.Contains("\"Col\"::INTEGER", sql.Up[0]);
+        Assert.Contains("TYPE INTEGER", sql.Up[0]);
+    }
+
+    [Fact]
+    public void AlteredColumn_IntegerToText_DownPath_EmitsUsingClause()
+    {
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "Col", ClrType = typeof(int).FullName!, IsNullable = true });
+        var oldCol = new ColumnSchema { Name = "Col", ClrType = typeof(string).FullName!, IsNullable = true };
+        var newCol = new ColumnSchema { Name = "Col", ClrType = typeof(int).FullName!, IsNullable = true };
+
+        var diff = new SchemaDiff();
+        diff.AlteredColumns.Add((table, newCol, oldCol));
+
+        var sql = Gen.GenerateSql(diff);
+
+        // Down path: change back from INTEGER (newCol) to TEXT (oldCol)
+        Assert.Single(sql.Down);
+        Assert.Contains("USING", sql.Down[0]);
+        Assert.Contains("\"Col\"::TEXT", sql.Down[0]);
+        Assert.Contains("TYPE TEXT", sql.Down[0]);
+    }
+
+    [Fact]
+    public void AlteredColumn_TextToUuid_EmitsUsingClause()
+    {
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "Id", ClrType = typeof(Guid).FullName!, IsNullable = false });
+        var oldCol = new ColumnSchema { Name = "Id", ClrType = typeof(string).FullName!, IsNullable = false };
+        var newCol = new ColumnSchema { Name = "Id", ClrType = typeof(Guid).FullName!, IsNullable = false };
+
+        var diff = new SchemaDiff();
+        diff.AlteredColumns.Add((table, newCol, oldCol));
+
+        var sql = Gen.GenerateSql(diff);
+
+        Assert.Single(sql.Up);
+        Assert.Contains("USING", sql.Up[0]);
+        Assert.Contains("\"Id\"::UUID", sql.Up[0]);
+        Assert.Contains("TYPE UUID", sql.Up[0]);
+    }
+
+    [Fact]
+    public void AlteredColumn_DecimalToText_EmitsUsingClauseWithBaseTypeNoPrecision()
+    {
+        // DECIMAL(18,2) → USING col::DECIMAL, NOT USING col::DECIMAL(18,2) (invalid Postgres syntax)
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "Amt", ClrType = typeof(string).FullName!, IsNullable = true });
+        var oldCol = new ColumnSchema { Name = "Amt", ClrType = typeof(decimal).FullName!, IsNullable = true };
+        var newCol = new ColumnSchema { Name = "Amt", ClrType = typeof(string).FullName!, IsNullable = true };
+
+        var diff = new SchemaDiff();
+        diff.AlteredColumns.Add((table, newCol, oldCol));
+
+        var sql = Gen.GenerateSql(diff);
+
+        Assert.Single(sql.Up);
+        Assert.Contains("USING", sql.Up[0]);
+        // Must use "TEXT" not "DECIMAL(18,2)" in the USING clause
+        Assert.Contains("\"Amt\"::TEXT", sql.Up[0]);
+        Assert.DoesNotContain("DECIMAL(18,2)", sql.Up[0].Substring(sql.Up[0].IndexOf("USING")));
+    }
+
+    [Fact]
+    public void AlteredColumn_CompatibleIntToBigint_EmitsUsingClause()
+    {
+        // Even for compatible types, USING clause is always emitted for safety.
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "Col", ClrType = typeof(long).FullName!, IsNullable = false });
+        var oldCol = new ColumnSchema { Name = "Col", ClrType = typeof(int).FullName!, IsNullable = false };
+        var newCol = new ColumnSchema { Name = "Col", ClrType = typeof(long).FullName!, IsNullable = false };
+
+        var diff = new SchemaDiff();
+        diff.AlteredColumns.Add((table, newCol, oldCol));
+
+        var sql = Gen.GenerateSql(diff);
+
+        Assert.Single(sql.Up);
+        Assert.Contains("USING", sql.Up[0]);
+        Assert.Contains("\"Col\"::BIGINT", sql.Up[0]);
+    }
+
+    [Fact]
+    public void AlteredColumn_UsingClause_ContainsEscapedColumnName()
+    {
+        // Column names with special chars must be escaped in the USING clause.
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "my col", ClrType = typeof(int).FullName!, IsNullable = true });
+        var oldCol = new ColumnSchema { Name = "my col", ClrType = typeof(string).FullName!, IsNullable = true };
+        var newCol = new ColumnSchema { Name = "my col", ClrType = typeof(int).FullName!, IsNullable = true };
+
+        var diff = new SchemaDiff();
+        diff.AlteredColumns.Add((table, newCol, oldCol));
+
+        var sql = Gen.GenerateSql(diff);
+
+        Assert.Single(sql.Up);
+        Assert.Contains("\"my col\"::INTEGER", sql.Up[0]);
+    }
 }
