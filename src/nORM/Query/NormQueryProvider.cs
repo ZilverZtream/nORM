@@ -429,6 +429,11 @@ namespace nORM.Query
             cmd.CommandText = plan.Sql;
             BindPlanParameters(cmd, plan, paramValues);
 
+            // A1: pre-cancelled tokens are silently ignored on the warm sync path unless checked here.
+            // EnsureConnectionAsync(ct) above returns immediately for warmed connections without
+            // inspecting the token; the sync dispatchers below never check it either.
+            ct.ThrowIfCancellationRequested();
+
             // Dispatch directly to materializer — avoids wrapping in another async method
             if (plan.IsScalar)
             {

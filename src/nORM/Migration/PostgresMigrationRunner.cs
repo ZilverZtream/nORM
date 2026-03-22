@@ -149,11 +149,13 @@ namespace nORM.Migration
             await using var cmd = _connection.CreateCommand();
             cmd.CommandText = $"SELECT pg_advisory_unlock({MigrationLockKey})";
             try { await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false); }
-            catch (DbException ex)
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
             {
                 // Best-effort release; surface failure for diagnostics rather than silently swallowing.
                 // Do not propagate — throwing from a finally block would mask the original exception.
-                // Narrowed to DbException so that fatal CLR errors (OutOfMemoryException etc.) propagate.
+                // Broadened from DbException: a closed/disposed connection raises InvalidOperationException
+                // or ObjectDisposedException (not DbException), which would otherwise escape and mask the
+                // original migration error.
                 _logger?.LogWarning(
                     "nORM: PostgreSQL migration advisory-lock release failed: {Message}. " +
                     "A stale pg_advisory_lock entry may block future migrations until the session resets.",

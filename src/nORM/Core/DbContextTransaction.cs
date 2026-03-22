@@ -57,7 +57,12 @@ namespace nORM.Core
             try
             {
                 if (_transaction != null)
-                    await _transaction.CommitAsync(ct).ConfigureAwait(false);
+                    // Always use CancellationToken.None: a commit must not be aborted even when the
+                    // caller's token is already cancelled. The database may have already committed;
+                    // surfacing OperationCanceledException at this point would leave the caller unable
+                    // to distinguish a cancelled-before-commit from an ambiguous partial-commit.
+                    // This mirrors the behaviour of RollbackAsync and internal TransactionManager.CommitAsync.
+                    await _transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
             finally
             {

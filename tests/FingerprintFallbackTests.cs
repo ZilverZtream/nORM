@@ -63,4 +63,67 @@ public class FingerprintFallbackTests
         var fp2 = FpOf(new CustomValue("same"));
         Assert.Equal(fp1, fp2);
     }
+
+    // ── G1: DateOnly and TimeOnly stable fingerprint ──────────────────────────
+
+    /// <summary>
+    /// Two different DateOnly values must produce different fingerprints.
+    /// Before the G1 fix: DateOnly fell through to the default branch which called
+    /// ToString() — culture-dependent and potentially unstable across environments.
+    /// After the fix: DateOnly uses DayNumber (a stable int) as its fingerprint.
+    /// </summary>
+    [Fact]
+    public void DateOnly_DifferentDates_ProduceDifferentFingerprints()
+    {
+        var fp1 = FpOf(new DateOnly(2024, 7, 15));
+        var fp2 = FpOf(new DateOnly(2024, 7, 16));
+        Assert.NotEqual(fp1, fp2);
+    }
+
+    [Fact]
+    public void DateOnly_SameDate_ProduceSameFingerprint()
+    {
+        var fp1 = FpOf(new DateOnly(2024, 7, 15));
+        var fp2 = FpOf(new DateOnly(2024, 7, 15));
+        Assert.Equal(fp1, fp2);
+    }
+
+    [Fact]
+    public void DateOnly_DifferentFromDateTime_ProduceDifferentFingerprints()
+    {
+        // DateOnly and DateTime with the same "date" must get different fingerprints
+        // because they are different types with different semantics.
+        var fp1 = FpOf(new DateOnly(2024, 7, 15));
+        var fp2 = FpOf(new DateTime(2024, 7, 15));
+        Assert.NotEqual(fp1, fp2);
+    }
+
+    /// <summary>
+    /// Two different TimeOnly values must produce different fingerprints.
+    /// After the G1 fix: TimeOnly uses Ticks (a stable long) for its fingerprint.
+    /// </summary>
+    [Fact]
+    public void TimeOnly_DifferentTimes_ProduceDifferentFingerprints()
+    {
+        var fp1 = FpOf(new TimeOnly(9, 0));
+        var fp2 = FpOf(new TimeOnly(9, 1));
+        Assert.NotEqual(fp1, fp2);
+    }
+
+    [Fact]
+    public void TimeOnly_SameTime_ProduceSameFingerprint()
+    {
+        var fp1 = FpOf(new TimeOnly(14, 30, 45));
+        var fp2 = FpOf(new TimeOnly(14, 30, 45));
+        Assert.Equal(fp1, fp2);
+    }
+
+    [Fact]
+    public void TimeOnly_DifferentFromTimeSpan_ProduceDifferentFingerprints()
+    {
+        // TimeOnly and TimeSpan with equivalent durations must get different fingerprints.
+        var fp1 = FpOf(new TimeOnly(9, 30));
+        var fp2 = FpOf(new TimeSpan(9, 30, 0));
+        Assert.NotEqual(fp1, fp2);
+    }
 }

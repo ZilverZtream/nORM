@@ -125,10 +125,13 @@ EXEC sp_releaseapplock
     @Resource  = '{MigrationLockResource}',
     @LockOwner = 'Session';";
             try { await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false); }
-            catch (DbException ex)
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
             {
                 // Best-effort release; surface failure for diagnostics rather than silently swallowing.
                 // Do not propagate — throwing from a finally block would mask the original exception.
+                // Broadened from DbException: a closed/disposed connection raises InvalidOperationException
+                // or ObjectDisposedException (not DbException), which would otherwise escape and mask the
+                // original migration error.
                 _logger?.LogWarning(
                     "nORM: SQL Server migration advisory-lock release failed: {Message}. " +
                     "A stale sp_getapplock entry may block future migrations until the session resets.",

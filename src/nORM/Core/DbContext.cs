@@ -20,6 +20,7 @@ using nORM.Internal;
 using nORM.Mapping;
 using nORM.Navigation;
 using nORM.Providers;
+using nORM.Query;
 using nORM.Scaffolding;
 using nORM.Versioning;
 #nullable enable
@@ -3550,7 +3551,7 @@ namespace nORM.Core
                 var (param, col) = bindings[i];
                 var rawValue = col.Getter(entity);
                 var value = col.Converter != null ? col.Converter.ConvertToProvider(rawValue) : rawValue;
-                param.Value = value ?? DBNull.Value;
+                ParameterAssign.AssignValue(param, value);
             }
 
             if (_hydrateGeneratedKeys)
