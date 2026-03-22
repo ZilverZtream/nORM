@@ -146,7 +146,6 @@ namespace nORM.Query
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
                                  !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
-                                 plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
                                  _ctx.IsMapped(plan.ElementType);
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
@@ -210,7 +209,6 @@ namespace nORM.Query
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
                                  !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
-                                 plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
                                  _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
@@ -311,7 +309,6 @@ namespace nORM.Query
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
                                  !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
-                                 plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
                                  _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
@@ -440,8 +437,8 @@ namespace nORM.Query
                 // Use cached list factory instead of Activator.CreateInstance.
                 var resultList = CreateList(info.ResultType, DefaultListCapacity);
 
-                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
-                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
+                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
+                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
 
                 var outerMap = _ctx.GetMapping(info.OuterType);
                 var innerMap = _ctx.GetMapping(info.InnerType);
@@ -578,8 +575,8 @@ namespace nORM.Query
             {
                 var resultList = CreateList(info.ResultType, DefaultListCapacity);
 
-                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) && info.OuterType.GetConstructor(Type.EmptyTypes) != null;
-                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) && info.InnerType.GetConstructor(Type.EmptyTypes) != null;
+                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
+                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
 
                 var outerMap = _ctx.GetMapping(info.OuterType);
                 var innerMap = _ctx.GetMapping(info.InnerType);

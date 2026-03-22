@@ -246,7 +246,12 @@ namespace nORM.Providers
         /// <param name="jsonPath">JSON path expression.</param>
         /// <returns>SQL fragment retrieving the requested JSON value.</returns>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
-            => $"json_extract({columnName}, '{jsonPath}')";
+        {
+            ArgumentNullException.ThrowIfNull(columnName);
+            ArgumentNullException.ThrowIfNull(jsonPath);
+            ValidateJsonPath(jsonPath);
+            return $"json_extract({columnName}, '{jsonPath}')";
+        }
 
         /// <summary>
         /// SQLite table-not-found errors use SQLITE_ERROR (code 1) combined with

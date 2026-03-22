@@ -48,7 +48,7 @@ namespace nORM.Tests;
 //   J. Security boundaries       → EQUAL (SEC_* tests)
 // ══════════════════════════════════════════════════════════════════════════════
 
-public class LiveParityMatrixTests
+public class ProviderBehaviorEquivalenceTests
 {
     // ── Entities (explicit keys — no auto-increment for provider parity) ───────
 

@@ -209,3 +209,174 @@ public class JsonPathValidationTests : TestBase
         Assert.DoesNotContain(", )", result);
     }
 }
+
+/// <summary>
+/// Tests that all four providers' <c>TranslateJsonPathAccess</c> public API rejects
+/// SQL-injectable characters in the JSON path argument.
+///
+/// Root cause: the public API accepted raw path strings without validation, allowing
+/// single-quotes, semicolons, backslashes, and control characters to be embedded
+/// directly into the generated SQL, enabling SQL injection.
+/// </summary>
+public class ProviderJsonPathInjectionTests
+{
+    // ── SQLite ────────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("$.name'")]
+    [InlineData("$.' OR '1'='1")]
+    [InlineData("$.id; DROP TABLE t--")]
+    [InlineData("$.foo\\bar")]
+    [InlineData("$.\"; DELETE")]
+    public void SQLite_InjectionPath_ThrowsArgumentException(string path)
+    {
+        var provider = new SqliteProvider();
+        Assert.Throws<ArgumentException>(() => provider.TranslateJsonPathAccess("col", path));
+    }
+
+    [Theory]
+    [InlineData("$.name")]
+    [InlineData("$.order.items[0].id")]
+    [InlineData("$.*")]
+    [InlineData("$.foo/bar")]
+    public void SQLite_ValidPath_DoesNotThrow(string path)
+    {
+        var provider = new SqliteProvider();
+        var sql = provider.TranslateJsonPathAccess("col", path);
+        Assert.NotEmpty(sql);
+    }
+
+    // ── SQL Server ────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("$.name'")]
+    [InlineData("$.' OR '1'='1")]
+    [InlineData("$.id; DROP TABLE t--")]
+    [InlineData("$.foo\\bar")]
+    [InlineData("$.\"; DELETE")]
+    public void SqlServer_InjectionPath_ThrowsArgumentException(string path)
+    {
+        var provider = new SqlServerProvider();
+        Assert.Throws<ArgumentException>(() => provider.TranslateJsonPathAccess("col", path));
+    }
+
+    [Theory]
+    [InlineData("$.name")]
+    [InlineData("$.order.items[0].id")]
+    [InlineData("$.*")]
+    public void SqlServer_ValidPath_DoesNotThrow(string path)
+    {
+        var provider = new SqlServerProvider();
+        var sql = provider.TranslateJsonPathAccess("col", path);
+        Assert.Contains("JSON_VALUE", sql);
+    }
+
+    // ── MySQL ─────────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("$.name'")]
+    [InlineData("$.id; DROP TABLE t--")]
+    [InlineData("$.foo\\bar")]
+    public void MySQL_InjectionPath_ThrowsArgumentException(string path)
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        Assert.Throws<ArgumentException>(() => provider.TranslateJsonPathAccess("col", path));
+    }
+
+    [Theory]
+    [InlineData("$.name")]
+    [InlineData("$.a.b.c")]
+    public void MySQL_ValidPath_DoesNotThrow(string path)
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var sql = provider.TranslateJsonPathAccess("col", path);
+        Assert.Contains("JSON_EXTRACT", sql);
+    }
+
+    // ── PostgreSQL ────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("$.name'")]
+    [InlineData("$.id; DROP TABLE t--")]
+    [InlineData("$.foo\\bar")]
+    public void Postgres_InjectionPath_ThrowsArgumentException(string path)
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        Assert.Throws<ArgumentException>(() => provider.TranslateJsonPathAccess("col", path));
+    }
+
+    [Theory]
+    [InlineData("$.name")]
+    [InlineData("$.a.b.c")]
+    [InlineData("$")]
+    public void Postgres_ValidPath_DoesNotThrow(string path)
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var sql = provider.TranslateJsonPathAccess("col", path);
+        Assert.NotEmpty(sql);
+    }
+
+    // ── Length limit: all providers ───────────────────────────────────────────
+
+    [Fact]
+    public void AllProviders_PathExceedsMaxLength_ThrowsArgumentException()
+    {
+        var longPath = "$." + new string('a', 500);
+        var providers = new DatabaseProvider[]
+        {
+            new SqliteProvider(),
+            new SqlServerProvider(),
+            new MySqlProvider(new SqliteParameterFactory()),
+            new PostgresProvider(new SqliteParameterFactory()),
+        };
+        foreach (var p in providers)
+            Assert.Throws<ArgumentException>(() => p.TranslateJsonPathAccess("col", longPath));
+    }
+
+    // ── Null guards: all providers ────────────────────────────────────────────
+
+    [Fact]
+    public void AllProviders_NullPath_ThrowsArgumentNullException()
+    {
+        var providers = new DatabaseProvider[]
+        {
+            new SqliteProvider(),
+            new SqlServerProvider(),
+            new MySqlProvider(new SqliteParameterFactory()),
+            new PostgresProvider(new SqliteParameterFactory()),
+        };
+        foreach (var p in providers)
+            Assert.Throws<ArgumentNullException>(() => p.TranslateJsonPathAccess("col", null!));
+    }
+
+    [Fact]
+    public void AllProviders_NullColumn_ThrowsArgumentNullException()
+    {
+        var providers = new DatabaseProvider[]
+        {
+            new SqliteProvider(),
+            new SqlServerProvider(),
+            new MySqlProvider(new SqliteParameterFactory()),
+            new PostgresProvider(new SqliteParameterFactory()),
+        };
+        foreach (var p in providers)
+            Assert.Throws<ArgumentNullException>(() => p.TranslateJsonPathAccess(null!, "$.x"));
+    }
+
+    // ── Adversarial: control characters ──────────────────────────────────────
+
+    [Fact]
+    public void AllProviders_ControlCharInPath_Rejected()
+    {
+        var path = "$.a\x00b"; // null byte embedded in path
+        var providers = new DatabaseProvider[]
+        {
+            new SqliteProvider(),
+            new SqlServerProvider(),
+            new MySqlProvider(new SqliteParameterFactory()),
+            new PostgresProvider(new SqliteParameterFactory()),
+        };
+        foreach (var p in providers)
+            Assert.Throws<ArgumentException>(() => p.TranslateJsonPathAccess("col", path));
+    }
+}

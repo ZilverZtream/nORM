@@ -123,6 +123,15 @@ namespace nORM.Providers
         public abstract string GetIdentityRetrievalString(TableMapping m);
 
         /// <summary>
+        /// Returns a SQL clause injected between the column list and <c>VALUES</c> to capture
+        /// generated key values inline (e.g. <c>OUTPUT INSERTED.[col]</c> on SQL Server).
+        /// The default implementation returns an empty string (suffix-based retrieval is used instead).
+        /// </summary>
+        /// <param name="m">The table mapping describing the entity.</param>
+        /// <returns>SQL clause placed between <c>({cols})</c> and <c>VALUES</c>, or empty.</returns>
+        public virtual string GetIdentityRetrievalPrefix(TableMapping m) => string.Empty;
+
+        /// <summary>
         /// Creates a database parameter with the given name and value.
         /// </summary>
         /// <param name="name">The parameter name, including prefix.</param>
@@ -146,6 +155,34 @@ namespace nORM.Providers
         /// <param name="jsonPath">The JSON path to access within the column.</param>
         /// <returns>The SQL fragment that accesses the specified JSON path.</returns>
         public abstract string TranslateJsonPathAccess(string columnName, string jsonPath);
+
+        /// <summary>
+        /// Validates a raw JSON path string for SQL-injection-capable characters.
+        /// The LINQ path performs this check before calling <see cref="TranslateJsonPathAccess"/>,
+        /// but callers who invoke the method directly on the provider API must also be protected.
+        /// </summary>
+        /// <param name="jsonPath">The path to validate.</param>
+        /// <exception cref="ArgumentException">Thrown when the path contains illegal characters or is too long.</exception>
+        protected static void ValidateJsonPath(string jsonPath)
+        {
+            const int MaxLength = 500;
+            if (jsonPath.Length > MaxLength)
+                throw new ArgumentException(
+                    $"JSON path exceeds maximum length of {MaxLength} characters (actual: {jsonPath.Length}).",
+                    nameof(jsonPath));
+
+            // Block characters that can escape an enclosing SQL string literal or open new statements.
+            if (jsonPath.IndexOfAny(new[] { '\'', '"', ';', '\\' }) >= 0)
+                throw new ArgumentException(
+                    "JSON path contains an illegal character. Paths must not contain single-quote, double-quote, semicolon, or backslash.",
+                    nameof(jsonPath));
+
+            foreach (char ch in jsonPath)
+                if (ch < 0x20)
+                    throw new ArgumentException(
+                        $"JSON path contains an illegal control character (U+{(int)ch:X4}).",
+                        nameof(jsonPath));
+        }
 
         /// <summary>
         /// Describes a column as it actually exists in the live database.
@@ -788,16 +825,15 @@ namespace nORM.Providers
             var cacheKey = includeIdentityRetrieval ? "INSERT" : "INSERT_PLAIN";
             return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheKey), _ => {
                 var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
-                var identityFragment = includeIdentityRetrieval
-                    ? GetIdentityRetrievalString(m)
-                    : string.Empty;
+                var identityPrefix = includeIdentityRetrieval ? GetIdentityRetrievalPrefix(m) : string.Empty;
+                var identitySuffix = includeIdentityRetrieval ? GetIdentityRetrievalString(m) : string.Empty;
                 if (cols.Length == 0)
                 {
-                    return $"INSERT INTO {m.EscTable} DEFAULT VALUES{identityFragment}";
+                    return $"INSERT INTO {m.EscTable}{identityPrefix} DEFAULT VALUES{identitySuffix}";
                 }
                 var colNames = string.Join(", ", cols.Select(c => c.EscCol));
                 var valParams = string.Join(", ", cols.Select(c => ParamPrefix + c.PropName));
-                return $"INSERT INTO {m.EscTable} ({colNames}) VALUES ({valParams}){identityFragment}";
+                return $"INSERT INTO {m.EscTable} ({colNames}){identityPrefix} VALUES ({valParams}){identitySuffix}";
             });
         }
 

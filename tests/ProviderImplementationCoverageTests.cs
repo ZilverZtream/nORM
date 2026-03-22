@@ -613,13 +613,16 @@ public class ProviderImplementationCoverageTests
     }
 
     [Fact]
-    public void SqlServerProvider_GetIdentityRetrievalString_ContainsScopeIdentity()
+    public void SqlServerProvider_GetIdentityRetrievalString_ReturnsEmpty()
     {
+        // X1 fix: SQL Server uses OUTPUT INSERTED (prefix before VALUES) instead of SCOPE_IDENTITY.
+        // GetIdentityRetrievalString always returns empty string — retrieval is handled by the prefix.
+        // SqlServerTestEntity has no db-generated key, so prefix is also empty, but the suffix contract holds.
         var provider = new SqlServerProvider();
         var mapping = new nORM.Core.DbContext(new SqliteConnection("Data Source=:memory:"), new SqliteProvider())
             .GetMapping(typeof(SqlServerTestEntity));
         var sql = provider.GetIdentityRetrievalString(mapping);
-        Assert.Contains("SCOPE_IDENTITY", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(string.Empty, sql);
     }
 
     [Fact]

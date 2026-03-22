@@ -34,7 +34,7 @@ file class GateSimple
     public string? Name { get; set; }
 }
 
-public class Gate30To35Tests
+public class QueryTranslatorProviderSmokeTests
 {
     // ── Malformed expression fuzz ──────────────────────────────────────────────
 
@@ -166,7 +166,7 @@ file class GateSE
     public string? Name { get; set; }
 }
 
-public class Gate35To40Tests
+public class SqliteLiveCrudTests
 {
     private static SqliteConnection OpenDb()
     {
@@ -320,7 +320,7 @@ public class Gate35To40Tests
 /// Tests for null parameter metadata reset, COUNT pooled command transaction rebinding,
 /// and pooled command disposal on provider dispose.
 /// </summary>
-public class Gate36To40Tests
+public class CompiledQueryCountAndPoolTests
 {
     // ── Null-after-nonNull on reused compiled-query parameter resets DbType/Size ──
 
@@ -498,7 +498,7 @@ file class C2Entity
 
 // ══════════════════════════════════════════════════════════════════════════════
 
-public class Gate40To45Tests
+public class CompiledQueryTimeoutAndSecurityTests
 {
     // ── ConcurrentLruCache.GetOrAdd factory called at most once per key ───
 
@@ -883,7 +883,7 @@ public class Gate40To45Tests
 /// Tests for compiled-query pooled command correctness and shared arg-array safety under
 /// sequential and concurrent access patterns.
 /// </summary>
-public class Gate32To35Tests
+public class LruCacheMigrationRetryTests
 {
     // ── Sequential calls with different params must never return stale results ──────────────
 
@@ -1038,7 +1038,7 @@ file class GateCQ
 /// <summary>
 /// Tests for fast-path timeout consistency and provider matrix under contention.
 /// </summary>
-public class Gate35To40AddlTests
+public class CompiledQuerySequentialParamTests
 {
     // ── Count fast path uses CommandTimeout consistently ─────────────────────────────────
 
@@ -1113,7 +1113,7 @@ public class Gate35To40AddlTests
     }
 }
 
-public class Gate45To50Tests
+public class CacheAndMultiTenantIsolationTests
 {
     // ── Cache poisoning: hostile value does not corrupt other keys ────────────
 
@@ -1331,7 +1331,7 @@ file class Gate38CQ
 /// Verifies that compile timeout is caller-cooperative and background workers are bounded
 /// via semaphore, with the semaphore count returning to capacity after each compile.
 /// </summary>
-public class Gate38To40Tests
+public class CompiledQueryConcurrencyLimitTests
 {
     // ── Caller receives TimeoutException; compile semaphore returns to capacity ──
 
@@ -1449,7 +1449,7 @@ file class Gate40Dec
 /// Tests for decimal precision/scale metadata reset on null and on reassignment, and for
 /// ConnectionManager Dispose safety when a slow health check overlaps with disposal.
 /// </summary>
-public class Gate40To45NewTests
+public class ParameterDecimalAndConnectionTests
 {
     // ── Decimal precision/scale not carried over between reused parameters ───────
 
@@ -1589,7 +1589,7 @@ file sealed class FixedTenantProvider : nORM.Enterprise.ITenantProvider
 /// and that GetFilterKey produces distinct cache keys for same-shape filters with different
 /// closure-captured values.
 /// </summary>
-public class Gate37To40Tests
+public class ParameterStringSizeAndFilterKeyTests
 {
     // ── String Size is always set correctly on every string branch ───────────────────────
 
@@ -1724,7 +1724,7 @@ public class Gate37To40Tests
 /// (no global filters needed — TenantProvider ID is included in the ctxKey string but does
 /// not add a WHERE clause unless an entity-level tenant column is configured).
 /// </summary>
-public class Gate40To45C1Tests
+public class TenantContextChurnTests
 {
     // ── 300 distinct tenant IDs → 300 distinct ctxKeys, LRU cap=256 → ~44 evicted ──────
 
@@ -1818,7 +1818,7 @@ public class Gate40To45C1Tests
 /// <summary>
 /// Adversarial closure-capture key tests with deterministic regression coverage.
 /// </summary>
-public class Gate45To50Sg1Tests
+public class ClosureCaptureFilterKeyTests
 {
     // ── Adversarial: rapid cycling of closure values → always-distinct keys ──────────────────
 

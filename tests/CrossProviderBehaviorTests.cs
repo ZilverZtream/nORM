@@ -36,7 +36,7 @@ namespace nORM.Tests;
 //   in CI service-container jobs — see .github/workflows/ci.yml)
 // ══════════════════════════════════════════════════════════════════════════════
 
-public class Gate50ProviderParityLockStepTests
+public class CrossProviderBehaviorTests
 {
     // ── Entities ────────────────────────────────────────────────────────────
 

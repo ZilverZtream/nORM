@@ -271,13 +271,40 @@ namespace nORM.Mapping
             var keyCol = KeyColumns.FirstOrDefault(k => k.IsDbGenerated);
             if (keyCol != null)
             {
-                // Use the underlying type for nullable value types (e.g., int?, long?) because
-                // Convert.ChangeType does not support Nullable<T> as a target type and would throw
-                // InvalidCastException. The setter's compiled lambda handles the implicit boxing.
                 var targetType = Nullable.GetUnderlyingType(keyCol.Prop.PropertyType) ?? keyCol.Prop.PropertyType;
-                var convertedValue = Convert.ChangeType(value, targetType);
+                var convertedValue = ConvertGeneratedKeyValue(value, targetType);
                 keyCol.Setter(entity, convertedValue);
             }
+        }
+
+        /// <summary>
+        /// Type-aware conversion for DB-generated key values. Handles Guid, byte[], string,
+        /// and numeric types. <c>Convert.ChangeType</c> is not used for non-IConvertible types.
+        /// </summary>
+        private static object ConvertGeneratedKeyValue(object value, Type targetType)
+        {
+            if (value.GetType() == targetType) return value;
+
+            if (targetType == typeof(Guid))
+                return value switch
+                {
+                    Guid g    => g,
+                    string s  => Guid.Parse(s),
+                    byte[] b when b.Length == 16 => new Guid(b),
+                    _ => Guid.Parse(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture)
+                             ?? throw new InvalidCastException($"Cannot convert {value.GetType().Name} to Guid."))
+                };
+
+            if (targetType == typeof(string))
+                return Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture)!;
+
+            if (targetType == typeof(byte[]))
+                return value is byte[] bytes ? bytes
+                    : System.Text.Encoding.UTF8.GetBytes(
+                        Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture)!);
+
+            // Numeric and other IConvertible types.
+            return Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private void BuildOwnedCollections(IEntityTypeConfiguration? fluentConfig, DatabaseProvider p)

@@ -67,19 +67,22 @@ public class AsyncCancellationProviderParityTests
     }
 
     /// <summary>
-    /// SQL Server identity retrieval SQL must reference SCOPE_IDENTITY or OUTPUT INSERTED.
+    /// SQL Server uses OUTPUT INSERTED (in the prefix clause, placed before VALUES) rather than
+    /// SCOPE_IDENTITY (postfix). GetIdentityRetrievalPrefix contains the OUTPUT INSERTED clause;
+    /// GetIdentityRetrievalString returns empty (no postfix needed).
     /// </summary>
     [Fact]
     public void SqlServerProvider_IdentityRetrieval_UsesScopeIdentityOrOutputInserted()
     {
         var provider = new SqlServerProvider();
         var mapping = GetMapping<ParityEntity>();
-        var sql = provider.GetIdentityRetrievalString(mapping);
 
-        Assert.True(
-            sql.Contains("SCOPE_IDENTITY", System.StringComparison.OrdinalIgnoreCase) ||
-            sql.Contains("OUTPUT INSERTED", System.StringComparison.OrdinalIgnoreCase),
-            $"Expected SCOPE_IDENTITY or OUTPUT INSERTED but got: {sql}");
+        // Suffix is now empty; OUTPUT INSERTED is in the prefix
+        var suffix = provider.GetIdentityRetrievalString(mapping);
+        var prefix = provider.GetIdentityRetrievalPrefix(mapping);
+
+        Assert.Equal(string.Empty, suffix);
+        Assert.Contains("OUTPUT INSERTED", prefix, System.StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
