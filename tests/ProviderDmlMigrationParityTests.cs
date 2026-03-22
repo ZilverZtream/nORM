@@ -819,7 +819,8 @@ public class ProviderDmlMigrationParityTests
         string insertSql = provider.BuildInsert(mapping);
         Assert.Contains("[PDM_Item]", insertSql);
         Assert.Contains("[Name]", insertSql);
-        Assert.Contains("SCOPE_IDENTITY", insertSql);
+        // X1 fix: SQL Server now uses OUTPUT INSERTED instead of SCOPE_IDENTITY
+        Assert.Contains("OUTPUT INSERTED", insertSql, StringComparison.OrdinalIgnoreCase);
 
         string updateSql = provider.BuildUpdate(mapping);
         Assert.Contains("[PDM_Item]", updateSql);

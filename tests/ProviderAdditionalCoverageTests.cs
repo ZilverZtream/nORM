@@ -585,13 +585,14 @@ public class ProviderAdditionalCoverageTests
     }
 
     [Fact]
-    public void SqlServerProvider_GetIdentityRetrievalString_ContainsScopeIdentity()
+    public void SqlServerProvider_GetIdentityRetrievalString_ReturnsEmpty_PrefixHasOutputInserted()
     {
+        // X1 fix: SQL Server now uses OUTPUT INSERTED (before VALUES) instead of SCOPE_IDENTITY (after).
         var p = new SqlServerProvider();
         using var ctx = CreateSqliteContext();
         var mapping = ctx.GetMapping(typeof(PacSimpleEntity));
-        var sql = p.GetIdentityRetrievalString(mapping);
-        Assert.Contains("SCOPE_IDENTITY", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(string.Empty, p.GetIdentityRetrievalString(mapping));
+        Assert.Contains("OUTPUT INSERTED", p.GetIdentityRetrievalPrefix(mapping), StringComparison.OrdinalIgnoreCase);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -223,6 +223,7 @@ namespace nORM.Providers
         {
             ArgumentNullException.ThrowIfNull(columnName);
             ArgumentNullException.ThrowIfNull(jsonPath);
+            ValidateJsonPath(jsonPath);
 
             var sb = _stringBuilderPool.Get();
             try

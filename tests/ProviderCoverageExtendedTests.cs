@@ -2316,15 +2316,15 @@ public class ProviderCoverageExtendedTests
     }
 
     [Fact]
-    public void SqlServerProvider_BuildInsert_ContainsInsertAndScopeIdentity()
+    public void SqlServerProvider_BuildInsert_ContainsInsertAndOutputInserted()
     {
-        // SqlServerProvider.BuildInsert calls base BuildInsert which appends GetIdentityRetrievalString
+        // X1 fix: SQL Server now uses OUTPUT INSERTED (placed before VALUES) instead of SCOPE_IDENTITY.
         using var ctx = CreateSqliteContext();
         var mapping = ctx.GetMapping(typeof(SimpleEntity));
         var p = new SqlServerProvider();
         var sql = p.BuildInsert(mapping, hydrateGeneratedKeys: true);
         Assert.Contains("INSERT INTO", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("SCOPE_IDENTITY", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("OUTPUT INSERTED", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -131,8 +131,30 @@ namespace nORM.Providers
 
         /// <summary>
         /// Returns a SQL fragment that retrieves the last auto-incremented identity value.
+        /// MySQL <c>LAST_INSERT_ID()</c> only supports numeric <c>AUTO_INCREMENT</c> columns.
+        /// Non-numeric generated keys (Guid, string, …) must be assigned by the application or a trigger
+        /// with <c>IsDbGenerated = false</c>.
         /// </summary>
-        public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT LAST_INSERT_ID();";
+        public override string GetIdentityRetrievalString(TableMapping m)
+        {
+            var keyCol = m?.KeyColumns.FirstOrDefault(c => c.IsDbGenerated);
+            if (keyCol != null)
+            {
+                var keyType = Nullable.GetUnderlyingType(keyCol.Prop.PropertyType) ?? keyCol.Prop.PropertyType;
+                if (!IsNumericType(keyType))
+                    throw new NormConfigurationException(
+                        $"MySQL LAST_INSERT_ID() only supports numeric AUTO_INCREMENT keys. " +
+                        $"Entity '{m!.Type.Name}' has a db-generated key of type '{keyType.Name}'. " +
+                        "Assign the key in application code (e.g. Guid.NewGuid()) and mark IsDbGenerated=false, " +
+                        "or use a trigger with a numeric surrogate key.");
+            }
+            return "; SELECT LAST_INSERT_ID();";
+        }
+
+        private static bool IsNumericType(Type t) =>
+            t == typeof(int)   || t == typeof(long)   || t == typeof(short)  ||
+            t == typeof(uint)  || t == typeof(ulong)  || t == typeof(ushort) ||
+            t == typeof(byte)  || t == typeof(sbyte)  || t == typeof(decimal);
 
         /// <summary>MySQL supports INSERT IGNORE for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
@@ -194,7 +216,12 @@ namespace nORM.Providers
         /// Translates access to a JSON value using MySQL's <c>JSON_EXTRACT</c> function.
         /// </summary>
         public override string TranslateJsonPathAccess(string columnName, string jsonPath)
-            => $"JSON_UNQUOTE(JSON_EXTRACT({columnName}, '{jsonPath}'))";
+        {
+            ArgumentNullException.ThrowIfNull(columnName);
+            ArgumentNullException.ThrowIfNull(jsonPath);
+            ValidateJsonPath(jsonPath);
+            return $"JSON_UNQUOTE(JSON_EXTRACT({columnName}, '{jsonPath}'))";
+        }
 
         /// <summary>
         /// Introspects live column definitions via INFORMATION_SCHEMA.COLUMNS.

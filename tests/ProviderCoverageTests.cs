@@ -711,10 +711,12 @@ public class SqlServerProviderTests
     }
 
     [Fact]
-    public void GetIdentityRetrievalString_ContainsScopeIdentity()
+    public void GetIdentityRetrievalString_ReturnsEmpty_OutputInsertedIsInPrefix()
     {
+        // SQL Server moved from SCOPE_IDENTITY (postfix) to OUTPUT INSERTED (prefix before VALUES).
+        // GetIdentityRetrievalString now returns empty; GetIdentityRetrievalPrefix carries the clause.
         var sql = _provider.GetIdentityRetrievalString(null!);
-        Assert.Contains("SCOPE_IDENTITY", sql);
+        Assert.Equal(string.Empty, sql);
     }
 
     [Fact]

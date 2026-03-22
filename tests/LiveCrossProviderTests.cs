@@ -37,7 +37,7 @@ namespace nORM.Tests;
 //   NORM_TEST_POSTGRES  = "Host=127.0.0.1;Port=5432;Database=normtest;Username=postgres;Password=normtest"
 // ══════════════════════════════════════════════════════════════════════════════
 
-public class LiveLockStepParityTests
+public class LiveCrossProviderTests
 {
     // ── Entities (explicit keys, no identity — compatible with all providers) ─
 
@@ -601,7 +601,7 @@ public class LiveLockStepParityTests
         var closedCn = new SqliteConnection("Data Source=:memory:");
         // Do NOT open closedCn — release will fail gracefully (M1 fix).
         var runner = new nORM.Migration.MySqlMigrationRunner(closedCn,
-            typeof(LiveLockStepParityTests).Assembly);
+            typeof(LiveCrossProviderTests).Assembly);
         // Should not throw — best-effort release with diagnostic logging.
         var ex = await Record.ExceptionAsync(() =>
             runner.ReleaseAdvisoryLockAsync(CancellationToken.None));

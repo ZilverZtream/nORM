@@ -217,11 +217,27 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// Returns SQL for retrieving the last identity value generated in the current scope.
+        /// SQL Server uses <c>OUTPUT INSERTED.[col]</c> (placed between the column list and VALUES)
+        /// rather than a postfix <c>SELECT SCOPE_IDENTITY()</c>, which only supports numeric identity
+        /// columns and cannot propagate GUID, string, or other non-numeric generated keys.
+        /// <see cref="GetIdentityRetrievalPrefix"/> returns the OUTPUT clause; this method returns empty.
         /// </summary>
-        /// <param name="m">The table mapping (unused for SQL Server; SCOPE_IDENTITY() is table-agnostic).</param>
-        /// <returns>SQL fragment appended after the insert to obtain the identity value.</returns>
-        public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT SCOPE_IDENTITY();";
+        /// <param name="m">The table mapping for the insert.</param>
+        /// <returns>An empty string — retrieval is handled by <see cref="GetIdentityRetrievalPrefix"/>.</returns>
+        public override string GetIdentityRetrievalString(TableMapping m) => string.Empty;
+
+        /// <summary>
+        /// Returns an <c>OUTPUT INSERTED.[keyCol]</c> clause placed between the column list and VALUES.
+        /// This works for any column type (int, bigint, uniqueidentifier, varchar, …) unlike SCOPE_IDENTITY()
+        /// which is restricted to numeric auto-increment columns.
+        /// </summary>
+        /// <param name="m">The table mapping for the insert.</param>
+        /// <returns>SQL clause e.g. <c> OUTPUT INSERTED.[Id]</c>, or empty when no db-generated key exists.</returns>
+        public override string GetIdentityRetrievalPrefix(TableMapping m)
+        {
+            var keyCol = m.KeyColumns.FirstOrDefault(c => c.IsDbGenerated);
+            return keyCol != null ? $" OUTPUT INSERTED.{keyCol.EscCol}" : string.Empty;
+        }
 
         /// <summary>SQL Server uses IF NOT EXISTS for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
@@ -317,6 +333,7 @@ namespace nORM.Providers
         {
             ArgumentNullException.ThrowIfNull(columnName);
             ArgumentNullException.ThrowIfNull(jsonPath);
+            ValidateJsonPath(jsonPath);
             return $"JSON_VALUE({columnName}, '{jsonPath}')";
         }
 

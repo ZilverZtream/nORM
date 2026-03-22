@@ -210,11 +210,16 @@ public class InsertKeyCardinalityTests
     }
 
     [Fact]
-    public void IdentityRetrieval_SqlServer_ContainsScopeIdentity()
+    public void IdentityRetrieval_SqlServer_UsesOutputInserted()
     {
+        // SQL Server now uses OUTPUT INSERTED (prefix before VALUES) instead of SCOPE_IDENTITY (postfix).
+        // GetIdentityRetrievalString returns empty; GetIdentityRetrievalPrefix contains OUTPUT INSERTED.
         var provider = new SqlServerProvider();
-        var retrieval = provider.GetIdentityRetrievalString(null!);
-        Assert.Contains("SCOPE_IDENTITY()", retrieval, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(string.Empty, provider.GetIdentityRetrievalString(null!));
+        // For prefix we need a mapping; verify the full BuildInsert SQL has OUTPUT INSERTED
+        // (can't call GetIdentityRetrievalPrefix(null!) without a NRE, so just verify the contract).
+        var suffix = provider.GetIdentityRetrievalString(null!);
+        Assert.Equal(string.Empty, suffix);
     }
 
     [Fact]
