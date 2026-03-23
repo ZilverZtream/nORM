@@ -94,7 +94,7 @@ public class CompileTimeMaterializerGuardTests
     // ── SG1-1: Mapped entity without [GenerateMaterializer] falls back to runtime ──────────────
 
     [Fact]
-    public async Task SG1_MappedEntity_NoGenerateMaterializer_FallsBackToRuntime()
+    public async Task MappedEntity_NoGenerateMaterializer_FallsBackToRuntime()
     {
         using var cn = OpenDb(
             "CREATE TABLE ctmg_unmapped (Id INTEGER PRIMARY KEY AUTOINCREMENT, Value TEXT NOT NULL);" +
@@ -118,7 +118,7 @@ public class CompileTimeMaterializerGuardTests
     // ── SG1-2: Unmapped entity, no compiled materializer → descriptive error ─────────────────
 
     [Fact]
-    public async Task SG1_UnmappedEntity_NoCompiledMaterializer_ThrowsDescriptively()
+    public async Task UnmappedEntity_NoCompiledMaterializer_ThrowsDescriptively()
     {
         using var cn = OpenDb("CREATE TABLE ctmg_unmapped2 (Id INTEGER PRIMARY KEY AUTOINCREMENT, Value TEXT NOT NULL);");
         // Fresh context, entity never queried → IsMapped = false; no [GenerateMaterializer] → no compiled mat
@@ -135,7 +135,7 @@ public class CompileTimeMaterializerGuardTests
     // ── SG2-1: Fluent HasColumnName bypasses compiled materializer (wrong GetOrdinal) ──────────
 
     [Fact]
-    public async Task SG2_FluentColumnRename_GetCompiledQueryMaterializer_ReturnsCorrectValues()
+    public async Task FluentColumnRename_Materializer_ReturnsCorrectValues()
     {
         // DB column is "display_value"; CLR property is "Value"; source-gen materializer would
         // call GetOrdinal("Value") → IndexOutOfRangeException. Runtime materializer knows "display_value".
@@ -163,7 +163,7 @@ public class CompileTimeMaterializerGuardTests
     // ── SG2-2: HasConversion bypasses compiled materializer (raw value, no converter applied) ──
 
     [Fact]
-    public async Task SG2_ValueConverter_GetCompiledQueryMaterializer_AppliesConverter()
+    public async Task ValueConverter_Materializer_AppliesConverter()
     {
         using var cn = OpenDb(
             "CREATE TABLE ctmg_converted (Id INTEGER PRIMARY KEY AUTOINCREMENT, Payload TEXT NOT NULL);" +
@@ -191,7 +191,7 @@ public class CompileTimeMaterializerGuardTests
     // ── SG2-3: No unsafe conditions → returns a working materializer ──────────────────────────
 
     [Fact]
-    public async Task SG2_NoUnsafeConditions_GetCompiledQueryMaterializer_ReturnsWorkingMaterializer()
+    public async Task NoUnsafeConditions_Materializer_ReturnsWorkingMaterializer()
     {
         // Standard mapping: CLR prop name = DB column name, no converter, no owned navigations.
         using var cn = OpenDb(
