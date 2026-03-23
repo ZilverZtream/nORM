@@ -532,6 +532,41 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// SG1/SG2: Returns the correct materializer for <typeparamref name="T"/> for use in
+        /// [CompileTimeQuery]-generated methods. When the entity is registered in this context,
+        /// delegates to <see cref="Query.MaterializerFactory"/> which applies the same eligibility
+        /// guards as the regular LINQ path (fluent renames, value converters, owned navigations),
+        /// falling back to the runtime reflection materializer when any unsafe condition is present.
+        /// When the entity is not registered, uses the compiled materializer directly (no runtime
+        /// config can override it). Throws a descriptive exception if no materializer exists at all.
+        /// </summary>
+        public Func<System.Data.Common.DbDataReader, CancellationToken, Task<T>> GetCompiledQueryMaterializer<T>(string tableName)
+        {
+            ThrowIfDisposed();
+            if (IsMapped(typeof(T)))
+            {
+                // MaterializerFactory.CreateMaterializer<T> applies all guards internally:
+                // it uses the compiled materializer only when safe (no fluent renames, no converters,
+                // no owned navigations), and falls back to a runtime materializer otherwise.
+                var mapping = GetMapping(typeof(T));
+                return _compiledQueryMaterializerFactory.CreateMaterializer<T>(mapping);
+            }
+            // Entity not registered in this context — no runtime fluent config can override the
+            // compiled materializer, so use it directly without guards.
+            if (SourceGeneration.CompiledMaterializerStore.TryGet(typeof(T), tableName, out var compiledUntyped))
+            {
+                return async (reader, ct) => (T)(await compiledUntyped(reader, ct).ConfigureAwait(false));
+            }
+            throw new InvalidOperationException(
+                $"No materializer found for {typeof(T).Name} (table '{tableName}'). " +
+                "Apply [GenerateMaterializer] to the entity type, or register it with the DbContext.");
+        }
+
+        // Singleton MaterializerFactory for compiled-query materialization. All state is static,
+        // so a single instance per DbContext is sufficient.
+        private static readonly Query.MaterializerFactory _compiledQueryMaterializerFactory = new();
+
+        /// <summary>
         /// Checks whether the database connection is healthy by executing a lightweight query.
         /// </summary>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
@@ -1315,10 +1350,33 @@ namespace nORM.Core
                 var insertCols = Array.FindAll(ownedMap.Columns, c => !c.IsDbGenerated);
                 var colNames = string.Join(", ", insertCols.Select(c => c.EscCol).Prepend(ownedMap.EscForeignKeyColumn));
 
+                // SAVE1: Detect tenant column on owned table once before the INSERT loop.
+                Column? insertTenantCol = null;
+                object? insertTenantId = null;
+                if (Options.TenantProvider != null && Options.TenantColumnName != null)
+                {
+                    insertTenantCol = Array.Find(insertCols, c => c.PropName == Options.TenantColumnName);
+                    if (insertTenantCol != null)
+                        insertTenantId = Options.TenantProvider.GetCurrentTenantId();
+                }
+
                 // INSERT each item individually — avoids multi-statement batch issues
                 // across providers (e.g. SQLite drivers that stop after the first statement).
                 foreach (var item in items)
                 {
+                    // SAVE1: Validate owned child tenant before INSERT to prevent cross-tenant contamination.
+                    if (insertTenantCol != null && insertTenantId != null)
+                    {
+                        var childTenant = insertTenantCol.Getter(item);
+                        if (childTenant == null)
+                            throw new InvalidOperationException(
+                                $"Tenant ID is required on owned child entity before saving but was null. " +
+                                "Explicitly set the tenant ID on the child entity.");
+                        if (!TenantIdsEqual(childTenant, insertTenantId))
+                            throw new InvalidOperationException(
+                                $"Owned child tenant '{childTenant}' does not match current tenant '{insertTenantId}'.");
+                    }
+
                     await using var insScope = new CommandScope(Connection, transaction);
                     await using var insCmd = insScope.CreateCommand();
                     var valuePlaceholders = new StringBuilder("@ownerFk");
@@ -1415,16 +1473,22 @@ namespace nORM.Core
                     continue;
                 }
 
-                // Compute current set of right PKs from the collection
+                // Compute current set of right PKs from the collection.
+                // SEC1: Also keep a pk→entity map so we can validate right-entity tenant before INSERT.
                 var collection = jtm.LeftCollectionGetter(entity);
                 var currentSet = new HashSet<object>();
+                var rightEntityByPk = new Dictionary<object, object>();
                 if (collection != null)
                 {
                     foreach (var item in collection)
                     {
                         if (item == null) continue;
                         var rpk = jtm.RightPkGetter(item);
-                        if (rpk != null) currentSet.Add(rpk);
+                        if (rpk != null)
+                        {
+                            currentSet.Add(rpk);
+                            rightEntityByPk[rpk] = item;
+                        }
                     }
                 }
 
@@ -1465,6 +1529,26 @@ namespace nORM.Core
                 // INSERT new join rows (idempotent / ignore duplicates)
                 foreach (var addedPk in toAdd)
                 {
+                    // SEC1: Validate right entity tenant before inserting the join row to prevent
+                    // cross-tenant join-table contamination when tenancy is active on the left side.
+                    if (tenantId != null && rightEntityByPk.TryGetValue(addedPk, out var rightEntity))
+                    {
+                        var rightMap = GetMapping(jtm.RightType);
+                        var rightTenantCol = rightMap.TenantColumn;
+                        if (rightTenantCol != null)
+                        {
+                            var rightTenant = rightTenantCol.Getter(rightEntity);
+                            if (rightTenant == null)
+                                throw new InvalidOperationException(
+                                    $"Cannot add M2M relation: related entity '{jtm.RightType.Name}' has null tenant ID. " +
+                                    "Explicitly set the tenant ID on the related entity.");
+                            if (!TenantIdsEqual(rightTenant, tenantId))
+                                throw new InvalidOperationException(
+                                    $"Cannot add cross-tenant M2M relation: related entity tenant '{rightTenant}' " +
+                                    $"does not match current tenant '{tenantId}'.");
+                        }
+                    }
+
                     cmd.Parameters.Clear();
                     var p1 = $"{_p.ParamPrefix}lp";
                     var p2 = $"{_p.ParamPrefix}rp";

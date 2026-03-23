@@ -46,6 +46,14 @@ namespace nORM.SourceGenerators
             category: "nORM.SourceGeneration",
             defaultSeverity: DiagnosticSeverity.Error,
             isEnabledByDefault: true);
+
+        private static readonly DiagnosticDescriptor SG004 = new DiagnosticDescriptor(
+            id: "nORMSG004",
+            title: "Entity type for [CompileTimeQuery] lacks [GenerateMaterializer]",
+            messageFormat: "Entity type '{0}' used in [CompileTimeQuery] does not have [GenerateMaterializer]. The query will use the runtime materializer, which may be slower. Add [GenerateMaterializer] to '{0}' for best performance.",
+            category: "nORM.SourceGeneration",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true);
 #pragma warning restore RS2008
 
         private sealed class SyntaxReceiver : ISyntaxContextReceiver
@@ -103,7 +111,7 @@ namespace nORM.SourceGenerators
                 {
                     if (attrData?.ConstructorArguments.Length == 1 && attrData.ConstructorArguments[0].Value is string sql)
                     {
-                        GenerateQuery(method.Symbol, sql, context);
+                        GenerateQuery(method.Symbol, sql, matAttr, context);
                     }
                 }
             }
@@ -341,7 +349,7 @@ namespace nORM.SourceGenerators
             return $"reader.GetFieldValue<{typeName}>({ordVar})";
         }
 
-        private void GenerateQuery(IMethodSymbol method, string sql, GeneratorExecutionContext context)
+        private void GenerateQuery(IMethodSymbol method, string sql, INamedTypeSymbol? matAttr, GeneratorExecutionContext context)
         {
             var cls = method.ContainingType;
             var ns = cls.ContainingNamespace.IsGlobalNamespace ? null : cls.ContainingNamespace.ToDisplayString();
@@ -371,6 +379,18 @@ namespace nORM.SourceGenerators
 
             var entityTypeName = entity!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
+            // SG1/SG2: Emit warning when entity lacks [GenerateMaterializer].
+            // The generated query will fall back to runtime materialization via
+            // DbContext.GetCompiledQueryMaterializer, which correctly applies runtime
+            // guards (fluent renames, converters, owned navigations) and is safe but slower.
+            if (matAttr != null && !HasAttribute(entity!, matAttr))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    SG004,
+                    method.Locations.FirstOrDefault(),
+                    entity!.Name));
+            }
+
             // Guard: the first parameter must be the DbContext; methods with zero parameters are invalid.
             if (method.Parameters.Length < MinQueryMethodParameters)
                 return;
@@ -389,7 +409,6 @@ namespace nORM.SourceGenerators
             sb.AppendLine("using System.Threading;");
             sb.AppendLine("using System.Threading.Tasks;");
             sb.AppendLine("using nORM.Core;");
-            sb.AppendLine("using nORM.SourceGeneration;");
             if (ns != null) sb.AppendLine($"namespace {ns};");
             sb.AppendLine($"public static partial class {className}");
             sb.AppendLine("{");
@@ -408,11 +427,13 @@ namespace nORM.SourceGenerators
             {
                 sb.AppendLine($"        nORM.Internal.ParameterOptimizer.AddOptimizedParam(cmd, $\"{{{ctxParam}.Provider.ParamPrefix}}{p.Name}\", {GetParameterValueExpression(p)});");
             }
-            // Pass compile-time-resolved table name so multi-model scenarios
-            // correctly retrieve the materializer registered under the right table key.
+            // SG1/SG2: Use GetCompiledQueryMaterializer instead of CompiledMaterializerStore.Get.
+            // This respects the same eligibility guards as MaterializerFactory (fluent renames,
+            // converters, owned navigations) and falls back to the runtime materializer when any
+            // unsafe condition is present, preventing wrong-value hydration and KeyNotFoundException.
             var queryTableName = GetTableNameForType(entity!);
             var escapedQueryTableName = queryTableName.Replace("\\", "\\\\").Replace("\"", "\\\"");
-            sb.AppendLine($"        var materializer = CompiledMaterializerStore.Get<{entityTypeName}>(\"{escapedQueryTableName}\");");
+            sb.AppendLine($"        var materializer = {ctxParam}.GetCompiledQueryMaterializer<{entityTypeName}>(\"{escapedQueryTableName}\");");
             // Use ExecuteCompiledQueryListAsync instead of cmd.ExecuteReaderAsync so that
             // command interceptors (logging, tracing, auditing) are invoked.
             sb.AppendLine($"        return await {ctxParam}.ExecuteCompiledQueryListAsync(cmd, materializer, {ctArg}).ConfigureAwait(false);");
