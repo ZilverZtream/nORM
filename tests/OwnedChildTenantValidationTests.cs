@@ -72,7 +72,7 @@ public class OwnedChildTenantValidationTests
     // ── SAVE1-1: Correct tenant passes through ────────────────────────────────
 
     [Fact]
-    public async Task SAVE1_CorrectChildTenant_SavesSuccessfully()
+    public async Task CorrectChildTenant_SavesSuccessfully()
     {
         using var cn = OpenDb();
         await using var ctx = MakeCtx(cn, "T1");
@@ -96,7 +96,7 @@ public class OwnedChildTenantValidationTests
     // ── SAVE1-2: Null child tenant throws ─────────────────────────────────────
 
     [Fact]
-    public async Task SAVE1_NullChildTenant_ThrowsInvalidOperationException()
+    public async Task NullChildTenant_ThrowsInvalidOperationException()
     {
         using var cn = OpenDb();
         await using var ctx = MakeCtx(cn, "T1");
@@ -120,7 +120,7 @@ public class OwnedChildTenantValidationTests
     // ── SAVE1-3: Mismatched child tenant throws ───────────────────────────────
 
     [Fact]
-    public async Task SAVE1_MismatchedChildTenant_ThrowsInvalidOperationException()
+    public async Task MismatchedChildTenant_ThrowsInvalidOperationException()
     {
         using var cn = OpenDb();
         await using var ctx = MakeCtx(cn, "T1");
@@ -142,7 +142,7 @@ public class OwnedChildTenantValidationTests
     // ── SAVE1-4: No tenant config → no validation (backward compat) ──────────
 
     [Fact]
-    public async Task SAVE1_NoTenantConfig_ChildSavesWithoutValidation()
+    public async Task NoTenantConfig_ChildSavesWithoutValidation()
     {
         using var cn = OpenDb();
         // Context without TenantProvider — tenant validation must be skipped entirely
@@ -167,7 +167,7 @@ public class OwnedChildTenantValidationTests
     // ── SAVE1-5: Update path revalidates children ─────────────────────────────
 
     [Fact]
-    public async Task SAVE1_Update_MismatchedChildTenant_ThrowsInvalidOperationException()
+    public async Task Update_MismatchedChildTenant_ThrowsInvalidOperationException()
     {
         using var cn = OpenDb();
         await using var ctx = MakeCtx(cn, "T1");

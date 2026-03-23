@@ -2041,6 +2041,15 @@ namespace nORM.Core
 
             var sb = new StringBuilder("SELECT COUNT(*) FROM ").Append(map.EscTable).Append(" WHERE ");
             sb.Append(string.Join(" AND ", conditions));
+            // SP1: Append tenant predicate so a tenant-blocked direct UPDATE (0 rows because
+            // the tenant WHERE clause filtered it out) is correctly classified as a concurrency
+            // conflict rather than a benign same-value update. Without this, the verifier may
+            // find a foreign-tenant row with the same PK+token and return count=1, masking the error.
+            if (Options.TenantProvider != null && map.TenantColumn != null)
+            {
+                sb.Append($" AND {map.TenantColumn.EscCol} = {_p.ParamPrefix}tenantVerifySingle");
+                cmd.AddParam($"{_p.ParamPrefix}tenantVerifySingle", Options.TenantProvider.GetCurrentTenantId());
+            }
             cmd.CommandText = sb.ToString();
 
             // X2: route through interceptor pipeline so observability tools see verification queries.
