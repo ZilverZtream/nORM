@@ -394,4 +394,64 @@ public class NavigationCleanupRaceTests
 
         loader.Dispose();
     }
+
+    /// <summary>
+    /// NAV1: Dispose() racing with RemovePendingLoadsForEntity must not throw
+    /// ObjectDisposedException. The race: Remove passes `if (_disposed) return` check,
+    /// then Dispose fires, then Remove calls _batchSemaphore.Wait(). Before the fix,
+    /// Dispose() called _batchSemaphore.Dispose() after releasing it, so the racing
+    /// Wait() would throw ODE. After the fix, the semaphore is never explicitly disposed.
+    /// </summary>
+    [Fact]
+    public async Task NAV1_Dispose_ConcurrentWithRemovePending_DoesNotThrowODE()
+    {
+        using var cn = OpenMemory();
+        var options = BuildOptions();
+
+        var odesCaught = 0;
+        var iterations = 2000;
+
+        for (int i = 0; i < iterations; i++)
+        {
+            using var ctx = new DbContext(cn, new SqliteProvider(), options);
+            var loader = new BatchedNavigationLoader(ctx);
+            var entity = new NcrAuthor { AuthorId = $"nav1_{i}" };
+
+            // Race Dispose() against RemovePendingLoadsForEntity() with no coordination.
+            // The semaphore-lifecycle race is triggered when Remove reads _disposed=false
+            // then Dispose runs fully (including the former _batchSemaphore.Dispose() call)
+            // before Remove calls _batchSemaphore.Wait().
+            var t1 = Task.Run(() =>
+            {
+                try { loader.Dispose(); }
+                catch (ObjectDisposedException) { Interlocked.Increment(ref odesCaught); }
+            });
+            var t2 = Task.Run(() =>
+            {
+                try { loader.RemovePendingLoadsForEntity(entity); }
+                catch (ObjectDisposedException) { Interlocked.Increment(ref odesCaught); }
+            });
+
+            await Task.WhenAll(t1, t2);
+        }
+
+        Assert.Equal(0, odesCaught);
+    }
+
+    /// <summary>
+    /// NAV1: Dispose() is safe to call concurrently from multiple threads.
+    /// Only one thread should do the actual cleanup; the others should silently no-op.
+    /// </summary>
+    [Fact]
+    public async Task NAV1_MultipleDisposeCalls_AreIdempotent()
+    {
+        using var cn = OpenMemory();
+        var options = BuildOptions();
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+        var loader = new BatchedNavigationLoader(ctx);
+
+        // Concurrent Dispose calls — should not throw
+        var tasks = Enumerable.Range(0, 20).Select(_ => Task.Run(() => loader.Dispose())).ToArray();
+        await Task.WhenAll(tasks);   // no assertion needed — absence of throw is the check
+    }
 }

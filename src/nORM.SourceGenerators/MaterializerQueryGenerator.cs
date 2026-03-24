@@ -151,6 +151,10 @@ namespace nORM.SourceGenerators
         /// Fluent <c>HasColumnName</c> is runtime-only and cannot be resolved at compile time;
         /// entities that rely solely on fluent renames must not use <c>[GenerateMaterializer]</c>.
         /// </summary>
+        /// <summary>SG2: escapes a value for embedding in a C# regular string literal.</summary>
+        private static string EscapeCSharpLiteral(string s)
+            => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
         private static string GetColumnName(IPropertySymbol prop)
         {
             foreach (var attr in prop.GetAttributes())
@@ -229,9 +233,11 @@ namespace nORM.SourceGenerators
             sb.AppendLine("        {");
             sb.AppendLine($"            var entity = new {typeName}();");
 
-            // Emit ordinal resolution - name-based, correct for any column order
+            // Emit ordinal resolution - name-based, correct for any column order.
+            // SG2: escape column names so backslash/quote in [Column("...")] values
+            // produce valid C# string literals instead of compile errors.
             foreach (var (varName, colName) in ordinalEntries)
-                sb.AppendLine($"            int {varName} = reader.GetOrdinal(\"{colName}\");");
+                sb.AppendLine($"            int {varName} = reader.GetOrdinal(\"{EscapeCSharpLiteral(colName)}\");");
 
             // Emit property assignments using resolved ordinals
             var entryIndex = 0;

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
@@ -86,6 +87,141 @@ public class StoredProcedureTests
     {
         var provider = new SqlServerProvider();
         Assert.Equal(CommandType.StoredProcedure, provider.StoredProcedureCommandType);
+    }
+
+    // ── SP1: Output parameter name validation ───────────────────────────────
+    // NOTE: NormException : DbException, so DefaultExecutionStrategy catches NormUsageException
+    // and wraps it in a new NormException. Tests unwrap via ContainsUsageException helper.
+
+    private static bool ContainsUsageException(Exception? ex)
+    {
+        while (ex != null)
+        {
+            if (ex is NormUsageException) return true;
+            ex = ex.InnerException;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// SP1: Valid output parameter names (letters/digits/underscore) must be accepted.
+    /// </summary>
+    [Fact]
+    public async Task SP1_ValidOutputParamName_IsAccepted()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(1,'Alpha');";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        // Valid names must not be rejected by nORM's validator.
+        // (SQLite doesn't support output parameters at the driver level, so a driver
+        // exception is expected after validation passes — that is not a test failure.)
+        var ex = await Record.ExceptionAsync(() =>
+            ctx.ExecuteStoredProcedureWithOutputAsync<Item>(
+                "SELECT Id, Name FROM Item",
+                outputParameters: new OutputParameter("myParam", DbType.Int32)));
+
+        Assert.False(ContainsUsageException(ex),
+            "A valid output param name must not be rejected by the nORM validator.");
+    }
+
+    /// <summary>
+    /// SP1: Output parameter name with a space must be rejected early (NormUsageException).
+    /// Before the fix, IsSafeIdentifier accepted spaces, causing a late provider exception.
+    /// </summary>
+    [Fact]
+    public async Task SP1_OutputParamName_WithSpace_ThrowsNormUsageException()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var ex = await Record.ExceptionAsync(() =>
+            ctx.ExecuteStoredProcedureWithOutputAsync<Item>(
+                "SELECT Id, Name FROM Item",
+                outputParameters: new OutputParameter("bad name", DbType.Int32)));
+
+        Assert.True(ContainsUsageException(ex), $"Expected NormUsageException in chain; got {ex?.GetType().Name}: {ex?.Message}");
+    }
+
+    /// <summary>
+    /// SP1: Output parameter name with a dot must be rejected early (NormUsageException).
+    /// "a.b" passes IsSafeIdentifier (dot-separated parts) but is not a valid param identifier.
+    /// </summary>
+    [Fact]
+    public async Task SP1_OutputParamName_WithDot_ThrowsNormUsageException()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var ex = await Record.ExceptionAsync(() =>
+            ctx.ExecuteStoredProcedureWithOutputAsync<Item>(
+                "SELECT Id, Name FROM Item",
+                outputParameters: new OutputParameter("schema.param", DbType.Int32)));
+
+        Assert.True(ContainsUsageException(ex), $"Expected NormUsageException in chain; got {ex?.GetType().Name}: {ex?.Message}");
+    }
+
+    /// <summary>
+    /// SP1: Empty output parameter name must be rejected.
+    /// </summary>
+    [Fact]
+    public async Task SP1_OutputParamName_Empty_ThrowsNormUsageException()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var ex = await Record.ExceptionAsync(() =>
+            ctx.ExecuteStoredProcedureWithOutputAsync<Item>(
+                "SELECT Id, Name FROM Item",
+                outputParameters: new OutputParameter("", DbType.Int32)));
+
+        Assert.True(ContainsUsageException(ex), $"Expected NormUsageException in chain; got {ex?.GetType().Name}: {ex?.Message}");
+    }
+
+    /// <summary>
+    /// SP1: Output parameter name starting with a digit must be rejected.
+    /// </summary>
+    [Fact]
+    public async Task SP1_OutputParamName_StartsWithDigit_ThrowsNormUsageException()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var ex = await Record.ExceptionAsync(() =>
+            ctx.ExecuteStoredProcedureWithOutputAsync<Item>(
+                "SELECT Id, Name FROM Item",
+                outputParameters: new OutputParameter("1badStart", DbType.Int32)));
+
+        Assert.True(ContainsUsageException(ex), $"Expected NormUsageException in chain; got {ex?.GetType().Name}: {ex?.Message}");
     }
 
     /// <summary>
