@@ -65,6 +65,16 @@ namespace nORM.Core
         /// <summary>Pre-compiled regex for identifier validation. Matches word characters and spaces only.</summary>
         private static readonly System.Text.RegularExpressions.Regex s_safeIdentifierRegex =
             new(@"^[\w\s]+$", System.Text.RegularExpressions.RegexOptions.Compiled);
+        /// <summary>
+        /// SP1: Strict output-parameter name validator. Allows only letters, digits, and
+        /// underscores (no spaces, no dots). Spaces/dots accepted by IsSafeIdentifier would
+        /// produce invalid ADO.NET parameter names when prefixed with the provider's ParamPrefix.
+        /// </summary>
+        private static readonly System.Text.RegularExpressions.Regex s_safeOutputParamNameRegex =
+            new(@"^[A-Za-z_][A-Za-z0-9_]*$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        private static bool IsSafeOutputParamName(string name)
+            => !string.IsNullOrEmpty(name) && s_safeOutputParamNameRegex.IsMatch(name);
         /// <summary>Cached PropertyInfo for DbException.Number (provider-specific); avoids repeated reflection.</summary>
         private static readonly ConcurrentDictionary<Type, PropertyInfo?> s_numberPropertyCache = new();
         /// <summary>Cached MethodInfo for NormQueryable.Query&lt;T&gt;() generic method definition; avoids repeated reflection.</summary>
@@ -3200,10 +3210,12 @@ namespace nORM.Core
                 var outputParamMap = new Dictionary<string, DbParameter>();
                 foreach (var op in outputParameters)
                 {
-                    // Validate parameter name to prevent SQL injection.
-                    if (!IsSafeIdentifier(op.Name))
+                    // SP1: use strict validator (letters/digits/underscore only; no spaces or dots)
+                    // so names that pass IsSafeIdentifier but are invalid ADO.NET param identifiers
+                    // are rejected early with a deterministic NormUsageException.
+                    if (!IsSafeOutputParamName(op.Name))
                         throw new NormUsageException($"Invalid output parameter name: '{op.Name}'. " +
-                            "Parameter names must contain only alphanumeric characters, underscores, and periods.");
+                            "Parameter names must start with a letter or underscore and contain only letters, digits, and underscores.");
                     var pName = ctx._p.ParamPrefix + op.Name;
                     var p = cmd.CreateParameter();
                     p.ParameterName = pName;

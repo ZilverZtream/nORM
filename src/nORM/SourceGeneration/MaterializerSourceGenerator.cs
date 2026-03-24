@@ -66,7 +66,10 @@ public class MaterializerSourceGenerator : ISourceGenerator
 
     private string GenerateMaterializerCode(INamedTypeSymbol classSymbol)
     {
-        var namespaceName = classSymbol.ContainingNamespace.ToDisplayString();
+        // SG1: use IsGlobalNamespace to avoid emitting "namespace ;" for global-namespace entities.
+        var namespaceName = classSymbol.ContainingNamespace.IsGlobalNamespace
+            ? null
+            : classSymbol.ContainingNamespace.ToDisplayString();
         var className = classSymbol.Name;
         var properties = GetWritableProperties(classSymbol);
 
@@ -75,18 +78,20 @@ public class MaterializerSourceGenerator : ISourceGenerator
         sb.AppendLine("using System.Data.Common;");
         sb.AppendLine("using nORM.SourceGeneration;");
         sb.AppendLine();
-        sb.AppendLine($"namespace {namespaceName}");
+        // SG1: file-scoped namespace; omit entirely for global-namespace entities.
+        if (namespaceName != null) sb.AppendLine($"namespace {namespaceName};");
+        sb.AppendLine($"public static class {className}Materializer");
         sb.AppendLine("{");
-        sb.AppendLine($"    public static class {className}Materializer");
+        sb.AppendLine($"    public static {className} Materialize(DbDataReader reader)");
         sb.AppendLine("    {");
-        sb.AppendLine($"        public static {className} Materialize(DbDataReader reader)");
-        sb.AppendLine("        {");
-        sb.AppendLine($"            var entity = new {className}();");
+        sb.AppendLine($"        var entity = new {className}();");
 
         // SG1 fix: resolve column ordinals using mapped column name ([Column] attr if present,
         // else property name), so [Column("db_name")] renames are honoured.
+        // SG2 fix: EscapeCSharpLiteral prevents column names containing \ or " from producing
+        // invalid C# string literals in the generated reader.GetOrdinal("...") calls.
         for (int i = 0; i < properties.Count; i++)
-            sb.AppendLine($"            int __ord_{properties[i].Name} = reader.GetOrdinal(\"{GetMappedColumnName(properties[i])}\");");
+            sb.AppendLine($"        int __ord_{properties[i].Name} = reader.GetOrdinal(\"{EscapeCSharpLiteral(GetMappedColumnName(properties[i]))}\");");
 
         for (int i = 0; i < properties.Count; i++)
         {
@@ -96,41 +101,44 @@ public class MaterializerSourceGenerator : ISourceGenerator
             var underlyingType = isNullable ? ((INamedTypeSymbol)propType).TypeArguments[0] : propType;
             var ordVar = $"__ord_{prop.Name}";
 
-            sb.AppendLine($"            if (!reader.IsDBNull({ordVar}))");
-            sb.AppendLine("            {");
+            sb.AppendLine($"        if (!reader.IsDBNull({ordVar}))");
+            sb.AppendLine("        {");
 
             var readerMethod = GetReaderMethod(underlyingType);
             var underlyingName = underlyingType.ToDisplayString();
             if (readerMethod != null)
             {
-                sb.AppendLine($"                entity.{prop.Name} = reader.{readerMethod}({ordVar});");
+                sb.AppendLine($"            entity.{prop.Name} = reader.{readerMethod}({ordVar});");
             }
             else if (underlyingName == "System.DateOnly" || underlyingName == "global::System.DateOnly")
             {
-                // SG1 fix: DateOnly requires explicit conversion — providers return DateTime/string
-                sb.AppendLine($"                entity.{prop.Name} = nORM.Query.MaterializerFactory.ConvertToDateOnly(reader.GetValue({ordVar}));");
+                // DateOnly requires explicit conversion — providers return DateTime/string
+                sb.AppendLine($"            entity.{prop.Name} = nORM.Query.MaterializerFactory.ConvertToDateOnly(reader.GetValue({ordVar}));");
             }
             else if (underlyingName == "System.TimeOnly" || underlyingName == "global::System.TimeOnly")
             {
-                // SG1 fix: TimeOnly requires explicit conversion — providers return TimeSpan/string
-                sb.AppendLine($"                entity.{prop.Name} = nORM.Query.MaterializerFactory.ConvertToTimeOnly(reader.GetValue({ordVar}));");
+                // TimeOnly requires explicit conversion — providers return TimeSpan/string
+                sb.AppendLine($"            entity.{prop.Name} = nORM.Query.MaterializerFactory.ConvertToTimeOnly(reader.GetValue({ordVar}));");
             }
             else
             {
-                sb.AppendLine($"                var value = reader.GetValue({ordVar});");
-                sb.AppendLine($"                entity.{prop.Name} = ({propType.ToDisplayString()})Convert.ChangeType(value, typeof({underlyingName}));");
+                sb.AppendLine($"            var value = reader.GetValue({ordVar});");
+                sb.AppendLine($"            entity.{prop.Name} = ({propType.ToDisplayString()})Convert.ChangeType(value, typeof({underlyingName}));");
             }
 
-            sb.AppendLine("            }");
+            sb.AppendLine("        }");
         }
 
-        sb.AppendLine("            return entity;");
-        sb.AppendLine("        }");
+        sb.AppendLine("        return entity;");
         sb.AppendLine("    }");
         sb.AppendLine("}");
 
         return sb.ToString();
     }
+
+    /// <summary>SG2: escapes a value for embedding in a C# regular string literal.</summary>
+    private static string EscapeCSharpLiteral(string s)
+        => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     private string GenerateRegistrationCode(List<ClassDeclarationSyntax> classes, Compilation compilation, INamedTypeSymbol materializerAttribute)
     {

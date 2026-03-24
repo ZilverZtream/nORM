@@ -392,7 +392,12 @@ namespace nORM.Navigation
                 _batchSemaphore.Release();
             }
 
-            _batchSemaphore.Dispose();
+            // Do NOT call _batchSemaphore.Dispose() here: RemovePendingLoadsForEntity may
+            // have passed its `if (_disposed) return` guard before _disposed was set and is
+            // now racing to call _batchSemaphore.Wait(). Disposing the semaphore while that
+            // thread is about to Wait() would throw ObjectDisposedException on a benign
+            // teardown path. SemaphoreSlim only allocates a kernel object when AvailableWaitHandle
+            // is accessed (which we never do), so GC finalization is sufficient.
         }
 
         /// <summary>
