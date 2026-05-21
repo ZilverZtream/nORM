@@ -817,64 +817,88 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             var batchSize = Math.Max(1, Math.Min(sizing.OptimalBatchSize, maxBatchForProvider));
 
             var totalUpdated = 0;
-            for (int i = 0; i < entityList.Count; i += batchSize)
+            var ownedTx = ctx.CurrentTransaction == null;
+            DbTransaction? transaction = ownedTx
+                ? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false)
+                : ctx.CurrentTransaction;
+            try
             {
-                var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
-                await using var cmd = ctx.CreateCommand();
-                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-
-                var sb = _stringBuilderPool.Get();
-                try
+                for (int i = 0; i < entityList.Count; i += batchSize)
                 {
-                    sb.Append("UPDATE ").Append(m.EscTable).Append(" AS t SET ");
-                    sb.Append(string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = v.{c.EscCol}")));
-                    sb.Append(" FROM (VALUES ");
+                    var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
+                    await using var cmd = ctx.CreateCommand();
+                    cmd.Transaction = transaction;
+                    cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
-                    var valueRows = new List<string>();
-                    var paramIndex = 0;
-                    foreach (var entity in batch)
+                    var sb = _stringBuilderPool.Get();
+                    try
                     {
-                        var paramNames = new List<string>();
-                        foreach (var col in valueCols)
+                        sb.Append("UPDATE ").Append(m.EscTable).Append(" AS t SET ");
+                        sb.Append(string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = v.{c.EscCol}")));
+                        sb.Append(" FROM (VALUES ");
+
+                        var valueRows = new List<string>();
+                        var paramIndex = 0;
+                        foreach (var entity in batch)
                         {
-                            var pName = $"{ParamPrefix}p{paramIndex++}";
-                            cmd.AddParam(pName, col.Getter(entity));
-                            paramNames.Add(pName);
+                            var paramNames = new List<string>();
+                            foreach (var col in valueCols)
+                            {
+                                var pName = $"{ParamPrefix}p{paramIndex++}";
+                                cmd.AddParam(pName, col.Getter(entity));
+                                paramNames.Add(pName);
+                            }
+                            valueRows.Add($"({string.Join(", ", paramNames)})");
                         }
-                        valueRows.Add($"({string.Join(", ", paramNames)})");
+
+                        sb.Append(string.Join(", ", valueRows));
+                        sb.Append(") AS v (");
+                        sb.Append(string.Join(", ", valueCols.Select(c => c.EscCol)));
+                        sb.Append(") WHERE ");
+
+                        // Add tenant predicate to prevent cross-tenant bulk updates
+                        var tenantParam = ctx.Options.TenantProvider != null && m.TenantColumn != null
+                            ? $"{ParamPrefix}__tenant_bulk"
+                            : null;
+                        sb.Append(BuildBulkUpdateWhereClause(
+                            keyCols.Select(c => c.EscCol),
+                            m.TimestampColumn?.EscCol,
+                            m.TenantColumn?.EscCol,
+                            tenantParam));
+                        if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                        {
+                            cmd.AddParam(tenantParam!, ctx.Options.TenantProvider.GetCurrentTenantId());
+                        }
+
+                        cmd.CommandText = sb.ToString();
+
+                        var batchSw = Stopwatch.StartNew();
+                        totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                        batchSw.Stop();
+                        BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                     }
-
-                    sb.Append(string.Join(", ", valueRows));
-                    sb.Append(") AS v (");
-                    sb.Append(string.Join(", ", valueCols.Select(c => c.EscCol)));
-                    sb.Append(") WHERE ");
-
-                    // Add tenant predicate to prevent cross-tenant bulk updates
-                    var tenantParam = ctx.Options.TenantProvider != null && m.TenantColumn != null
-                        ? $"{ParamPrefix}__tenant_bulk"
-                        : null;
-                    sb.Append(BuildBulkUpdateWhereClause(
-                        keyCols.Select(c => c.EscCol),
-                        m.TimestampColumn?.EscCol,
-                        m.TenantColumn?.EscCol,
-                        tenantParam));
-                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                    finally
                     {
-                        cmd.AddParam(tenantParam!, ctx.Options.TenantProvider.GetCurrentTenantId());
+                        sb.Clear();
+                        _stringBuilderPool.Return(sb);
                     }
-
-                    cmd.CommandText = sb.ToString();
-
-                    var batchSw = Stopwatch.StartNew();
-                    totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
-                    batchSw.Stop();
-                    BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                 }
-                finally
+
+                if (ownedTx) await transaction!.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                if (ownedTx)
                 {
-                    sb.Clear();
-                    _stringBuilderPool.Return(sb);
+                    try { await transaction!.RollbackAsync(CancellationToken.None).ConfigureAwait(false); }
+                    catch (Exception rollbackEx) { throw new AggregateException(ex, rollbackEx); }
                 }
+                throw;
+            }
+            finally
+            {
+                if (ownedTx && transaction != null)
+                    await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
             ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // Invalidate query cache after bulk write to prevent stale reads
@@ -923,33 +947,57 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             var batchSize = Math.Max(1, sizing.OptimalBatchSize);
 
             var totalDeleted = 0;
-            for (int i = 0; i < entityList.Count; i += batchSize)
+            var ownedTx = ctx.CurrentTransaction == null;
+            DbTransaction? transaction = ownedTx
+                ? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false)
+                : ctx.CurrentTransaction;
+            try
             {
-                var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
-                var keys = CreateTypedArray(batch.Select(e => keyCol.Getter(e)).ToArray());
-                await using var cmd = ctx.CreateCommand();
-                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-                var pName = $"{ParamPrefix}p0";
-                var p = cmd.CreateParameter();
-                p.ParameterName = pName;
-                p.Value = keys;
-                cmd.Parameters.Add(p);
-                var deleteSql = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} = ANY({pName})";
-                // Add tenant predicate to prevent cross-tenant bulk deletes
-                if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                for (int i = 0; i < entityList.Count; i += batchSize)
                 {
-                    var tenantParam = $"{ParamPrefix}__tenant_bulk";
-                    var tp = cmd.CreateParameter();
-                    tp.ParameterName = tenantParam;
-                    tp.Value = ctx.Options.TenantProvider.GetCurrentTenantId() ?? (object)DBNull.Value;
-                    cmd.Parameters.Add(tp);
-                    deleteSql += $" AND {m.TenantColumn.EscCol} = {tenantParam}";
+                    var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
+                    var keys = CreateTypedArray(batch.Select(e => keyCol.Getter(e)).ToArray());
+                    await using var cmd = ctx.CreateCommand();
+                    cmd.Transaction = transaction;
+                    cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+                    var pName = $"{ParamPrefix}p0";
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = pName;
+                    p.Value = keys;
+                    cmd.Parameters.Add(p);
+                    var deleteSql = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} = ANY({pName})";
+                    // Add tenant predicate to prevent cross-tenant bulk deletes
+                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                    {
+                        var tenantParam = $"{ParamPrefix}__tenant_bulk";
+                        var tp = cmd.CreateParameter();
+                        tp.ParameterName = tenantParam;
+                        tp.Value = ctx.Options.TenantProvider.GetCurrentTenantId() ?? (object)DBNull.Value;
+                        cmd.Parameters.Add(tp);
+                        deleteSql += $" AND {m.TenantColumn.EscCol} = {tenantParam}";
+                    }
+                    cmd.CommandText = deleteSql;
+                    var batchSw = Stopwatch.StartNew();
+                    totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+                    batchSw.Stop();
+                    BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
                 }
-                cmd.CommandText = deleteSql;
-                var batchSw = Stopwatch.StartNew();
-                totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
-                batchSw.Stop();
-                BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
+
+                if (ownedTx) await transaction!.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                if (ownedTx)
+                {
+                    try { await transaction!.RollbackAsync(CancellationToken.None).ConfigureAwait(false); }
+                    catch (Exception rollbackEx) { throw new AggregateException(ex, rollbackEx); }
+                }
+                throw;
+            }
+            finally
+            {
+                if (ownedTx && transaction != null)
+                    await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
             ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // Invalidate query cache after bulk write to prevent stale reads
