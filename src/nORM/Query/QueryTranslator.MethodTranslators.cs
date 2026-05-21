@@ -428,15 +428,8 @@ namespace nORM.Query
                 var terminalMethodEa = t._methodName;
                 var elementSource = t.Visit(node.Arguments[0]);
                 t._methodName = terminalMethodEa;
-                if (node.Arguments[1] is ParameterExpression eaParam)
+                if (t.TryBindPagingParameter(node.Arguments[1], out var eName))
                 {
-                    if (!t._paramMap.TryGetValue(eaParam, out var eName))
-                    {
-                        eName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
-                        t._params[eName] = DBNull.Value;
-                        t._compiledParams.Add(eName);
-                        t._paramMap[eaParam] = eName;
-                    }
                     if (t._skipParam != null)
                         t._skipParam = $"({t._skipParam} + {eName})";
                     else if (t._skip != null)
@@ -460,7 +453,7 @@ namespace nORM.Query
                 }
 
                 t._take = 1;
-                var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
+                var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
                 t._params[pName] = 1;
                 t._takeParam = pName;
                 t._singleResult = t._methodName == "ElementAt";

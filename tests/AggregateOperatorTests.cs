@@ -242,6 +242,44 @@ public class AggregateOperatorTests
     }
 
     [Fact]
+    public async Task Where_OrderBy_VariableSkipTake_ReturnsExpectedPage()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        for (int i = 1; i <= 10; i++) InsertRow(cn, 812, i * 10, i * 1.0);
+        InsertRow(cn, 813, 999, 99.0);
+
+        var skip = 3;
+        var take = 4;
+        var rows = await ctx.Query<NumericRow>()
+            .Where(x => x.Category == 812)
+            .OrderBy(x => x.IntValue)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        Assert.Equal(4, rows.Count);
+        Assert.Equal(new[] { 40, 50, 60, 70 }, rows.Select(r => r.IntValue).ToArray());
+        Assert.All(rows, r => Assert.Equal(812, r.Category));
+    }
+
+    [Fact]
+    public void OrderBy_VariableElementAt_ReturnsExpectedRow()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        for (int i = 1; i <= 5; i++) InsertRow(cn, 814, i * 10, i * 1.0);
+
+        var index = 2;
+        var row = ctx.Query<NumericRow>()
+            .Where(x => x.Category == 814)
+            .OrderBy(x => x.IntValue)
+            .ElementAt(index);
+
+        Assert.Equal(30, row.IntValue);
+    }
+
+    [Fact]
     public async Task Take_LargerThanCount_ReturnsAllRows()
     {
         var (cn, ctx) = CreateContext();
