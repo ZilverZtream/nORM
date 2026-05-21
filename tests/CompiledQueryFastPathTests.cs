@@ -590,7 +590,6 @@ public class CompiledQueryFastPathTests
         try
         {
             using var cn = CreateConnection(path);
-            cn.Close();
 
             var interceptor = new ThrowOnceReaderInterceptor();
             var options = new DbContextOptions();
