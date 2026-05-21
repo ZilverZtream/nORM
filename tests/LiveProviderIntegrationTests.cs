@@ -620,14 +620,15 @@ public class LiveProviderIntegrationTests
         // which maps ALL provider kinds to SqliteConnection.
         //
         // Resolution path (Gate 3.6 → 4.0):
-        //   1. Set NORM_TEST_SQLSERVER / NORM_TEST_MYSQL / NORM_TEST_POSTGRES env vars.
+        //   1. Set NORM_TEST_SQLSERVER / NORM_TEST_MYSQL / NORM_TEST_POSTGRES env vars
+        //      or their *_CS aliases.
         //   2. The LPI tests above will run against real servers, proving actual parity.
         //   3. Once all LPI_*_Live_* tests pass on all 4 providers, T1 is resolved.
 
         const string finding =
             "T1: non-SQLite provider matrix tests use SqliteConnection as the underlying DB. " +
             "This validates SQL shape but not server execution semantics. " +
-            "Set NORM_TEST_SQLSERVER / NORM_TEST_MYSQL / NORM_TEST_POSTGRES to run live parity tests.";
+            "Set NORM_TEST_SQLSERVER / NORM_TEST_MYSQL / NORM_TEST_POSTGRES, or their *_CS aliases, to run live parity tests.";
 
         // Record the finding — always passes (documents the gap, does not block CI).
         Assert.NotEmpty(finding);

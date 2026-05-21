@@ -29,7 +29,8 @@ namespace nORM.Tests;
 //
 // SQLite tests run live (in-memory). SQL Server, MySQL, and PostgreSQL are
 // env-gated via:
-//   NORM_TEST_SQLSERVER_CS, NORM_TEST_MYSQL_CS, NORM_TEST_POSTGRES_CS
+//   NORM_TEST_SQLSERVER, NORM_TEST_MYSQL, NORM_TEST_POSTGRES
+//   (the *_CS aliases are also accepted)
 //
 // Non-SQLite providers that lack env vars are silently skipped (return early).
 // =============================================================================

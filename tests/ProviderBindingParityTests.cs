@@ -31,7 +31,8 @@ namespace nORM.Tests;
 //
 // SQLite tests run live (in-memory). Env-gated stubs document what the
 // equivalent SQL Server / MySQL / PostgreSQL live tests would verify.
-//   NORM_TEST_SQLSERVER_CS, NORM_TEST_MYSQL_CS, NORM_TEST_POSTGRES_CS
+//   NORM_TEST_SQLSERVER, NORM_TEST_MYSQL, NORM_TEST_POSTGRES
+//   (the *_CS aliases are also accepted)
 // =============================================================================
 
 // -- Entities -----------------------------------------------------------------

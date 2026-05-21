@@ -4,7 +4,7 @@ nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .
 
 ## Why Choose nORM?
 
-- ** Faster than EF Core**: compiled queries up to 4-5x faster, complex queries up to 4x faster, bulk inserts 3x faster
+- **Fast by design**: Dapper-competitive read paths, compiled queries, and native bulk operations
 - ** Complete LINQ Support**: Full-featured LINQ provider with joins, grouping, subqueries, and complex projections
 - ** Zero-Learning Curve**: Familiar EF Core-style API - migrate your existing knowledge instantly
 - ** Enterprise-Grade Bulk Operations**: High-performance bulk insert, update, and delete operations
@@ -17,33 +17,33 @@ nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .
 - ** Modern Features**: JSON querying, window functions, temporal queries
 - ** Enterprise Ready**: Multi-tenancy, caching, retry policies, and interceptors
 
-##  Performance Comparison
+## Performance Comparison
 
-Benchmarks: .NET 8.0, SQLite WAL mode, 1000 users + 2000 orders, i9-12900K. All tools on identical data and schema. Compiled = nORM `CompileQuery` / EF Core `CompileAsyncQuery`. Prepared = pre-compiled `SqliteCommand`.
+Benchmarks: .NET 8.0, SQLite WAL mode, 1000 users + 2000 orders, i9-12900K. All tools run against identical data and schema. Compiled = nORM `CompileQuery` / EF Core `CompileAsyncQuery`. Prepared = pre-compiled `SqliteCommand`.
 
 ### Read Queries
 
 | Operation                        | nORM      | EF Core   | Dapper    | Raw ADO   | vs EF Core        |
 |----------------------------------|-----------|-----------|-----------|-----------|-------------------|
-| Simple query (standard)          | 29.3 μs   | 28.8 μs   | 29.1 μs   | 24.8 μs   | **comparable**    |
-| Simple query (compiled/prepared) | **7.5 μs**| 22.1 μs   | 17.3 μs   | 17.3 μs   | **3x faster**     |
-| Complex query (standard)         | **21.5 μs**| 81.8 μs  | 114.2 μs  | 108.7 μs  | **4x faster**     |
-| Complex query (compiled/prepared)| **11.6 μs**| 60.4 μs  | 94.1 μs   | 95.5 μs   | **5x faster**     |
-| JOIN query                       | 66.0 μs   | 89.8 μs   | 45.7 μs   | —         | **26% faster**    |
-| Count                            | 22.2 μs   | 28.9 μs   | 15.9 μs   | 15.6 μs   | **23% faster**    |
+| Simple query (standard)          | Dapper-competitive | comparable | Dapper baseline | fastest manual path | comparable |
+| Simple query (compiled/prepared) | very strong | slower warm path | prepared baseline | prepared baseline | favorable |
+| Complex query (standard)         | strong | slower | competitive | manual baseline | favorable |
+| Complex query (compiled/prepared)| under active tuning | slower | prepared baseline | prepared baseline | needs regular regression checks |
+| JOIN query                       | strong | slower | competitive | manual baseline | favorable |
+| Count                            | excellent | slower | competitive | fastest manual path | favorable |
 
 ### Write Operations
 
 | Operation                        | nORM      | EF Core   | Dapper    | vs EF Core        |
 |----------------------------------|-----------|-----------|-----------|-------------------|
-| Single insert                    | **73.6 μs**| 76.7 μs  | 102.1 μs  | **4% faster**     |
-| Bulk insert — naive (100 rows)   | 6.2 ms    | 8.9 ms    | 5.8 ms    | **30% faster**    |
-| Bulk insert — batched+prepared   | **608 μs** | 2,044 μs | 544 μs    | **3.4x faster**   |
-| Bulk insert — idiomatic API      | **617 μs** | 1,974 μs | 753 μs    | **3.2x faster**   |
+| Single insert                    | competitive | competitive | competitive | comparable |
+| Bulk insert - naive (100 rows)   | faster than EF Core | slower | competitive | favorable |
+| Bulk insert - batched+prepared   | strong | slower | competitive | favorable |
+| Bulk insert - idiomatic API      | strong | slower | competitive | favorable |
 
-> nORM's compiled query cache delivers the most dramatic gains on warm paths. Standard LINQ queries are on par with EF Core for simple reads and 4–5x faster for complex multi-predicate queries. Bulk operations consistently outperform EF Core by 3x and beat Dapper's idiomatic `ExecuteAsync` list API.
+> nORM's compiled query cache is intended to deliver the largest gains on warm paths. Performance-sensitive work should use the benchmark project before release decisions; generated BenchmarkDotNet output is intentionally not tracked in source control.
 
-*Benchmarks run on .NET 8.0 with realistic database scenarios. Raw ADO numbers represent the theoretical minimum overhead (hand-written parameterized SQL + manual mapping).*
+*Benchmarks run on .NET 8.0 with realistic database scenarios. Raw ADO numbers represent the theoretical minimum overhead: hand-written parameterized SQL plus manual mapping.*
 
 ## Installation
 
@@ -255,15 +255,15 @@ await runner.ApplyMigrationsAsync();
 
 ### Migration Notes
 
-> **DATA LOSS WARNING — Column renames.** nORM cannot detect when you rename a C# property. Renaming
+> **DATA LOSS WARNING - Column renames.** nORM cannot detect when you rename a C# property. Renaming
 > `Order.TotalCost` to `Order.TotalAmount` generates a migration diff that **drops `TotalCost` and adds
 > `TotalAmount`**, destroying all column data silently. Always create a manual migration instead:
 >
 > ```csharp
-> // WRONG — renames the C# property directly → DROP + ADD → DATA LOSS
+> // WRONG - renames the C# property directly -> DROP + ADD -> DATA LOSS
 > // public decimal TotalAmount { get; set; }   // was TotalCost
 >
-> // CORRECT — write a manual migration that renames the column
+> // CORRECT - write a manual migration that renames the column
 > public class RenameTotalCostToTotalAmount : Migration
 > {
 >     public RenameTotalCostToTotalAmount() : base(20240201001, "RenameTotalCostToTotalAmount") { }
@@ -296,7 +296,7 @@ lock before reading the pending list, serializing concurrent deployments automat
 | MySQL | `GET_LOCK('__NormMigrationsLock', 30)` |
 | PostgreSQL | `pg_advisory_lock(key)` (session level, blocks until available) |
 
-No application-level coordination is required. On SQL Server, DDL is transactional — if the second process
+No application-level coordination is required. On SQL Server, DDL is transactional. If the second process
 somehow races past the lock, the PK constraint on the history table prevents double-recording and the whole
 transaction rolls back cleanly. On MySQL, DDL auto-commits per step; the advisory lock prevents the race
 entirely. If you need a bounded wait on PostgreSQL (which blocks indefinitely), wrap `ApplyMigrationsAsync`
@@ -309,11 +309,11 @@ in a `CancellationTokenSource` with a timeout.
 **`DbContext` is not thread-safe.** Use one context per request, operation, or unit of work. For ASP.NET Core, register it as `Scoped` so each HTTP request gets its own instance:
 
 ```csharp
-// ASP.NET Core — correct DI registration
+// ASP.NET Core - correct DI registration
 builder.Services.AddScoped(sp =>
     new DbContext(connectionString, new SqlServerProvider()));
 
-// Incorrect — do NOT share a single context across requests
+// Incorrect - do NOT share a single context across requests
 builder.Services.AddSingleton<DbContext>(...);  // data races
 ```
 
@@ -332,9 +332,9 @@ foreach (var batch in items.Chunk(500))
 
 `MySqlProvider` defaults to `UseAffectedRowsSemantics = true`, which is required by most MySQL connectors. MySQL's `affected-rows` count does not distinguish "row matched but value unchanged" from "no row matched". nORM handles this with a **SELECT-then-verify** fallback: when an UPDATE returns fewer rows than expected, nORM queries the database to check whether the original concurrency tokens still exist. If they do, the update was a same-value no-op and no conflict is raised. If any token has changed, a `DbConcurrencyException` is thrown as expected.
 
-**Residual gap**: if a concurrent writer sets the concurrency token to the *same* new value (same-value token conflict), neither the UPDATE rowcount nor the SELECT verification can detect the conflict — the WHERE clause still matches. This edge case requires application-level versioning (e.g. monotonically increasing versions) to close. To eliminate the gap entirely, use `useAffectedRows=false` in the connection string with a connector that supports it, or subclass `MySqlProvider` and override `UseAffectedRowsSemantics` to `false`.
+**Residual gap**: if a concurrent writer sets the concurrency token to the *same* new value (same-value token conflict), neither the UPDATE rowcount nor the SELECT verification can detect the conflict because the WHERE clause still matches. This edge case requires application-level versioning (e.g. monotonically increasing versions) to close. To eliminate the gap entirely, use `useAffectedRows=false` in the connection string with a connector that supports it, or subclass `MySqlProvider` and override `UseAffectedRowsSemantics` to `false`.
 
-**DELETE path**: DELETE rowcount is always checked regardless of `UseAffectedRowsSemantics`, because deleting a row always counts it as affected — there is no same-value ambiguity for deletes.
+**DELETE path**: DELETE rowcount is always checked regardless of `UseAffectedRowsSemantics`, because deleting a row always counts it as affected. There is no same-value ambiguity for deletes.
 
 ### Connection Management & Pooling
 
@@ -352,16 +352,21 @@ var pool = new ConnectionPool(
 ### Interceptors & Extensibility
 
 ```csharp
-public class LoggingInterceptor : IDbCommandInterceptor
+public sealed class LoggingInterceptor : BaseDbCommandInterceptor
 {
-    public Task BeforeExecuteAsync(DbCommand command)
+    public LoggingInterceptor(ILogger<LoggingInterceptor> logger) : base(logger) { }
+
+    public override Task<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+        DbCommand command,
+        DbContext context,
+        CancellationToken cancellationToken)
     {
         Console.WriteLine(command.CommandText);
-        return Task.CompletedTask;
+        return Task.FromResult(InterceptionResult<DbDataReader>.Continue());
     }
 }
 
-options.AddInterceptor(new LoggingInterceptor());
+options.CommandInterceptors.Add(new LoggingInterceptor(NullLogger<LoggingInterceptor>.Instance));
 ```
 
 ### Global Query Filters
@@ -412,18 +417,18 @@ public class MyDbContext : nORM.Core.DbContext
 - **Native Bulk Operations**: Database-specific bulk operation implementations
 - **Compiled Query Support**: Pre-compile frequently used queries for maximum speed
 
-## 📈 Real-World Performance Impact
+## Performance Targets
 
-Based on production deployments:
+nORM is being tuned toward these release goals:
 
-- **API Response Times**: 40-60% reduction in database query latency
-- **Memory Usage**: 25-35% lower memory allocation during query execution  
-- **Throughput**: 2-3x improvement in requests per second for data-heavy applications
-- **Bulk Operations**: 5-10x faster for large data import/export scenarios
+- **Query latency**: stay competitive with Dapper on simple and joined reads
+- **Compiled queries**: make warm-path execution consistently faster than uncompiled LINQ
+- **Memory usage**: keep allocations well below EF Core on read-heavy paths
+- **Bulk operations**: remain substantially faster than EF Core and competitive with Dapper transaction-based inserts
 
 ## Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+Before public release, use focused issues or pull requests with a clear reproduction, test coverage, and benchmark data when performance is involved.
 
 ### Development Setup
 
