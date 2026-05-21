@@ -196,4 +196,22 @@ public class RawSqlNameBasedMaterializationTests
             Assert.Contains("multiple", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
     }
+
+    [Fact]
+    public async Task FromSqlRawAsync_NonSourceGeneratedEntity_ReorderedColumns_PopulatesCorrectProperties()
+    {
+        var (cn, ctx) = CreateContext(
+            "CREATE TABLE NamedCol (Id INTEGER PRIMARY KEY, Code TEXT NOT NULL, Name TEXT NOT NULL);" +
+            "INSERT INTO NamedCol VALUES (42, 'Z999', 'Zeta');");
+        await using (cn) await using (ctx)
+        {
+            var results = await ctx.FromSqlRawAsync<NamedColEntity>(
+                "SELECT \"Name\", \"Code\", \"Id\" FROM \"NamedCol\"");
+
+            Assert.Single(results);
+            Assert.Equal(42, results[0].Id);
+            Assert.Equal("Z999", results[0].Code);
+            Assert.Equal("Zeta", results[0].Name);
+        }
+    }
 }
