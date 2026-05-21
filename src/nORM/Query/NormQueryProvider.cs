@@ -73,10 +73,23 @@ namespace nORM.Query
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
         private readonly ConcurrentDictionary<string, string> _simpleSqlCache = new();
-        /// <summary>PERF: Dedicated count SQL cache with ValueTuple keys to avoid string.Concat allocation per count call.</summary>
-        private readonly ConcurrentDictionary<(Type ElementType, string PredicateKey), (string Sql, bool NeedsParam)> _countSqlCache = new();
+        /// <summary>PERF: Dedicated count SQL cache with structured keys to avoid per-call string composition and predicate-shape collisions.</summary>
+        private readonly ConcurrentDictionary<CountSqlCacheKey, (string Sql, bool NeedsParam)> _countSqlCache = new();
         /// <summary>PERF: Pooled prepared commands for parameterless count queries (keyed by SQL), each paired with a lock object to serialize concurrent access.</summary>
         private readonly ConcurrentDictionary<string, (DbCommand Cmd, object Lock)> _pooledCountCommands = new();
+
+        private enum CountPredicateShape : byte
+        {
+            None,
+            BoolTrue,
+            BoolFalse,
+            EqualityValue,
+            EqualityNull,
+            Complex
+        }
+
+        private readonly record struct CountSqlCacheKey(Type ElementType, string PredicateKey, CountPredicateShape Shape);
+
         public NormQueryProvider(DbContext ctx)
         {
             _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
@@ -1580,25 +1593,15 @@ namespace nORM.Query
                 return false;
 
             var elementType = GetElementType(constant);
-            var map = _ctx.GetMapping(elementType);
 
-            // Use structural key instead of string.Concat to avoid string allocation per count call.
-            // Q1 fix: include null-shape in key so col==null and col==value produce distinct cache entries.
-            string predicateKey;
-            if (predicate == null)
-                predicateKey = "";
-            else if (predicate.Body is MemberExpression pm)
-                predicateKey = pm.Member.Name; // interned by CLR, no alloc
-            else if (predicate.Body is BinaryExpression pb && pb.Left is MemberExpression pbm)
-                predicateKey = IsNullConstant(pb.Right) ? pbm.Member.Name + "==NULL" : pbm.Member.Name;
-            else
+            if (!TryBuildCountCacheKey(elementType, predicate, allowComplex: false, out var cacheKey))
                 return false; // Complex predicates fall back to normal path
 
-            var cacheKey = (elementType, predicateKey);
             Dictionary<string, object> parameters = _emptyParams;
 
             if (!_countSqlCache.TryGetValue(cacheKey, out var cached))
             {
+                var map = _ctx.GetMapping(elementType);
                 string whereClause = string.Empty;
                 if (predicate != null)
                 {
@@ -1613,6 +1616,7 @@ namespace nORM.Query
             else if (predicate != null && cached.NeedsParam)
             {
                 // Only re-extract parameter value when the predicate actually uses a parameter
+                var map = _ctx.GetMapping(elementType);
                 if (!TryBuildCountWhereClause(predicate, map, ref parameters, out _, populateParameters: true))
                     return false;
             }
@@ -1656,24 +1660,8 @@ namespace nORM.Query
                 return false;
 
             var elementType = GetElementType(constant);
-            // Use structural hash instead of predicate.Body.ToString() to avoid
-            // string allocation on every count call. For simple predicates (bool member,
-            // equality), the member name is sufficient as a cache key.
-            // Q1 fix: include null-shape in key so col==null and col==value produce distinct cache entries.
-            string predicateKey;
-            if (predicate == null)
-                predicateKey = "";
-            else if (predicate.Body is MemberExpression pm)
-                predicateKey = pm.Member.Name;
-            else if (predicate.Body is BinaryExpression pb && pb.Left is MemberExpression pbm)
-                predicateKey = IsNullConstant(pb.Right)
-                    ? string.Concat(pbm.Member.Name, "=", pb.NodeType.ToString(), ":NULL")
-                    : string.Concat(pbm.Member.Name, "=", pb.NodeType.ToString());
-            else
-                predicateKey = predicate.Body.ToString(); // fallback for complex predicates
-
-            // Use ValueTuple key to avoid string.Concat allocation per count call
-            var countCacheKey = (elementType, predicateKey);
+            if (!TryBuildCountCacheKey(elementType, predicate, allowComplex: true, out var countCacheKey))
+                return false;
 
             if (_countSqlCache.TryGetValue(countCacheKey, out var cached))
             {
@@ -1707,6 +1695,82 @@ namespace nORM.Query
             }
         }
 
+        private static bool TryBuildCountCacheKey(
+            Type elementType,
+            LambdaExpression? predicate,
+            bool allowComplex,
+            out CountSqlCacheKey key)
+        {
+            if (predicate == null)
+            {
+                key = new CountSqlCacheKey(elementType, string.Empty, CountPredicateShape.None);
+                return true;
+            }
+
+            if (predicate.Body is MemberExpression { Type: var memberType } member && memberType == typeof(bool))
+            {
+                key = new CountSqlCacheKey(elementType, member.Member.Name, CountPredicateShape.BoolTrue);
+                return true;
+            }
+
+            if (predicate.Body is UnaryExpression { NodeType: ExpressionType.Not, Operand: MemberExpression { Type: var negatedType } negatedMember }
+                && negatedType == typeof(bool))
+            {
+                key = new CountSqlCacheKey(elementType, negatedMember.Member.Name, CountPredicateShape.BoolFalse);
+                return true;
+            }
+
+            if (predicate.Body is BinaryExpression binary && TryGetMemberEquality(binary, out var comparedMember, out var valueExpression))
+            {
+                if (comparedMember.Type == typeof(bool) &&
+                    ExpressionValueExtractor.TryGetConstantValue(valueExpression, out var boolValue) &&
+                    boolValue is bool expected)
+                {
+                    key = new CountSqlCacheKey(
+                        elementType,
+                        comparedMember.Member.Name,
+                        expected ? CountPredicateShape.BoolTrue : CountPredicateShape.BoolFalse);
+                    return true;
+                }
+
+                key = new CountSqlCacheKey(
+                    elementType,
+                    comparedMember.Member.Name,
+                    IsNullConstant(valueExpression) ? CountPredicateShape.EqualityNull : CountPredicateShape.EqualityValue);
+                return true;
+            }
+
+            if (allowComplex)
+            {
+                key = new CountSqlCacheKey(elementType, predicate.Body.ToString(), CountPredicateShape.Complex);
+                return true;
+            }
+
+            key = default;
+            return false;
+        }
+
+        private static bool TryGetMemberEquality(BinaryExpression expression, out MemberExpression member, out Expression valueExpression)
+        {
+            if (expression.NodeType == ExpressionType.Equal && expression.Left is MemberExpression leftMember)
+            {
+                member = leftMember;
+                valueExpression = expression.Right;
+                return true;
+            }
+
+            if (expression.NodeType == ExpressionType.Equal && expression.Right is MemberExpression rightMember)
+            {
+                member = rightMember;
+                valueExpression = expression.Left;
+                return true;
+            }
+
+            member = default!;
+            valueExpression = default!;
+            return false;
+        }
+
         /// <summary>
         /// Q1 fix: returns true when <paramref name="e"/> is a null literal or a Nullable&lt;T&gt; Convert
         /// wrapping a null literal, so cache keys distinguish col==null from col==value.
@@ -1736,7 +1800,7 @@ namespace nORM.Query
                 if (!map.ColumnsByName.TryGetValue(boolMember.Member.Name, out var boolCol))
                     return false;
 
-                whereClause = $" WHERE {_ctx.Provider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: true)}";
+                whereClause = $" WHERE {FormatCountBooleanPredicate(boolCol.EscCol, expectedValue: true)}";
                 return true;
             }
 
@@ -1747,17 +1811,23 @@ namespace nORM.Query
                 if (!map.ColumnsByName.TryGetValue(negBoolMember2.Member.Name, out var boolCol2))
                     return false;
 
-                whereClause = $" WHERE {_ctx.Provider.FormatBooleanPredicate(boolCol2.EscCol, expectedValue: false)}";
+                whereClause = $" WHERE {FormatCountBooleanPredicate(boolCol2.EscCol, expectedValue: false)}";
                 return true;
             }
 
-            if (lambda.Body is BinaryExpression be && be.NodeType == ExpressionType.Equal && be.Left is MemberExpression me)
+            if (lambda.Body is BinaryExpression be && TryGetMemberEquality(be, out var me, out var valueExpression))
             {
                 if (!map.ColumnsByName.TryGetValue(me.Member.Name, out var column))
                     return false;
 
-                if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var constValue))
+                if (!ExpressionValueExtractor.TryGetConstantValue(valueExpression, out var constValue))
                     return false;
+
+                if (me.Type == typeof(bool) && constValue is bool boolValue)
+                {
+                    whereClause = $" WHERE {FormatCountBooleanPredicate(column.EscCol, boolValue)}";
+                    return true;
+                }
 
                 if (constValue == null)
                 {
@@ -1781,6 +1851,10 @@ namespace nORM.Query
 
             return false;
         }
+
+        private string FormatCountBooleanPredicate(string expressionSql, bool expectedValue)
+            => $"{expressionSql} = {(expectedValue ? _ctx.Provider.BooleanTrueLiteral : _ctx.Provider.BooleanFalseLiteral)}";
+
         private Task<TResult> ExecuteCountAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
         {
             // Split into fast (no logger) and slow (with logger) paths.
