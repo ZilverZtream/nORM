@@ -22,10 +22,13 @@ namespace nORM.Internal
         internal static SemaphoreSlim? GetSerializedConnectionGate(DbCommand command, DbContext ctx)
         {
             var connection = command.Connection;
-            return ctx.Provider.PrefersSyncExecution && connection != null
+            return connection != null ? GetSerializedConnectionGate(connection, ctx) : null;
+        }
+
+        internal static SemaphoreSlim? GetSerializedConnectionGate(DbConnection connection, DbContext ctx)
+            => ctx.Provider.PrefersSyncExecution
                 ? s_serializedConnectionGates.GetValue(connection, CreateGate)
                 : null;
-        }
 
         /// <summary>
         /// Executes <see cref="DbCommand.ExecuteNonQueryAsync()"/> while invoking any registered
