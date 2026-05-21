@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
+using nORM.Providers;
 
 namespace nORM.Versioning
 {
@@ -41,8 +42,7 @@ namespace nORM.Versioning
 
                 // Introspect live column types before generating history DDL so that
                 // custom precision/length on main-table columns is mirrored in history table.
-                var liveColumns = await context.Provider
-                    .IntrospectTableColumnsAsync(conn, mapping.TableName, ct)
+                var liveColumns = await IntrospectTableColumnsAsync(context, conn, mapping.TableName, ct)
                     .ConfigureAwait(false);
                 var createHistoryTableSql = context.Provider.GenerateCreateHistoryTableSql(mapping, liveColumns);
                 await ExecuteDdlAsync(context, conn, createHistoryTableSql, ct).ConfigureAwait(false);
@@ -67,10 +67,20 @@ namespace nORM.Versioning
             var probeSql = context.Provider.GetHistoryTableExistsProbeSql(historyTable);
             try
             {
-                await using var cmd = conn.CreateCommand();
-                cmd.CommandText = probeSql;
-                await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
-                return true;
+                var gate = CommandInterceptorExtensions.GetSerializedConnectionGate(conn, context);
+                if (gate != null)
+                    await gate.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    await using var cmd = conn.CreateCommand();
+                    cmd.CommandText = probeSql;
+                    await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+                    return true;
+                }
+                finally
+                {
+                    gate?.Release();
+                }
             }
             catch (DbException dbEx) when (context.Provider.IsObjectNotFoundError(dbEx))
             {
@@ -80,6 +90,24 @@ namespace nORM.Versioning
                 return false;
             }
             // All other exceptions (non-DbException, permission errors, connectivity) propagate.
+        }
+
+        private static async Task<IReadOnlyList<DatabaseProvider.LiveColumnInfo>> IntrospectTableColumnsAsync(
+            DbContext context, DbConnection conn, string tableName, CancellationToken ct)
+        {
+            var gate = CommandInterceptorExtensions.GetSerializedConnectionGate(conn, context);
+            if (gate == null)
+                return await context.Provider.IntrospectTableColumnsAsync(conn, tableName, ct).ConfigureAwait(false);
+
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                return await context.Provider.IntrospectTableColumnsAsync(conn, tableName, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                gate.Release();
+            }
         }
 
         // S6-1: Split on both T-SQL GO batch separators and MySQL trigger delimiters.
