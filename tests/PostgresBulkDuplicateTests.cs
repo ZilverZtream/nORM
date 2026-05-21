@@ -4,10 +4,12 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
 using nORM.Core;
+using nORM.Mapping;
 using nORM.Providers;
 using Xunit;
 
@@ -38,30 +40,21 @@ public class PostgresBulkDuplicateTests
     [Fact]
     public void PostgresProvider_BuildBatchInsertSql_DoesNotContain_OnConflictDoNothing()
     {
-        // Access internal method via reflection to verify SQL shape
-        var providerType = typeof(PostgresProvider);
-        var method = providerType.GetMethod("BuildPostgresBatchInsertSql",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var sql = BuildPostgresBatchInsertSql(batchSize: 2);
 
-        if (method == null)
-        {
-            // Method may have been inlined or renamed; skip gracefully
-            return;
-        }
-
-        // Create a minimal mock that doesn't require live connection
-        // We cannot instantiate PostgresProvider without a parameterFactory.
-        // Just verify via string assertion on what the fix removes.
-        Assert.True(true, "P1 fix: BuildPostgresBatchInsertSql no longer appends ON CONFLICT DO NOTHING");
+        Assert.StartsWith("INSERT INTO", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("VALUES", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ON CONFLICT DO NOTHING", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void P1_Fix_PostgresBatchInsert_RaisesConstraintError_OnDuplicate()
+    public void PostgresProvider_BuildBatchInsertSql_UsesPlainInsertSoDuplicatesPropagate()
     {
-        // Without live PostgreSQL, document expected behavior:
-        // After P1 fix: BulkInsertAsync with duplicate PK raises DbException (unique constraint violation).
-        // Before P1 fix: would silently succeed with 0 rows inserted for duplicates.
-        Assert.True(true, "P1 fix: duplicate PK in PostgreSQL BulkInsertAsync now raises exception instead of silent discard");
+        var sql = BuildPostgresBatchInsertSql(batchSize: 1);
+
+        Assert.Contains("INSERT INTO", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ON CONFLICT", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("DO NOTHING", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── Live PostgreSQL test (env-gated) ─────────────────────────────────────
@@ -107,7 +100,12 @@ public class PostgresBulkDuplicateTests
         //             BulkInsertAsync → silently returns with ON CONFLICT DO NOTHING
         // After fix:  BulkInsertAsync → raises exception on duplicate (same as InsertAsync)
         // This ensures provider parity between single-row and bulk insert paths.
-        Assert.True(true, "P1 semantic parity verified: BulkInsertAsync now raises on duplicate, matching InsertAsync behavior");
+        var bulkSql = BuildPostgresBatchInsertSql(batchSize: 3);
+        var joinTableSql = new PostgresProvider(new SqliteParameterFactory())
+            .GetInsertOrIgnoreSql("\"PostTag\"", "\"PostId\"", "\"TagId\"", "@p0", "@p1");
+
+        Assert.DoesNotContain("ON CONFLICT", bulkSql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ON CONFLICT DO NOTHING", joinTableSql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -145,6 +143,18 @@ public class PostgresBulkDuplicateTests
         cmd.CommandText = "CREATE TABLE SqliteBdiRow (Id INTEGER PRIMARY KEY, Value TEXT NOT NULL)";
         await cmd.ExecuteNonQueryAsync();
         return (cn, new DbContext(cn, new SqliteProvider()));
+    }
+
+    private static string BuildPostgresBatchInsertSql(int batchSize)
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var getMapping = typeof(DbContext).GetMethod("GetMapping", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var mapping = (TableMapping)getMapping.Invoke(ctx, new object[] { typeof(PgBdiRow) })!;
+        var cols = mapping.Columns.Where(c => !c.IsDbGenerated).ToArray();
+        return provider.BuildPostgresBatchInsertSql(mapping, cols, batchSize);
     }
 
     [Fact]
