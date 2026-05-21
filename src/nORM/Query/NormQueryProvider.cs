@@ -2527,7 +2527,7 @@ namespace nORM.Query
 
             // Batch all 5 extends into a single hash operation (saves 4 XxHash128 calls)
             var fingerprint = ExpressionFingerprint
-                .Compute(filtered)
+                .ComputeForPlanCache(filtered)
                 .Extend(tenantHash, elementType.GetHashCode(), filtered.Type.GetHashCode(),
                         _ctx.Provider.GetType().GetHashCode(), mappingHash);
 
