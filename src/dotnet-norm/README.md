@@ -11,7 +11,7 @@
 Install the tool locally using the .NET CLI:
 
 ```bash
-dotnet tool install --global dotnet-norm --version 1.0.0
+dotnet tool install --global dotnet-norm
 ```
 
 Then run the tool from your project directory:
@@ -20,4 +20,4 @@ Then run the tool from your project directory:
 norm --help
 ```
 
-For more information about package readmes and why they matter, see the [NuGet authoring best practices](https://aka.ms/nuget/authoring-best-practices/readme).
+The tool package follows the same versioning as the nORM repository release it ships with.
