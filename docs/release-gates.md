@@ -35,3 +35,25 @@ set NORM_TEST_MYSQL=Server=127.0.0.1;Port=3306;Database=normtest;User=root;Passw
 The gate sets `NORM_REQUIRE_LIVE_PARITY=any` when at least one live provider is configured and defaults `NORM_MIN_LIVE_PROVIDERS` to the number of configured providers. Set either variable before running the script when a stricter local policy is needed.
 
 For a release candidate, run `full` with every supported live provider configured. For everyday regression work, run `quick` or `live` with the providers available on the machine.
+
+## v1.0 Release Candidate Gate
+
+Use `eng\v1-release-gate.ps1` for v1.0 release-candidate validation. It extends
+the live-provider gate with the public API snapshot, package creation, repeated
+navigation/transaction/compiled-query stress loops, provider/source-generator
+parity, migration parity, concurrency/adversarial coverage, and the fast complex
+query benchmark.
+
+```powershell
+.\eng\v1-release-gate.ps1 -Mode rc -MinLiveProviders 2 -StressIterations 20
+```
+
+Modes:
+
+- `quick`: restore, build, public API snapshot, and package validation.
+- `live`: quick gate plus live provider tests.
+- `full`: live gate plus full test suite and benchmark.
+- `rc`: full gate plus the repeated v1.0 stress/parity loops.
+
+The public API baseline is documented in `docs\public-api-policy.md`. The v1.0
+release checklist is documented in `docs\v1-readiness.md`.

@@ -17,6 +17,11 @@
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(CI)'=='true'">true</ContinuousIntegrationBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,6 +33,7 @@
       <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
       <PackageReference Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="170.100.0" />
       <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
+      <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
     </ItemGroup>
 
 	<ItemGroup>
