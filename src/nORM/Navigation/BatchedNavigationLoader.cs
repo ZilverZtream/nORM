@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -30,13 +31,17 @@ namespace nORM.Navigation
         private int _hasCancelablePending;
         private long _lastEnqueueTimestamp;
         private volatile bool _disposed;
+        private int _schedulerQueued;
+        private static readonly ConcurrentQueue<BatchedNavigationLoader> s_scheduledLoaders = new();
+        private static readonly SemaphoreSlim s_schedulerSignal = new(0);
+        private static int s_schedulerStarted;
 
         /// <summary>
         /// Delay in milliseconds before the batch timer fires after the first pending load is queued.
         /// Balances latency (lower value) against batching efficiency (higher value).
         /// </summary>
         private const int BatchDelayMs = 25;
-        private const int CancelableBatchDelayMs = 250;
+        private const int CancelableBatchDelayMs = BatchDelayMs;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BatchedNavigationLoader"/>
@@ -46,8 +51,8 @@ namespace nORM.Navigation
         /// <exception cref="ArgumentNullException"><paramref name="context"/> is <c>null</c>.</exception>
         /// <remarks>
         /// PERFORMANCE OPTIMIZATION: Uses reactive scheduling instead of polling.
-        /// Short-lived long-running workers own the batch delay so heavy thread-pool load cannot
-        /// starve queued navigation requests, without keeping one permanent thread per loader.
+        /// A small process-wide scheduler owns each batch window and coalesces requests that
+        /// arrive within the configured delay.
         /// </remarks>
         public BatchedNavigationLoader(DbContext context)
         {
@@ -93,9 +98,11 @@ namespace nORM.Navigation
                 return Task.FromCanceled<List<object>>(ct);
 
             var entityType = entity.GetType();
+            if (!ct.CanBeCanceled && TryCompleteWithoutBatch(entityType, propertyName, entity, out var completed))
+                return completed;
+
             var key = (entityType, propertyName);
             var tcs = new TaskCompletionSource<List<object>>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var shouldSignalBatch = false;
             if (ct.CanBeCanceled)
             {
                 var cancellationRegistration = ct.Register(static state =>
@@ -133,20 +140,18 @@ namespace nORM.Navigation
                 if (ct.CanBeCanceled)
                     Volatile.Write(ref _hasCancelablePending, 1);
 
-                // Signal the worker only for the first pending item in a batch window.
                 if (!_batchScheduled)
-                {
                     _batchScheduled = true;
-                    shouldSignalBatch = true;
-                }
             }
             finally
             {
                 _batchSemaphore.Release();
             }
 
-            if (shouldSignalBatch)
-                StartBatchThread();
+            if (ct.CanBeCanceled)
+                QueueBatchWorker();
+            else
+                ProcessBatchInline();
 
             return tcs.Task;
         }
@@ -155,14 +160,67 @@ namespace nORM.Navigation
         /// Processes a scheduled navigation batch after the configured delay without relying on
         /// thread-pool timer callbacks.
         /// </summary>
-        private void StartBatchThread()
+        private void QueueBatchWorker()
         {
-            var thread = new Thread(static state => ((BatchedNavigationLoader)state!).ProcessScheduledBatch())
+            if (Interlocked.Exchange(ref _schedulerQueued, 1) != 0)
+                return;
+
+            EnsureSchedulerStarted();
+            s_scheduledLoaders.Enqueue(this);
+            s_schedulerSignal.Release();
+        }
+
+        private static void EnsureSchedulerStarted()
+        {
+            if (Interlocked.Exchange(ref s_schedulerStarted, 1) != 0)
+                return;
+
+            var workerCount = Math.Max(16, Math.Min(64, Environment.ProcessorCount * 2));
+            for (var i = 0; i < workerCount; i++)
             {
-                IsBackground = true,
-                Name = "nORM navigation batch loader"
-            };
-            thread.Start(this);
+                var thread = new Thread(SchedulerLoop)
+                {
+                    IsBackground = true,
+                    Name = "nORM navigation batch scheduler"
+                };
+                thread.Start();
+            }
+        }
+
+        private static void SchedulerLoop()
+        {
+            while (true)
+            {
+                s_schedulerSignal.Wait();
+                if (s_scheduledLoaders.TryDequeue(out var loader))
+                    loader.ProcessScheduledBatch();
+            }
+        }
+
+        private void ProcessBatchInline()
+        {
+            if (Interlocked.Exchange(ref _processing, 1) == 1)
+            {
+                QueueBatchWorker();
+                return;
+            }
+
+            try
+            {
+                ProcessBatch();
+            }
+            catch
+            {
+                // ProcessBatch delivers per-request errors to queued TCS instances. If an
+                // unexpected exception escapes outside that path, leave future batches usable.
+            }
+            finally
+            {
+                Volatile.Write(ref _processing, 0);
+                Volatile.Write(ref _schedulerQueued, 0);
+                if (!_disposed && HasScheduledBatch())
+                    QueueBatchWorker();
+            }
         }
 
         private void ProcessScheduledBatch()
@@ -198,7 +256,41 @@ namespace nORM.Navigation
             finally
             {
                 Volatile.Write(ref _processing, 0);
+                Volatile.Write(ref _schedulerQueued, 0);
+                if (!_disposed && HasScheduledBatch())
+                    QueueBatchWorker();
             }
+        }
+
+        private bool HasScheduledBatch()
+        {
+            _batchSemaphore.Wait();
+            try
+            {
+                return _batchScheduled;
+            }
+            finally
+            {
+                _batchSemaphore.Release();
+            }
+        }
+
+        private bool TryCompleteWithoutBatch(
+            Type entityType,
+            string propertyName,
+            object entity,
+            out Task<List<object>> completed)
+        {
+            var mapping = _context.GetMapping(entityType);
+            if (!mapping.Relations.TryGetValue(propertyName, out var relation) ||
+                relation.PrincipalKey.Getter(entity) == null)
+            {
+                completed = Task.FromResult(new List<object>());
+                return true;
+            }
+
+            completed = null!;
+            return false;
         }
 
         /// <summary>

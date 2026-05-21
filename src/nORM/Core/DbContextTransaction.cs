@@ -40,8 +40,11 @@ namespace nORM.Core
         /// </summary>
         public void Commit()
         {
+            if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
+                return;
+
             try { _transaction?.Commit(); }
-            finally { Dispose(); }
+            finally { DisposeTransactionAndClear(); }
         }
 
         /// <summary>
@@ -54,6 +57,9 @@ namespace nORM.Core
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task CommitAsync(CancellationToken ct = default)
         {
+            if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
+                return;
+
             try
             {
                 if (_transaction != null)
@@ -67,7 +73,7 @@ namespace nORM.Core
             finally
             {
                 // Always clear — even if commit threw, the transaction is done (unknown state).
-                await DisposeAsync().ConfigureAwait(false);
+                await DisposeTransactionAndClearAsync().ConfigureAwait(false);
             }
         }
 
@@ -79,8 +85,11 @@ namespace nORM.Core
         /// </summary>
         public void Rollback()
         {
+            if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
+                return;
+
             try { _transaction?.Rollback(); }
-            finally { Dispose(); }
+            finally { DisposeTransactionAndClear(); }
         }
 
         /// <summary>
@@ -92,6 +101,9 @@ namespace nORM.Core
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public async Task RollbackAsync(CancellationToken ct = default)
         {
+            if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
+                return;
+
             try
             {
                 if (_transaction != null)
@@ -102,7 +114,7 @@ namespace nORM.Core
             finally
             {
                 // Always clear — even if rollback threw, the transaction is done (unknown state).
-                await DisposeAsync().ConfigureAwait(false);
+                await DisposeTransactionAndClearAsync().ConfigureAwait(false);
             }
         }
 
@@ -113,11 +125,7 @@ namespace nORM.Core
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _completed, 1, 0) == 0)
-            {
-                _transaction?.Dispose();
-                if (_transaction != null)
-                    _context.ClearTransaction(_transaction);
-            }
+                DisposeTransactionAndClear();
         }
 
         /// <summary>
@@ -128,12 +136,36 @@ namespace nORM.Core
         public async ValueTask DisposeAsync()
         {
             if (Interlocked.CompareExchange(ref _completed, 1, 0) == 0)
+                await DisposeTransactionAndClearAsync().ConfigureAwait(false);
+        }
+
+        private void DisposeTransactionAndClear()
+        {
+            if (_transaction == null)
+                return;
+
+            try
             {
-                if (_transaction != null)
-                {
-                    await _transaction.DisposeAsync().ConfigureAwait(false);
-                    _context.ClearTransaction(_transaction);
-                }
+                _transaction.Dispose();
+            }
+            finally
+            {
+                _context.ClearTransaction(_transaction);
+            }
+        }
+
+        private async ValueTask DisposeTransactionAndClearAsync()
+        {
+            if (_transaction == null)
+                return;
+
+            try
+            {
+                await _transaction.DisposeAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                _context.ClearTransaction(_transaction);
             }
         }
     }
