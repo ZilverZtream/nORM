@@ -52,6 +52,28 @@ namespace nORM.Tests.Ns2
 
 namespace nORM.Tests
 {
+    // SG3 verification: nested classes with the same simple name in the same
+    // namespace must generate unique helper class names.
+    internal static class NestedMaterializerContainerA
+    {
+        [GenerateMaterializer]
+        internal class DuplicateNested
+        {
+            public int Id { get; set; }
+            public string Name { get; set; } = string.Empty;
+        }
+    }
+
+    internal static class NestedMaterializerContainerB
+    {
+        [GenerateMaterializer]
+        internal class DuplicateNested
+        {
+            public int Id { get; set; }
+            public string Tag { get; set; } = string.Empty;
+        }
+    }
+
     public class MaterializerGeneratorTests
     {
         [Fact]
@@ -95,6 +117,34 @@ namespace nORM.Tests
             Assert.Equal("Main", entity.Address.Street);
             Assert.Equal("Metro", entity.Address.City);
             Assert.Equal(1, entity.Id);
+        }
+
+        [Fact]
+        public async Task Nested_generated_materializers_with_same_simple_name_do_not_collide()
+        {
+            Assert.True(CompiledMaterializerStore.TryGet(typeof(NestedMaterializerContainerA.DuplicateNested), out _));
+            Assert.True(CompiledMaterializerStore.TryGet(typeof(NestedMaterializerContainerB.DuplicateNested), out _));
+
+            using var cn = new SqliteConnection("Data Source=:memory:");
+            cn.Open();
+
+            using var cmdA = cn.CreateCommand();
+            cmdA.CommandText = "SELECT 1 AS Id, 'alpha' AS Name";
+            using var readerA = cmdA.ExecuteReader();
+            Assert.True(readerA.Read());
+            var matA = CompiledMaterializerStore.Get<NestedMaterializerContainerA.DuplicateNested>();
+            var entityA = await matA(readerA, CancellationToken.None);
+            Assert.Equal(1, entityA.Id);
+            Assert.Equal("alpha", entityA.Name);
+
+            using var cmdB = cn.CreateCommand();
+            cmdB.CommandText = "SELECT 2 AS Id, 'beta' AS Tag";
+            using var readerB = cmdB.ExecuteReader();
+            Assert.True(readerB.Read());
+            var matB = CompiledMaterializerStore.Get<NestedMaterializerContainerB.DuplicateNested>();
+            var entityB = await matB(readerB, CancellationToken.None);
+            Assert.Equal(2, entityB.Id);
+            Assert.Equal("beta", entityB.Tag);
         }
     }
 }

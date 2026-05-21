@@ -155,6 +155,28 @@ namespace nORM.SourceGenerators
         private static string EscapeCSharpLiteral(string s)
             => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
+        private static string GetGeneratedMaterializerClassName(INamedTypeSymbol type)
+        {
+            var parts = new Stack<string>();
+            for (INamedTypeSymbol? current = type; current != null; current = current.ContainingType)
+            {
+                parts.Push(current.MetadataName);
+            }
+
+            return "Materializer_" + SanitizeIdentifier(string.Join("_", parts));
+        }
+
+        private static string SanitizeIdentifier(string value)
+        {
+            var sb = new StringBuilder(value.Length);
+            foreach (var ch in value)
+            {
+                sb.Append(char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_');
+            }
+
+            return sb.ToString();
+        }
+
         private static string GetColumnName(IPropertySymbol prop)
         {
             foreach (var attr in prop.GetAttributes())
@@ -174,6 +196,7 @@ namespace nORM.SourceGenerators
             var ns = type.ContainingNamespace.IsGlobalNamespace ? null : type.ContainingNamespace.ToDisplayString();
             var typeName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var simpleName = type.Name;
+            var generatedClassName = GetGeneratedMaterializerClassName(type);
             var props = type.GetMembers().OfType<IPropertySymbol>()
                 .Where(p => !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
                 .OrderBy(p => p.Name)
@@ -220,7 +243,7 @@ namespace nORM.SourceGenerators
             sb.AppendLine("using System.Data.Common;");
             sb.AppendLine("using nORM.SourceGeneration;");
             if (ns != null) sb.AppendLine($"namespace {ns};");
-            sb.AppendLine($"internal static class Materializer_{simpleName}");
+            sb.AppendLine($"internal static class {generatedClassName}");
             sb.AppendLine("{");
             sb.AppendLine("    [global::System.Runtime.CompilerServices.ModuleInitializer]");
             sb.AppendLine("    public static void Register()");
@@ -264,11 +287,11 @@ namespace nORM.SourceGenerators
             sb.AppendLine("    }");
             sb.AppendLine("}");
 
-            // Use fully-qualified type name as hint to avoid collisions when two classes
-            // share the same simple name but live in different namespaces.
+            // Use the namespace plus generated helper name as hint to avoid collisions
+            // when types share a simple name across namespaces or containing types.
             var hintName = ns != null
-                ? $"{ns.Replace(".", "_")}_{simpleName}_Materializer.g.cs"
-                : $"{simpleName}_Materializer.g.cs";
+                ? $"{ns.Replace(".", "_")}_{generatedClassName}.g.cs"
+                : $"{generatedClassName}.g.cs";
             context.AddSource(hintName, SourceText.From(sb.ToString(), Encoding.UTF8));
         }
 
