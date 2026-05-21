@@ -120,6 +120,35 @@ public class CompiledQueryFastPathTests
         }
     }
 
+    private sealed class ThrowOnceReaderInterceptor : IDbCommandInterceptor
+    {
+        private int _remainingThrows = 1;
+        public List<DbCommand> SeenCommands { get; } = new();
+
+        public InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, DbContext ctx)
+        {
+            SeenCommands.Add(command);
+            if (Interlocked.Exchange(ref _remainingThrows, 0) == 1)
+                throw new InvalidOperationException("Injected reader failure");
+            return InterceptionResult<DbDataReader>.Continue();
+        }
+
+        public Task<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand _, DbContext __, CancellationToken ___) =>
+            Task.FromResult(InterceptionResult<int>.Continue());
+        public Task NonQueryExecutedAsync(DbCommand _, DbContext __, int ___, TimeSpan ____, CancellationToken _____) =>
+            Task.CompletedTask;
+        public Task<InterceptionResult<object?>> ScalarExecutingAsync(DbCommand _, DbContext __, CancellationToken ___) =>
+            Task.FromResult(InterceptionResult<object?>.Continue());
+        public Task ScalarExecutedAsync(DbCommand _, DbContext __, object? ___, TimeSpan ____, CancellationToken _____) =>
+            Task.CompletedTask;
+        public Task<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, DbContext ctx, CancellationToken ct)
+            => Task.FromResult(ReaderExecuting(command, ctx));
+        public Task ReaderExecutedAsync(DbCommand _, DbContext __, DbDataReader ___, TimeSpan ____, CancellationToken _____) =>
+            Task.CompletedTask;
+        public Task CommandFailedAsync(DbCommand _, DbContext __, Exception ___, CancellationToken ____) =>
+            Task.CompletedTask;
+    }
+
     // ════════════════════════════════════════════════════════════════════════════
     // Connection state handling
     // ════════════════════════════════════════════════════════════════════════════
@@ -543,6 +572,41 @@ public class CompiledQueryFastPathTests
         Assert.Same(ctx.CurrentTransaction, interceptor.CapturedTransaction);
 
         await tx.CommitAsync();
+    }
+
+    [Fact]
+    public async Task CompiledQuery_PooledCommand_ReturnedAfterSyncReaderException()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"norm_compiled_pool_{Guid.NewGuid():N}.db");
+        try
+        {
+            using var cn = CreateConnection(path);
+            cn.Close();
+
+            var interceptor = new ThrowOnceReaderInterceptor();
+            var options = new DbContextOptions();
+            options.CommandInterceptors.Add(interceptor);
+
+            var compiled = Norm.CompileQuery((DbContext ctx, int id) =>
+                ctx.Query<Article>().Where(a => a.Id == id));
+
+            using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => compiled(ctx, 1));
+
+            var result = await compiled(ctx, 2);
+
+            Assert.Single(result);
+            Assert.Equal("Fast Car", result[0].Title);
+            Assert.Equal(2, interceptor.SeenCommands.Count);
+            Assert.Same(interceptor.SeenCommands[0], interceptor.SeenCommands[1]);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (File.Exists(path))
+                File.Delete(path);
+        }
     }
 
     /// <summary>

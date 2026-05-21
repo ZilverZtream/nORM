@@ -1005,9 +1005,14 @@ namespace nORM.Query
             // Sync materialization for providers without true async I/O
             if (_ctx.Provider.PrefersSyncExecution)
             {
-                var result = ExecutePooledListSync<TResult>(plan, cmd);
-                state.CommandPool.Enqueue(cmd);
-                return result;
+                try
+                {
+                    return ExecutePooledListSync<TResult>(plan, cmd);
+                }
+                finally
+                {
+                    state.CommandPool.Enqueue(cmd);
+                }
             }
             // Handle List<object> covariant case
             if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
