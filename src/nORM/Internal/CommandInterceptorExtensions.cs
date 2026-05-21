@@ -41,15 +41,31 @@ namespace nORM.Internal
         public static Task<int> ExecuteNonQueryWithInterceptionAsync(this DbCommand command, DbContext ctx, CancellationToken ct)
         {
             var interceptors = ctx.Options.CommandInterceptors;
+            var gate = GetSerializedConnectionGate(command, ctx);
             if (interceptors.Count == 0)
             {
                 // Return the task directly — avoids async state machine allocation
+                if (gate != null)
+                    return ExecuteNonQuerySerializedAsync(command, gate, ct);
                 return command.ExecuteNonQueryAsync(ct);
             }
-            return ExecuteNonQueryWithInterceptionSlowAsync(command, ctx, interceptors, ct);
+            return ExecuteNonQueryWithInterceptionSlowAsync(command, ctx, interceptors, ct, gate);
         }
 
-        private static async Task<int> ExecuteNonQueryWithInterceptionSlowAsync(DbCommand command, DbContext ctx, System.Collections.Generic.IList<IDbCommandInterceptor> interceptors, CancellationToken ct)
+        private static async Task<int> ExecuteNonQuerySerializedAsync(DbCommand command, SemaphoreSlim gate, CancellationToken ct)
+        {
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        private static async Task<int> ExecuteNonQueryWithInterceptionSlowAsync(DbCommand command, DbContext ctx, System.Collections.Generic.IList<IDbCommandInterceptor> interceptors, CancellationToken ct, SemaphoreSlim? gate)
         {
 
             foreach (var interceptor in interceptors)
@@ -64,8 +80,14 @@ namespace nORM.Internal
             }
 
             var sw = Stopwatch.StartNew();
+            var gateHeld = false;
             try
             {
+                if (gate != null)
+                {
+                    await gate.WaitAsync(ct).ConfigureAwait(false);
+                    gateHeld = true;
+                }
                 var result = await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 sw.Stop();
                 foreach (var interceptor in interceptors)
@@ -76,12 +98,22 @@ namespace nORM.Internal
             }
             catch (Exception ex)
             {
+                if (gateHeld)
+                {
+                    gate!.Release();
+                    gateHeld = false;
+                }
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
                     await interceptor.CommandFailedAsync(command, ctx, ex, ct).ConfigureAwait(false);
                 }
                 throw;
+            }
+            finally
+            {
+                if (gateHeld)
+                    gate!.Release();
             }
         }
 
@@ -97,9 +129,21 @@ namespace nORM.Internal
         public static int ExecuteNonQueryWithInterception(this DbCommand command, DbContext ctx)
         {
             var interceptors = ctx.Options.CommandInterceptors;
+            var gate = GetSerializedConnectionGate(command, ctx);
             if (interceptors.Count == 0)
             {
-                return command.ExecuteNonQuery();
+                if (gate == null)
+                    return command.ExecuteNonQuery();
+
+                gate.Wait();
+                try
+                {
+                    return command.ExecuteNonQuery();
+                }
+                finally
+                {
+                    gate.Release();
+                }
             }
 
             foreach (var interceptor in interceptors)
@@ -114,8 +158,14 @@ namespace nORM.Internal
             }
 
             var sw = Stopwatch.StartNew();
+            var gateHeld = false;
             try
             {
+                if (gate != null)
+                {
+                    gate.Wait();
+                    gateHeld = true;
+                }
                 var result = command.ExecuteNonQuery();
                 sw.Stop();
                 foreach (var interceptor in interceptors)
@@ -124,10 +174,20 @@ namespace nORM.Internal
             }
             catch (Exception ex)
             {
+                if (gateHeld)
+                {
+                    gate!.Release();
+                    gateHeld = false;
+                }
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                     interceptor.CommandFailed(command, ctx, ex);
                 throw;
+            }
+            finally
+            {
+                if (gateHeld)
+                    gate!.Release();
             }
         }
 
@@ -142,15 +202,31 @@ namespace nORM.Internal
         public static Task<object?> ExecuteScalarWithInterceptionAsync(this DbCommand command, DbContext ctx, CancellationToken ct)
         {
             var interceptors = ctx.Options.CommandInterceptors;
+            var gate = GetSerializedConnectionGate(command, ctx);
             if (interceptors.Count == 0)
             {
                 // Return the task directly — avoids async state machine allocation
+                if (gate != null)
+                    return ExecuteScalarSerializedAsync(command, gate, ct);
                 return command.ExecuteScalarAsync(ct);
             }
-            return ExecuteScalarWithInterceptionSlowAsync(command, ctx, interceptors, ct);
+            return ExecuteScalarWithInterceptionSlowAsync(command, ctx, interceptors, ct, gate);
         }
 
-        private static async Task<object?> ExecuteScalarWithInterceptionSlowAsync(DbCommand command, DbContext ctx, System.Collections.Generic.IList<IDbCommandInterceptor> interceptors, CancellationToken ct)
+        private static async Task<object?> ExecuteScalarSerializedAsync(DbCommand command, SemaphoreSlim gate, CancellationToken ct)
+        {
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                return await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        private static async Task<object?> ExecuteScalarWithInterceptionSlowAsync(DbCommand command, DbContext ctx, System.Collections.Generic.IList<IDbCommandInterceptor> interceptors, CancellationToken ct, SemaphoreSlim? gate)
         {
 
             foreach (var interceptor in interceptors)
@@ -165,8 +241,14 @@ namespace nORM.Internal
             }
 
             var sw = Stopwatch.StartNew();
+            var gateHeld = false;
             try
             {
+                if (gate != null)
+                {
+                    await gate.WaitAsync(ct).ConfigureAwait(false);
+                    gateHeld = true;
+                }
                 var result = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
                 sw.Stop();
                 foreach (var interceptor in interceptors)
@@ -177,12 +259,22 @@ namespace nORM.Internal
             }
             catch (Exception ex)
             {
+                if (gateHeld)
+                {
+                    gate!.Release();
+                    gateHeld = false;
+                }
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
                     await interceptor.CommandFailedAsync(command, ctx, ex, ct).ConfigureAwait(false);
                 }
                 throw;
+            }
+            finally
+            {
+                if (gateHeld)
+                    gate!.Release();
             }
         }
 
@@ -196,7 +288,7 @@ namespace nORM.Internal
         /// <param name="ctx">The current <see cref="DbContext"/>.</param>
         /// <returns>The scalar result returned by the command.</returns>
         public static object? ExecuteScalarWithInterception(this DbCommand command, DbContext ctx)
-            => ExecuteScalarWithInterceptionCore(command, ctx);
+            => ExecuteScalarWithInterceptionSerialized(command, ctx);
 
         internal static object? ExecuteScalarWithInterceptionSerialized(this DbCommand command, DbContext ctx)
         {

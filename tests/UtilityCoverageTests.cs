@@ -109,6 +109,110 @@ public sealed class UctEmptyReader : DbDataReader
     public override Type GetFieldType(int ordinal) => typeof(object);
 }
 
+public sealed class UctGateTrackingConnection : DbConnection
+{
+    private ConnectionState _state = ConnectionState.Closed;
+    private int _activeCommands;
+    private int _maxConcurrentCommands;
+
+    public TaskCompletionSource FirstCommandEntered { get; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public int MaxConcurrentCommands => Volatile.Read(ref _maxConcurrentCommands);
+
+    [System.Diagnostics.CodeAnalysis.AllowNull]
+    public override string ConnectionString { get; set; } = "Data Source=:memory:";
+    public override string Database => "GateTracking";
+    public override string DataSource => "GateTracking";
+    public override string ServerVersion => "1.0";
+    public override ConnectionState State => _state;
+
+    public override void ChangeDatabase(string databaseName) { }
+    public override void Close() => _state = ConnectionState.Closed;
+    public override void Open() => _state = ConnectionState.Open;
+
+    protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
+        => throw new NotSupportedException();
+
+    protected override DbCommand CreateDbCommand()
+        => new UctGateTrackingCommand(this);
+
+    internal async Task EnterCommandAsync(CancellationToken ct)
+    {
+        var active = Interlocked.Increment(ref _activeCommands);
+        FirstCommandEntered.TrySetResult();
+
+        int observed;
+        while (active > (observed = Volatile.Read(ref _maxConcurrentCommands))
+               && Interlocked.CompareExchange(ref _maxConcurrentCommands, active, observed) != observed)
+        {
+        }
+
+        try
+        {
+            await Task.Delay(150, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _activeCommands);
+        }
+    }
+}
+
+public sealed class UctGateTrackingCommand : DbCommand
+{
+    private readonly UctGateTrackingConnection _connection;
+    private readonly SqliteCommand _parameterSource = new();
+
+    public UctGateTrackingCommand(UctGateTrackingConnection connection)
+        => _connection = connection;
+
+    [System.Diagnostics.CodeAnalysis.AllowNull]
+    public override string CommandText { get; set; } = "";
+    public override int CommandTimeout { get; set; }
+    public override CommandType CommandType { get; set; } = CommandType.Text;
+    public override bool DesignTimeVisible { get; set; }
+    public override UpdateRowSource UpdatedRowSource { get; set; }
+
+    protected override DbConnection? DbConnection
+    {
+        get => _connection;
+        set { }
+    }
+
+    protected override DbParameterCollection DbParameterCollection => _parameterSource.Parameters;
+    protected override DbTransaction? DbTransaction { get; set; }
+
+    public override void Cancel() { }
+    public override int ExecuteNonQuery() => 1;
+    public override object ExecuteScalar() => 1L;
+    public override void Prepare() { }
+
+    public override async Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken)
+    {
+        await _connection.EnterCommandAsync(cancellationToken).ConfigureAwait(false);
+        return 1;
+    }
+
+    public override async Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken)
+    {
+        await _connection.EnterCommandAsync(cancellationToken).ConfigureAwait(false);
+        return 1L;
+    }
+
+    protected override DbParameter CreateDbParameter() => new SqliteParameter();
+
+    protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
+        => throw new NotSupportedException();
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+            _parameterSource.Dispose();
+        base.Dispose(disposing);
+    }
+}
+
 /// <summary>Coverage for DbCommandExtensions, FastExpressionVisitorPool, DynamicBatchSizer,
 /// CommandInterceptorExtensions, DbConnectionFactory, BaseDbCommandInterceptor.</summary>
 public class UtilityCoverageTests
@@ -636,6 +740,50 @@ public class UtilityCoverageTests
     // ══════════════════════════════════════════════════════════════════════
     // DbConnectionFactory
     // ══════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task CommandInterceptorExtensions_ExecuteNonQueryAsync_SyncProviderSerializesSameConnection()
+    {
+        using var cn = new UctGateTrackingConnection();
+        cn.Open();
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        using var firstCommand = cn.CreateCommand();
+        var first = firstCommand.ExecuteNonQueryWithInterceptionAsync(ctx, CancellationToken.None);
+
+        await cn.FirstCommandEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        using var secondCommand = cn.CreateCommand();
+        var second = secondCommand.ExecuteNonQueryWithInterceptionAsync(ctx, CancellationToken.None);
+
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, cn.MaxConcurrentCommands);
+    }
+
+    [Fact]
+    public async Task CommandInterceptorExtensions_ExecuteScalarAsync_WithInterceptor_SyncProviderSerializesSameConnection()
+    {
+        using var cn = new UctGateTrackingConnection();
+        cn.Open();
+        var opts = new DbContextOptions
+        {
+            CommandInterceptors = { new UctLoggingInterceptor(new FakeLogger()) }
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+
+        using var firstCommand = cn.CreateCommand();
+        var first = firstCommand.ExecuteScalarWithInterceptionAsync(ctx, CancellationToken.None);
+
+        await cn.FirstCommandEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        using var secondCommand = cn.CreateCommand();
+        var second = secondCommand.ExecuteScalarWithInterceptionAsync(ctx, CancellationToken.None);
+
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, cn.MaxConcurrentCommands);
+    }
 
     [Fact]
     public void DbConnectionFactory_Create_Sqlite_ReturnsConnection()
