@@ -370,12 +370,12 @@ public class ProviderParityQueryPagingTests
     [InlineData("NORM_TEST_POSTGRES",  "PostgreSQL")]
     public void LiveProvider_StatusReport(string envVar, string name)
     {
-        var configured = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(envVar));
+        var configured = !string.IsNullOrEmpty(LiveProviderEnvironment.GetByCanonicalName(envVar));
         // Always passes — output tells CI which providers are live.
         if (configured)
-            Assert.True(true, $"{name} live parity tests ENABLED ({envVar} set).");
+            Assert.True(true, $"{name} live parity tests ENABLED ({envVar} or {envVar}_CS set).");
         else
-            Assert.True(true, $"{name} live parity tests SKIPPED ({envVar} not set). " +
+            Assert.True(true, $"{name} live parity tests SKIPPED ({envVar} and {envVar}_CS not set). " +
                 $"Set env var to a valid connection string to enable.");
     }
 
@@ -388,9 +388,9 @@ public class ProviderParityQueryPagingTests
             ?.ToLowerInvariant()?.Trim();
         if (string.IsNullOrEmpty(policy)) return; // advisory mode
 
-        bool ss   = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_SQLSERVER"));
-        bool my   = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_MYSQL"));
-        bool pg   = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_POSTGRES"));
+        bool ss   = LiveProviderEnvironment.IsConfigured("sqlserver");
+        bool my   = LiveProviderEnvironment.IsConfigured("mysql");
+        bool pg   = LiveProviderEnvironment.IsConfigured("postgres");
 
         if (policy == "all")
         {

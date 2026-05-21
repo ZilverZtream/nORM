@@ -417,7 +417,7 @@ public class SqlServerMigrationRunnerTests
     [Fact]
     public async Task Live_SqlServer_ApplyMigrations_CreatesHistoryTable()
     {
-        var connStr = Environment.GetEnvironmentVariable("NORM_TEST_SQLSERVER");
+        var connStr = LiveProviderEnvironment.GetConnectionString("sqlserver");
         if (connStr == null) return; // skip — no live SQL Server available
 
         await Task.CompletedTask;
@@ -426,7 +426,7 @@ public class SqlServerMigrationRunnerTests
     [Fact]
     public async Task Live_SqlServer_HasPendingMigrations_AfterApply_ReturnsFalse()
     {
-        var connStr = Environment.GetEnvironmentVariable("NORM_TEST_SQLSERVER");
+        var connStr = LiveProviderEnvironment.GetConnectionString("sqlserver");
         if (connStr == null) return; // skip
 
         await Task.CompletedTask;

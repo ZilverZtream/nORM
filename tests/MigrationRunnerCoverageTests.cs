@@ -1052,7 +1052,7 @@ public class MigrationRunnerCoverageTests
     [Fact]
     public async Task SqlServer_Live_ApplyMigrations()
     {
-        var connStr = Environment.GetEnvironmentVariable("NORM_TEST_SQLSERVER");
+        var connStr = LiveProviderEnvironment.GetConnectionString("sqlserver");
         if (connStr == null) return;
         await Task.CompletedTask;
     }
@@ -1064,7 +1064,7 @@ public class MigrationRunnerCoverageTests
     [Fact]
     public async Task MySQL_Live_ApplyMigrations()
     {
-        var connStr = Environment.GetEnvironmentVariable("NORM_TEST_MYSQL");
+        var connStr = LiveProviderEnvironment.GetConnectionString("mysql");
         if (connStr == null) return;
         await Task.CompletedTask;
     }

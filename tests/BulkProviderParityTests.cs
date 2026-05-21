@@ -139,25 +139,25 @@ public class BulkProviderParityTests
             }
             case "sqlserver":
             {
-                var cs = Environment.GetEnvironmentVariable("NORM_TEST_SQLSERVER_CS");
+                var cs = LiveProviderEnvironment.GetConnectionString("sqlserver");
                 if (string.IsNullOrEmpty(cs))
-                    return (null, null, "NORM_TEST_SQLSERVER_CS not set");
+                    return (null, null, "NORM_TEST_SQLSERVER or NORM_TEST_SQLSERVER_CS not set");
                 var cn = OpenReflected("Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient", cs);
                 return (cn, new SqlServerProvider(), null);
             }
             case "mysql":
             {
-                var cs = Environment.GetEnvironmentVariable("NORM_TEST_MYSQL_CS");
+                var cs = LiveProviderEnvironment.GetConnectionString("mysql");
                 if (string.IsNullOrEmpty(cs))
-                    return (null, null, "NORM_TEST_MYSQL_CS not set");
+                    return (null, null, "NORM_TEST_MYSQL or NORM_TEST_MYSQL_CS not set");
                 var cn = OpenReflected("MySqlConnector.MySqlConnection, MySqlConnector", cs);
                 return (cn, new MySqlProvider(new SqliteParameterFactory()), null);
             }
             case "postgres":
             {
-                var cs = Environment.GetEnvironmentVariable("NORM_TEST_POSTGRES_CS");
+                var cs = LiveProviderEnvironment.GetConnectionString("postgres");
                 if (string.IsNullOrEmpty(cs))
-                    return (null, null, "NORM_TEST_POSTGRES_CS not set");
+                    return (null, null, "NORM_TEST_POSTGRES or NORM_TEST_POSTGRES_CS not set");
                 var cn = OpenReflected("Npgsql.NpgsqlConnection, Npgsql", cs);
                 return (cn, new PostgresProvider(new SqliteParameterFactory()), null);
             }
