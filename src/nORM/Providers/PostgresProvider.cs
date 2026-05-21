@@ -849,16 +849,18 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
                     sb.Append(string.Join(", ", valueCols.Select(c => c.EscCol)));
                     sb.Append(") WHERE ");
 
-                    var joinConditions = keyCols.Select(c => $"t.{c.EscCol} = v.{c.EscCol}").ToList();
-                    if (m.TimestampColumn != null)
-                        joinConditions.Add($"t.{m.TimestampColumn.EscCol} = v.{m.TimestampColumn.EscCol}");
-                    sb.Append(string.Join(" AND ", joinConditions));
                     // Add tenant predicate to prevent cross-tenant bulk updates
+                    var tenantParam = ctx.Options.TenantProvider != null && m.TenantColumn != null
+                        ? $"{ParamPrefix}__tenant_bulk"
+                        : null;
+                    sb.Append(BuildBulkUpdateWhereClause(
+                        keyCols.Select(c => c.EscCol),
+                        m.TimestampColumn?.EscCol,
+                        m.TenantColumn?.EscCol,
+                        tenantParam));
                     if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
                     {
-                        var tenantParam = $"{ParamPrefix}__tenant_bulk";
-                        cmd.AddParam(tenantParam, ctx.Options.TenantProvider.GetCurrentTenantId());
-                        sb.Append($" AND t.{m.TenantColumn.EscCol} = {tenantParam}");
+                        cmd.AddParam(tenantParam!, ctx.Options.TenantProvider.GetCurrentTenantId());
                     }
 
                     cmd.CommandText = sb.ToString();
@@ -878,6 +880,20 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // Invalidate query cache after bulk write to prevent stale reads
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, totalUpdated, sw.Elapsed);
             return totalUpdated;
+        }
+
+        internal static string BuildBulkUpdateWhereClause(
+            IEnumerable<string> keyColumns,
+            string? timestampColumn,
+            string? tenantColumn,
+            string? tenantParameter)
+        {
+            var conditions = keyColumns.Select(c => $"t.{c} = v.{c}").ToList();
+            if (timestampColumn != null)
+                conditions.Add($"t.{timestampColumn} = v.{timestampColumn}");
+            if (tenantColumn != null && tenantParameter != null)
+                conditions.Add($"t.{tenantColumn} = {tenantParameter}");
+            return string.Join(" AND ", conditions);
         }
 
         /// <summary>

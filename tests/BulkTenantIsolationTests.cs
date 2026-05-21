@@ -205,30 +205,53 @@ public class BulkTenantIsolationTests
     [Fact]
     public void MySqlProvider_BulkUpdate_JoinClause_IncludesTenantParam()
     {
-        // Shape test: verify the MySQL UPDATE SQL includes a WHERE clause for tenant
-        // We don't have a live MySQL, so we verify the SQL shape by checking that
-        // the generated UpdateAsync SQL for a tenant-scoped context includes tenant predicate.
-        // This is covered by the live provider running the X1 fix path.
-        // Placeholder to document the expected shape.
-        Assert.True(true, "MySQL BulkUpdateAsync adds WHERE T1.TenantId = @__tenant_bulk when TenantProvider is set");
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+
+        var sql = provider.BuildBulkUpdateSql(
+            "`BtiItem`",
+            "`BulkUpdate_test`",
+            "T1.`Name` = T2.`Name`, T1.`TenantId` = T2.`TenantId`",
+            "T1.`Id` = T2.`Id`",
+            "`TenantId`");
+
+        Assert.Equal("UPDATE `BtiItem` T1 JOIN `BulkUpdate_test` T2 ON T1.`Id` = T2.`Id` SET T1.`Name` = T2.`Name`, T1.`TenantId` = T2.`TenantId` WHERE T1.`TenantId` = @__tenant_bulk", sql);
     }
 
     [Fact]
     public void PostgresProvider_BulkUpdate_JoinConditions_IncludesTenant()
     {
-        Assert.True(true, "PostgreSQL BulkUpdateAsync appends AND t.TenantId = @__tenant_bulk when TenantProvider is set");
+        var where = PostgresProvider.BuildBulkUpdateWhereClause(
+            new[] { "\"Id\"" },
+            "\"RowVersion\"",
+            "\"TenantId\"",
+            "@__tenant_bulk");
+
+        Assert.Equal("t.\"Id\" = v.\"Id\" AND t.\"RowVersion\" = v.\"RowVersion\" AND t.\"TenantId\" = @__tenant_bulk", where);
     }
 
     [Fact]
     public void SqlServerProvider_BulkUpdate_WhereClause_IncludesTenant()
     {
-        Assert.True(true, "SQL Server BulkUpdateAsync appends WHERE T1.TenantId = @__tenant_bulk when TenantProvider is set");
+        var sql = SqlServerProvider.BuildBulkUpdateSql(
+            "[BtiItem]",
+            "#BulkUpdate_test",
+            "T1.[Name] = T2.[Name], T1.[TenantId] = T2.[TenantId]",
+            "T1.[Id] = T2.[Id]",
+            "[TenantId]");
+
+        Assert.Equal("UPDATE T1 SET T1.[Name] = T2.[Name], T1.[TenantId] = T2.[TenantId] FROM [BtiItem] T1 JOIN #BulkUpdate_test T2 ON T1.[Id] = T2.[Id] WHERE T1.[TenantId] = @__tenant_bulk", sql);
     }
 
     [Fact]
     public void SqlServerProvider_BulkDelete_WhereClause_IncludesTenant()
     {
-        Assert.True(true, "SQL Server BulkDeleteAsync appends WHERE T1.TenantId = @__tenant_bulk when TenantProvider is set");
+        var sql = SqlServerProvider.BuildBulkDeleteSql(
+            "[BtiItem]",
+            "#BulkDelete_test",
+            "T1.[Id] = T2.[Id]",
+            "[TenantId]");
+
+        Assert.Equal("DELETE T1 FROM [BtiItem] T1 JOIN #BulkDelete_test T2 ON T1.[Id] = T2.[Id] WHERE T1.[TenantId] = @__tenant_bulk", sql);
     }
 
     // ── Composite-key entity for cross-tenant tests ──────────────────────────

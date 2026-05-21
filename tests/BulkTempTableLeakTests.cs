@@ -130,26 +130,25 @@ public class BulkTempTableLeakTests
     [Fact]
     public void X4_Fix_MySQL_BulkUpdateAsync_DropsTemporaryTable()
     {
-        // Before fix: MySQL BulkUpdateAsync created CREATE TEMPORARY TABLE but never dropped it.
-        // After fix: wrapped in try/finally with DROP TEMPORARY TABLE IF EXISTS {tempTableName}
-        // This prevents session-local temp-table accumulation on long-lived connections.
-        Assert.True(true, "X4 fix: MySQL BulkUpdateAsync now drops temp table in finally block");
+        var sql = MySqlProvider.BuildBulkUpdateDropTempTableSql("`BulkUpdate_test`");
+
+        Assert.Equal("DROP TEMPORARY TABLE IF EXISTS `BulkUpdate_test`", sql);
     }
 
     [Fact]
     public void X4_Fix_SqlServer_BulkUpdateAsync_DropsHashTable()
     {
-        // Before fix: SQL Server BulkUpdateAsync created #BulkUpdate_* but never dropped it.
-        // After fix: wrapped in try/finally with IF OBJECT_ID(...) IS NOT NULL DROP TABLE
-        Assert.True(true, "X4 fix: SQL Server BulkUpdateAsync now drops #BulkUpdate_* in finally block");
+        var sql = SqlServerProvider.BuildDropTempTableSql("#BulkUpdate_test");
+
+        Assert.Equal("IF OBJECT_ID('tempdb..#BulkUpdate_test') IS NOT NULL DROP TABLE #BulkUpdate_test", sql);
     }
 
     [Fact]
     public void X4_Fix_SqlServer_BulkDeleteAsync_DropsHashTable()
     {
-        // Before fix: SQL Server BulkDeleteAsync created #BulkDelete_* but never dropped it.
-        // After fix: wrapped in try/finally with IF OBJECT_ID(...) IS NOT NULL DROP TABLE
-        Assert.True(true, "X4 fix: SQL Server BulkDeleteAsync now drops #BulkDelete_* in finally block");
+        var sql = SqlServerProvider.BuildDropTempTableSql("#BulkDelete_test");
+
+        Assert.Equal("IF OBJECT_ID('tempdb..#BulkDelete_test') IS NOT NULL DROP TABLE #BulkDelete_test", sql);
     }
 
     // ── Live MySQL test (env-gated) ───────────────────────────────────────────
