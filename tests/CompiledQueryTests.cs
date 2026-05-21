@@ -24,6 +24,13 @@ public class CompiledQueryTests
         public string City { get; set; } = string.Empty;
     }
 
+    public class PagedPerson
+    {
+        public int Id { get; set; }
+        public int GroupId { get; set; }
+        public int Score { get; set; }
+    }
+
     private sealed class MutableIdHolder
     {
         public int[] Values { get; set; } = Array.Empty<int>();
@@ -164,5 +171,33 @@ public class CompiledQueryTests
         Assert.Equal(2, second.Count);
         Assert.DoesNotContain(second, p => p.Id == 1);
     }
-}
 
+    [Fact]
+    public async Task Compiled_query_where_skip_take_binds_parameters_in_sql_order()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE PagedPerson(Id INTEGER, GroupId INTEGER, Score INTEGER);";
+            for (int i = 1; i <= 10; i++)
+                cmd.CommandText += $"INSERT INTO PagedPerson VALUES({i}, 7, {i * 10});";
+            cmd.CommandText += "INSERT INTO PagedPerson VALUES(99, 8, 999);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var compiled = Norm.CompileQuery<DbContext, (int GroupId, int Skip, int Take), PagedPerson>(
+            (ctx2, p) => ctx2.Query<PagedPerson>()
+                .Where(x => x.GroupId == p.GroupId)
+                .OrderBy(x => x.Score)
+                .Skip(p.Skip)
+                .Take(p.Take));
+
+        var result = await compiled(ctx, (7, 2, 5));
+
+        Assert.Equal(5, result.Count);
+        Assert.Equal(new[] { 30, 40, 50, 60, 70 }, result.Select(p => p.Score).ToArray());
+        Assert.All(result, p => Assert.Equal(7, p.GroupId));
+    }
+}

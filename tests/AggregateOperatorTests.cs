@@ -211,9 +211,6 @@ public class AggregateOperatorTests
     public async Task Take_ReturnsSubsetOfRows()
     {
         // Verify Take(N) returns exactly N rows when more rows exist.
-        // Note: Skip+Where combo has known parameter-extraction ordering issues in nORM,
-        // so this test uses Take-only (no Skip) combined with a category filter via
-        // a separate count verification.
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
         for (int i = 1; i <= 10; i++) InsertRow(cn, 800, i * 10, i * 1.0);
@@ -222,6 +219,26 @@ public class AggregateOperatorTests
         // Take 5 out of 10 — should return exactly 5
         var rows = await ctx.Query<NumericRow>().OrderBy(x => x.IntValue).Take(5).ToListAsync();
         Assert.Equal(5, rows.Count);
+    }
+
+    [Fact]
+    public async Task Where_OrderBy_Skip_Take_ReturnsExpectedPage()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        for (int i = 1; i <= 10; i++) InsertRow(cn, 810, i * 10, i * 1.0);
+        InsertRow(cn, 811, 999, 99.0);
+
+        var rows = await ctx.Query<NumericRow>()
+            .Where(x => x.Category == 810)
+            .OrderBy(x => x.IntValue)
+            .Skip(2)
+            .Take(5)
+            .ToListAsync();
+
+        Assert.Equal(5, rows.Count);
+        Assert.Equal(new[] { 30, 40, 50, 60, 70 }, rows.Select(r => r.IntValue).ToArray());
+        Assert.All(rows, r => Assert.Equal(810, r.Category));
     }
 
     [Fact]
