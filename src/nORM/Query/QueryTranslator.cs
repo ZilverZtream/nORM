@@ -1561,6 +1561,43 @@ namespace nORM.Query
             }
             return false;
         }
+
+        private bool TryBindPagingParameter(Expression expression, out string parameterName)
+        {
+            while (expression is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
+                expression = convert.Operand;
+
+            if (expression is ParameterExpression parameter)
+            {
+                if (!_paramMap.TryGetValue(parameter, out parameterName!))
+                {
+                    parameterName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+                    AddParameter(parameterName, DBNull.Value);
+                    _paramMap[parameter] = parameterName;
+                }
+                return true;
+            }
+
+            if (expression is MemberExpression member && HasUncorrelatedParameterRoot(member))
+            {
+                parameterName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+                AddParameter(parameterName, DBNull.Value);
+                return true;
+            }
+
+            parameterName = string.Empty;
+            return false;
+        }
+
+        private bool HasUncorrelatedParameterRoot(MemberExpression member)
+        {
+            Expression? current = member.Expression;
+            while (current is MemberExpression nested)
+                current = nested.Expression;
+
+            return current is ParameterExpression parameter && !_correlatedParams.ContainsKey(parameter);
+        }
+
         protected override Expression VisitConstant(ConstantExpression node)
         {
             if (node.Value is IQueryable q && q.ElementType != null)

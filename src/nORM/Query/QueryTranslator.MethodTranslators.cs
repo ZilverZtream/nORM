@@ -258,15 +258,8 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var source = t.Visit(node.Arguments[0]);
-                if (node.Arguments[1] is ParameterExpression tp)
+                if (t.TryBindPagingParameter(node.Arguments[1], out var tName))
                 {
-                    if (!t._paramMap.TryGetValue(tp, out var tName))
-                    {
-                        tName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
-                        t._params[tName] = DBNull.Value;
-                        t._compiledParams.Add(tName);
-                        t._paramMap[tp] = tName;
-                    }
                     t._takeParam = tName;
                 }
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int take))
@@ -293,15 +286,8 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var source = t.Visit(node.Arguments[0]);
-                if (node.Arguments[1] is ParameterExpression sp)
+                if (t.TryBindPagingParameter(node.Arguments[1], out var sName))
                 {
-                    if (!t._paramMap.TryGetValue(sp, out var sName))
-                    {
-                        sName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
-                        t._params[sName] = DBNull.Value;
-                        t._compiledParams.Add(sName);
-                        t._paramMap[sp] = sName;
-                    }
                     t._skipParam = sName;
                 }
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int skip))
