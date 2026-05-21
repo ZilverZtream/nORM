@@ -3468,6 +3468,7 @@ namespace nORM.Core
                 foreach (var col in mapping.InsertColumns)
                 {
                     cmd.AddOptimizedParam(_p.ParamPrefix + col.PropName, null, GetParameterKnownType(col, null));
+                    ApplyPreparedInsertSizeHint(cmd.Parameters[cmd.Parameters.Count - 1], col);
                 }
 
                 try
@@ -3486,6 +3487,22 @@ namespace nORM.Core
                 await cmd.DisposeAsync().ConfigureAwait(false);
                 throw;
             }
+        }
+
+        private static void ApplyPreparedInsertSizeHint(DbParameter parameter, Column column)
+        {
+            if (parameter.Size != 0)
+                return;
+
+            var type = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
+            if (type == typeof(string) || type == typeof(char))
+                parameter.Size = ParameterOptimizer.MaxInlineStringSize;
+            else if (type == typeof(byte[]))
+                parameter.Size = -1;
+            else if (parameter.DbType == DbType.Object)
+                parameter.Size = ParameterOptimizer.MaxInlineStringSize;
+            else
+                parameter.Size = 1;
         }
 
         private List<PreparedInsertCommand> DrainPreparedInsertCache()

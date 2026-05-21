@@ -41,8 +41,9 @@ For a release candidate, run `full` with every supported live provider configure
 Use `eng\v1-release-gate.ps1` for v1.0 release-candidate validation. It extends
 the live-provider gate with the public API snapshot, package creation, repeated
 navigation/transaction/compiled-query stress loops, provider/source-generator
-parity, migration parity, concurrency/adversarial coverage, and the fast complex
-query benchmark.
+parity, migration parity, concurrency/adversarial coverage, the fast complex
+query benchmark, and the full SQLite/SQL Server/PostgreSQL provider benchmark
+matrix.
 
 ```powershell
 .\eng\v1-release-gate.ps1 -Mode rc -MinLiveProviders 2 -StressIterations 20
@@ -53,7 +54,13 @@ Modes:
 - `quick`: restore, build, public API snapshot, and package validation.
 - `live`: quick gate plus live provider tests.
 - `full`: live gate plus full test suite and benchmark.
-- `rc`: full gate plus the repeated v1.0 stress/parity loops.
+- `rc`: full gate plus the repeated v1.0 stress/parity loops and provider
+  matrix benchmarks.
+
+The RC provider matrix requires both `NORM_TEST_SQLSERVER` (or
+`NORM_TEST_SQLSERVER_CS`) and `NORM_TEST_POSTGRES` (or `NORM_TEST_POSTGRES_CS`).
+Use `-SkipProviderMatrixBenchmark` only when validating a non-performance change
+that cannot access both servers locally.
 
 The public API baseline is documented in `docs\public-api-policy.md`. The v1.0
 release checklist is documented in `docs\v1-readiness.md`.

@@ -997,7 +997,7 @@ namespace nORM.Query
 
             // Q1 fix: reuse pooled prepared command to avoid repeated allocations; create new if pool is empty
             if (!state.CommandPool.TryDequeue(out var cmd))
-                cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
+                cmd = CreateAndPreparePooledCommand(plan, parameterValues, fixedParams, state);
 
             // Only update compiled parameter values — fixed params are already set
             UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
@@ -1035,7 +1035,7 @@ namespace nORM.Query
 
             // Q1 fix: reuse pooled prepared command to avoid repeated allocations; create new if pool is empty
             if (!state.CommandPool.TryDequeue(out var cmd))
-                cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
+                cmd = CreateAndPreparePooledCommand(plan, parameterValues, fixedParams, state);
             UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
             cmd.Transaction = _ctx.CurrentTransaction;
             try
@@ -1051,7 +1051,10 @@ namespace nORM.Query
         }
 
         private DbCommand CreateAndPreparePooledCommand(
-            QueryPlan plan, KeyValuePair<string, object>[]? fixedParams, CompiledQueryState state)
+            QueryPlan plan,
+            object?[] parameterValues,
+            KeyValuePair<string, object>[]? fixedParams,
+            CompiledQueryState state)
         {
             var cmd = _ctx.CreateCommand();
             cmd.CommandText = plan.Sql;
@@ -1083,21 +1086,34 @@ namespace nORM.Query
                 }
             }
 
-            // Pre-create compiled parameter slots (values updated per call)
+            // Pre-create compiled parameter slots with the first call's values. Providers
+            // such as Npgsql infer prepared-statement parameter types during Prepare().
             for (int i = 0; i < plan.CompiledParameters.Count; i++)
             {
                 var p = cmd.CreateParameter();
                 p.ParameterName = plan.CompiledParameters[i];
-                p.Value = DBNull.Value;
+                if (i < parameterValues.Length)
+                    ParameterAssign.AssignValue(p, parameterValues[i]);
+                else
+                    p.Value = DBNull.Value;
                 cmd.Parameters.Add(p);
             }
 
             // Prepare the command — compiles SQL once, subsequent executions skip sqlite3_prepare_v2.
             // Prepare() is optional — some providers (e.g., in-memory) throw NotSupportedException.
-            try { cmd.Prepare(); } catch (NotSupportedException) { } catch (InvalidOperationException) { }
+            ApplyPreparedParameterSizeHints(cmd);
+            try { cmd.Prepare(); } catch (NotSupportedException) { } catch (InvalidOperationException) { } catch (DbException) { }
 
             state.FixedParamCount = fixedCount;
             return cmd;
+        }
+
+        private static void ApplyPreparedParameterSizeHints(DbCommand cmd)
+        {
+            foreach (DbParameter parameter in cmd.Parameters)
+            {
+                ApplyPreparedParameterSizeHint(cmd, parameter);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1109,7 +1125,21 @@ namespace nORM.Query
             // P1 fix: call AssignValue (not direct .Value assignment) so that DbType and Size
             // are reset when the value is null, preventing stale metadata carry-over.
             for (int i = 0; i < count; i++)
-                ParameterAssign.AssignValue(cmd.Parameters[fixedParamCount + i], parameterValues[i]);
+            {
+                var parameter = cmd.Parameters[fixedParamCount + i];
+                ParameterAssign.AssignValue(parameter, parameterValues[i]);
+                ApplyPreparedParameterSizeHint(cmd, parameter);
+            }
+        }
+
+        private static void ApplyPreparedParameterSizeHint(DbCommand cmd, DbParameter parameter)
+        {
+            if (parameter.DbType is DbType.String or DbType.AnsiString or DbType.StringFixedLength or DbType.AnsiStringFixedLength)
+                parameter.Size = nORM.Internal.ParameterOptimizer.MaxInlineStringSize;
+            else if (parameter.DbType == DbType.Binary)
+                parameter.Size = -1;
+            else if (cmd.GetType().FullName == "Microsoft.Data.SqlClient.SqlCommand" && parameter.Size == 0)
+                parameter.Size = 1;
         }
 
         /// <summary>
