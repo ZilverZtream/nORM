@@ -113,9 +113,14 @@ public sealed class UctGateTrackingConnection : DbConnection
 {
     private ConnectionState _state = ConnectionState.Closed;
     private int _activeCommands;
+    private int _enteredCommands;
     private int _maxConcurrentCommands;
 
     public TaskCompletionSource FirstCommandEntered { get; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource SecondCommandEntered { get; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource AllowCommandsToComplete { get; } =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public int MaxConcurrentCommands => Volatile.Read(ref _maxConcurrentCommands);
@@ -140,7 +145,11 @@ public sealed class UctGateTrackingConnection : DbConnection
     internal async Task EnterCommandAsync(CancellationToken ct)
     {
         var active = Interlocked.Increment(ref _activeCommands);
-        FirstCommandEntered.TrySetResult();
+        var entered = Interlocked.Increment(ref _enteredCommands);
+        if (entered == 1)
+            FirstCommandEntered.TrySetResult();
+        else if (entered == 2)
+            SecondCommandEntered.TrySetResult();
 
         int observed;
         while (active > (observed = Volatile.Read(ref _maxConcurrentCommands))
@@ -150,7 +159,7 @@ public sealed class UctGateTrackingConnection : DbConnection
 
         try
         {
-            await Task.Delay(150, ct).ConfigureAwait(false);
+            await AllowCommandsToComplete.Task.WaitAsync(ct).ConfigureAwait(false);
         }
         finally
         {
@@ -756,9 +765,13 @@ public class UtilityCoverageTests
         using var secondCommand = cn.CreateCommand();
         var second = secondCommand.ExecuteNonQueryWithInterceptionAsync(ctx, CancellationToken.None);
 
+        Assert.False(await EnteredSecondCommandBeforeReleaseAsync(cn));
+        cn.AllowCommandsToComplete.TrySetResult();
+
         await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(1, cn.MaxConcurrentCommands);
+        Assert.True(cn.SecondCommandEntered.Task.IsCompleted);
     }
 
     [Fact]
@@ -780,9 +793,19 @@ public class UtilityCoverageTests
         using var secondCommand = cn.CreateCommand();
         var second = secondCommand.ExecuteScalarWithInterceptionAsync(ctx, CancellationToken.None);
 
+        Assert.False(await EnteredSecondCommandBeforeReleaseAsync(cn));
+        cn.AllowCommandsToComplete.TrySetResult();
+
         await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(1, cn.MaxConcurrentCommands);
+        Assert.True(cn.SecondCommandEntered.Task.IsCompleted);
+    }
+
+    private static async Task<bool> EnteredSecondCommandBeforeReleaseAsync(UctGateTrackingConnection cn)
+    {
+        var completed = await Task.WhenAny(cn.SecondCommandEntered.Task, Task.Delay(TimeSpan.FromMilliseconds(100)));
+        return ReferenceEquals(completed, cn.SecondCommandEntered.Task);
     }
 
     [Fact]
