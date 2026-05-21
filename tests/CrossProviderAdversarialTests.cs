@@ -134,14 +134,14 @@ public class CrossProviderAdversarialTests
     private static void Exec(DbConnection cn, string sql)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = sql;
+        cmd.CommandText = LiveProviderSql.Normalize(cn, sql);
         cmd.ExecuteNonQuery();
     }
 
     private static long ScalarLong(DbConnection cn, string sql)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = sql;
+        cmd.CommandText = LiveProviderSql.Normalize(cn, sql);
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
 

@@ -926,7 +926,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             for (int i = 0; i < entityList.Count; i += batchSize)
             {
                 var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
-                var keys = batch.Select(e => keyCol.Getter(e)).ToArray();
+                var keys = CreateTypedArray(batch.Select(e => keyCol.Getter(e)).ToArray());
                 await using var cmd = ctx.CreateCommand();
                 cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                 var pName = $"{ParamPrefix}p0";

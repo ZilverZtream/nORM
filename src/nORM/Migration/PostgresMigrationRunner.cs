@@ -245,7 +245,7 @@ namespace nORM.Migration
             cmd.CommandText = $"INSERT INTO \"{HistoryTableName}\" (\"Version\", \"Name\", \"AppliedOn\") VALUES (@Version, @Name, @AppliedOn);";
             cmd.AddParam("@Version", migration.Version);
             cmd.AddParam("@Name", migration.Name);
-            cmd.AddParam("@AppliedOn", DateTime.UtcNow);
+            cmd.AddParam("@AppliedOn", DateTimeOffset.UtcNow);
             await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
         }
 
@@ -301,7 +301,7 @@ namespace nORM.Migration
         private async Task EnsureHistoryTableAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{HistoryTableName}\" (Version BIGINT PRIMARY KEY, Name TEXT NOT NULL, AppliedOn TIMESTAMP NOT NULL);";
+            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{HistoryTableName}\" (\"Version\" BIGINT PRIMARY KEY, \"Name\" TEXT NOT NULL, \"AppliedOn\" TIMESTAMPTZ NOT NULL);";
             await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
         }
 

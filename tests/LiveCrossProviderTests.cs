@@ -153,14 +153,14 @@ public class LiveCrossProviderTests
     private static void Exec(DbConnection cn, string sql)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = sql;
+        cmd.CommandText = LiveProviderSql.Normalize(cn, sql);
         cmd.ExecuteNonQuery();
     }
 
     private static long CountRows(DbConnection cn, string table)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = $"SELECT COUNT(*) FROM {table}";
+        cmd.CommandText = $"SELECT COUNT(*) FROM {LiveProviderSql.Identifier(cn, table)}";
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
 
@@ -375,7 +375,7 @@ public class LiveCrossProviderTests
                 "sqlite"    => "UPDATE LS_OccItem SET Token=randomblob(8) WHERE Id=1",
                 "sqlserver" => "UPDATE LS_OccItem SET Token=CONVERT(VARBINARY(8),NEWID()) WHERE Id=1",
                 "mysql"     => "UPDATE LS_OccItem SET Token=UNHEX(REPLACE(UUID(),'-','')) WHERE Id=1",
-                "postgres"  => "UPDATE LS_OccItem SET Token=gen_random_bytes(8) WHERE Id=1",
+                "postgres"  => "UPDATE LS_OccItem SET Token=decode(md5(random()::text), 'hex') WHERE Id=1",
                 _           => throw new ArgumentOutOfRangeException(nameof(kind))
             };
             Exec(cn!, tokenUpdateSql);
