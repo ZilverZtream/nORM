@@ -2932,55 +2932,10 @@ namespace nORM.Core
                 // Get or create mapping for type T - this supports both mapped entities and ad-hoc types
                 var mapping = ctx.GetMapping(typeof(T));
 
-                // Build a name->ordinal map from the actual reader schema so columns are always
-                // read by name, not by position. Reading by position would silently populate the
-                // wrong properties when raw SQL returns columns in a different order than the mapping.
-                //
-                // OrdinalIgnoreCase lookup: column names from different providers may differ in casing
-                // (e.g. PostgreSQL lowercases unquoted identifiers, SQL Server preserves original case).
-                // Case-insensitive comparison ensures the mapping resolves regardless of provider casing.
-                var fieldCount = reader.FieldCount;
-                var nameToOrdinal = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
-                var duplicateColumnNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                for (int i = 0; i < fieldCount; i++)
-                {
-                    var name = reader.GetName(i);
-                    if (!nameToOrdinal.TryAdd(name, i))
-                        duplicateColumnNames.Add(name);
-                }
-
-                // Resolve each mapping column to its reader ordinal; missing columns throw
-                // immediately so callers get a clear diagnostic instead of default-value silencing.
-                var colOrdinals = new (global::nORM.Mapping.Column Col, int Ordinal)[mapping.Columns.Length];
-                for (int i = 0; i < mapping.Columns.Length; i++)
-                {
-                    var col = mapping.Columns[i];
-                    if (duplicateColumnNames.Contains(col.Name))
-                        throw new InvalidOperationException(
-                            $"Column '{col.Name}' appears multiple times in the raw SQL result for {typeof(T).Name}. " +
-                            "Use unique aliases for projected columns so materialization is unambiguous.");
-                    if (!nameToOrdinal.TryGetValue(col.Name, out var ordinal))
-                        throw new InvalidOperationException(
-                            $"Column '{col.Name}' expected by {typeof(T).Name} is not present in the raw SQL result. " +
-                            "Include all mapped columns in the SELECT list, or use column aliases that match property names.");
-                    colOrdinals[i] = (col, ordinal);
-                }
+                var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
 
                 while (await reader.ReadAsync(token).ConfigureAwait(false))
-                {
-                    var instance = Activator.CreateInstance<T>();
-                    foreach (var (col, ordinal) in colOrdinals)
-                    {
-                        if (reader.IsDBNull(ordinal)) continue;
-                        var raw = reader.GetValue(ordinal);
-                        // Coerce provider-specific types (e.g. SQLite returns long for INTEGER columns).
-                        var propType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
-                        if (raw.GetType() != propType)
-                            raw = CoerceRawValue(raw, propType);
-                        col.Setter(instance, raw);
-                    }
-                    list.Add(instance);
-                }
+                    list.Add(MaterializeRawEntity<T>(reader, colOrdinals));
 
                 ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
                 cmd.Parameters.Clear();
@@ -3046,11 +3001,56 @@ namespace nORM.Core
             return Convert.ChangeType(raw, propType, System.Globalization.CultureInfo.InvariantCulture);
         }
 
+        private static (Column Col, int Ordinal)[] ResolveRawResultOrdinals(DbDataReader reader, TableMapping mapping, Type targetType)
+        {
+            var fieldCount = reader.FieldCount;
+            var nameToOrdinal = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
+            var duplicateColumnNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < fieldCount; i++)
+            {
+                var name = reader.GetName(i);
+                if (!nameToOrdinal.TryAdd(name, i))
+                    duplicateColumnNames.Add(name);
+            }
+
+            var colOrdinals = new (Column Col, int Ordinal)[mapping.Columns.Length];
+            for (int i = 0; i < mapping.Columns.Length; i++)
+            {
+                var col = mapping.Columns[i];
+                if (duplicateColumnNames.Contains(col.Name))
+                    throw new InvalidOperationException(
+                        $"Column '{col.Name}' appears multiple times in the raw SQL result for {targetType.Name}. " +
+                        "Use unique aliases for projected columns so materialization is unambiguous.");
+                if (!nameToOrdinal.TryGetValue(col.Name, out var ordinal))
+                    throw new InvalidOperationException(
+                        $"Column '{col.Name}' expected by {targetType.Name} is not present in the raw SQL result. " +
+                        "Include all mapped columns in the SELECT list, or use column aliases that match property names.");
+                colOrdinals[i] = (col, ordinal);
+            }
+
+            return colOrdinals;
+        }
+
+        private static T MaterializeRawEntity<T>(DbDataReader reader, (Column Col, int Ordinal)[] colOrdinals) where T : class, new()
+        {
+            var instance = Activator.CreateInstance<T>();
+            foreach (var (col, ordinal) in colOrdinals)
+            {
+                if (reader.IsDBNull(ordinal)) continue;
+                var raw = reader.GetValue(ordinal);
+                var propType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
+                if (raw.GetType() != propType)
+                    raw = CoerceRawValue(raw, propType);
+                col.Setter(instance, raw);
+            }
+            return instance;
+        }
+
         /// <summary>
         /// Executes a raw SQL query and materializes the results into instances of
         /// <typeparamref name="T"/>. Unlike <see cref="QueryUnchangedAsync"/>, the
-        /// entities are materialized using the nORM query translation pipeline which
-        /// supports projections and navigations.
+        /// entities are materialized using the same name-based raw entity path as
+        /// <see cref="QueryUnchangedAsync{T}"/>.
         /// </summary>
         /// <typeparam name="T">Result entity type.</typeparam>
         /// <param name="sql">Raw SQL query to execute.</param>
@@ -3074,13 +3074,13 @@ namespace nORM.Core
                     throw new NormUsageException("Potential SQL injection detected in raw query.");
                 NormValidator.ValidateRawSql(sql, paramDict);
 
-                using var translator = global::nORM.Query.QueryTranslator.Rent(this);
-                var materializer = translator.CreateMaterializer(GetMapping(typeof(T)), typeof(T));
+                var mapping = ctx.GetMapping(typeof(T));
                 var list = new List<T>();
 
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
+                var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
                 while (await reader.ReadAsync(token).ConfigureAwait(false))
-                    list.Add((T)await materializer(reader, token).ConfigureAwait(false));
+                    list.Add(MaterializeRawEntity<T>(reader, colOrdinals));
 
                 ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
                 cmd.Parameters.Clear();
