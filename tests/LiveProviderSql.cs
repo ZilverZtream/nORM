@@ -16,10 +16,12 @@ internal static class LiveProviderSql
         "G40_TenantItem", "G40_OccItem", "G40_OccStr", "G40_Item", "G40_SP", "G40_NoKey",
         "LPM_TenantItem", "LPM_OccItem", "LPM_Item",
         "LS_TenantItem", "LS_OccItem", "LS_Item",
+        "PS_Customer", "PS_Order",
         "SP_Item", "SpLiveMigTarget",
         "NullableNum", "RowVersion", "TenantId", "AppliedOn",
-        "Payload", "Version", "Active", "Amount", "Secret",
-        "Label", "Score", "Value", "Token", "Name", "Tag", "Id"
+        "CustomerId", "IsActive", "Payload", "Version", "Active",
+        "Amount", "Secret", "Total", "Email", "Label", "Score",
+        "Value", "Token", "Name", "Tag", "Id"
     };
 
     public static bool IsPostgres(DbConnection connection)
