@@ -36,6 +36,13 @@ public class CompiledQueryTests
         public int[] Values { get; set; } = Array.Empty<int>();
     }
 
+    public static TheoryData<DatabaseProvider> LimitOffsetProviders() => new()
+    {
+        new SqliteProvider(),
+        new MySqlProvider(new SqliteParameterFactory()),
+        new PostgresProvider(new SqliteParameterFactory())
+    };
+
     [Fact]
     public async Task Compiled_query_executes_with_different_parameters()
     {
@@ -199,5 +206,35 @@ public class CompiledQueryTests
         Assert.Equal(5, result.Count);
         Assert.Equal(new[] { 30, 40, 50, 60, 70 }, result.Select(p => p.Score).ToArray());
         Assert.All(result, p => Assert.Equal(7, p.GroupId));
+    }
+
+    [Theory]
+    [MemberData(nameof(LimitOffsetProviders))]
+    public async Task Compiled_query_where_skip_take_binds_parameters_across_limit_offset_providers(DatabaseProvider provider)
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE PagedPerson(Id INTEGER, GroupId INTEGER, Score INTEGER);";
+            for (int i = 1; i <= 8; i++)
+                cmd.CommandText += $"INSERT INTO PagedPerson VALUES({i}, 11, {i * 10});";
+            cmd.CommandText += "INSERT INTO PagedPerson VALUES(99, 12, 999);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, provider);
+
+        var compiled = Norm.CompileQuery<DbContext, (int GroupId, int Skip, int Take), PagedPerson>(
+            (ctx2, p) => ctx2.Query<PagedPerson>()
+                .Where(x => x.GroupId == p.GroupId)
+                .OrderBy(x => x.Score)
+                .Skip(p.Skip)
+                .Take(p.Take));
+
+        var result = await compiled(ctx, (11, 1, 3));
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(new[] { 20, 30, 40 }, result.Select(p => p.Score).ToArray());
+        Assert.All(result, p => Assert.Equal(11, p.GroupId));
     }
 }
