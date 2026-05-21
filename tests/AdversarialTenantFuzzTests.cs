@@ -190,6 +190,7 @@ public class AdversarialTenantFuzzTests
         }
 
         var violations = new ConcurrentBag<string>();
+        var observed = new (string TenantId, List<string> NormNames)[20];
 
         // Two batches of concurrent tasks, each querying a different tenant.
         var tasks = Enumerable.Range(0, 20).Select(idx => Task.Run(async () =>
@@ -205,16 +206,22 @@ public class AdversarialTenantFuzzTests
                     violations.Add($"task{idx}: query for '{tenantId}' returned row belonging to '{row.TenantId}'");
             }
 
-            // nORM result must match direct SQL.
-            var oracle = await DirectQueryNamesAsync(cn, tenantId);
-            var normNames = rows.OrderBy(r => r.Name).Select(r => r.Name).ToList();
-            var oracleNames = oracle.OrderBy(n => n).ToList();
-
-            if (!normNames.SequenceEqual(oracleNames))
-                violations.Add($"task{idx}: nORM vs oracle divergence for tenant '{tenantId}'");
+            observed[idx] = (tenantId, rows.OrderBy(r => r.Name).Select(r => r.Name).ToList());
         })).ToArray();
 
         await Task.WhenAll(tasks);
+
+        // Keep direct ADO.NET oracle reads out of the concurrent stress phase. Microsoft.Data.Sqlite
+        // does not support arbitrary concurrent raw commands on one connection; nORM serializes its
+        // own SQLite command paths, but the direct oracle bypasses that gate.
+        for (int idx = 0; idx < observed.Length; idx++)
+        {
+            var (tenantId, normNames) = observed[idx];
+            var oracleNames = (await DirectQueryNamesAsync(cn, tenantId)).OrderBy(n => n).ToList();
+            if (!normNames.SequenceEqual(oracleNames))
+                violations.Add($"task{idx}: nORM vs oracle divergence for tenant '{tenantId}'");
+        }
+
         Assert.Empty(violations);
     }
 

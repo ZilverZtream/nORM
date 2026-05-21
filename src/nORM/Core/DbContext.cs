@@ -271,7 +271,17 @@ namespace nORM.Core
                 {
                     if (!_providerInitialized)
                     {
-                        await _p.InitializeConnectionAsync(_cn, ct).ConfigureAwait(false);
+                        var connectionGate = CommandInterceptorExtensions.GetSerializedConnectionGate(_cn, this);
+                        if (connectionGate != null)
+                            await connectionGate.WaitAsync(ct).ConfigureAwait(false);
+                        try
+                        {
+                            await _p.InitializeConnectionAsync(_cn, ct).ConfigureAwait(false);
+                        }
+                        finally
+                        {
+                            connectionGate?.Release();
+                        }
                         _providerInitialized = true;
                     }
                 }
@@ -316,7 +326,16 @@ namespace nORM.Core
                 {
                     if (!_providerInitialized)
                     {
-                        _p.InitializeConnection(_cn);
+                        var connectionGate = CommandInterceptorExtensions.GetSerializedConnectionGate(_cn, this);
+                        connectionGate?.Wait();
+                        try
+                        {
+                            _p.InitializeConnection(_cn);
+                        }
+                        finally
+                        {
+                            connectionGate?.Release();
+                        }
                         _providerInitialized = true;
                     }
                 }
