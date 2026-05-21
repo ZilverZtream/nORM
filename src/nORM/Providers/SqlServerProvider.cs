@@ -473,6 +473,8 @@ ORDER BY c.ORDINAL_POSITION";
             var keyConditionH2 = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h2.{Escape(c.Name)} = d.{Escape(c.Name)}"));
 
             return $@"
+DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_TemporalInsert")};
+GO
 CREATE TRIGGER {Escape(mapping.TableName + "_TemporalInsert")} ON {table} AFTER INSERT AS
 BEGIN
     SET NOCOUNT ON;
@@ -482,6 +484,8 @@ BEGIN
 END;
 GO
 
+DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_TemporalUpdate")};
+GO
 CREATE TRIGGER {Escape(mapping.TableName + "_TemporalUpdate")} ON {table} AFTER UPDATE AS
 BEGIN
     SET NOCOUNT ON;
@@ -499,6 +503,8 @@ BEGIN
 END;
 GO
 
+DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_TemporalDelete")};
+GO
 CREATE TRIGGER {Escape(mapping.TableName + "_TemporalDelete")} ON {table} AFTER DELETE AS
 BEGIN
     SET NOCOUNT ON;

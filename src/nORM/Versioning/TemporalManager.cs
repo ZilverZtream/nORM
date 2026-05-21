@@ -37,15 +37,15 @@ namespace nORM.Versioning
             {
                 ct.ThrowIfCancellationRequested();
 
-                if (await HistoryTableExistsAsync(context, conn, mapping, ct).ConfigureAwait(false))
-                    continue;
-
-                // Introspect live column types before generating history DDL so that
-                // custom precision/length on main-table columns is mirrored in history table.
-                var liveColumns = await IntrospectTableColumnsAsync(context, conn, mapping.TableName, ct)
-                    .ConfigureAwait(false);
-                var createHistoryTableSql = context.Provider.GenerateCreateHistoryTableSql(mapping, liveColumns);
-                await ExecuteDdlAsync(context, conn, createHistoryTableSql, ct).ConfigureAwait(false);
+                if (!await HistoryTableExistsAsync(context, conn, mapping, ct).ConfigureAwait(false))
+                {
+                    // Introspect live column types before generating history DDL so that
+                    // custom precision/length on main-table columns is mirrored in history table.
+                    var liveColumns = await IntrospectTableColumnsAsync(context, conn, mapping.TableName, ct)
+                        .ConfigureAwait(false);
+                    var createHistoryTableSql = context.Provider.GenerateCreateHistoryTableSql(mapping, liveColumns);
+                    await ExecuteDdlAsync(context, conn, createHistoryTableSql, ct).ConfigureAwait(false);
+                }
 
                 var createTriggersSql = context.Provider.GenerateTemporalTriggersSql(mapping);
                 await ExecuteDdlAsync(context, conn, createTriggersSql, ct).ConfigureAwait(false);

@@ -310,11 +310,12 @@ public class TemporalSchemaTests
             .Where(b => b.Length > 0)
             .ToList();
 
- // Must produce exactly 3 CREATE TRIGGER statements
-        Assert.Equal(3, batches.Count);
-        Assert.All(batches, batch =>
-            Assert.True(batch.TrimStart().StartsWith("CREATE TRIGGER", StringComparison.OrdinalIgnoreCase),
-                $"Each batch must start with CREATE TRIGGER, but got: {batch.Substring(0, Math.Min(50, batch.Length))}"));
+ // Must produce one DROP and one CREATE statement for each trigger.
+        Assert.Equal(6, batches.Count);
+        Assert.Equal(3, batches.Count(batch =>
+            batch.TrimStart().StartsWith("DROP TRIGGER", StringComparison.OrdinalIgnoreCase)));
+        Assert.Equal(3, batches.Count(batch =>
+            batch.TrimStart().StartsWith("CREATE TRIGGER", StringComparison.OrdinalIgnoreCase)));
     }
 
  //<summary>
@@ -337,13 +338,17 @@ public class TemporalSchemaTests
             .Where(b => b.Length > 0)
             .ToList();
 
+        var createBatches = batches
+            .Where(b => b.TrimStart().StartsWith("CREATE TRIGGER", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
  // Verify each trigger contains the expected events
-        Assert.Contains(batches, b => b.Contains("AFTER INSERT", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(batches, b => b.Contains("AFTER UPDATE", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(batches, b => b.Contains("AFTER DELETE", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(createBatches, b => b.Contains("AFTER INSERT", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(createBatches, b => b.Contains("AFTER UPDATE", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(createBatches, b => b.Contains("AFTER DELETE", StringComparison.OrdinalIgnoreCase));
 
  // Verify all triggers reference the history table
-        Assert.All(batches, batch =>
+        Assert.All(createBatches, batch =>
             Assert.Contains("_History", batch, StringComparison.OrdinalIgnoreCase));
     }
 
