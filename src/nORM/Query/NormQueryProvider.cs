@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -2299,49 +2300,47 @@ namespace nORM.Query
         private string BuildCacheKeyFromPlan<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
         {
             var hasher = new XxHash128();
-            AppendUtf8(hasher, plan.Sql.AsSpan());
-            AppendByte(hasher, (byte)'|');
-            AppendUtf8(hasher, typeof(TResult).FullName!.AsSpan());
+            AppendLengthPrefixedUtf8(hasher, plan.Sql.AsSpan());
+            AppendLengthPrefixedUtf8(hasher, (typeof(TResult).AssemblyQualifiedName ?? typeof(TResult).FullName ?? typeof(TResult).Name).AsSpan());
             // Include a stable database identity in the result cache key so that two contexts
             // pointing to different databases with the same schema, query, and parameters
             // do not share a cache entry and return data from the wrong database.
             var dbIdentity = NormalizeConnectionStringForCacheKey(_ctx.Connection.ConnectionString);
-            AppendUtf8(hasher, "|DB:".AsSpan());
-            AppendUtf8(hasher, dbIdentity.AsSpan());
+            AppendUtf8(hasher, "DB".AsSpan());
+            AppendLengthPrefixedUtf8(hasher, dbIdentity.AsSpan());
             var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             if (_ctx.Options.TenantProvider != null)
             {
                 // Null tenant is allowed when the tenant column is nullable (ApplyGlobalFilters
                 // emits IS NULL in that case). Use a distinct cache key segment so null-tenant
                 // results are never confused with non-null-tenant results.
-                AppendUtf8(hasher, "|TENANT:".AsSpan());
-                AppendUtf8(hasher, (tenant?.ToString() ?? "<null>").AsSpan());
+                AppendUtf8(hasher, "TENANT".AsSpan());
+                AppendLengthPrefixedUtf8(hasher, (tenant?.ToString() ?? "<null>").AsSpan());
             }
             // Sort parameters deterministically so identical parameter sets produce the same hash
             // regardless of insertion order.
             foreach (var kvp in parameters.OrderBy(k => k.Key, StringComparer.Ordinal))
             {
-                AppendByte(hasher, (byte)'|');
-                AppendUtf8(hasher, kvp.Key.AsSpan());
-                AppendByte(hasher, (byte)'=');
+                AppendUtf8(hasher, "PARAM".AsSpan());
+                AppendLengthPrefixedUtf8(hasher, kvp.Key.AsSpan());
                 if (kvp.Value is null)
                 {
-                    AppendUtf8(hasher, "null".AsSpan());
+                    AppendByte(hasher, 0);
                     continue;
                 }
-                AppendUtf8(hasher, kvp.Value.GetType().FullName!.AsSpan());
-                AppendByte(hasher, (byte)':');
+                AppendByte(hasher, 1);
+                AppendLengthPrefixedUtf8(hasher, (kvp.Value.GetType().AssemblyQualifiedName ?? kvp.Value.GetType().FullName ?? kvp.Value.GetType().Name).AsSpan());
                 if (kvp.Value is byte[] bytesValue)
                 {
-                    hasher.Append(bytesValue);
+                    AppendLengthPrefixedBytes(hasher, bytesValue);
                 }
                 else if (kvp.Value is IFormattable formattable)
                 {
-                    AppendUtf8(hasher, formattable.ToString(null, CultureInfo.InvariantCulture)!.AsSpan());
+                    AppendLengthPrefixedUtf8(hasher, formattable.ToString(null, CultureInfo.InvariantCulture)!.AsSpan());
                 }
                 else
                 {
-                    AppendUtf8(hasher, kvp.Value.ToString()!.AsSpan());
+                    AppendLengthPrefixedUtf8(hasher, kvp.Value.ToString()!.AsSpan());
                 }
             }
             Span<byte> hash = stackalloc byte[16];
@@ -2377,6 +2376,29 @@ namespace nORM.Query
                     System.Security.Cryptography.SHA256.HashData(
                         System.Text.Encoding.UTF8.GetBytes(cs)));
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void AppendLengthPrefixedUtf8(XxHash128 hasher, ReadOnlySpan<char> value)
+        {
+            var byteCount = Encoding.UTF8.GetByteCount(value);
+            AppendInt32(hasher, byteCount);
+            AppendUtf8(hasher, value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void AppendLengthPrefixedBytes(XxHash128 hasher, ReadOnlySpan<byte> value)
+        {
+            AppendInt32(hasher, value.Length);
+            hasher.Append(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void AppendInt32(XxHash128 hasher, int value)
+        {
+            Span<byte> bytes = stackalloc byte[sizeof(int)];
+            BinaryPrimitives.WriteInt32LittleEndian(bytes, value);
+            hasher.Append(bytes);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

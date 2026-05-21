@@ -80,4 +80,26 @@ public class CacheKeyTests
 
         Assert.NotEqual(key1, key2);
     }
+
+    [Fact]
+    public void ParameterSerialization_IsLengthFramed_ToAvoidBoundaryCollisions()
+    {
+        using var ctx = CreateContext();
+        var provider = new NormQueryProvider(ctx);
+
+        var twoParameters = new Dictionary<string, object>
+        {
+            ["@a"] = "x",
+            ["@b"] = "y"
+        };
+        var craftedSingleParameter = new Dictionary<string, object>
+        {
+            ["@a"] = "x|@b=System.String:y"
+        };
+
+        var key1 = BuildKey(provider, CreatePlan(twoParameters), twoParameters);
+        var key2 = BuildKey(provider, CreatePlan(craftedSingleParameter), craftedSingleParameter);
+
+        Assert.NotEqual(key1, key2);
+    }
 }
