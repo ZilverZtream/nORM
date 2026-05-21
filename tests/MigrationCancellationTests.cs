@@ -74,19 +74,17 @@ public class MigrationCancellationTests
     private class BlockingMigration : nORM.Migration.Migration
     {
         private readonly TaskCompletionSource<bool> _started = new();
+        private readonly bool _enableBlocking;
         public Task Started => _started.Task;
 
-        /// <summary>
-        /// Set to <c>true</c> only for the blocking-cancellation test; revert to
-        /// <c>false</c> in a finally block so assembly-scan paths are unaffected.
-        /// </summary>
-        public static bool EnableBlocking { get; set; } = false;
+        public BlockingMigration() : this(enableBlocking: false) { }
 
-        public BlockingMigration() : base(9002, nameof(BlockingMigration)) { }
+        public BlockingMigration(bool enableBlocking) : base(9002, nameof(BlockingMigration))
+            => _enableBlocking = enableBlocking;
 
         public override void Up(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)
         {
-            if (!EnableBlocking)
+            if (!_enableBlocking)
             {
                 // Normal path: create a harmless table and return immediately.
                 using var cmd = connection.CreateCommand();
@@ -204,28 +202,20 @@ public class MigrationCancellationTests
     public async Task Migration_BlockingUp_CancelledMidStep_ThrowsOperationCancelled()
     {
         // Verify that a real cancellation inside Up() (not just before it) works.
-        BlockingMigration.EnableBlocking = true;
-        try
-        {
-            var blocking = new BlockingMigration();
-            using var cts = new CancellationTokenSource();
+        var blocking = new BlockingMigration(enableBlocking: true);
+        using var cts = new CancellationTokenSource();
 
-            using var cn = OpenConnection();
-            await using var tx = await cn.BeginTransactionAsync();
+        using var cn = OpenConnection();
+        await using var tx = await cn.BeginTransactionAsync();
 
-            // Run Up() on a thread pool thread; cancel after it signals it has started.
-            var upTask = Task.Run(() => blocking.Up(cn, tx, cts.Token));
+        // Run Up() on a thread pool thread; cancel after it signals it has started.
+        var upTask = Task.Run(() => blocking.Up(cn, tx, cts.Token));
 
-            await blocking.Started.WaitAsync(TimeSpan.FromSeconds(5));
-            cts.Cancel(); // Signal cancellation while Up() is blocked.
+        await blocking.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        cts.Cancel(); // Signal cancellation while Up() is blocked.
 
-            var ex = await Record.ExceptionAsync(() => upTask);
-            Assert.IsType<OperationCanceledException>(ex);
-        }
-        finally
-        {
-            BlockingMigration.EnableBlocking = false;
-        }
+        var ex = await Record.ExceptionAsync(() => upTask);
+        Assert.IsType<OperationCanceledException>(ex);
     }
 
     [Fact]
