@@ -26,7 +26,7 @@ namespace nORM.Benchmarks
                     case "--fast":
                     case "--norm-only":
                         Console.WriteLine("⚡ Running fast nORM-only benchmarks...");
-                        await RunFastNormBenchmarks();
+                        await RunFastNormBenchmarks(BuildFastBenchmarkArgs(args.Skip(1).ToArray()));
                         return;
 
                     case "--complex":
@@ -127,6 +127,7 @@ namespace nORM.Benchmarks
             Console.WriteLine("  (no args)         Run full benchmark suite (10-15 minutes)");
             Console.WriteLine("  --quick           Quick functionality test (30 seconds)");
             Console.WriteLine("  --fast            Fast nORM-only benchmarks (2-3 minutes)");
+            Console.WriteLine("  --fast <filter>   Fast nORM-only benchmarks matching a filter");
             Console.WriteLine("  --norm-only       Same as --fast");
             Console.WriteLine("  --complex         Focused complex-query comparison");
             Console.WriteLine("  --filter <pattern> Run benchmarks matching a BenchmarkDotNet filter");
@@ -135,6 +136,7 @@ namespace nORM.Benchmarks
             Console.WriteLine("Examples:");
             Console.WriteLine("  dotnet run --quick      # Verify nORM works");
             Console.WriteLine("  dotnet run --fast       # Debug nORM performance only");
+            Console.WriteLine("  dotnet run --fast Query_Complex_Compiled");
             Console.WriteLine("  dotnet run --complex    # Compare complex-query implementations");
             Console.WriteLine("  dotnet run              # Full comparison benchmark");
         }
@@ -149,7 +151,17 @@ namespace nORM.Benchmarks
                 .Run(benchmarkArgs, config);
         }
 
-        private static async Task RunFastNormBenchmarks()
+        private static string[] BuildFastBenchmarkArgs(string[] args)
+        {
+            if (args.Length == 0)
+                return args;
+
+            return args[0].StartsWith("-", StringComparison.Ordinal)
+                ? args
+                : new[] { "--filter", $"*{args[0]}*" }.Concat(args.Skip(1)).ToArray();
+        }
+
+        private static async Task RunFastNormBenchmarks(string[] benchmarkArgs)
         {
             Console.WriteLine("Running fast nORM-only benchmarks...");
             Console.WriteLine("This will quickly test nORM performance with smaller datasets.");
@@ -161,7 +173,9 @@ namespace nORM.Benchmarks
                     .WithOptions(ConfigOptions.DisableOptimizationsValidator);
 
                 await Task.Run(() => {
-                    var summary = BenchmarkRunner.Run<FastNormBenchmarks>(config);
+                    var summary = BenchmarkSwitcher
+                        .FromTypes(new[] { typeof(FastNormBenchmarks) })
+                        .Run(benchmarkArgs, config);
                     return summary;
                 });
 
