@@ -25,9 +25,9 @@ namespace nORM.Providers
     /// </summary>
     public abstract class DatabaseProvider : IFastProvider
     {
-        // S1/Save1 fix: cache key includes table name to prevent cross-context DML contamination
-        // when the same provider instance is shared across contexts with different mappings.
-        private readonly ConcurrentLruCache<(Type Type, string TableName, string Operation), string> _sqlCache = new(maxSize: 1000);
+        // S1/Save1 fix: cache key includes table and mapping shape to prevent cross-context
+        // DML contamination when the same provider instance is shared across divergent mappings.
+        private readonly ConcurrentLruCache<(Type Type, string TableName, string Operation, string Shape), string> _sqlCache = new(maxSize: 1000);
 
         /// <summary>Number of entities sampled for dynamic batch sizing heuristics.</summary>
         protected const int BatchSizingSampleCount = 100;
@@ -838,7 +838,7 @@ namespace nORM.Providers
         {
             var includeIdentityRetrieval = hydrateGeneratedKeys && m.KeyColumns.Any(k => k.IsDbGenerated);
             var cacheKey = includeIdentityRetrieval ? "INSERT" : "INSERT_PLAIN";
-            return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheKey), _ => {
+            return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheKey, m.SqlShapeKey), _ => {
                 var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
                 var identityPrefix = includeIdentityRetrieval ? GetIdentityRetrievalPrefix(m) : string.Empty;
                 var identitySuffix = includeIdentityRetrieval ? GetIdentityRetrievalString(m) : string.Empty;
@@ -868,7 +868,7 @@ namespace nORM.Providers
 
             // X1: cache key distinguishes tenant vs non-tenant SQL so both shapes can coexist.
             var cacheOp = includeTenant ? "UPDATE_TENANT" : "UPDATE";
-            return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheOp), _ =>
+            return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheOp, m.SqlShapeKey), _ =>
             {
                 var set = string.Join(", ", m.UpdateColumns
                     .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}"));
@@ -902,7 +902,7 @@ namespace nORM.Providers
         {
             // X1: cache key distinguishes tenant vs non-tenant SQL so both shapes can coexist.
             var cacheOp = includeTenant ? "DELETE_TENANT" : "DELETE";
-            return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheOp), _ =>
+            return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheOp, m.SqlShapeKey), _ =>
             {
                 var whereCols = m.KeyColumns
                     .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}").ToList();
