@@ -433,31 +433,20 @@ public class MappingHashCacheIsolationTests
 
         var sqlA = sharedProvider.BuildInsert(mapA);
         var sqlB = sharedProvider.BuildInsert(mapB);
+        var updateA = sharedProvider.BuildUpdate(mapA);
+        var updateB = sharedProvider.BuildUpdate(mapB);
+        var deleteA = sharedProvider.BuildDelete(mapA);
+        var deleteB = sharedProvider.BuildDelete(mapB);
 
         // Both mappings have the same Type and TableName, but column names differ.
-        // The provider's _sqlCache key includes (Type, TableName, "INSERT") which
-        // would collide. The insert SQL should still differ because columns differ.
-        // If they are equal, the cache is poisoned.
-        //
-        // NOTE: If the provider cache key does NOT differentiate column layout,
-        // this test documents that limitation. The provider should ideally use
-        // a mapping-specific key (e.g., including column fingerprint).
-        // For now, verify the actual behavior:
-        if (sqlA == sqlB)
-        {
-            // Provider cache collision: same Type+TableName causes stale SQL.
-            // Both contexts MUST use separate provider instances (or the cache
-            // key must incorporate column layout). Document this as a known
-            // limitation by asserting the collision is detected.
-            Assert.True(true, "Provider-level DML cache collision detected for shared provider " +
-                "with same Type+TableName but different column mappings. " +
-                "Use separate provider instances to avoid this.");
-        }
-        else
-        {
-            // If the provider differentiates, verify column names are correct
-            Assert.Contains("[Name]", sqlA);
-            Assert.Contains("[display_name]", sqlB);
-        }
+        // Shared provider DML caches must include mapping shape so SQL never crosses
+        // fluent-model boundaries.
+        Assert.NotEqual(sqlA, sqlB);
+        Assert.NotEqual(updateA, updateB);
+        Assert.Equal(deleteA, deleteB);
+        Assert.Contains("\"Name\"", sqlA);
+        Assert.Contains("\"display_name\"", sqlB);
+        Assert.Contains("\"Name\"", updateA);
+        Assert.Contains("\"display_name\"", updateB);
     }
 }

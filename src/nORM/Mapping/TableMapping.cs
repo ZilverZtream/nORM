@@ -10,6 +10,7 @@ using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
 using System.Linq.Expressions;
+using System.Text;
 
 #nullable enable
 
@@ -73,6 +74,9 @@ namespace nORM.Mapping
 
         /// <summary>Gets the many-to-many join table mappings for this entity type.</summary>
         public readonly List<JoinTableMapping> ManyToManyJoins = new();
+
+        /// <summary>Gets a stable key segment for provider-level SQL shape caches.</summary>
+        internal readonly string SqlShapeKey;
 
         private readonly IEntityTypeConfiguration? _fluentConfig;
 
@@ -185,11 +189,39 @@ namespace nORM.Mapping
             foreach (var col in Columns)
                 if (col.IsShadow) sfp = HashCode.Combine(sfp, col.Name);
             ShadowFingerprint = sfp;
+            SqlShapeKey = BuildSqlShapeKey();
 
             DiscoverRelations(ctx);
             BuildOwnedCollections(fluentConfig, p);
             BuildManyToManyJoins(fluentConfig, p, ctx);
         }
+
+        private string BuildSqlShapeKey()
+        {
+            var sb = new StringBuilder();
+            AppendSegment(sb, EscTable);
+            AppendSegment(sb, ConverterFingerprint.ToString());
+            AppendSegment(sb, ShadowFingerprint.ToString());
+            AppendSegment(sb, TenantColumn?.Name ?? string.Empty);
+            AppendSegment(sb, TimestampColumn?.Name ?? string.Empty);
+            sb.Append(Columns.Length).Append('|');
+            foreach (var col in Columns)
+            {
+                AppendSegment(sb, col.PropName);
+                AppendSegment(sb, col.Name);
+                AppendSegment(sb, col.EscCol);
+                sb.Append(col.IsKey ? '1' : '0')
+                  .Append(col.IsDbGenerated ? '1' : '0')
+                  .Append(col.IsTimestamp ? '1' : '0')
+                  .Append(col.IsShadow ? '1' : '0')
+                  .Append('|');
+            }
+
+            return sb.ToString();
+        }
+
+        private static void AppendSegment(StringBuilder sb, string value)
+            => sb.Append(value.Length).Append(':').Append(value).Append('|');
 
         /// <summary>
         /// Inspects the entity type and associated configuration to build the collection of
