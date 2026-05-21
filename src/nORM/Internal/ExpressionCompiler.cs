@@ -80,17 +80,21 @@ namespace nORM.Internal
             public static CompiledParameterValueSource FromQueryMember(MemberInfo member)
                 => new(null, member, false);
 
-            public bool IsQueryMember => _queryMember != null;
-
             public object? GetValue(object? queryValue)
             {
                 if (_useQueryValue)
                     return queryValue;
 
                 if (_queryMember != null)
+                {
+                    if (queryValue == null)
+                        throw new InvalidOperationException(
+                            $"Compiled query parameter object cannot be null when binding member '{_queryMember.Name}'.");
+
                     return _queryMember is FieldInfo fi ? fi.GetValue(queryValue) :
                            _queryMember is PropertyInfo pi ? pi.GetValue(queryValue) :
                            null;
+                }
 
                 if (_expression != null && QueryTranslator.TryGetConstantValue(_expression, out var value))
                     return value;
@@ -401,14 +405,6 @@ namespace nORM.Internal
 
             if (valueSources.Length == paramNames.Count)
             {
-                if (value is not System.Runtime.CompilerServices.ITuple &&
-                    valueSources.Count(static source => source.IsQueryMember) > 1)
-                {
-                    throw new InvalidOperationException(
-                        $"Compiled query expects {paramNames.Count} parameters. " +
-                        "Pass values as a ValueTuple, e.g. (value1, value2).");
-                }
-
                 var values = new object?[valueSources.Length];
                 object? boxed = value;
                 for (int i = 0; i < valueSources.Length; i++)

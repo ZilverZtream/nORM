@@ -91,9 +91,8 @@ public class CompiledQueryTests
     }
 
  /// <summary>
- /// A compiled query whose plan has multiple SQL parameters, called with a non-tuple
- /// value, must throw InvalidOperationException (not silently replicate the same object).
- /// A custom class with two properties becomes two compiled params in the plan.
+ /// A compiled query whose plan has multiple SQL parameters can bind each member
+ /// from a typed parameter object without reusing the whole object for every SQL parameter.
  /// </summary>
     public class TwoParamQuery
     {
@@ -102,7 +101,7 @@ public class CompiledQueryTests
     }
 
     [Fact]
-    public async Task Compiled_query_multi_param_non_tuple_throws_InvalidOperationException()
+    public async Task Compiled_query_multi_param_object_binds_members_independently()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -121,8 +120,35 @@ public class CompiledQueryTests
             (ctx2, p) => ctx2.Query<PersonInfo>().Where(x => x.Age > p.MinAge && x.City == p.City));
 
         var param = new TwoParamQuery { MinAge = 25, City = "LA" };
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => compiled(ctx, param));
-        Assert.Contains("ValueTuple", ex.Message);
+        var result = await compiled(ctx, param);
+
+        Assert.Single(result);
+        Assert.Equal(2, result[0].Id);
+
+        param.MinAge = 35;
+        param.City = "NY";
+        var noMatch = await compiled(ctx, param);
+        Assert.Empty(noMatch);
+    }
+
+    [Fact]
+    public async Task Compiled_query_multi_param_object_null_parameter_throws_clear_error()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE PersonInfo(Id INTEGER, Name TEXT, Age INTEGER, City TEXT);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var compiled = Norm.CompileQuery<DbContext, TwoParamQuery?, PersonInfo>(
+            (ctx2, p) => ctx2.Query<PersonInfo>().Where(x => x.Age > p!.MinAge && x.City == p.City));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => compiled(ctx, null));
+        Assert.Contains("cannot be null", ex.Message);
+        Assert.Contains(nameof(TwoParamQuery.MinAge), ex.Message);
     }
 
  /// <summary>
