@@ -2,11 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
+using nORM.Mapping;
 using nORM.Providers;
+using nORM.Query;
 using Xunit;
 
 namespace nORM.Tests;
@@ -33,6 +36,17 @@ public class BulkOperationCancellationTests
         cmd.CommandText = "CREATE TABLE BocItems (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)";
         cmd.ExecuteNonQuery();
         var ctx = new DbContext(cn, new SqliteProvider());
+        return (cn, ctx);
+    }
+
+    private static (SqliteConnection cn, DbContext ctx) CreateBaseBulkInsertContext()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE BocItems (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)";
+        cmd.ExecuteNonQuery();
+        var ctx = new DbContext(cn, new BaseBulkInsertSqliteProvider());
         return (cn, ctx);
     }
 
@@ -133,5 +147,57 @@ public class BulkOperationCancellationTests
         verifyCmd.CommandText = "SELECT COUNT(*) FROM BocItems WHERE Id = 1";
         var count = (long)(verifyCmd.ExecuteScalar()!);
         Assert.Equal(0L, count);
+    }
+
+    [Fact]
+    public async Task BaseBulkInsert_WhenLaterBatchFails_RollsBackEarlierBatches()
+    {
+        var (cn, ctx) = CreateBaseBulkInsertContext();
+        using var _ = cn;
+        using var __ = ctx;
+
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "INSERT INTO BocItems (Id, Name) VALUES (99, 'Existing')";
+        cmd.ExecuteNonQuery();
+
+        var items = new List<BocItem>
+        {
+            new() { Id = 1,  Name = "First" },
+            new() { Id = 99, Name = "Conflict" }
+        };
+
+        await Assert.ThrowsAnyAsync<Exception>(() => ctx.BulkInsertAsync(items, CancellationToken.None));
+
+        using var verifyCmd = cn.CreateCommand();
+        verifyCmd.CommandText = "SELECT COUNT(*) FROM BocItems WHERE Id = 1";
+        var count = (long)(verifyCmd.ExecuteScalar()!);
+        Assert.Equal(0L, count);
+    }
+
+    private sealed class BaseBulkInsertSqliteProvider : DatabaseProvider
+    {
+        public override int MaxParameters => 11;
+        public override string Escape(string id) => "\"" + id.Replace("\"", "\"\"") + "\"";
+        public override void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
+        {
+            if (limit.HasValue) sb.Append(" LIMIT ").Append(limitParameterName ?? limit.Value.ToString());
+            if (offset.HasValue) sb.Append(" OFFSET ").Append(offsetParameterName ?? offset.Value.ToString());
+        }
+
+        public override string GetIdentityRetrievalString(TableMapping m) => "SELECT last_insert_rowid();";
+
+        public override DbParameter CreateParameter(string name, object? value)
+            => new SqliteParameter(name, value ?? DBNull.Value);
+
+        public override string? TranslateFunction(string name, Type declaringType, params string[] args) => null;
+
+        public override string TranslateJsonPathAccess(string columnName, string jsonPath)
+            => throw new NotSupportedException();
+
+        public override string GenerateCreateHistoryTableSql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
+            => throw new NotSupportedException();
+
+        public override string GenerateTemporalTriggersSql(TableMapping mapping)
+            => throw new NotSupportedException();
     }
 }
