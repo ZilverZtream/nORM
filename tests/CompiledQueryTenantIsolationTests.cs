@@ -42,6 +42,11 @@ public class CompiledQueryTenantIsolationTests
         public object GetCurrentTenantId() => _id;
     }
 
+    private sealed class MutableTenantScope
+    {
+        public int CurrentTenant { get; set; }
+    }
+
  //<summary>
  //Two contexts sharing the same connection but with different global filters
  //(simulating per-tenant row visibility via integer tenant key) must each receive their
@@ -167,6 +172,39 @@ public class CompiledQueryTenantIsolationTests
 
         Assert.Single(r2);
         Assert.False(r2[0].IsActive);
+    }
+
+    [Fact]
+    public async Task CompiledQuery_GlobalFilterMutableClosure_SameContext_RebindsFilterAndQueryParams()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var setup = cn.CreateCommand();
+        setup.CommandText =
+            "CREATE TABLE CqtiRow (Id INTEGER PRIMARY KEY, Name TEXT, TenantKey INTEGER);" +
+            "INSERT INTO CqtiRow VALUES (1,'Alpha',1);" +
+            "INSERT INTO CqtiRow VALUES (2,'Beta',1);" +
+            "INSERT INTO CqtiRow VALUES (3,'Gamma',2);" +
+            "INSERT INTO CqtiRow VALUES (4,'Delta',2);";
+        setup.ExecuteNonQuery();
+
+        var scope = new MutableTenantScope { CurrentTenant = 1 };
+        var options = new DbContextOptions();
+        options.AddGlobalFilter<CqtiRow>(e => e.TenantKey == scope.CurrentTenant);
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+        var compiled = Norm.CompileQuery((DbContext c, int minId) =>
+            c.Query<CqtiRow>().Where(x => x.Id >= minId));
+
+        var tenantOne = await compiled(ctx, 2);
+        Assert.Single(tenantOne);
+        Assert.Equal("Beta", tenantOne[0].Name);
+
+        scope.CurrentTenant = 2;
+
+        var tenantTwo = await compiled(ctx, 4);
+        Assert.Single(tenantTwo);
+        Assert.Equal("Delta", tenantTwo[0].Name);
     }
 
  //<summary>
