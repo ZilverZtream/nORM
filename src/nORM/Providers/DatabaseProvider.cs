@@ -557,21 +557,51 @@ namespace nORM.Providers
 
             var recordsAffected = 0;
             var index = 0;
-            while (index < entityList.Count)
+            bool ownedTx = ctx.CurrentTransaction == null;
+            DbTransaction transaction = ctx.CurrentTransaction
+                ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+            try
             {
-                var availableMemory = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
-                if (availableMemory < sizing.EstimatedMemoryUsage * 2)
-                    effectiveBatchSize = Math.Max(1, effectiveBatchSize / 2);
+                while (index < entityList.Count)
+                {
+                    var availableMemory = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+                    if (availableMemory < sizing.EstimatedMemoryUsage * 2)
+                        effectiveBatchSize = Math.Max(1, effectiveBatchSize / 2);
 
-                if (await IsTransactionLogNearCapacityAsync(ctx, ct).ConfigureAwait(false))
-                    effectiveBatchSize = Math.Max(1, effectiveBatchSize / 2);
+                    if (await IsTransactionLogNearCapacityAsync(ctx, ct).ConfigureAwait(false))
+                        effectiveBatchSize = Math.Max(1, effectiveBatchSize / 2);
 
-                var batch = entityList.GetRange(index, Math.Min(effectiveBatchSize, entityList.Count - index));
-                var batchSw = Stopwatch.StartNew();
-                recordsAffected += await ExecuteInsertBatch(ctx, m, batch, ct).ConfigureAwait(false);
-                batchSw.Stop();
-                BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
-                index += batch.Count;
+                    var batch = entityList.GetRange(index, Math.Min(effectiveBatchSize, entityList.Count - index));
+                    var batchSw = Stopwatch.StartNew();
+                    recordsAffected += await ExecuteInsertBatch(ctx, m, batch, ct, transaction).ConfigureAwait(false);
+                    batchSw.Stop();
+                    BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
+                    index += batch.Count;
+                }
+
+                if (ownedTx) await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception originalEx)
+            {
+                if (ownedTx)
+                {
+                    try
+                    {
+                        await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch (Exception rollbackEx)
+                    {
+                        throw new AggregateException(
+                            "BulkInsert failed and rollback also failed. See inner exceptions for details.",
+                            originalEx, rollbackEx);
+                    }
+                }
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
+                throw;
+            }
+            finally
+            {
+                if (ownedTx) await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
             ctx.Options.CacheProvider?.InvalidateTag(m.TableName);
@@ -587,8 +617,9 @@ namespace nORM.Providers
         /// <param name="m">Table mapping used to generate the insert statement.</param>
         /// <param name="batch">Entities to insert in a single round-trip.</param>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <param name="transaction">Transaction that should contain the batch, or <c>null</c> to use the context's active transaction.</param>
         /// <returns>The number of rows affected by the batch.</returns>
-        protected async Task<int> ExecuteInsertBatch<T>(DbContext ctx, TableMapping m, List<T> batch, CancellationToken ct) where T : class
+        protected async Task<int> ExecuteInsertBatch<T>(DbContext ctx, TableMapping m, List<T> batch, CancellationToken ct, DbTransaction? transaction = null) where T : class
         {
             ValidateConnection(ctx.Connection);
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
@@ -597,6 +628,7 @@ namespace nORM.Providers
             {
                 var inserted = 0;
                 await using var cmd = ctx.CreateCommand();
+                if (transaction != null) cmd.Transaction = transaction;
                 cmd.CommandText = $"INSERT INTO {m.EscTable} DEFAULT VALUES";
                 for (int i = 0; i < batch.Count; i++)
                     inserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
@@ -609,6 +641,7 @@ namespace nORM.Providers
                 sb.Append($"INSERT INTO {m.EscTable} ({colNames}) VALUES ");
 
                 await using var cmd = ctx.CreateCommand();
+                if (transaction != null) cmd.Transaction = transaction;
                 var pIndex = 0;
                 for (int i = 0; i < batch.Count; i++)
                 {
