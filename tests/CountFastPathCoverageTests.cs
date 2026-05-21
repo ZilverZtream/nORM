@@ -40,7 +40,27 @@ public class CountFastPathCoverageTests
         Assert.Equal(2, count);
         Assert.Contains("SELECT COUNT(*)", interceptor.LastCommandText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("\"IsActive\"", interceptor.LastCommandText, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("= 1", interceptor.LastCommandText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("= 1", interceptor.LastCommandText, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(interceptor.LastParameters);
+    }
+
+    [Fact]
+    public async Task CountAsync_bool_equality_cache_distinguishes_false_from_member_predicate()
+    {
+        using var connection = CreateConnection();
+        var interceptor = new CountCommandCaptureInterceptor();
+        var options = new DbContextOptions();
+        options.CommandInterceptors.Add(interceptor);
+
+        await using var context = new DbContext(connection, new SqliteProvider(), options);
+
+        var active = await context.Query<CountFastUser>().Where(user => user.IsActive).CountAsync();
+        var inactive = await context.Query<CountFastUser>().Where(user => user.IsActive == false).CountAsync();
+
+        Assert.Equal(2, active);
+        Assert.Equal(1, inactive);
+        Assert.Contains("\"IsActive\"", interceptor.LastCommandText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("= 0", interceptor.LastCommandText, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(interceptor.LastParameters);
     }
 
