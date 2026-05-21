@@ -276,13 +276,12 @@ public class RawSqlSchemaVarianceFuzzingTests
     // ── Duplicate column names in SQL result ─────────────────────────────────
 
     /// <summary>
-    /// M-1 fuzzing: SQL selects the same column twice under different aliases.
-    /// The name→ordinal map last-write-wins for duplicates. The named property
-    /// picks up the last occurrence of its name in the SELECT list.
-    /// Documented behavior: no crash, deterministic (last alias wins).
+    /// M-1 fuzzing: SQL returns the same mapped column name more than once.
+    /// Duplicate mapped names are ambiguous and must throw clearly instead of
+    /// silently taking whichever duplicate appears last in the SELECT list.
     /// </summary>
     [Fact]
-    public async Task QueryUnchangedAsync_DuplicateColumnNameInResult_LastOrdinalWins()
+    public async Task QueryUnchangedAsync_DuplicateColumnNameInResult_ThrowsInvalidOperationException()
     {
         var (cn, ctx) = CreateContext(
             "CREATE TABLE FuzzEntity (Id INTEGER PRIMARY KEY, Code TEXT NOT NULL, Name TEXT NOT NULL, Count INTEGER NOT NULL);" +
@@ -290,15 +289,12 @@ public class RawSqlSchemaVarianceFuzzingTests
         await using (cn) await using (ctx)
         {
             // "Code" appears twice: first as the real value, second as a different value.
-            // The name-based map overwrites: last Code ordinal wins → 'Last'.
-            var results = await ctx.QueryUnchangedAsync<FuzzEntity>(
-                "SELECT \"Id\", 'First' AS \"Code\", \"Name\", \"Count\", 'Last' AS \"Code\" FROM \"FuzzEntity\"");
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                ctx.QueryUnchangedAsync<FuzzEntity>(
+                    "SELECT \"Id\", 'First' AS \"Code\", \"Name\", \"Count\", 'Last' AS \"Code\" FROM \"FuzzEntity\""));
 
-            Assert.Single(results);
-            // Last occurrence of the "Code" alias wins (StringComparer.OrdinalIgnoreCase dict).
-            // This documents the deterministic behavior without silent corruption.
-            Assert.Equal("Last", results[0].Code);
-            Assert.Equal(1, results[0].Id);
+            Assert.Contains("Code", ex.Message);
+            Assert.Contains("multiple", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
     }
 

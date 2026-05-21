@@ -2941,8 +2941,13 @@ namespace nORM.Core
                 // Case-insensitive comparison ensures the mapping resolves regardless of provider casing.
                 var fieldCount = reader.FieldCount;
                 var nameToOrdinal = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
+                var duplicateColumnNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 for (int i = 0; i < fieldCount; i++)
-                    nameToOrdinal[reader.GetName(i)] = i;
+                {
+                    var name = reader.GetName(i);
+                    if (!nameToOrdinal.TryAdd(name, i))
+                        duplicateColumnNames.Add(name);
+                }
 
                 // Resolve each mapping column to its reader ordinal; missing columns throw
                 // immediately so callers get a clear diagnostic instead of default-value silencing.
@@ -2950,6 +2955,10 @@ namespace nORM.Core
                 for (int i = 0; i < mapping.Columns.Length; i++)
                 {
                     var col = mapping.Columns[i];
+                    if (duplicateColumnNames.Contains(col.Name))
+                        throw new InvalidOperationException(
+                            $"Column '{col.Name}' appears multiple times in the raw SQL result for {typeof(T).Name}. " +
+                            "Use unique aliases for projected columns so materialization is unambiguous.");
                     if (!nameToOrdinal.TryGetValue(col.Name, out var ordinal))
                         throw new InvalidOperationException(
                             $"Column '{col.Name}' expected by {typeof(T).Name} is not present in the raw SQL result. " +
