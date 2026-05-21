@@ -135,7 +135,7 @@ public class BulkConcurrencyStressTests : IDisposable
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-        var tasks = Enumerable.Range(0, taskCount).Select(taskIdx => Task.Run(() =>
+        var tasks = Enumerable.Range(0, taskCount).Select(taskIdx => Task.Factory.StartNew(() =>
         {
             try
             {
@@ -161,7 +161,7 @@ public class BulkConcurrencyStressTests : IDisposable
             {
                 exceptions.Add(ex);
             }
-        })).ToArray();
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
 
         var completed = Task.WhenAll(tasks);
         var winner = await Task.WhenAny(completed, Task.Delay(TimeSpan.FromSeconds(5)));
