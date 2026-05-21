@@ -25,10 +25,17 @@ namespace nORM.Query
         }
 
         public static ExpressionFingerprint Compute(Expression expression)
+            => ComputeCore(expression, includeClosureCollectionValues: false);
+
+        public static ExpressionFingerprint ComputeForPlanCache(Expression expression)
+            => ComputeCore(expression, includeClosureCollectionValues: true);
+
+        private static ExpressionFingerprint ComputeCore(Expression expression, bool includeClosureCollectionValues)
         {
             var visitor = _visitorPool.Get();
             try
             {
+                visitor.IncludeClosureCollectionValues = includeClosureCollectionValues;
                 visitor.Visit(expression);
                 Span<byte> hash = stackalloc byte[16];
                 visitor.GetCurrentHash(hash);
@@ -87,12 +94,15 @@ namespace nORM.Query
             private readonly XxHash128 _hasher = new();
             private readonly Dictionary<ParameterExpression, int> _parameters = new();
 
+            public bool IncludeClosureCollectionValues { get; set; }
+
             public void GetCurrentHash(Span<byte> destination) => _hasher.GetCurrentHash(destination);
 
             public void Reset()
             {
                 _hasher.Reset();
                 _parameters.Clear();
+                IncludeClosureCollectionValues = false;
             }
 
             public override Expression? Visit(Expression? node)
@@ -138,34 +148,54 @@ namespace nORM.Query
                 if (node.Member.DeclaringType != null)
                     AppendLong(node.Member.DeclaringType.TypeHandle.Value.ToInt64());
 
-                // For closure captures (member access on a ConstantExpression), include
-                // whether the captured value is null as a bit in the fingerprint.
-                // A cached plan for a non-null closure variable must not be reused when the
-                // variable is later null (which requires IS NULL expansion in SQL).
-                if (node.Expression is ConstantExpression closure)
+                // For closure captures, include nullness because null/non-null values can
+                // produce different SQL shapes. Captured collections are expanded into fixed
+                // IN-clause parameters, so their contents also participate in the fingerprint.
+                if (TryGetClosureValue(node, out var capturedValue))
                 {
-                    try
+                    AppendInt(capturedValue is null ? 1 : 0);
+                    if (IncludeClosureCollectionValues &&
+                        capturedValue is System.Collections.IEnumerable enumerable &&
+                        capturedValue is not string &&
+                        capturedValue is not byte[] &&
+                        capturedValue is not IQueryable)
                     {
-                        object? capturedValue = closure.Value == null ? null :
-                            node.Member is FieldInfo fi ? fi.GetValue(closure.Value) :
-                            node.Member is PropertyInfo pi ? pi.GetValue(closure.Value) : null;
-                        // 1 = null, 0 = non-null. Different nullability → different plan shape.
-                        AppendInt(capturedValue is null ? 1 : 0);
-                    }
-                    catch (Exception ex) when (ex is MemberAccessException
-                                                    or TargetInvocationException
-                                                    or InvalidOperationException
-                                                    or NotSupportedException
-                                                    or UnauthorizedAccessException)
-                    {
-                        // If we can't read the value, conservatively treat it as potentially null.
-                        // UnauthorizedAccessException can be raised by PropertyInfo.GetValue in
-                        // security-restricted contexts or on security-critical properties.
-                        AppendInt(1);
+                        AppendEnumerableStableValue(enumerable);
                     }
                 }
 
                 return base.VisitMember(node);
+            }
+
+            private static bool TryGetClosureValue(MemberExpression node, out object? value)
+            {
+                if (!HasConstantRoot(node))
+                {
+                    value = null;
+                    return false;
+                }
+
+                try
+                {
+                    return ExpressionValueExtractor.TryGetConstantValue(node, out value);
+                }
+                catch (Exception ex) when (ex is MemberAccessException
+                                                or TargetInvocationException
+                                                or InvalidOperationException
+                                                or NotSupportedException
+                                                or UnauthorizedAccessException)
+                {
+                    value = null;
+                    return false;
+                }
+            }
+
+            private static bool HasConstantRoot(MemberExpression node)
+            {
+                Expression? current = node.Expression;
+                while (current is MemberExpression member)
+                    current = member.Expression;
+                return current is ConstantExpression;
             }
 
             protected override Expression VisitMethodCall(MethodCallExpression node)
@@ -217,6 +247,22 @@ namespace nORM.Query
                 Span<byte> data = stackalloc byte[8];
                 BinaryPrimitives.WriteInt64LittleEndian(data, value);
                 _hasher.Append(data);
+            }
+            private void AppendEnumerableStableValue(System.Collections.IEnumerable values)
+            {
+                AppendString("IEnumerable");
+                var count = 0;
+                foreach (var item in values)
+                {
+                    count++;
+                    AppendInt(item is null ? 1 : 0);
+                    if (item != null)
+                    {
+                        AppendString(item.GetType().FullName ?? string.Empty);
+                        AppendStableValue(item);
+                    }
+                }
+                AppendInt(count);
             }
 
             // Stable value hashing — emits full bytes for each type so two constants

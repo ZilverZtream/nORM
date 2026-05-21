@@ -29,6 +29,16 @@ public class PlanCacheNullSemanticsTests
         public int? Value { get; set; }
     }
 
+    private sealed class MutableNameHolder
+    {
+        public string? Current { get; set; }
+    }
+
+    private sealed class MutableIdList
+    {
+        public int[] Values { get; set; } = Array.Empty<int>();
+    }
+
     private static (SqliteConnection Cn, DbContext Ctx) CreateContext()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
@@ -105,6 +115,47 @@ public class PlanCacheNullSemanticsTests
         var q2 = await ctx.Query<NullSemRow>().Where(x => x.Name == val).ToListAsync();
         Assert.Single(q2);
         Assert.Equal("Bob", q2[0].Name);
+    }
+
+    [Fact]
+    public async Task HolderClosure_NonNullThenNull_ReturnsCorrectRowsBothTimes()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+
+        Insert(cn, "Holder", 1);
+        Insert(cn, null, 2);
+
+        var holder = new MutableNameHolder { Current = "Holder" };
+        var q1 = await ctx.Query<NullSemRow>().Where(x => x.Name == holder.Current).ToListAsync();
+        Assert.Single(q1);
+        Assert.Equal("Holder", q1[0].Name);
+
+        holder.Current = null;
+        var q2 = await ctx.Query<NullSemRow>().Where(x => x.Name == holder.Current).ToListAsync();
+        Assert.Single(q2);
+        Assert.Null(q2[0].Name);
+    }
+
+    [Fact]
+    public async Task HolderCollection_ChangedValues_RebuildsContainsPlan()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+
+        Insert(cn, "One", 1);
+        Insert(cn, "Two", 2);
+        Insert(cn, "Three", 3);
+
+        var holder = new MutableIdList { Values = new[] { 1 } };
+        var first = await ctx.Query<NullSemRow>().Where(x => holder.Values.Contains(x.Id)).ToListAsync();
+        Assert.Single(first);
+        Assert.Equal("One", first[0].Name);
+
+        holder.Values = new[] { 2, 3 };
+        var second = await ctx.Query<NullSemRow>().Where(x => holder.Values.Contains(x.Id)).ToListAsync();
+        Assert.Equal(2, second.Count);
+        Assert.DoesNotContain(second, x => x.Id == 1);
     }
 
     // ─── null literal in expression → IS NULL (not closure) ─────────
