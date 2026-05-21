@@ -6,6 +6,7 @@ using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
 using nORM.Internal;
@@ -395,6 +396,33 @@ public class CompileTimeQueryParameterParityTests
 
         Assert.Equal(DbType.Decimal, cmd.Parameters[0].DbType);
         Assert.Equal(123.456m, cmd.Parameters[0].Value);
+    }
+
+    [Fact]
+    public void SG1_SqlServerDecimal_SetsPrepareSafePrecisionAndScale()
+    {
+        using var cmd = new SqlCommand();
+
+        ParameterOptimizer.AddOptimizedParam(cmd, "@p0", 123.456m);
+
+        var param = Assert.IsType<SqlParameter>(cmd.Parameters[0]);
+        Assert.Equal(DbType.Decimal, param.DbType);
+        Assert.Equal(29, param.Precision);
+        Assert.Equal(3, param.Scale);
+    }
+
+    [Fact]
+    public void SG1_SqlServerDecimal_TypedNullSetsPrepareSafePrecisionAndScale()
+    {
+        using var cmd = new SqlCommand();
+
+        ParameterOptimizer.AddOptimizedParam(cmd, "@p0", null, typeof(decimal?));
+
+        var param = Assert.IsType<SqlParameter>(cmd.Parameters[0]);
+        Assert.Equal(DBNull.Value, param.Value);
+        Assert.Equal(DbType.Decimal, param.DbType);
+        Assert.Equal(29, param.Precision);
+        Assert.Equal(10, param.Scale);
     }
 
     [Fact]

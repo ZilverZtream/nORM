@@ -2445,7 +2445,7 @@ namespace nORM.Core
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddParam(_p.ParamPrefix + col.PropName, val);
+                        cmd.AddOptimizedParam(_p.ParamPrefix + col.PropName, val, GetParameterKnownType(col, val));
                     }
                     break;
                 case WriteOperation.Update:
@@ -2453,13 +2453,13 @@ namespace nORM.Core
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddParam(_p.ParamPrefix + col.PropName, val);
+                        cmd.AddOptimizedParam(_p.ParamPrefix + col.PropName, val, GetParameterKnownType(col, val));
                     }
                     foreach (var col in map.KeyColumns)
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddParam(_p.ParamPrefix + col.PropName, val);
+                        cmd.AddOptimizedParam(_p.ParamPrefix + col.PropName, val, GetParameterKnownType(col, val));
                     }
                     if (map.TimestampColumn != null)
                     {
@@ -2471,7 +2471,7 @@ namespace nORM.Core
                         // captured yet). In that case the current property value is the best available
                         // token for the WHERE predicate.
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
-                        cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue);
+                        cmd.AddOptimizedParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
                     // X1: bind tenant param to match the WHERE predicate added by BuildUpdate(includeTenant=true).
                     // Skip if TenantColumn is already in UpdateColumns — same @PropName is already bound
@@ -2487,14 +2487,14 @@ namespace nORM.Core
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddParam(_p.ParamPrefix + col.PropName, val);
+                        cmd.AddOptimizedParam(_p.ParamPrefix + col.PropName, val, GetParameterKnownType(col, val));
                     }
                     if (map.TimestampColumn != null)
                     {
                         // Fallback: use current property value when originalToken is null (same
                         // rationale as the Update case above — entities attached without snapshot).
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
-                        cmd.AddParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue);
+                        cmd.AddOptimizedParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
                     // X1: bind tenant param to match the WHERE predicate added by BuildDelete(includeTenant=true).
                     if (Options.TenantProvider != null && map.TenantColumn != null)
@@ -2566,15 +2566,19 @@ namespace nORM.Core
         {
             // INS-1: Only append identity retrieval when at least one key column is DB-generated.
             // For natural-key entities the fragment is wasteful and potentially wrong across providers.
-            var identityFragment = HasDbGeneratedKey(map.KeyColumns)
+            var hasDbGeneratedKey = HasDbGeneratedKey(map.KeyColumns);
+            var identityPrefix = hasDbGeneratedKey
+                ? _p.GetIdentityRetrievalPrefix(map)
+                : string.Empty;
+            var identityFragment = hasDbGeneratedKey
                 ? _p.GetIdentityRetrievalString(map)
                 : string.Empty;
             var cols = map.InsertColumns;
             if (cols.Length == 0)
-                return $"INSERT INTO {map.EscTable} DEFAULT VALUES{identityFragment}";
+                return $"INSERT INTO {map.EscTable}{identityPrefix} DEFAULT VALUES{identityFragment}";
             var colNames = string.Join(", ", cols.Select(c => c.EscCol));
             var paramNames = string.Join(", ", cols.Select((c, i) => $"{_p.ParamPrefix}p{startParamIndex + i}"));
-            return $"INSERT INTO {map.EscTable} ({colNames}) VALUES ({paramNames}){identityFragment}";
+            return $"INSERT INTO {map.EscTable} ({colNames}){identityPrefix} VALUES ({paramNames}){identityFragment}";
         }
 
         private string BuildUpdateBatch(TableMapping map, int startParamIndex)
@@ -2654,7 +2658,7 @@ namespace nORM.Core
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", val);
+                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", val, GetParameterKnownType(col, val));
                     }
                     break;
                 case WriteOperation.Update:
@@ -2662,20 +2666,20 @@ namespace nORM.Core
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", val);
+                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", val, GetParameterKnownType(col, val));
                     }
                     foreach (var col in map.KeyColumns)
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", val);
+                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", val, GetParameterKnownType(col, val));
                     }
                     if (map.TimestampColumn != null)
                     {
                         // Use the original snapshot token when available rather than the current
                         // (possibly mutated) property value, to ensure the correct concurrency check.
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", tokenValue);
+                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
                     if (Options.TenantProvider != null && map.TenantColumn != null)
                         cmd.AddParam($"{_p.ParamPrefix}p{index++}", Options.TenantProvider.GetCurrentTenantId());
@@ -2685,13 +2689,13 @@ namespace nORM.Core
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", val);
+                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", val, GetParameterKnownType(col, val));
                     }
                     if (map.TimestampColumn != null)
                     {
                         // Use the original snapshot token when available.
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", tokenValue);
+                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
                     if (Options.TenantProvider != null && map.TenantColumn != null)
                         cmd.AddParam($"{_p.ParamPrefix}p{index++}", Options.TenantProvider.GetCurrentTenantId());
@@ -2699,6 +2703,9 @@ namespace nORM.Core
             }
             return index;
         }
+
+        internal static Type? GetParameterKnownType(Column col, object? providerValue)
+            => providerValue?.GetType() ?? (col.Converter == null ? col.Prop.PropertyType : null);
 
         // TODO: Consider replacing the tuple array with parallel name[] and value[] arrays
         // to reduce per-element overhead. ValueTuple<string, object> boxes the object on every
@@ -3451,9 +3458,7 @@ namespace nORM.Core
 
                 foreach (var col in mapping.InsertColumns)
                 {
-                    var parameter = cmd.CreateParameter();
-                    parameter.ParameterName = _p.ParamPrefix + col.PropName;
-                    cmd.Parameters.Add(parameter);
+                    cmd.AddOptimizedParam(_p.ParamPrefix + col.PropName, null, GetParameterKnownType(col, null));
                 }
 
                 try
@@ -3775,7 +3780,7 @@ namespace nORM.Core
                 var (param, col) = bindings[i];
                 var rawValue = col.Getter(entity);
                 var value = col.Converter != null ? col.Converter.ConvertToProvider(rawValue) : rawValue;
-                ParameterAssign.AssignValue(param, value);
+                ParameterAssign.AssignValue(param, value, DbContext.GetParameterKnownType(col, value));
             }
 
             if (_hydrateGeneratedKeys)

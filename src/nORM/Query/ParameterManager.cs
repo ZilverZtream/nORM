@@ -114,10 +114,7 @@ namespace nORM.Query
             if (type == typeof(decimal))
             {
                 p.DbType = System.Data.DbType.Decimal;
-                // P1 fix: reset precision/scale to 0 (driver-default) so stale values from a
-                // previous high-precision decimal assignment do not coerce the new value.
-                p.Precision = 0;
-                p.Scale = 0;
+                nORM.Internal.ParameterOptimizer.ApplyProviderDecimalMetadata(p, v);
                 p.Value = v;
                 return;
             }
@@ -262,6 +259,31 @@ namespace nORM.Query
             // (e.g. DbType.Int32 from a preceding int parameter) does not coerce this value.
             p.DbType = System.Data.DbType.Object;
             p.Value = v;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+        internal static void AssignValue(DbParameter p, object? v, Type? knownType)
+        {
+            if (v is null && IsDecimalType(knownType))
+            {
+                p.Value = DBNull.Value;
+                p.DbType = System.Data.DbType.Decimal;
+                p.Size = 0;
+                nORM.Internal.ParameterOptimizer.ApplyProviderDecimalMetadata(p, null);
+                return;
+            }
+
+            AssignValue(p, v);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsDecimalType(Type? type)
+        {
+            if (type == null)
+                return false;
+
+            type = Nullable.GetUnderlyingType(type) ?? type;
+            return type == typeof(decimal);
         }
     }
 }
