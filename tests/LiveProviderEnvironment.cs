@@ -16,12 +16,24 @@ internal static class LiveProviderEnvironment
     public static string? GetByCanonicalName(string envVar)
     {
         var value = Environment.GetEnvironmentVariable(envVar);
-        if (!string.IsNullOrEmpty(value)) return value;
-
-        return envVar.EndsWith("_CS", StringComparison.Ordinal)
+        var aliasValue = envVar.EndsWith("_CS", StringComparison.Ordinal)
             ? Environment.GetEnvironmentVariable(envVar[..^3])
             : Environment.GetEnvironmentVariable(envVar + "_CS");
+
+        if (!string.IsNullOrEmpty(value) && !IsEnableFlag(value))
+            return value;
+
+        if (!string.IsNullOrEmpty(aliasValue))
+            return aliasValue;
+
+        return string.IsNullOrEmpty(value) ? null : value;
     }
+
+    private static bool IsEnableFlag(string value)
+        => value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+           value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+           value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+           value.Equals("enabled", StringComparison.OrdinalIgnoreCase);
 
     public static bool IsConfigured(string kind) => !string.IsNullOrEmpty(GetConnectionString(kind));
 

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -32,16 +31,14 @@ namespace nORM.Navigation
         private long _lastEnqueueTimestamp;
         private volatile bool _disposed;
         private int _schedulerQueued;
-        private static readonly ConcurrentQueue<BatchedNavigationLoader> s_scheduledLoaders = new();
-        private static readonly SemaphoreSlim s_schedulerSignal = new(0);
-        private static int s_schedulerStarted;
+        private int _cancellationDrainQueued;
 
         /// <summary>
         /// Delay in milliseconds before the batch timer fires after the first pending load is queued.
         /// Balances latency (lower value) against batching efficiency (higher value).
         /// </summary>
         private const int BatchDelayMs = 25;
-        private const int CancelableBatchDelayMs = BatchDelayMs;
+        private const int CancelableBatchDelayMs = 250;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BatchedNavigationLoader"/>
@@ -51,8 +48,8 @@ namespace nORM.Navigation
         /// <exception cref="ArgumentNullException"><paramref name="context"/> is <c>null</c>.</exception>
         /// <remarks>
         /// PERFORMANCE OPTIMIZATION: Uses reactive scheduling instead of polling.
-        /// A small process-wide scheduler owns each batch window and coalesces requests that
-        /// arrive within the configured delay.
+        /// Async delay continuations own scheduled batch windows, avoiding a shared scheduler
+        /// bottleneck or a retained thread per loader.
         /// </remarks>
         public BatchedNavigationLoader(DbContext context)
         {
@@ -98,7 +95,7 @@ namespace nORM.Navigation
                 return Task.FromCanceled<List<object>>(ct);
 
             var entityType = entity.GetType();
-            if (!ct.CanBeCanceled && TryCompleteWithoutBatch(entityType, propertyName, entity, out var completed))
+            if (TryCompleteWithoutBatch(entityType, propertyName, entity, out var completed))
                 return completed;
 
             var key = (entityType, propertyName);
@@ -107,9 +104,10 @@ namespace nORM.Navigation
             {
                 var cancellationRegistration = ct.Register(static state =>
                 {
-                    var (completion, token) = ((TaskCompletionSource<List<object>>, CancellationToken))state!;
+                    var (loader, completion, token) = ((BatchedNavigationLoader, TaskCompletionSource<List<object>>, CancellationToken))state!;
                     completion.TrySetCanceled(token);
-                }, (tcs, ct))
+                    loader.QueueCancellationDrainWorker();
+                }, (this, tcs, ct))
                 ;
 
                 _ = tcs.Task.ContinueWith(static (_, state) =>
@@ -165,44 +163,37 @@ namespace nORM.Navigation
             if (Interlocked.Exchange(ref _schedulerQueued, 1) != 0)
                 return;
 
-            EnsureSchedulerStarted();
-            s_scheduledLoaders.Enqueue(this);
-            s_schedulerSignal.Release();
+            _ = ProcessScheduledBatchAsync();
         }
 
-        private static void EnsureSchedulerStarted()
+        private void QueueCancellationDrainWorker()
         {
-            if (Interlocked.Exchange(ref s_schedulerStarted, 1) != 0)
+            if (Interlocked.Exchange(ref _cancellationDrainQueued, 1) != 0)
                 return;
 
-            var workerCount = Math.Max(16, Math.Min(64, Environment.ProcessorCount * 2));
-            for (var i = 0; i < workerCount; i++)
-            {
-                var thread = new Thread(SchedulerLoop)
-                {
-                    IsBackground = true,
-                    Name = "nORM navigation batch scheduler"
-                };
-                thread.Start();
-            }
+            _ = DrainAfterCancellationAsync();
         }
 
-        private static void SchedulerLoop()
+        private async Task DrainAfterCancellationAsync()
         {
-            while (true)
+            await Task.Delay(5).ConfigureAwait(false);
+            try
             {
-                s_schedulerSignal.Wait();
-                if (s_scheduledLoaders.TryDequeue(out var loader))
-                    loader.ProcessScheduledBatch();
+                ProcessBatchInline();
+            }
+            finally
+            {
+                Volatile.Write(ref _cancellationDrainQueued, 0);
             }
         }
 
         private void ProcessBatchInline()
         {
-            if (Interlocked.Exchange(ref _processing, 1) == 1)
+            while (Interlocked.Exchange(ref _processing, 1) == 1)
             {
-                QueueBatchWorker();
-                return;
+                if (_disposed)
+                    return;
+                Thread.Sleep(1);
             }
 
             try
@@ -223,7 +214,7 @@ namespace nORM.Navigation
             }
         }
 
-        private void ProcessScheduledBatch()
+        private async Task ProcessScheduledBatchAsync()
         {
             while (true)
             {
@@ -233,14 +224,14 @@ namespace nORM.Navigation
                 if (remainingMs <= 0)
                     break;
 
-                Thread.Sleep(Math.Max(1, (int)Math.Ceiling(remainingMs)));
+                await Task.Delay(Math.Max(1, (int)Math.Ceiling(remainingMs))).ConfigureAwait(false);
                 if (_disposed) return;
             }
 
             while (Interlocked.Exchange(ref _processing, 1) == 1)
             {
                 if (_disposed) return;
-                Thread.Sleep(1);
+                await Task.Delay(1).ConfigureAwait(false);
             }
 
             try

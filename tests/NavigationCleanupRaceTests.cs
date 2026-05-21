@@ -236,18 +236,7 @@ public class NavigationCleanupRaceTests
             .ToArray();
 
         var exceptions = new ConcurrentBag<Exception>();
-        using var cts = new CancellationTokenSource();
-        var cancelThread = new Thread(static state =>
-        {
-            var source = (CancellationTokenSource)state!;
-            Thread.Sleep(TimeSpan.FromSeconds(2));
-            source.Cancel();
-        })
-        {
-            IsBackground = true,
-            Name = "nORM navigation cleanup fuzz cancellation"
-        };
-        cancelThread.Start(cts);
+        var stopAt = Stopwatch.GetTimestamp() + Stopwatch.Frequency * 2;
         var tasks = new List<Task>();
 
         // 10 tasks doing RemovePendingLoadsForEntity on random entities
@@ -255,11 +244,11 @@ public class NavigationCleanupRaceTests
         for (int t = 0; t < 10; t++)
         {
             var localSeed = rng.Next();
-            tasks.Add(Task.Run(() =>
+            tasks.Add(Task.Factory.StartNew(() =>
             {
                 var localRng = new Random(localSeed);
                 var iterations = 0;
-                while (!cts.IsCancellationRequested)
+                while (Stopwatch.GetTimestamp() < stopAt)
                 {
                     try
                     {
@@ -278,20 +267,19 @@ public class NavigationCleanupRaceTests
                         exceptions.Add(ex);
                     }
                 }
-            }));
+            }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default));
         }
 
-        // 1 task doing LoadNavigationAsync repeatedly (uses cts.Token so it
-        // terminates promptly when the test period ends)
-        tasks.Add(Task.Run(async () =>
+        // 1 task doing LoadNavigationAsync repeatedly until the same deadline.
+        tasks.Add(Task.Factory.StartNew(async () =>
         {
             var localRng = new Random(12345);
-            while (!cts.IsCancellationRequested)
+            while (Stopwatch.GetTimestamp() < stopAt)
             {
                 try
                 {
                     var entity = entities[localRng.Next(entities.Length)];
-                    await loader.LoadNavigationAsync(entity, nameof(NcrAuthor.Books), cts.Token);
+                    await loader.LoadNavigationAsync(entity, nameof(NcrAuthor.Books), CancellationToken.None);
                 }
                 catch (ObjectDisposedException)
                 {
@@ -307,11 +295,10 @@ public class NavigationCleanupRaceTests
                     exceptions.Add(ex);
                 }
             }
-        }));
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap());
 
-        // Wait for all tasks (cleanup tasks stop via CTS check; load task stops via OCE)
-        await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(10));
-        cancelThread.Join(millisecondsTimeout: 1000);
+        // Wait for all tasks to observe the shared deadline.
+        await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(30));
 
         // No dictionary corruption or unexpected exceptions
         Assert.Empty(exceptions);

@@ -255,11 +255,11 @@ public class BatchedNavigationCancellationParityTests
     // ── A1-4: missing-relation path honours per-caller cancellation ───────────
 
     /// <summary>
-    /// The early-exit path (missing relation → DeliverEmpty) must also respect
-    /// per-caller cancellation: canceled caller gets OCE, uncanceled gets [].
+    /// The early-exit path for a missing relation completes immediately with an
+    /// empty result. Cancellation requested after completion is not retroactive.
     /// </summary>
     [Fact]
-    public async Task MissingRelation_CanceledCallerA_UncanceledCallerB_GetsEmpty()
+    public async Task MissingRelation_CompletesImmediately_CancelAfterCompletionDoesNotRetroactivelyCancel()
     {
         using var cn = OpenMemory();
         await using var ctx = new DbContext(cn, new SqliteProvider()); // no model config → no relations
@@ -270,10 +270,11 @@ public class BatchedNavigationCancellationParityTests
 
         using var ctsA = new CancellationTokenSource();
 
-        // Enqueue A (not yet canceled)
+        // Missing-relation requests are no-op loads and complete synchronously.
         var taskA = loader.LoadNavigationAsync(e1, "NonExistentProp", ctsA.Token);
+        Assert.True(taskA.IsCompleted);
 
-        // Cancel after enqueue
+        // Cancel after completion.
         ctsA.Cancel();
 
         // Enqueue B (uncanceled)
@@ -283,8 +284,8 @@ public class BatchedNavigationCancellationParityTests
         var resultB = await taskB.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Empty(resultB);
 
-        // A gets OCE
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => taskA.WaitAsync(TimeSpan.FromSeconds(5)));
+        var resultA = await taskA.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Empty(resultA);
     }
 
     // ── A1-5: batch-level exception does not poison uncanceled callers ─────────
