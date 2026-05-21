@@ -754,7 +754,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         /// <summary>
         /// Builds a multi-row INSERT INTO ... VALUES statement with parameterized placeholders.
         /// </summary>
-        private string BuildPostgresBatchInsertSql(TableMapping mapping, Column[] cols, int batchSize)
+        internal string BuildPostgresBatchInsertSql(TableMapping mapping, Column[] cols, int batchSize)
         {
             var colNames = string.Join(", ", cols.Select(c => c.EscCol));
             var sb = _stringBuilderPool.Get();
