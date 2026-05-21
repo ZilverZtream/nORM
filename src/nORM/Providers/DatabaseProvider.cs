@@ -676,7 +676,8 @@ namespace nORM.Providers
                     cmd.Transaction = transaction;
                     var batchHasTenant = ctx.Options.TenantProvider != null && m.TenantColumn != null;
                     cmd.CommandText = BuildUpdate(m, batchHasTenant);
-                    foreach (var col in m.Columns.Where(c => !c.IsTimestamp)) cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
+                    foreach (var col in m.Columns.Where(c => !c.IsTimestamp && !(batchHasTenant && ReferenceEquals(c, m.TenantColumn))))
+                        cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
                     if (m.TimestampColumn != null) cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                     // X1: bind tenant param to match the WHERE predicate added when batchHasTenant is true.
                     if (batchHasTenant) cmd.AddParam(ParamPrefix + m.TenantColumn!.PropName, ctx.Options.TenantProvider!.GetCurrentTenantId());
