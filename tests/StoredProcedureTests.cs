@@ -45,6 +45,25 @@ public class StoredProcedureTests
         Assert.Equal("Alpha", results[0].Name);
     }
 
+    [Fact]
+    public async Task ExecuteStoredProcedureAsync_ReorderedColumns_PopulatesCorrectProperties()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(5,'Delta');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var results = await ctx.ExecuteStoredProcedureAsync<Item>("SELECT Name, Id FROM Item");
+
+        Assert.Single(results);
+        Assert.Equal(5, results[0].Id);
+        Assert.Equal("Delta", results[0].Name);
+    }
+
     /// <summary>
     /// ExecuteStoredProcedureAsAsyncEnumerable already correctly uses Provider.StoredProcedureCommandType.
     /// Verify all three overloads produce consistent results on SQLite.
@@ -66,6 +85,25 @@ public class StoredProcedureTests
         var result = await ctx.ExecuteStoredProcedureWithOutputAsync<Item>("SELECT Id, Name FROM Item");
         Assert.Single(result.Results);
         Assert.Equal("Beta", result.Results[0].Name);
+    }
+
+    [Fact]
+    public async Task ExecuteStoredProcedureWithOutputAsync_ReorderedColumns_PopulatesCorrectProperties()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(6,'Epsilon');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var result = await ctx.ExecuteStoredProcedureWithOutputAsync<Item>("SELECT Name, Id FROM Item");
+
+        Assert.Single(result.Results);
+        Assert.Equal(6, result.Results[0].Id);
+        Assert.Equal("Epsilon", result.Results[0].Name);
     }
 
     /// <summary>
@@ -247,5 +285,27 @@ public class StoredProcedureTests
 
         Assert.Single(results);
         Assert.Equal("Gamma", results[0].Name);
+    }
+
+    [Fact]
+    public async Task AsyncEnumerableVariant_ReorderedColumns_PopulatesCorrectProperties()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(7,'Zeta');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var results = new List<Item>();
+        await foreach (var item in ctx.ExecuteStoredProcedureAsAsyncEnumerable<Item>("SELECT Name, Id FROM Item"))
+            results.Add(item);
+
+        Assert.Single(results);
+        Assert.Equal(7, results[0].Id);
+        Assert.Equal("Zeta", results[0].Name);
     }
 }
