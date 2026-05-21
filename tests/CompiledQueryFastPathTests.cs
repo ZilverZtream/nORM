@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Data.Common;
 using System.IO;
@@ -30,6 +31,14 @@ public class CompiledQueryFastPathTests
         public int    Id       { get; set; }
         public string Title    { get; set; } = "";
         public int    Category { get; set; }   // also used as enum-backed column
+    }
+
+    [Table("Article")]
+    public class EnumArticle
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public ArticleCategory Category { get; set; }
     }
 
     public class NullableArticle
@@ -68,6 +77,7 @@ public class CompiledQueryFastPathTests
         public int    ReaderExecutingCallCount;
         public DbTransaction? CapturedTransaction;
         public string? CapturedSql;
+        public List<(string Name, DbType DbType, object? Value)> CapturedParameters { get; } = new();
 
         // Sync hook — called from sync execution paths (e.g. compiled query fast path on SQLite)
         public InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, DbContext ctx)
@@ -75,6 +85,7 @@ public class CompiledQueryFastPathTests
             Interlocked.Increment(ref ReaderExecutingCallCount);
             CapturedTransaction = command.Transaction;
             CapturedSql = command.CommandText;
+            CaptureParameters(command);
             return InterceptionResult<DbDataReader>.Continue();
         }
 
@@ -94,11 +105,19 @@ public class CompiledQueryFastPathTests
             Interlocked.Increment(ref ReaderExecutingCallCount);
             CapturedTransaction = command.Transaction;
             CapturedSql = command.CommandText;
+            CaptureParameters(command);
             return Task.FromResult(InterceptionResult<DbDataReader>.Continue());
         }
 
         public Task ReaderExecutedAsync(DbCommand _, DbContext __, DbDataReader ___, TimeSpan ____, CancellationToken _____) =>
             Task.CompletedTask;
+
+        private void CaptureParameters(DbCommand command)
+        {
+            CapturedParameters.Clear();
+            foreach (DbParameter parameter in command.Parameters)
+                CapturedParameters.Add((parameter.ParameterName, parameter.DbType, parameter.Value));
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -372,6 +391,28 @@ public class CompiledQueryFastPathTests
 
         Assert.Single(result);
         Assert.Equal("Fast Car", result[0].Title);
+    }
+
+    [Fact]
+    public async Task CompiledQuery_AsyncProvider_EnumConstantFixedParam_UsesInt32Binding()
+    {
+        using var cn = CreateConnection();
+        var interceptor = new ReaderCapturingInterceptor();
+        var options = new DbContextOptions();
+        options.CommandInterceptors.Add(interceptor);
+
+        var compiled = Norm.CompileQuery((DbContext c, int _dummy) =>
+            c.Query<EnumArticle>().Where(a => a.Category == ArticleCategory.Sports));
+
+        using var ctx = new DbContext(cn, new AsyncSqliteProvider(), options);
+
+        var result = await compiled(ctx, 0);
+
+        Assert.Single(result);
+        Assert.Equal("Fast Car", result[0].Title);
+        var parameter = Assert.Single(interceptor.CapturedParameters);
+        Assert.Equal(DbType.Int32, parameter.DbType);
+        Assert.Equal((int)ArticleCategory.Sports, Convert.ToInt32(parameter.Value));
     }
 
     /// <summary>

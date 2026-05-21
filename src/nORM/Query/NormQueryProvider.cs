@@ -1053,20 +1053,7 @@ namespace nORM.Query
                 {
                     var p = cmd.CreateParameter();
                     p.ParameterName = fixedParams[i].Key;
-                    p.Value = fixedParams[i].Value;
-                    // Set DbType from value for optimal binding
-                    if (fixedParams[i].Value is int) p.DbType = DbType.Int32;
-                    else if (fixedParams[i].Value is string s) { p.DbType = DbType.String; p.Size = s.Length <= MaxInlineStringSize ? s.Length : -1; }
-                    else if (fixedParams[i].Value is long) p.DbType = DbType.Int64;
-                    else if (fixedParams[i].Value is bool) p.DbType = DbType.Boolean;
-                    else if (fixedParams[i].Value is decimal) p.DbType = DbType.Decimal;
-                    else if (fixedParams[i].Value is DateTime) p.DbType = DbType.DateTime2;
-                    else if (fixedParams[i].Value is Guid) p.DbType = DbType.Guid;
-                    else if (fixedParams[i].Value is double) p.DbType = DbType.Double;
-                    else if (fixedParams[i].Value is float) p.DbType = DbType.Single;
-                    else if (fixedParams[i].Value is short) p.DbType = DbType.Int16;
-                    else if (fixedParams[i].Value is byte) p.DbType = DbType.Byte;
-                    else if (fixedParams[i].Value is byte[]) p.DbType = DbType.Binary;
+                    ParameterAssign.AssignValue(p, fixedParams[i].Value);
                     cmd.Parameters.Add(p);
                 }
                 fixedCount = fixedParams.Length;
@@ -1078,7 +1065,7 @@ namespace nORM.Query
                 {
                     var p = cmd.CreateParameter();
                     p.ParameterName = kvp.Key;
-                    p.Value = kvp.Value;
+                    ParameterAssign.AssignValue(p, kvp.Value);
                     cmd.Parameters.Add(p);
                     fixedCount++;
                 }
