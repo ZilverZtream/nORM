@@ -172,11 +172,17 @@ namespace nORM.Benchmarks
                 var config = ManualConfig.Create(DefaultConfig.Instance)
                     .WithOptions(ConfigOptions.DisableOptimizationsValidator);
 
+                var argsToRun = benchmarkArgs.Length == 0
+                    ? new[] { "--filter", "*FastNormBenchmarks*" }
+                    : benchmarkArgs;
+
                 await Task.Run(() => {
-                    var summary = BenchmarkSwitcher
+                    var summaries = BenchmarkSwitcher
                         .FromTypes(new[] { typeof(FastNormBenchmarks) })
-                        .Run(benchmarkArgs, config);
-                    return summary;
+                        .Run(argsToRun, config);
+                    if (summaries.Any(s => s.HasCriticalValidationErrors))
+                        throw new InvalidOperationException("Fast nORM benchmark validation failed.");
+                    return summaries;
                 });
 
                 Console.WriteLine();
