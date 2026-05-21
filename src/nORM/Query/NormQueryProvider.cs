@@ -992,6 +992,9 @@ namespace nORM.Query
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteCompiledPooledSlowAsync<TResult>(ensureTask, plan, parameterValues, fixedParams, state, ct);
 
+            if (_ctx.Provider.PrefersSyncExecution)
+                return ExecuteCompiledFreshSync<TResult>(plan, parameterValues, fixedParams);
+
             // Q1 fix: reuse pooled prepared command to avoid repeated allocations; create new if pool is empty
             if (!state.CommandPool.TryDequeue(out var cmd))
                 cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
@@ -1027,6 +1030,9 @@ namespace nORM.Query
             CompiledQueryState state, CancellationToken ct)
         {
             await ensureTask.ConfigureAwait(false);
+            if (_ctx.Provider.PrefersSyncExecution)
+                return await ExecuteCompiledFreshSync<TResult>(plan, parameterValues, fixedParams).ConfigureAwait(false);
+
             // Q1 fix: reuse pooled prepared command to avoid repeated allocations; create new if pool is empty
             if (!state.CommandPool.TryDequeue(out var cmd))
                 cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
@@ -1171,6 +1177,7 @@ namespace nORM.Query
         {
             using var cmd = _ctx.CreateCommand();
             cmd.CommandText = plan.Sql;
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
 
             // Bind fixed parameters (constants from the compiled expression)
             if (fixedParams != null)
@@ -1190,6 +1197,20 @@ namespace nORM.Query
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             for (int i = 0; i < count; i++)
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
+
+            if (plan.IsScalar)
+            {
+                var scalarResult = cmd.ExecuteScalarWithInterception(_ctx);
+                if (scalarResult == null || scalarResult is DBNull)
+                {
+                    if (plan.MethodName is "Min" or "Max" or "Average" &&
+                        typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
+                        throw new InvalidOperationException("Sequence contains no elements");
+                    return Task.FromResult(default(TResult)!);
+                }
+
+                return Task.FromResult(ConvertScalarResult<TResult>(scalarResult)!);
+            }
 
             // Sync materialization — no async state machine overhead
             var capacity = plan.SingleResult ? 1 : (plan.Take ?? DefaultListCapacity);
