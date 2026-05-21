@@ -148,6 +148,8 @@ namespace nORM.Internal
                     param.DbType = dbType;
                     if (dbType == DbType.Decimal)
                         ApplyProviderDecimalMetadata(param, null);
+                    else if (IsVariableLengthType(dbType))
+                        param.Size = GetTypedNullSize(dbType);
                 }
                 else
                 {
@@ -264,6 +266,16 @@ namespace nORM.Internal
 
             cmd.Parameters.Add(param);
         }
+
+        private static bool IsVariableLengthType(DbType dbType)
+            => dbType is DbType.String
+                or DbType.AnsiString
+                or DbType.StringFixedLength
+                or DbType.AnsiStringFixedLength
+                or DbType.Binary;
+
+        private static int GetTypedNullSize(DbType dbType)
+            => dbType == DbType.Binary ? -1 : MaxInlineStringSize;
 
         internal static void ApplyProviderDecimalMetadata(DbParameter param, object? value)
         {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Running;
@@ -32,6 +33,11 @@ namespace nORM.Benchmarks
                     case "--complex":
                         Console.WriteLine("Running focused complex-query benchmarks...");
                         RunFilteredBenchmarks(new[] { "--filter", "nORM.Benchmarks.OrmBenchmarks.Query_Complex*" });
+                        return;
+
+                    case "--provider-matrix":
+                        Console.WriteLine("Running SQLite/SQL Server/PostgreSQL provider matrix benchmarks...");
+                        RunProviderMatrixBenchmarks(args.Skip(1).ToArray());
                         return;
 
                     case "--filter":
@@ -84,7 +90,7 @@ namespace nORM.Benchmarks
                 Console.WriteLine("• 'Rank' shows relative performance (1 = fastest)");
                 Console.WriteLine();
 
-                if (summary.HasCriticalValidationErrors)
+                if (HasBenchmarkFailures(summary))
                 {
                     Console.WriteLine("❌ Critical validation errors occurred during benchmarking.");
                 }
@@ -130,6 +136,7 @@ namespace nORM.Benchmarks
             Console.WriteLine("  --fast <filter>   Fast nORM-only benchmarks matching a filter");
             Console.WriteLine("  --norm-only       Same as --fast");
             Console.WriteLine("  --complex         Focused complex-query comparison");
+            Console.WriteLine("  --provider-matrix Run full provider matrix comparison across SQLite, SQL Server, PostgreSQL");
             Console.WriteLine("  --filter <pattern> Run benchmarks matching a BenchmarkDotNet filter");
             Console.WriteLine("  --help            Show this help");
             Console.WriteLine();
@@ -138,6 +145,7 @@ namespace nORM.Benchmarks
             Console.WriteLine("  dotnet run --fast       # Debug nORM performance only");
             Console.WriteLine("  dotnet run --fast Query_Complex_Compiled");
             Console.WriteLine("  dotnet run --complex    # Compare complex-query implementations");
+            Console.WriteLine("  dotnet run -- --provider-matrix --filter *Query_Complex*");
             Console.WriteLine("  dotnet run              # Full comparison benchmark");
         }
 
@@ -180,7 +188,7 @@ namespace nORM.Benchmarks
                     var summaries = BenchmarkSwitcher
                         .FromTypes(new[] { typeof(FastNormBenchmarks) })
                         .Run(argsToRun, config);
-                    if (summaries.Any(s => s.HasCriticalValidationErrors))
+                    if (summaries.Any(HasBenchmarkFailures))
                         throw new InvalidOperationException("Fast nORM benchmark validation failed.");
                     return summaries;
                 });
@@ -199,6 +207,61 @@ namespace nORM.Benchmarks
                     Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
                 }
             }
+        }
+
+        private static void RunProviderMatrixBenchmarks(string[] benchmarkArgs)
+        {
+            var config = ManualConfig.Create(DefaultConfig.Instance)
+                .WithOptions(ConfigOptions.DisableOptimizationsValidator);
+
+            var argsToRun = benchmarkArgs.Length == 0
+                ? new[] { "--filter", "*ProviderMatrixBenchmarks*" }
+                : benchmarkArgs;
+
+            var summaries = BenchmarkSwitcher
+                .FromTypes(new[] { typeof(ProviderMatrixBenchmarks) })
+                .Run(argsToRun, config);
+
+            if (summaries.Any(HasBenchmarkFailures))
+                throw new InvalidOperationException("Provider matrix benchmark validation failed.");
+        }
+
+        private static bool HasBenchmarkFailures(object summary)
+        {
+            if (summary.GetType().GetProperty("HasCriticalValidationErrors")?.GetValue(summary) is true)
+                return true;
+
+            if (summary.GetType().GetProperty("Reports")?.GetValue(summary) is not IEnumerable reports)
+                return false;
+
+            foreach (var report in reports)
+            {
+                if (report == null)
+                    return true;
+
+                if (report.GetType().GetProperty("Success")?.GetValue(report) is bool success && !success)
+                    return true;
+
+                var resultStatistics = report.GetType().GetProperty("ResultStatistics")?.GetValue(report);
+                if (resultStatistics == null)
+                    return true;
+
+                if (report.GetType().GetProperty("ExecuteResults")?.GetValue(report) is not IEnumerable executeResults)
+                    continue;
+
+                var sawExecuteResult = false;
+                foreach (var executeResult in executeResults)
+                {
+                    sawExecuteResult = true;
+                    if (executeResult?.GetType().GetProperty("ExitCode")?.GetValue(executeResult) is int exitCode && exitCode != 0)
+                        return true;
+                }
+
+                if (!sawExecuteResult)
+                    return true;
+            }
+
+            return false;
         }
 
         private static async Task RunQuickTests()

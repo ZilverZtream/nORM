@@ -12,6 +12,9 @@ public v1.0 package is cut.
 - MySQL support is either live-gated or explicitly documented as preview.
 - Fast complex-query benchmark keeps compiled query materially ahead of runtime
   query and below the recorded allocation baseline.
+- Full provider benchmark matrix passes for SQLite, SQL Server, and PostgreSQL,
+  covering nORM, EF Core, Dapper, and Raw ADO.NET for query, prepared/compiled,
+  join, count, insert, and bulk insert scenarios.
 - `dotnet pack` succeeds for `nORM` and `dotnet-norm`, including symbols.
 
 ## Recommended RC Command
@@ -53,4 +56,5 @@ Capture these values from the final RC run:
 - Live provider pass count and configured providers.
 - Fast benchmark means and allocations for `Query_Complex` and
   `Query_Complex_Compiled`.
+- Provider matrix benchmark summaries for SQLite, SQL Server, and PostgreSQL.
 - Package files produced in `src/bin/Release`.

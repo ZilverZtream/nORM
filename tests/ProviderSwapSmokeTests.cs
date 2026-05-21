@@ -39,6 +39,14 @@ public class ProviderSwapSmokeTests
         public string Label { get; set; } = "";
     }
 
+    [Table("CQ_TakeUser")]
+    private sealed class CqTakeUser
+    {
+        [Key] public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public bool IsActive { get; set; }
+    }
+
     private sealed class FixedTenantProvider(int tenantId) : ITenantProvider
     {
         public object GetCurrentTenantId() => tenantId;
@@ -121,6 +129,60 @@ public class ProviderSwapSmokeTests
         }
     }
 
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("sqlserver")]
+    [InlineData("postgres")]
+    public async Task CompiledQuery_TakeParameter_RunsAcrossProviders(string kind)
+    {
+        var (cn, provider, skip) = OpenLive(kind);
+        if (skip != null) return;
+
+        using (cn) await using (var ctx = new DbContext(cn!, provider!, null, ownsConnection: false))
+        {
+            ResetCompiledTakeSchema(cn!, kind);
+
+            ctx.Add(new CqTakeUser { Id = 1, Name = "alpha", IsActive = true });
+            ctx.Add(new CqTakeUser { Id = 2, Name = "beta", IsActive = true });
+            ctx.Add(new CqTakeUser { Id = 3, Name = "inactive", IsActive = false });
+            await ctx.SaveChangesAsync();
+
+            var compiled = Norm.CompileQuery<nORM.Core.DbContext, int, CqTakeUser>(
+                (c, take) => c.Query<CqTakeUser>()
+                    .Where(u => u.IsActive == true)
+                    .OrderBy(u => u.Id)
+                    .Take(take));
+
+            var two = await compiled(ctx, 2);
+            Assert.Equal(new[] { 1, 2 }, two.Select(u => u.Id).ToArray());
+
+            var one = await compiled(ctx, 1);
+            Assert.Equal(new[] { 1 }, one.Select(u => u.Id).ToArray());
+        }
+    }
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("sqlserver")]
+    [InlineData("postgres")]
+    public async Task PreparedInsert_StringColumns_RunsAcrossProviders(string kind)
+    {
+        var (cn, provider, skip) = OpenLive(kind);
+        if (skip != null) return;
+
+        using (cn) await using (var ctx = new DbContext(cn!, provider!, null, ownsConnection: false))
+        {
+            ResetCompiledTakeSchema(cn!, kind);
+
+            await ctx.InsertAsync(new CqTakeUser { Id = 1, Name = "alpha", IsActive = true });
+            await ctx.InsertAsync(new CqTakeUser { Id = 2, Name = "beta", IsActive = false });
+
+            Assert.Equal(2L, CountRows(cn!, "CQ_TakeUser"));
+            var rows = ctx.Query<CqTakeUser>().OrderBy(x => x.Id).ToList();
+            Assert.Equal(new[] { "alpha", "beta" }, rows.Select(x => x.Name).ToArray());
+        }
+    }
+
     private static (DbConnection? Cn, DatabaseProvider? Provider, string? SkipReason) OpenLive(string kind)
     {
         if (kind == "sqlite")
@@ -177,6 +239,27 @@ public class ProviderSwapSmokeTests
             "sqlite" => "CREATE TABLE PS_Order (Id INTEGER PRIMARY KEY, TenantId INTEGER NOT NULL, CustomerId INTEGER NOT NULL, Total REAL NOT NULL, Label TEXT NOT NULL)",
             "sqlserver" => "CREATE TABLE PS_Order (Id INT PRIMARY KEY, TenantId INT NOT NULL, CustomerId INT NOT NULL, Total DECIMAL(18,4) NOT NULL, Label NVARCHAR(200) NOT NULL)",
             "postgres" => "CREATE TABLE PS_Order (Id INT PRIMARY KEY, TenantId INT NOT NULL, CustomerId INT NOT NULL, Total DECIMAL(18,4) NOT NULL, Label VARCHAR(200) NOT NULL)",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        });
+    }
+
+    private static void ResetCompiledTakeSchema(DbConnection cn, string kind)
+    {
+        var table = LiveProviderSql.Identifier(cn, "CQ_TakeUser");
+        var id = LiveProviderSql.Identifier(cn, "Id");
+        var name = LiveProviderSql.Identifier(cn, "Name");
+        var isActive = LiveProviderSql.Identifier(cn, "IsActive");
+
+        if (kind == "sqlserver")
+            Exec(cn, "IF OBJECT_ID('CQ_TakeUser','U') IS NOT NULL DROP TABLE CQ_TakeUser");
+        else
+            Exec(cn, $"DROP TABLE IF EXISTS {table}");
+
+        Exec(cn, kind switch
+        {
+            "sqlite" => $"CREATE TABLE {table} ({id} INTEGER PRIMARY KEY, {name} TEXT NOT NULL, {isActive} INTEGER NOT NULL)",
+            "sqlserver" => $"CREATE TABLE {table} ({id} INT PRIMARY KEY, {name} NVARCHAR(200) NOT NULL, {isActive} BIT NOT NULL)",
+            "postgres" => $"CREATE TABLE {table} ({id} INT PRIMARY KEY, {name} VARCHAR(200) NOT NULL, {isActive} BOOLEAN NOT NULL)",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         });
     }
