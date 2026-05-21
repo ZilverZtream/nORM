@@ -70,11 +70,16 @@ public class FaultInjectedCancellationRaceTests
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
 
+        using var retryObserved = new ManualResetEventSlim();
         var policy = new RetryPolicy
         {
             MaxRetries = 3,
             BaseDelay  = TimeSpan.FromMilliseconds(500), // long enough to cancel reliably
-            ShouldRetry = _ => true   // retry on any IOException
+            ShouldRetry = _ =>
+            {
+                retryObserved.Set();
+                return true;
+            }
         };
         var opts = new nORM.Configuration.DbContextOptions { RetryPolicy = policy };
         using var ctx = new DbContext(cn, new SqliteProvider(), opts, ownsConnection: false);
@@ -89,8 +94,9 @@ public class FaultInjectedCancellationRaceTests
             (_, _) => throw new IOException("transient"),
             cts.Token);
 
-        // Give the strategy time to catch the first exception and begin the delay.
-        await Task.Delay(50);
+        // Wait until the strategy has caught the first exception and is about to enter
+        // the retry delay. This avoids relying on Task.Delay scheduling under full-suite load.
+        Assert.True(retryObserved.Wait(TimeSpan.FromSeconds(5)));
         cts.Cancel();
 
         // Cancellation during the delay must surface as OperationCanceledException

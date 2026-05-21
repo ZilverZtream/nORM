@@ -751,12 +751,12 @@ public class UtilityCoverageTests
         using var firstCommand = cn.CreateCommand();
         var first = firstCommand.ExecuteNonQueryWithInterceptionAsync(ctx, CancellationToken.None);
 
-        await cn.FirstCommandEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await cn.FirstCommandEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         using var secondCommand = cn.CreateCommand();
         var second = secondCommand.ExecuteNonQueryWithInterceptionAsync(ctx, CancellationToken.None);
 
-        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(1, cn.MaxConcurrentCommands);
     }
@@ -775,12 +775,12 @@ public class UtilityCoverageTests
         using var firstCommand = cn.CreateCommand();
         var first = firstCommand.ExecuteScalarWithInterceptionAsync(ctx, CancellationToken.None);
 
-        await cn.FirstCommandEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await cn.FirstCommandEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         using var secondCommand = cn.CreateCommand();
         var second = secondCommand.ExecuteScalarWithInterceptionAsync(ctx, CancellationToken.None);
 
-        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(1, cn.MaxConcurrentCommands);
     }
