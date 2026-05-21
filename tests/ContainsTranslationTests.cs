@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using Npgsql;
 using nORM.Core;
 using nORM.Providers;
 using Xunit;
@@ -158,5 +160,26 @@ public class ContainsTranslationTests
         Assert.Equal(5, sqlServerCmd.Parameters.Count);
         Assert.DoesNotContain("STRING_SPLIT", sqliteResult, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("STRING_SPLIT", sqlServerResult, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PostgresProvider_Contains_NullsAndValues_MatchesBoth_Live()
+    {
+        var cs = LiveProviderEnvironment.GetConnectionString("postgres");
+        if (string.IsNullOrEmpty(cs)) return;
+
+        await using var cn = new NpgsqlConnection(cs);
+        await cn.OpenAsync();
+        await using var cmd = cn.CreateCommand();
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        var where = provider.BuildContainsClause(cmd, "\"Value\"", new object?[] { 1, null });
+        cmd.CommandText = $"""
+            SELECT COUNT(*)
+            FROM (VALUES (1), (NULL), (2)) AS v("Value")
+            WHERE {where}
+            """;
+
+        var count = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+        Assert.Equal(2, count);
     }
 }

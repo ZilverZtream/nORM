@@ -225,18 +225,34 @@ public class ProviderImplementationCoverageTests
     }
 
     [Fact]
-    public void PostgresProvider_BuildContainsClause_AllNullValues_FallsBackToObjectArray()
+    public void PostgresProvider_BuildContainsClause_AllNullValues_EmitsIsNull()
     {
         var provider = new PostgresProvider(new SqliteParameterFactory());
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var cmd = cn.CreateCommand();
         var values = new List<object?> { null, null };
-        provider.BuildContainsClause(cmd, "col", values);
+        var sql = provider.BuildContainsClause(cmd, "col", values);
+        Assert.Empty(cmd.Parameters);
+        Assert.Equal("col IS NULL", sql);
+    }
+
+    [Fact]
+    public void PostgresProvider_BuildContainsClause_NullAndGuidValues_UsesTypedArrayPlusIsNull()
+    {
+        var provider = new PostgresProvider(new SqliteParameterFactory());
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        var g1 = Guid.NewGuid();
+        var g2 = Guid.NewGuid();
+        var values = new List<object?> { g1, null, g2 };
+        var sql = provider.BuildContainsClause(cmd, "col", values);
+        Assert.Equal("(col = ANY(@p0) OR col IS NULL)", sql);
         Assert.Equal(1, cmd.Parameters.Count);
-        // All-null → object[] fallback
-        var arr = cmd.Parameters[0].Value as object[];
+        var arr = cmd.Parameters[0].Value as Guid[];
         Assert.NotNull(arr);
+        Assert.Equal(new[] { g1, g2 }, arr);
     }
 
     [Fact]

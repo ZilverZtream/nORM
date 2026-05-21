@@ -1129,7 +1129,7 @@ public class ProviderAdditionalCoverageTests
     }
 
     [Fact]
-    public void PostgresProvider_BuildContainsClause_AllNulls_FallsBackToObjectArray()
+    public void PostgresProvider_BuildContainsClause_AllNulls_EmitsIsNull()
     {
         var p = new PostgresProvider(new SqliteParameterFactory());
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -1137,8 +1137,24 @@ public class ProviderAdditionalCoverageTests
         using var cmd = cn.CreateCommand();
         var values = new List<object?> { null, null };
         var sql = p.BuildContainsClause(cmd, "\"col\"", values);
+        Assert.Empty(cmd.Parameters);
+        Assert.Equal("\"col\" IS NULL", sql);
+    }
+
+    [Fact]
+    public void PostgresProvider_BuildContainsClause_NullsAndInts_EmitsAnyOrIsNull()
+    {
+        var p = new PostgresProvider(new SqliteParameterFactory());
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        var values = new List<object?> { 1, null, 2 };
+        var sql = p.BuildContainsClause(cmd, "\"col\"", values);
         Assert.Equal(1, cmd.Parameters.Count);
-        Assert.Contains("ANY", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("(\"col\" = ANY(@p0) OR \"col\" IS NULL)", sql);
+        var arr = cmd.Parameters[0].Value as int[];
+        Assert.NotNull(arr);
+        Assert.Equal(new[] { 1, 2 }, arr);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
