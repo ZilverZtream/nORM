@@ -113,7 +113,7 @@ public class ProviderBehaviorEquivalenceTests
         "sqlite"    => $"CREATE TABLE IF NOT EXISTS {tableName} (Id INTEGER PRIMARY KEY, Tag TEXT NOT NULL DEFAULT '')",
         "sqlserver" => $"IF OBJECT_ID('{tableName}','U') IS NULL CREATE TABLE {tableName} (Id INT PRIMARY KEY, Tag NVARCHAR(200) NOT NULL DEFAULT '')",
         "mysql"     => $"CREATE TABLE IF NOT EXISTS {tableName} (Id INT PRIMARY KEY, Tag VARCHAR(200) NOT NULL DEFAULT '')",
-        "postgres"  => $"CREATE TABLE IF NOT EXISTS {tableName} (Id INT PRIMARY KEY, Tag VARCHAR(200) NOT NULL DEFAULT '')",
+        "postgres"  => $"CREATE TABLE IF NOT EXISTS {LiveProviderSql.Quote(tableName)} (\"Id\" INT PRIMARY KEY, \"Tag\" VARCHAR(200) NOT NULL DEFAULT '')",
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
@@ -122,7 +122,7 @@ public class ProviderBehaviorEquivalenceTests
         "sqlite"    => $"ALTER TABLE {tableName} ADD COLUMN {colName} INTEGER NOT NULL DEFAULT 0",
         "sqlserver" => $"IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='{tableName}' AND COLUMN_NAME='{colName}') ALTER TABLE {tableName} ADD {colName} INT NOT NULL DEFAULT 0",
         "mysql"     => $"ALTER TABLE {tableName} ADD COLUMN IF NOT EXISTS {colName} INT NOT NULL DEFAULT 0",
-        "postgres"  => $"ALTER TABLE {tableName} ADD COLUMN IF NOT EXISTS {colName} INT NOT NULL DEFAULT 0",
+        "postgres"  => $"ALTER TABLE {LiveProviderSql.Quote(tableName)} ADD COLUMN IF NOT EXISTS {LiveProviderSql.Quote(colName)} INT NOT NULL DEFAULT 0",
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
@@ -179,14 +179,14 @@ public class ProviderBehaviorEquivalenceTests
     private static void Exec(DbConnection cn, string sql)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = sql;
+        cmd.CommandText = LiveProviderSql.Normalize(cn, sql);
         cmd.ExecuteNonQuery();
     }
 
     private static long CountRows(DbConnection cn, string table)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = $"SELECT COUNT(*) FROM {table}";
+        cmd.CommandText = $"SELECT COUNT(*) FROM {LiveProviderSql.Identifier(cn, table)}";
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
 
@@ -893,7 +893,8 @@ public class ProviderBehaviorEquivalenceTests
             Exec(cn!, ItemDdl(kind));
             Exec(cn!, "DELETE FROM LPM_Item");
             // Insert via raw SQL to avoid save-pipeline coupling.
-            Exec(cn!, "INSERT INTO LPM_Item (Id, Name, Score, Active, NullableNum, Amount) VALUES (1, 'n1', 10, 0, NULL, 0)");
+            var activeVal = kind == "postgres" ? "FALSE" : "0";
+            Exec(cn!, $"INSERT INTO LPM_Item (Id, Name, Score, Active, NullableNum, Amount) VALUES (1, 'n1', 10, {activeVal}, NULL, 0)");
 
             var item = ctx.Query<LpmItem>().Where(x => x.Id == 1).ToList().Single();
             Assert.Null(item.NullableNum);
@@ -958,7 +959,8 @@ public class ProviderBehaviorEquivalenceTests
         {
             Exec(cn!, ItemDdl(kind));
             Exec(cn!, "DELETE FROM LPM_Item");
-            Exec(cn!, "INSERT INTO LPM_Item (Id, Name, Score, Active, Amount) VALUES (3, 'x', 12345, 0, 0)");
+            var activeVal = kind == "postgres" ? "FALSE" : "0";
+            Exec(cn!, $"INSERT INTO LPM_Item (Id, Name, Score, Active, Amount) VALUES (3, 'x', 12345, {activeVal}, 0)");
 
             var item = ctx.Query<LpmItem>().Where(x => x.Id == 3).ToList().Single();
             Assert.Equal(12345, item.Score);
@@ -979,7 +981,8 @@ public class ProviderBehaviorEquivalenceTests
         {
             Exec(cn!, ItemDdl(kind));
             Exec(cn!, "DELETE FROM LPM_Item");
-            Exec(cn!, "INSERT INTO LPM_Item (Id, Name, Score, Active, Amount) VALUES (4, 'hello world', 0, 0, 0)");
+            var activeVal = kind == "postgres" ? "FALSE" : "0";
+            Exec(cn!, $"INSERT INTO LPM_Item (Id, Name, Score, Active, Amount) VALUES (4, 'hello world', 0, {activeVal}, 0)");
 
             var item = ctx.Query<LpmItem>().Where(x => x.Id == 4).ToList().Single();
             Assert.Equal("hello world", item.Name);
@@ -1038,7 +1041,7 @@ public class ProviderBehaviorEquivalenceTests
 
             // Verify via raw SQL
             using var cmd = cn!.CreateCommand();
-            cmd.CommandText = "SELECT Score FROM LPM_Item WHERE Id = 1";
+            cmd.CommandText = LiveProviderSql.Normalize(cn!, "SELECT Score FROM LPM_Item WHERE Id = 1");
             var score = Convert.ToInt32(cmd.ExecuteScalar());
             Assert.Equal(99, score);
         }
@@ -1125,7 +1128,7 @@ public class ProviderBehaviorEquivalenceTests
             Assert.Equal(2L, CountRows(cn!, "LPM_Item"));
 
             using var cmd = cn!.CreateCommand();
-            cmd.CommandText = "SELECT Score FROM LPM_Item WHERE Id = 1";
+            cmd.CommandText = LiveProviderSql.Normalize(cn!, "SELECT Score FROM LPM_Item WHERE Id = 1");
             Assert.Equal(99, Convert.ToInt32(cmd.ExecuteScalar()));
         }
     }
@@ -1186,7 +1189,7 @@ public class ProviderBehaviorEquivalenceTests
                 "sqlite"    => "UPDATE LPM_OccItem SET Token=randomblob(8) WHERE Id=1",
                 "sqlserver" => "UPDATE LPM_OccItem SET Token=CONVERT(VARBINARY(8),NEWID()) WHERE Id=1",
                 "mysql"     => "UPDATE LPM_OccItem SET Token=UNHEX(REPLACE(UUID(),'-','')) WHERE Id=1",
-                "postgres"  => "UPDATE LPM_OccItem SET Token=gen_random_bytes(8) WHERE Id=1",
+                "postgres"  => "UPDATE LPM_OccItem SET Token=decode(md5(random()::text), 'hex') WHERE Id=1",
                 _           => throw new ArgumentOutOfRangeException(nameof(kind))
             };
             Exec(cn!, tokenSql);

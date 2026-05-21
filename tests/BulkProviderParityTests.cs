@@ -179,21 +179,21 @@ public class BulkProviderParityTests
     private static void Exec(DbConnection cn, string sql)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = sql;
+        cmd.CommandText = LiveProviderSql.Normalize(cn, sql);
         cmd.ExecuteNonQuery();
     }
 
     private static long CountRows(DbConnection cn, string table)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = $"SELECT COUNT(*) FROM {table}";
+        cmd.CommandText = $"SELECT COUNT(*) FROM {LiveProviderSql.Identifier(cn, table)}";
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
 
     private static object? ReadScalar(DbConnection cn, string sql)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = sql;
+        cmd.CommandText = LiveProviderSql.Normalize(cn, sql);
         return cmd.ExecuteScalar();
     }
 

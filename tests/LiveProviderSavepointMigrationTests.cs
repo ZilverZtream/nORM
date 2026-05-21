@@ -60,7 +60,7 @@ public class LiveProviderSavepointMigrationTests
         "sqlite"    => $"CREATE TABLE IF NOT EXISTS {tableName} (Id INTEGER PRIMARY KEY, Tag TEXT NOT NULL)",
         "sqlserver" => $"IF OBJECT_ID('{tableName}','U') IS NULL CREATE TABLE {tableName} (Id INT PRIMARY KEY, Tag NVARCHAR(200) NOT NULL)",
         "mysql"     => $"CREATE TABLE IF NOT EXISTS {tableName} (Id INT PRIMARY KEY, Tag VARCHAR(200) NOT NULL)",
-        "postgres"  => $"CREATE TABLE IF NOT EXISTS {tableName} (Id INT PRIMARY KEY, Tag VARCHAR(200) NOT NULL)",
+        "postgres"  => $"CREATE TABLE IF NOT EXISTS {LiveProviderSql.Quote(tableName)} (\"Id\" INT PRIMARY KEY, \"Tag\" VARCHAR(200) NOT NULL)",
         _           => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
@@ -117,7 +117,7 @@ public class LiveProviderSavepointMigrationTests
     private static void Exec(DbConnection cn, string sql)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = sql;
+        cmd.CommandText = LiveProviderSql.Normalize(cn, sql);
         cmd.ExecuteNonQuery();
     }
 
@@ -125,7 +125,7 @@ public class LiveProviderSavepointMigrationTests
     {
         using var cmd = cn.CreateCommand();
         cmd.Transaction = tx;
-        cmd.CommandText = $"SELECT COUNT(*) FROM {table}";
+        cmd.CommandText = $"SELECT COUNT(*) FROM {LiveProviderSql.Identifier(cn, table)}";
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
 
@@ -263,7 +263,7 @@ public class LiveProviderSavepointMigrationTests
     {
         using var cmd = cn.CreateCommand();
         cmd.Transaction = tx;
-        cmd.CommandText = $"INSERT INTO SP_Item (Id, Label) VALUES ({id}, '{label}')";
+        cmd.CommandText = LiveProviderSql.Normalize(cn, $"INSERT INTO SP_Item (Id, Label) VALUES ({id}, '{label}')");
         cmd.ExecuteNonQuery();
     }
 
@@ -844,7 +844,7 @@ public class LiveProviderSavepointMigrationTests
 
             // History row must exist.
             using var histCmd = cn!.CreateCommand();
-            histCmd.CommandText = $"SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE Version = {version}";
+            histCmd.CommandText = LiveProviderSql.Normalize(cn!, $"SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE Version = {version}");
             var count = Convert.ToInt64(histCmd.ExecuteScalar());
             Assert.Equal(1L, count);
         }
@@ -888,7 +888,7 @@ public class LiveProviderSavepointMigrationTests
             await runner.ApplyMigrationsAsync();
 
             using var histCmd = cn!.CreateCommand();
-            histCmd.CommandText = $"SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE Version = {version}";
+            histCmd.CommandText = LiveProviderSql.Normalize(cn!, $"SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE Version = {version}");
             var count = Convert.ToInt64(histCmd.ExecuteScalar());
             Assert.Equal(1L, count);
         }

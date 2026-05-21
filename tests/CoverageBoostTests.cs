@@ -1070,19 +1070,24 @@ public class CoverageBoostTests : TestBase
     // ═══════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void DbConnectionFactory_PostgresProvider_ThrowsWhenNpgsqlNotInstalled()
+    public void DbConnectionFactory_PostgresProvider_HandlesInstalledOrMissingNpgsql()
     {
-        // In test env without Npgsql, this should throw InvalidOperationException
         var createMethod = typeof(DbContext).Assembly
             .GetType("nORM.Core.DbConnectionFactory", true)!
             .GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!;
 
-        var ex = Assert.Throws<TargetInvocationException>(() =>
-            createMethod.Invoke(null, new object[] { "Host=localhost;Database=test;", new PostgresProvider(new SqliteParameterFactory()) }));
-
-        Assert.True(
-            ex.InnerException is InvalidOperationException || ex.InnerException is ArgumentException,
-            $"Expected InvalidOperationException or ArgumentException, got: {ex.InnerException?.GetType().Name}");
+        try
+        {
+            var connection = Assert.IsAssignableFrom<DbConnection>(
+                createMethod.Invoke(null, new object[] { "Host=localhost;Database=test;", new PostgresProvider(new SqliteParameterFactory()) }));
+            Assert.Contains("Npgsql", connection.GetType().FullName, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (TargetInvocationException ex)
+        {
+            Assert.True(
+                ex.InnerException is InvalidOperationException || ex.InnerException is ArgumentException,
+                $"Expected InvalidOperationException or ArgumentException, got: {ex.InnerException?.GetType().Name}");
+        }
     }
 
     [Fact]
@@ -5642,13 +5647,18 @@ public class ConnectionManagerPrivateMethodTests
 public class DbConnectionFactoryProviderPathTests
 {
     [Fact]
-    public void Create_PostgresProvider_ThrowsWhenNpgsqlNotInstalled()
+    public void Create_PostgresProvider_HandlesInstalledOrMissingNpgsql()
     {
-        // In the test environment Npgsql is not available, so this throws
-        // InvalidOperationException("Npgsql package is required...")
-        var ex = Assert.Throws<InvalidOperationException>(() =>
-            DbConnectionFactory.Create("Host=localhost;Database=test;", new PostgresProvider(new SqliteParameterFactory())));
-        Assert.Contains("Npgsql", ex.Message, StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            using var connection = DbConnectionFactory.Create(
+                "Host=localhost;Database=test;", new PostgresProvider(new SqliteParameterFactory()));
+            Assert.Contains("Npgsql", connection.GetType().FullName, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Assert.Contains("Npgsql", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     [Fact]
