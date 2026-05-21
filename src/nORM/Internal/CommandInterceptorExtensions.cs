@@ -89,6 +89,11 @@ namespace nORM.Internal
                     gateHeld = true;
                 }
                 var result = await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                if (gateHeld)
+                {
+                    gate!.Release();
+                    gateHeld = false;
+                }
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
@@ -167,6 +172,11 @@ namespace nORM.Internal
                     gateHeld = true;
                 }
                 var result = command.ExecuteNonQuery();
+                if (gateHeld)
+                {
+                    gate!.Release();
+                    gateHeld = false;
+                }
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                     interceptor.NonQueryExecuted(command, ctx, result, sw.Elapsed);
@@ -250,6 +260,11 @@ namespace nORM.Internal
                     gateHeld = true;
                 }
                 var result = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+                if (gateHeld)
+                {
+                    gate!.Release();
+                    gateHeld = false;
+                }
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
@@ -296,15 +311,7 @@ namespace nORM.Internal
             if (gate == null)
                 return ExecuteScalarWithInterceptionCore(command, ctx);
 
-            gate.Wait();
-            try
-            {
-                return ExecuteScalarWithInterceptionCore(command, ctx);
-            }
-            finally
-            {
-                gate.Release();
-            }
+            return ExecuteScalarWithInterceptionCoreSerialized(command, ctx, gate, disposeCommand: false);
         }
 
         internal static object? ExecuteScalarWithInterceptionSerializedAndDispose(this DbCommand command, DbContext ctx)
@@ -316,15 +323,69 @@ namespace nORM.Internal
                 finally { command.Dispose(); }
             }
 
-            gate.Wait();
+            return ExecuteScalarWithInterceptionCoreSerialized(command, ctx, gate, disposeCommand: true);
+        }
+
+        private static object? ExecuteScalarWithInterceptionCoreSerialized(DbCommand command, DbContext ctx, SemaphoreSlim gate, bool disposeCommand)
+        {
             try
             {
-                return ExecuteScalarWithInterceptionCore(command, ctx);
+                var interceptors = ctx.Options.CommandInterceptors;
+                if (interceptors.Count == 0)
+                {
+                    gate.Wait();
+                    try
+                    {
+                        return command.ExecuteScalar();
+                    }
+                    finally
+                    {
+                        gate.Release();
+                    }
+                }
+
+                foreach (var interceptor in interceptors)
+                {
+                    var interception = interceptor.ScalarExecuting(command, ctx);
+                    if (interception.IsSuppressed)
+                    {
+                        foreach (var i in interceptors)
+                            i.ScalarExecuted(command, ctx, interception.Result, TimeSpan.Zero);
+                        return interception.Result;
+                    }
+                }
+
+                var sw = Stopwatch.StartNew();
+                try
+                {
+                    gate.Wait();
+                    object? result;
+                    try
+                    {
+                        result = command.ExecuteScalar();
+                    }
+                    finally
+                    {
+                        gate.Release();
+                    }
+
+                    sw.Stop();
+                    foreach (var interceptor in interceptors)
+                        interceptor.ScalarExecuted(command, ctx, result, sw.Elapsed);
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    sw.Stop();
+                    foreach (var interceptor in interceptors)
+                        interceptor.CommandFailed(command, ctx, ex);
+                    throw;
+                }
             }
             finally
             {
-                command.Dispose();
-                gate.Release();
+                if (disposeCommand)
+                    command.Dispose();
             }
         }
 

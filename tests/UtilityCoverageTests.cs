@@ -802,6 +802,79 @@ public class UtilityCoverageTests
         Assert.True(cn.SecondCommandEntered.Task.IsCompleted);
     }
 
+    private sealed class UctNestedScalarInterceptor : BaseDbCommandInterceptor
+    {
+        private int _nested;
+        public object? NestedResult { get; private set; }
+
+        public UctNestedScalarInterceptor(ILogger logger) : base(logger)
+        {
+        }
+
+        public override async Task ScalarExecutedAsync(DbCommand command, DbContext context, object? result, TimeSpan duration, CancellationToken cancellationToken)
+        {
+            if (Interlocked.Exchange(ref _nested, 1) == 0)
+            {
+                using var nested = command.Connection!.CreateCommand();
+                nested.CommandText = "SELECT 2";
+                NestedResult = await nested.ExecuteScalarWithInterceptionAsync(context, cancellationToken).ConfigureAwait(false);
+            }
+
+            await base.ScalarExecutedAsync(command, context, result, duration, cancellationToken).ConfigureAwait(false);
+        }
+
+        public override void ScalarExecuted(DbCommand command, DbContext context, object? result, TimeSpan duration)
+        {
+            if (Interlocked.Exchange(ref _nested, 1) == 0)
+            {
+                using var nested = command.Connection!.CreateCommand();
+                nested.CommandText = "SELECT 2";
+                NestedResult = nested.ExecuteScalarWithInterception(context);
+            }
+
+            base.ScalarExecuted(command, context, result, duration);
+        }
+    }
+
+    [Fact]
+    public async Task CommandInterceptorExtensions_ExecuteScalarAsync_PostInterceptorCanUseSameConnection()
+    {
+        using var cn = OpenDb();
+        var interceptor = new UctNestedScalarInterceptor(new FakeLogger());
+        var opts = new DbContextOptions
+        {
+            CommandInterceptors = { interceptor }
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT 1";
+
+        var result = await cmd.ExecuteScalarWithInterceptionAsync(ctx, CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1L, Convert.ToInt64(result));
+        Assert.Equal(2L, Convert.ToInt64(interceptor.NestedResult));
+    }
+
+    [Fact]
+    public void CommandInterceptorExtensions_ExecuteScalar_PostInterceptorCanUseSameConnection()
+    {
+        using var cn = OpenDb();
+        var interceptor = new UctNestedScalarInterceptor(new FakeLogger());
+        var opts = new DbContextOptions
+        {
+            CommandInterceptors = { interceptor }
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT 1";
+
+        var result = cmd.ExecuteScalarWithInterception(ctx);
+
+        Assert.Equal(1L, Convert.ToInt64(result));
+        Assert.Equal(2L, Convert.ToInt64(interceptor.NestedResult));
+    }
+
     private static async Task<bool> EnteredSecondCommandBeforeReleaseAsync(UctGateTrackingConnection cn)
     {
         var completed = await Task.WhenAny(cn.SecondCommandEntered.Task, Task.Delay(TimeSpan.FromMilliseconds(100)));
