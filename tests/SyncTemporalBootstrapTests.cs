@@ -254,6 +254,41 @@ public class SyncTemporalBootstrapTests
     // ── SB-6: Temporal disabled — no bootstrap tables created ─────────────────
 
     [Fact]
+    public void ExistingHistoryTableWithoutTriggers_BootstrapCreatesTriggers()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmdSetup = cn.CreateCommand();
+        cmdSetup.CommandText = @"
+CREATE TABLE SbEntity (Id INTEGER PRIMARY KEY AUTOINCREMENT, Label TEXT NOT NULL);
+CREATE TABLE SbEntity_History (
+    __VersionId INTEGER PRIMARY KEY AUTOINCREMENT,
+    __ValidFrom TEXT NOT NULL,
+    __ValidTo TEXT NOT NULL,
+    __Operation TEXT NOT NULL,
+    Id INTEGER NOT NULL,
+    Label TEXT NOT NULL
+);";
+        cmdSetup.ExecuteNonQuery();
+
+        var opts = new DbContextOptions { OnModelCreating = mb => mb.Entity<SbEntity>() };
+        opts.EnableTemporalVersioning();
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+
+        _ = ctx.Query<SbEntity>().Count();
+
+        using var insert = cn.CreateCommand();
+        insert.CommandText = "INSERT INTO SbEntity (Label) VALUES ('trigger-check')";
+        insert.ExecuteNonQuery();
+
+        using var historyCount = cn.CreateCommand();
+        historyCount.CommandText = "SELECT COUNT(*) FROM SbEntity_History WHERE Label = 'trigger-check' AND __Operation = 'I'";
+        Assert.Equal(1L, (long)historyCount.ExecuteScalar()!);
+
+        cn.Dispose();
+    }
+
+    [Fact]
     public void SyncCount_TemporalDisabled_NoBootstrapTables()
     {
         var (cn, ctx) = BuildNoTemporal();

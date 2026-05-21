@@ -321,12 +321,16 @@ CREATE TABLE {historyTable} (
             var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.Name)} = OLD.{Escape(c.Name)}"));
 
             return $@"
+DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_ai")};
+-- DELIMITER
 CREATE TRIGGER {Escape(mapping.TableName + "_ai")} AFTER INSERT ON {table}
 FOR EACH ROW
 BEGIN
     INSERT INTO {history} (`__ValidFrom`, `__ValidTo`, `__Operation`, {columns})
     VALUES (UTC_TIMESTAMP(), '9999-12-31', 'I', {newColumns});
 END;
+-- DELIMITER
+DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_au")};
 -- DELIMITER
 CREATE TRIGGER {Escape(mapping.TableName + "_au")} AFTER UPDATE ON {table}
 FOR EACH ROW
@@ -335,6 +339,8 @@ BEGIN
     INSERT INTO {history} (`__ValidFrom`, `__ValidTo`, `__Operation`, {columns})
     VALUES (UTC_TIMESTAMP(), '9999-12-31', 'U', {newColumns});
 END;
+-- DELIMITER
+DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_ad")};
 -- DELIMITER
 CREATE TRIGGER {Escape(mapping.TableName + "_ad")} AFTER DELETE ON {table}
 FOR EACH ROW
