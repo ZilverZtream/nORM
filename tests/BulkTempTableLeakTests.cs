@@ -154,25 +154,25 @@ public class BulkTempTableLeakTests
     // ── Live MySQL test (env-gated) ───────────────────────────────────────────
 
     private static string? GetMysqlCs()
-        => Environment.GetEnvironmentVariable("NORM_TEST_MYSQL_CS");
+        => LiveProviderEnvironment.GetConnectionString("mysql");
 
     [Fact]
     public async Task MySQL_RepeatedBulkUpdate_NoTempTableAccumulation_Live()
     {
         if (string.IsNullOrEmpty(GetMysqlCs())) return;
         await Task.CompletedTask;
-        Assert.True(true, "Live MySQL repeated BulkUpdateAsync temp table cleanup test: set NORM_TEST_MYSQL_CS to enable");
+        Assert.True(true, "Live MySQL repeated BulkUpdateAsync temp table cleanup test: set NORM_TEST_MYSQL or NORM_TEST_MYSQL_CS to enable");
     }
 
     private static string? GetSqlServerCs()
-        => Environment.GetEnvironmentVariable("NORM_TEST_SQLSERVER_CS");
+        => LiveProviderEnvironment.GetConnectionString("sqlserver");
 
     [Fact]
     public async Task SqlServer_RepeatedBulkUpdate_NoTempTableAccumulation_Live()
     {
         if (string.IsNullOrEmpty(GetSqlServerCs())) return;
         await Task.CompletedTask;
-        Assert.True(true, "Live SQL Server repeated BulkUpdateAsync temp table cleanup test: set NORM_TEST_SQLSERVER_CS to enable");
+        Assert.True(true, "Live SQL Server repeated BulkUpdateAsync temp table cleanup test: set NORM_TEST_SQLSERVER or NORM_TEST_SQLSERVER_CS to enable");
     }
 
     [Fact]
@@ -180,7 +180,7 @@ public class BulkTempTableLeakTests
     {
         if (string.IsNullOrEmpty(GetSqlServerCs())) return;
         await Task.CompletedTask;
-        Assert.True(true, "Live SQL Server repeated BulkDeleteAsync temp table cleanup test: set NORM_TEST_SQLSERVER_CS to enable");
+        Assert.True(true, "Live SQL Server repeated BulkDeleteAsync temp table cleanup test: set NORM_TEST_SQLSERVER or NORM_TEST_SQLSERVER_CS to enable");
     }
 
     // ── Additional SQLite temp table cleanup tests ────────────────────────────

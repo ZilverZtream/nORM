@@ -95,7 +95,7 @@ public class CrossProviderAdversarialTests
             }
             case "sqlserver":
             {
-                var cs = Environment.GetEnvironmentVariable("NORM_TEST_SQLSERVER");
+                var cs = LiveProviderEnvironment.GetConnectionString("sqlserver");
                 if (string.IsNullOrEmpty(cs))
                     return (null, null, "NORM_TEST_SQLSERVER not set — SQL Server live tests skipped.");
                 var cn = OpenReflected("Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient", cs);
@@ -103,7 +103,7 @@ public class CrossProviderAdversarialTests
             }
             case "mysql":
             {
-                var cs = Environment.GetEnvironmentVariable("NORM_TEST_MYSQL");
+                var cs = LiveProviderEnvironment.GetConnectionString("mysql");
                 if (string.IsNullOrEmpty(cs))
                     return (null, null, "NORM_TEST_MYSQL not set — MySQL live tests skipped.");
                 var cn = OpenReflected("MySqlConnector.MySqlConnection, MySqlConnector", cs);
@@ -111,7 +111,7 @@ public class CrossProviderAdversarialTests
             }
             case "postgres":
             {
-                var cs = Environment.GetEnvironmentVariable("NORM_TEST_POSTGRES");
+                var cs = LiveProviderEnvironment.GetConnectionString("postgres");
                 if (string.IsNullOrEmpty(cs))
                     return (null, null, "NORM_TEST_POSTGRES not set — PostgreSQL live tests skipped.");
                 var cn = OpenReflected("Npgsql.NpgsqlConnection, Npgsql", cs);

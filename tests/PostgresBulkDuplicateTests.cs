@@ -22,7 +22,7 @@ namespace nORM.Tests;
 /// Previously, BuildPostgresBatchInsertSql appended ON CONFLICT DO NOTHING which
 /// silently discarded duplicate rows instead of surfacing the constraint error.
 ///
-/// Live tests are env-gated (require NORM_TEST_POSTGRES_CS env var).
+/// Live tests are env-gated (require NORM_TEST_POSTGRES or NORM_TEST_POSTGRES_CS env var).
 /// Shape tests verify ON CONFLICT DO NOTHING is absent from generated SQL.
 /// </summary>
 public class PostgresBulkDuplicateTests
@@ -60,7 +60,7 @@ public class PostgresBulkDuplicateTests
     // ── Live PostgreSQL test (env-gated) ─────────────────────────────────────
 
     private static string? GetPostgresCs()
-        => Environment.GetEnvironmentVariable("NORM_TEST_POSTGRES_CS");
+        => LiveProviderEnvironment.GetConnectionString("postgres");
 
     [Fact]
     public async Task PostgresBulkInsert_DuplicatePk_ThrowsException_Live()
@@ -73,9 +73,9 @@ public class PostgresBulkDuplicateTests
         }
 
         // This test requires live PostgreSQL and Npgsql package.
-        // Connection string set via NORM_TEST_POSTGRES_CS env variable.
+        // Connection string set via NORM_TEST_POSTGRES or NORM_TEST_POSTGRES_CS env variable.
         await Task.CompletedTask;
-        Assert.True(true, "Live PostgreSQL BulkInsert duplicate-key test: set NORM_TEST_POSTGRES_CS to enable");
+        Assert.True(true, "Live PostgreSQL BulkInsert duplicate-key test: set NORM_TEST_POSTGRES or NORM_TEST_POSTGRES_CS to enable");
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public class PostgresBulkDuplicateTests
         }
 
         await Task.CompletedTask;
-        Assert.True(true, "Live PostgreSQL BulkInsert unique-index duplicate test: set NORM_TEST_POSTGRES_CS to enable");
+        Assert.True(true, "Live PostgreSQL BulkInsert unique-index duplicate test: set NORM_TEST_POSTGRES or NORM_TEST_POSTGRES_CS to enable");
     }
 
     // ── Behavioral documentation ─────────────────────────────────────────────

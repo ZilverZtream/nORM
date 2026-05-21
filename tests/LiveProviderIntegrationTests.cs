@@ -59,11 +59,11 @@ public class LiveProviderIntegrationTests
         public static bool SqliteAvailable => true;
 
         public static string? SqlServerConnectionString
-            => Environment.GetEnvironmentVariable(SqlServerVar);
+            => LiveProviderEnvironment.GetByCanonicalName(SqlServerVar);
         public static string? MySqlConnectionString
-            => Environment.GetEnvironmentVariable(MySqlVar);
+            => LiveProviderEnvironment.GetByCanonicalName(MySqlVar);
         public static string? PostgresConnectionString
-            => Environment.GetEnvironmentVariable(PostgresVar);
+            => LiveProviderEnvironment.GetByCanonicalName(PostgresVar);
 
         public static bool SqlServerAvailable => !string.IsNullOrEmpty(SqlServerConnectionString);
         public static bool MySqlAvailable     => !string.IsNullOrEmpty(MySqlConnectionString);
@@ -639,12 +639,12 @@ public class LiveProviderIntegrationTests
     [InlineData("NORM_TEST_POSTGRES",  "PostgreSQL")]
     public void T1_LiveProviderStatus_ReportedInOutput(string envVar, string providerName)
     {
-        var configured = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(envVar));
+        var configured = !string.IsNullOrEmpty(LiveProviderEnvironment.GetByCanonicalName(envVar));
         // This test always passes but its output tells CI which providers are live.
         if (configured)
-            Assert.True(true, $"{providerName} live tests ENABLED ({envVar} is set).");
+            Assert.True(true, $"{providerName} live tests ENABLED ({envVar} or {envVar}_CS is set).");
         else
-            Assert.True(true, $"{providerName} live tests SKIPPED ({envVar} not set).");
+            Assert.True(true, $"{providerName} live tests SKIPPED ({envVar} and {envVar}_CS not set).");
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -664,9 +664,9 @@ public class LiveProviderIntegrationTests
         if (string.IsNullOrEmpty(policy))
             return; // Advisory mode — no enforcement.
 
-        bool sqlServerLive = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_SQLSERVER"));
-        bool mysqlLive     = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_MYSQL"));
-        bool postgresLive  = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_POSTGRES"));
+        bool sqlServerLive = LiveProviderEnvironment.IsConfigured("sqlserver");
+        bool mysqlLive     = LiveProviderEnvironment.IsConfigured("mysql");
+        bool postgresLive  = LiveProviderEnvironment.IsConfigured("postgres");
 
         if (policy == "all")
         {
@@ -681,7 +681,7 @@ public class LiveProviderIntegrationTests
         {
             Assert.True(sqlServerLive || mysqlLive || postgresLive,
                 "P2 parity policy 'any' requires at least one of NORM_TEST_SQLSERVER, " +
-                "NORM_TEST_MYSQL, or NORM_TEST_POSTGRES to be set in this CI lane.");
+                "NORM_TEST_MYSQL, or NORM_TEST_POSTGRES, or their _CS aliases, to be set in this CI lane.");
         }
         else
         {
@@ -703,13 +703,10 @@ public class LiveProviderIntegrationTests
         if (!int.TryParse(minStr, out var minRequired) || minRequired <= 0)
             return; // Advisory mode.
 
-        int liveCount = 0;
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_SQLSERVER"))) liveCount++;
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_MYSQL")))     liveCount++;
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NORM_TEST_POSTGRES")))  liveCount++;
+        var liveCount = LiveProviderEnvironment.ConfiguredProviderCount();
 
         Assert.True(liveCount >= minRequired,
             $"P2 minimum live provider count not met: required {minRequired}, got {liveCount}. " +
-            $"Set NORM_TEST_SQLSERVER / NORM_TEST_MYSQL / NORM_TEST_POSTGRES as needed.");
+            $"Set NORM_TEST_SQLSERVER / NORM_TEST_MYSQL / NORM_TEST_POSTGRES, or their _CS aliases, as needed.");
     }
 }

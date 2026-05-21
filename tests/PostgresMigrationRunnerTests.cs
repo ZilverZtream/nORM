@@ -500,7 +500,7 @@ public class PostgresMigrationRunnerTests
     [Fact]
     public async Task Live_Postgres_ApplyMigrations_CreatesHistoryTable()
     {
-        var connStr = Environment.GetEnvironmentVariable("NORM_TEST_POSTGRES");
+        var connStr = LiveProviderEnvironment.GetConnectionString("postgres");
         if (connStr == null) return; // skip — no live PostgreSQL available
 
         // Cannot open a Npgsql connection without a reference; test is intentionally
@@ -511,7 +511,7 @@ public class PostgresMigrationRunnerTests
     [Fact]
     public async Task Live_Postgres_HasPendingMigrations_AfterApply_ReturnsFalse()
     {
-        var connStr = Environment.GetEnvironmentVariable("NORM_TEST_POSTGRES");
+        var connStr = LiveProviderEnvironment.GetConnectionString("postgres");
         if (connStr == null) return; // skip
 
         await Task.CompletedTask;
@@ -520,7 +520,7 @@ public class PostgresMigrationRunnerTests
     [Fact]
     public async Task Live_Postgres_AdvisoryLock_AcquireAndRelease()
     {
-        var connStr = Environment.GetEnvironmentVariable("NORM_TEST_POSTGRES");
+        var connStr = LiveProviderEnvironment.GetConnectionString("postgres");
         if (connStr == null) return; // skip
 
         await Task.CompletedTask;
