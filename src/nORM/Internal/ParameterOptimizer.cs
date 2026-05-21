@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Runtime.CompilerServices;
+using Microsoft.Data.SqlClient;
 
 #nullable enable
 
@@ -143,9 +144,15 @@ namespace nORM.Internal
                         lookupType = Enum.GetUnderlyingType(lookupType);
                 }
                 if (lookupType != null && _typeMap.TryGetValue(lookupType, out var dbType))
+                {
                     param.DbType = dbType;
+                    if (dbType == DbType.Decimal)
+                        ApplyProviderDecimalMetadata(param, null);
+                }
                 else
+                {
                     param.DbType = DbType.Object;
+                }
             }
             else
             {
@@ -175,6 +182,7 @@ namespace nORM.Internal
                 else if (valueType == typeof(decimal))
                 {
                     param.DbType = DbType.Decimal;
+                    ApplyProviderDecimalMetadata(param, value);
                 }
                 else if (valueType == typeof(DateTime))
                 {
@@ -255,6 +263,23 @@ namespace nORM.Internal
             }
 
             cmd.Parameters.Add(param);
+        }
+
+        internal static void ApplyProviderDecimalMetadata(DbParameter param, object? value)
+        {
+            if (param is not SqlParameter sqlParameter)
+                return;
+
+            sqlParameter.Precision = 29;
+            sqlParameter.Scale = value is decimal decimalValue
+                ? GetDecimalScale(decimalValue)
+                : (byte)10;
+        }
+
+        private static byte GetDecimalScale(decimal value)
+        {
+            var bits = decimal.GetBits(value);
+            return (byte)((bits[3] >> 16) & 0x7F);
         }
 
         /// <summary>

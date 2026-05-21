@@ -108,8 +108,7 @@ EXEC @Result = sp_getapplock
     @LockTimeout   = {MigrationLockTimeoutMs};
 IF @Result < 0
     RAISERROR(
-        'nORM: Failed to acquire migration advisory lock (sp_getapplock returned %d). ' +
-        'Another process may already be deploying migrations.',
+        'nORM: Failed to acquire migration advisory lock (sp_getapplock returned %d). Another process may already be deploying migrations.',
         16, 1, @Result);";
             await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
         }

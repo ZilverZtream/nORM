@@ -121,9 +121,10 @@ public class LiveProviderSavepointMigrationTests
         cmd.ExecuteNonQuery();
     }
 
-    private static long CountRows(DbConnection cn, string table)
+    private static long CountRows(DbConnection cn, string table, DbTransaction? tx = null)
     {
         using var cmd = cn.CreateCommand();
+        cmd.Transaction = tx;
         cmd.CommandText = $"SELECT COUNT(*) FROM {table}";
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
@@ -175,6 +176,7 @@ public class LiveProviderSavepointMigrationTests
         // DbCommand members used in Up() IL
         var createCmd   = typeof(DbConnection).GetMethod("CreateCommand")!;
         var setPropText = typeof(DbCommand).GetProperty("CommandText")!.SetMethod!;
+        var setPropTx   = typeof(DbCommand).GetProperty("Transaction")!.SetMethod!;
         var execNonQ    = typeof(DbCommand).GetMethod("ExecuteNonQuery")!;
         var disposeCmd  = typeof(IDisposable).GetMethod("Dispose")!;
         var throwCtor   = typeof(InvalidOperationException).GetConstructor(new[] { typeof(string) })!;
@@ -210,6 +212,11 @@ public class LiveProviderSavepointMigrationTests
                 upIL.Emit(OpCodes.Ldarg_1);                 // connection (arg1)
                 upIL.Emit(OpCodes.Callvirt, createCmd);
                 upIL.Emit(OpCodes.Stloc, cmdLocal);
+
+                // cmd.Transaction = transaction;
+                upIL.Emit(OpCodes.Ldloc, cmdLocal);
+                upIL.Emit(OpCodes.Ldarg_2);
+                upIL.Emit(OpCodes.Callvirt, setPropTx);
 
                 // cmd.CommandText = ddl;
                 upIL.Emit(OpCodes.Ldloc, cmdLocal);
@@ -293,13 +300,13 @@ public class LiveProviderSavepointMigrationTests
             RawInsert(cn!, tx.Transaction!, 2, "after-savepoint");
 
             // Row B is visible before rollback.
-            Assert.Equal(2L, CountRows(cn!, "SP_Item"));
+            Assert.Equal(2L, CountRows(cn!, "SP_Item", tx.Transaction));
 
             // Roll back to savepoint — row B should disappear.
             await ctx.RollbackToSavepointAsync(tx.Transaction!, "sp1");
 
             // Only row A survives the savepoint rollback.
-            Assert.Equal(1L, CountRows(cn!, "SP_Item"));
+            Assert.Equal(1L, CountRows(cn!, "SP_Item", tx.Transaction));
 
             await tx.CommitAsync();
 
@@ -338,7 +345,7 @@ public class LiveProviderSavepointMigrationTests
             await ctx.RollbackToSavepointAsync(tx.Transaction!, "mark");
 
             // Pre-savepoint row must still be visible.
-            Assert.Equal(1L, CountRows(cn!, "SP_Item"));
+            Assert.Equal(1L, CountRows(cn!, "SP_Item", tx.Transaction));
 
             await tx.CommitAsync();
 
@@ -415,12 +422,12 @@ public class LiveProviderSavepointMigrationTests
 
             RawInsert(cn!, tx.Transaction!, 32, "after-sp-b");
 
-            Assert.Equal(3L, CountRows(cn!, "SP_Item"));
+            Assert.Equal(3L, CountRows(cn!, "SP_Item", tx.Transaction));
 
             // Roll back all the way to sp_a — rows 31 and 32 should disappear.
             await ctx.RollbackToSavepointAsync(tx.Transaction!, "sp_a");
 
-            Assert.Equal(1L, CountRows(cn!, "SP_Item"));
+            Assert.Equal(1L, CountRows(cn!, "SP_Item", tx.Transaction));
 
             await tx.CommitAsync();
         }

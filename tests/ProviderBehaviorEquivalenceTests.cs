@@ -233,6 +233,7 @@ public class ProviderBehaviorEquivalenceTests
 
         var createCmd   = typeof(DbConnection).GetMethod("CreateCommand")!;
         var setPropText = typeof(DbCommand).GetProperty("CommandText")!.SetMethod!;
+        var setPropTx   = typeof(DbCommand).GetProperty("Transaction")!.SetMethod!;
         var execNonQ    = typeof(DbCommand).GetMethod("ExecuteNonQuery")!;
         var disposeCmd  = typeof(IDisposable).GetMethod("Dispose")!;
         var throwCtor   = typeof(InvalidOperationException).GetConstructor(new[] { typeof(string) })!;
@@ -265,6 +266,9 @@ public class ProviderBehaviorEquivalenceTests
                 upIL.Emit(OpCodes.Ldarg_1);
                 upIL.Emit(OpCodes.Callvirt, createCmd);
                 upIL.Emit(OpCodes.Stloc, cmdLocal);
+                upIL.Emit(OpCodes.Ldloc, cmdLocal);
+                upIL.Emit(OpCodes.Ldarg_2);
+                upIL.Emit(OpCodes.Callvirt, setPropTx);
                 upIL.Emit(OpCodes.Ldloc, cmdLocal);
                 upIL.Emit(OpCodes.Ldstr, ddl);
                 upIL.Emit(OpCodes.Callvirt, setPropText);
