@@ -103,18 +103,26 @@ namespace nORM.Migration
                 int upAltIdx = 0;
                 foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
                 {
-                    var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}";
-                    up.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {newDef}");
+                    var columnDefinitionChanged = ColumnDefinitionChanged(oldCol, newCol);
+                    var defaultChanged = !string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal);
+                    var needsDefaultRebind = defaultChanged || (columnDefinitionChanged && oldCol.DefaultValue != null);
 
-                    // M1: Emit DEFAULT constraint changes when DefaultValue differs.
-                    if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
+                    // SQL Server binds defaults as constraints. Drop the existing constraint
+                    // before ALTER COLUMN, then add the intended default back after the shape change.
+                    if (needsDefaultRebind)
                     {
                         // D: use sequential index for a deterministic, stable T-SQL variable name.
                         var upVar = $"@__df_{upAltIdx}";
                         up.Add($"DECLARE {upVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(newCol.Name)}') IF {upVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{upVar}+']')");
-                        if (newCol.DefaultValue != null)
-                            up.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{newCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(newCol.DefaultValue)}) FOR {Esc(newCol.Name)}");
                     }
+                    if (columnDefinitionChanged)
+                    {
+                        var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}";
+                        up.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {newDef}");
+                    }
+                    if (needsDefaultRebind && newCol.DefaultValue != null)
+                        up.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{newCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(newCol.DefaultValue)}) FOR {Esc(newCol.Name)}");
+
                     upAltIdx++;
                 }
             }
@@ -187,17 +195,24 @@ namespace nORM.Migration
                 int downAltIdx = 0;
                 foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
                 {
-                    var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}";
-                    down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {oldDef}");
+                    var columnDefinitionChanged = ColumnDefinitionChanged(oldCol, newCol);
+                    var defaultChanged = !string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal);
+                    var needsDefaultRebind = defaultChanged || (columnDefinitionChanged && newCol.DefaultValue != null);
 
-                    if (!string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal))
+                    if (needsDefaultRebind)
                     {
                         // D: use sequential index for a deterministic, stable T-SQL variable name.
                         var downVar = $"@__df_{downAltIdx}";
                         down.Add($"DECLARE {downVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(oldCol.Name)}') IF {downVar} IS NOT NULL EXEC('ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT ['+{downVar}+']')");
-                        if (oldCol.DefaultValue != null)
-                            down.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{oldCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(oldCol.DefaultValue)}) FOR {Esc(oldCol.Name)}");
                     }
+                    if (columnDefinitionChanged)
+                    {
+                        var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}";
+                        down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {oldDef}");
+                    }
+                    if (needsDefaultRebind && oldCol.DefaultValue != null)
+                        down.Add($"ALTER TABLE {Esc(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{oldCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(oldCol.DefaultValue)}) FOR {Esc(oldCol.Name)}");
+
                     downAltIdx++;
                 }
             }
@@ -271,6 +286,10 @@ namespace nORM.Migration
             }
             return sql;
         }
+
+        private static bool ColumnDefinitionChanged(ColumnSchema oldCol, ColumnSchema newCol) =>
+            !string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal)
+            || oldCol.IsNullable != newCol.IsNullable;
 
         // M1/X1: Allowlist for FK referential action tokens.
         // NOTE: Identical copy exists in the other three migration generators. If a shared base class is introduced, consolidate here.

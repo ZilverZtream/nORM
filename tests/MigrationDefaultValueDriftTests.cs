@@ -133,6 +133,7 @@ public class MigrationDefaultValueDriftTests
         var diff = SchemaDiffer.Diff(old, @new);
         var sql = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
         Assert.Contains(sql.Up, s => s.Contains("ADD CONSTRAINT") && s.Contains("DEFAULT (0)"));
+        Assert.DoesNotContain(sql.Up, s => s.Contains("ALTER COLUMN"));
     }
 
     [Fact]
@@ -144,5 +145,43 @@ public class MigrationDefaultValueDriftTests
         // Should have the DECLARE/DROP block but no ADD CONSTRAINT for the up direction
         Assert.Contains(sql.Up, s => s.Contains("DROP CONSTRAINT") || s.Contains("IF @__df_"));
         Assert.DoesNotContain(sql.Up, s => s.Contains("ADD CONSTRAINT") && s.Contains("DEFAULT"));
+        Assert.DoesNotContain(sql.Up, s => s.Contains("ALTER COLUMN"));
+    }
+
+    [Fact]
+    public void SqlServer_TypeChangeWithExistingDefault_DropsDefaultBeforeAlterAndRestoresIt()
+    {
+        var oldTable = new TableSchema { Name = "Widgets" };
+        oldTable.Columns.Add(new ColumnSchema
+        {
+            Name = "Score",
+            ClrType = typeof(int).FullName!,
+            IsNullable = false,
+            DefaultValue = "0"
+        });
+
+        var newTable = new TableSchema { Name = "Widgets" };
+        newTable.Columns.Add(new ColumnSchema
+        {
+            Name = "Score",
+            ClrType = typeof(long).FullName!,
+            IsNullable = false,
+            DefaultValue = "0"
+        });
+
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { oldTable } },
+            new SchemaSnapshot { Tables = { newTable } });
+
+        var sql = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
+
+        var indexedUp = sql.Up.Select((Statement, Index) => (Statement, Index)).ToArray();
+        var dropIndex = System.Array.FindIndex(indexedUp, x => x.Statement.Contains("DROP CONSTRAINT"));
+        var alterIndex = System.Array.FindIndex(indexedUp, x => x.Statement.Contains("ALTER COLUMN") && x.Statement.Contains("BIGINT"));
+        var addIndex = System.Array.FindIndex(indexedUp, x => x.Statement.Contains("ADD CONSTRAINT") && x.Statement.Contains("DEFAULT (0)"));
+
+        Assert.True(dropIndex >= 0);
+        Assert.True(alterIndex > dropIndex);
+        Assert.True(addIndex > alterIndex);
     }
 }
