@@ -47,6 +47,15 @@ public class CompiledQueryFastPathTests
         public string? Title { get; set; }
     }
 
+    [Table("SpecialParamEntity")]
+    public class SpecialParamEntity
+    {
+        public int Id { get; set; }
+        public Guid GuidValue { get; set; }
+        public DateOnly Created { get; set; }
+        public TimeOnly StartsAt { get; set; }
+    }
+
     public enum ArticleCategory { News = 1, Sports = 2, Tech = 3 }
 
     private sealed class AsyncSqliteProvider : SqliteProvider
@@ -77,7 +86,7 @@ public class CompiledQueryFastPathTests
         public int    ReaderExecutingCallCount;
         public DbTransaction? CapturedTransaction;
         public string? CapturedSql;
-        public List<(string Name, DbType DbType, object? Value)> CapturedParameters { get; } = new();
+        public List<(string Name, DbType DbType, object? Value, int Size)> CapturedParameters { get; } = new();
 
         // Sync hook — called from sync execution paths (e.g. compiled query fast path on SQLite)
         public InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, DbContext ctx)
@@ -116,7 +125,7 @@ public class CompiledQueryFastPathTests
         {
             CapturedParameters.Clear();
             foreach (DbParameter parameter in command.Parameters)
-                CapturedParameters.Add((parameter.ParameterName, parameter.DbType, parameter.Value));
+                CapturedParameters.Add((parameter.ParameterName, parameter.DbType, parameter.Value, parameter.Size));
         }
     }
 
@@ -684,4 +693,82 @@ public class CompiledQueryFastPathTests
         Assert.NotNull(interceptor.CapturedSql);
         Assert.Contains(" IS ", interceptor.CapturedSql);
     }
+
+    [Fact]
+    public async Task CompiledQuery_PooledStringParameter_ResetsSizeAndNullMetadata()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText =
+                "CREATE TABLE NullableArticle (Id INTEGER PRIMARY KEY, Title TEXT);" +
+                "INSERT INTO NullableArticle VALUES (1, 'A');" +
+                "INSERT INTO NullableArticle VALUES (2, 'A much longer title');" +
+                "INSERT INTO NullableArticle VALUES (3, NULL);";
+            setup.ExecuteNonQuery();
+        }
+
+        var interceptor = new ReaderCapturingInterceptor();
+        var options = new DbContextOptions();
+        options.CommandInterceptors.Add(interceptor);
+
+        var compiled = Norm.CompileQuery((DbContext c, string? title) =>
+            c.Query<NullableArticle>().Where(a => a.Title == title));
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var shortResult = await compiled(ctx, "A");
+        Assert.Single(shortResult);
+        var shortParameter = Assert.Single(interceptor.CapturedParameters);
+        Assert.Equal(DbType.String, shortParameter.DbType);
+        Assert.Equal(1, shortParameter.Size);
+
+        var longResult = await compiled(ctx, "A much longer title");
+        Assert.Single(longResult);
+        var longParameter = Assert.Single(interceptor.CapturedParameters);
+        Assert.Equal(DbType.String, longParameter.DbType);
+        Assert.Equal("A much longer title".Length, longParameter.Size);
+
+        var nullResult = await compiled(ctx, null);
+        Assert.Single(nullResult);
+        var nullParameter = Assert.Single(interceptor.CapturedParameters);
+        Assert.Equal(DbType.Object, nullParameter.DbType);
+        Assert.Equal(DBNull.Value, nullParameter.Value);
+        Assert.Equal(0, nullParameter.Size);
+    }
+
+    [Fact]
+    public async Task CompiledQuery_PooledSpecialParameters_SetExpectedDbTypes()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText =
+                "CREATE TABLE SpecialParamEntity (" +
+                "Id INTEGER PRIMARY KEY, GuidValue TEXT NOT NULL, Created TEXT NOT NULL, StartsAt TEXT NOT NULL);";
+            setup.ExecuteNonQuery();
+        }
+
+        var interceptor = new ReaderCapturingInterceptor();
+        var options = new DbContextOptions();
+        options.CommandInterceptors.Add(interceptor);
+
+        var compiled = Norm.CompileQuery((DbContext c, (Guid Id, DateOnly Date, TimeOnly Time) p) =>
+            c.Query<SpecialParamEntity>().Where(e =>
+                e.GuidValue == p.Id &&
+                e.Created == p.Date &&
+                e.StartsAt == p.Time));
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var rows = await compiled(ctx, (Guid.NewGuid(), new DateOnly(2026, 5, 21), new TimeOnly(14, 30)));
+
+        Assert.Empty(rows);
+        Assert.Contains(interceptor.CapturedParameters, p => p.DbType == DbType.Guid);
+        Assert.Contains(interceptor.CapturedParameters, p => p.DbType == DbType.Date);
+        Assert.Contains(interceptor.CapturedParameters, p => p.DbType == DbType.Time && p.Value is TimeSpan);
+    }
+
 }

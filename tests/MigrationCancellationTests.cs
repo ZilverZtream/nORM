@@ -73,9 +73,9 @@ public class MigrationCancellationTests
     /// </summary>
     private class BlockingMigration : nORM.Migration.Migration
     {
-        private readonly TaskCompletionSource<bool> _started = new();
+        private readonly ManualResetEventSlim _started = new();
         private readonly bool _enableBlocking;
-        public Task Started => _started.Task;
+        public bool WaitForStart(TimeSpan timeout) => _started.Wait(timeout);
 
         public BlockingMigration() : this(enableBlocking: false) { }
 
@@ -94,7 +94,7 @@ public class MigrationCancellationTests
                 return;
             }
 
-            _started.TrySetResult(true);
+            _started.Set();
             // Block until token is cancelled (or 10 s safety timeout).
             ct.WaitHandle.WaitOne(TimeSpan.FromSeconds(10));
             ct.ThrowIfCancellationRequested();
@@ -211,7 +211,7 @@ public class MigrationCancellationTests
         // Run Up() on a thread pool thread; cancel after it signals it has started.
         var upTask = Task.Run(() => blocking.Up(cn, tx, cts.Token));
 
-        await blocking.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(blocking.WaitForStart(TimeSpan.FromSeconds(5)));
         cts.Cancel(); // Signal cancellation while Up() is blocked.
 
         var ex = await Record.ExceptionAsync(() => upTask);
