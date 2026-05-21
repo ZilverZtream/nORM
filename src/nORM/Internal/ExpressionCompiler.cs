@@ -58,6 +58,100 @@ namespace nORM.Internal
             public readonly ConcurrentLruCache<string, CompiledQueryState> DynamicStates = new(PlanCacheCapacity);
         }
 
+        private readonly struct CompiledParameterValueSource
+        {
+            private readonly Expression? _expression;
+            private readonly MemberInfo? _queryMember;
+            private readonly bool _useQueryValue;
+
+            private CompiledParameterValueSource(Expression? expression, MemberInfo? queryMember, bool useQueryValue)
+            {
+                _expression = expression;
+                _queryMember = queryMember;
+                _useQueryValue = useQueryValue;
+            }
+
+            public static CompiledParameterValueSource FromExpression(Expression expression)
+                => new(expression, null, false);
+
+            public static CompiledParameterValueSource FromQueryValue()
+                => new(null, null, true);
+
+            public static CompiledParameterValueSource FromQueryMember(MemberInfo member)
+                => new(null, member, false);
+
+            public bool IsQueryMember => _queryMember != null;
+
+            public object? GetValue(object? queryValue)
+            {
+                if (_useQueryValue)
+                    return queryValue;
+
+                if (_queryMember != null)
+                    return _queryMember is FieldInfo fi ? fi.GetValue(queryValue) :
+                           _queryMember is PropertyInfo pi ? pi.GetValue(queryValue) :
+                           null;
+
+                if (_expression != null && QueryTranslator.TryGetConstantValue(_expression, out var value))
+                    return value;
+
+                return null;
+            }
+        }
+
+        private sealed class CompiledParameterValueSourceCollector : ExpressionVisitor
+        {
+            private readonly ParameterExpression _queryParameter;
+            private readonly int _expectedCount;
+            private readonly List<CompiledParameterValueSource> _sources;
+
+            public CompiledParameterValueSourceCollector(ParameterExpression queryParameter, int expectedCount)
+            {
+                _queryParameter = queryParameter;
+                _expectedCount = expectedCount;
+                _sources = new List<CompiledParameterValueSource>(expectedCount);
+            }
+
+            public CompiledParameterValueSource[] Collect(Expression expression)
+            {
+                Visit(expression);
+                return _sources.ToArray();
+            }
+
+            protected override Expression VisitConstant(ConstantExpression node) => node;
+
+            protected override Expression VisitParameter(ParameterExpression node)
+            {
+                if (_sources.Count < _expectedCount && ReferenceEquals(node, _queryParameter))
+                {
+                    _sources.Add(CompiledParameterValueSource.FromQueryValue());
+                    return node;
+                }
+
+                return base.VisitParameter(node);
+            }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (_sources.Count >= _expectedCount)
+                    return node;
+
+                if (ReferenceEquals(node.Expression, _queryParameter))
+                {
+                    _sources.Add(CompiledParameterValueSource.FromQueryMember(node.Member));
+                    return node;
+                }
+
+                if (QueryTranslator.TryGetConstantValue(node, out _))
+                {
+                    _sources.Add(CompiledParameterValueSource.FromExpression(node));
+                    return node;
+                }
+
+                return base.VisitMember(node);
+            }
+        }
+
         public static Func<T, TResult> CompileExpression<T, TResult>(Expression<Func<T, TResult>> expr)
         {
             var key = ExpressionFingerprint.Compute(expr);
@@ -105,7 +199,7 @@ namespace nORM.Internal
             // Cap entries via ConcurrentLruCache so long-lived processes with many
             // distinct tenant/filter/provider/model combinations don't grow this dictionary without bound.
             // Shared plan cache (thread-safe ConcurrentLruCache, keyed by context shape string).
-            var plansByCtx = new ConcurrentLruCache<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams)>(PlanCacheCapacity);
+            var plansByCtx = new ConcurrentLruCache<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams, CompiledParameterValueSource[] ValueSources)>(PlanCacheCapacity);
             // Per-context pooled state via ConditionalWeakTable.
             // Each DbContext gets its own context-state container. Stable contexts use a single
             // cached command pool; tenant/global-filter contexts keep one command pool per computed
@@ -152,7 +246,7 @@ namespace nORM.Internal
                     var ctxParam = capturedExpr.Parameters[0];
                     var body = new ParameterReplacer(ctxParam, Expression.Constant(capturedCtx)).Visit(capturedExpr.Body)!;
                     body = new QueryCallEvaluator().Visit(body)!;
-                    var p = capturedCtx.GetQueryProvider().GetPlan(body, out _, out _);
+                    var p = capturedCtx.GetQueryProvider().GetPlan(body, out var filtered, out _);
                     var paramSet = new HashSet<string>(p.CompiledParameters, StringComparer.Ordinal);
                     KeyValuePair<string, object>[]? fixedParams = null;
                     if (paramSet.Count > 0)
@@ -165,40 +259,16 @@ namespace nORM.Internal
                         }
                         fixedParams = fpList.ToArray();
                     }
-                    return (p, p.CompiledParameters, paramSet, fixedParams);
+                    var valueSources = BuildCompiledParameterValueSources(
+                        filtered, capturedExpr.Parameters[1], p.CompiledParameters.Count);
+                    return (p, p.CompiledParameters, paramSet, fixedParams, valueSources);
                 });
 
                 // invEntry is a LOCAL variable — thread-safe for this invocation.
                 var cachedPlan = invEntry.Plan;
                 var paramNames = invEntry.ParamNames;
 
-                // Reuse single-element array for the common single-param case
-                object?[] args;
-                if (paramNames != null && paramNames.Count > 0)
-                {
-                    if (value is System.Runtime.CompilerServices.ITuple tuple)
-                    {
-                        var arr = new object?[paramNames.Count];
-                        var count = Math.Min(tuple.Length, paramNames.Count);
-                        for (int i = 0; i < count; i++)
-                            arr[i] = tuple[i];
-                        args = arr;
-                    }
-                    else if (paramNames.Count == 1)
-                    {
-                        args = new object?[] { (object?)value };
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException(
-                            $"Compiled query expects {paramNames.Count} parameters. " +
-                            "Pass values as a ValueTuple, e.g. (value1, value2).");
-                    }
-                }
-                else
-                {
-                    args = Array.Empty<object?>();
-                }
+                var args = BuildCompiledParameterValues(invEntry.ValueSources, value, paramNames);
 
                 // Inline pooled sync execution for providers without true async I/O (SQLite).
                 // Bypasses the entire NormQueryProvider call chain (RetryPolicy, CacheProvider,
@@ -311,6 +381,58 @@ namespace nORM.Internal
             };
         }
 
+        private static CompiledParameterValueSource[] BuildCompiledParameterValueSources(
+            Expression filteredExpression, ParameterExpression queryParameter, int expectedCount)
+        {
+            if (expectedCount == 0)
+                return Array.Empty<CompiledParameterValueSource>();
+
+            return new CompiledParameterValueSourceCollector(queryParameter, expectedCount)
+                .Collect(filteredExpression);
+        }
+
+        private static object?[] BuildCompiledParameterValues<TParam>(
+            CompiledParameterValueSource[] valueSources, TParam value, IReadOnlyList<string>? paramNames)
+        {
+            if (paramNames == null || paramNames.Count == 0)
+                return Array.Empty<object?>();
+
+            if (valueSources.Length == paramNames.Count)
+            {
+                if (value is not System.Runtime.CompilerServices.ITuple &&
+                    valueSources.Count(static source => source.IsQueryMember) > 1)
+                {
+                    throw new InvalidOperationException(
+                        $"Compiled query expects {paramNames.Count} parameters. " +
+                        "Pass values as a ValueTuple, e.g. (value1, value2).");
+                }
+
+                var values = new object?[valueSources.Length];
+                object? boxed = value;
+                for (int i = 0; i < valueSources.Length; i++)
+                    values[i] = valueSources[i].GetValue(boxed);
+                return values;
+            }
+
+            // Fallback for rare translator-produced parameters not represented by the expression
+            // collector. This preserves the legacy explicit-argument behavior for unsupported shapes.
+            if (value is System.Runtime.CompilerServices.ITuple tuple)
+            {
+                var arr = new object?[paramNames.Count];
+                var count = Math.Min(tuple.Length, paramNames.Count);
+                for (int i = 0; i < count; i++)
+                    arr[i] = tuple[i];
+                return arr;
+            }
+
+            if (paramNames.Count == 1)
+                return new object?[] { (object?)value };
+
+            throw new InvalidOperationException(
+                $"Compiled query expects {paramNames.Count} parameters. " +
+                "Pass values as a ValueTuple, e.g. (value1, value2).");
+        }
+
         private static (string CtxKey, CompiledQueryState State) ResolveContextPlanState(
             DbContext ctx, CompiledQueryContextState contextState)
         {
@@ -392,25 +514,14 @@ namespace nORM.Internal
 
         private static void AppendClosureValues(Expression expr, StringBuilder sb)
         {
-            // Closure field access pattern: member access on a constant (compiler-generated closure).
-            // Reading the field gives the actual captured runtime value.
-            if (expr is MemberExpression me && me.Expression is ConstantExpression ce)
+            if (expr is MemberExpression me && QueryTranslator.TryGetConstantValue(me, out var evaluated))
             {
-                try
-                {
-                    object? val = me.Member is FieldInfo fi ? fi.GetValue(ce.Value) :
-                                  me.Member is PropertyInfo pi ? pi.GetValue(ce.Value) : null;
-                    // X1: Include runtime type so objects of different types with the same
-                    // ToString() (e.g. int vs string) produce distinct cache key segments.
-                    sb.Append(val == null ? "null" : string.Concat(val.GetType().FullName, ":", val));
-                    sb.Append(';');
-                }
-                catch (Exception ex) when (ex is MemberAccessException or TargetInvocationException or InvalidOperationException or NotSupportedException)
-                {
-                    // Reflection failure reading closure value — treat as stable (no value appended).
-                    // Only catch expected reflection exceptions; let unexpected failures propagate.
-                }
-                return; // Don't recurse further into this constant node
+                // Include runtime type so objects of different types with the same ToString()
+                // (e.g. int vs string) produce distinct cache key segments. Evaluating the full
+                // member expression covers common holder patterns such as tenant.CurrentId.
+                sb.Append(evaluated == null ? "null" : string.Concat(evaluated.GetType().FullName, ":", evaluated));
+                sb.Append(';');
+                return;
             }
 
             switch (expr)
