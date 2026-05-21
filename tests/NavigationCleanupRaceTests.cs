@@ -236,7 +236,18 @@ public class NavigationCleanupRaceTests
             .ToArray();
 
         var exceptions = new ConcurrentBag<Exception>();
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        using var cts = new CancellationTokenSource();
+        var cancelThread = new Thread(static state =>
+        {
+            var source = (CancellationTokenSource)state!;
+            Thread.Sleep(TimeSpan.FromSeconds(2));
+            source.Cancel();
+        })
+        {
+            IsBackground = true,
+            Name = "nORM navigation cleanup fuzz cancellation"
+        };
+        cancelThread.Start(cts);
         var tasks = new List<Task>();
 
         // 10 tasks doing RemovePendingLoadsForEntity on random entities
@@ -247,12 +258,15 @@ public class NavigationCleanupRaceTests
             tasks.Add(Task.Run(() =>
             {
                 var localRng = new Random(localSeed);
+                var iterations = 0;
                 while (!cts.IsCancellationRequested)
                 {
                     try
                     {
                         var entity = entities[localRng.Next(entities.Length)];
                         loader.RemovePendingLoadsForEntity(entity);
+                        if ((++iterations & 0x3F) == 0)
+                            Thread.Yield();
                     }
                     catch (ObjectDisposedException)
                     {
@@ -297,6 +311,7 @@ public class NavigationCleanupRaceTests
 
         // Wait for all tasks (cleanup tasks stop via CTS check; load task stops via OCE)
         await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(10));
+        cancelThread.Join(millisecondsTimeout: 1000);
 
         // No dictionary corruption or unexpected exceptions
         Assert.Empty(exceptions);
