@@ -709,14 +709,13 @@ END;";
                     cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                     // X1: Add tenant predicate to prevent cross-tenant bulk updates
                     if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
-                    {
                         cmd.AddParam("@__tenant_bulk", ctx.Options.TenantProvider.GetCurrentTenantId());
-                        cmd.CommandText = $"UPDATE T1 SET {setClause} FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause} WHERE T1.{m.TenantColumn.EscCol} = @__tenant_bulk";
-                    }
-                    else
-                    {
-                        cmd.CommandText = $"UPDATE T1 SET {setClause} FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause}";
-                    }
+                    cmd.CommandText = BuildBulkUpdateSql(
+                        m.EscTable,
+                        tempTableName,
+                        setClause,
+                        joinClause,
+                        ctx.Options.TenantProvider != null ? m.TenantColumn?.EscCol : null);
                     updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
             }
@@ -728,7 +727,7 @@ END;";
                     try
                     {
                         await using var dropCmd = ctx.CreateCommand();
-                        dropCmd.CommandText = $"IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL DROP TABLE {tempTableName}";
+                        dropCmd.CommandText = BuildDropTempTableSql(tempTableName);
                         await dropCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
                     }
                     catch (DbException ex)
@@ -838,14 +837,12 @@ END;";
                     cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                     // X1: Add tenant predicate to prevent cross-tenant bulk deletes
                     if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
-                    {
                         cmd.AddParam("@__tenant_bulk", ctx.Options.TenantProvider.GetCurrentTenantId());
-                        cmd.CommandText = $"DELETE T1 FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause} WHERE T1.{m.TenantColumn.EscCol} = @__tenant_bulk";
-                    }
-                    else
-                    {
-                        cmd.CommandText = $"DELETE T1 FROM {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause}";
-                    }
+                    cmd.CommandText = BuildBulkDeleteSql(
+                        m.EscTable,
+                        tempTableName,
+                        joinClause,
+                        ctx.Options.TenantProvider != null ? m.TenantColumn?.EscCol : null);
                     deletedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
             }
@@ -857,7 +854,7 @@ END;";
                     try
                     {
                         await using var dropCmd = ctx.CreateCommand();
-                        dropCmd.CommandText = $"IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL DROP TABLE {tempTableName}";
+                        dropCmd.CommandText = BuildDropTempTableSql(tempTableName);
                         await dropCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
                     }
                     catch (DbException ex)
@@ -871,6 +868,25 @@ END;";
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, deletedCount, sw.Elapsed);
             return deletedCount;
         }
+
+        internal static string BuildBulkUpdateSql(string tableName, string tempTableName, string setClause, string joinClause, string? tenantColumn)
+        {
+            var sql = $"UPDATE T1 SET {setClause} FROM {tableName} T1 JOIN {tempTableName} T2 ON {joinClause}";
+            return tenantColumn == null
+                ? sql
+                : $"{sql} WHERE T1.{tenantColumn} = @__tenant_bulk";
+        }
+
+        internal static string BuildBulkDeleteSql(string tableName, string tempTableName, string joinClause, string? tenantColumn)
+        {
+            var sql = $"DELETE T1 FROM {tableName} T1 JOIN {tempTableName} T2 ON {joinClause}";
+            return tenantColumn == null
+                ? sql
+                : $"{sql} WHERE T1.{tenantColumn} = @__tenant_bulk";
+        }
+
+        internal static string BuildDropTempTableSql(string tempTableName)
+            => $"IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL DROP TABLE {tempTableName}";
 
         private static string GetSqlType(Type t)
         {

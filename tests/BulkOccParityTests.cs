@@ -201,11 +201,13 @@ public class BulkOccParityTests
     [Fact]
     public void PostgresProvider_BulkUpdate_AlreadyIncludesTimestampInJoin()
     {
-        // PostgreSQL BulkUpdateAsync already builds:
-        //   UPDATE table AS t SET ... FROM (VALUES ...) AS v (...)
-        //   WHERE t.key = v.key AND t.timestamp = v.timestamp
-        // This was correct before the audit — no change needed.
-        Assert.True(true, "PostgreSQL BulkUpdateAsync already includes timestamp column in WHERE join conditions.");
+        var where = PostgresProvider.BuildBulkUpdateWhereClause(
+            new[] { "\"Id\"" },
+            "\"RowVersion\"",
+            tenantColumn: null,
+            tenantParameter: null);
+
+        Assert.Equal("t.\"Id\" = v.\"Id\" AND t.\"RowVersion\" = v.\"RowVersion\"", where);
     }
 
     // ── Section 9 Requirement 2: same-value update with matching token ───────

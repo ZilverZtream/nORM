@@ -598,14 +598,13 @@ END;";
                     cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                     // X1: Add tenant predicate to prevent cross-tenant bulk updates
                     if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
-                    {
                         cmd.AddParam($"{ParamPrefix}__tenant_bulk", ctx.Options.TenantProvider.GetCurrentTenantId());
-                        cmd.CommandText = $"UPDATE {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause} SET {setClause} WHERE T1.{m.TenantColumn.EscCol} = {ParamPrefix}__tenant_bulk";
-                    }
-                    else
-                    {
-                        cmd.CommandText = $"UPDATE {m.EscTable} T1 JOIN {tempTableName} T2 ON {joinClause} SET {setClause}";
-                    }
+                    cmd.CommandText = BuildBulkUpdateSql(
+                        m.EscTable,
+                        tempTableName,
+                        setClause,
+                        joinClause,
+                        ctx.Options.TenantProvider != null ? m.TenantColumn?.EscCol : null);
                     updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
             }
@@ -617,7 +616,7 @@ END;";
                     try
                     {
                         await using var dropCmd = ctx.CreateCommand();
-                        dropCmd.CommandText = $"DROP TEMPORARY TABLE IF EXISTS {tempTableName}";
+                        dropCmd.CommandText = BuildBulkUpdateDropTempTableSql(tempTableName);
                         await dropCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
                     }
                     catch (DbException ex)
@@ -631,6 +630,17 @@ END;";
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkUpdateAsync), m.EscTable, updatedCount, sw.Elapsed);
             return updatedCount;
         }
+
+        internal string BuildBulkUpdateSql(string tableName, string tempTableName, string setClause, string joinClause, string? tenantColumn)
+        {
+            var sql = $"UPDATE {tableName} T1 JOIN {tempTableName} T2 ON {joinClause} SET {setClause}";
+            return tenantColumn == null
+                ? sql
+                : $"{sql} WHERE T1.{tenantColumn} = {ParamPrefix}__tenant_bulk";
+        }
+
+        internal static string BuildBulkUpdateDropTempTableSql(string tempTableName)
+            => $"DROP TEMPORARY TABLE IF EXISTS {tempTableName}";
         
         /// <summary>
         /// Deletes multiple records using MySQL-optimized WHERE IN clauses for efficient bulk deletes.
