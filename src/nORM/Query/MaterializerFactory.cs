@@ -80,9 +80,9 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _propertiesCache = new();
 
         // Cached NullabilityInfoContext instance shared across all materializer creations.
-        // NullabilityInfoContext is thread-safe for reads and expensive to construct repeatedly,
-        // so we create it once and reuse. Falls back to null if the runtime doesn't support it.
+        // The runtime type keeps mutable internal caches, so access is guarded by a lock.
         private static readonly NullabilityInfoContext? _nullabilityInfoContext = CreateNullabilityInfoContext();
+        private static readonly object _nullabilityInfoContextLock = new();
         private static NullabilityInfoContext? CreateNullabilityInfoContext()
         {
             try { return new NullabilityInfoContext(); }
@@ -1412,7 +1412,11 @@ namespace nORM.Query
                     // Reference type: skip IsDBNull if NRT metadata says non-nullable
                     try
                     {
-                        var nullabilityInfo = nullabilityCtx.Create(column.Prop);
+                        NullabilityInfo nullabilityInfo;
+                        lock (_nullabilityInfoContextLock)
+                        {
+                            nullabilityInfo = nullabilityCtx.Create(column.Prop);
+                        }
                         skipIsDbNull = nullabilityInfo.WriteState == NullabilityState.NotNull;
                     }
                     catch (InvalidOperationException)

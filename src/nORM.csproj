@@ -26,10 +26,7 @@
       <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="8.0.7" />
       <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
       <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
-      <PackageReference Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="170.100.0">
-        <PrivateAssets>all</PrivateAssets>
-        <IncludeAssets>compile;runtime;build;native;contentfiles;analyzers;buildtransitive</IncludeAssets>
-      </PackageReference>
+      <PackageReference Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="170.100.0" />
       <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
     </ItemGroup>
 

@@ -278,7 +278,7 @@ namespace nORM.Query
 
             var joinRows = new Dictionary<object, List<object>>();
             var allRightPks = new HashSet<object>();
-            using (var jReader = cmd.ExecuteReaderWithInterception(_ctx, System.Data.CommandBehavior.Default))
+            using (var jReader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, System.Data.CommandBehavior.Default))
             {
                 while (jReader.Read())
                 {
@@ -326,7 +326,7 @@ namespace nORM.Query
 
             var rightEntitiesByPk = new Dictionary<object, object>();
             var rightMat = _materializerFactory.CreateSyncMaterializer(rightMapping, jtm.RightType);
-            using (var rReader = cmd2.ExecuteReaderWithInterception(_ctx, System.Data.CommandBehavior.Default))
+            using (var rReader = cmd2.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, System.Data.CommandBehavior.Default))
             {
                 while (rReader.Read())
                 {
@@ -526,7 +526,7 @@ namespace nORM.Query
                 cmd.CommandText = BuildSql(include.Path, mappings, paramNames, cmd);
                 cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
-                using var reader = cmd.ExecuteReaderWithInterception(_ctx, System.Data.CommandBehavior.Default);
+                using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, System.Data.CommandBehavior.Default);
 
                 IList currentParents = keyBatch.SelectMany(k => parentLookup[k]).ToList();
 

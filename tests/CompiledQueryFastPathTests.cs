@@ -32,7 +32,18 @@ public class CompiledQueryFastPathTests
         public int    Category { get; set; }   // also used as enum-backed column
     }
 
+    public class NullableArticle
+    {
+        public int Id { get; set; }
+        public string? Title { get; set; }
+    }
+
     public enum ArticleCategory { News = 1, Sports = 2, Tech = 3 }
+
+    private sealed class AsyncSqliteProvider : SqliteProvider
+    {
+        public override bool PrefersSyncExecution => false;
+    }
 
     private static SqliteConnection CreateConnection(string? path = null)
     {
@@ -56,12 +67,14 @@ public class CompiledQueryFastPathTests
     {
         public int    ReaderExecutingCallCount;
         public DbTransaction? CapturedTransaction;
+        public string? CapturedSql;
 
         // Sync hook — called from sync execution paths (e.g. compiled query fast path on SQLite)
         public InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, DbContext ctx)
         {
             Interlocked.Increment(ref ReaderExecutingCallCount);
             CapturedTransaction = command.Transaction;
+            CapturedSql = command.CommandText;
             return InterceptionResult<DbDataReader>.Continue();
         }
 
@@ -80,6 +93,7 @@ public class CompiledQueryFastPathTests
         {
             Interlocked.Increment(ref ReaderExecutingCallCount);
             CapturedTransaction = command.Transaction;
+            CapturedSql = command.CommandText;
             return Task.FromResult(InterceptionResult<DbDataReader>.Continue());
         }
 
@@ -462,6 +476,34 @@ public class CompiledQueryFastPathTests
         await tx.CommitAsync();
     }
 
+    [Fact]
+    public async Task CompiledQuery_PooledCommand_RebindsTransactionAfterReuse()
+    {
+        using var cn = CreateConnection();
+
+        var interceptor = new ReaderCapturingInterceptor();
+        var options = new DbContextOptions();
+        options.CommandInterceptors.Add(interceptor);
+
+        var compiled = Norm.CompileQuery((DbContext ctx, int id) =>
+            ctx.Query<Article>().Where(a => a.Id == id));
+
+        using var ctx = new DbContext(cn, new AsyncSqliteProvider(), options);
+
+        var outsideTx = await compiled(ctx, 1);
+        Assert.Single(outsideTx);
+        Assert.Null(interceptor.CapturedTransaction);
+
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+        var insideTx = await compiled(ctx, 2);
+
+        Assert.Single(insideTx);
+        Assert.Equal("Fast Car", insideTx[0].Title);
+        Assert.Same(ctx.CurrentTransaction, interceptor.CapturedTransaction);
+
+        await tx.CommitAsync();
+    }
+
     /// <summary>
     /// 200 iterations alternating between two parameter values must all return correct
     /// results, catching stale-state or pool-corruption issues.
@@ -483,5 +525,58 @@ public class CompiledQueryFastPathTests
             Assert.Single(result);
             Assert.Equal(expect, result[0].Title);
         }
+    }
+
+    [Fact]
+    public async Task CompiledQuery_NonNullableStringColumn_UsesPlainEquality()
+    {
+        using var cn = CreateConnection();
+        var interceptor = new ReaderCapturingInterceptor();
+        var options = new DbContextOptions();
+        options.CommandInterceptors.Add(interceptor);
+
+        var compiled = Norm.CompileQuery((DbContext c, string title) =>
+            c.Query<Article>().Where(a => a.Title == title));
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var result = await compiled(ctx, "Fast Car");
+
+        Assert.Single(result);
+        Assert.Equal(2, result[0].Id);
+        Assert.NotNull(interceptor.CapturedSql);
+        Assert.Contains(" = ", interceptor.CapturedSql);
+        Assert.DoesNotContain(" IS ", interceptor.CapturedSql);
+    }
+
+    [Fact]
+    public async Task CompiledQuery_NullableStringColumn_KeepsNullSafeEquality()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var setup = cn.CreateCommand())
+        {
+            setup.CommandText =
+                "CREATE TABLE NullableArticle (Id INTEGER PRIMARY KEY, Title TEXT);" +
+                "INSERT INTO NullableArticle VALUES (1, 'Hello World');" +
+                "INSERT INTO NullableArticle VALUES (2, NULL);";
+            setup.ExecuteNonQuery();
+        }
+
+        var interceptor = new ReaderCapturingInterceptor();
+        var options = new DbContextOptions();
+        options.CommandInterceptors.Add(interceptor);
+
+        var compiled = Norm.CompileQuery((DbContext c, string? title) =>
+            c.Query<NullableArticle>().Where(a => a.Title == title));
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var result = await compiled(ctx, null);
+
+        Assert.Single(result);
+        Assert.Equal(2, result[0].Id);
+        Assert.NotNull(interceptor.CapturedSql);
+        Assert.Contains(" IS ", interceptor.CapturedSql);
     }
 }

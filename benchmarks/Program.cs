@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Configs;
@@ -26,6 +27,17 @@ namespace nORM.Benchmarks
                     case "--norm-only":
                         Console.WriteLine("⚡ Running fast nORM-only benchmarks...");
                         await RunFastNormBenchmarks();
+                        return;
+
+                    case "--complex":
+                        Console.WriteLine("Running focused complex-query benchmarks...");
+                        RunFilteredBenchmarks(new[] { "--filter", "nORM.Benchmarks.OrmBenchmarks.Query_Complex*" });
+                        return;
+
+                    case "--filter":
+                        RunFilteredBenchmarks(args.Length == 2
+                            ? new[] { "--filter", args[1] }
+                            : args.Skip(1).ToArray());
                         return;
 
                     case "--help":
@@ -116,12 +128,25 @@ namespace nORM.Benchmarks
             Console.WriteLine("  --quick           Quick functionality test (30 seconds)");
             Console.WriteLine("  --fast            Fast nORM-only benchmarks (2-3 minutes)");
             Console.WriteLine("  --norm-only       Same as --fast");
+            Console.WriteLine("  --complex         Focused complex-query comparison");
+            Console.WriteLine("  --filter <pattern> Run benchmarks matching a BenchmarkDotNet filter");
             Console.WriteLine("  --help            Show this help");
             Console.WriteLine();
             Console.WriteLine("Examples:");
             Console.WriteLine("  dotnet run --quick      # Verify nORM works");
             Console.WriteLine("  dotnet run --fast       # Debug nORM performance only");
+            Console.WriteLine("  dotnet run --complex    # Compare complex-query implementations");
             Console.WriteLine("  dotnet run              # Full comparison benchmark");
+        }
+
+        private static void RunFilteredBenchmarks(string[] benchmarkArgs)
+        {
+            var config = ManualConfig.Create(DefaultConfig.Instance)
+                .WithOptions(ConfigOptions.DisableOptimizationsValidator);
+
+            BenchmarkSwitcher
+                .FromAssembly(typeof(Program).Assembly)
+                .Run(benchmarkArgs, config);
         }
 
         private static async Task RunFastNormBenchmarks()
@@ -181,8 +206,7 @@ namespace nORM.Benchmarks
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Quick test failed: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                Console.WriteLine($"❌ Quick test failed: {ex}");
             }
         }
 

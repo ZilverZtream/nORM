@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.SqlServer.TransactSql.ScriptDom;
+using nORM.Internal;
 using nORM.Providers;
 
 #nullable enable
@@ -68,6 +69,7 @@ namespace nORM.Core
 
         private static readonly ObjectPool<HashSet<object>> HashSetPool =
             new DefaultObjectPool<HashSet<object>>(new HashSetPolicy(), Environment.ProcessorCount * 2);
+        private static readonly ConcurrentLruCache<string, bool> RawSqlSafetyCache = new(maxSize: 2048);
 
         /// <summary>
         /// Validates a single entity instance to ensure it does not contain excessively deep
@@ -724,6 +726,18 @@ namespace nORM.Core
             if (string.IsNullOrWhiteSpace(sql))
                 return false;
 
+            var providerKey = provider?.GetType().FullName ?? "sqlserver";
+            var cacheKey = string.Concat(providerKey, "|", sql);
+            if (RawSqlSafetyCache.TryGet(cacheKey, out var cached))
+                return cached;
+
+            var result = IsSafeRawSqlUncached(sql, provider);
+            RawSqlSafetyCache.Set(cacheKey, result);
+            return result;
+        }
+
+        private static bool IsSafeRawSqlUncached(string sql, DatabaseProvider? provider)
+        {
             // Normalize BEFORE keyword checks to defeat comment/whitespace obfuscation.
             var normalized = NormalizeSql(sql);
 

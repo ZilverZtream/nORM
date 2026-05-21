@@ -28,6 +28,40 @@ file class BoolPredEntity
     public string? Name { get; set; }
 }
 
+file static class BoolLiteralAssertions
+{
+    public static void AssertNonNullableBoolTrueShape(DatabaseProvider provider, string? sql, string trueLit)
+    {
+        Assert.NotNull(sql);
+        Assert.Contains("WHERE", sql!, StringComparison.OrdinalIgnoreCase);
+        if (provider.PrefersBareBooleanPredicates)
+        {
+            Assert.DoesNotContain($"= {trueLit}", sql);
+            Assert.DoesNotContain($"<> {trueLit}", sql);
+        }
+        else
+        {
+            Assert.Contains($"= {trueLit}", sql);
+        }
+    }
+
+    public static void AssertNonNullableBoolFalseShape(DatabaseProvider provider, string? sql, string falseLit)
+    {
+        Assert.NotNull(sql);
+        Assert.Contains("WHERE", sql!, StringComparison.OrdinalIgnoreCase);
+        if (provider.PrefersBareBooleanPredicates)
+        {
+            Assert.Contains("NOT", sql!, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain($"= {falseLit}", sql);
+            Assert.DoesNotContain($"<> {falseLit}", sql);
+        }
+        else
+        {
+            Assert.Contains($"= {falseLit}", sql);
+        }
+    }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // BooleanFalseLiteral contract + cross-provider bool SQL shape
 // ══════════════════════════════════════════════════════════════════════════════
@@ -99,7 +133,7 @@ public class BoolLiteralSqlShapeTests
         using (cn) using (ctx)
         {
             var sql = ctx.Query<BoolPredEntity>().Where(e => e.IsActive == true).ToString();
-            Assert.Contains($"= {trueLit}", sql);
+            BoolLiteralAssertions.AssertNonNullableBoolTrueShape(p, sql, trueLit);
         }
     }
 
@@ -112,7 +146,7 @@ public class BoolLiteralSqlShapeTests
         using (cn) using (ctx)
         {
             var sql = ctx.Query<BoolPredEntity>().Where(e => e.IsActive == false).ToString();
-            Assert.Contains($"= {falseLit}", sql);
+            BoolLiteralAssertions.AssertNonNullableBoolFalseShape(p, sql, falseLit);
         }
     }
 
@@ -125,7 +159,10 @@ public class BoolLiteralSqlShapeTests
         using (cn) using (ctx)
         {
             var sql = ctx.Query<BoolPredEntity>().Where(e => e.IsActive != true).ToString();
-            Assert.Contains($"<> {trueLit}", sql);
+            if (p.PrefersBareBooleanPredicates)
+                BoolLiteralAssertions.AssertNonNullableBoolFalseShape(p, sql, trueLit);
+            else
+                Assert.Contains($"<> {trueLit}", sql);
         }
     }
 
@@ -138,13 +175,16 @@ public class BoolLiteralSqlShapeTests
         using (cn) using (ctx)
         {
             var sql = ctx.Query<BoolPredEntity>().Where(e => e.IsActive != false).ToString();
-            Assert.Contains($"<> {falseLit}", sql);
+            if (p.PrefersBareBooleanPredicates)
+                BoolLiteralAssertions.AssertNonNullableBoolTrueShape(p, sql, falseLit);
+            else
+                Assert.Contains($"<> {falseLit}", sql);
         }
     }
 
     [Theory]
     [MemberData(nameof(AllProvidersOnly))]
-    public void BoolPredicate_BoolMember_EmitsTrueLiteral(object provider)
+    public void BoolPredicate_BoolMember_EmitsProviderBooleanPredicate(object provider)
     {
         // e => e.IsActive — standalone bool member must produce a WHERE clause.
         var p = (DatabaseProvider)provider;
@@ -152,13 +192,13 @@ public class BoolLiteralSqlShapeTests
         using (cn) using (ctx)
         {
             var sql = ctx.Query<BoolPredEntity>().Where(e => e.IsActive).ToString();
-            Assert.Contains("WHERE", sql, StringComparison.OrdinalIgnoreCase);
+            BoolLiteralAssertions.AssertNonNullableBoolTrueShape(p, sql, p.BooleanTrueLiteral);
         }
     }
 
     [Theory]
     [MemberData(nameof(AllProvidersOnly))]
-    public void BoolPredicate_NegatedBoolMember_ContainsWhereClause(object provider)
+    public void BoolPredicate_NegatedBoolMember_EmitsProviderBooleanPredicate(object provider)
     {
         // e => !e.IsActive must produce a valid WHERE clause.
         var p = (DatabaseProvider)provider;
@@ -166,7 +206,7 @@ public class BoolLiteralSqlShapeTests
         using (cn) using (ctx)
         {
             var sql = ctx.Query<BoolPredEntity>().Where(e => !e.IsActive).ToString();
-            Assert.Contains("WHERE", sql, StringComparison.OrdinalIgnoreCase);
+            BoolLiteralAssertions.AssertNonNullableBoolFalseShape(p, sql, p.BooleanFalseLiteral);
         }
     }
 
@@ -333,8 +373,7 @@ public class BoolLiteralExpandedTests
         using (cn) using (ctx)
         {
             var sql = ctx.Query<BoolPredEntity>().Where(e => e.Id > 0 && e.IsActive == true).ToString();
-            Assert.Contains($"= {p.BooleanTrueLiteral}", sql);
-            Assert.Contains("WHERE", sql, StringComparison.OrdinalIgnoreCase);
+            BoolLiteralAssertions.AssertNonNullableBoolTrueShape(p, sql, p.BooleanTrueLiteral);
         }
     }
 
@@ -347,7 +386,7 @@ public class BoolLiteralExpandedTests
         using (cn) using (ctx)
         {
             var sql = ctx.Query<BoolPredEntity>().Where(e => e.Id > 0 && e.IsActive == false).ToString();
-            Assert.Contains($"= {p.BooleanFalseLiteral}", sql);
+            BoolLiteralAssertions.AssertNonNullableBoolFalseShape(p, sql, p.BooleanFalseLiteral);
         }
     }
 
@@ -367,7 +406,7 @@ public class BoolLiteralExpandedTests
                 .Where(e => e.IsActive == true)
                 .Where(e => e.IsEnabled == false)
                 .ToString();
-            Assert.Contains($"= {p.BooleanTrueLiteral}", sql);
+            BoolLiteralAssertions.AssertNonNullableBoolTrueShape(p, sql, p.BooleanTrueLiteral);
             Assert.Contains($"= {p.BooleanFalseLiteral}", sql);
         }
     }
@@ -384,7 +423,7 @@ public class BoolLiteralExpandedTests
                 .Where(e => e.IsActive == false)
                 .Where(e => e.IsEnabled == true)
                 .ToString();
-            Assert.Contains($"= {p.BooleanFalseLiteral}", sql);
+            BoolLiteralAssertions.AssertNonNullableBoolFalseShape(p, sql, p.BooleanFalseLiteral);
             Assert.Contains($"= {p.BooleanTrueLiteral}", sql);
         }
     }
@@ -678,9 +717,9 @@ public class BoolLiteralProviderLiteralTests
     }
 
     [Fact]
-    public void Sqlite_BoolPredicate_EqualsTrue_UsesOne_NotTrue()
+    public void Sqlite_BoolPredicate_EqualsTrue_UsesBarePredicate_NotTrueLiteral()
     {
-        // Regression guard: SQLite must emit "= 1", not "= true".
+        // Regression guard: SQLite must not emit PostgreSQL's true literal for bool predicates.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -688,13 +727,14 @@ public class BoolLiteralProviderLiteralTests
         var sql = ctx.Query<BoolPredEntity>().Where(e => e.IsActive == true).ToString();
 
         Assert.DoesNotContain("= true", sql);
-        Assert.Contains("= 1", sql);
+        Assert.DoesNotContain("= 1", sql);
+        Assert.Contains("WHERE", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Sqlite_BoolPredicate_EqualsFalse_UsesZero_NotFalse()
+    public void Sqlite_BoolPredicate_EqualsFalse_UsesBareNotPredicate_NotFalseLiteral()
     {
-        // Regression guard: SQLite must emit "= 0", not "= false".
+        // Regression guard: SQLite must not emit PostgreSQL's false literal for bool predicates.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -702,6 +742,7 @@ public class BoolLiteralProviderLiteralTests
         var sql = ctx.Query<BoolPredEntity>().Where(e => e.IsActive == false).ToString();
 
         Assert.DoesNotContain("= false", sql);
-        Assert.Contains("= 0", sql);
+        Assert.DoesNotContain("= 0", sql);
+        Assert.Contains("NOT", sql, StringComparison.OrdinalIgnoreCase);
     }
 }
