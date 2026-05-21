@@ -344,14 +344,38 @@ namespace nORM.Providers
             ArgumentNullException.ThrowIfNull(columnName);
             ArgumentNullException.ThrowIfNull(values);
 
+            if (values.Count == 0)
+                return "(1=0)";
+
+            var hasNulls = false;
+            List<object?>? nonNullValues = null;
+            for (var i = 0; i < values.Count; i++)
+            {
+                if (values[i] == null)
+                {
+                    hasNulls = true;
+                    nonNullValues ??= values.Take(i).ToList();
+                }
+                else
+                {
+                    nonNullValues?.Add(values[i]);
+                }
+            }
+
+            if (hasNulls && (nonNullValues == null || nonNullValues.Count == 0))
+                return $"{columnName} IS NULL";
+
+            var arrayValues = nonNullValues ?? values;
             var pName = ParamPrefix + "p0";
             var p = cmd.CreateParameter();
             p.ParameterName = pName;
             // Create a typed array so Npgsql can infer NpgsqlDbType correctly.
             // An untyped object[] causes binding failures for Guid, int, enum, nullable types on live PostgreSQL.
-            p.Value = CreateTypedArray(values);
+            p.Value = CreateTypedArray(arrayValues);
             cmd.Parameters.Add(p);
-            return $"{columnName} = ANY({pName})";
+            return hasNulls
+                ? $"({columnName} = ANY({pName}) OR {columnName} IS NULL)"
+                : $"{columnName} = ANY({pName})";
         }
 
         /// <summary>
