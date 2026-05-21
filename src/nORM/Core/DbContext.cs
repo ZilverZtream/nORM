@@ -252,6 +252,9 @@ namespace nORM.Core
 
         internal Task<DbConnection> EnsureConnectionAsync(CancellationToken ct = default)
         {
+            if (ct.IsCancellationRequested)
+                return Task.FromCanceled<DbConnection>(ct);
+
             // Fast path — connection already open, provider initialized, and temporal init either
             // not needed or already complete. Returns a cached Task to avoid async state machine allocation.
             if (_cn.State == ConnectionState.Open && _providerInitialized &&

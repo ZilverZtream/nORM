@@ -259,6 +259,23 @@ public class AsyncCancellationAuditTests
         AssertCancelled(ex);
     }
 
+    [Fact]
+    public async Task CreateCompiledQueryCommandAsync_WarmedContext_PreCancelledToken_ThrowsCancellation()
+    {
+        var (cn, ctx) = BuildContext();
+        await using var _ = ctx;
+        using var __ = cn;
+
+        await using (await ctx.CreateCompiledQueryCommandAsync())
+        {
+        }
+
+        var ex = await Record.ExceptionAsync(() =>
+            ctx.CreateCompiledQueryCommandAsync(PreCancelled()));
+
+        AssertCancelled(ex);
+    }
+
     // ── Async enumerable cancellation ─────────────────────────────────────────
 
     [Fact]
