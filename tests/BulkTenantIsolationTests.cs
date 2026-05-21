@@ -2,13 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
 using nORM.Core;
 using nORM.Enterprise;
+using nORM.Mapping;
 using nORM.Providers;
+using nORM.Query;
 using Xunit;
 
 namespace nORM.Tests;
@@ -36,15 +39,39 @@ public class BulkTenantIsolationTests
         public object GetCurrentTenantId() => _id;
     }
 
-    private static async Task<(SqliteConnection cn, DbContext ctx)> MakeCtx(string tenantId)
+    private sealed class FallbackSqliteProvider : DatabaseProvider
+    {
+        public override int MaxSqlLength => 1_000_000;
+        public override int MaxParameters => 999;
+        public override string Escape(string id) => $"\"{id}\"";
+        public override void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName)
+        {
+            if (limitParameterName != null) sb.Append(" LIMIT ").Append(limitParameterName);
+            if (offsetParameterName != null) sb.Append(" OFFSET ").Append(offsetParameterName);
+        }
+
+        public override string GetIdentityRetrievalString(TableMapping m) => "; SELECT last_insert_rowid();";
+        public override DbParameter CreateParameter(string name, object? value) => new SqliteParameter(name, value ?? DBNull.Value);
+        public override string? TranslateFunction(string name, Type declaringType, params string[] args) => null;
+        public override string TranslateJsonPathAccess(string columnName, string jsonPath) => $"json_extract({columnName}, '{jsonPath}')";
+        public override string GenerateCreateHistoryTableSql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null) => throw new NotImplementedException();
+        public override string GenerateTemporalTriggersSql(TableMapping mapping) => throw new NotImplementedException();
+    }
+
+    private static async Task<(SqliteConnection cn, DbContext ctx)> MakeCtx(string tenantId, bool useBatchedBulkOps = false, bool useFallbackProvider = false)
     {
         var cn = new SqliteConnection("Data Source=:memory:");
         await cn.OpenAsync();
         await using var cmd = cn.CreateCommand();
         cmd.CommandText = "CREATE TABLE BtiItem (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, TenantId TEXT NOT NULL)";
         await cmd.ExecuteNonQueryAsync();
-        var opts = new DbContextOptions { TenantProvider = new FixedTenantProvider(tenantId) };
-        return (cn, new DbContext(cn, new SqliteProvider(), opts));
+        var opts = new DbContextOptions
+        {
+            TenantProvider = new FixedTenantProvider(tenantId),
+            UseBatchedBulkOps = useBatchedBulkOps
+        };
+        DatabaseProvider provider = useFallbackProvider ? new FallbackSqliteProvider() : new SqliteProvider();
+        return (cn, new DbContext(cn, provider, opts));
     }
 
     private static async Task InsertRawAsync(SqliteConnection cn, int id, string name, string tenantId)
@@ -151,6 +178,18 @@ public class BulkTenantIsolationTests
         await ctx.BulkDeleteAsync(new[] { entity });
 
         Assert.Equal(1, await CountAsync(cn, 50, "B")); // still there
+    }
+
+    [Fact]
+    public async Task BulkDelete_Batched_CrossTenant_DoesNotDeleteForeignTenantRow_SQLite()
+    {
+        var (cn, ctx) = await MakeCtx("A", useBatchedBulkOps: true, useFallbackProvider: true);
+        await InsertRawAsync(cn, 51, "exists", "B");
+
+        var entity = new BtiItem { Id = 51, TenantId = "A" };
+        await ctx.BulkDeleteAsync(new[] { entity });
+
+        Assert.Equal(1, await CountAsync(cn, 51, "B"));
     }
 
     [Fact]
@@ -269,7 +308,7 @@ public class BulkTenantIsolationTests
         public string TenantId { get; set; } = string.Empty;
     }
 
-    private static async Task<(SqliteConnection cn, DbContext ctx)> MakeCompositeCtx(string tenantId)
+    private static async Task<(SqliteConnection cn, DbContext ctx)> MakeCompositeCtx(string tenantId, bool useBatchedBulkOps = false, bool useFallbackProvider = false)
     {
         var cn = new SqliteConnection("Data Source=:memory:");
         await cn.OpenAsync();
@@ -279,9 +318,11 @@ public class BulkTenantIsolationTests
         var opts = new DbContextOptions
         {
             TenantProvider = new FixedTenantProvider(tenantId),
+            UseBatchedBulkOps = useBatchedBulkOps,
             OnModelCreating = mb => mb.Entity<BtiComposite>().HasKey(e => new { e.RegionId, e.ItemSeq })
         };
-        return (cn, new DbContext(cn, new SqliteProvider(), opts));
+        DatabaseProvider provider = useFallbackProvider ? new FallbackSqliteProvider() : new SqliteProvider();
+        return (cn, new DbContext(cn, provider, opts));
     }
 
     private static async Task InsertCompositeRawAsync(SqliteConnection cn, int regionId, int itemSeq, string name, string tenantId)
@@ -360,6 +401,18 @@ public class BulkTenantIsolationTests
 
         // Row must still exist — tenant predicate excludes it
         Assert.Equal(1, await CountCompositeAsync(cn, 3, 300, "B"));
+    }
+
+    [Fact]
+    public async Task CompositeKey_BulkDelete_Batched_CrossTenant_DoesNotDeleteForeignRow()
+    {
+        var (cn, ctx) = await MakeCompositeCtx("A", useBatchedBulkOps: true, useFallbackProvider: true);
+        await InsertCompositeRawAsync(cn, 5, 500, "exists", "B");
+
+        var entity = new BtiComposite { RegionId = 5, ItemSeq = 500, TenantId = "A" };
+        await ctx.BulkDeleteAsync(new[] { entity });
+
+        Assert.Equal(1, await CountCompositeAsync(cn, 5, 500, "B"));
     }
 
     [Fact]

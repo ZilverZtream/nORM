@@ -785,6 +785,13 @@ namespace nORM.Providers
                         whereClause = string.Join(" OR ", orConditions);
                     }
 
+                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                    {
+                        var tenantParam = $"{ParamPrefix}__tenant_bulk";
+                        cmd.AddParam(tenantParam, ctx.Options.TenantProvider.GetCurrentTenantId());
+                        whereClause = $"({whereClause}) AND {m.TenantColumn.EscCol} = {tenantParam}";
+                    }
+
                     cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {whereClause}";
                     var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                     totalDeleted += deleted;
