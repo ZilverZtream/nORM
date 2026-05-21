@@ -94,7 +94,7 @@ namespace nORM.Navigation
 
             var entityType = entity.GetType();
             var key = (entityType, propertyName);
-            var tcs = new TaskCompletionSource<List<object>>();
+            var tcs = new TaskCompletionSource<List<object>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var shouldSignalBatch = false;
             if (ct.CanBeCanceled)
             {
