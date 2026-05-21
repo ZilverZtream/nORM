@@ -4,7 +4,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <!-- ScriptDom is PrivateAssets in nORM.csproj; tests need a direct reference to keep full AST-validation coverage. -->
+    <!-- Tests use ScriptDom directly to keep full AST-validation coverage. -->
     <PackageReference Include="coverlet.collector" Version="8.0.1">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

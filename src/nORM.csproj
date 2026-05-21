@@ -7,10 +7,10 @@
     <NoWarn>$(NoWarn);CA2229</NoWarn>
     <GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
     <PackageId>nORM</PackageId>
-    <Version>1.0.0</Version>
+    <Version>0.9.0-preview.1</Version>
     <Authors>Dennis Östling</Authors>
-    <Description>nORM - The Norm: A high-performance, enterprise-grade ORM for .NET with Dapper-speed IL materialization, comprehensive LINQ support, and advanced features like multi-tenancy, connection resilience, and bulk operations.</Description>
-    <PackageTags>ORM;Database;LINQ;Performance;Entity Framework;Dapper;SQL</PackageTags>
+    <Description>nORM - The Norm: a high-performance ORM for .NET with LINQ querying, compiled queries, multi-provider support, multi-tenancy, caching, resilience, migrations, and bulk operations.</Description>
+    <PackageTags>ORM;Database;LINQ;Performance;Entity Framework;Dapper;SQL;SQLite;PostgreSQL;MySQL</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/zilverztream/nORM</PackageProjectUrl>
     <RepositoryUrl>https://github.com/zilverztream/nORM</RepositoryUrl>
