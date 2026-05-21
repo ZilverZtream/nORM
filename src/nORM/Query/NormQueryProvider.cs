@@ -1371,6 +1371,35 @@ namespace nORM.Query
             return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration,
                 () => ExecuteCompiledInternalArrayAsync<TResult>(plan, parameterValues, ct), ct).ConfigureAwait(false);
         }
+
+        private static string BuildSimpleWhereCacheKey(LambdaExpression lambda)
+        {
+            if (lambda.Body is MemberExpression { Type: var memberType } member && memberType == typeof(bool))
+                return member.Member.Name;
+
+            if (lambda.Body is UnaryExpression { NodeType: ExpressionType.Not, Operand: MemberExpression { Type: var negatedType } negatedMember }
+                && negatedType == typeof(bool))
+                return string.Concat(negatedMember.Member.Name, ":BOOL_FALSE");
+
+            if (lambda.Body is BinaryExpression { NodeType: ExpressionType.Equal } binary
+                && binary.Left is MemberExpression comparedMember)
+            {
+                if (comparedMember.Type == typeof(bool) &&
+                    ExpressionValueExtractor.TryGetConstantValue(binary.Right, out var boolValue) &&
+                    boolValue is bool expected)
+                    return expected
+                        ? comparedMember.Member.Name
+                        : string.Concat(comparedMember.Member.Name, ":BOOL_FALSE");
+
+                if (IsNullConstant(binary.Right))
+                    return string.Concat(comparedMember.Member.Name, ":NULL");
+
+                return string.Concat(comparedMember.Member.Name, ":EQ");
+            }
+
+            return lambda.Body.ToString();
+        }
+
         private bool TryGetSimpleQuery(Expression expr, out string sql, out Dictionary<string, object> parameters, out string? resultMethodName)
         {
             sql = string.Empty;
@@ -1428,11 +1457,6 @@ namespace nORM.Query
                 return false;
             var elementType = GetElementType(constant);
             var map = _ctx.GetMapping(elementType);
-            // Use structural key instead of full ToString() to avoid string allocation.
-            // For simple predicates (member == value), the member name is sufficient.
-            // Include a :NULL suffix when the predicate compares to null so that null and
-            // non-null predicates are never folded into the same cached SQL entry —
-            // null requires IS NULL while non-null requires = @p0.
             string whereKey;
             if (whereCall == null)
                 whereKey = "";
@@ -1440,19 +1464,7 @@ namespace nORM.Query
             {
                 var wLambda = StripQuotes(whereCall.Arguments[1]) as LambdaExpression;
                 if (wLambda == null) return false;
-                if (wLambda.Body is MemberExpression wm)
-                    whereKey = wm.Member.Name;
-                else if (wLambda.Body is BinaryExpression wb && wb.Left is MemberExpression wbm)
-                {
-                    whereKey = wbm.Member.Name;
-                    // Peek at the RHS to tag the cache key when it is a null constant.
-                    if (wb.NodeType == ExpressionType.Equal
-                        && ExpressionValueExtractor.TryGetConstantValue(wb.Right, out var peekVal)
-                        && (peekVal == null || peekVal == DBNull.Value))
-                        whereKey += ":NULL";
-                }
-                else
-                    whereKey = wLambda.Body.ToString(); // fallback for complex predicates
+                whereKey = BuildSimpleWhereCacheKey(wLambda);
             }
             var cacheKey = string.Concat("SIMPLE:", elementType.FullName, ":", resultMethodName ?? "", ":", whereKey);
             if (!_simpleSqlCache.TryGetValue(cacheKey, out var cachedSql))
@@ -1493,8 +1505,12 @@ namespace nORM.Query
                         // DynamicInvoke is significantly slower and poses RCE risks.
                         if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
                             return false;
+                        if (me.Type == typeof(bool) && value is bool boolValue)
+                        {
+                            whereClause = $" WHERE {_ctx.Provider.FormatBooleanPredicate(column.EscCol, boolValue)}";
+                        }
                         // Null value: emit IS NULL (SQL "col = NULL" is always UNKNOWN/false).
-                        if (value == null || value == DBNull.Value)
+                        else if (value == null || value == DBNull.Value)
                         {
                             whereClause = $" WHERE {column.EscCol} IS NULL";
                             // no parameters needed
@@ -1529,8 +1545,11 @@ namespace nORM.Query
                         return false;
                     if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
                         return false;
-                    // IS NULL predicate: cache key includes :NULL, no parameter needed.
-                    if (value != null && value != DBNull.Value)
+                    // Boolean literals and NULL predicates are part of the SQL cache key and need no parameter.
+                    var isBoolLiteralPredicate = be.Left is MemberExpression { Type: var memberType }
+                                                 && memberType == typeof(bool)
+                                                 && value is bool;
+                    if (!isBoolLiteralPredicate && value != null && value != DBNull.Value)
                     {
                         var paramName = _ctx.Provider.ParamPrefix + "p0";
                         parameters = new Dictionary<string, object>(1) { [paramName] = value };

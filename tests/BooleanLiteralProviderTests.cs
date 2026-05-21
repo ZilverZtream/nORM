@@ -90,4 +90,32 @@ public class BooleanLiteralProviderTests
             Assert.Equal(3, all.Count);
         }
     }
+
+    [Fact]
+    public async Task SimpleQuery_bool_cache_distinguishes_member_true_from_equality_false()
+    {
+        using var ctx = CreateAndSeed(out var cn);
+        using (cn)
+        {
+            var active = await ctx.Query<Item>().Where(u => u.IsActive).ToListAsync();
+            var inactive = await ctx.Query<Item>().Where(u => u.IsActive == false).ToListAsync();
+
+            Assert.Equal(new[] { 1, 3 }, active.Select(i => i.Id).OrderBy(i => i).ToArray());
+            Assert.Equal(new[] { 2 }, inactive.Select(i => i.Id).ToArray());
+        }
+    }
+
+    [Fact]
+    public async Task SimpleQuery_bool_cache_distinguishes_equality_false_from_member_true()
+    {
+        using var ctx = CreateAndSeed(out var cn);
+        using (cn)
+        {
+            var inactive = await ctx.Query<Item>().Where(u => u.IsActive == false).ToListAsync();
+            var active = await ctx.Query<Item>().Where(u => u.IsActive).ToListAsync();
+
+            Assert.Equal(new[] { 2 }, inactive.Select(i => i.Id).ToArray());
+            Assert.Equal(new[] { 1, 3 }, active.Select(i => i.Id).OrderBy(i => i).ToArray());
+        }
+    }
 }
