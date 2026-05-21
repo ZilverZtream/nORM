@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Core;
@@ -13,6 +15,18 @@ namespace nORM.Internal
 {
     internal static class CommandInterceptorExtensions
     {
+        private static readonly ConditionalWeakTable<DbConnection, SemaphoreSlim> s_serializedConnectionGates = new();
+
+        private static SemaphoreSlim CreateGate(DbConnection _) => new(1, 1);
+
+        internal static SemaphoreSlim? GetSerializedConnectionGate(DbCommand command, DbContext ctx)
+        {
+            var connection = command.Connection;
+            return ctx.Provider.PrefersSyncExecution && connection != null
+                ? s_serializedConnectionGates.GetValue(connection, CreateGate)
+                : null;
+        }
+
         /// <summary>
         /// Executes <see cref="DbCommand.ExecuteNonQueryAsync()"/> while invoking any registered
         /// command interceptors before and after execution.
@@ -179,6 +193,47 @@ namespace nORM.Internal
         /// <param name="ctx">The current <see cref="DbContext"/>.</param>
         /// <returns>The scalar result returned by the command.</returns>
         public static object? ExecuteScalarWithInterception(this DbCommand command, DbContext ctx)
+            => ExecuteScalarWithInterceptionCore(command, ctx);
+
+        internal static object? ExecuteScalarWithInterceptionSerialized(this DbCommand command, DbContext ctx)
+        {
+            var gate = GetSerializedConnectionGate(command, ctx);
+            if (gate == null)
+                return ExecuteScalarWithInterceptionCore(command, ctx);
+
+            gate.Wait();
+            try
+            {
+                return ExecuteScalarWithInterceptionCore(command, ctx);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        internal static object? ExecuteScalarWithInterceptionSerializedAndDispose(this DbCommand command, DbContext ctx)
+        {
+            var gate = GetSerializedConnectionGate(command, ctx);
+            if (gate == null)
+            {
+                try { return ExecuteScalarWithInterceptionCore(command, ctx); }
+                finally { command.Dispose(); }
+            }
+
+            gate.Wait();
+            try
+            {
+                return ExecuteScalarWithInterceptionCore(command, ctx);
+            }
+            finally
+            {
+                command.Dispose();
+                gate.Release();
+            }
+        }
+
+        private static object? ExecuteScalarWithInterceptionCore(DbCommand command, DbContext ctx)
         {
             var interceptors = ctx.Options.CommandInterceptors;
             if (interceptors.Count == 0)
@@ -227,15 +282,33 @@ namespace nORM.Internal
         public static Task<DbDataReader> ExecuteReaderWithInterceptionAsync(this DbCommand command, DbContext ctx, CommandBehavior behavior, CancellationToken ct)
         {
             var interceptors = ctx.Options.CommandInterceptors;
+            var gate = GetSerializedConnectionGate(command, ctx);
             if (interceptors.Count == 0)
             {
                 // Return the task directly — avoids async state machine allocation
+                if (gate != null)
+                    return ExecuteReaderSerializedAsync(command, gate, behavior, ct);
                 return command.ExecuteReaderAsync(behavior, ct);
             }
-            return ExecuteReaderWithInterceptionSlowAsync(command, ctx, interceptors, behavior, ct);
+            return ExecuteReaderWithInterceptionSlowAsync(command, ctx, interceptors, behavior, ct, gate);
         }
 
-        private static async Task<DbDataReader> ExecuteReaderWithInterceptionSlowAsync(DbCommand command, DbContext ctx, System.Collections.Generic.IList<IDbCommandInterceptor> interceptors, CommandBehavior behavior, CancellationToken ct)
+        private static async Task<DbDataReader> ExecuteReaderSerializedAsync(DbCommand command, SemaphoreSlim gate, CommandBehavior behavior, CancellationToken ct)
+        {
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var reader = await command.ExecuteReaderAsync(behavior, ct).ConfigureAwait(false);
+                return new SerializedDbDataReader(reader, gate);
+            }
+            catch
+            {
+                gate.Release();
+                throw;
+            }
+        }
+
+        private static async Task<DbDataReader> ExecuteReaderWithInterceptionSlowAsync(DbCommand command, DbContext ctx, System.Collections.Generic.IList<IDbCommandInterceptor> interceptors, CommandBehavior behavior, CancellationToken ct, SemaphoreSlim? gate)
         {
 
             foreach (var interceptor in interceptors)
@@ -252,16 +325,19 @@ namespace nORM.Internal
             var sw = Stopwatch.StartNew();
             try
             {
+                if (gate != null)
+                    await gate.WaitAsync(ct).ConfigureAwait(false);
                 var reader = await command.ExecuteReaderAsync(behavior, ct).ConfigureAwait(false);
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
                     await interceptor.ReaderExecutedAsync(command, ctx, reader, sw.Elapsed, ct).ConfigureAwait(false);
                 }
-                return reader;
+                return gate != null ? new SerializedDbDataReader(reader, gate) : reader;
             }
             catch (Exception ex)
             {
+                gate?.Release();
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                 {
@@ -283,11 +359,18 @@ namespace nORM.Internal
         /// <param name="behavior">Behavior flags that influence reader execution.</param>
         /// <returns>The <see cref="DbDataReader"/> returned by the command execution.</returns>
         public static DbDataReader ExecuteReaderWithInterception(this DbCommand command, DbContext ctx, CommandBehavior behavior)
+            => ExecuteReaderWithInterceptionCore(command, ctx, behavior, disposeCommandWithReader: false);
+
+        internal static DbDataReader ExecuteReaderWithInterceptionAndCommandDispose(this DbCommand command, DbContext ctx, CommandBehavior behavior)
+            => ExecuteReaderWithInterceptionCore(command, ctx, behavior, disposeCommandWithReader: true);
+
+        private static DbDataReader ExecuteReaderWithInterceptionCore(DbCommand command, DbContext ctx, CommandBehavior behavior, bool disposeCommandWithReader)
         {
             var interceptors = ctx.Options.CommandInterceptors;
+            var gate = GetSerializedConnectionGate(command, ctx);
             if (interceptors.Count == 0)
             {
-                return command.ExecuteReader(behavior);
+                return ExecuteReaderSerializedIfNeeded(command, gate, behavior, disposeCommandWithReader);
             }
 
             foreach (var interceptor in interceptors)
@@ -297,26 +380,208 @@ namespace nORM.Internal
                 {
                     foreach (var i in interceptors)
                         i.ReaderExecuted(command, ctx, interception.Result!, TimeSpan.Zero);
-                    return interception.Result!;
+                    return disposeCommandWithReader
+                        ? new SerializedDbDataReader(interception.Result!, gate, command, holdGateUntilDispose: true)
+                        : interception.Result!;
                 }
             }
 
             var sw = Stopwatch.StartNew();
             try
             {
+                gate?.Wait();
                 var reader = command.ExecuteReader(behavior);
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                     interceptor.ReaderExecuted(command, ctx, reader, sw.Elapsed);
-                return reader;
+                return gate != null || disposeCommandWithReader
+                    ? new SerializedDbDataReader(reader, gate, disposeCommandWithReader ? command : null, disposeCommandWithReader)
+                    : reader;
             }
             catch (Exception ex)
             {
+                try
+                {
+                    if (disposeCommandWithReader)
+                        command.Dispose();
+                }
+                finally
+                {
+                    gate?.Release();
+                }
                 sw.Stop();
                 foreach (var interceptor in interceptors)
                     interceptor.CommandFailed(command, ctx, ex);
                 throw;
             }
+        }
+
+        private static DbDataReader ExecuteReaderSerializedIfNeeded(DbCommand command, SemaphoreSlim? gate, CommandBehavior behavior, bool disposeCommandWithReader)
+        {
+            if (gate == null)
+            {
+                var reader = command.ExecuteReader(behavior);
+                return disposeCommandWithReader
+                    ? new SerializedDbDataReader(reader, null, command, holdGateUntilDispose: true)
+                    : reader;
+            }
+
+            gate.Wait();
+            try
+            {
+                return new SerializedDbDataReader(
+                    command.ExecuteReader(behavior),
+                    gate,
+                    disposeCommandWithReader ? command : null,
+                    disposeCommandWithReader);
+            }
+            catch
+            {
+                try
+                {
+                    if (disposeCommandWithReader)
+                        command.Dispose();
+                }
+                finally
+                {
+                    gate.Release();
+                }
+                throw;
+            }
+        }
+
+        private sealed class SerializedDbDataReader : DbDataReader
+        {
+            private readonly DbDataReader _inner;
+            private readonly SemaphoreSlim? _gate;
+            private readonly DbCommand? _commandToDispose;
+            private readonly bool _holdGateUntilDispose;
+            private int _released;
+
+            internal SerializedDbDataReader(DbDataReader inner, SemaphoreSlim? gate, DbCommand? commandToDispose = null, bool holdGateUntilDispose = false)
+            {
+                _inner = inner;
+                _gate = gate;
+                _commandToDispose = commandToDispose;
+                _holdGateUntilDispose = holdGateUntilDispose;
+            }
+
+            private void ReleaseGate()
+            {
+                if (Interlocked.Exchange(ref _released, 1) == 0)
+                {
+                    try
+                    {
+                        _commandToDispose?.Dispose();
+                    }
+                    finally
+                    {
+                        _gate?.Release();
+                    }
+                }
+            }
+
+            private void ReleaseGateAfterExhaustion()
+            {
+                if (!_holdGateUntilDispose)
+                    ReleaseGate();
+            }
+
+            public override void Close()
+            {
+                try { _inner.Close(); }
+                finally { ReleaseGate(); }
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                try
+                {
+                    if (disposing)
+                        _inner.Dispose();
+                }
+                finally
+                {
+                    ReleaseGate();
+                    base.Dispose(disposing);
+                }
+            }
+
+            public override async ValueTask DisposeAsync()
+            {
+                try { await _inner.DisposeAsync().ConfigureAwait(false); }
+                finally { ReleaseGate(); }
+            }
+
+            public override object this[int ordinal] => _inner[ordinal];
+            public override object this[string name] => _inner[name];
+            public override int Depth => _inner.Depth;
+            public override int FieldCount => _inner.FieldCount;
+            public override bool HasRows => _inner.HasRows;
+            public override bool IsClosed => _inner.IsClosed;
+            public override int RecordsAffected => _inner.RecordsAffected;
+            public override int VisibleFieldCount => _inner.VisibleFieldCount;
+            public override bool GetBoolean(int ordinal) => _inner.GetBoolean(ordinal);
+            public override byte GetByte(int ordinal) => _inner.GetByte(ordinal);
+            public override long GetBytes(int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length)
+                => _inner.GetBytes(ordinal, dataOffset, buffer, bufferOffset, length);
+            public override char GetChar(int ordinal) => _inner.GetChar(ordinal);
+            public override long GetChars(int ordinal, long dataOffset, char[]? buffer, int bufferOffset, int length)
+                => _inner.GetChars(ordinal, dataOffset, buffer, bufferOffset, length);
+            public override string GetDataTypeName(int ordinal) => _inner.GetDataTypeName(ordinal);
+            public override DateTime GetDateTime(int ordinal) => _inner.GetDateTime(ordinal);
+            public override decimal GetDecimal(int ordinal) => _inner.GetDecimal(ordinal);
+            public override double GetDouble(int ordinal) => _inner.GetDouble(ordinal);
+            public override Type GetFieldType(int ordinal) => _inner.GetFieldType(ordinal);
+            public override T GetFieldValue<T>(int ordinal) => _inner.GetFieldValue<T>(ordinal);
+            public override Task<T> GetFieldValueAsync<T>(int ordinal, CancellationToken cancellationToken)
+                => _inner.GetFieldValueAsync<T>(ordinal, cancellationToken);
+            public override float GetFloat(int ordinal) => _inner.GetFloat(ordinal);
+            public override Guid GetGuid(int ordinal) => _inner.GetGuid(ordinal);
+            public override short GetInt16(int ordinal) => _inner.GetInt16(ordinal);
+            public override int GetInt32(int ordinal) => _inner.GetInt32(ordinal);
+            public override long GetInt64(int ordinal) => _inner.GetInt64(ordinal);
+            public override string GetName(int ordinal) => _inner.GetName(ordinal);
+            public override int GetOrdinal(string name) => _inner.GetOrdinal(name);
+            public override DataTable? GetSchemaTable() => _inner.GetSchemaTable();
+            public override string GetString(int ordinal) => _inner.GetString(ordinal);
+            public override object GetValue(int ordinal) => _inner.GetValue(ordinal);
+            public override int GetValues(object[] values) => _inner.GetValues(values);
+            public override bool IsDBNull(int ordinal) => _inner.IsDBNull(ordinal);
+            public override Task<bool> IsDBNullAsync(int ordinal, CancellationToken cancellationToken)
+                => _inner.IsDBNullAsync(ordinal, cancellationToken);
+            public override bool NextResult()
+            {
+                var hasNext = _inner.NextResult();
+                if (!hasNext)
+                    ReleaseGateAfterExhaustion();
+                return hasNext;
+            }
+
+            public override async Task<bool> NextResultAsync(CancellationToken cancellationToken)
+            {
+                var hasNext = await _inner.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                if (!hasNext)
+                    ReleaseGateAfterExhaustion();
+                return hasNext;
+            }
+
+            public override bool Read()
+            {
+                var hasRow = _inner.Read();
+                if (!hasRow)
+                    ReleaseGateAfterExhaustion();
+                return hasRow;
+            }
+
+            public override async Task<bool> ReadAsync(CancellationToken cancellationToken)
+            {
+                var hasRow = await _inner.ReadAsync(cancellationToken).ConfigureAwait(false);
+                if (!hasRow)
+                    ReleaseGateAfterExhaustion();
+                return hasRow;
+            }
+            public override IEnumerator GetEnumerator() => _inner.GetEnumerator();
         }
     }
 }

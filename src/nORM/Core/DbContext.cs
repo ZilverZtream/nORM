@@ -815,12 +815,12 @@ namespace nORM.Core
             var schemaSignature = _typeGenerator.ComputeSchemaSignature(_cn, tableName);
             var cacheKey = $"{Provider.GetType().FullName}|{NormalizeConnectionString(_cn.ConnectionString)}|{tableName}|{schemaSignature}";
             var lazyTask = _dynamicTypeCache.GetOrAdd(cacheKey,
-                _ => new Lazy<Task<Type>>(() => _typeGenerator.GenerateEntityTypeAsync(this.Connection, tableName)));
+                _ => new Lazy<Task<Type>>(() => Task.FromResult(_typeGenerator.GenerateEntityType(Connection, tableName))));
 
-            // Use Task.Run to avoid blocking the calling thread, preventing potential deadlocks
-            // in synchronization contexts (e.g., ASP.NET, WPF). The Lazy<T> ensures type
-            // generation happens only once per table, so the overhead is minimal.
-            var entityType = Task.Run(async () => await lazyTask.Value.ConfigureAwait(false)).GetAwaiter().GetResult();
+            // Query(string) is synchronous. Generate the cached type on the current thread
+            // instead of bouncing through Task.Run, which can starve the thread pool when many
+            // callers hit the same dynamic root concurrently.
+            var entityType = lazyTask.Value.GetAwaiter().GetResult();
 
             var generic = s_queryMethodInfo.Value.MakeGenericMethod(entityType);
             return (IQueryable)generic.Invoke(null, new object[] { this })!;

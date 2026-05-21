@@ -167,6 +167,8 @@ namespace nORM.Query
                     list.Add(entity);
                 }
 
+                await reader.DisposeAsync().ConfigureAwait(false);
+
                 if (plan.SplitQuery)
                 {
                     // Convert to IList for EagerLoadAsync compatibility
@@ -259,6 +261,8 @@ namespace nORM.Query
                     }
                 }
 
+                await reader.DisposeAsync().ConfigureAwait(false);
+
                 if (plan.SplitQuery)
                 {
                     foreach (var include in plan.Includes)
@@ -297,11 +301,16 @@ namespace nORM.Query
 
         public IList Materialize(QueryPlan plan, DbCommand cmd)
         {
-            using var command = cmd;
+            var command = cmd;
+            var commandText = command.CommandText;
+            var commandLifetimeTransferred = false;
             try
             {
                 if (plan.GroupJoinInfo != null)
+                {
+                    using var groupJoinCommand = command;
                     return MaterializeGroupJoin(plan, command);
+                }
 
                 // List capacity pre-sizing: SingleResult=1, Take=Take value, else DefaultListCapacity heuristic.
                 var capacity = plan.SingleResult ? 1 : Math.Max(1, plan.Take ?? DefaultListCapacity);
@@ -317,7 +326,8 @@ namespace nORM.Query
                 // Hoist read-only check out of per-row loop: context options don't change during execution.
                 bool isReadOnly = IsReadOnlyQuery();
 
-                using var reader = command.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+                commandLifetimeTransferred = true;
+                using var reader = command.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
 
                 // Use sync materializer — no Task allocation, no async state machine.
                 var syncMaterializer = plan.SyncMaterializer;
@@ -351,6 +361,8 @@ namespace nORM.Query
                     }
                 }
 
+                reader.Dispose();
+
                 if (plan.SplitQuery)
                 {
                     foreach (var include in plan.Includes)
@@ -378,7 +390,9 @@ namespace nORM.Query
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Materialize failed for SQL: {Sql}", RedactSqlForLogging(command.CommandText));
+                if (!commandLifetimeTransferred)
+                    command.Dispose();
+                _logger.LogError(ex, "Materialize failed for SQL: {Sql}", RedactSqlForLogging(commandText));
                 throw;
             }
         }
@@ -589,7 +603,7 @@ namespace nORM.Query
                         $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
                 var innerKeyIndex = outerColumnCount + innerKeyOffset;
 
-                using var reader = cmd.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+                using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
 
                 object? currentOuter = null;
                 object? currentKey = null;
@@ -837,7 +851,7 @@ namespace nORM.Query
                 AdaptiveTimeoutManager.OperationType.ComplexSelect,
                 cmd.CommandText).TotalSeconds;
 
-            using var reader = cmd.ExecuteReaderWithInterception(
+            using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(
                 _ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
 
             var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(

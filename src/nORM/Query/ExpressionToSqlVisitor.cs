@@ -149,7 +149,8 @@ namespace nORM.Query
         {
             using var builder = new OptimizedSqlBuilder();
             _sql = builder;
-            Visit(expression);
+            if (!TryEmitMappedBooleanPredicate(expression, expectedValue: true))
+                Visit(expression);
             return builder.ToSqlString();
         }
         protected override Expression VisitBinary(BinaryExpression node)
@@ -168,10 +169,9 @@ namespace nORM.Query
                 }
 
                 // Inline boolean literals (true/false) as SQL literals instead of parameterizing.
-                // Parameterized booleans (WHERE col = @p0 with @p0=1) deprive the query planner of
-                // column selectivity statistics, causing suboptimal index selection (e.g., choosing a
-                // 70%-selective IsActive index over a 12%-selective City index).
-                // Emitting the literal (WHERE col = 1) lets the planner use ANALYZE statistics.
+                // Parameterized booleans (WHERE col = @p0 with @p0=1) deprive query planners of
+                // column selectivity statistics. Providers that prefer bare boolean predicates get
+                // WHERE col / WHERE NOT col for non-nullable bools instead.
                 if (TryInlineBoolLiteral(node))
                     return node;
 
@@ -211,6 +211,18 @@ namespace nORM.Query
                     }
                     return node;
                 }
+            }
+
+            if (node.NodeType is ExpressionType.AndAlso or ExpressionType.OrElse)
+            {
+                _sql.Append("(");
+                if (!TryEmitMappedBooleanPredicate(node.Left, expectedValue: true))
+                    Visit(node.Left);
+                _sql.Append(node.NodeType == ExpressionType.AndAlso ? " AND " : " OR ");
+                if (!TryEmitMappedBooleanPredicate(node.Right, expectedValue: true))
+                    Visit(node.Right);
+                _sql.Append(")");
+                return node;
             }
 
             _sql.Append("(");
@@ -270,6 +282,20 @@ namespace nORM.Query
 
         private void EmitBoolComparison(Expression memberSide, bool boolVal, ExpressionType op)
         {
+            if (_provider.PrefersBareBooleanPredicates && memberSide.Type == typeof(bool))
+            {
+                var emitPositivePredicate =
+                    op == ExpressionType.Equal && boolVal ||
+                    op == ExpressionType.NotEqual && !boolVal;
+
+                _sql.Append("(");
+                if (!emitPositivePredicate)
+                    _sql.Append("NOT ");
+                Visit(memberSide);
+                _sql.Append(")");
+                return;
+            }
+
             var literal = boolVal ? _provider.BooleanTrueLiteral : _provider.BooleanFalseLiteral;
             _sql.Append("(");
             Visit(memberSide);
@@ -330,7 +356,7 @@ namespace nORM.Query
         ///   UNKNOWN (excluded), but C# semantics say <c>null != "Alice"</c> is true (included).
         ///   Fix: emit <c>(col IS NULL OR col &lt;&gt; @p)</c> whenever left could be null.
         /// </summary>
-        private static bool NeedsNullSafeExpansion(Expression left, Expression right, ExpressionType nodeType = ExpressionType.Equal)
+        private bool NeedsNullSafeExpansion(Expression left, Expression right, ExpressionType nodeType = ExpressionType.Equal)
         {
             // Nullable<T> value types always need expansion (runtime null is possible on either side)
             if (IsNullableValueType(left.Type) || IsNullableValueType(right.Type))
@@ -374,7 +400,7 @@ namespace nORM.Query
         /// can be null, so this method conservatively returns <c>true</c> for any reference-typed
         /// column or method-call expression.
         /// </remarks>
-        private static bool CouldBeNull(Expression expr)
+        private bool CouldBeNull(Expression expr)
         {
             // Non-null compile-time constant: cannot be null
             if (expr is ConstantExpression ce)
@@ -383,6 +409,14 @@ namespace nORM.Query
             // Unwrap casts/conversions
             if (expr is UnaryExpression ue && (ue.NodeType == ExpressionType.Convert || ue.NodeType == ExpressionType.ConvertChecked))
                 return CouldBeNull(ue.Operand);
+
+            if (expr is MemberExpression columnMember &&
+                columnMember.Expression is ParameterExpression columnParameter &&
+                _parameterMappings.TryGetValue(columnParameter, out var mappedParameter) &&
+                mappedParameter.Mapping.ColumnsByName.TryGetValue(columnMember.Member.Name, out var column))
+            {
+                return column.IsNullable;
+            }
 
             // Closure-captured member whose value is non-null at expression-build time
             if (expr is MemberExpression me && me.Expression is ConstantExpression closure)
@@ -403,6 +437,28 @@ namespace nORM.Query
             }
 
             // Everything else (column references, method calls, etc.) could be null
+            return true;
+        }
+
+        private bool TryEmitMappedBooleanPredicate(Expression expression, bool expectedValue)
+        {
+            while (expression is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
+                expression = convert.Operand;
+
+            if (expression is UnaryExpression { NodeType: ExpressionType.Not } not)
+                return TryEmitMappedBooleanPredicate(not.Operand, !expectedValue);
+
+            if (expression.Type != typeof(bool) ||
+                expression is not MemberExpression member ||
+                member.Expression is not ParameterExpression parameter ||
+                !_parameterMappings.TryGetValue(parameter, out var info) ||
+                !info.Mapping.ColumnsByName.ContainsKey(member.Member.Name))
+            {
+                return false;
+            }
+
+            var columnSql = GetSql(member);
+            _sql.Append(_provider.FormatBooleanPredicate(columnSql, expectedValue));
             return true;
         }
 
@@ -490,6 +546,9 @@ namespace nORM.Query
         {
             if (node.NodeType == ExpressionType.Not)
             {
+                if (TryEmitMappedBooleanPredicate(node.Operand, expectedValue: false))
+                    return node;
+
                 _sql.Append("(NOT(");
                 Visit(node.Operand);
                 _sql.Append("))");

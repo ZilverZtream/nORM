@@ -523,8 +523,7 @@ namespace nORM.Query
         /// <summary>PERF: Fully synchronous scalar path for providers without true async I/O.</summary>
         private Task<TResult> ExecuteScalarPlanSync<TResult>(QueryPlan plan, DbCommand cmd, Stopwatch? sw)
         {
-            using var command = cmd;
-            var scalarResult = command.ExecuteScalarWithInterception(_ctx);
+            var scalarResult = cmd.ExecuteScalarWithInterceptionSerializedAndDispose(_ctx);
             sw?.Stop();
             _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, scalarResult == null || scalarResult is DBNull ? 0 : 1);
             if (scalarResult == null || scalarResult is DBNull)
@@ -985,6 +984,7 @@ namespace nORM.Query
 
             // Only update compiled parameter values — fixed params are already set
             UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
+            cmd.Transaction = _ctx.CurrentTransaction;
 
             // Inline materialization — command returned to pool after use
             if (plan.IsScalar)
@@ -1012,6 +1012,7 @@ namespace nORM.Query
             if (!state.CommandPool.TryDequeue(out var cmd))
                 cmd = CreateAndPreparePooledCommand(plan, fixedParams, state);
             UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
+            cmd.Transaction = _ctx.CurrentTransaction;
             try
             {
                 if (plan.IsScalar)
@@ -1469,7 +1470,7 @@ namespace nORM.Query
                     {
                         if (!map.ColumnsByName.TryGetValue(boolMember.Member.Name, out var boolCol))
                             return false;
-                        whereClause = $" WHERE {boolCol.EscCol} = {_ctx.Provider.BooleanTrueLiteral}";
+                        whereClause = $" WHERE {_ctx.Provider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: true)}";
                     }
                     // Support negated boolean member: u => !u.IsActive
                     else if (lambda.Body is UnaryExpression { NodeType: ExpressionType.Not } notExpr
@@ -1478,7 +1479,7 @@ namespace nORM.Query
                     {
                         if (!map.ColumnsByName.TryGetValue(negBoolMember.Member.Name, out var boolCol))
                             return false;
-                        whereClause = $" WHERE {boolCol.EscCol} = {_ctx.Provider.BooleanFalseLiteral}";
+                        whereClause = $" WHERE {_ctx.Provider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: false)}";
                     }
                     else
                     {
@@ -1735,7 +1736,7 @@ namespace nORM.Query
                 if (!map.ColumnsByName.TryGetValue(boolMember.Member.Name, out var boolCol))
                     return false;
 
-                whereClause = $" WHERE {boolCol.EscCol} = {_ctx.Provider.BooleanTrueLiteral}";
+                whereClause = $" WHERE {_ctx.Provider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: true)}";
                 return true;
             }
 
@@ -1746,7 +1747,7 @@ namespace nORM.Query
                 if (!map.ColumnsByName.TryGetValue(negBoolMember2.Member.Name, out var boolCol2))
                     return false;
 
-                whereClause = $" WHERE {boolCol2.EscCol} = {_ctx.Provider.BooleanFalseLiteral}";
+                whereClause = $" WHERE {_ctx.Provider.FormatBooleanPredicate(boolCol2.EscCol, expectedValue: false)}";
                 return true;
             }
 
@@ -1816,7 +1817,7 @@ namespace nORM.Query
                     // transaction at creation time; reuse across transaction changes would run
                     // the count against a stale (or null) transaction binding.
                     entry.Cmd.Transaction = _ctx.CurrentTransaction;
-                    var scalar = entry.Cmd.ExecuteScalarWithInterception(_ctx);
+                    var scalar = entry.Cmd.ExecuteScalarWithInterceptionSerialized(_ctx);
                     if (scalar == null || scalar is DBNull)
                         return Task.FromResult(default(TResult)!);
                     return Task.FromResult(ConvertScalarResult<TResult>(scalar));
@@ -1834,8 +1835,7 @@ namespace nORM.Query
             if (_ctx.Provider.PrefersSyncExecution)
             {
                 ct.ThrowIfCancellationRequested();
-                var scalar = cmd.ExecuteScalarWithInterception(_ctx);
-                cmd.Dispose();
+                var scalar = cmd.ExecuteScalarWithInterceptionSerializedAndDispose(_ctx);
                 if (scalar == null || scalar is DBNull)
                     return Task.FromResult(default(TResult)!);
                 return Task.FromResult(ConvertScalarResult<TResult>(scalar));
@@ -1911,7 +1911,7 @@ namespace nORM.Query
             foreach (var p in parameters)
                 cmd.AddOptimizedParam(p.Key, p.Value);
 
-            var scalar = cmd.ExecuteScalarWithInterception(_ctx);
+            var scalar = cmd.ExecuteScalarWithInterceptionSerializedAndDispose(_ctx);
             sw?.Stop();
             if (sw != null)
                 _ctx.Options.Logger?.LogQuery(sql, parameters, sw.Elapsed, scalar == null || scalar is DBNull ? 0 : 1);
@@ -2082,7 +2082,7 @@ namespace nORM.Query
                 object? result;
                 if (plan.IsScalar)
                 {
-                    var scalarResult = cmd.ExecuteScalarWithInterception(_ctx);
+                    var scalarResult = cmd.ExecuteScalarWithInterceptionSerializedAndDispose(_ctx);
                     sw?.Stop();
                     _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw?.Elapsed ?? default, scalarResult == null || scalarResult is DBNull ? 0 : 1);
                     if (scalarResult == null || scalarResult is DBNull)

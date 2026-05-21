@@ -40,7 +40,7 @@ public class CountFastPathCoverageTests
         Assert.Equal(2, count);
         Assert.Contains("SELECT COUNT(*)", interceptor.LastCommandText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("\"IsActive\"", interceptor.LastCommandText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("= 1", interceptor.LastCommandText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("= 1", interceptor.LastCommandText, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(interceptor.LastParameters);
     }
 

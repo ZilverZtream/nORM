@@ -30,6 +30,16 @@ namespace nORM.Providers
         public override bool PrefersSyncExecution => true;
 
         /// <summary>
+        /// Bare boolean predicates avoid steering SQLite toward low-selectivity boolean indexes
+        /// when a more selective conjunct is available.
+        /// </summary>
+        public override bool PrefersBareBooleanPredicates => true;
+
+        /// <inheritdoc />
+        public override string FormatBooleanPredicate(string expressionSql, bool expectedValue)
+            => expectedValue ? expressionSql : $"NOT ({expressionSql})";
+
+        /// <summary>
         /// SQLite's <c>IS</c> operator provides null-safe equality with index support.
         /// <c>col IS @p</c> is equivalent to <c>col = @p OR (col IS NULL AND @p IS NULL)</c>
         /// but allows the query planner to use column indexes efficiently.

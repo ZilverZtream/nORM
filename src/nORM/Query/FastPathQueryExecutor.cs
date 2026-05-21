@@ -265,9 +265,9 @@ namespace nORM.Query
                 if (isNull)
                     sql += $" WHERE {column.EscCol} IS NULL";
                 else if (isBoolTrue)
-                    sql += $" WHERE {column.EscCol} = {ctx.Provider.BooleanTrueLiteral}";
+                    sql += $" WHERE {ctx.Provider.FormatBooleanPredicate(column.EscCol, expectedValue: true)}";
                 else if (isBoolFalse)
-                    sql += $" WHERE {column.EscCol} = {ctx.Provider.BooleanFalseLiteral}";
+                    sql += $" WHERE {ctx.Provider.FormatBooleanPredicate(column.EscCol, expectedValue: false)}";
                 else
                     sql += $" WHERE {column.EscCol} = {ctx.Provider.ParamPrefix}p0";
                 if (takeCount.HasValue)
@@ -318,15 +318,26 @@ namespace nORM.Query
         {
             var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
             var materializer = GetSyncMaterializer<T>(ctx);
-            await using var command = cmd;
             if (sync)
             {
-                using var reader = command.ExecuteReader();
-                while (reader.Read())
-                    results.Add(materializer(reader));
+                var commandLifetimeTransferred = false;
+                try
+                {
+                    commandLifetimeTransferred = true;
+                    using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+                    while (reader.Read())
+                        results.Add(materializer(reader));
+                }
+                catch
+                {
+                    if (!commandLifetimeTransferred)
+                        cmd.Dispose();
+                    throw;
+                }
             }
             else
             {
+                await using var command = cmd;
                 await using var asyncReader = await command.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
                 while (await asyncReader.ReadAsync(ct).ConfigureAwait(false))
                     results.Add(materializer(asyncReader));

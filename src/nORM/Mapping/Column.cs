@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -34,6 +35,8 @@ namespace nORM.Mapping
         public readonly bool IsTimestamp;
         /// <summary>Indicates whether this column represents a shadow property not defined on the entity type.</summary>
         public readonly bool IsShadow;
+        /// <summary>Indicates whether the mapped value can be null according to CLR metadata.</summary>
+        public readonly bool IsNullable;
         /// <summary>Name of the principal type if this column is a foreign key, otherwise <c>null</c>.</summary>
         public readonly string? ForeignKeyPrincipalTypeName;
         /// <summary>Delegate used to read the property value from an entity instance.</summary>
@@ -70,6 +73,7 @@ namespace nORM.Mapping
             IsKey = (fluentConfig?.KeyProperties.Any(p => p == info.Property) ?? false) || info.IsKey;
             IsTimestamp = info.IsTimestamp;
             IsDbGenerated = info.IsDbGenerated;
+            IsNullable = prefix != null || DetermineIsNullable(info.Property);
             ForeignKeyPrincipalTypeName = info.ForeignKeyName;
             if (ForeignKeyPrincipalTypeName == null && !IsKey)
             {
@@ -122,6 +126,7 @@ namespace nORM.Mapping
             IsKey = (fluentConfig?.KeyProperties.Any(p => p == pi) ?? false) || pi.GetCustomAttribute<KeyAttribute>() != null;
             IsTimestamp = pi.GetCustomAttribute<TimestampAttribute>() != null;
             IsDbGenerated = pi.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity;
+            IsNullable = prefix != null || DetermineIsNullable(pi);
             ForeignKeyPrincipalTypeName = pi.GetCustomAttribute<ForeignKeyAttribute>()?.Name;
             if (ForeignKeyPrincipalTypeName == null && !IsKey)
             {
@@ -167,6 +172,7 @@ namespace nORM.Mapping
             IsKey = false;
             IsTimestamp = false;
             IsDbGenerated = false;
+            IsNullable = !clrType.IsValueType || Nullable.GetUnderlyingType(clrType) != null;
             ForeignKeyPrincipalTypeName = null;
             var propName = name;
             if (propName.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && propName.Length > 2)
@@ -185,6 +191,52 @@ namespace nORM.Mapping
             Setter = (e, v) => ShadowPropertyStore.Set(e, name, v);
             SetterMethod = Methods.SetShadowValue;
             IsShadow = true;
+        }
+
+        private static readonly NullabilityInfoContext? s_nullabilityContext = CreateNullabilityContext();
+        private static readonly object s_nullabilityContextLock = new();
+
+        private static NullabilityInfoContext? CreateNullabilityContext()
+        {
+            try { return new NullabilityInfoContext(); }
+            catch (Exception ex) when (ex is NotSupportedException or TypeLoadException)
+            {
+                return null;
+            }
+        }
+
+        private static bool DetermineIsNullable(PropertyInfo property)
+        {
+            var propertyType = property.PropertyType;
+            if (Nullable.GetUnderlyingType(propertyType) != null)
+                return true;
+            if (propertyType.IsValueType)
+                return false;
+            if (property.GetCustomAttribute<RequiredAttribute>() != null ||
+                property.GetCustomAttribute<DisallowNullAttribute>() != null)
+                return false;
+            if (property.GetCustomAttribute<AllowNullAttribute>() != null ||
+                property.GetCustomAttribute<MaybeNullAttribute>() != null)
+                return true;
+
+            try
+            {
+                NullabilityState? state;
+                lock (s_nullabilityContextLock)
+                {
+                    state = s_nullabilityContext?.Create(property).WriteState;
+                }
+                if (state == NullabilityState.NotNull)
+                    return false;
+                if (state == NullabilityState.Nullable)
+                    return true;
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException)
+            {
+                // Dynamic/emitted properties can lack complete nullable metadata.
+            }
+
+            return true;
         }
 
         /// <summary>

@@ -65,6 +65,18 @@ namespace nORM.Providers
         public virtual bool PrefersSyncExecution => false;
 
         /// <summary>
+        /// Returns true when bare boolean predicates such as <c>WHERE IsActive</c> and
+        /// <c>WHERE NOT IsActive</c> are valid and preferred over equality-to-literal forms.
+        /// </summary>
+        public virtual bool PrefersBareBooleanPredicates => false;
+
+        /// <summary>
+        /// Formats a SQL predicate that tests a non-nullable boolean expression for the expected value.
+        /// </summary>
+        public virtual string FormatBooleanPredicate(string expressionSql, bool expectedValue)
+            => $"{expressionSql} = {(expectedValue ? BooleanTrueLiteral : BooleanFalseLiteral)}";
+
+        /// <summary>
         /// Returns true when the provider uses TOP(n)/OFFSET-FETCH paging syntax (SQL Server style).
         /// Providers using LIMIT return false. Used by the fast-path query executor to emit the
         /// correct paging fragment without inspecting the provider type name.

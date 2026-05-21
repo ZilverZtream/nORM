@@ -81,52 +81,16 @@ namespace nORM.Internal
             where TContext : DbContext
             where T : class
         {
-            Func<TContext, TParam, Task<List<T>>>? result = null;
-            Exception? compileException = null;
-
-            // Acquire one compile slot before launching the task.
-            // The slot is released inside the task's finally block (not when the caller times out),
-            // so concurrent in-flight compiles never exceed _compileSemaphoreCapacity even under
-            // repeated hostile-timeout pressure. Expression.Compile() is not interruptible, but
-            // bounding concurrency prevents unbounded thread-pool growth.
-            var task = Task.Run(() =>
-            {
-                _compileSemaphore.Wait(token); // cancellable wait; if cancelled, task faults without acquiring semaphore
-                try
-                {
-                    result = CompileQueryInternal<TContext, TParam, T>(queryExpression);
-                }
-                catch (Exception ex)
-                {
-                    compileException = ex;
-                }
-                finally
-                {
-                    _compileSemaphore.Release();
-                }
-            }, token);
-
+            _compileSemaphore.Wait();
             try
             {
-                task.Wait(token);
+                token.ThrowIfCancellationRequested();
+                return CompileQueryInternal<TContext, TParam, T>(queryExpression);
             }
-            catch (OperationCanceledException ex)
+            finally
             {
-                throw new TimeoutException("Expression compilation timed out", ex);
+                _compileSemaphore.Release();
             }
-            catch (AggregateException ae) when (ae.InnerException is OperationCanceledException oce)
-            {
-                // task.Wait throws AggregateException when the task itself is canceled or
-                // faults with OperationCanceledException (e.g., _compileSemaphore.Wait(token)
-                // inside Task.Run threw OCE while the caller token fired). Unwrap and rethrow
-                // as TimeoutException to match the OperationCanceledException catch above.
-                throw new TimeoutException("Expression compilation timed out", oce);
-            }
-
-            if (compileException != null)
-                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(compileException).Throw();
-
-            return result!;
         }
 
         private static Func<TContext, TParam, Task<List<T>>> CompileQueryInternal<TContext, TParam, T>(Expression<Func<TContext, TParam, IQueryable<T>>> queryExpression)
