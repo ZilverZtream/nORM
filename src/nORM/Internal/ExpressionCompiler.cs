@@ -27,10 +27,6 @@ namespace nORM.Internal
         // Sequential callers (common case) reuse the same command from the pool with zero contention.
         public readonly System.Collections.Concurrent.ConcurrentQueue<System.Data.Common.DbCommand> CommandPool = new();
         public int FixedParamCount;
-        // Per-context plan-cache key. Written once (lazily) on the first call from this context.
-        // Stored here so concurrent different-context callers never share a key slot and cannot
-        // overwrite each other's key — eliminating the shared-closure ctxKey race.
-        public string? CachedCtxKey;
     }
 
     internal static class ExpressionCompiler
@@ -54,6 +50,13 @@ namespace nORM.Internal
         // Exposed for deterministic test assertions (bounded-worker proof).
         internal static int CompileSemaphoreCurrentCount => _compileSemaphore.CurrentCount;
         internal static int CompileSemaphoreCapacity => _compileSemaphoreCapacity;
+
+        private sealed class CompiledQueryContextState
+        {
+            public string? StableCtxKey;
+            public CompiledQueryState? StableState;
+            public readonly ConcurrentLruCache<string, CompiledQueryState> DynamicStates = new(PlanCacheCapacity);
+        }
 
         public static Func<T, TResult> CompileExpression<T, TResult>(Expression<Func<T, TResult>> expr)
         {
@@ -104,73 +107,40 @@ namespace nORM.Internal
             // Shared plan cache (thread-safe ConcurrentLruCache, keyed by context shape string).
             var plansByCtx = new ConcurrentLruCache<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams)>(PlanCacheCapacity);
             // Per-context pooled state via ConditionalWeakTable.
-            // Each DbContext gets its own CompiledQueryState (CommandPool + per-ctx key cache).
-            // Prevents cross-connection command contamination and eliminates shared-state key races.
+            // Each DbContext gets its own context-state container. Stable contexts use a single
+            // cached command pool; tenant/global-filter contexts keep one command pool per computed
+            // plan key so changed filter values cannot reuse commands prepared for an older plan.
             // ConditionalWeakTable provides automatic GC-tracked lifetime.
-            var stateByCtx = new System.Runtime.CompilerServices.ConditionalWeakTable<DbContext, CompiledQueryState>();
+            var stateByCtx = new System.Runtime.CompilerServices.ConditionalWeakTable<DbContext, CompiledQueryContextState>();
             // Single-slot fast-path HINTS for the common case of repeated calls on the same ctx.
             // These vars are NOT synchronized — races cause a ConditionalWeakTable lookup (minor perf hit),
-            // not a correctness failure, because correctness depends on per-ctx state (state.CachedCtxKey),
-            // not on these shared hints.
+            // not a correctness failure, because correctness depends on the per-ctx context state.
             DbContext? fastCtxOwner = null;
-            CompiledQueryState? fastCtxState = null;
+            CompiledQueryContextState? fastCtxState = null;
 
             return (ctx, value) =>
             {
                 // ── 1. Resolve per-context state (thread-safe via ConditionalWeakTable) ──────
-                // State stores CachedCtxKey (per-ctx plan key) and CommandPool.
                 // Fast-path: same ctx as last call → direct field read (unsynchronized hint).
                 // Race consequence: stale miss → falls back to GetOrCreateValue (correct, O(1)).
-                CompiledQueryState state;
+                CompiledQueryContextState contextState;
                 if (ReferenceEquals(fastCtxOwner, ctx) && fastCtxState != null)
                 {
-                    state = fastCtxState;
+                    contextState = fastCtxState;
                 }
                 else
                 {
-                    state = stateByCtx.GetOrCreateValue(ctx);
+                    contextState = stateByCtx.GetOrCreateValue(ctx);
                     fastCtxOwner = ctx;   // unsynchronized hint — safe (performance only)
-                    fastCtxState = state; // unsynchronized hint — safe (performance only)
+                    fastCtxState = contextState; // unsynchronized hint — safe (performance only)
                 }
 
-                // ── 2. Get or compute plan-cache key (per-context, no sharing) ──────────────
-                // CachedCtxKey is stored in state (per-ctx). Only written once (lazily on first
-                // invocation for this ctx). No two contexts share a state object, so there is no
-                // cross-context key race.
-                string ctxKey;
-                if (state.CachedCtxKey != null)
-                {
-                    ctxKey = state.CachedCtxKey;
-                }
-                else
-                {
-                    var tenantId = ctx.Options.TenantProvider?.GetCurrentTenantId();
-                    // Use GetFilterKey() instead of f.ToString().
-                    // f.ToString() is shape-only — same string regardless of captured closure value.
-                    // ExpressionFingerprint alone also misses closure values: it hashes the closure
-                    // object reference (whose ToString() is the type name), not the actual field values.
-                    // GetFilterKey() combines the shape fingerprint with a recursive extraction of all
-                    // closure-accessed field values so two lambdas with the same shape but different
-                    // captured values (e.g., tenantId=1 vs tenantId=2) produce distinct cache keys.
-                    // Tenant segment: "TENANT:NULL:" when provider is set but returns null,
-                    // vs empty string when no provider — prevents cross-tenant plan sharing.
-                    // X1: Include the runtime type in the key so objects of different types
-                    // that produce the same ToString() (e.g. int 1 vs string "1") yield
-                    // distinct cache keys and cannot cross-pollinate compiled plans.
-                    var tenantSegment = ctx.Options.TenantProvider != null
-                        ? (tenantId == null
-                            ? "TENANT:NULL:"
-                            : string.Concat("TENANT:", tenantId.GetType().FullName, ":", tenantId, ":"))
-                        : "";
-                    ctxKey = string.Concat(
-                        ctx.Provider.GetType().FullName, "|",
-                        ctx.GetMappingHash().ToString(), "|",
-                        tenantSegment, "|",
-                        ctx.Options.GlobalFilters.Count > 0
-                            ? string.Join(";", ctx.Options.GlobalFilters.SelectMany(kvp => kvp.Value.Select(GetFilterKey)))
-                            : "");
-                    state.CachedCtxKey = ctxKey; // per-ctx: no sharing, no race
-                }
+                // ── 2. Get plan-cache key and matching command-pool state ───────────────────
+                // Contexts without tenant/global filters keep the old single cached key/state for
+                // the hot benchmark path. Contexts with dynamic filter inputs recompute the key on
+                // every call and select a matching command pool, preventing stale tenant/filter
+                // values and stale prepared commands when the provider value changes in-place.
+                var (ctxKey, state) = ResolveContextPlanState(ctx, contextState);
 
                 // ── 3. Look up or build the query plan (thread-safe ConcurrentLruCache) ──────
                 // Use GetOrAdd so evicted entries are recomputed on demand; concurrent misses
@@ -339,6 +309,66 @@ namespace nORM.Internal
                 return ctx.GetQueryProvider().ExecuteCompiledPooledAsync<List<T>>(
                     cachedPlan!, args, invEntry.FixedParams, state, default);
             };
+        }
+
+        private static (string CtxKey, CompiledQueryState State) ResolveContextPlanState(
+            DbContext ctx, CompiledQueryContextState contextState)
+        {
+            if (ctx.Options.TenantProvider == null && ctx.Options.GlobalFilters.Count == 0)
+            {
+                var stableKey = contextState.StableCtxKey;
+                var stableState = contextState.StableState;
+                if (stableKey != null && stableState != null)
+                    return (stableKey, stableState);
+
+                lock (contextState)
+                {
+                    stableKey = contextState.StableCtxKey;
+                    stableState = contextState.StableState;
+                    if (stableKey == null || stableState == null)
+                    {
+                        stableKey = BuildContextPlanKey(ctx);
+                        stableState = new CompiledQueryState();
+                        contextState.StableCtxKey = stableKey;
+                        contextState.StableState = stableState;
+                    }
+
+                    return (stableKey, stableState);
+                }
+            }
+
+            var ctxKey = BuildContextPlanKey(ctx);
+            return (ctxKey, contextState.DynamicStates.GetOrAdd(ctxKey, _ => new CompiledQueryState()));
+        }
+
+        private static string BuildContextPlanKey(DbContext ctx)
+        {
+            var tenantId = ctx.Options.TenantProvider?.GetCurrentTenantId();
+            // Use GetFilterKey() instead of f.ToString().
+            // f.ToString() is shape-only — same string regardless of captured closure value.
+            // ExpressionFingerprint alone also misses closure values: it hashes the closure
+            // object reference (whose ToString() is the type name), not the actual field values.
+            // GetFilterKey() combines the shape fingerprint with a recursive extraction of all
+            // closure-accessed field values so two lambdas with the same shape but different
+            // captured values (e.g., tenantId=1 vs tenantId=2) produce distinct cache keys.
+            // Tenant segment: "TENANT:NULL:" when provider is set but returns null,
+            // vs empty string when no provider — prevents cross-tenant plan sharing.
+            // X1: Include the runtime type in the key so objects of different types
+            // that produce the same ToString() (e.g. int 1 vs string "1") yield
+            // distinct cache keys and cannot cross-pollinate compiled plans.
+            var tenantSegment = ctx.Options.TenantProvider != null
+                ? (tenantId == null
+                    ? "TENANT:NULL:"
+                    : string.Concat("TENANT:", tenantId.GetType().FullName, ":", tenantId, ":"))
+                : "";
+
+            return string.Concat(
+                ctx.Provider.GetType().FullName, "|",
+                ctx.GetMappingHash().ToString(), "|",
+                tenantSegment, "|",
+                ctx.Options.GlobalFilters.Count > 0
+                    ? string.Join(";", ctx.Options.GlobalFilters.SelectMany(kvp => kvp.Value.Select(GetFilterKey)))
+                    : "");
         }
 
         /// <summary>

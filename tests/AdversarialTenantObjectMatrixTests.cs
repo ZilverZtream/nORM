@@ -181,8 +181,6 @@ public class AdversarialTenantObjectMatrixTests
     //
     // A mutable tenant provider whose CurrentId changes between contexts.
     // Each new DbContext built with a different CurrentId gets its own plan.
-    // (Within the same context, the cache key is pinned to the first call;
-    // to pick up a changed tenant value the caller must create a new context.)
 
     [Fact]
     public async Task MutableTenantId_NewContextPerState_GetsCorrectPlan()
@@ -216,6 +214,33 @@ public class AdversarialTenantObjectMatrixTests
         var res2 = await compiled(ctxB, 1);
         Assert.Single(res2);
         Assert.Equal("mutated", res2[0].TenantId);
+    }
+
+    [Fact]
+    public async Task MutableTenantId_SameContext_RecomputesCompiledPlanKey()
+    {
+        using var cn = OpenDb();
+        Seed(cn, 1, "initial", "initial-row");
+        Seed(cn, 2, "mutated", "mutated-row");
+
+        var mutable = new MutableTenant { CurrentId = "initial" };
+        await using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions
+        {
+            TenantProvider   = mutable,
+            TenantColumnName = "TenantId"
+        });
+
+        var compiled = _compiledAtomRow;
+
+        var initial = await compiled(ctx, 1);
+        Assert.Single(initial);
+        Assert.Equal("initial", initial[0].TenantId);
+
+        mutable.CurrentId = "mutated";
+
+        var mutated = await compiled(ctx, 1);
+        Assert.Single(mutated);
+        Assert.Equal("mutated", mutated[0].TenantId);
     }
 
     // ── ATOM-4: Culture-sensitive decimal tenant string ───────────────────────
