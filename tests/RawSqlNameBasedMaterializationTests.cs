@@ -174,4 +174,26 @@ public class RawSqlNameBasedMaterializationTests
             Assert.Contains("Code", ex.Message);
         }
     }
+
+    /// <summary>
+    /// Duplicate projected column names are ambiguous for name-based materialization.
+    /// A later duplicate must not silently overwrite the earlier ordinal and corrupt
+    /// the mapped property value.
+    /// </summary>
+    [Fact]
+    public async Task QueryUnchangedAsync_DuplicateMappedColumnName_ThrowsInvalidOperationException()
+    {
+        var (cn, ctx) = CreateContext(
+            "CREATE TABLE NamedCol (Id INTEGER PRIMARY KEY, Code TEXT NOT NULL, Name TEXT NOT NULL);" +
+            "INSERT INTO NamedCol VALUES (1, 'C001', 'Alpha');");
+        await using (cn) await using (ctx)
+        {
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                ctx.QueryUnchangedAsync<NamedColEntity>(
+                    "SELECT \"Id\", \"Code\", \"Name\" AS \"Code\", \"Name\" FROM \"NamedCol\""));
+
+            Assert.Contains("Code", ex.Message);
+            Assert.Contains("multiple", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+    }
 }
