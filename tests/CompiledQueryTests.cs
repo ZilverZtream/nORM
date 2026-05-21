@@ -24,6 +24,11 @@ public class CompiledQueryTests
         public string City { get; set; } = string.Empty;
     }
 
+    private sealed class MutableIdHolder
+    {
+        public int[] Values { get; set; } = Array.Empty<int>();
+    }
+
     [Fact]
     public async Task Compiled_query_executes_with_different_parameters()
     {
@@ -128,6 +133,36 @@ public class CompiledQueryTests
         var result = await compiled(ctx, 1);
         Assert.Single(result);
         Assert.Equal("Alice", result[0].Name);
+    }
+
+    [Fact]
+    public async Task Compiled_query_captured_collection_change_rebuilds_plan()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Person(Id INTEGER, Name TEXT);" +
+                             "INSERT INTO Person VALUES(1,'Alice');" +
+                             "INSERT INTO Person VALUES(2,'Bob');" +
+                             "INSERT INTO Person VALUES(3,'Carol');";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var holder = new MutableIdHolder { Values = new[] { 1 } };
+        var compiled = Norm.CompileQuery((DbContext ctx2, int _) =>
+            ctx2.Query<Person>().Where(p => holder.Values.Contains(p.Id)));
+
+        var first = await compiled(ctx, 0);
+        Assert.Single(first);
+        Assert.Equal("Alice", first[0].Name);
+
+        holder.Values = new[] { 2, 3 };
+        var second = await compiled(ctx, 0);
+
+        Assert.Equal(2, second.Count);
+        Assert.DoesNotContain(second, p => p.Id == 1);
     }
 }
 

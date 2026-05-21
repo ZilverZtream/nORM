@@ -211,6 +211,7 @@ namespace nORM.Internal
             // not a correctness failure, because correctness depends on the per-ctx context state.
             DbContext? fastCtxOwner = null;
             CompiledQueryContextState? fastCtxState = null;
+            var expressionKeyCanChange = HasClosureValues(queryExpression.Body);
 
             return (ctx, value) =>
             {
@@ -234,7 +235,8 @@ namespace nORM.Internal
                 // the hot benchmark path. Contexts with dynamic filter inputs recompute the key on
                 // every call and select a matching command pool, preventing stale tenant/filter
                 // values and stale prepared commands when the provider value changes in-place.
-                var (ctxKey, state) = ResolveContextPlanState(ctx, contextState);
+                var expressionKey = expressionKeyCanChange ? GetFilterKey(queryExpression) : null;
+                var (ctxKey, state) = ResolveContextPlanState(ctx, contextState, expressionKey);
 
                 // ── 3. Look up or build the query plan (thread-safe ConcurrentLruCache) ──────
                 // Use GetOrAdd so evicted entries are recomputed on demand; concurrent misses
@@ -434,9 +436,9 @@ namespace nORM.Internal
         }
 
         private static (string CtxKey, CompiledQueryState State) ResolveContextPlanState(
-            DbContext ctx, CompiledQueryContextState contextState)
+            DbContext ctx, CompiledQueryContextState contextState, string? expressionKey)
         {
-            if (ctx.Options.TenantProvider == null && ctx.Options.GlobalFilters.Count == 0)
+            if (ctx.Options.TenantProvider == null && ctx.Options.GlobalFilters.Count == 0 && expressionKey == null)
             {
                 var stableKey = contextState.StableCtxKey;
                 var stableState = contextState.StableState;
@@ -460,6 +462,8 @@ namespace nORM.Internal
             }
 
             var ctxKey = BuildContextPlanKey(ctx);
+            if (expressionKey != null)
+                ctxKey = string.Concat(ctxKey, "|EXPR:", expressionKey);
             return (ctxKey, contextState.DynamicStates.GetOrAdd(ctxKey, _ => new CompiledQueryState()));
         }
 
@@ -493,6 +497,40 @@ namespace nORM.Internal
                     : "");
         }
 
+        private static bool HasClosureValues(Expression expression)
+        {
+            var detector = new ClosureValueDetector();
+            detector.Visit(expression);
+            return detector.Found;
+        }
+
+        private sealed class ClosureValueDetector : ExpressionVisitor
+        {
+            public bool Found { get; private set; }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (Found)
+                    return node;
+
+                if (HasConstantRoot(node) && QueryTranslator.TryGetConstantValue(node, out _))
+                {
+                    Found = true;
+                    return node;
+                }
+
+                return base.VisitMember(node);
+            }
+        }
+
+        private static bool HasConstantRoot(MemberExpression node)
+        {
+            Expression? current = node.Expression;
+            while (current is MemberExpression member)
+                current = member.Expression;
+            return current is ConstantExpression;
+        }
+
         /// <summary>
         /// Builds a cache key for a global filter expression that captures both
         /// expression shape and closure-captured runtime values.
@@ -519,7 +557,7 @@ namespace nORM.Internal
                 // Include runtime type so objects of different types with the same ToString()
                 // (e.g. int vs string) produce distinct cache key segments. Evaluating the full
                 // member expression covers common holder patterns such as tenant.CurrentId.
-                sb.Append(evaluated == null ? "null" : string.Concat(evaluated.GetType().FullName, ":", evaluated));
+                AppendClosureValue(evaluated, sb);
                 sb.Append(';');
                 return;
             }
@@ -549,6 +587,35 @@ namespace nORM.Internal
                     if (mem.Expression != null) AppendClosureValues(mem.Expression, sb);
                     break;
             }
+        }
+
+        private static void AppendClosureValue(object? value, StringBuilder sb)
+        {
+            if (value == null)
+            {
+                sb.Append("null");
+                return;
+            }
+
+            sb.Append(value.GetType().FullName).Append(':');
+            if (value is System.Collections.IEnumerable enumerable &&
+                value is not string &&
+                value is not byte[] &&
+                value is not IQueryable)
+            {
+                sb.Append('[');
+                var first = true;
+                foreach (var item in enumerable)
+                {
+                    if (!first) sb.Append(',');
+                    AppendClosureValue(item, sb);
+                    first = false;
+                }
+                sb.Append(']');
+                return;
+            }
+
+            sb.Append(value);
         }
 
         internal static object? Evaluate(Expression expression)
