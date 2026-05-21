@@ -56,7 +56,7 @@ public class AdversarialTenantFuzzTests
 
     private static SqliteConnection BuildDb()
     {
-        var cn = new SqliteConnection("Data Source=:memory:");
+        var cn = new SqliteConnection($"Data Source=tenant_fuzz_{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
         cn.Open();
         using var cmd = cn.CreateCommand();
         cmd.CommandText = @"
@@ -73,9 +73,10 @@ public class AdversarialTenantFuzzTests
     private static DbContext BuildTenantContext(SqliteConnection cn, string tenantId)
     {
         // TenantColumnName defaults to "TenantId" which matches FuzzRow.TenantId.
-        // ownsConnection:false — the test holds the shared connection; the context must not close it.
+        // Each context owns a separate connection into the same shared in-memory database.
+        var contextConnection = new SqliteConnection(cn.ConnectionString);
         var opts = new DbContextOptions { TenantProvider = new StringTenantProvider(tenantId) };
-        return new DbContext(cn, new SqliteProvider(), opts, ownsConnection: false);
+        return new DbContext(contextConnection, new SqliteProvider(), opts);
     }
 
     private static async Task<List<string>> DirectQueryNamesAsync(SqliteConnection cn, string tenantId)
