@@ -56,3 +56,13 @@ from `BenchmarkDotNet.Artifacts/results`. It writes
 the release commit, SDK/OS, raw report paths, driver package versions, redacted
 provider configuration, and fastest method per provider. Release automation runs
 this script after benchmark steps in `full` and `rc` modes.
+
+## Executable Thresholds
+
+`eng/benchmark-thresholds.json` is the versioned v1 benchmark budget file.
+`eng/check-benchmark-thresholds.ps1` reads the raw BenchmarkDotNet CSV reports
+and compares named nORM paths against the fastest matching Dapper, optimized Raw
+ADO, or EF baseline for the same provider. The RC release gate runs this check
+as a hard pass/fail step after generating benchmark evidence. `full` mode runs
+the same checker with missing provider-matrix rules allowed so local evidence
+smoke runs do not pretend to validate the full public benchmark claim.

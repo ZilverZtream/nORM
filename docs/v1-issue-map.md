@@ -63,7 +63,7 @@ still needs release evidence.
 | 35 | Complete logging and redaction coverage | Verified | `LogQuery`, CLI connection-string validation, and the built-in command interceptor now have tests proving SQL literals, parameter values, scalar results, and connection-string secrets are not emitted by default; docs cover benchmark/release artifact boundaries. |
 | 36 | Freeze interceptor semantics | Verified | Command interceptor ordering, mutation visibility, suppression notifications, and failure propagation now have contract tests; docs define the suppression and mutation rules. |
 | 37 | Rebuild benchmark evidence before any performance launch | Verified | Release gate now generates a benchmark evidence manifest from raw BenchmarkDotNet reports, including commit, SDK/OS, driver packages, redacted provider configuration, report paths, and fastest methods by provider. |
-| 38 | Make benchmark thresholds executable | Open | Governance docs exist; versioned threshold files and gate enforcement remain open. |
+| 38 | Make benchmark thresholds executable | Verified | `eng/benchmark-thresholds.json` defines versioned latency/allocation budgets, `eng/check-benchmark-thresholds.ps1` enforces them from raw BenchmarkDotNet CSV reports, and the release gate runs the checker after benchmark evidence. |
 | 39 | Reduce test-suite entropy before v1 | In Progress | Build is warning-free; test-result hygiene and coverage-test consolidation remain open. |
 | 40 | Run and publish a real RC release gate | Open | Requires `eng/v1-release-gate.ps1 -Mode rc -MinLiveProviders 3` artifacts. |
 
