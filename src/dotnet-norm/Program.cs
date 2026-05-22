@@ -24,7 +24,7 @@ using nORM.Security;
 var root = new RootCommand("Command line tools for the nORM ORM framework");
 
 // scaffold command
-var scaffold = new Command("scaffold", "Scaffold entity classes and a DbContext from an existing database.\nExample:\n  norm scaffold --connection \"Server=.;Database=AppDb;Trusted_Connection=True;\" --provider sqlserver --output Models");
+var scaffold = new Command("scaffold", "Preview: scaffold entity classes and a DbContext from an existing database.\nExample:\n  norm scaffold --connection \"Server=.;Database=AppDb;Trusted_Connection=True;\" --provider sqlserver --output Models");
 var connOpt = new Option<string>("--connection") { Description = "Database connection string. e.g. 'Server=.;Database=AppDb;Trusted_Connection=True;'", Required = true };
 var providerOpt = new Option<string>("--provider") { Description = "Database provider (sqlserver, sqlite, postgres, mysql)", Required = true };
 var outputOpt = new Option<string>("--output") { Description = "Output directory for generated code", DefaultValueFactory = _ => "." };

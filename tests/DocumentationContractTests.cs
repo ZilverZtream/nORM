@@ -67,6 +67,22 @@ public class DocumentationContractTests
         Assert.Contains("Partial", contract, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Readme_links_to_scaffolding_preview_contract()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "scaffolding.md"));
+
+        Assert.Contains("docs/scaffolding.md", readme, StringComparison.Ordinal);
+        Assert.Contains("preview", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SQL Server", contract, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL", contract, StringComparison.Ordinal);
+        Assert.Contains("MySQL", contract, StringComparison.Ordinal);
+        Assert.Contains("SQLite", contract, StringComparison.Ordinal);
+        Assert.Contains("Relationship", contract, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

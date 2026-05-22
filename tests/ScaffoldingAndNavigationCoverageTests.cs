@@ -493,19 +493,13 @@ public class DatabaseScaffolderPrivateMethodTests
     [Fact]
     public async Task ScaffoldAsync_EmptyDatabase_ThrowsOrWritesContextFile()
     {
-        // Microsoft.Data.Sqlite does not support GetSchema("Tables"); ScaffoldAsync will throw
-        // ArgumentException in that case. We verify the guard arguments pass and the method
-        // either succeeds or fails specifically because of the SQLite schema limitation.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
         try
         {
-            // Either succeeds (future SQLite driver) or throws ArgumentException (no Tables schema)
-            var ex = await Record.ExceptionAsync(() =>
-                DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "TestCtx"));
-            Assert.True(ex == null || ex is ArgumentException,
-                $"Expected success or ArgumentException, got: {ex?.GetType().Name}: {ex?.Message}");
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "TestCtx");
+            Assert.True(File.Exists(Path.Combine(dir, "TestCtx.cs")));
         }
         finally
         {
@@ -516,8 +510,6 @@ public class DatabaseScaffolderPrivateMethodTests
     [Fact]
     public async Task ScaffoldAsync_WithTable_ThrowsOrWritesFiles()
     {
-        // Microsoft.Data.Sqlite does not support GetSchema("Tables"). We verify the method
-        // fails specifically on that limitation rather than on argument validation.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var cmd = cn.CreateCommand();
@@ -527,14 +519,9 @@ public class DatabaseScaffolderPrivateMethodTests
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
         try
         {
-            var ex = await Record.ExceptionAsync(() =>
-                DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "MyCtx2"));
-            Assert.True(ex == null || ex is ArgumentException,
-                $"Expected success or ArgumentException, got: {ex?.GetType().Name}: {ex?.Message}");
-            if (ex == null)
-            {
-                Assert.True(File.Exists(Path.Combine(dir, "MyCtx2.cs")));
-            }
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "MyCtx2");
+            Assert.True(File.Exists(Path.Combine(dir, "MyCtx2.cs")));
+            Assert.True(File.Exists(Path.Combine(dir, "Sanwidget2.cs")));
         }
         finally
         {
