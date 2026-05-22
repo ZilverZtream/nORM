@@ -167,7 +167,7 @@ namespace nORM.Enterprise
         /// <inheritdoc />
         public virtual Task ScalarExecutedAsync(DbCommand command, DbContext context, object? result, TimeSpan duration, CancellationToken cancellationToken)
         {
-            Logger.LogInformation("Executed scalar in {Duration}ms, result {Result}", duration.TotalMilliseconds, result);
+            Logger.LogInformation("Executed scalar in {Duration}ms", duration.TotalMilliseconds);
             return Task.CompletedTask;
         }
 

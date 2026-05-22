@@ -885,14 +885,18 @@ Evidence:
 
 - `ConnectionStringValidator` has redaction support.
 - Logging docs exist.
-- Raw benchmark/release artifacts can include connection configuration summaries.
+- Runtime tests prove `LogQuery` redacts SQL literals and parameter values.
+- Interceptor tests prove the built-in command interceptor redacts command text
+  and does not log scalar result values.
+- CLI tests prove validated execution strings remain separate from redacted
+  diagnostics.
+- Logging docs define the benchmark/release artifact boundary: provider names,
+  versions, commands, and result files only; never `NORM_TEST_*` values.
 
 Scope:
 
-- Audit every log/error path for secrets.
-- Add tests for redaction in CLI, runtime logging, benchmark summaries, and
-  release artifacts.
-- Define what is never logged.
+- Keep runtime logging, CLI, interceptor, and release-artifact redaction tests.
+- Keep sensitive-data logging as an explicit application-owned decision.
 
 Done when:
 

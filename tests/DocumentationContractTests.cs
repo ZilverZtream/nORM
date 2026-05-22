@@ -271,6 +271,8 @@ public class DocumentationContractTests
         Assert.Contains("Connection strings", contract, StringComparison.Ordinal);
         Assert.Contains("Command interceptors", contract, StringComparison.Ordinal);
         Assert.Contains("FromSqlInterpolatedAsync", contract, StringComparison.Ordinal);
+        Assert.Contains("scalar result values", contract, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NORM_TEST_*", contract, StringComparison.Ordinal);
     }
 
     [Fact]
