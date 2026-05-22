@@ -9,7 +9,7 @@ namespace nORM.Cli;
 
 public static class MigrationCodeWriter
 {
-    public static string WriteMigrationSource(string className, long version, string name, MigrationSqlStatements sql)
+    public static string WriteMigrationSource(string className, long version, string name, MigrationSqlStatements sql, IReadOnlyList<string>? warnings = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(className);
         ArgumentNullException.ThrowIfNull(name);
@@ -23,6 +23,13 @@ public static class MigrationCodeWriter
         sb.AppendLine($"public class {className} : Migration");
         sb.AppendLine("{");
         sb.AppendLine($"    public {className}() : base({version}, {ToCSharpStringLiteral(name)}) {{ }}");
+        if (warnings is { Count: > 0 })
+        {
+            sb.AppendLine();
+            sb.AppendLine("    // WARNING: destructive schema changes were detected when this migration was generated.");
+            foreach (var warning in warnings)
+                sb.AppendLine($"    // TODO: {warning}");
+        }
         AppendMethod("Up", sql.PreTransactionUp, sql.Up, sql.PostTransactionUp, sb);
         AppendMethod("Down", sql.PreTransactionDown, sql.Down, sql.PostTransactionDown, sb);
         sb.AppendLine("}");

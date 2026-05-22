@@ -461,6 +461,44 @@ namespace nORM.Migration
             || AddedIndexes.Count > 0 || DroppedIndexes.Count > 0
             || DroppedTables.Count > 0 || DroppedColumns.Count > 0
             || AddedForeignKeys.Count > 0 || DroppedForeignKeys.Count > 0;
+
+        /// <summary>
+        /// Indicates whether the diff contains table or column drops that can destroy data.
+        /// </summary>
+        public bool HasDestructiveChanges => DroppedTables.Count > 0 || DroppedColumns.Count > 0;
+
+        /// <summary>
+        /// Returns human-readable warnings for destructive operations in this diff.
+        /// </summary>
+        public IReadOnlyList<string> GetDestructiveChangeWarnings()
+        {
+            if (!HasDestructiveChanges)
+                return Array.Empty<string>();
+
+            var warnings = new List<string>(DroppedTables.Count + DroppedColumns.Count);
+            foreach (var table in DroppedTables)
+            {
+                warnings.Add($"Drop table '{table.Name}' will remove all data in that table. If this is a rename, replace the generated drop/create with a provider-specific rename operation.");
+            }
+
+            foreach (var (table, column) in DroppedColumns)
+            {
+                var candidate = AddedColumns
+                    .Where(x => string.Equals(x.Table.Name, table.Name, StringComparison.OrdinalIgnoreCase))
+                    .Select(x => x.Column)
+                    .FirstOrDefault(x =>
+                        string.Equals(x.ClrType, column.ClrType, StringComparison.OrdinalIgnoreCase) &&
+                        x.IsNullable == column.IsNullable);
+
+                var message = $"Drop column '{table.Name}.{column.Name}' will remove data in that column.";
+                if (candidate != null)
+                    message += $" Possible rename candidate: '{table.Name}.{candidate.Name}'.";
+                message += " If this is a rename, replace the generated drop/add with a provider-specific rename operation.";
+                warnings.Add(message);
+            }
+
+            return warnings;
+        }
     }
 
     /// <summary>

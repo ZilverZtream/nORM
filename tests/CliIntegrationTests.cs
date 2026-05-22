@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using nORM.Cli;
 using nORM.Migration;
 using Xunit;
@@ -55,6 +56,69 @@ public class CliIntegrationTests
             Assert.Contains("\\n", File.ReadAllText(generated), StringComparison.Ordinal);
 
             RunDotNet("build -c Release --no-restore --nologo", tempRoot);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
+    public void Migrations_add_requires_force_for_destructive_column_drop()
+    {
+        var root = FindRepositoryRoot();
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_cli_destructive_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(tempRoot, "CliModel.csproj"), ModelProjectXml(root), Encoding.UTF8);
+            File.WriteAllText(Path.Combine(tempRoot, "Model.cs"), RenameModelSource, Encoding.UTF8);
+
+            RunDotNet("build -c Release --nologo", tempRoot);
+
+            var migrationsDir = Path.Combine(tempRoot, "Migrations");
+            Directory.CreateDirectory(migrationsDir);
+            var oldSnapshot = new SchemaSnapshot
+            {
+                Tables =
+                {
+                    new TableSchema
+                    {
+                        Name = "Orders",
+                        Columns =
+                        {
+                            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true },
+                            new ColumnSchema { Name = "TotalCost", ClrType = typeof(decimal).FullName!, IsNullable = true }
+                        }
+                    }
+                }
+            };
+            File.WriteAllText(
+                Path.Combine(migrationsDir, "schema.snapshot.json"),
+                JsonSerializer.Serialize(oldSnapshot, new JsonSerializerOptions { WriteIndented = true }),
+                Encoding.UTF8);
+
+            var modelAssembly = Path.Combine(tempRoot, "bin", "Release", "net8.0", "CliModel.dll");
+            var blocked = RunCli(
+                $"migrations add RenameTotal --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)}",
+                root);
+
+            Assert.Equal(3, blocked.ExitCode);
+            Assert.Contains("Destructive schema changes detected", blocked.Stderr, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Orders.TotalCost", blocked.Stderr, StringComparison.Ordinal);
+            Assert.Empty(Directory.EnumerateFiles(migrationsDir, "Migration_*_RenameTotal.cs"));
+
+            var forced = RunCli(
+                $"migrations add RenameTotal --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)} --force",
+                root);
+
+            Assert.Equal(0, forced.ExitCode);
+            var generated = Directory.EnumerateFiles(migrationsDir, "Migration_*_RenameTotal.cs").Single();
+            var source = File.ReadAllText(generated);
+            Assert.Contains("WARNING: destructive schema changes", source, StringComparison.Ordinal);
+            Assert.Contains("Possible rename candidate", source, StringComparison.Ordinal);
+            Assert.Contains("Orders.TotalAmount", source, StringComparison.Ordinal);
         }
         finally
         {
@@ -164,6 +228,20 @@ public class CliIntegrationTests
 
             [Column("Value\"Column\\Line\nBreak")]
             public string Value { get; set; } = "";
+        }
+        """;
+
+    private const string RenameModelSource = """
+        using System.ComponentModel.DataAnnotations;
+        using System.ComponentModel.DataAnnotations.Schema;
+
+        [Table("Orders")]
+        public sealed class Order
+        {
+            [Key]
+            public int Id { get; set; }
+
+            public decimal? TotalAmount { get; set; }
         }
         """;
 
