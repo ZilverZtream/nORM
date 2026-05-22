@@ -366,7 +366,7 @@ namespace nORM.Query
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteCompiledPooledSlowAsync<TResult>(ensureTask, plan, parameterValues, fixedParams, state, ct);
 
-            if (_ctx.Provider.PrefersSyncExecution)
+            if (_ctx.Provider.PrefersSyncCompiledQueryExecution)
                 return ExecuteCompiledFreshSync<TResult>(plan, parameterValues, fixedParams);
 
             // Q1 fix: reuse pooled prepared command to avoid repeated allocations; create new if pool is empty
@@ -381,7 +381,7 @@ namespace nORM.Query
             if (plan.IsScalar)
                 return ReturnCommandToPool(state.CommandPool, cmd, ExecutePooledScalarAsync<TResult>(plan, cmd, ct));
             // Sync materialization for providers without true async I/O
-            if (_ctx.Provider.PrefersSyncExecution)
+            if (_ctx.Provider.PrefersSyncCompiledQueryExecution)
             {
                 try
                 {
@@ -404,7 +404,7 @@ namespace nORM.Query
             CompiledQueryState state, CancellationToken ct)
         {
             await ensureTask.ConfigureAwait(false);
-            if (_ctx.Provider.PrefersSyncExecution)
+            if (_ctx.Provider.PrefersSyncCompiledQueryExecution)
                 return await ExecuteCompiledFreshSync<TResult>(plan, parameterValues, fixedParams).ConfigureAwait(false);
 
             // Q1 fix: reuse pooled prepared command to avoid repeated allocations; create new if pool is empty

@@ -71,6 +71,23 @@ namespace nORM.Providers
         /// </summary>
         internal virtual bool PrefersSyncFastPathExecution => PrefersSyncExecution;
 
+        /// <summary>
+        /// Indicates whether compiled query execution should prefer synchronous reader loops.
+        /// This is intentionally separate from <see cref="PrefersSyncFastPathExecution"/> because
+        /// provider prepared-command behavior can differ between ad-hoc fast paths and compiled
+        /// query command pooling.
+        /// </summary>
+        internal virtual bool PrefersSyncCompiledQueryExecution => PrefersSyncExecution;
+
+        /// <summary>
+        /// Indicates whether general cached query-plan execution should prefer synchronous
+        /// reader loops. Kept separate from fast-path and compiled execution because provider
+        /// async overhead differs across prepared, pooled, and ad-hoc commands.
+        /// </summary>
+        internal virtual bool PrefersSyncQueryPlanExecution => PrefersSyncExecution;
+
+        internal virtual bool SupportsQueryPlanPreparedCommandCache => false;
+
         internal virtual bool ParameterizeFastPathBooleanPredicates => false;
 
         internal virtual bool SupportsFastPathPreparedCommandCache => false;

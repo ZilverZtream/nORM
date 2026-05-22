@@ -31,6 +31,12 @@ namespace nORM.Providers
 
         internal override bool SupportsCommandGeneratedKeyRetrieval => true;
 
+        internal override bool PrefersSyncFastPathExecution => true;
+
+        internal override bool PrefersSyncQueryPlanExecution => true;
+
+        internal override bool SupportsQueryPlanPreparedCommandCache => true;
+
         /// <summary>Maximum number of cached DataTable schemas used for bulk insert data tables.</summary>
         private const int TableSchemaCacheSize = 100;
 

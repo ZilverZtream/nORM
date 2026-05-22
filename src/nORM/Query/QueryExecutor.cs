@@ -397,6 +397,32 @@ namespace nORM.Query
             }
         }
 
+        public IList MaterializePooled(QueryPlan plan, DbCommand command)
+        {
+            var capacity = plan.SingleResult ? 1 : Math.Max(1, plan.Take ?? DefaultListCapacity);
+            var list = CreateList(plan.ElementType, capacity);
+
+            var trackable = !plan.NoTracking &&
+                             plan.ElementType.IsClass &&
+                             !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
+                             _ctx.IsMapped(plan.ElementType);
+
+            TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
+            bool isReadOnly = IsReadOnlyQuery();
+
+            using var reader = command.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+            var syncMaterializer = plan.SyncMaterializer;
+
+            while (reader.Read())
+            {
+                var entity = syncMaterializer(reader);
+                entity = ProcessEntity(entity, trackable, entityMap, isReadOnly);
+                list.Add(entity);
+            }
+
+            return list;
+        }
+
         /// <summary>
         /// Processes an entity after materialization, optionally tracking it and enabling lazy loading.
         /// </summary>
