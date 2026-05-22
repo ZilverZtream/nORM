@@ -127,4 +127,25 @@ public class TransactionIsolationTests
         var rowsAfter = await ctx.FromSqlRawAsync<TxItem>("SELECT * FROM \"TxItem\"");
         Assert.Empty(rowsAfter);
     }
+
+    [Fact]
+    public async Task ExecuteStoredProcedureAsync_TextProvider_BindsToActiveTransaction()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+
+        ctx.Add(new TxItem { Value = "stored-proc-txbound" });
+        await ctx.SaveChangesAsync();
+
+        var rows = await ctx.ExecuteStoredProcedureAsync<TxItem>("SELECT * FROM \"TxItem\"");
+        Assert.Contains(rows, r => r.Value == "stored-proc-txbound");
+
+        await tx.RollbackAsync();
+
+        var rowsAfter = await ctx.ExecuteStoredProcedureAsync<TxItem>("SELECT * FROM \"TxItem\"");
+        Assert.Empty(rowsAfter);
+    }
 }
