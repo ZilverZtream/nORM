@@ -40,3 +40,19 @@ process-wide caches are bounded and can be inspected where they are public API.
 For source-generated materializers, `CompiledMaterializerStore.Clear()` is the
 supported manual reset hook for tests, tenant/model reload scenarios, and
 diagnostic maintenance windows.
+
+## Release Gate Evidence
+
+The v1 RC gate runs a dedicated cache memory bounds step:
+
+- `CacheMemoryBoundReleaseGateTests.ConcurrentLruCache_AdversarialChurn_StaysBoundedAndEvicts`
+- `CacheMemoryBoundReleaseGateTests.BoundedCache_AdversarialChurn_StaysBelowMaxSize`
+- `CacheMemoryBoundReleaseGateTests.CompiledMaterializerStore_TableNameChurn_StaysBoundedAndObservable`
+- `CacheFaultInjectionStressTests.BoundedCacheEvictionUnderContention_30Tasks_SizeBounded_ValuesCorrect`
+- `ConcurrentLruCacheStressTests`
+- `CacheLockConcurrencyTests`
+
+These tests intentionally churn beyond cache capacity and assert entry counts,
+eviction counters, and latest-entry usability. They are count-based rather than
+timing-based so release evidence is stable across developer machines and CI
+agents.

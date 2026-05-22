@@ -153,6 +153,18 @@ public class DocumentationContractTests
     }
 
     [Fact]
+    public void Cache_policy_names_the_release_memory_bounds_gate()
+    {
+        var root = FindRepositoryRoot();
+        var policy = File.ReadAllText(Path.Combine(root, "docs", "cache-policy.md"));
+        var gate = File.ReadAllText(Path.Combine(root, "eng", "v1-release-gate.ps1"));
+
+        Assert.Contains("Release Gate Evidence", policy, StringComparison.Ordinal);
+        Assert.Contains("CacheMemoryBoundReleaseGateTests", policy, StringComparison.Ordinal);
+        Assert.Contains("cache memory bounds gate", gate, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Readme_links_to_migration_provider_contract()
     {
         var root = FindRepositoryRoot();
