@@ -965,6 +965,7 @@ namespace nORM.Query
             }
             var subPlan = TranslateInSubContext(source, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subMapping);
             _mapping = subMapping;
+            MergeSubPlanParameters(subPlan);
             using var subSqlBuilder = new OptimizedSqlBuilder();
             var fromIndex = subPlan.Sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
             if (fromIndex >= 0)
@@ -976,9 +977,7 @@ namespace nORM.Query
             {
                 subSqlBuilder.Append(subPlan.Sql);
             }
-            var limitParam = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
-            AddParameter(limitParam, 1);
-            _ctx.Provider.ApplyPaging(subSqlBuilder, 1, null, limitParam, null);
+            _ctx.Provider.ApplyPaging(subSqlBuilder, 1, null, null, null);
             switch (node.Method.Name)
             {
                 case nameof(Queryable.Any):
@@ -1021,6 +1020,37 @@ namespace nORM.Query
             value = null;
             return false;
         }
+        private void MergeSubPlanParameters(QueryPlan subPlan)
+        {
+            var compiledSubPlanParameters = subPlan.CompiledParameters.Count == 0
+                ? null
+                : new HashSet<string>(subPlan.CompiledParameters, StringComparer.Ordinal);
+
+            foreach (var parameter in subPlan.Parameters)
+            {
+                _params[parameter.Key] = parameter.Value;
+                if (compiledSubPlanParameters?.Contains(parameter.Key) == true && !_compiledParams.Contains(parameter.Key))
+                    _compiledParams.Add(parameter.Key);
+
+                AdvanceParameterIndexPast(parameter.Key);
+            }
+        }
+
+        private void AdvanceParameterIndexPast(string parameterName)
+        {
+            var generatedPrefix = _ctx.Provider.ParamPrefix + "p";
+            if (!parameterName.StartsWith(generatedPrefix, StringComparison.Ordinal))
+                return;
+
+            var indexText = parameterName.Substring(generatedPrefix.Length);
+            if (!int.TryParse(indexText, out var index))
+                return;
+
+            var nextIndex = index + 1;
+            if (_parameterManager.Index < nextIndex)
+                _parameterManager.Index = nextIndex;
+        }
+
         private void AddParameter(string name, object? value)
         {
             _params[name] = value ?? DBNull.Value;
