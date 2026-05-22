@@ -5,6 +5,7 @@ using System.Text;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
+using nORM.Configuration;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
@@ -192,15 +193,24 @@ namespace nORM.Query
                     // Try to split the projection into server and client parts
                     if (t.TrySplitProjection(originalProjection, out var serverProjection, out var clientProjection))
                     {
+                        if (t._ctx.Options.ClientEvaluationPolicy == ClientEvaluationPolicy.Throw)
+                        {
+                            throw new NormUnsupportedFeatureException(
+                                "The query projection requires client-side evaluation. Set DbContextOptions.ClientEvaluationPolicy to Warn or Allow to permit client-side projection after server-side filtering, ordering, and paging.");
+                        }
+
                         // Store both projections
                         t._projection = serverProjection;
                         t._clientProjection = clientProjection;
 
-                        t._ctx.Options.Logger?.LogQuery(
-                            "-- CLIENT-EVAL: Projection split for client-side evaluation",
-                            EmptyParamDict,
-                            TimeSpan.Zero,
-                            0);
+                        if (t._ctx.Options.ClientEvaluationPolicy == ClientEvaluationPolicy.Warn)
+                        {
+                            t._ctx.Options.Logger?.LogQuery(
+                                "-- CLIENT-EVAL: Projection split for client-side evaluation",
+                                EmptyParamDict,
+                                TimeSpan.Zero,
+                                0);
+                        }
                     }
                     else
                     {
