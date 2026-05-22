@@ -127,6 +127,10 @@ await context.BulkUpdateAsync(modifiedUsers);
 await context.BulkDeleteAsync(usersToDelete);
 ```
 
+Bulk operation semantics, fallback/native provider paths, transactions, tenant
+checks, and cache invalidation are part of the v1 contract. See
+[Bulk Operation Contract](docs/bulk-operations.md).
+
 ## Advanced Features
 
 ### Zero-Configuration Database Discovery
