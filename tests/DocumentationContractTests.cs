@@ -379,6 +379,9 @@ public class DocumentationContractTests
         Assert.Contains("UseAffectedRows=false", contract, StringComparison.Ordinal);
         Assert.Contains("new MySqlProvider(useAffectedRowsSemantics: false)", contract, StringComparison.Ordinal);
         Assert.Contains("RequireMatchedRowOccSemantics", contract, StringComparison.Ordinal);
+        Assert.Contains("default v1 behavior", contract, StringComparison.Ordinal);
+        Assert.Contains("Strict gate by default", contract, StringComparison.Ordinal);
+        Assert.Contains("refuses timestamp-tracked MySQL updates by default", readme, StringComparison.Ordinal);
         Assert.Contains("same-value token", contract, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("subclass", readme, StringComparison.OrdinalIgnoreCase);
     }

@@ -755,11 +755,14 @@ Evidence:
 
 - `DbContextOptions.RequireMatchedRowOccSemantics` defaults to true.
 - Its XML docs describe an unsafe same-value token collision mode.
+- MySQL affected-row timestamp updates fail fast by default unless the
+  application configures matched-row mode or explicitly sets
+  `RequireMatchedRowOccSemantics=false`.
 
 Scope:
 
-- Verify default behavior with both MySqlConnector affected-row modes.
-- Add live tests for same-value token conflicts.
+- Keep default behavior strong by refusing affected-row timestamp updates.
+- Verify matched-row and explicit affected-row opt-in behavior.
 - Keep unsafe mode very explicit in docs and exception messages.
 
 Done when:

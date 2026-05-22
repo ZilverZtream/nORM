@@ -382,7 +382,9 @@ foreach (var batch in items.Chunk(500))
 
 ### MySQL Optimistic Concurrency
 
-`MySqlProvider` defaults to affected-row semantics, which is required by most MySQL connectors. MySQL's `affected-rows` count does not distinguish "row matched but value unchanged" from "no row matched". nORM handles this with a **SELECT-then-verify** fallback: when an UPDATE returns fewer rows than expected, nORM queries the database to check whether the original concurrency tokens still exist. If they do, the update was a same-value no-op and no conflict is raised. If any token has changed, a `DbConcurrencyException` is thrown as expected.
+`MySqlProvider` defaults to affected-row semantics, which is required by most MySQL connectors. MySQL's `affected-rows` count does not distinguish "row matched but value unchanged" from "no row matched". For v1, nORM refuses timestamp-tracked MySQL updates by default when affected-row semantics are active. This fail-fast gate is controlled by `DbContextOptions.RequireMatchedRowOccSemantics`, which defaults to `true`.
+
+For the full MySQL optimistic-concurrency guarantee, configure the driver for matched-row semantics with `UseAffectedRows=false` and construct `new MySqlProvider(useAffectedRowsSemantics: false)`. Applications may instead set `RequireMatchedRowOccSemantics=false` to accept the weaker affected-row mode; in that opt-in mode nORM uses a **SELECT-then-verify** fallback for zero-row updates.
 
 **Residual gap**: if a concurrent writer sets the concurrency token to the *same* new value (same-value token conflict), neither the UPDATE rowcount nor the SELECT verification can detect the conflict because the WHERE clause still matches. This edge case requires application-level versioning (e.g. monotonically increasing versions) to close. To eliminate the gap entirely, use `UseAffectedRows=false` in the connection string with a connector that supports it and construct `new MySqlProvider(useAffectedRowsSemantics: false)`.
 
