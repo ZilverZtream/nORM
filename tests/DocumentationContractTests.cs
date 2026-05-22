@@ -175,6 +175,24 @@ public class DocumentationContractTests
         Assert.Contains("SQLite", contract, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Readme_links_to_temporal_versioning_contract()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "temporal-versioning.md"));
+
+        Assert.Contains("docs/temporal-versioning.md", readme, StringComparison.Ordinal);
+        Assert.Contains("EnableTemporalVersioning", contract, StringComparison.Ordinal);
+        Assert.Contains("__NormTemporalTags", contract, StringComparison.Ordinal);
+        Assert.Contains("_History", contract, StringComparison.Ordinal);
+        Assert.Contains("AsOf(DateTime)", contract, StringComparison.Ordinal);
+        Assert.Contains("SQL Server", contract, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL", contract, StringComparison.Ordinal);
+        Assert.Contains("MySQL", contract, StringComparison.Ordinal);
+        Assert.Contains("SQLite", contract, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

@@ -202,6 +202,10 @@ var releaseData = await context.Query<Product>()
     .ToListAsync();
 ```
 
+Temporal versioning is implemented with nORM-managed history tables and
+provider-specific triggers. See [Temporal Versioning](docs/temporal-versioning.md)
+for the stable v1 contract.
+
 ## Database Providers
 
 Full support for major database engines:
