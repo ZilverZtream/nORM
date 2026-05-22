@@ -58,6 +58,51 @@ public class BatchCudTests
     }
 
     [Fact]
+    public async Task ExecuteUpdateAsync_uses_captured_set_value()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE User(Id INTEGER, Name TEXT, Archived INTEGER);" +
+                             "INSERT INTO User VALUES(1,'A',0);" +
+                             "INSERT INTO User VALUES(2,'B',0);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var archived = true;
+
+        await ctx.Query<User>()
+            .Where(u => u.Id == 1)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Archived, archived));
+
+        var users = await ctx.Query<User>().ToListAsync();
+        Assert.True(users.Single(u => u.Id == 1).Archived);
+        Assert.False(users.Single(u => u.Id == 2).Archived);
+    }
+
+    [Fact]
+    public async Task ExecuteUpdateAsync_rejects_method_set_value_without_invoking_it()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE User(Id INTEGER, Name TEXT, Archived INTEGER);" +
+                             "INSERT INTO User VALUES(1,'A',0);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var ex = await Assert.ThrowsAsync<NotSupportedException>(() =>
+            ctx.Query<User>()
+                .Where(u => u.Id == 1)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Name, ThrowingName())));
+
+        Assert.Contains("set values", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ExecuteDeleteAsync_rejects_paged_query_shape()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -99,4 +144,7 @@ public class BatchCudTests
 
         Assert.Contains("ordered", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    private static string ThrowingName()
+        => throw new InvalidOperationException("The set value expression was invoked.");
 }
