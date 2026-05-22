@@ -1427,7 +1427,7 @@ public class AdversarialMultiTenantTests
         }
 
         var provider = MakeProvider(kind);
-        var tasks = Enumerable.Range(1, Degree).Select(async i =>
+        var tasks = Enumerable.Range(1, Degree).Select(i => Task.Run(() =>
         {
             using var cn = new SqliteConnection(connStr);
             cn.Open();
@@ -1436,7 +1436,7 @@ public class AdversarialMultiTenantTests
             Assert.Single(rows);
             Assert.Equal($"T{i}", rows[0].TenantId);
             Assert.Equal($"secret-{i}", rows[0].Payload);
-        });
+        }));
 
         await Task.WhenAll(tasks);
     }
@@ -1447,7 +1447,7 @@ public class AdversarialMultiTenantTests
     [InlineData("sqlite")]
     [InlineData("mysql")]
     [InlineData("postgres")]
-    public async Task AdversarialTenant_SharedPlanCache_NoCrossTenantData_AllProviders(string kind)
+    public void AdversarialTenant_SharedPlanCache_NoCrossTenantData_AllProviders(string kind)
     {
         var dbName = $"G50FzSh_{Guid.NewGuid():N}";
         var connStr = $"Data Source={dbName};Mode=Memory;Cache=Shared";

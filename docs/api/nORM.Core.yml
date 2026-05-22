@@ -5,12 +5,9 @@ items:
   id: nORM.Core
   children:
   - nORM.Core.AdvancedLinqExtensions
-  - nORM.Core.AsyncConnectionManager
   - nORM.Core.CacheableExtensions
   - nORM.Core.ChangeTracker
   - nORM.Core.ConnectionManager
-  - nORM.Core.ConnectionPool
-  - nORM.Core.ConnectionPoolOptions
   - nORM.Core.DatabaseFacade
   - nORM.Core.DatabaseTopology
   - nORM.Core.DatabaseTopology.DatabaseNode
@@ -62,12 +59,6 @@ references:
   name: AdvancedLinqExtensions
   nameWithType: AdvancedLinqExtensions
   fullName: nORM.Core.AdvancedLinqExtensions
-- uid: nORM.Core.AsyncConnectionManager
-  commentId: T:nORM.Core.AsyncConnectionManager
-  href: nORM.Core.AsyncConnectionManager.html
-  name: AsyncConnectionManager
-  nameWithType: AsyncConnectionManager
-  fullName: nORM.Core.AsyncConnectionManager
 - uid: nORM.Core.CacheableExtensions
   commentId: T:nORM.Core.CacheableExtensions
   parent: nORM.Core
@@ -88,19 +79,6 @@ references:
   name: ConnectionManager
   nameWithType: ConnectionManager
   fullName: nORM.Core.ConnectionManager
-- uid: nORM.Core.ConnectionPool
-  commentId: T:nORM.Core.ConnectionPool
-  href: nORM.Core.ConnectionPool.html
-  name: ConnectionPool
-  nameWithType: ConnectionPool
-  fullName: nORM.Core.ConnectionPool
-- uid: nORM.Core.ConnectionPoolOptions
-  commentId: T:nORM.Core.ConnectionPoolOptions
-  parent: nORM.Core
-  href: nORM.Core.ConnectionPoolOptions.html
-  name: ConnectionPoolOptions
-  nameWithType: ConnectionPoolOptions
-  fullName: nORM.Core.ConnectionPoolOptions
 - uid: nORM.Core.DatabaseFacade
   commentId: T:nORM.Core.DatabaseFacade
   parent: nORM.Core

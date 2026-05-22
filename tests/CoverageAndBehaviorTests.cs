@@ -668,7 +668,7 @@ public class CompiledQueryTimeoutAndSecurityTests
     // ── Migration atomicity: history entry rolled back with DDL on failure ────
 
     [Fact]
-    public async Task Migration_AtomicUnit_HistoryRolledBackOnDdlFailure()
+    public void Migration_AtomicUnit_HistoryRolledBackOnDdlFailure()
     {
         // Verifies the nORM migration invariant: history entry and DDL are in the same tx.
         // If the DDL fails, the history record is also rolled back — runner can safely retry.
@@ -701,7 +701,7 @@ public class CompiledQueryTimeoutAndSecurityTests
     }
 
     [Fact]
-    public async Task Migration_RetryAfterTransactionFailure_AppliesCleanly()
+    public void Migration_RetryAfterTransactionFailure_AppliesCleanly()
     {
         // After a failed migration run (rolled back), a retry must succeed
         // and must not duplicate-insert history records.
@@ -1486,7 +1486,7 @@ public class ParameterDecimalAndConnectionTests
     }
 
     [Fact]
-    public async Task ParameterReuse_NullResetsAllMetadata_AssignValueDirectly()
+    public void ParameterReuse_NullResetsAllMetadata_AssignValueDirectly()
     {
         // Verify that AssignValue resets Precision/Scale on null, not just DbType/Size.
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -1512,7 +1512,7 @@ public class ParameterDecimalAndConnectionTests
     // ── ConnectionManager.Dispose() does not throw under slow health check ────────
 
     [Fact]
-    public async Task ConnectionManager_Dispose_SafeUnderSlowHealthCheck()
+    public void ConnectionManager_Dispose_SafeUnderSlowHealthCheck()
     {
         // When the health check runs slow and Dispose() proceeds past its 10s timeout,
         // the semaphore disposal must NOT throw ObjectDisposedException back at the health task.

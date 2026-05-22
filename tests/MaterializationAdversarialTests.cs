@@ -427,7 +427,7 @@ public class MaterializationAdversarialTests
     }
 
     [Fact]
-    public async Task RetryPolicy_MaxRetriesExhausted_ThrowsLastException()
+    public void RetryPolicy_MaxRetriesExhausted_ThrowsLastException()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();

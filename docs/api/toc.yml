@@ -51,9 +51,6 @@ items:
   - uid: nORM.Core.AdvancedLinqExtensions
     name: AdvancedLinqExtensions
     type: Class
-  - uid: nORM.Core.AsyncConnectionManager
-    name: AsyncConnectionManager
-    type: Class
   - uid: nORM.Core.CacheableExtensions
     name: CacheableExtensions
     type: Class
@@ -62,12 +59,6 @@ items:
     type: Class
   - uid: nORM.Core.ConnectionManager
     name: ConnectionManager
-    type: Class
-  - uid: nORM.Core.ConnectionPool
-    name: ConnectionPool
-    type: Class
-  - uid: nORM.Core.ConnectionPoolOptions
-    name: ConnectionPoolOptions
     type: Class
   - uid: nORM.Core.DatabaseFacade
     name: DatabaseFacade

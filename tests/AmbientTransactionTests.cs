@@ -316,7 +316,7 @@ public class AmbientTransactionTests
     }
 
     [Fact]
-    public async Task GateE_DefaultPolicy_IsFailFast()
+    public void GateE_DefaultPolicy_IsFailFast()
     {
         // Gate E: Verify that the default policy is FailFast (the production-safe setting).
         // An unconfigured DbContextOptions should use FailFast.

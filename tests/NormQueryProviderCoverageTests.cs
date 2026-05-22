@@ -601,7 +601,7 @@ public class NormQueryProviderCoverageTests
     // ─── Compiled query via ExecuteCompiledAsync ──────────────────────────
 
     [Fact]
-    public async Task ExecuteCompiledAsync_Dict_ExecutesCorrectly()
+    public void ExecuteCompiledAsync_Dict_ExecutesCorrectly()
     {
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
@@ -1979,7 +1979,7 @@ public class NormQueryProviderCoverageTests
     // ─── GetPlan returns cached plan on second call ────────────────────────
 
     [Fact]
-    public async Task GetPlan_ReturnsConsistentPlan_OnMultipleCalls()
+    public void GetPlan_ReturnsConsistentPlan_OnMultipleCalls()
     {
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;

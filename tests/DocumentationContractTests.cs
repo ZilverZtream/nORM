@@ -1,5 +1,8 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using nORM.Core;
 using Xunit;
 
 namespace nORM.Tests;
@@ -21,6 +24,44 @@ public class DocumentationContractTests
         Assert.Contains("ExecuteUpdateAsync", matrix, StringComparison.Ordinal);
         Assert.Contains("AsAsyncEnumerable", matrix, StringComparison.Ordinal);
         Assert.Contains("Unsupported", matrix, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Readme_uses_bounded_v1_claims()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+
+        Assert.DoesNotContain("drop-in replacement", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("outperforms", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("beats raw ADO", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Enterprise Ready", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("built-in pooling", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Benchmark Governance", readme, StringComparison.Ordinal);
+        Assert.Contains("Documented LINQ Support", readme, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generated_api_docs_do_not_reference_removed_public_types()
+    {
+        var root = FindRepositoryRoot();
+        var apiDirectory = Path.Combine(root, "docs", "api");
+        var exportedTypes = typeof(DbContext).Assembly
+            .GetExportedTypes()
+            .Select(t => t.FullName?.Replace('+', '.') ?? t.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var file in Directory.EnumerateFiles(apiDirectory, "*.yml", SearchOption.AllDirectories))
+        {
+            var text = File.ReadAllText(file);
+            Assert.DoesNotContain("nORM.Core.ConnectionPool", text, StringComparison.Ordinal);
+
+            var pageType = Regex.Match(
+                text,
+                @"(?ms)^items:\s*\r?\n-\s+uid:\s+(nORM\.[^\r\n]+).*?^\s+type:\s+(Class|Struct|Enum|Interface)");
+            if (pageType.Success)
+                Assert.True(exportedTypes.Contains(pageType.Groups[1].Value), $"{file} documents missing public type {pageType.Groups[1].Value}.");
+        }
     }
 
     [Fact]
@@ -346,20 +387,23 @@ public class DocumentationContractTests
     }
 
     [Fact]
-    public void V1_issue_map_tracks_all_blockers_including_benchmark_trust()
+    public void V1_issue_map_tracks_current_forty_blockers()
     {
         var root = FindRepositoryRoot();
         var readme = File.ReadAllText(Path.Combine(root, "README.md"));
         var map = File.ReadAllText(Path.Combine(root, "docs", "v1-issue-map.md"));
 
         Assert.Contains("docs/v1-issue-map.md", readme, StringComparison.Ordinal);
-        for (var i = 1; i <= 41; i++)
+        for (var i = 1; i <= 40; i++)
             Assert.Contains($"| {i} |", map, StringComparison.Ordinal);
 
-        Assert.Contains("Benchmark trust", map, StringComparison.Ordinal);
-        Assert.Contains("optimized Raw ADO", map, StringComparison.Ordinal);
+        Assert.DoesNotContain("| 41 |", map, StringComparison.Ordinal);
+        Assert.Contains("exactly 40 blockers", map, StringComparison.Ordinal);
+        Assert.Contains("Rebuild benchmark evidence", map, StringComparison.Ordinal);
         Assert.Contains("Closure Rule", map, StringComparison.Ordinal);
-        Assert.Contains("README no longer claims full LINQ", map, StringComparison.Ordinal);
+        Assert.Contains("Open", map, StringComparison.Ordinal);
+        Assert.Contains("In Progress", map, StringComparison.Ordinal);
+        Assert.Contains("Verified", map, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

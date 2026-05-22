@@ -296,7 +296,7 @@ public class CoverageBoostTests : TestBase
     }
 
     [Fact]
-    public async Task LongCountTranslator_WithPredicate_IncludesWhereInSql()
+    public void LongCountTranslator_WithPredicate_IncludesWhereInSql()
     {
         using var cn = CreateItemDb();
         using var ctx = MakeCtx(cn);
@@ -1975,7 +1975,7 @@ public class CoverageBoostTests : TestBase
     // ═══════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task LastTranslator_WithPredicate_ReturnsLastMatch()
+    public void LastTranslator_WithPredicate_ReturnsLastMatch()
     {
         using var cn = CreateItemDb();
         using var ctx = MakeCtx(cn);
@@ -2104,7 +2104,7 @@ public class CoverageBoostTests : TestBase
     // ═══════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task ElementAt_WithLiteralIndex_ReturnsCorrectElement()
+    public void ElementAt_WithLiteralIndex_ReturnsCorrectElement()
     {
         using var cn = CreateItemDb();
         using var ctx = MakeCtx(cn);
@@ -2127,7 +2127,7 @@ public class CoverageBoostTests : TestBase
     }
 
     [Fact]
-    public async Task ElementAtOrDefault_WithLiteralIndex_TranslatesCorrectly()
+    public void ElementAtOrDefault_WithLiteralIndex_TranslatesCorrectly()
     {
         using var cn = CreateItemDb();
         using var ctx = MakeCtx(cn);
@@ -2151,7 +2151,7 @@ public class CoverageBoostTests : TestBase
     // ═══════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task ThenIncludeTranslator_WithExecutedQuery_CoversTranslation()
+    public void ThenIncludeTranslator_WithExecutedQuery_CoversTranslation()
     {
         // Configure relation via fluent API to enable ThenInclude
         var opts = new DbContextOptions
