@@ -134,22 +134,23 @@ Done when:
 
 ### 5. Make the Release build warning-free
 
-Problem: The Release build succeeds but emits 25 `CS1998` warnings from tests.
-The test project explicitly exempts `CS1998` from warnings-as-errors. For v1,
-warnings should either be fixed or intentionally documented with a narrow
-suppression.
+Problem: The Release build must stay warning-free. Earlier audit passes found
+test `CS1998` warnings and a broad project-level exemption, which would have
+made warning regressions too easy to hide before v1.
 
 Evidence:
 
-- `tests/nORM.Tests.csproj` contains `WarningsNotAsErrors` for `CS1998`.
-- `dotnet build nORM.sln -c Release --nologo` emitted 25 `CS1998` warnings.
+- `tests/nORM.Tests.csproj` no longer contains a `CS1998` or
+  `WarningsNotAsErrors` exemption.
+- `RepositoryHygieneTests` locks that suppression out.
+- `dotnet build nORM.sln -c Release --no-restore --nologo` reports zero
+  warnings on this tree.
 
 Scope:
 
-- Fix async tests that do not await anything.
-- Convert truly synchronous tests to non-async facts.
-- Keep only targeted suppressions with comments where async signatures are
-  intentional.
+- Keep the Release build warning-free.
+- Avoid project-wide warning exemptions for tests.
+- Use targeted suppressions with comments only when a warning is intentional.
 
 Done when:
 
@@ -996,19 +997,25 @@ and many overlapping tests. v1 needs maintainable signal, not just volume.
 
 Evidence:
 
-- Build emits many async test warnings.
-- `rg` searches hit `tests/TestResults` artifacts unless ignored.
-- Many files are named `CoverageBoost*`.
+- Release builds are warning-free and the stale `CS1998` test-project
+  suppression has been removed.
+- Local ignored `tests/TestResults` artifacts were removed from the working
+  tree, and `.gitignore` now also ignores `*.trx` and `*.coverage`.
+- `docs/test-suite-ownership.md` documents the remaining legacy
+  `CoverageBoost*.cs` files and prohibits new catch-all coverage files.
+- `RepositoryHygieneTests` verifies warning-suppression removal, artifact ignore
+  rules, and that generated test artifacts are not tracked.
 
 Scope:
 
-- Ensure generated artifacts and test results are ignored and absent from source.
-- Rename or consolidate low-signal coverage-only tests where practical.
-- Keep adversarial and regression tests, but make ownership clear.
+- Continue moving legacy `CoverageBoost*` groups into domain-named regression
+  files whenever those tests are touched for substantive changes.
+- Keep adversarial and regression tests, with ownership clear in docs.
 
 Done when:
 
-- The test suite is maintainable and warning-free.
+- The test suite is warning-free, generated artifacts stay out of source, and
+  legacy catch-all coverage files have a documented containment policy.
 
 ### 40. Run and publish a real RC release gate
 

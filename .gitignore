@@ -45,6 +45,8 @@ Thumbs.db
 
 # Coverage and test result artifacts
 tests/TestResults/
+*.trx
+*.coverage
 coverage/
 coverage-report/
 
