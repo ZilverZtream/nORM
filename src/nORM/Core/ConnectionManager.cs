@@ -155,12 +155,12 @@ namespace nORM.Core
             }
 
             var primary = _currentPrimary;
-            if (primary == null)
+            if (primary == null || !primary.IsHealthy)
             {
                 await TriggerFailoverAsync(ct).ConfigureAwait(false);
                 primary = _currentPrimary;
-                if (primary == null)
-                    throw new InvalidOperationException("No primary node available.");
+                if (primary == null || !primary.IsHealthy)
+                    throw new InvalidOperationException("No healthy primary node available.");
             }
 
             DbConnection? cn = null;

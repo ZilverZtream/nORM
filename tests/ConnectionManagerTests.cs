@@ -1,6 +1,7 @@
 using System;
 using System.Data.Common;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using nORM.Core;
@@ -13,20 +14,27 @@ public class ConnectionManagerTests
 {
     private static SqliteProvider Provider => new();
 
+    private static string CreateSqliteConnectionString()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "norm-cm-" + Guid.NewGuid());
+        Directory.CreateDirectory(directory);
+        return $"Data Source={Path.Combine(directory, "db.sqlite")}";
+    }
+
     [Fact]
     public async Task Failover_to_secondary_when_primary_unhealthy()
     {
         var topology = new DatabaseTopology();
         var primary = new DatabaseTopology.DatabaseNode
         {
-            ConnectionString = "Data Source=:memory:",
+            ConnectionString = CreateSqliteConnectionString(),
             Role = DatabaseTopology.DatabaseRole.Primary,
             Priority = 1,
             IsHealthy = true
         };
         var secondary = new DatabaseTopology.DatabaseNode
         {
-            ConnectionString = "Data Source=:memory:",
+            ConnectionString = CreateSqliteConnectionString(),
             Role = DatabaseTopology.DatabaseRole.SecondaryMaster,
             Priority = 2,
             IsHealthy = true
@@ -93,6 +101,50 @@ public class ConnectionManagerTests
         await Assert.ThrowsAnyAsync<Exception>(() => manager.GetWriteConnectionAsync());
         var ex = await Assert.ThrowsAsync<NormConnectionException>(() => manager.GetWriteConnectionAsync());
         Assert.Contains("Circuit breaker is open", ex.Message);
+    }
+
+    [Fact]
+    public async Task Concurrent_read_requests_and_dispose_do_not_throw_unexpected_exceptions()
+    {
+        var topology = new DatabaseTopology();
+        topology.Nodes.Add(new DatabaseTopology.DatabaseNode
+        {
+            ConnectionString = CreateSqliteConnectionString(),
+            Role = DatabaseTopology.DatabaseRole.Primary,
+            Priority = 1,
+            IsHealthy = true
+        });
+        topology.Nodes.Add(new DatabaseTopology.DatabaseNode
+        {
+            ConnectionString = CreateSqliteConnectionString(),
+            Role = DatabaseTopology.DatabaseRole.ReadReplica,
+            Priority = 1,
+            IsHealthy = true
+        });
+        topology.Nodes.Add(new DatabaseTopology.DatabaseNode
+        {
+            ConnectionString = CreateSqliteConnectionString(),
+            Role = DatabaseTopology.DatabaseRole.ReadReplica,
+            Priority = 2,
+            IsHealthy = true
+        });
+
+        using var manager = new ConnectionManager(topology, Provider, NullLogger.Instance, TimeSpan.FromMilliseconds(10));
+        var tasks = Enumerable.Range(0, 64).Select(async _ =>
+        {
+            try
+            {
+                await using var cn = await manager.GetReadConnectionAsync();
+                Assert.NotNull(cn);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Dispose may win the race; that is the documented boundary.
+            }
+        }).ToArray();
+
+        manager.Dispose();
+        await Task.WhenAll(tasks);
     }
 }
 
