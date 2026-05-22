@@ -405,6 +405,9 @@ public sealed class LoggingInterceptor : BaseDbCommandInterceptor
 options.CommandInterceptors.Add(new LoggingInterceptor(NullLogger<LoggingInterceptor>.Instance));
 ```
 
+Interceptor ordering, suppression, failure, cancellation, and redaction behavior
+are part of the v1 contract. See [Interceptor Contract](docs/interceptors.md).
+
 ### Global Query Filters
 
 ```csharp
