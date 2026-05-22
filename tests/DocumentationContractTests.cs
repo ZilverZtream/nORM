@@ -27,6 +27,48 @@ public class DocumentationContractTests
     }
 
     [Fact]
+    public void Linq_support_matrix_rows_have_executable_coverage_inventory()
+    {
+        var root = FindRepositoryRoot();
+        var matrix = File.ReadAllText(Path.Combine(root, "docs", "linq-support.md"));
+        var coveragePath = Path.Combine(root, "docs", "linq-support-coverage.md");
+        var coverage = File.ReadAllText(coveragePath);
+
+        Assert.Contains("docs/linq-support-coverage.md", matrix, StringComparison.Ordinal);
+
+        foreach (var line in matrix.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
+        {
+            if (!line.StartsWith("| ", StringComparison.Ordinal) ||
+                line.StartsWith("| Feature", StringComparison.Ordinal) ||
+                line.StartsWith("| ---", StringComparison.Ordinal))
+                continue;
+
+            var columns = line.Split('|');
+            if (columns.Length < 4)
+                continue;
+
+            var feature = columns[1].Trim();
+            var status = columns[2].Trim();
+            if (status.Equals("Unsupported", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            Assert.Contains($"| {feature} |", coverage, StringComparison.Ordinal);
+        }
+
+        var referencedTests = Regex.Matches(coverage, @"`(tests/[^`]+\.cs)`")
+            .Select(match => match.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.NotEmpty(referencedTests);
+        foreach (var referencedTest in referencedTests)
+        {
+            var path = Path.Combine(root, referencedTest.Replace('/', Path.DirectorySeparatorChar));
+            Assert.True(File.Exists(path), $"{coveragePath} references missing test file {referencedTest}.");
+        }
+    }
+
+    [Fact]
     public void Readme_uses_bounded_v1_claims()
     {
         var root = FindRepositoryRoot();

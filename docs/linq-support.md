@@ -51,3 +51,5 @@ handled by `DatabaseProvider` implementations and cross-provider tests.
 - New LINQ translations need a test that proves SQL shape or result behavior.
 - New unsupported LINQ shapes need a test that proves the exception is stable
   and does not fall back to unsafe client-side filtering.
+- `docs/linq-support-coverage.md` maps each non-unsupported row in this matrix
+  to executable test files and is enforced by documentation contract tests.
