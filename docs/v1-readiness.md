@@ -9,8 +9,10 @@ public v1.0 package is cut.
 - Full test suite passes in `Release`.
 - SQL Server, PostgreSQL, and MySQL live provider gates pass against real local
   or CI databases.
-- Fast complex-query benchmark keeps compiled query materially ahead of runtime
-  query and below the recorded allocation baseline.
+- Fast complex-query benchmark keeps runtime and compiled/prepared paths at or
+  below the recorded time and allocation baselines. Provider-specific runtime
+  fast paths may legitimately beat compiled/prepared paths and should not be
+  treated as a failure by itself.
 - Full provider benchmark matrix passes for SQLite, SQL Server, PostgreSQL, and
   MySQL, covering nORM, EF Core, Dapper, and Raw ADO.NET for query,
   prepared/compiled, join, count, insert, and bulk insert scenarios.

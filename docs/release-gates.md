@@ -27,7 +27,7 @@ The script uses the same environment variables as the tests:
 ```cmd
 set NORM_TEST_SQLSERVER=Server=localhost\SQLEXPRESS;Database=normtest;Integrated Security=True;TrustServerCertificate=True;Encrypt=False
 set NORM_TEST_POSTGRES=Host=127.0.0.1;Port=5432;Database=normtest;Username=postgres;Password=postgres
-set NORM_TEST_MYSQL=Server=127.0.0.1;Port=3306;Database=normtest;User=root;Password=normtest;AllowPublicKeyRetrieval=True
+set NORM_TEST_MYSQL=Server=127.0.0.1;Port=3306;Database=normtest;User ID=root;Password=normtest;AllowPublicKeyRetrieval=True
 ```
 
 `*_CS` aliases are also supported by the test infrastructure, for example `NORM_TEST_POSTGRES_CS`.
