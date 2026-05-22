@@ -17,6 +17,16 @@ code supplies the wrong tenant ID, nORM will consistently enforce the wrong
 tenant. Use database row-level security or separate databases when the database
 must independently verify tenant identity.
 
+## Boundary Inventory
+
+| Boundary | Protected by nORM | Bypass-capable APIs | Required control |
+| --- | --- | --- | --- |
+| ORM-generated reads | `Query<T>()`, compiled queries, includes, split queries, result cache keys | `FromSqlRawAsync<T>`, `QueryUnchangedAsync<T>`, direct `DbCommand` | Add tenant predicates manually or use database row-level security for caller-authored SQL. |
+| ORM-generated writes | `SaveChangesAsync`, direct writes, bulk update/delete, owned/many-to-many maintenance | direct `DbCommand`, migrations, admin CLI commands | Restrict privileged write paths and review tenant predicates in hand-authored SQL. |
+| Relationship loading | mapped `Include`, `ThenInclude`, split-query loaders | raw SQL joins, stored procedures | Verify related tables carry tenant columns or enforce tenancy in database code. |
+| Cache isolation | query/result cache keys include tenant state where nORM owns the key | external cache providers, application-level cache keys | Prefix external keys/tags with tenant identity. |
+| Operational tooling | none; tooling is administrative | migrations, scaffolding, database drop/update commands | Run tooling only with deployment/admin permissions and disposable or approved targets. |
+
 ## Enforced Paths
 
 These paths are tenant-scoped when a tenant provider is configured and the

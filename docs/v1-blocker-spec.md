@@ -681,11 +681,13 @@ Evidence:
 
 - There are extensive adversarial tenant tests.
 - Docs still classify raw SQL and stored procedures as caller-owned.
+- `docs/multi-tenancy-security.md` now includes a boundary inventory that lists
+  protected ORM paths, bypass-capable APIs, and required controls.
 
 Scope:
 
 - Run tenant security tests in the full live provider matrix.
-- Add a threat model table with bypass-capable APIs.
+- Keep a threat model table with bypass-capable APIs.
 - Require tenant cache-key and compiled-query isolation tests for every new
   query path.
 
