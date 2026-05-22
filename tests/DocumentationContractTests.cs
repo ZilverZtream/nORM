@@ -301,6 +301,9 @@ public class DocumentationContractTests
         Assert.Contains("DatabaseProvider", contract, StringComparison.Ordinal);
         Assert.Contains("Capabilities", contract, StringComparison.Ordinal);
         Assert.Contains("IsAvailableAsync", contract, StringComparison.Ordinal);
+        Assert.Contains("InitializeConnectionAsync", contract, StringComparison.Ordinal);
+        Assert.Contains("NormConfigurationException", contract, StringComparison.Ordinal);
+        Assert.Contains("MinimumServerVersion", contract, StringComparison.Ordinal);
         Assert.Contains("SQL Server", contract, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL", contract, StringComparison.Ordinal);
         Assert.Contains("MySQL", contract, StringComparison.Ordinal);

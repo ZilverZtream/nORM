@@ -660,6 +660,22 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
             }
         }
 
+        /// <inheritdoc />
+        protected override async Task<string?> GetServerVersionStringAsync(DbConnection connection, CancellationToken ct)
+        {
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SHOW server_version";
+            return await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
+        }
+
+        /// <inheritdoc />
+        protected override string? GetServerVersionString(DbConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SHOW server_version";
+            return cmd.ExecuteScalar() as string;
+        }
+
         /// <summary>
         /// Creates a transaction savepoint using Npgsql's save or savepoint APIs if available.
         /// Checks the CancellationToken before executing so that pre-cancelled tokens

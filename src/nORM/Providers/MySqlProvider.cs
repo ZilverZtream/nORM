@@ -674,6 +674,22 @@ END;";
             return affected;
         }
 
+        /// <inheritdoc />
+        protected override async Task<string?> GetServerVersionStringAsync(DbConnection connection, CancellationToken ct)
+        {
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT VERSION()";
+            return await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
+        }
+
+        /// <inheritdoc />
+        protected override string? GetServerVersionString(DbConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT VERSION()";
+            return cmd.ExecuteScalar() as string;
+        }
+
         private static string GetBulkCopyCapabilityKey(DbConnection connection)
             => $"{connection.GetType().FullName}|{connection.DataSource}|{connection.Database}";
 
