@@ -387,6 +387,8 @@ foreach (var batch in items.Chunk(500))
 
 The full provider-specific contract is documented in
 [Optimistic Concurrency](docs/optimistic-concurrency.md).
+Source generator package boundaries and runtime attribute ownership are
+documented in [Source Generation](docs/source-generation.md).
 
 ### Connection Management & Pooling
 

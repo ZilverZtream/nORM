@@ -50,7 +50,6 @@
   <ItemGroup>
     <Compile Remove="nORM.SourceGenerators/**" />
     <Compile Remove="dotnet-norm/**" />
-    <Compile Remove="nORM/SourceGeneration/**" />
   </ItemGroup>
 
     <ItemGroup>

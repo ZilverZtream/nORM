@@ -257,6 +257,24 @@ public class DocumentationContractTests
         Assert.DoesNotContain("─", ci, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Source_generation_boundaries_are_documented_and_single_path()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "source-generation.md"));
+        var runtimeAttributes = Path.Combine(root, "src", "SourceGeneration");
+        var analyzerProject = Path.Combine(root, "src", "nORM.SourceGenerators", "nORM.SourceGenerators.csproj");
+        var legacyPath = Path.Combine(root, "src", "nORM", "SourceGeneration");
+
+        Assert.Contains("docs/source-generation.md", readme, StringComparison.Ordinal);
+        Assert.True(Directory.Exists(runtimeAttributes));
+        Assert.True(File.Exists(analyzerProject));
+        Assert.False(Directory.Exists(legacyPath));
+        Assert.Contains("analyzers/dotnet/cs/nORM.SourceGenerators.dll", contract, StringComparison.Ordinal);
+        Assert.Contains("must not be recreated", contract, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
