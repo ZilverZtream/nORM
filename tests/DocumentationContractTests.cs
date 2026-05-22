@@ -117,6 +117,8 @@ public class DocumentationContractTests
         Assert.Contains("NativeAOT", policy, StringComparison.Ordinal);
         Assert.Contains("RequiresDynamicCode", policy, StringComparison.Ordinal);
         Assert.Contains("RequiresUnreferencedCode", policy, StringComparison.Ordinal);
+        Assert.Contains("negative `PublishTrimmed=true` smoke test", policy, StringComparison.Ordinal);
+        Assert.Contains("explicitly unsupported for v1", policy, StringComparison.Ordinal);
         Assert.Contains("not supported", policy, StringComparison.OrdinalIgnoreCase);
     }
 

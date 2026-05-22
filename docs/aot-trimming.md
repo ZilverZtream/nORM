@@ -35,6 +35,13 @@ Public APIs that require runtime code generation are annotated with
 trimming or NativeAOT should get build-time warnings for those APIs instead of a
 silent runtime failure.
 
+The v1 test suite includes a negative `PublishTrimmed=true` smoke test. It
+publishes a small nORM/SQLite application and requires the publish to fail with
+ILLink trim diagnostics or SDK publish diagnostics before a usable artifact is
+produced. That test locks the current support boundary: trimmed and NativeAOT
+deployment are explicitly unsupported for v1 rather than accidentally marketed
+as working.
+
 Provider packages that are loaded by reflection, such as Npgsql and MySQL
 drivers, must be referenced directly by the application. See
 [Provider Packages](provider-packages.md) for the provider dependency contract.

@@ -56,7 +56,7 @@ still needs release evidence.
 | 28 | Decide temporal/versioning stability | Verified | Temporal versioning is explicitly stable for nORM-managed history tables/triggers; docs define schema ownership, rollback responsibilities, and the RC live-provider evidence requirement. |
 | 29 | Enforce provider version support at startup | Verified | Provider initialization validates the actual opened connection against `Capabilities.MinimumServerVersion`; unsupported versions throw `NormConfigurationException`, and provider docs/tests lock the startup contract. |
 | 30 | Finish MySQL optimistic concurrency guarantees | Verified | MySQL affected-row OCC is refused by default through `RequireMatchedRowOccSemantics=true`; matched-row mode and explicit weakened opt-in are documented and covered by regression tests. |
-| 31 | Prove AOT and trimming claims with real publish tests | Open | AOT/trimming docs exist; publish-time tests remain open. |
+| 31 | Prove AOT and trimming claims with real publish tests | Verified | AOT/trimming is explicitly unsupported for v1; annotation tests and a negative `PublishTrimmed=true` smoke test lock the current boundary with real publish diagnostics. |
 | 32 | Harden source generator limitations | In Progress | Generator ships and has diagnostics; unsupported mapping diagnostics need completion. |
 | 33 | Stress cache and plan memory bounds as release gates | In Progress | Cache policy exists; RC memory stress evidence remains open. |
 | 34 | Normalize public exception taxonomy | In Progress | Some unsupported query paths use nORM exceptions; remaining public paths need audit. |

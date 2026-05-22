@@ -779,12 +779,16 @@ Evidence:
 - `docs/aot-trimming.md` documents reflection, dynamic code, and source
   generation boundaries.
 - Runtime materialization and scaffolding use reflection/dynamic code paths.
+- `AotTrimmingPolicyTests` verifies dynamic-code annotations and runs a negative
+  `PublishTrimmed=true` smoke test that must fail with trim or SDK publish
+  diagnostics.
 
 Scope:
 
-- Add `PublishTrimmed` and NativeAOT smoke tests for the supported subset.
+- Keep v1 AOT/trimming unsupported unless a future source-generator-first
+  runtime path is added.
 - Ensure unsupported dynamic features fail at build or startup with clear
-  messages.
+  messages and publish diagnostics.
 - Document exact linker warnings that are accepted.
 
 Done when:
