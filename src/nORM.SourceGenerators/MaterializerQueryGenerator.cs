@@ -54,6 +54,22 @@ namespace nORM.SourceGenerators
             category: "nORM.SourceGeneration",
             defaultSeverity: DiagnosticSeverity.Warning,
             isEnabledByDefault: true);
+
+        private static readonly DiagnosticDescriptor SG005 = new DiagnosticDescriptor(
+            id: "nORMSG005",
+            title: "Unsupported property shape for [GenerateMaterializer]",
+            messageFormat: "Property '{1}' on type '{0}' cannot be source-generated. [GenerateMaterializer] requires mapped properties to have get and set accessors accessible from generated code. Mark computed members [NotMapped] or remove [GenerateMaterializer].",
+            category: "nORM.SourceGeneration",
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+
+        private static readonly DiagnosticDescriptor SG006 = new DiagnosticDescriptor(
+            id: "nORMSG006",
+            title: "Owned type lacks parameterless constructor for [GenerateMaterializer]",
+            messageFormat: "Owned type '{1}' used by '{0}' does not have an accessible parameterless constructor. [GenerateMaterializer] cannot construct owned navigations without one.",
+            category: "nORM.SourceGeneration",
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
 #pragma warning restore RS2008
 
         private sealed class SyntaxReceiver : ISyntaxContextReceiver
@@ -205,8 +221,11 @@ namespace nORM.SourceGenerators
             var typeName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var simpleName = type.Name;
             var generatedClassName = GetGeneratedMaterializerClassName(type);
+            if (!ValidateMaterializerShape(type, context))
+                return;
+
             var props = type.GetMembers().OfType<IPropertySymbol>()
-                .Where(p => !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
+                .Where(IsGeneratedMappedProperty)
                 .OrderBy(p => p.Name)
                 .ToList();
 
@@ -234,7 +253,7 @@ namespace nORM.SourceGenerators
                 {
                     var ownedType = (INamedTypeSymbol)prop.Type;
                     var ownedProps = ownedType.GetMembers().OfType<IPropertySymbol>()
-                        .Where(p => !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
+                        .Where(IsGeneratedMappedProperty)
                         .OrderBy(p => p.Name);
                     var ownerColName = GetColumnName(prop);
                     foreach (var op in ownedProps)
@@ -278,7 +297,7 @@ namespace nORM.SourceGenerators
                 {
                     var ownedType = (INamedTypeSymbol)prop.Type;
                     var ownedProps = ownedType.GetMembers().OfType<IPropertySymbol>()
-                        .Where(p => !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
+                        .Where(IsGeneratedMappedProperty)
                         .OrderBy(p => p.Name)
                         .ToList();
                     foreach (var op in ownedProps)
@@ -302,6 +321,80 @@ namespace nORM.SourceGenerators
                 : $"{generatedClassName}.g.cs";
             context.AddSource(hintName, SourceText.From(sb.ToString(), Encoding.UTF8));
         }
+
+        private static bool ValidateMaterializerShape(INamedTypeSymbol type, GeneratorExecutionContext context)
+        {
+            var valid = true;
+            foreach (var prop in GetMappedCandidateProperties(type))
+            {
+                if (!IsSourceGeneratedMappedProperty(prop))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        SG005,
+                        prop.Locations.FirstOrDefault() ?? type.Locations.FirstOrDefault(),
+                        type.Name,
+                        prop.Name));
+                    valid = false;
+                    continue;
+                }
+
+                if (IsOwnedType(prop.Type) && prop.Type is INamedTypeSymbol ownedType)
+                {
+                    if (!HasAccessibleParameterlessConstructor(ownedType))
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            SG006,
+                            prop.Locations.FirstOrDefault() ?? type.Locations.FirstOrDefault(),
+                            type.Name,
+                            ownedType.Name));
+                        valid = false;
+                    }
+
+                    foreach (var ownedProp in GetMappedCandidateProperties(ownedType))
+                    {
+                        if (!IsSourceGeneratedMappedProperty(ownedProp))
+                        {
+                            context.ReportDiagnostic(Diagnostic.Create(
+                                SG005,
+                                ownedProp.Locations.FirstOrDefault() ?? prop.Locations.FirstOrDefault() ?? type.Locations.FirstOrDefault(),
+                                ownedType.Name,
+                                ownedProp.Name));
+                            valid = false;
+                        }
+                    }
+                }
+            }
+
+            return valid;
+        }
+
+        private static IEnumerable<IPropertySymbol> GetMappedCandidateProperties(INamedTypeSymbol type)
+            => type.GetMembers().OfType<IPropertySymbol>()
+                .Where(p => !p.IsStatic && !IsNotMapped(p));
+
+        private static bool IsGeneratedMappedProperty(IPropertySymbol prop)
+            => !prop.IsStatic &&
+               !IsNotMapped(prop) &&
+               IsSourceGeneratedMappedProperty(prop);
+
+        private static bool IsSourceGeneratedMappedProperty(IPropertySymbol prop)
+            => prop.Parameters.Length == 0 &&
+               IsAccessorAccessibleToGeneratedCode(prop.GetMethod) &&
+               IsAccessorAccessibleToGeneratedCode(prop.SetMethod);
+
+        private static bool IsAccessorAccessibleToGeneratedCode(IMethodSymbol? accessor)
+            => accessor != null &&
+               accessor.DeclaredAccessibility is Microsoft.CodeAnalysis.Accessibility.Public
+                   or Microsoft.CodeAnalysis.Accessibility.Internal;
+
+        private static bool HasAccessibleParameterlessConstructor(INamedTypeSymbol type)
+            => type.Constructors.Any(c =>
+                c.Parameters.Length == 0 &&
+                c.DeclaredAccessibility is Microsoft.CodeAnalysis.Accessibility.Public
+                    or Microsoft.CodeAnalysis.Accessibility.Internal);
+
+        private static bool IsNotMapped(IPropertySymbol prop)
+            => prop.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == "System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute");
 
         private static string BuildAssignmentExpression(IPropertySymbol prop, string ordVar)
         {

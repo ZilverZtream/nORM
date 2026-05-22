@@ -123,6 +123,22 @@ public class DocumentationContractTests
     }
 
     [Fact]
+    public void Source_generation_docs_define_v1_diagnostics_and_limits()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "source-generation.md"));
+
+        Assert.Contains("docs/source-generation.md", readme, StringComparison.Ordinal);
+        Assert.Contains("v1 Materializer Support", contract, StringComparison.Ordinal);
+        Assert.Contains("nORMSG005", contract, StringComparison.Ordinal);
+        Assert.Contains("nORMSG006", contract, StringComparison.Ordinal);
+        Assert.Contains("Fluent-only column renames", contract, StringComparison.Ordinal);
+        Assert.Contains("value converters", contract, StringComparison.Ordinal);
+        Assert.Contains("[NotMapped]", contract, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Readme_links_to_cache_policy()
     {
         var root = FindRepositoryRoot();

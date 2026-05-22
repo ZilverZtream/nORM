@@ -807,11 +807,17 @@ Evidence:
 - `MaterializerQueryGenerator` emits diagnostics for unsupported return types
   and missing parameterless constructors.
 - Source-generation docs warn about runtime-only mapping cases.
+- `docs/source-generation.md` defines the v1 materializer support contract and
+  diagnostic IDs.
+- Package-consumer tests verify unsupported mapped properties fail with
+  `nORMSG005` from the packed analyzer.
 
 Scope:
 
-- Add analyzer diagnostics for every unsupported source-gen mapping feature.
-- Ensure generated code is compatible with trimmed/AOT-supported scenarios.
+- Keep analyzer diagnostics for source-visible unsupported materializer shapes.
+- Keep runtime guards for fluent-only renames, `OwnsOne`, and value converters
+  that source generation cannot see at compile time.
+- Keep generated code inside the documented AOT/trimming boundary.
 - Keep package-consumer tests covering generated materializers and compile-time
   queries.
 
