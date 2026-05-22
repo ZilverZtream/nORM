@@ -129,6 +129,20 @@ public class DocumentationContractTests
         Assert.Contains("row-level security", contract, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Readme_links_to_logging_redaction_policy()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "logging-redaction.md"));
+
+        Assert.Contains("docs/logging-redaction.md", readme, StringComparison.Ordinal);
+        Assert.Contains("Parameter values", contract, StringComparison.Ordinal);
+        Assert.Contains("Connection strings", contract, StringComparison.Ordinal);
+        Assert.Contains("Command interceptors", contract, StringComparison.Ordinal);
+        Assert.Contains("FromSqlInterpolatedAsync", contract, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

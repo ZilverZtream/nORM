@@ -243,6 +243,9 @@ var results = await context.ExecuteStoredProcedureAsync<UserStats>(
     new { StartDate = DateTime.Now.AddMonths(-1) });
 ```
 
+SQL diagnostics redact string literals and parameter values by default. See
+[Logging and Redaction](docs/logging-redaction.md).
+
 ## Database Migrations
 
 ```csharp
@@ -394,7 +397,7 @@ public sealed class LoggingInterceptor : BaseDbCommandInterceptor
         DbContext context,
         CancellationToken cancellationToken)
     {
-        Console.WriteLine(command.CommandText);
+        Console.WriteLine("Command executing");
         return Task.FromResult(InterceptionResult<DbDataReader>.Continue());
     }
 }
