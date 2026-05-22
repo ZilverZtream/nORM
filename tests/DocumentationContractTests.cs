@@ -316,6 +316,35 @@ public class DocumentationContractTests
         Assert.Contains("Troubleshooting", runbook, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Public_project_governance_files_exist()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+
+        var requiredFiles = new[]
+        {
+            "SECURITY.md",
+            "CHANGELOG.md",
+            "CONTRIBUTING.md",
+            "SUPPORT.md",
+            Path.Combine("docs", "release-checklist.md")
+        };
+
+        foreach (var relativePath in requiredFiles)
+        {
+            var path = Path.Combine(root, relativePath);
+            Assert.True(File.Exists(path), $"{relativePath} should exist.");
+            Assert.True(new FileInfo(path).Length > 200, $"{relativePath} should not be a placeholder.");
+        }
+
+        Assert.Contains("SECURITY.md", readme, StringComparison.Ordinal);
+        Assert.Contains("CHANGELOG.md", readme, StringComparison.Ordinal);
+        Assert.Contains("CONTRIBUTING.md", readme, StringComparison.Ordinal);
+        Assert.Contains("SUPPORT.md", readme, StringComparison.Ordinal);
+        Assert.Contains("docs/release-checklist.md", readme, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
