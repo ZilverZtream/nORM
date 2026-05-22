@@ -293,6 +293,22 @@ public class DocumentationContractTests
     }
 
     [Fact]
+    public void Bulk_cud_uses_structural_query_shape_not_sql_text_parsing()
+    {
+        var root = FindRepositoryRoot();
+        var builder = File.ReadAllText(Path.Combine(root, "src", "nORM", "Query", "BulkCudBuilder.cs"));
+        var provider = File.ReadAllText(Path.Combine(root, "src", "nORM", "Query", "NormQueryProvider.cs"));
+
+        Assert.Contains("ValidateCudPlan(BulkCudQueryShape? shape)", builder, StringComparison.Ordinal);
+        Assert.Contains("GetWhereClause(BulkCudQueryShape? shape)", builder, StringComparison.Ordinal);
+        Assert.DoesNotContain("ValidateCudPlan(string sql)", builder, StringComparison.Ordinal);
+        Assert.DoesNotContain("ExtractWhereClause(string sql", builder, StringComparison.Ordinal);
+        Assert.DoesNotContain("IndexOf(\" WHERE\"", builder, StringComparison.Ordinal);
+        Assert.Contains("ValidateCudPlan(plan.BulkCudShape)", provider, StringComparison.Ordinal);
+        Assert.Contains("GetWhereClause(plan.BulkCudShape)", provider, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Readme_links_to_optimistic_concurrency_contract()
     {
         var root = FindRepositoryRoot();

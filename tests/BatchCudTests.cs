@@ -145,6 +145,26 @@ public class BatchCudTests
         Assert.Contains("ordered", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task ExecuteDeleteAsync_rejects_distinct_query_shape()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE User(Id INTEGER, Name TEXT, Archived INTEGER);" +
+                             "INSERT INTO User VALUES(1,'A',0);" +
+                             "INSERT INTO User VALUES(2,'B',0);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
+            ctx.Query<User>().Where(u => !u.Archived).Distinct().ExecuteDeleteAsync());
+
+        Assert.Contains("distinct", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string ThrowingName()
         => throw new InvalidOperationException("The set value expression was invoked.");
 }

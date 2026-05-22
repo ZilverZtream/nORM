@@ -498,21 +498,26 @@ Done when:
 
 ### 21. Remove legacy string-based bulk CUD paths
 
-Problem: Bulk CUD now has structural shape validation, but legacy SQL string
-validation and `ExtractWhereClause` still exist. Dead fallback paths invite
-future regressions.
+Status: Verified.
+
+Problem addressed: Bulk CUD has structural shape validation, and the legacy SQL
+string validation/extraction entry points have been removed so generated SQL
+comments, literals, aliases, or provider quoting cannot steer the CUD safety
+decision.
 
 Evidence:
 
-- `BulkCudBuilder` contains both `ValidateCudPlan(string sql)` and
-  `ValidateCudPlan(BulkCudQueryShape? shape)`.
-- `ExtractWhereClause` still parses SQL text.
+- `BulkCudBuilder` exposes only `ValidateCudPlan(BulkCudQueryShape? shape)` and
+  `GetWhereClause(BulkCudQueryShape? shape)`.
+- `NormQueryProvider` passes `plan.BulkCudShape` into both delete and update
+  CUD paths.
+- `DocumentationContractTests.Bulk_cud_uses_structural_query_shape_not_sql_text_parsing`
+  rejects the removed SQL string parser signatures.
 
 Scope:
 
-- Remove or quarantine string-based bulk CUD parsing.
-- Ensure bulk update/delete use structural metadata only.
-- Add tests that comments/literals/quoted identifiers cannot confuse bulk CUD.
+- Keep bulk update/delete on structural metadata only.
+- Keep tests that reject reintroducing SQL text parsing.
 
 Done when:
 
