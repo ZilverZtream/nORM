@@ -333,6 +333,7 @@ M:nORM.Migration.IMigrationRunner.HasPendingMigrationsAsync(System.Threading.Can
 M:nORM.Migration.IMigrationSqlGenerator.GenerateSql(nORM.Migration.SchemaDiff):nORM.Migration.MigrationSqlStatements
 M:nORM.Migration.Migration.Down(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken):System.Void
 M:nORM.Migration.Migration.Up(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken):System.Void
+M:nORM.Migration.MigrationOptions.#ctor(System.String,System.String,System.Nullable{System.TimeSpan},System.Nullable{System.Int64})
 M:nORM.Migration.MigrationSqlStatements.#ctor(System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String})
 M:nORM.Migration.MigrationSqlStatements.<Clone>$():nORM.Migration.MigrationSqlStatements
 M:nORM.Migration.MigrationSqlStatements.Deconstruct(System.Collections.Generic.IReadOnlyList{System.String}&,System.Collections.Generic.IReadOnlyList{System.String}&,System.Collections.Generic.IReadOnlyList{System.String}&,System.Collections.Generic.IReadOnlyList{System.String}&,System.Collections.Generic.IReadOnlyList{System.String}&,System.Collections.Generic.IReadOnlyList{System.String}&):System.Void
@@ -341,6 +342,7 @@ M:nORM.Migration.MigrationSqlStatements.Equals(nORM.Migration.MigrationSqlStatem
 M:nORM.Migration.MigrationSqlStatements.GetHashCode():System.Int32
 M:nORM.Migration.MigrationSqlStatements.ToString():System.String
 M:nORM.Migration.MySqlMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)
+M:nORM.Migration.MySqlMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions)
 M:nORM.Migration.MySqlMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Migration.MySqlMigrationRunner.Dispose():System.Void
 M:nORM.Migration.MySqlMigrationRunner.DisposeAsync():System.Threading.Tasks.ValueTask
@@ -349,6 +351,7 @@ M:nORM.Migration.MySqlMigrationRunner.HasPendingMigrationsAsync(System.Threading
 M:nORM.Migration.MySqlMigrationSqlGenerator.#ctor()
 M:nORM.Migration.MySqlMigrationSqlGenerator.GenerateSql(nORM.Migration.SchemaDiff):nORM.Migration.MigrationSqlStatements
 M:nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+M:nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
 M:nORM.Migration.PostgresMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Migration.PostgresMigrationRunner.Dispose():System.Void
 M:nORM.Migration.PostgresMigrationRunner.DisposeAsync():System.Threading.Tasks.ValueTask
@@ -363,6 +366,7 @@ M:nORM.Migration.SchemaSnapshot.#ctor()
 M:nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly):nORM.Migration.SchemaSnapshot
 M:nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext):nORM.Migration.SchemaSnapshot
 M:nORM.Migration.SqlServerMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+M:nORM.Migration.SqlServerMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
 M:nORM.Migration.SqlServerMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Migration.SqlServerMigrationRunner.Dispose():System.Void
 M:nORM.Migration.SqlServerMigrationRunner.DisposeAsync():System.Threading.Tasks.ValueTask
@@ -371,6 +375,7 @@ M:nORM.Migration.SqlServerMigrationRunner.HasPendingMigrationsAsync(System.Threa
 M:nORM.Migration.SqlServerMigrationSqlGenerator.#ctor()
 M:nORM.Migration.SqlServerMigrationSqlGenerator.GenerateSql(nORM.Migration.SchemaDiff):nORM.Migration.MigrationSqlStatements
 M:nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+M:nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
 M:nORM.Migration.SqliteMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Migration.SqliteMigrationRunner.Dispose():System.Void
 M:nORM.Migration.SqliteMigrationRunner.DisposeAsync():System.Threading.Tasks.ValueTask
@@ -776,6 +781,10 @@ P:nORM.Migration.ForeignKeySchema.PrincipalColumns:System.String[]
 P:nORM.Migration.ForeignKeySchema.PrincipalTable:System.String
 P:nORM.Migration.Migration.Name:System.String
 P:nORM.Migration.Migration.Version:System.Int64
+P:nORM.Migration.MigrationOptions.HistoryTableName:System.String
+P:nORM.Migration.MigrationOptions.LockName:System.String
+P:nORM.Migration.MigrationOptions.LockTimeout:System.TimeSpan
+P:nORM.Migration.MigrationOptions.PostgresAdvisoryLockKey:System.Int64
 P:nORM.Migration.MigrationSqlStatements.Down:System.Collections.Generic.IReadOnlyList{System.String}
 P:nORM.Migration.MigrationSqlStatements.PostTransactionDown:System.Collections.Generic.IReadOnlyList{System.String}
 P:nORM.Migration.MigrationSqlStatements.PostTransactionUp:System.Collections.Generic.IReadOnlyList{System.String}
@@ -931,6 +940,7 @@ T:nORM.Migration.ForeignKeySchema
 T:nORM.Migration.IMigrationRunner
 T:nORM.Migration.IMigrationSqlGenerator
 T:nORM.Migration.Migration
+T:nORM.Migration.MigrationOptions
 T:nORM.Migration.MigrationSqlStatements
 T:nORM.Migration.MySqlMigrationRunner
 T:nORM.Migration.MySqlMigrationSqlGenerator

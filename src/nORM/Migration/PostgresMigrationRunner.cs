@@ -23,6 +23,7 @@ namespace nORM.Migration
     {
         private readonly DbConnection _connection;
         private readonly Assembly _migrationsAssembly;
+        private readonly MigrationOptions _migrationOptions;
         private DbContext? _context;
         private readonly ILogger? _logger;
         private const string HistoryTableName = "__NormMigrationsHistory";
@@ -32,9 +33,6 @@ namespace nORM.Migration
 
         /// <summary>PostgreSQL SqlState 42P01: undefined_table (table does not exist).</summary>
         private const string PgSqlStateUndefinedTable = "42P01";
-
-        /// <summary>Default timeout for advisory lock acquisition retry loop.</summary>
-        private static readonly TimeSpan DefaultLockTimeout = TimeSpan.FromSeconds(30);
 
         /// <summary>Delay between advisory lock acquisition retries, in milliseconds.</summary>
         private const int LockRetryDelayMs = 250;
@@ -49,9 +47,23 @@ namespace nORM.Migration
         /// <param name="options">Optional DbContext configuration for interceptors.</param>
         /// <param name="logger">Optional logger for drift warnings and diagnostics.</param>
         public PostgresMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null, ILogger? logger = null)
+            : this(connection, migrationsAssembly, new MigrationOptions(), options, logger)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PostgresMigrationRunner"/> class.
+        /// </summary>
+        /// <param name="connection">Open connection to the target PostgreSQL database.</param>
+        /// <param name="migrationsAssembly">Assembly containing migration classes.</param>
+        /// <param name="migrationOptions">Migration runner options.</param>
+        /// <param name="options">Optional DbContext configuration for interceptors.</param>
+        /// <param name="logger">Optional logger for drift warnings and diagnostics.</param>
+        public PostgresMigrationRunner(DbConnection connection, Assembly migrationsAssembly, MigrationOptions migrationOptions, DbContextOptions? options = null, ILogger? logger = null)
         {
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
             _migrationsAssembly = migrationsAssembly ?? throw new ArgumentNullException(nameof(migrationsAssembly));
+            _migrationOptions = migrationOptions ?? throw new ArgumentNullException(nameof(migrationOptions));
             _logger = logger;
             if (options != null && options.CommandInterceptors.Count > 0)
             {
@@ -111,7 +123,7 @@ namespace nORM.Migration
         /// <param name="timeout">Maximum time to wait for the lock. Defaults to 30 seconds.</param>
         internal async Task AcquireAdvisoryLockAsync(CancellationToken ct, TimeSpan? timeout = null)
         {
-            var effectiveTimeout = timeout ?? DefaultLockTimeout;
+            var effectiveTimeout = timeout ?? _migrationOptions.LockTimeout;
             var deadline = DateTime.UtcNow + effectiveTimeout;
 
             while (true)
@@ -119,7 +131,7 @@ namespace nORM.Migration
                 ct.ThrowIfCancellationRequested();
 
                 await using var cmd = _connection.CreateCommand();
-                cmd.CommandText = $"SELECT pg_try_advisory_lock({MigrationLockKey})";
+                cmd.CommandText = $"SELECT pg_try_advisory_lock({_migrationOptions.PostgresAdvisoryLockKey})";
                 var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
 
                 // pg_try_advisory_lock returns true if the lock was acquired
@@ -131,7 +143,7 @@ namespace nORM.Migration
 
                 if (DateTime.UtcNow >= deadline)
                     throw new TimeoutException(
-                        $"Failed to acquire PostgreSQL migration advisory lock (key={MigrationLockKey}) " +
+                        $"Failed to acquire PostgreSQL migration advisory lock (key={_migrationOptions.PostgresAdvisoryLockKey}) " +
                         $"within {effectiveTimeout.TotalSeconds} seconds. " +
                         "Another migration runner or stale session may be holding the lock.");
 
@@ -147,7 +159,7 @@ namespace nORM.Migration
         internal async Task ReleaseAdvisoryLockAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"SELECT pg_advisory_unlock({MigrationLockKey})";
+            cmd.CommandText = $"SELECT pg_advisory_unlock({_migrationOptions.PostgresAdvisoryLockKey})";
             try { await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false); }
             catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
             {
@@ -242,7 +254,7 @@ namespace nORM.Migration
         {
             await using var cmd = _connection.CreateCommand();
             cmd.Transaction = transaction;
-            cmd.CommandText = $"INSERT INTO \"{HistoryTableName}\" (\"Version\", \"Name\", \"AppliedOn\") VALUES (@Version, @Name, @AppliedOn);";
+            cmd.CommandText = $"INSERT INTO \"{_migrationOptions.HistoryTableName}\" (\"Version\", \"Name\", \"AppliedOn\") VALUES (@Version, @Name, @AppliedOn);";
             cmd.AddParam("@Version", migration.Version);
             cmd.AddParam("@Name", migration.Name);
             cmd.AddParam("@AppliedOn", DateTimeOffset.UtcNow);
@@ -259,7 +271,7 @@ namespace nORM.Migration
         {
             var applied = new Dictionary<long, string>();
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"SELECT \"Version\", \"Name\" FROM \"{HistoryTableName}\"";
+            cmd.CommandText = $"SELECT \"Version\", \"Name\" FROM \"{_migrationOptions.HistoryTableName}\"";
             try
             {
                 await using var reader = await ExecuteReaderAsync(cmd, ct).ConfigureAwait(false);
@@ -301,7 +313,7 @@ namespace nORM.Migration
         private async Task EnsureHistoryTableAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{HistoryTableName}\" (\"Version\" BIGINT PRIMARY KEY, \"Name\" TEXT NOT NULL, \"AppliedOn\" TIMESTAMPTZ NOT NULL);";
+            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{_migrationOptions.HistoryTableName}\" (\"Version\" BIGINT PRIMARY KEY, \"Name\" TEXT NOT NULL, \"AppliedOn\" TIMESTAMPTZ NOT NULL);";
             await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
         }
 

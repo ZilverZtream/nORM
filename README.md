@@ -300,13 +300,13 @@ lock before reading the pending list, serializing concurrent deployments automat
 | SQLite | `BEGIN EXCLUSIVE` transaction |
 | SQL Server | `sp_getapplock` (Session scope, 30 s timeout) |
 | MySQL | `GET_LOCK('__NormMigrationsLock', 30)` |
-| PostgreSQL | `pg_advisory_lock(key)` (session level, blocks until available) |
+| PostgreSQL | `pg_try_advisory_lock(key)` retry loop (session level, 30 s timeout) |
 
 No application-level coordination is required. On SQL Server, DDL is transactional. If the second process
 somehow races past the lock, the PK constraint on the history table prevents double-recording and the whole
 transaction rolls back cleanly. On MySQL, DDL auto-commits per step; the advisory lock prevents the race
-entirely. If you need a bounded wait on PostgreSQL (which blocks indefinitely), wrap `ApplyMigrationsAsync`
-in a `CancellationTokenSource` with a timeout.
+entirely. For the full provider contract, cancellation behavior, and custom migration options, see
+[Migration Provider Contract](docs/migration-provider-contract.md).
 
 ## Production-Ready Features
 

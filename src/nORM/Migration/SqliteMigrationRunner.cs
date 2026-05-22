@@ -23,6 +23,7 @@ namespace nORM.Migration
     {
         private readonly DbConnection _connection;
         private readonly Assembly _migrationsAssembly;
+        private readonly MigrationOptions _migrationOptions;
         private DbContext? _context;
         private readonly ILogger? _logger;
         private const string HistoryTableName = "__NormMigrationsHistory";
@@ -40,9 +41,23 @@ namespace nORM.Migration
         /// <param name="options">Optional DbContext configuration for interceptors.</param>
         /// <param name="logger">Optional logger for drift warnings and diagnostics.</param>
         public SqliteMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null, ILogger? logger = null)
+            : this(connection, migrationsAssembly, new MigrationOptions(), options, logger)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SqliteMigrationRunner"/> class.
+        /// </summary>
+        /// <param name="connection">Open connection to the target SQLite database.</param>
+        /// <param name="migrationsAssembly">Assembly containing migration classes.</param>
+        /// <param name="migrationOptions">Migration runner options.</param>
+        /// <param name="options">Optional DbContext configuration for interceptors.</param>
+        /// <param name="logger">Optional logger for drift warnings and diagnostics.</param>
+        public SqliteMigrationRunner(DbConnection connection, Assembly migrationsAssembly, MigrationOptions migrationOptions, DbContextOptions? options = null, ILogger? logger = null)
         {
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
             _migrationsAssembly = migrationsAssembly ?? throw new ArgumentNullException(nameof(migrationsAssembly));
+            _migrationOptions = migrationOptions ?? throw new ArgumentNullException(nameof(migrationOptions));
             _logger = logger;
             if (options != null && options.CommandInterceptors.Count > 0)
             {
@@ -179,7 +194,7 @@ namespace nORM.Migration
         {
             await using var cmd = _connection.CreateCommand();
             cmd.Transaction = transaction;
-            cmd.CommandText = $"INSERT INTO \"{HistoryTableName}\" (\"Version\", \"Name\", \"AppliedOn\") VALUES (@Version, @Name, @AppliedOn);";
+            cmd.CommandText = $"INSERT INTO \"{_migrationOptions.HistoryTableName}\" (\"Version\", \"Name\", \"AppliedOn\") VALUES (@Version, @Name, @AppliedOn);";
             cmd.AddParam("@Version", migration.Version);
             cmd.AddParam("@Name", migration.Name);
             cmd.AddParam("@AppliedOn", DateTime.UtcNow);
@@ -196,7 +211,7 @@ namespace nORM.Migration
         {
             var applied = new Dictionary<long, string>();
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"SELECT \"Version\", \"Name\" FROM \"{HistoryTableName}\"";
+            cmd.CommandText = $"SELECT \"Version\", \"Name\" FROM \"{_migrationOptions.HistoryTableName}\"";
             try
             {
                 await using var reader = await ExecuteReaderAsync(cmd, ct).ConfigureAwait(false);
@@ -239,7 +254,7 @@ namespace nORM.Migration
         private async Task EnsureHistoryTableAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{HistoryTableName}\" (Version INTEGER PRIMARY KEY, Name TEXT NOT NULL, AppliedOn TEXT NOT NULL);";
+            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{_migrationOptions.HistoryTableName}\" (Version INTEGER PRIMARY KEY, Name TEXT NOT NULL, AppliedOn TEXT NOT NULL);";
             await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
         }
 

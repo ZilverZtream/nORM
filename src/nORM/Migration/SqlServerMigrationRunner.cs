@@ -25,6 +25,7 @@ namespace nORM.Migration
     {
         private readonly DbConnection _connection;
         private readonly Assembly _migrationsAssembly;
+        private readonly MigrationOptions _migrationOptions;
         private DbContext? _context;
         private readonly ILogger? _logger;
         internal const string HistoryTableName = "__NormMigrationsHistory";
@@ -43,9 +44,23 @@ namespace nORM.Migration
         /// <param name="options">Optional context configuration used for executing migrations.</param>
         /// <param name="logger">Optional logger for drift warnings and diagnostics.</param>
         public SqlServerMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null, ILogger? logger = null)
+            : this(connection, migrationsAssembly, new MigrationOptions(), options, logger)
+        {
+        }
+
+        /// <summary>
+        /// Creates a new migration runner for SQL Server.
+        /// </summary>
+        /// <param name="connection">Open connection to the target database.</param>
+        /// <param name="migrationsAssembly">Assembly containing migration classes.</param>
+        /// <param name="migrationOptions">Migration runner options.</param>
+        /// <param name="options">Optional context configuration used for executing migrations.</param>
+        /// <param name="logger">Optional logger for drift warnings and diagnostics.</param>
+        public SqlServerMigrationRunner(DbConnection connection, Assembly migrationsAssembly, MigrationOptions migrationOptions, DbContextOptions? options = null, ILogger? logger = null)
         {
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
             _migrationsAssembly = migrationsAssembly ?? throw new ArgumentNullException(nameof(migrationsAssembly));
+            _migrationOptions = migrationOptions ?? throw new ArgumentNullException(nameof(migrationOptions));
             _logger = logger;
             if (options != null && options.CommandInterceptors.Count > 0)
             {
@@ -93,8 +108,8 @@ namespace nORM.Migration
         /// <summary>
         /// Acquires an exclusive session-scoped advisory lock using <c>sp_getapplock</c>.
         /// Session scope ensures the lock survives across transaction boundaries within this connection.
-        /// Throws <see cref="InvalidOperationException"/> if the lock cannot be acquired within
-        /// <see cref="MigrationLockTimeoutMs"/> milliseconds.
+        /// Throws <see cref="InvalidOperationException"/> if the lock cannot be acquired within the
+        /// configured <see cref="MigrationOptions.LockTimeout"/>.
         /// </summary>
         internal async Task AcquireAdvisoryLockAsync(CancellationToken ct)
         {
@@ -102,10 +117,10 @@ namespace nORM.Migration
             cmd.CommandText = $@"
 DECLARE @Result INT;
 EXEC @Result = sp_getapplock
-    @Resource      = '{MigrationLockResource}',
+    @Resource      = '{_migrationOptions.LockName}',
     @LockMode      = 'Exclusive',
     @LockOwner     = 'Session',
-    @LockTimeout   = {MigrationLockTimeoutMs};
+    @LockTimeout   = {_migrationOptions.LockTimeoutMilliseconds};
 IF @Result < 0
     RAISERROR(
         'nORM: Failed to acquire migration advisory lock (sp_getapplock returned %d). Another process may already be deploying migrations.',
@@ -121,7 +136,7 @@ IF @Result < 0
             await using var cmd = _connection.CreateCommand();
             cmd.CommandText = $@"
 EXEC sp_releaseapplock
-    @Resource  = '{MigrationLockResource}',
+    @Resource  = '{_migrationOptions.LockName}',
     @LockOwner = 'Session';";
             try { await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false); }
             catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
@@ -217,7 +232,7 @@ EXEC sp_releaseapplock
         {
             await using var cmd = _connection.CreateCommand();
             cmd.Transaction = transaction;
-            cmd.CommandText = $"INSERT INTO [{HistoryTableName}] (Version, Name, AppliedOn) VALUES (@Version, @Name, @AppliedOn)";
+            cmd.CommandText = $"INSERT INTO [{_migrationOptions.HistoryTableName}] (Version, Name, AppliedOn) VALUES (@Version, @Name, @AppliedOn)";
             cmd.AddParam("@Version", migration.Version);
             cmd.AddParam("@Name", migration.Name);
             cmd.AddParam("@AppliedOn", DateTime.UtcNow);
@@ -234,7 +249,7 @@ EXEC sp_releaseapplock
         {
             var applied = new Dictionary<long, string>();
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"SELECT [Version], [Name] FROM [{HistoryTableName}]";
+            cmd.CommandText = $"SELECT [Version], [Name] FROM [{_migrationOptions.HistoryTableName}]";
             try
             {
                 await using var reader = await ExecuteReaderAsync(cmd, ct).ConfigureAwait(false);
@@ -274,7 +289,7 @@ EXEC sp_releaseapplock
         private async Task EnsureHistoryTableAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"IF OBJECT_ID(N'{HistoryTableName}', N'U') IS NULL CREATE TABLE [{HistoryTableName}] (Version BIGINT PRIMARY KEY, Name NVARCHAR(255) NOT NULL, AppliedOn DATETIME2 NOT NULL);";
+            cmd.CommandText = $"IF OBJECT_ID(N'{_migrationOptions.HistoryTableName}', N'U') IS NULL CREATE TABLE [{_migrationOptions.HistoryTableName}] (Version BIGINT PRIMARY KEY, Name NVARCHAR(255) NOT NULL, AppliedOn DATETIME2 NOT NULL);";
             await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
         }
 
