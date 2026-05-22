@@ -106,6 +106,40 @@ public class StoredProcedureTests
         Assert.Equal("Epsilon", result.Results[0].Name);
     }
 
+    [Fact]
+    public async Task ExecuteStoredProcedureAsync_SqliteTextProvider_RejectsNonReadOnlyCommandText()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(1,'Alpha');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var ex = await Record.ExceptionAsync(() =>
+            ctx.ExecuteStoredProcedureAsync<Item>("DELETE FROM Item"));
+
+        Assert.True(ContainsUsageException(ex), $"Expected NormUsageException in chain; got {ex?.GetType().Name}: {ex?.Message}");
+    }
+
+    [Theory]
+    [InlineData("bad proc")]
+    [InlineData("dbo.GetUsers; DROP TABLE Item")]
+    [InlineData("EXEC dbo.GetUsers")]
+    public void StoredProcedureProvider_RejectsCommandTextNames(string procedureName)
+    {
+        var ex = Assert.Throws<NormUsageException>(() =>
+            DbContext.ValidateStoredProcedureCommandText(
+                procedureName,
+                new SqlServerProvider(),
+                parameters: null));
+
+        Assert.Contains("Stored procedure names", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>
     /// Verifies SqliteProvider.StoredProcedureCommandType returns CommandType.Text.
     /// This is the provider override that all SP methods should use.

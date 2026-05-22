@@ -243,6 +243,22 @@ public class DocumentationContractTests
     }
 
     [Fact]
+    public void Readme_links_to_stored_procedure_security_contract()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "stored-procedure-security.md"));
+        var tenantContract = File.ReadAllText(Path.Combine(root, "docs", "multi-tenancy-security.md"));
+
+        Assert.Contains("docs/stored-procedure-security.md", readme, StringComparison.Ordinal);
+        Assert.Contains("privileged execution paths", contract, StringComparison.Ordinal);
+        Assert.Contains("TenantId", contract, StringComparison.Ordinal);
+        Assert.Contains("allowlisted", contract, StringComparison.Ordinal);
+        Assert.Contains("docs/stored-procedure-security.md", tenantContract, StringComparison.Ordinal);
+        Assert.Contains("ExecuteStoredProcedureAsync<UserStats>", tenantContract, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Readme_links_to_interceptor_contract()
     {
         var root = FindRepositoryRoot();
