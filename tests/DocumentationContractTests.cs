@@ -193,6 +193,22 @@ public class DocumentationContractTests
         Assert.Contains("SQLite", contract, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Readme_links_to_bulk_operation_contract()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "bulk-operations.md"));
+
+        Assert.Contains("docs/bulk-operations.md", readme, StringComparison.Ordinal);
+        Assert.Contains("BulkInsertAsync", contract, StringComparison.Ordinal);
+        Assert.Contains("BulkUpdateAsync", contract, StringComparison.Ordinal);
+        Assert.Contains("BulkDeleteAsync", contract, StringComparison.Ordinal);
+        Assert.Contains("tenant", contract, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CancellationToken.None", contract, StringComparison.Ordinal);
+        Assert.Contains("SupportsNativeBulkInsert", contract, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
