@@ -551,8 +551,7 @@ END;";
                     {
                         var batch = entityList.GetRange(i, Math.Min(sizing.OptimalBatchSize, entityList.Count - i));
                         using var table = GetDataTable(m, insertableCols);
-                        foreach (var entity in batch)
-                            table.Rows.Add(insertableCols.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
+                        LoadBulkInsertRows(table, insertableCols, batch);
 
                         var batchSw = Stopwatch.StartNew();
                         await bulkCopy.WriteToServerAsync(table, ct).ConfigureAwait(false);
@@ -821,6 +820,27 @@ END;";
                 return dt;
             });
             return schema.Clone();
+        }
+
+        private static void LoadBulkInsertRows<T>(DataTable table, List<Column> cols, List<T> batch) where T : class
+        {
+            var values = new object[cols.Count];
+            table.BeginLoadData();
+            try
+            {
+                for (int i = 0; i < batch.Count; i++)
+                {
+                    var entity = batch[i];
+                    for (int j = 0; j < cols.Count; j++)
+                        values[j] = cols[j].Getter(entity) ?? DBNull.Value;
+
+                    table.Rows.Add(values);
+                }
+            }
+            finally
+            {
+                table.EndLoadData();
+            }
         }
     }
 }
