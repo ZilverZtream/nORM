@@ -106,6 +106,8 @@ public class ProviderMatrixBenchmarks
     private DbCommand? _adoComplexPrepared;
     private DbParameter? _adoComplexAgeParam;
     private DbParameter? _adoComplexCityParam;
+    private DbCommand? _adoJoinPrepared;
+    private DbParameter? _adoJoinAmountParam;
 
     private static readonly Func<ProviderMatrixEfContext, int, IAsyncEnumerable<BenchmarkUser>> s_efSimpleCompiled
         = CompileAsyncQuery((ProviderMatrixEfContext ctx, int take)
@@ -264,6 +266,8 @@ public class ProviderMatrixBenchmarks
         _adoSimplePrepared = CreatePreparedCommand(QuerySimpleSql(prepared: true), out _adoSimpleTakeParam);
 
         _adoComplexPrepared = CreatePreparedCommand(QueryComplexSql(), out _adoComplexAgeParam, out _adoComplexCityParam);
+
+        _adoJoinPrepared = CreateJoinPreparedCommand(QueryJoinSql(), out _adoJoinAmountParam);
     }
 
     private DbCommand CreatePreparedCommand(string sql, out DbParameter take)
@@ -283,6 +287,15 @@ public class ProviderMatrixBenchmarks
         AddParameter(command, "@IsActive", DbType.Boolean, ActiveValue());
         age = AddParameter(command, "@Age", DbType.Int32, 25);
         city = AddParameter(command, "@City", DbType.String, "New York", size: 128);
+        command.Prepare();
+        return command;
+    }
+
+    private DbCommand CreateJoinPreparedCommand(string sql, out DbParameter amount)
+    {
+        var command = _adoConnection!.CreateCommand();
+        command.CommandText = sql;
+        amount = AddParameter(command, "@Amount", DbType.Decimal, 100m);
         command.Prepare();
         return command;
     }
@@ -431,9 +444,20 @@ public class ProviderMatrixBenchmarks
     public async Task<List<BenchmarkJoinRow>> Query_Join_Dapper()
         => (await _adoConnection!.QueryAsync<BenchmarkJoinRow>(QueryJoinSql(), new { Amount = 100 })).ToList();
 
+    [Benchmark(Description = "Query Join Raw ADO (Convenience)")]
+    public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo_Convenience()
+        => ReadJoinRowsConvenienceAsync(QueryJoinSql(), ("@Amount", DbType.Decimal, 100m));
+
     [Benchmark(Description = "Query Join Raw ADO (Optimized)")]
     public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo_Optimized()
         => ReadJoinRowsAsync(QueryJoinSql(), ("@Amount", DbType.Decimal, 100m));
+
+    [Benchmark(Description = "Query Join Raw ADO (Prepared Optimized)")]
+    public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo_PreparedOptimized()
+    {
+        _adoJoinAmountParam!.Value = 100m;
+        return ReadJoinRowsAsync(_adoJoinPrepared!);
+    }
 
     [Benchmark]
     public Task<List<BenchmarkJoinRow>> Query_Join_nORM_Compiled()
@@ -694,6 +718,11 @@ public class ProviderMatrixBenchmarks
         foreach (var (name, type, value) in parameters)
             AddParameter(command, name, type, value);
 
+        return await ReadJoinRowsAsync(command);
+    }
+
+    private async Task<List<BenchmarkJoinRow>> ReadJoinRowsAsync(DbCommand command)
+    {
         var rows = new List<BenchmarkJoinRow>();
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -702,6 +731,26 @@ public class ProviderMatrixBenchmarks
                 reader.GetString(0),
                 reader.GetDecimal(1),
                 reader.GetString(2)));
+        }
+
+        return rows;
+    }
+
+    private async Task<List<BenchmarkJoinRow>> ReadJoinRowsConvenienceAsync(string sql, params (string Name, DbType Type, object Value)[] parameters)
+    {
+        await using var command = _adoConnection!.CreateCommand();
+        command.CommandText = sql;
+        foreach (var (name, type, value) in parameters)
+            AddParameter(command, name, type, value);
+
+        var rows = new List<BenchmarkJoinRow>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new BenchmarkJoinRow(
+                Convert.ToString(reader["Name"], CultureInfo.InvariantCulture)!,
+                Convert.ToDecimal(reader["Amount"], CultureInfo.InvariantCulture),
+                Convert.ToString(reader["ProductName"], CultureInfo.InvariantCulture)!));
         }
 
         return rows;

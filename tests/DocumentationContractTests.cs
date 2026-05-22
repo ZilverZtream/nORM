@@ -275,6 +275,28 @@ public class DocumentationContractTests
         Assert.Contains("must not be recreated", contract, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Benchmark_governance_defines_fair_raw_ado_categories()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "benchmark-governance.md"));
+        var providerMatrix = File.ReadAllText(Path.Combine(root, "benchmarks", "ProviderMatrixBenchmarks.cs"));
+        var sqliteMatrix = File.ReadAllText(Path.Combine(root, "benchmarks", "OrmBenchmarks.cs"));
+
+        Assert.Contains("docs/benchmark-governance.md", readme, StringComparison.Ordinal);
+        Assert.Contains("RawAdo_Convenience", contract, StringComparison.Ordinal);
+        Assert.Contains("RawAdo_Optimized", contract, StringComparison.Ordinal);
+        Assert.Contains("RawAdo_PreparedOptimized", contract, StringComparison.Ordinal);
+        Assert.Contains("Dapper_Prepared", contract, StringComparison.Ordinal);
+        Assert.Contains("warmupCount: 3, iterationCount: 10", providerMatrix, StringComparison.Ordinal);
+        Assert.Contains("Query_Join_RawAdo_Convenience", providerMatrix, StringComparison.Ordinal);
+        Assert.Contains("Query_Join_RawAdo_Optimized", providerMatrix, StringComparison.Ordinal);
+        Assert.Contains("Query_Join_RawAdo_PreparedOptimized", providerMatrix, StringComparison.Ordinal);
+        Assert.Contains("Query_Join_RawAdo_Convenience", sqliteMatrix, StringComparison.Ordinal);
+        Assert.Contains("Query_Join_RawAdo_PreparedOptimized", sqliteMatrix, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

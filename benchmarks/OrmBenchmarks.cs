@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
@@ -83,6 +84,8 @@ namespace nORM.Benchmarks
         private SqliteCommand? _adoComplexPrepared;
         private SqliteParameter? _adoComplexAgeParam;
         private SqliteParameter? _adoComplexCityParam;
+        private SqliteCommand? _adoJoinPrepared;
+        private SqliteParameter? _adoJoinAmountParam;
 
         // EF Core compiled queries
         private static readonly Func<EfCoreContext, int, IAsyncEnumerable<BenchmarkUser>> _efSimpleCompiled
@@ -248,6 +251,15 @@ namespace nORM.Benchmarks
             _adoComplexPrepared.Parameters.Add(_adoComplexAgeParam);
             _adoComplexPrepared.Parameters.Add(_adoComplexCityParam);
             _adoComplexPrepared.Prepare();
+
+            _adoJoinPrepared = _dapperConnection.CreateCommand();
+            _adoJoinPrepared.CommandText = QueryJoinSql();
+            _adoJoinAmountParam = _adoJoinPrepared.CreateParameter();
+            _adoJoinAmountParam.ParameterName = "@Amount";
+            _adoJoinAmountParam.DbType = DbType.Decimal;
+            _adoJoinAmountParam.Value = 100m;
+            _adoJoinPrepared.Parameters.Add(_adoJoinAmountParam);
+            _adoJoinPrepared.Prepare();
         }
 
         // ========== SINGLE INSERT (reuse contexts/connections; no per-op PRAGMAs) ==========
@@ -586,9 +598,20 @@ namespace nORM.Benchmarks
         public async Task<List<BenchmarkJoinRow>> Query_Join_Dapper()
             => (await _dapperConnection!.QueryAsync<BenchmarkJoinRow>(QueryJoinSql(), new { Amount = 100 })).ToList();
 
-        [Benchmark]
-        public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo()
+        [Benchmark(Description = "Query Join Raw ADO (Convenience)")]
+        public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo_Convenience()
+            => ReadJoinRowsConvenienceAsync(QueryJoinSql(), ("@Amount", DbType.Decimal, 100m));
+
+        [Benchmark(Description = "Query Join Raw ADO (Optimized)")]
+        public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo_Optimized()
             => ReadJoinRowsAsync(QueryJoinSql(), ("@Amount", DbType.Decimal, 100m));
+
+        [Benchmark(Description = "Query Join Raw ADO (Prepared Optimized)")]
+        public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo_PreparedOptimized()
+        {
+            _adoJoinAmountParam!.Value = 100m;
+            return ReadJoinRowsAsync(_adoJoinPrepared!);
+        }
 
         [Benchmark]
         public Task<List<BenchmarkJoinRow>> Query_Join_nORM_Compiled() => _normJoinCompiled(_nOrmContext!, 100);
@@ -637,6 +660,11 @@ namespace nORM.Benchmarks
                 command.Parameters.Add(parameter);
             }
 
+            return await ReadJoinRowsAsync(command);
+        }
+
+        private static async Task<List<BenchmarkJoinRow>> ReadJoinRowsAsync(SqliteCommand command)
+        {
             using var reader = await command.ExecuteReaderAsync();
             var rows = new List<BenchmarkJoinRow>();
             while (await reader.ReadAsync())
@@ -644,6 +672,30 @@ namespace nORM.Benchmarks
                     reader.GetString(0),
                     reader.GetDecimal(1),
                     reader.GetString(2)));
+
+            return rows;
+        }
+
+        private async Task<List<BenchmarkJoinRow>> ReadJoinRowsConvenienceAsync(string sql, params (string Name, DbType Type, object Value)[] parameters)
+        {
+            using var command = _dapperConnection!.CreateCommand();
+            command.CommandText = sql;
+            foreach (var (name, type, value) in parameters)
+            {
+                var parameter = command.CreateParameter();
+                parameter.ParameterName = name;
+                parameter.DbType = type;
+                parameter.Value = value;
+                command.Parameters.Add(parameter);
+            }
+
+            using var reader = await command.ExecuteReaderAsync();
+            var rows = new List<BenchmarkJoinRow>();
+            while (await reader.ReadAsync())
+                rows.Add(new BenchmarkJoinRow(
+                    Convert.ToString(reader["Name"], CultureInfo.InvariantCulture)!,
+                    Convert.ToDecimal(reader["Amount"], CultureInfo.InvariantCulture),
+                    Convert.ToString(reader["ProductName"], CultureInfo.InvariantCulture)!));
 
             return rows;
         }
