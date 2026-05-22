@@ -483,6 +483,9 @@ nORM is being tuned toward these release goals:
 - **Memory usage**: keep allocations well below EF Core on read-heavy paths
 - **Bulk operations**: remain substantially faster than EF Core and competitive with Dapper transaction-based inserts
 
+Benchmark claims must follow the reproducibility and baseline rules in
+[Benchmark Governance](docs/benchmark-governance.md).
+
 ## Contributing
 
 Before public release, use focused issues or pull requests with a clear reproduction, test coverage, and benchmark data when performance is involved.
