@@ -187,7 +187,7 @@ namespace nORM.Query
                 var member = (MemberExpression)lambda.Body;
                 var column = mapping.ColumnsByName[member.Member.Name].EscCol;
                 if (!TryGetSetValue(call.Arguments[1], out var value))
-                    throw new NormUnsupportedFeatureException("ExecuteUpdate set values must be constants or captured local values. Method calls and computed expressions are not supported.");
+                    throw new NormUnsupportedFeatureException("ExecuteUpdate set values must be literal constants or precomputed captured local values. Method calls, inline computed values, column-based updates and server expressions are not supported in v1; compute the value before calling ExecuteUpdateAsync.");
                 assigns.Add((column, value));
                 call = call.Object as MethodCallExpression;
             }

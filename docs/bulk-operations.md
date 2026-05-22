@@ -30,6 +30,23 @@ invalid entity shapes fail before provider execution.
   nORM-owned transaction reaches commit or rollback, completion uses
   `CancellationToken.None` to avoid ambiguous partial cleanup.
 
+## `ExecuteUpdateAsync` Set Values
+
+The v1 `ExecuteUpdateAsync` assignment contract is intentionally narrow:
+
+- Supported: literal constants, `null`, and precomputed captured local values.
+- Supported: chained `SetProperty` calls that each target a mapped scalar
+  property.
+- Unsupported: method calls in the assignment value, inline computed values such
+  as `prefix + suffix`, column-based updates such as `x => x.Count + 1`, and
+  provider/server expressions.
+
+Unsupported assignment values throw `NormUnsupportedFeatureException` before
+the update command executes. If an application needs a computed value in v1,
+compute it into a local variable first and pass that local variable to
+`SetProperty`. Server-side computed updates are a post-v1 feature, not part of
+the stable v1 contract.
+
 ## Transactions and Partial Failures
 
 If the context has an active transaction, bulk operations use it and the caller

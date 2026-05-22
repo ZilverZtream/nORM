@@ -103,6 +103,31 @@ public class BatchCudTests
     }
 
     [Fact]
+    public async Task ExecuteUpdateAsync_rejects_inline_computed_set_value_with_actionable_message()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE User(Id INTEGER, Name TEXT, Archived INTEGER);" +
+                             "INSERT INTO User VALUES(1,'A',0);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var prefix = "B";
+        var suffix = "C";
+
+        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
+            ctx.Query<User>()
+                .Where(u => u.Id == 1)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Name, prefix + suffix)));
+
+        Assert.Contains("precomputed captured local values", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("server expressions", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("before calling ExecuteUpdateAsync", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ExecuteDeleteAsync_rejects_paged_query_shape()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
