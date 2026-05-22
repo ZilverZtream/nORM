@@ -1364,7 +1364,7 @@ public class QueryTranslatorCoverageTests
     // ─── Inner Join (Queryable.Join) ───────────────────────────────────────
 
     [Fact]
-    public async Task InnerJoin_TwoTables_ReturnsJoinedResults()
+    public void InnerJoin_TwoTables_ReturnsJoinedResults()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();

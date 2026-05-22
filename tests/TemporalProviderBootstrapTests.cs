@@ -221,7 +221,7 @@ public class TemporalProviderBootstrapTests
  //escaped identifiers when temporal features are enabled on a real SQLite connection.
  //</summary>
     [Fact]
-    public async System.Threading.Tasks.Task Sqlite_TemporalTagRoundTrip_WorksEndToEnd()
+    public void Sqlite_TemporalTagRoundTrip_WorksEndToEnd()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();

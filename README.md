@@ -1,23 +1,23 @@
 # nORM (The Norm) - High-Performance ORM for .NET
 
-nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .NET that targets Dapper-competitive hot paths and substantially lower overhead than Entity Framework Core while maintaining the developer-friendly features expected from a modern ORM. Built for enterprise applications that demand both developer productivity and performance.
+nORM is a modern Object-Relational Mapping (ORM) library for .NET that is being tuned for low-overhead hot paths while keeping familiar ORM features such as LINQ queries, change tracking, migrations, multi-tenancy, and provider-specific bulk operations.
 
 ## Why Choose nORM?
 
-- **Fast by design**: Dapper-competitive read paths, compiled queries, and native bulk operations
+- **Performance-focused**: compiled queries, native bulk operations, and BenchmarkDotNet suites for comparing tuned paths
 - **Documented LINQ Support**: Provider-tested LINQ support for common query shapes, with explicit limits documented in [the LINQ support matrix](docs/linq-support.md)
 - **Explicit Deployment Boundaries**: JIT-first runtime with source-generation support and documented [AOT/trimming limits](docs/aot-trimming.md)
 - **Bounded Cache Policy**: Process-wide and per-context caches have documented lifetimes, limits, and diagnostics in [the cache policy](docs/cache-policy.md)
 - **Familiar API**: EF Core-style context, configuration, and change-tracking patterns
-- **Enterprise-Grade Bulk Operations**: High-performance bulk insert, update, and delete operations
+- **Bulk Operations**: provider-specific bulk insert, update, and delete operations with documented semantics
 - **Advanced Query Capabilities**: Raw SQL, stored procedures, and compiled queries
-- **Intelligent Connection Management**: Built-in pooling and connection optimization
+- **Connection Management**: context-level connection ownership plus database-driver pooling
 - **Multi-Database Support**: SQL Server, PostgreSQL, SQLite, and MySQL
 - **Smart Relationship Handling**: Automatic relationship discovery and lazy loading
 - **Flexible Configuration**: Fluent API and attribute-based configuration
 - **Developer Tools**: Preview database scaffolding and reverse engineering
 - **Modern Features**: JSON querying, window functions, temporal queries
-- **Enterprise Ready**: Multi-tenancy, caching, retry policies, and interceptors
+- **Operational Features**: Multi-tenancy, caching, retry policies, and interceptors with explicit support contracts
 
 ## Performance Validation
 
@@ -43,7 +43,7 @@ nORM ships with BenchmarkDotNet suites that compare EF Core, Dapper, Raw ADO.NET
 
 > nORM's compiled query cache is intended to deliver the largest gains on warm paths. Performance-sensitive work should run `benchmarks/nORM.Benchmarks.csproj` before release decisions; generated BenchmarkDotNet output is intentionally not tracked in source control.
 
-Raw ADO.NET labels are precise: `Convenience` means straightforward handwritten ADO using name lookup/conversions, `Optimized` means ordinal-based typed getters where provider values permit them, and `PreparedOptimized` means prepared command reuse plus the optimized reader path. Any public "beats Raw ADO" claim must name the exact category, provider, and benchmark artifact.
+Raw ADO.NET labels are precise: `Convenience` means straightforward handwritten ADO using name lookup/conversions, `Optimized` means ordinal-based typed getters where provider values permit them, and `PreparedOptimized` means prepared command reuse plus the optimized reader path. Any public performance comparison against Raw ADO.NET must name the exact category, provider, and benchmark artifact.
 
 ## Installation
 
@@ -59,7 +59,6 @@ dotnet add package nORM
 using nORM.Core;
 using nORM.Providers;
 
-// Drop-in replacement for EF Core setup
 var provider = new SqlServerProvider();
 var context = new DbContext("Server=.;Database=MyApp;Trusted_Connection=true", provider);
 
@@ -72,7 +71,7 @@ public class User
     public string Email { get; set; }
     public DateTime CreatedAt { get; set; }
     
-    // Navigation properties work identically
+    // Navigation properties are supported for documented relationship shapes
     public virtual ICollection<Order> Orders { get; set; }
 }
 ```
@@ -396,14 +395,20 @@ multi-tenancy, logging, and troubleshooting are covered in
 ### Connection Management & Pooling
 
 ```csharp
-var pool = new ConnectionPool(
-    () => new SqlConnection("Server=.;Database=MyApp;Trusted_Connection=true"),
-    new ConnectionPoolOptions
-    {
-        MaxPoolSize = 50,
-        MinPoolSize = 5,
-        ConnectionIdleLifetime = TimeSpan.FromMinutes(5)
-    });
+var builder = new SqlConnectionStringBuilder(connectionString)
+{
+    Pooling = true,
+    MaxPoolSize = 50,
+    MinPoolSize = 5
+};
+
+await using var connection = new SqlConnection(builder.ConnectionString);
+await connection.OpenAsync(cancellationToken);
+
+await using var context = new DbContext(
+    connection,
+    new SqlServerProvider(),
+    new DbContextOptions());
 ```
 
 ### Interceptors & Extensibility
@@ -438,13 +443,16 @@ options.AddGlobalFilter<ISoftDeletable>(e => !e.IsDeleted);
 
 ## Migration from Entity Framework Core
 
-nORM is designed as a drop-in replacement for EF Core:
+nORM intentionally uses familiar EF Core-style concepts, but it is not a
+binary-compatible EF Core provider and it does not implement every EF Core LINQ,
+tracking, lazy-loading, or migrations behavior. Treat migration as a deliberate
+port:
 
-1. **Same DbContext patterns** - Minimal code changes required
-2. **Identical LINQ syntax** - Your existing queries work unchanged  
-3. **Compatible attribute model** - `[Key]`, `[Table]`, `[Column]` attributes work identically
-4. **Familiar fluent API** - Model configuration uses the same patterns
-5. **Same dependency injection** - Integrate with your existing DI container
+1. **DbContext-style patterns** - Context and query entry points are familiar, but constructors and options differ.
+2. **Documented LINQ subset** - Query shapes must be checked against [the LINQ support matrix](docs/linq-support.md).
+3. **Compatible common attributes** - `[Key]`, `[Table]`, and `[Column]` are supported for standard mapping cases.
+4. **Fluent API with nORM semantics** - Configuration is similar in shape, not a one-for-one EF Core clone.
+5. **DI integration** - Register contexts and providers explicitly for the target database.
 
 ### Simple Migration Example
 
@@ -458,7 +466,7 @@ public class MyDbContext : DbContext
         => options.UseSqlServer(connectionString);
 }
 
-// After (nORM) - Almost identical!
+// After (nORM)
 public class MyDbContext : nORM.Core.DbContext
 {
     public MyDbContext() : base(connectionString, new SqlServerProvider()) { }
@@ -468,12 +476,12 @@ public class MyDbContext : nORM.Core.DbContext
 }
 ```
 
-## Why nORM Outperforms EF Core
+## Performance Design
 
 - **Advanced IL Materialization**: Hand-optimized IL generation eliminates reflection overhead
 - **Zero-Allocation Query Execution**: Memory-efficient query processing reduces GC pressure  
 - **Intelligent Caching**: Multi-layered caching strategy for query plans and metadata
-- **Optimized Connection Management**: Efficient connection pooling and reuse
+- **Driver Pooling**: Uses ADO.NET provider-native pooling instead of a custom public pool
 - **Native Bulk Operations**: Database-specific bulk operation implementations
 - **Compiled Query Support**: Pre-compile frequently used queries for maximum speed
 

@@ -37,9 +37,11 @@ large batches.
 
 ## Connection Pooling
 
-Prefer the database driver's built-in pooling unless the application has a
-specific reason to use nORM's `ConnectionPool`. Keep pool limits aligned with the
-database server's connection limit and the host's concurrency level.
+Use the database driver's built-in pooling. nORM no longer ships a public custom
+connection pool; `ConnectionManager` is for topology, health checks, and
+read/write routing, not for replacing provider-native pooling. Keep driver pool
+limits aligned with the database server's connection limit and the host's
+concurrency level.
 
 ## Timeouts and Retries
 

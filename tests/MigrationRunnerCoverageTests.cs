@@ -752,7 +752,7 @@ public class MigrationRunnerCoverageTests
     }
 
     [Fact]
-    public async Task Postgres_ApplyMigrationsAsync_LockKeyConstantPresent()
+    public void Postgres_ApplyMigrationsAsync_LockKeyConstantPresent()
     {
         // Verify the constant is what the advisory lock SQL references
         Assert.NotEqual(0L, PostgresMigrationRunner.MigrationLockKey);

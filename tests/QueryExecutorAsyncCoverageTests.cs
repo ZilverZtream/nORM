@@ -437,7 +437,7 @@ public class QueryExecutorAsyncCoverageTests
     }
 
     [Fact]
-    public async Task Async4_DependentQuery_Sync_PathAlsoCovered()
+    public void Async4_DependentQuery_Sync_PathAlsoCovered()
     {
         // Exercise the sync ExecuteDependentQueries path via Materialize (sync)
         using var cn = OpenMemory();

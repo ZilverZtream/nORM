@@ -583,7 +583,7 @@ public class ShadowPropertyTests
     }
 
     [Fact]
-    public async Task SP6_ShadowPropertyEntry_State_After_Add()
+    public void SP6_ShadowPropertyEntry_State_After_Add()
     {
         using var cn = CreateOpenDb("CREATE TABLE Article (Id INTEGER PRIMARY KEY AUTOINCREMENT, Title TEXT, Tenant TEXT)");
         var opts = new DbContextOptions
@@ -757,7 +757,7 @@ public class ShadowPropertyTests
     }
 
     [Fact]
-    public async Task SP8_ShadowProp_DoesNotAppearOnEntityClrType()
+    public void SP8_ShadowProp_DoesNotAppearOnEntityClrType()
     {
         using var cn = CreateOpenDb("CREATE TABLE Article (Id INTEGER PRIMARY KEY AUTOINCREMENT, Title TEXT, Tenant TEXT)");
         var opts = new DbContextOptions

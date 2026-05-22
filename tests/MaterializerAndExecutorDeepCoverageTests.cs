@@ -745,7 +745,7 @@ public class MaterializerAndExecutorDeepCoverageTests
     // ══════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task MF_AnonymousType_Projection_SyncPath_PositionalCtor()
+    public void MF_AnonymousType_Projection_SyncPath_PositionalCtor()
     {
         using var cn = CreateProductDb();
         using var ctx = new DbContext(cn, new SqliteProvider());

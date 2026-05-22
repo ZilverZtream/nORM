@@ -484,7 +484,7 @@ INSERT INTO X2_Child  (Id, ParentId, TenantId, Value) VALUES (2, 1, 'any', 'c2')
     // S2 — Direct UpdateAsync/DeleteAsync PK mutation guard
     // ══════════════════════════════════════════════════════════════════════════
 
-    private static async Task<(SqliteConnection Cn, DbContext Ctx)> BuildS2Async()
+    private static (SqliteConnection Cn, DbContext Ctx) BuildS2()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -501,7 +501,7 @@ INSERT INTO X2_Child  (Id, ParentId, TenantId, Value) VALUES (2, 1, 'any', 'c2')
     [Fact]
     public async Task S2_DirectUpdateAsync_MutatedPk_Throws()
     {
-        var (cn, ctx) = await BuildS2Async();
+        var (cn, ctx) = BuildS2();
         await using var _ = ctx; using var __ = cn;
 
         // Explicitly track entity with OriginalKey=1
@@ -523,7 +523,7 @@ INSERT INTO X2_Child  (Id, ParentId, TenantId, Value) VALUES (2, 1, 'any', 'c2')
     [Fact]
     public async Task S2_DirectDeleteAsync_MutatedPk_Throws()
     {
-        var (cn, ctx) = await BuildS2Async();
+        var (cn, ctx) = BuildS2();
         await using var _ = ctx; using var __ = cn;
 
         var item = new S2Item { Id = 1, Name = "original" };
@@ -542,7 +542,7 @@ INSERT INTO X2_Child  (Id, ParentId, TenantId, Value) VALUES (2, 1, 'any', 'c2')
     [Fact]
     public async Task S2_DirectUpdateAsync_UntrackedEntity_NoMutationGuard()
     {
-        var (cn, ctx) = await BuildS2Async();
+        var (cn, ctx) = BuildS2();
         await using var _ = ctx; using var __ = cn;
 
         // Not tracked — no snapshot — no mutation guard

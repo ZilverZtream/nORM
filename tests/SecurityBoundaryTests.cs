@@ -545,7 +545,7 @@ WHERE u.IsActive = 1";
     }
 
     [Fact]
-    public async Task GateB_RawSqlWithStringLiteralInWhere_IsAllowedWhenSafe()
+    public void GateB_RawSqlWithStringLiteralInWhere_IsAllowedWhenSafe()
     {
         // Gate B: "SELECT * FROM Users WHERE Type = 'DROP'" is safe — DROP is in a string literal,
         // not in SQL structure. The validator uses IsSafeRawSql which checks the SQL itself.

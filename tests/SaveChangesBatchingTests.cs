@@ -101,7 +101,7 @@ public class SaveChangesBatchingTests
     }
 
     [Fact]
-    public async Task DefaultKey_two_added_entities_both_appear_in_ChangeTracker()
+    public void DefaultKey_two_added_entities_both_appear_in_ChangeTracker()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
