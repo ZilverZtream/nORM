@@ -44,7 +44,7 @@ still needs release evidence.
 | 16 | Generate LINQ support matrix from tests | Verified | `docs/linq-support-coverage.md` maps non-unsupported matrix rows to test files and documentation contracts enforce coverage entries. |
 | 17 | Resolve `Any` and `All` semantics across providers | In Progress | Direct SQLite cardinality tests now exercise `Any`, `Any(predicate)`, and `All`; live provider parity still required. |
 | 18 | Stabilize Include and lazy-loading contracts | In Progress | Relationship docs exist; unsupported paths and exception taxonomy need cleanup. |
-| 19 | Prove terminal operator parity in every execution path | Open | Needs table-driven runtime/sync/async/compiled coverage. |
+| 19 | Prove terminal operator parity in every execution path | In Progress | Sync/async SQLite cardinality coverage now includes terminal operators; compiled/live-provider parity remains open. |
 | 20 | Decide the v1 default for client evaluation | In Progress | Policy exists; default remains a v1 compatibility decision. |
 | 21 | Remove legacy string-based bulk CUD paths | Open | Structural validation exists, but legacy SQL parsing paths remain. |
 | 22 | Define bulk update value-expression support | In Progress | Safe extraction exists; documented expression contract needs sharpening. |
