@@ -143,6 +143,21 @@ public class DocumentationContractTests
         Assert.Contains("FromSqlInterpolatedAsync", contract, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Readme_links_to_interceptor_contract()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "interceptors.md"));
+
+        Assert.Contains("docs/interceptors.md", readme, StringComparison.Ordinal);
+        Assert.Contains("registration order", contract, StringComparison.Ordinal);
+        Assert.Contains("SuppressWithResult", contract, StringComparison.Ordinal);
+        Assert.Contains("CommandFailed", contract, StringComparison.Ordinal);
+        Assert.Contains("SavedChangesAsync", contract, StringComparison.Ordinal);
+        Assert.Contains("CancellationToken.None", contract, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
