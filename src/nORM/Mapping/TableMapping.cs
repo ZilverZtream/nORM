@@ -22,46 +22,46 @@ namespace nORM.Mapping
     public sealed class TableMapping
     {
         /// <summary>Gets the CLR type represented by this mapping.</summary>
-        public readonly Type Type;
+        public Type Type { get; }
 
         /// <summary>Gets the escaped table name used in SQL statements.</summary>
-        public string EscTable;
+        public string EscTable { get; set; }
 
         /// <summary>Gets all mapped columns.</summary>
-        public readonly Column[] Columns;
+        public Column[] Columns { get; }
 
         /// <summary>Gets a lookup of columns by property name.</summary>
-        public readonly Dictionary<string, Column> ColumnsByName;
+        public Dictionary<string, Column> ColumnsByName { get; }
 
         /// <summary>Gets the columns that form the primary key.</summary>
-        public readonly Column[] KeyColumns;
+        public Column[] KeyColumns { get; }
 
         /// <summary>Gets the timestamp column used for concurrency, if any.</summary>
-        public readonly Column? TimestampColumn;
+        public Column? TimestampColumn { get; }
 
         /// <summary>Gets the tenant discriminator column, if multi-tenancy is enabled.</summary>
-        public readonly Column? TenantColumn;
+        public Column? TenantColumn { get; }
 
         /// <summary>Gets the set of columns included in insert statements.</summary>
-        public readonly Column[] InsertColumns;
+        public Column[] InsertColumns { get; }
 
         /// <summary>Gets the set of columns included in update statements.</summary>
-        public readonly Column[] UpdateColumns;
+        public Column[] UpdateColumns { get; }
 
         /// <summary>Gets the unescaped table name.</summary>
         public string TableName { get; }
 
         /// <summary>Gets the relationships to dependent entities.</summary>
-        public readonly Dictionary<string, Relation> Relations = new();
+        public Dictionary<string, Relation> Relations { get; } = new();
 
         /// <summary>Gets the database provider associated with this mapping.</summary>
-        public readonly DatabaseProvider Provider;
+        public DatabaseProvider Provider { get; }
 
         /// <summary>Gets the discriminator column used for TPH inheritance, if any.</summary>
-        public readonly Column? DiscriminatorColumn = null;
+        public Column? DiscriminatorColumn { get; private set; } = null;
 
         /// <summary>Gets mappings for derived types in TPH inheritance scenarios.</summary>
-        public readonly Dictionary<object, TableMapping> TphMappings = new();
+        public Dictionary<object, TableMapping> TphMappings { get; } = new();
 
         /// <summary>Gets a fingerprint hash of all converter configurations for cache differentiation.</summary>
         public int ConverterFingerprint { get; private set; }
@@ -70,10 +70,10 @@ namespace nORM.Mapping
         public int ShadowFingerprint { get; private set; }
 
         /// <summary>Gets the owned collection mappings for this entity type.</summary>
-        public readonly List<OwnedCollectionMapping> OwnedCollections = new();
+        public List<OwnedCollectionMapping> OwnedCollections { get; } = new();
 
         /// <summary>Gets the many-to-many join table mappings for this entity type.</summary>
-        public readonly List<JoinTableMapping> ManyToManyJoins = new();
+        public List<JoinTableMapping> ManyToManyJoins { get; } = new();
 
         /// <summary>Gets a stable key segment for provider-level SQL shape caches.</summary>
         internal readonly string SqlShapeKey;
@@ -418,34 +418,34 @@ namespace nORM.Mapping
     public sealed class OwnedCollectionMapping
     {
         /// <summary>The navigation property on the owner entity that holds the collection.</summary>
-        public readonly PropertyInfo NavigationProperty;
+        public PropertyInfo NavigationProperty { get; }
 
         /// <summary>CLR element type of the owned collection items.</summary>
-        public readonly Type OwnedType;
+        public Type OwnedType { get; }
 
         /// <summary>Escaped name of the child table that stores owned items.</summary>
-        public readonly string EscTable;
+        public string EscTable { get; }
 
         /// <summary>Plain name of the child table.</summary>
-        public readonly string TableName;
+        public string TableName { get; }
 
         /// <summary>Column name in the child table that holds the FK to the owner's PK.</summary>
-        public readonly string ForeignKeyColumn;
+        public string ForeignKeyColumn { get; }
 
         /// <summary>Escaped FK column.</summary>
-        public readonly string EscForeignKeyColumn;
+        public string EscForeignKeyColumn { get; }
 
         /// <summary>All columns of the owned item (excluding the FK column itself).</summary>
-        public readonly Column[] Columns;
+        public Column[] Columns { get; }
 
         /// <summary>PK columns of the owned item (used for UPDATE/DELETE targeting).</summary>
-        public readonly Column[] KeyColumns;
+        public Column[] KeyColumns { get; }
 
         /// <summary>Getter that reads the collection from an owner instance.</summary>
-        public readonly Func<object, object?> CollectionGetter;
+        public Func<object, object?> CollectionGetter { get; }
 
         /// <summary>Setter that assigns the collection on an owner instance.</summary>
-        public readonly Action<object, object?> CollectionSetter;
+        public Action<object, object?> CollectionSetter { get; }
 
         internal OwnedCollectionMapping(
             PropertyInfo navProp,

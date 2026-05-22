@@ -15,52 +15,52 @@ namespace nORM.Mapping
     public sealed class JoinTableMapping
     {
         /// <summary>Plain join table name.</summary>
-        public readonly string TableName;
+        public string TableName { get; }
 
         /// <summary>Escaped join table name for use in SQL statements.</summary>
-        public readonly string EscTableName;
+        public string EscTableName { get; }
 
         /// <summary>Escaped column in the join table that holds the FK to the left (owner) entity's PK.</summary>
-        public readonly string EscLeftFkColumn;
+        public string EscLeftFkColumn { get; }
 
         /// <summary>Escaped column in the join table that holds the FK to the right (related) entity's PK.</summary>
-        public readonly string EscRightFkColumn;
+        public string EscRightFkColumn { get; }
 
         /// <summary>Plain left FK column name.</summary>
-        public readonly string LeftFkColumn;
+        public string LeftFkColumn { get; }
 
         /// <summary>Plain right FK column name.</summary>
-        public readonly string RightFkColumn;
+        public string RightFkColumn { get; }
 
         /// <summary>CLR type of the left (owner) entity.</summary>
-        public readonly Type LeftType;
+        public Type LeftType { get; }
 
         /// <summary>CLR type of the right (related) entity.</summary>
-        public readonly Type RightType;
+        public Type RightType { get; }
 
         /// <summary>Name of the navigation property on the left entity.</summary>
-        public readonly string LeftNavPropertyName;
+        public string LeftNavPropertyName { get; }
 
         /// <summary>Name of the navigation property on the right entity (inverse side), if any.</summary>
-        public readonly string? RightNavPropertyName;
+        public string? RightNavPropertyName { get; }
 
         /// <summary>Gets the FK value (left entity PK) from a left entity instance.</summary>
-        public readonly Func<object, object?> LeftPkGetter;
+        public Func<object, object?> LeftPkGetter { get; }
 
         /// <summary>Gets the FK value (right entity PK) from a right entity instance.</summary>
-        public readonly Func<object, object?> RightPkGetter;
+        public Func<object, object?> RightPkGetter { get; }
 
         /// <summary>Gets the collection of related (right) entities from a left entity instance.</summary>
-        public readonly Func<object, IList?> LeftCollectionGetter;
+        public Func<object, IList?> LeftCollectionGetter { get; }
 
         /// <summary>Sets the collection of related (right) entities on a left entity instance.</summary>
-        public readonly Action<object, IList?> LeftCollectionSetter;
+        public Action<object, IList?> LeftCollectionSetter { get; }
 
         /// <summary>Gets the collection of related (left) entities from a right entity instance (inverse), if configured.</summary>
-        public readonly Func<object, IList?>? RightCollectionGetter;
+        public Func<object, IList?>? RightCollectionGetter { get; }
 
         /// <summary>Sets the collection of related (left) entities on a right entity instance (inverse), if configured.</summary>
-        public readonly Action<object, IList?>? RightCollectionSetter;
+        public Action<object, IList?>? RightCollectionSetter { get; }
 
         internal JoinTableMapping(
             string tableName,

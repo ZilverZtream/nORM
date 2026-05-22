@@ -33,6 +33,19 @@ public sealed class PublicApiSnapshotTests
         Assert.Equal(expected, actual);
     }
 
+    [Fact]
+    public void Public_api_has_no_public_fields_outside_enums()
+    {
+        var fields = typeof(DbContext).Assembly.GetExportedTypes()
+            .Where(static type => !type.IsEnum)
+            .SelectMany(static type => type.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Select(field => $"{type.FullName}.{field.Name}"))
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(fields);
+    }
+
     private static IEnumerable<string> GetPublicApiLines(Assembly assembly)
     {
         var lines = new SortedSet<string>(StringComparer.Ordinal);

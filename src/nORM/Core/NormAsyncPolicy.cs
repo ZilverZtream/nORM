@@ -11,7 +11,7 @@ namespace nORM.Core
         /// Determines whether execution context flow should be suppressed for library async operations.
         /// Set environment variable NORM_PRESERVE_CONTEXT to "true" to preserve context.
         /// </summary>
-        public static readonly bool SuppressExecutionContextFlow =
+        public static bool SuppressExecutionContextFlow { get; } =
             !(Environment.GetEnvironmentVariable("NORM_PRESERVE_CONTEXT")?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false);
     }
 }
