@@ -30,7 +30,7 @@ Status values:
 | Set operations: `Union`, `Intersect`, `Except` | Supported | Translator tests cover SQL generation and execution coverage tests cover result behavior. |
 | `Include`, `ThenInclude` | Constrained | Supported for mapped navigation paths. Composite-key dependent includes and unsupported relationship shapes throw `NotSupportedException`. |
 | `AsSplitQuery`, `AsNoTracking`, caching, temporal `AsOf` | Supported | These are nORM-specific query modifiers with dedicated tests. |
-| Raw SQL composition | Constrained | `FromSqlRawAsync<T>` executes caller-provided SQL. Caller owns SQL shape and parameter safety until the safer raw SQL API gate is completed. |
+| Raw SQL composition | Constrained | `FromSqlRawAsync<T>` and `FromSqlInterpolatedAsync<T>` execute read-only `SELECT`/CTE statements through the provider-aware raw query gate. Raw SQL does not add tenant predicates automatically. |
 | `AsAsyncEnumerable` | Constrained | Streams ordinary queries. Include and group-join streaming paths are rejected because they require coordinated materialization. |
 | `ExecuteUpdateAsync` | Constrained | Simple filtered entity queries only. Grouped, ordered, joined, distinct, paged, and aggregated queries are rejected. Assignment values allow literal constants and precomputed captured locals only; method calls, inline computed values, column-based updates, and server expressions are post-v1. |
 | `ExecuteDeleteAsync` | Constrained | Simple filtered entity queries only. Grouped, ordered, joined, distinct, paged, and aggregated queries are rejected. |

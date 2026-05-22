@@ -39,9 +39,7 @@ namespace nORM.Core
                     cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
                 var paramDict = ctx.AddParametersFast(cmd, parameters);
-                if (!NormValidator.IsSafeRawSql(sql, ctx.Provider))
-                    throw new NormUsageException("Potential SQL injection detected in raw query.");
-                NormValidator.ValidateRawSql(sql, paramDict);
+                NormValidator.ValidateRawQuerySql(sql, ctx.Provider, paramDict);
 
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
@@ -179,9 +177,7 @@ namespace nORM.Core
                     cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
                 var paramDict = ctx.AddParametersFast(cmd, parameters);
-                if (!NormValidator.IsSafeRawSql(sql, ctx.Provider))
-                    throw new NormUsageException("Potential SQL injection detected in raw query.");
-                NormValidator.ValidateRawSql(sql, paramDict);
+                NormValidator.ValidateRawQuerySql(sql, ctx.Provider, paramDict);
 
                 var mapping = ctx.GetMapping(typeof(T));
                 var list = new List<T>();

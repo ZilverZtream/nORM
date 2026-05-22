@@ -274,6 +274,29 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Validates SQL used by read-only raw query APIs. This combines the provider-aware
+        /// SELECT/CTE safety gate with the shared injection-pattern and parameter-budget checks.
+        /// </summary>
+        /// <param name="sql">The raw SQL query to validate.</param>
+        /// <param name="provider">The active database provider.</param>
+        /// <param name="parameters">Optional parameters used with the SQL query.</param>
+        /// <exception cref="NormUsageException">Thrown when the SQL is not a read-only raw query.</exception>
+        /// <exception cref="ArgumentException">Thrown when the SQL exceeds shared validation limits.</exception>
+        internal static void ValidateRawQuerySql(string sql, DatabaseProvider provider, IReadOnlyDictionary<string, object>? parameters = null)
+        {
+            ArgumentNullException.ThrowIfNull(provider);
+
+            if (!IsSafeRawSql(sql, provider))
+            {
+                throw new NormUsageException(
+                    $"Raw SQL query for provider '{provider.GetType().Name}' must be a single read-only SELECT or CTE statement. " +
+                    "DML, DDL, administrative commands, stored procedure execution and stacked statements are not allowed through raw query APIs.");
+            }
+
+            ValidateRawSql(sql, parameters);
+        }
+
+        /// <summary>
         /// Detects common SQL injection patterns in raw SQL, including UNION attacks,
         /// comment-based injection, and embedded quotes without proper parameterization.
         /// </summary>

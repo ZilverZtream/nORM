@@ -48,7 +48,7 @@ still needs release evidence.
 | 20 | Decide the v1 default for client evaluation | Verified | The v1 default is `ClientEvaluationPolicy.Throw`; `Warn` and `Allow` are explicit opt-ins with tests and docs. |
 | 21 | Remove legacy string-based bulk CUD paths | Verified | Bulk CUD now validates `BulkCudQueryShape` only; `ValidateCudPlan(string)` and `ExtractWhereClause(string, ...)` are removed and documentation tests lock that boundary. |
 | 22 | Define bulk update value-expression support | Verified | `ExecuteUpdateAsync` v1 assignment values are documented as literal constants or precomputed captured locals only; unsupported computed/server expressions throw actionable `NormUnsupportedFeatureException`s. |
-| 23 | Replace raw SQL safety heuristics with provider-aware validation | Open | Raw SQL validation still needs provider-aware policy. |
+| 23 | Replace raw SQL safety heuristics with provider-aware validation | Verified | Raw query APIs now call `NormValidator.ValidateRawQuerySql`, which combines provider-aware SELECT/CTE gating with shared injection checks; `docs/raw-sql-security.md` documents read-only raw query and privileged-path boundaries. |
 | 24 | Tighten stored procedure security and tenant boundaries | In Progress | Multi-tenancy docs identify bypass paths; examples/helpers remain open. |
 | 25 | Finish transaction and sync/async policy hardening | In Progress | Transaction and sync docs exist; live/cancellation/interceptor parity remains open. |
 | 26 | Prove `ConnectionManager` failover behavior under load | Open | Needs stress tests for health checks, replica churn, and dispose races. |

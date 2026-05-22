@@ -252,7 +252,10 @@ var results = await context.ExecuteStoredProcedureAsync<UserStats>(
     new { StartDate = DateTime.Now.AddMonths(-1) });
 ```
 
-SQL diagnostics redact string literals and parameter values by default. See
+Raw query APIs are read-only `SELECT`/CTE APIs with provider-aware validation.
+Stored procedures and direct connection access are privileged paths. See
+[Raw SQL Security](docs/raw-sql-security.md). SQL diagnostics redact string
+literals and parameter values by default; see
 [Logging and Redaction](docs/logging-redaction.md).
 Stable exception categories for query, provider, timeout, configuration, usage,
 unsupported-feature, and concurrency failures are documented in
