@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -55,6 +56,17 @@ namespace nORM.Core
                 cmd.Parameters.Clear();
                 return list;
             }, ct);
+        }
+
+        /// <summary>
+        /// Executes interpolated SQL with every interpolation hole converted into a
+        /// database parameter before execution.
+        /// </summary>
+        public Task<List<T>> QueryUnchangedInterpolatedAsync<T>(FormattableString sql, CancellationToken ct = default) where T : class, new()
+        {
+            ArgumentNullException.ThrowIfNull(sql);
+            var prepared = BuildInterpolatedSql(sql);
+            return QueryUnchangedAsync<T>(prepared.Sql, ct, prepared.Parameters);
         }
 
         private static object CoerceRawValue(object raw, Type propType)
@@ -183,6 +195,35 @@ namespace nORM.Core
                 cmd.Parameters.Clear();
                 return list;
             }, ct);
+        }
+
+        /// <summary>
+        /// Executes interpolated SQL with every interpolation hole converted into a
+        /// database parameter before execution.
+        /// </summary>
+        public Task<List<T>> FromSqlInterpolatedAsync<T>(FormattableString sql, CancellationToken ct = default) where T : class, new()
+        {
+            ArgumentNullException.ThrowIfNull(sql);
+            var prepared = BuildInterpolatedSql(sql);
+            return FromSqlRawAsync<T>(prepared.Sql, ct, prepared.Parameters);
+        }
+
+        private (string Sql, object[] Parameters) BuildInterpolatedSql(FormattableString sql)
+        {
+            var arguments = sql.GetArguments();
+            if (arguments.Length == 0)
+                return (sql.Format, Array.Empty<object>());
+
+            var parameterNames = new object[arguments.Length];
+            var parameters = new object[arguments.Length];
+            for (var i = 0; i < arguments.Length; i++)
+            {
+                parameterNames[i] = $"{_p.ParamPrefix}p{i}";
+                parameters[i] = arguments[i] ?? DBNull.Value;
+            }
+
+            var commandText = string.Format(CultureInfo.InvariantCulture, sql.Format, parameterNames);
+            return (commandText, parameters);
         }
 
         /// <summary>

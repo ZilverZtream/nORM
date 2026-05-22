@@ -231,6 +231,48 @@ public class RawSqlEdgeCaseTests
         Assert.All(results, r => Assert.True(r.Value > 5));
     }
 
+    [Fact]
+    public async Task QueryUnchangedInterpolatedAsync_ParameterizesInterpolation()
+    {
+        var (cn, ctx) = CreateContext();
+        await using var _ = ctx;
+
+        using var insert = cn.CreateCommand();
+        insert.CommandText = "INSERT INTO RsItem (Name, Value) VALUES (@a, 1), (@b, 2)";
+        insert.Parameters.AddWithValue("@a", "safe");
+        insert.Parameters.AddWithValue("@b", "x' OR 1=1 --");
+        insert.ExecuteNonQuery();
+
+        var needle = "x' OR 1=1 --";
+        var results = await ctx.QueryUnchangedInterpolatedAsync<RsItem>(
+            $"SELECT Id, Name, Value FROM RsItem WHERE Name = {needle}");
+
+        Assert.Single(results);
+        Assert.Equal(needle, results[0].Name);
+    }
+
+    [Fact]
+    public async Task FromSqlInterpolatedAsync_ParameterizesInterpolation()
+    {
+        var (cn, ctx) = CreateContext();
+        await using var _ = ctx;
+
+        using var insert = cn.CreateCommand();
+        insert.CommandText = "INSERT INTO RsItem (Name, Value) VALUES (@a, 3), (@b, 4)";
+        insert.Parameters.AddWithValue("@a", "one");
+        insert.Parameters.AddWithValue("@b", "two");
+        insert.ExecuteNonQuery();
+
+        var minValue = 4;
+        var name = "two";
+        var results = await ctx.FromSqlInterpolatedAsync<RsItem>(
+            $"SELECT Id, Name, Value FROM RsItem WHERE Value >= {minValue} AND Name = {name}");
+
+        Assert.Single(results);
+        Assert.Equal("two", results[0].Name);
+        Assert.Equal(4, results[0].Value);
+    }
+
     // ── Test 4: QueryUnchangedAsync rejects unsafe SQL ──────────────────
 
     /// <summary>
