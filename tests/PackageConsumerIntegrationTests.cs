@@ -88,6 +88,33 @@ public class PackageConsumerIntegrationTests
     }
 
     [Fact]
+    public void Package_reference_consumer_gets_source_generation_limit_diagnostics()
+    {
+        var root = FindRepositoryRoot();
+        EnsureRuntimePackage(root);
+
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_pkg_diag_" + Guid.NewGuid().ToString("N"));
+        var packageCache = Path.Combine(tempRoot, "packages");
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            File.WriteAllText(Path.Combine(tempRoot, "Consumer.csproj"), ConsumerProjectXml(root), Encoding.UTF8);
+            File.WriteAllText(Path.Combine(tempRoot, "Program.cs"), UnsupportedMaterializerProgram, Encoding.UTF8);
+
+            RunDotNet("restore --no-cache", tempRoot, packageCache);
+            var result = RunDotNetAllowFailure("build -c Release --no-restore", tempRoot, packageCache);
+
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.Contains("nORMSG005", result.Output, StringComparison.Ordinal);
+            Assert.Contains("Computed", result.Output, StringComparison.Ordinal);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
     public void Tool_package_installs_from_nupkg_and_runs_help()
     {
         var root = FindRepositoryRoot();
@@ -204,6 +231,21 @@ public class PackageConsumerIntegrationTests
         }
         """";
 
+    private const string UnsupportedMaterializerProgram = """"
+        using System;
+        using nORM.SourceGeneration;
+
+        Console.WriteLine(typeof(UnsupportedUser).Name);
+
+        [GenerateMaterializer]
+        public sealed class UnsupportedUser
+        {
+            public int Id { get; set; }
+            public string Name { get; set; } = "";
+            public string Computed => Name.ToUpperInvariant();
+        }
+        """";
+
     private static void EnsureRuntimePackage(string root)
     {
         CleanPackageOutput(Path.Combine(root, "src", "bin", "Release"), "nORM");
@@ -270,6 +312,26 @@ public class PackageConsumerIntegrationTests
             $"dotnet {arguments} failed with exit code {process.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{stderr}");
 
         return stdout + stderr;
+    }
+
+    private static (int ExitCode, string Output) RunDotNetAllowFailure(string arguments, string workingDirectory, string? packageCache)
+    {
+        var startInfo = new ProcessStartInfo("dotnet", arguments)
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+
+        if (packageCache != null)
+            startInfo.Environment["NUGET_PACKAGES"] = packageCache;
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start dotnet process.");
+        var stdout = process.StandardOutput.ReadToEnd();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        return (process.ExitCode, stdout + stderr);
     }
 
     private static string Quote(string value) => "\"" + value.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";

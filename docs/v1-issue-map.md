@@ -57,7 +57,7 @@ still needs release evidence.
 | 29 | Enforce provider version support at startup | Verified | Provider initialization validates the actual opened connection against `Capabilities.MinimumServerVersion`; unsupported versions throw `NormConfigurationException`, and provider docs/tests lock the startup contract. |
 | 30 | Finish MySQL optimistic concurrency guarantees | Verified | MySQL affected-row OCC is refused by default through `RequireMatchedRowOccSemantics=true`; matched-row mode and explicit weakened opt-in are documented and covered by regression tests. |
 | 31 | Prove AOT and trimming claims with real publish tests | Verified | AOT/trimming is explicitly unsupported for v1; annotation tests and a negative `PublishTrimmed=true` smoke test lock the current boundary with real publish diagnostics. |
-| 32 | Harden source generator limitations | In Progress | Generator ships and has diagnostics; unsupported mapping diagnostics need completion. |
+| 32 | Harden source generator limitations | Verified | Source-generation docs now define the v1 materializer support contract and diagnostics; package-consumer tests verify unsupported mapped properties report `nORMSG005`. |
 | 33 | Stress cache and plan memory bounds as release gates | In Progress | Cache policy exists; RC memory stress evidence remains open. |
 | 34 | Normalize public exception taxonomy | In Progress | Some unsupported query paths use nORM exceptions; remaining public paths need audit. |
 | 35 | Complete logging and redaction coverage | In Progress | Connection-string and SQL redaction exist; artifact/interceptor/benchmark coverage remains open. |
