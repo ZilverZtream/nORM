@@ -5,6 +5,11 @@ This repository has two levels of verification:
 - The ordinary test suite, which runs without external databases and is suitable for every change.
 - The live provider gate, which also runs provider parity and provider-swap tests against any configured SQL Server, PostgreSQL, or MySQL databases.
 
+Release and CI builds use the supported SDK pinned in `global.json`. The v1
+gate currently expects .NET SDK `8.0.417` with `allowPrerelease` disabled; CI
+prints `dotnet --info` and fails if the resolved SDK differs from the pinned
+version or resolves to a preview build.
+
 ## Local Live Provider Gate
 
 Use `eng\live-provider-gate.cmd` from the repository root.
