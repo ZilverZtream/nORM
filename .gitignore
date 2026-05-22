@@ -47,4 +47,8 @@ Thumbs.db
 tests/TestResults/
 coverage/
 coverage-report/
-*.ps1
+
+# Local ad-hoc PowerShell scratch files only. Release and engineering scripts
+# under eng/ or .github/ must remain visible to git.
+*.local.ps1
+*.scratch.ps1

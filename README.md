@@ -484,6 +484,8 @@ nORM is being tuned toward these release goals:
 ## Contributing
 
 Before public release, use focused issues or pull requests with a clear reproduction, test coverage, and benchmark data when performance is involved.
+Repository artifact and encoding rules are documented in
+[Repository Hygiene](docs/repository-hygiene.md).
 
 ### Development Setup
 

@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # ── Core test matrix: SQLite-only (always runs, no external infra required) ─
+  # Core test matrix: SQLite-only (always runs, no external infra required)
   test:
     name: Build and Test (${{ matrix.os }})
     strategy:
@@ -57,7 +57,7 @@ jobs:
           path: "**/*.trx"
           retention-days: 7
 
-  # ── P1 gate: live MySQL provider parity (ubuntu only, service container) ────
+  # P1 gate: live MySQL provider parity (ubuntu only, service container)
   # Gate 4.5 requirement: mandatory live provider matrix, no optional skip path
   # for core parity scenarios. The NORM_TEST_MYSQL env var activates live tests;
   # this job always sets it so the parity tests are never skipped in CI.
@@ -110,7 +110,7 @@ jobs:
           retention-days: 7
 
   test-mysql:
-    name: Live MySQL Provider Parity
+  # P1 gate: live MySQL provider parity (ubuntu only, service container)
     runs-on: ubuntu-latest
 
     services:
@@ -175,9 +175,9 @@ jobs:
           path: "**/*.trx"
           retention-days: 7
 
-  # ── P1 gate: live PostgreSQL provider parity ─────────────────────────────────
+  # P1 gate: live PostgreSQL provider parity
   test-postgres:
-    name: Live PostgreSQL Provider Parity
+  # P1 gate: live PostgreSQL provider parity
     runs-on: ubuntu-latest
 
     services:
@@ -234,9 +234,9 @@ jobs:
           path: "**/*.trx"
           retention-days: 7
 
-  # ── P1 gate: live SQL Server provider parity ──────────────────────────────────
+  # P1 gate: live SQL Server provider parity
   test-sqlserver:
-    name: Live SQL Server Provider Parity
+  # P1 gate: live SQL Server provider parity
     runs-on: ubuntu-latest
 
     services:

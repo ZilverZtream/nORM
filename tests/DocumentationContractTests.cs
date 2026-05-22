@@ -238,6 +238,25 @@ public class DocumentationContractTests
         Assert.Contains("OperationCanceledException", contract, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Repository_hygiene_policy_keeps_release_scripts_visible()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var gitignore = File.ReadAllText(Path.Combine(root, ".gitignore"));
+        var policy = File.ReadAllText(Path.Combine(root, "docs", "repository-hygiene.md"));
+        var ci = File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml"));
+
+        Assert.Contains("docs/repository-hygiene.md", readme, StringComparison.Ordinal);
+        Assert.DoesNotContain("*.ps1", gitignore.Replace("*.local.ps1", "", StringComparison.Ordinal).Replace("*.scratch.ps1", "", StringComparison.Ordinal), StringComparison.Ordinal);
+        Assert.Contains("*.local.ps1", gitignore, StringComparison.Ordinal);
+        Assert.Contains("*.scratch.ps1", gitignore, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(root, "eng", "v1-release-gate.ps1")));
+        Assert.Contains("PowerShell scripts are not globally ignored", policy, StringComparison.Ordinal);
+        Assert.DoesNotContain("â", ci, StringComparison.Ordinal);
+        Assert.DoesNotContain("─", ci, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
