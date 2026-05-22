@@ -24,7 +24,18 @@ jobs:
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
+
+      - name: Show .NET SDK
+        run: dotnet --info
+
+      - name: Validate .NET SDK
+        shell: pwsh
+        run: |
+          $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
+          $actual = dotnet --version
+          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Restore dependencies
         run: dotnet restore tests/
@@ -61,7 +72,18 @@ jobs:
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
+
+      - name: Show .NET SDK
+        run: dotnet --info
+
+      - name: Validate .NET SDK
+        shell: pwsh
+        run: |
+          $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
+          $actual = dotnet --version
+          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Run quick release gate
         shell: pwsh
@@ -104,7 +126,18 @@ jobs:
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
+
+      - name: Show .NET SDK
+        run: dotnet --info
+
+      - name: Validate .NET SDK
+        shell: pwsh
+        run: |
+          $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
+          $actual = dotnet --version
+          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Restore dependencies
         run: dotnet restore tests/
@@ -163,7 +196,18 @@ jobs:
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
+
+      - name: Show .NET SDK
+        run: dotnet --info
+
+      - name: Validate .NET SDK
+        shell: pwsh
+        run: |
+          $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
+          $actual = dotnet --version
+          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Restore dependencies
         run: dotnet restore tests/
@@ -215,7 +259,18 @@ jobs:
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
+
+      - name: Show .NET SDK
+        run: dotnet --info
+
+      - name: Validate .NET SDK
+        shell: pwsh
+        run: |
+          $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
+          $actual = dotnet --version
+          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Restore dependencies
         run: dotnet restore tests/

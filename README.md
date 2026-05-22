@@ -430,7 +430,7 @@ Before public release, use focused issues or pull requests with a clear reproduc
 ### Development Setup
 
 1. Clone the repository
-2. Install .NET 8.0 SDK
+2. Install the .NET SDK pinned by `global.json` (`8.0.417` for the current v1 gate)
 3. Run `dotnet restore`
 4. Run `dotnet build`
 5. Run tests: `dotnet test`
