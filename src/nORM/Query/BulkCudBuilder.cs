@@ -42,6 +42,34 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Validates a bulk update/delete query from structural translation metadata
+        /// instead of scanning generated SQL text.
+        /// </summary>
+        /// <param name="shape">The query shape captured during LINQ translation.</param>
+        /// <exception cref="NotSupportedException">Thrown when the query shape is unsupported for bulk CUD.</exception>
+        public void ValidateCudPlan(BulkCudQueryShape? shape)
+        {
+            if (shape == null)
+                throw new NotSupportedException("ExecuteUpdate/Delete requires query-shape metadata.");
+
+            if (shape.HasGroupBy || shape.HasOrderBy || shape.HasHaving || shape.HasJoins || shape.HasDistinct || shape.HasPaging)
+                throw new NotSupportedException("ExecuteUpdate/Delete does not support grouped, ordered, joined, distinct, paged or aggregated queries.");
+        }
+
+        /// <summary>
+        /// Returns the structurally captured WHERE clause for a bulk CUD statement.
+        /// </summary>
+        /// <param name="shape">The query shape captured during LINQ translation.</param>
+        /// <returns>The normalized WHERE clause, or an empty string when the query has no predicate.</returns>
+        public string GetWhereClause(BulkCudQueryShape? shape)
+        {
+            if (shape == null || string.IsNullOrEmpty(shape.WhereClause))
+                return string.Empty;
+
+            return RemoveAliasFromWhereClause(shape.WhereClause, alias: null);
+        }
+
+        /// <summary>
         /// Attempts to extract the <c>WHERE</c> clause from an arbitrary SQL statement while removing
         /// any table aliases that may be present. The resulting clause can be reused in generated
         /// bulk update or delete statements.
@@ -98,6 +126,17 @@ namespace nORM.Query
             {
                 char c = where[i];
 
+                if (!inString && !inBracket)
+                {
+                    if (TrySkipDelimitedAlias(where, i, '"', out var quotedAliasEnd) ||
+                        TrySkipDelimitedAlias(where, i, '`', out quotedAliasEnd) ||
+                        TrySkipBracketedAlias(where, i, out quotedAliasEnd))
+                    {
+                        i = quotedAliasEnd;
+                        continue;
+                    }
+                }
+
                 if (!inString && c == '[')
                 {
                     inBracket = true;
@@ -144,6 +183,60 @@ namespace nORM.Query
         }
 
         private static bool IsIdentifierChar(char c) => char.IsLetterOrDigit(c) || c == '_' || c == '$';
+
+        private static bool TrySkipDelimitedAlias(string where, int start, char delimiter, out int dotIndex)
+        {
+            dotIndex = -1;
+            if (start >= where.Length || where[start] != delimiter)
+                return false;
+
+            var aliasStart = start + 1;
+            if (aliasStart >= where.Length || where[aliasStart] != 'T')
+                return false;
+
+            var aliasEnd = aliasStart + 1;
+            while (aliasEnd < where.Length && char.IsDigit(where[aliasEnd]))
+                aliasEnd++;
+
+            if (aliasEnd == aliasStart + 1 ||
+                aliasEnd >= where.Length ||
+                where[aliasEnd] != delimiter ||
+                aliasEnd + 1 >= where.Length ||
+                where[aliasEnd + 1] != '.')
+            {
+                return false;
+            }
+
+            dotIndex = aliasEnd + 1;
+            return true;
+        }
+
+        private static bool TrySkipBracketedAlias(string where, int start, out int dotIndex)
+        {
+            dotIndex = -1;
+            if (start >= where.Length || where[start] != '[')
+                return false;
+
+            var aliasStart = start + 1;
+            if (aliasStart >= where.Length || where[aliasStart] != 'T')
+                return false;
+
+            var aliasEnd = aliasStart + 1;
+            while (aliasEnd < where.Length && char.IsDigit(where[aliasEnd]))
+                aliasEnd++;
+
+            if (aliasEnd == aliasStart + 1 ||
+                aliasEnd >= where.Length ||
+                where[aliasEnd] != ']' ||
+                aliasEnd + 1 >= where.Length ||
+                where[aliasEnd + 1] != '.')
+            {
+                return false;
+            }
+
+            dotIndex = aliasEnd + 1;
+            return true;
+        }
 
         public (string Sql, Dictionary<string, object> Params) BuildSetClause<T>(TableMapping mapping, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set)
         {
