@@ -7,6 +7,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Loader;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -82,7 +83,7 @@ update.SetAction(async (ParseResult result, CancellationToken _) =>
         }
         using var connection = CreateConnection(prov, validated.ConnectionString);
         await connection.OpenAsync();
-        var assembly = Assembly.LoadFrom(asmPath);
+        var assembly = LoadDesignTimeAssembly(asmPath);
         IMigrationRunner runner = prov.ToLowerInvariant() switch
         {
             "sqlserver" => new SqlServerMigrationRunner(connection, assembly),
@@ -225,7 +226,7 @@ add.SetAction((ParseResult result) =>
             Console.Error.WriteLine($"Assembly '{asmPath}' not found.");
             return 2;
         }
-        var assembly = Assembly.LoadFrom(asmPath);
+        var assembly = LoadDesignTimeAssembly(asmPath);
 
         var snapshotPath = Path.Combine(output, "schema.snapshot.json");
         SchemaSnapshot oldSnap = File.Exists(snapshotPath)
@@ -283,6 +284,13 @@ migrations.Add(add);
 root.Add(migrations);
 
 return await root.Parse(args).InvokeAsync(new InvocationConfiguration());
+
+static Assembly LoadDesignTimeAssembly(string assemblyPath)
+{
+    var fullPath = Path.GetFullPath(assemblyPath);
+    var loadContext = new DesignTimeAssemblyLoadContext(fullPath);
+    return loadContext.LoadFromAssemblyPath(fullPath);
+}
 
 static SchemaSnapshot BuildMigrationSnapshot(Assembly assembly, bool attributeOnly)
 {
@@ -437,4 +445,31 @@ static string ToCSharpIdentifier(string value)
     }
 
     return builder.Length == 0 ? "_" : builder.ToString();
+}
+
+sealed class DesignTimeAssemblyLoadContext : AssemblyLoadContext
+{
+    private readonly AssemblyDependencyResolver _resolver;
+
+    public DesignTimeAssemblyLoadContext(string mainAssemblyPath)
+    {
+        _resolver = new AssemblyDependencyResolver(mainAssemblyPath);
+    }
+
+    protected override Assembly? Load(AssemblyName assemblyName)
+    {
+        var sharedAssembly = AssemblyLoadContext.Default.Assemblies.FirstOrDefault(assembly =>
+            AssemblyName.ReferenceMatchesDefinition(assembly.GetName(), assemblyName));
+        if (sharedAssembly != null)
+            return sharedAssembly;
+
+        var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
+        return assemblyPath == null ? null : LoadFromAssemblyPath(assemblyPath);
+    }
+
+    protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)
+    {
+        var libraryPath = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
+        return libraryPath == null ? IntPtr.Zero : LoadUnmanagedDllFromPath(libraryPath);
+    }
 }
