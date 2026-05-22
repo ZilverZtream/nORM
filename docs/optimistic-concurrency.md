@@ -12,17 +12,22 @@ tracked writes and direct writes.
 | SQL Server | Matched-row semantics | Full row-count OCC checks for updates and deletes. |
 | PostgreSQL | Matched-row semantics | Full row-count OCC checks for updates and deletes. |
 | SQLite | Matched-row semantics | Full row-count OCC checks for updates and deletes. |
-| MySQL / MariaDB | Affected-row semantics | SELECT-then-verify fallback detects stale tokens except the same-value token edge case described below. |
+| MySQL / MariaDB | Strict gate by default | Timestamp-tracked updates are refused unless the provider is configured for matched-row semantics or the application explicitly accepts affected-row semantics. |
 
 MySQL drivers commonly report affected rows for UPDATE statements. A successful
 UPDATE that matched the row but wrote the same values can return `0`, which is
-ambiguous with a stale token conflict. nORM therefore verifies a zero-row update
-by checking whether the original key and token still exist.
+ambiguous with a stale token conflict. Because affected-row mode cannot provide
+the full optimistic-concurrency guarantee, nORM's default v1 behavior is to fail
+fast before saving timestamp-tracked updates when `UseAffectedRowsSemantics` is
+true.
 
-That fallback prevents false-positive conflicts for same-value updates and
-detects ordinary stale-token conflicts. It cannot detect the pathological case
-where a concurrent writer changes the row but leaves the concurrency token equal
-to the original token value.
+Applications may explicitly set `RequireMatchedRowOccSemantics=false` to accept
+affected-row semantics. In that opt-in mode nORM verifies a zero-row update by
+checking whether the original key and token still exist. That fallback prevents
+false-positive conflicts for same-value updates and detects ordinary stale-token
+conflicts. It cannot detect the pathological case where a concurrent writer
+changes the row but leaves the concurrency token equal to the original token
+value.
 
 ## Strict MySQL Mode
 
@@ -59,7 +64,8 @@ var options = new DbContextOptions
 
 Only disable the gate when the application accepts the same-value token edge
 case or uses an application-level token discipline that makes same-value token
-conflicts impossible, such as monotonically increasing versions.
+conflicts impossible, such as monotonically increasing versions. This is a
+deliberate weakened guarantee and should be called out in application review.
 
 ## Delete Semantics
 

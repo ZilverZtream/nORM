@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
@@ -122,6 +123,10 @@ public class OptimisticConcurrencyProviderMatrixTests
         => Assert.True(new MySqlProvider(new SqliteParameterFactory()).UseAffectedRowsSemantics);
 
     [Fact]
+    public void MySqlProvider_MatchedRowConstructor_UseAffectedRowsSemantics_IsFalse()
+        => Assert.False(new MySqlProvider(new SqliteParameterFactory(), useAffectedRowsSemantics: false).UseAffectedRowsSemantics);
+
+    [Fact]
     public void SqliteProvider_UseAffectedRowsSemantics_IsFalse()
         => Assert.False(new SqliteProvider().UseAffectedRowsSemantics);
 
@@ -136,6 +141,33 @@ public class OptimisticConcurrencyProviderMatrixTests
     [Fact]
     public void MatchedRowsProvider_UseAffectedRowsSemantics_IsFalse()
         => Assert.False(new MatchedRowsProvider().UseAffectedRowsSemantics);
+
+    [Fact]
+    public async Task AffectedRowsProvider_DefaultStrictOccGate_ThrowsNormConfigurationException()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText =
+            "CREATE TABLE OccMatrixEntity " +
+            "(Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL, RowVersion BLOB NOT NULL)";
+        cmd.ExecuteNonQuery();
+
+        await using var ctx = new DbContext(cn, new AffectedRowsProvider());
+
+        var e = new OccMatrixEntity { Name = "Strict", RowVersion = new byte[] { 1 } };
+        ctx.Add(e);
+        await ctx.SaveChangesAsync();
+
+        e.Name = "Strict v2";
+        MarkDirty(ctx, e);
+
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(() => ctx.SaveChangesAsync());
+
+        Assert.Contains("affected-row semantics", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("RequireMatchedRowOccSemantics=false", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("useAffectedRows=false", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
 
     // ── SQLite (matched-row): genuine conflict is detected ───────────────────
 
