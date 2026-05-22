@@ -470,7 +470,9 @@ M:nORM.Providers.DynamicBatchSizer.RecordBatchPerformance(System.String,System.I
 M:nORM.Providers.IDbParameterFactory.CreateParameter(System.String,System.Object):System.Data.Common.DbParameter
 M:nORM.Providers.IFastProvider.BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32&):System.Void
 M:nORM.Providers.MySqlProvider.#ctor()
+M:nORM.Providers.MySqlProvider.#ctor(System.Boolean)
 M:nORM.Providers.MySqlProvider.#ctor(nORM.Providers.IDbParameterFactory)
+M:nORM.Providers.MySqlProvider.#ctor(nORM.Providers.IDbParameterFactory,System.Boolean)
 M:nORM.Providers.MySqlProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String):System.Void
 M:nORM.Providers.MySqlProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Providers.MySqlProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}

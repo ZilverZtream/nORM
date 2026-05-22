@@ -106,6 +106,18 @@ public class MySqlOccSemanticEnforcementTests
     }
 
     [Fact]
+    public void MySqlProvider_CanBeConfiguredForMatchedRowSemantics()
+    {
+        var defaultProvider = new MySqlProvider(new SqliteParameterFactory());
+        var matchedRowsProvider = new MySqlProvider(new SqliteParameterFactory(), useAffectedRowsSemantics: false);
+        var matchedRowsReflectionProvider = new MySqlProvider(useAffectedRowsSemantics: false);
+
+        Assert.True(defaultProvider.UseAffectedRowsSemantics);
+        Assert.False(matchedRowsProvider.UseAffectedRowsSemantics);
+        Assert.False(matchedRowsReflectionProvider.UseAffectedRowsSemantics);
+    }
+
+    [Fact]
     public void SqliteProvider_UseAffectedRowsSemantics_IsFalse()
     {
         var p = new SqliteProvider();
@@ -265,8 +277,8 @@ public class MySqlOccSemanticEnforcementTests
     [Fact]
     public void S1_Gap_IsDocumented_InMySqlProvider()
     {
-        // The S1 gap is explicitly documented in MySqlProvider.UseAffectedRowsSemantics XML docs.
-        // This test verifies the property exists and reflects the known trade-off.
+        // The S1 gap is explicitly documented and the default provider mode still reflects
+        // the known trade-off.
         var propInfo = typeof(MySqlProvider)
             .GetProperty("UseAffectedRowsSemantics",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);

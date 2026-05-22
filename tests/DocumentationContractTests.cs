@@ -209,6 +209,21 @@ public class DocumentationContractTests
         Assert.Contains("SupportsNativeBulkInsert", contract, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Readme_links_to_optimistic_concurrency_contract()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "optimistic-concurrency.md"));
+
+        Assert.Contains("docs/optimistic-concurrency.md", readme, StringComparison.Ordinal);
+        Assert.Contains("UseAffectedRows=false", contract, StringComparison.Ordinal);
+        Assert.Contains("new MySqlProvider(useAffectedRowsSemantics: false)", contract, StringComparison.Ordinal);
+        Assert.Contains("RequireMatchedRowOccSemantics", contract, StringComparison.Ordinal);
+        Assert.Contains("same-value token", contract, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("subclass", readme, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

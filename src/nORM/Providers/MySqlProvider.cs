@@ -44,6 +44,7 @@ namespace nORM.Providers
         private static readonly ConcurrentDictionary<string, bool> _bulkCopyUnavailable = new(StringComparer.Ordinal);
         private static readonly ConcurrentDictionary<Type, Func<DbCommand, object?>> _lastInsertedIdAccessors = new();
         private readonly IDbParameterFactory _parameterFactory;
+        private readonly bool _useAffectedRowsSemantics;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MySqlProvider"/> class.
@@ -54,7 +55,20 @@ namespace nORM.Providers
         /// MySQL commands.
         /// </remarks>
         public MySqlProvider()
-            : this(new ReflectionMySqlParameterFactory())
+            : this(new ReflectionMySqlParameterFactory(), useAffectedRowsSemantics: true)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MySqlProvider"/> class.
+        /// </summary>
+        /// <param name="useAffectedRowsSemantics">
+        /// <see langword="true"/> when the MySQL driver reports changed rows for UPDATE statements.
+        /// Use <see langword="false"/> only when the connection string is configured for matched-row
+        /// semantics, for example <c>UseAffectedRows=false</c> with MySqlConnector.
+        /// </param>
+        public MySqlProvider(bool useAffectedRowsSemantics)
+            : this(new ReflectionMySqlParameterFactory(), useAffectedRowsSemantics)
         {
         }
 
@@ -78,8 +92,29 @@ namespace nORM.Providers
         /// </para>
         /// </remarks>
         public MySqlProvider(IDbParameterFactory parameterFactory)
+            : this(parameterFactory, useAffectedRowsSemantics: true)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MySqlProvider"/> class.
+        /// </summary>
+        /// <param name="parameterFactory">Factory used to create provider-specific parameters.</param>
+        /// <param name="useAffectedRowsSemantics">
+        /// <see langword="true"/> when the MySQL driver reports changed rows for UPDATE statements.
+        /// Use <see langword="false"/> only when the connection string is configured for matched-row
+        /// semantics, for example <c>UseAffectedRows=false</c> with MySqlConnector.
+        /// </param>
+        /// <remarks>
+        /// When this value is <see langword="false"/>, nORM treats zero-row UPDATE results as strict
+        /// optimistic-concurrency conflicts. The database connection must be configured consistently;
+        /// setting this to <see langword="false"/> while the driver still uses affected-row semantics
+        /// can produce false-positive conflicts for same-value updates.
+        /// </remarks>
+        public MySqlProvider(IDbParameterFactory parameterFactory, bool useAffectedRowsSemantics)
         {
             _parameterFactory = parameterFactory ?? throw new ArgumentNullException(nameof(parameterFactory));
+            _useAffectedRowsSemantics = useAffectedRowsSemantics;
         }
 
         private sealed class ReflectionMySqlParameterFactory : IDbParameterFactory
@@ -182,10 +217,11 @@ namespace nORM.Providers
         ///
         /// <para><b>Known trade-off (S1):</b> With affected-row semantics, a genuine stale-row
         /// conflict where the concurrent writer sets the token to the <em>same</em> value is not
-        /// detected. For full OCC guarantee on MySQL, add <c>useAffectedRows=false</c> to the
-        /// connection string and derive a provider subclass that overrides this to <c>false</c>.</para>
+        /// detected. For full OCC guarantee on MySQL, add <c>UseAffectedRows=false</c> to the
+        /// connection string and construct this provider with
+        /// <c>useAffectedRowsSemantics: false</c>.</para>
         /// </summary>
-        internal override bool UseAffectedRowsSemantics => true;
+        internal override bool UseAffectedRowsSemantics => _useAffectedRowsSemantics;
 
         /// <summary>
         /// Returns a SQL fragment that retrieves the last auto-incremented identity value.
