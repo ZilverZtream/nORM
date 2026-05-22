@@ -489,6 +489,8 @@ public class DocumentationContractTests
         Assert.Contains("Dapper_Prepared", contract, StringComparison.Ordinal);
         Assert.Contains("eng/benchmark-evidence.ps1", contract, StringComparison.Ordinal);
         Assert.Contains("benchmark-evidence.md", contract, StringComparison.Ordinal);
+        Assert.Contains("eng/benchmark-thresholds.json", contract, StringComparison.Ordinal);
+        Assert.Contains("eng/check-benchmark-thresholds.ps1", contract, StringComparison.Ordinal);
         Assert.Contains("warmupCount: 3, iterationCount: 10", providerMatrix, StringComparison.Ordinal);
         Assert.Contains("Query_Join_RawAdo_Convenience", providerMatrix, StringComparison.Ordinal);
         Assert.Contains("Query_Join_RawAdo_Optimized", providerMatrix, StringComparison.Ordinal);

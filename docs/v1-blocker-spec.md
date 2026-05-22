@@ -969,16 +969,24 @@ Evidence:
 - `eng/v1-release-gate.ps1` can run benchmarks.
 - CI quick gates skip benchmarks.
 - RC workflow has a `skip_benchmark` input.
+- `eng/benchmark-thresholds.json` now defines versioned v1 latency and
+  allocation ratio budgets for simple, complex, join, and batched insert paths.
+- `eng/check-benchmark-thresholds.ps1` evaluates raw BenchmarkDotNet CSV reports
+  and writes markdown/JSON threshold artifacts.
+- `eng/v1-release-gate.ps1` runs the threshold gate after benchmark evidence; RC
+  mode treats missing provider-matrix rows and threshold violations as failures.
 
 Scope:
 
-- Add pass/fail thresholds for latency and allocation regressions.
-- Make threshold files versioned.
-- Require explicit override notes when benchmarks are skipped.
+- Run the full provider matrix on release hardware and tighten the initial
+  budgets from conservative v1 guardrails into release-candidate baselines.
+- Require explicit override notes when benchmarks are skipped in release
+  automation.
 
 Done when:
 
-- Performance regressions fail the release gate.
+- Performance regressions fail the release gate through the executable
+  threshold checker and its versioned budget file.
 
 ### 39. Reduce test-suite entropy before v1
 

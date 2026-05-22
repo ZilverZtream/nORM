@@ -136,11 +136,17 @@ public sealed class BenchmarkFairnessLockTests
     {
         var gate = ReadRepoFile("eng/v1-release-gate.ps1");
         var evidence = ReadRepoFile("eng/benchmark-evidence.ps1");
+        var thresholdGate = ReadRepoFile("eng/check-benchmark-thresholds.ps1");
+        var thresholds = ReadRepoFile("eng/benchmark-thresholds.json");
         var governance = ReadRepoFile("docs/benchmark-governance.md");
 
         Assert.Contains("benchmark evidence manifest", gate);
         Assert.Contains("eng/benchmark-evidence.ps1", gate);
+        Assert.Contains("benchmark threshold gate", gate);
+        Assert.Contains("eng/check-benchmark-thresholds.ps1", gate);
         Assert.Contains("BenchmarkDotNet.Artifacts/v1-evidence", governance);
+        Assert.Contains("eng/benchmark-thresholds.json", governance);
+        Assert.Contains("eng/check-benchmark-thresholds.ps1", governance);
         Assert.Contains("Redact-ConnectionString", evidence);
         Assert.Contains("NORM_TEST_SQLSERVER", evidence);
         Assert.Contains("NORM_TEST_POSTGRES", evidence);
@@ -148,6 +154,14 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("FastestByProvider", evidence);
         Assert.Contains("DriverPackages", evidence);
         Assert.DoesNotContain("Password=$env", evidence);
+        Assert.Contains("maxMeanRatio", thresholds);
+        Assert.Contains("maxAllocatedRatio", thresholds);
+        Assert.Contains("Query_Complex_nORM", thresholds);
+        Assert.Contains("Query_Join_nORM_Compiled", thresholds);
+        Assert.Contains("BulkInsert_Batched_nORM", thresholds);
+        Assert.Contains("Convert-MeanToNanoseconds", thresholdGate);
+        Assert.Contains("Convert-AllocatedToBytes", thresholdGate);
+        Assert.Contains("Benchmark threshold check failed", thresholdGate);
     }
 
     private static void AssertMethodContains(string code, string methodName, string expected)

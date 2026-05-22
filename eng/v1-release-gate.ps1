@@ -224,6 +224,18 @@ if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
     Invoke-Step 'benchmark evidence manifest' {
         & (Join-Path $root 'eng/benchmark-evidence.ps1') -BenchmarkFilter $ProviderMatrixBenchmarkFilter -Mode $Mode
     }
+
+    Invoke-Step 'benchmark threshold gate' {
+        $thresholdArgs = @(
+            '-ThresholdFile',
+            (Join-Path $root 'eng/benchmark-thresholds.json')
+        )
+        if ($Mode -ne 'rc') {
+            $thresholdArgs += '-AllowMissingRules'
+        }
+
+        & (Join-Path $root 'eng/check-benchmark-thresholds.ps1') @thresholdArgs
+    }
 }
 
 Invoke-Step 'clean package outputs' {
