@@ -264,6 +264,51 @@ public class LinqOperatorCardinalityTests
         Assert.False(ctx.Query<CardItem>().All(x => x.Value > 0));
     }
 
+    [Fact]
+    public void TerminalOperators_SyncPath_MatchLinqCardinalitySemantics()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+
+        Assert.Null(ctx.Query<CardItem>().FirstOrDefault());
+        Assert.Null(ctx.Query<CardItem>().SingleOrDefault());
+        Assert.Null(ctx.Query<CardItem>().LastOrDefault());
+        Assert.Null(ctx.Query<CardItem>().ElementAtOrDefault(0));
+        Assert.Throws<InvalidOperationException>(() => ctx.Query<CardItem>().First());
+        Assert.Throws<InvalidOperationException>(() => ctx.Query<CardItem>().Single());
+        Assert.Throws<InvalidOperationException>(() => ctx.Query<CardItem>().Last());
+        Assert.Throws<ArgumentOutOfRangeException>(() => ctx.Query<CardItem>().ElementAt(0));
+
+        InsertRow(cn, 1, "Alpha", 10);
+
+        Assert.Equal("Alpha", ctx.Query<CardItem>().First().Name);
+        Assert.Equal("Alpha", ctx.Query<CardItem>().FirstOrDefault()!.Name);
+        Assert.Equal("Alpha", ctx.Query<CardItem>().Single().Name);
+        Assert.Equal("Alpha", ctx.Query<CardItem>().SingleOrDefault()!.Name);
+        Assert.Equal("Alpha", ctx.Query<CardItem>().Last().Name);
+        Assert.Equal("Alpha", ctx.Query<CardItem>().LastOrDefault()!.Name);
+        Assert.Equal("Alpha", ctx.Query<CardItem>().ElementAt(0).Name);
+        Assert.Equal("Alpha", ctx.Query<CardItem>().ElementAtOrDefault(0)!.Name);
+
+        InsertRow(cn, 2, "Beta", 20);
+        InsertRow(cn, 3, "Gamma", 30);
+        var ordered = ctx.Query<CardItem>().OrderBy(x => x.Value);
+
+        Assert.Equal("Alpha", ordered.First().Name);
+        Assert.Equal("Alpha", ordered.FirstOrDefault()!.Name);
+        Assert.Equal("Gamma", ordered.Last().Name);
+        Assert.Equal("Gamma", ordered.LastOrDefault()!.Name);
+        Assert.Equal("Beta", ordered.ElementAt(1).Name);
+        Assert.Equal("Gamma", ordered.ElementAtOrDefault(2)!.Name);
+        Assert.Null(ordered.ElementAtOrDefault(3));
+        Assert.Throws<InvalidOperationException>(() => ordered.Single());
+        Assert.Throws<InvalidOperationException>(() => ordered.SingleOrDefault());
+        Assert.Throws<ArgumentOutOfRangeException>(() => ordered.ElementAt(3));
+
+        Assert.Equal("Beta", ordered.Where(x => x.CategoryId == 2).Single().Name);
+        Assert.Equal("Beta", ordered.Where(x => x.CategoryId == 2).SingleOrDefault()!.Name);
+    }
+
     // ─── Skip / Take ────────────────────────────────────────────────────────
 
     [Fact]
