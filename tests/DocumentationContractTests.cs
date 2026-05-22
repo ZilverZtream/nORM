@@ -23,6 +23,20 @@ public class DocumentationContractTests
         Assert.Contains("Unsupported", matrix, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Readme_links_to_aot_and_trimming_policy()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var policy = File.ReadAllText(Path.Combine(root, "docs", "aot-trimming.md"));
+
+        Assert.Contains("docs/aot-trimming.md", readme, StringComparison.Ordinal);
+        Assert.Contains("NativeAOT", policy, StringComparison.Ordinal);
+        Assert.Contains("RequiresDynamicCode", policy, StringComparison.Ordinal);
+        Assert.Contains("RequiresUnreferencedCode", policy, StringComparison.Ordinal);
+        Assert.Contains("not supported", policy, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

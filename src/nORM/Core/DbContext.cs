@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
@@ -853,6 +854,8 @@ namespace nORM.Core
         /// <returns>An <see cref="IQueryable"/> that can be composed with LINQ operators.</returns>
         /// <exception cref="ArgumentException">Thrown when <paramref name="tableName"/> is null or empty.</exception>
         /// <exception cref="NormUsageException">Thrown when the provided name contains invalid characters.</exception>
+        [RequiresDynamicCode("Query(string) generates a CLR entity type at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")]
+        [RequiresUnreferencedCode("Query(string) reflects database schema into a runtime-generated type and is not trim-safe.")]
         public IQueryable Query(string tableName)
         {
             ThrowIfDisposed();
