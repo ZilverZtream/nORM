@@ -66,7 +66,8 @@ public class CliIntegrationTests
                 $"database drop --connection {Quote($"Data Source={dbFile}")} --provider sqlite --dry-run",
                 root);
 
-            Assert.Equal(0, result.ExitCode);
+            Assert.True(result.ExitCode == 0,
+                $"CLI failed with exit code {result.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{result.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{result.Stderr}");
             Assert.Contains("Would delete", result.Stdout, StringComparison.Ordinal);
             Assert.True(File.Exists(dbFile));
         }
@@ -112,7 +113,8 @@ public class CliIntegrationTests
                 $"migrations add WeirdMigration --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)} --attribute-only",
                 root);
 
-            Assert.Equal(0, result.ExitCode);
+            Assert.True(result.ExitCode == 0,
+                $"CLI failed with exit code {result.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{result.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{result.Stderr}");
 
             var generated = Directory.EnumerateFiles(migrationsDir, "Migration_*_WeirdMigration.cs").Single();
             Assert.Contains("\\n", File.ReadAllText(generated), StringComparison.Ordinal);
@@ -253,6 +255,45 @@ public class CliIntegrationTests
     }
 
     [Fact]
+    public void Migrations_add_resolves_design_time_assembly_dependencies()
+    {
+        var root = FindRepositoryRoot();
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_cli_deps_" + Guid.NewGuid().ToString("N"));
+        var dependencyDir = Path.Combine(tempRoot, "DependencyLib");
+        Directory.CreateDirectory(dependencyDir);
+
+        try
+        {
+            var dependencyProject = Path.Combine(dependencyDir, "DependencyLib.csproj");
+            File.WriteAllText(dependencyProject, DependencyProjectXml, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dependencyDir, "ModelNames.cs"), DependencyModelNamesSource, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(tempRoot, "CliModel.csproj"), ModelProjectWithDependencyXml(root, dependencyProject), Encoding.UTF8);
+            File.WriteAllText(Path.Combine(tempRoot, "Model.cs"), DependencyBackedDesignTimeFactoryModelSource, Encoding.UTF8);
+
+            RunDotNet("build CliModel.csproj -c Release --nologo", tempRoot);
+
+            var modelAssembly = Path.Combine(tempRoot, "bin", "Release", "net8.0", "CliModel.dll");
+            var migrationsDir = Path.Combine(tempRoot, "Migrations");
+            var result = RunCli(
+                $"migrations add DependencyModel --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)}",
+                root);
+
+            Assert.True(result.ExitCode == 0,
+                $"CLI failed with exit code {result.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{result.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{result.Stderr}");
+            Assert.Contains("design-time DbContext factory", result.Stdout, StringComparison.OrdinalIgnoreCase);
+
+            var generated = Directory.EnumerateFiles(migrationsDir, "Migration_*_DependencyModel.cs").Single();
+            var source = File.ReadAllText(generated);
+            Assert.Contains("DependentTable", source, StringComparison.Ordinal);
+            Assert.Contains("dependency_name", source, StringComparison.Ordinal);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
     public void MigrationCodeWriter_generated_source_compiles_and_roundtrips_adversarial_sql()
     {
         var root = FindRepositoryRoot();
@@ -323,6 +364,32 @@ public class CliIntegrationTests
             </Project>
             """;
     }
+
+    private static string ModelProjectWithDependencyXml(string root, string dependencyProject)
+    {
+        var projectReference = Path.Combine(root, "src", "nORM.csproj");
+        return $$"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+                <Nullable>enable</Nullable>
+              </PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="{{projectReference}}" />
+                <ProjectReference Include="{{dependencyProject}}" />
+              </ItemGroup>
+            </Project>
+            """;
+    }
+
+    private const string DependencyProjectXml = """
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <TargetFramework>net8.0</TargetFramework>
+            <Nullable>enable</Nullable>
+          </PropertyGroup>
+        </Project>
+        """;
 
     private static string RoundTripProjectXml(string root)
     {
@@ -403,6 +470,53 @@ public class CliIntegrationTests
                         .HasColumnName("display_name")
                 };
                 return new FactoryContext(connection, new SqliteProvider(), options);
+            }
+        }
+        """;
+
+    private const string DependencyModelNamesSource = """
+        namespace DependencyLib;
+
+        public static class ModelNames
+        {
+            public const string TableName = "DependentTable";
+            public const string NameColumn = "dependency_name";
+        }
+        """;
+
+    private const string DependencyBackedDesignTimeFactoryModelSource = """
+        using System.Data.Common;
+        using DependencyLib;
+        using Microsoft.Data.Sqlite;
+        using nORM.Configuration;
+        using nORM.Core;
+        using nORM.Migration;
+        using nORM.Providers;
+
+        public sealed class DependentEntity
+        {
+            public int Id { get; set; }
+            public string Name { get; set; } = "";
+        }
+
+        public sealed class DependentContext(DbConnection connection, DatabaseProvider provider, DbContextOptions? options = null)
+            : DbContext(connection, provider, options);
+
+        public sealed class DependentDesignTimeContext : INormDesignTimeDbContextFactory<DependentContext>
+        {
+            public DependentContext CreateDbContext(string[] args)
+            {
+                var connection = new SqliteConnection("Data Source=:memory:");
+                connection.Open();
+                var options = new DbContextOptions
+                {
+                    OnModelCreating = mb => mb.Entity<DependentEntity>()
+                        .ToTable(ModelNames.TableName)
+                        .HasKey(e => e.Id)
+                        .Property(e => e.Name)
+                        .HasColumnName(ModelNames.NameColumn)
+                };
+                return new DependentContext(connection, new SqliteProvider(), options);
             }
         }
         """;
