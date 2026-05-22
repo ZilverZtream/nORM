@@ -1,6 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
+using nORM.Core;
+using nORM.Enterprise;
 using Xunit;
 
 namespace nORM.Tests;
@@ -37,6 +42,47 @@ public sealed class LoggingRedactionTests
         Assert.Equal("[redacted]", loggedParameters["@p1"]);
     }
 
+    [Fact]
+    public async Task BaseDbCommandInterceptor_ScalarExecutedAsync_DoesNotLogScalarResult()
+    {
+        var logger = new CapturingLogger();
+        var interceptor = new CapturingInterceptor(logger);
+        using var command = new SqliteCommand("SELECT 'api-token-123'");
+
+        await interceptor.ScalarExecutedAsync(command, null!, "api-token-123", TimeSpan.FromMilliseconds(1), CancellationToken.None);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.DoesNotContain("api-token-123", entry.Rendered, StringComparison.Ordinal);
+        Assert.Contains("Executed scalar", entry.Rendered, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task BaseDbCommandInterceptor_CommandFailedAsync_RedactsCommandText()
+    {
+        var logger = new CapturingLogger();
+        var interceptor = new CapturingInterceptor(logger);
+        using var command = new SqliteCommand("SELECT * FROM Users WHERE Password = 'super-secret'");
+
+        await interceptor.CommandFailedAsync(command, null!, new InvalidOperationException("boom"), CancellationToken.None);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.DoesNotContain("super-secret", entry.Rendered, StringComparison.Ordinal);
+        Assert.Contains("[redacted]", entry.Rendered, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cli_connection_string_validation_keeps_execution_string_separate_from_redacted_diagnostics()
+    {
+        const string secret = "cli-secret-456";
+        var validated = nORM.Security.ConnectionStringValidator.Validate(
+            $"Host=localhost;Database=norm;Username=postgres;Password={secret}",
+            "postgres");
+
+        Assert.Contains(secret, validated.ConnectionString, StringComparison.Ordinal);
+        Assert.DoesNotContain(secret, validated.RedactedConnectionString, StringComparison.Ordinal);
+        Assert.Contains("***", validated.RedactedConnectionString, StringComparison.Ordinal);
+    }
+
     private sealed class CapturingLogger : ILogger
     {
         public List<LogEntry> Entries { get; } = new();
@@ -52,6 +98,13 @@ public sealed class LoggingRedactionTests
             Exception? exception,
             Func<TState, Exception?, string> formatter)
             => Entries.Add(new LogEntry(formatter(state, exception), state!));
+    }
+
+    private sealed class CapturingInterceptor : BaseDbCommandInterceptor
+    {
+        public CapturingInterceptor(ILogger logger) : base(logger)
+        {
+        }
     }
 
     private sealed record LogEntry(string Rendered, object State);

@@ -21,8 +21,8 @@ parameters, transaction, timeout, and provider-specific command state. This is a
 privileged extension point. Interceptor authors must not log parameter values or
 connection strings unless the application has its own sensitive-data policy.
 
-The built-in `BaseDbCommandInterceptor` logs redacted command text and does not
-log parameter values.
+The built-in `BaseDbCommandInterceptor` logs redacted command text, does not log
+parameter values, and does not log scalar result values.
 
 ## Raw SQL
 
@@ -35,5 +35,9 @@ raw query security contract is documented in `docs/raw-sql-security.md`.
 ## Release Gate
 
 The v1 release gate includes tests proving that `LogQuery` does not expose SQL
-literal values or parameter values by default, and that CLI/runtime connection
-string handling keeps execution strings separate from redacted diagnostics.
+literal values or parameter values by default, that the built-in interceptor does
+not expose scalar result values or unredacted command text, and that CLI/runtime
+connection string handling keeps execution strings separate from redacted
+diagnostics. Benchmark and release artifacts must summarize provider names,
+versions, commands, and result files without writing `NORM_TEST_*` connection
+string values.
