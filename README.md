@@ -259,9 +259,11 @@ await runner.ApplyMigrationsAsync();
 
 ### Migration Notes
 
-> **DATA LOSS WARNING - Column renames.** nORM cannot detect when you rename a C# property. Renaming
-> `Order.TotalCost` to `Order.TotalAmount` generates a migration diff that **drops `TotalCost` and adds
-> `TotalAmount`**, destroying all column data silently. Always create a manual migration instead:
+> **DATA LOSS WARNING - Column renames.** nORM cannot prove that a dropped column and a new column are
+> a rename. Renaming `Order.TotalCost` to `Order.TotalAmount` produces a migration diff that **drops
+> `TotalCost` and adds `TotalAmount`**. `norm migrations add` refuses to write table/column-drop
+> migrations unless `--force` is supplied, and forced migrations include TODO warnings. Always replace
+> rename-like drops/adds with a manual rename operation before applying the migration:
 >
 > ```csharp
 > // WRONG - renames the C# property directly -> DROP + ADD -> DATA LOSS

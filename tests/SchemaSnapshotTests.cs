@@ -226,6 +226,39 @@ public class SchemaSnapshotTests
     }
 
     [Fact]
+    public void SchemaDiff_destructive_warnings_identify_column_rename_candidate()
+    {
+        var oldTable = new TableSchema
+        {
+            Name = "Orders",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true },
+                new ColumnSchema { Name = "TotalCost", ClrType = typeof(decimal).FullName!, IsNullable = false }
+            }
+        };
+        var newTable = new TableSchema
+        {
+            Name = "Orders",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true },
+                new ColumnSchema { Name = "TotalAmount", ClrType = typeof(decimal).FullName!, IsNullable = false }
+            }
+        };
+
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { oldTable } },
+            new SchemaSnapshot { Tables = { newTable } });
+
+        Assert.True(diff.HasDestructiveChanges);
+        var warning = Assert.Single(diff.GetDestructiveChangeWarnings());
+        Assert.Contains("Orders.TotalCost", warning);
+        Assert.Contains("Possible rename candidate", warning);
+        Assert.Contains("Orders.TotalAmount", warning);
+    }
+
+    [Fact]
     public void SchemaDiffer_HasChanges_IsTrueWhenDroppedTables()
     {
         var oldTable = new TableSchema { Name = "Gone", Columns = { new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName! } } };

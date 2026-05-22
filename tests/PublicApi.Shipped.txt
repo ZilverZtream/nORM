@@ -357,6 +357,7 @@ M:nORM.Migration.PostgresMigrationRunner.HasPendingMigrationsAsync(System.Thread
 M:nORM.Migration.PostgresMigrationSqlGenerator.#ctor()
 M:nORM.Migration.PostgresMigrationSqlGenerator.GenerateSql(nORM.Migration.SchemaDiff):nORM.Migration.MigrationSqlStatements
 M:nORM.Migration.SchemaDiff.#ctor()
+M:nORM.Migration.SchemaDiff.GetDestructiveChangeWarnings():System.Collections.Generic.IReadOnlyList{System.String}
 M:nORM.Migration.SchemaDiffer.Diff(nORM.Migration.SchemaSnapshot,nORM.Migration.SchemaSnapshot):nORM.Migration.SchemaDiff
 M:nORM.Migration.SchemaSnapshot.#ctor()
 M:nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly):nORM.Migration.SchemaSnapshot
@@ -791,6 +792,7 @@ P:nORM.Migration.SchemaDiff.DroppedForeignKeys:System.Collections.Generic.List{S
 P:nORM.Migration.SchemaDiff.DroppedIndexes:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String}}
 P:nORM.Migration.SchemaDiff.DroppedTables:System.Collections.Generic.List{nORM.Migration.TableSchema}
 P:nORM.Migration.SchemaDiff.HasChanges:System.Boolean
+P:nORM.Migration.SchemaDiff.HasDestructiveChanges:System.Boolean
 P:nORM.Migration.SchemaSnapshot.Tables:System.Collections.Generic.List{nORM.Migration.TableSchema}
 P:nORM.Migration.TableSchema.Columns:System.Collections.Generic.List{nORM.Migration.ColumnSchema}
 P:nORM.Migration.TableSchema.ForeignKeys:System.Collections.Generic.List{nORM.Migration.ForeignKeySchema}

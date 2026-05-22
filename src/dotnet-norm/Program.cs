@@ -170,10 +170,12 @@ var migNameArg = new Argument<string>("name") { Description = "Migration name" }
 var addProvOpt = new Option<string>("--provider") { Description = "Database provider (sqlserver, sqlite, postgres, mysql)", Required = true };
 var addAsmOpt = new Option<string>("--assembly") { Description = "Path to assembly containing DbContext and entities", Required = true };
 var addOutOpt = new Option<string>("--output") { Description = "Output directory for migrations", DefaultValueFactory = _ => "Migrations" };
+var addForceOpt = new Option<bool>("--force") { Description = "Allow destructive table/column drops when generating the migration." };
 add.Add(migNameArg);
 add.Add(addProvOpt);
 add.Add(addAsmOpt);
 add.Add(addOutOpt);
+add.Add(addForceOpt);
 add.SetAction((ParseResult result) =>
 {
     try
@@ -182,6 +184,7 @@ add.SetAction((ParseResult result) =>
         var prov = result.GetValue(addProvOpt)!;
         var asmPath = result.GetValue(addAsmOpt)!;
         var output = result.GetValue(addOutOpt)!;
+        var force = result.GetValue(addForceOpt);
         if (!File.Exists(asmPath))
         {
             Console.Error.WriteLine($"Assembly '{asmPath}' not found.");
@@ -231,6 +234,16 @@ add.SetAction((ParseResult result) =>
             return 0;
         }
 
+        var destructiveWarnings = diff.GetDestructiveChangeWarnings();
+        if (destructiveWarnings.Count > 0 && !force)
+        {
+            Console.Error.WriteLine("Destructive schema changes detected. No migration was written.");
+            foreach (var warning in destructiveWarnings)
+                Console.Error.WriteLine($"  - {warning}");
+            Console.Error.WriteLine("Re-run with --force after replacing rename-like drops/adds with explicit rename operations or after accepting the data loss.");
+            return 3;
+        }
+
         IMigrationSqlGenerator generator = prov.ToLowerInvariant() switch
         {
             "sqlserver" => new SqlServerMigrationSqlGenerator(),
@@ -247,7 +260,7 @@ add.SetAction((ParseResult result) =>
         var className = $"Migration_{version}_{ToCSharpIdentifier(name)}";
         var filePath = Path.Combine(output, className + ".cs");
 
-        File.WriteAllText(filePath, MigrationCodeWriter.WriteMigrationSource(className, version, name, sql));
+        File.WriteAllText(filePath, MigrationCodeWriter.WriteMigrationSource(className, version, name, sql, destructiveWarnings));
 
         var snapJson = JsonSerializer.Serialize(newSnap, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(snapshotPath, snapJson);
