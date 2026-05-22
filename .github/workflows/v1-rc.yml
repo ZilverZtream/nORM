@@ -1,0 +1,141 @@
+name: v1 RC Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      stress_iterations:
+        description: Stress-loop iterations for the RC gate
+        required: true
+        default: "20"
+      provider_matrix_filter:
+        description: BenchmarkDotNet provider-matrix filter
+        required: true
+        default: "*ProviderMatrixBenchmarks*"
+      skip_benchmark:
+        description: Skip benchmark steps for non-performance validation
+        type: boolean
+        required: true
+        default: false
+  schedule:
+    - cron: "0 3 * * 0"
+
+jobs:
+  rc:
+    name: v1 RC Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: normtest
+          MYSQL_DATABASE: normtest
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: normtest
+          POSTGRES_DB: normtest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          SA_PASSWORD: "NormTest!2024"
+          MSSQL_PID: "Developer"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd="/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'NormTest!2024' -Q 'SELECT 1' -No"
+          --health-interval=15s
+          --health-timeout=10s
+          --health-retries=12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Show .NET SDK
+        run: dotnet --info
+
+      - name: Validate .NET SDK
+        shell: pwsh
+        run: |
+          $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
+          $actual = dotnet --version
+          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
+
+      - name: Run RC release gate
+        shell: pwsh
+        env:
+          NORM_TEST_MYSQL: "Server=127.0.0.1;Port=3306;Database=normtest;User=root;Password=normtest;AllowPublicKeyRetrieval=True"
+          NORM_TEST_POSTGRES: "Host=127.0.0.1;Port=5432;Database=normtest;Username=postgres;Password=normtest"
+          NORM_TEST_SQLSERVER: "Server=127.0.0.1,1433;Database=normtest;User Id=sa;Password=NormTest!2024;TrustServerCertificate=True"
+        run: |
+          $stressIterations = "${{ github.event.inputs.stress_iterations }}"
+          if (-not $stressIterations) { $stressIterations = "20" }
+
+          $providerMatrixFilter = "${{ github.event.inputs.provider_matrix_filter }}"
+          if (-not $providerMatrixFilter) { $providerMatrixFilter = "*ProviderMatrixBenchmarks*" }
+
+          $arguments = @(
+            '-Mode', 'rc',
+            '-MinLiveProviders', '3',
+            '-StressIterations', $stressIterations,
+            '-ProviderMatrixBenchmarkFilter', $providerMatrixFilter
+          )
+
+          if ("${{ github.event.inputs.skip_benchmark }}" -eq "true") {
+            $arguments += '-SkipBenchmark'
+          }
+
+          ./eng/v1-release-gate.ps1 @arguments
+
+      - name: Upload RC test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1-rc-test-results
+          path: "tests/TestResults/**/*.trx"
+          retention-days: 14
+
+      - name: Upload RC packages
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1-rc-packages
+          path: |
+            src/bin/Release/*.nupkg
+            src/bin/Release/*.snupkg
+            src/dotnet-norm/bin/Release/*.nupkg
+            src/dotnet-norm/bin/Release/*.snupkg
+          retention-days: 14
+
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1-rc-benchmarks
+          path: |
+            BenchmarkDotNet.Artifacts/**
+            benchmarks/BenchmarkDotNet.Artifacts/**
+          retention-days: 14

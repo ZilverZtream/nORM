@@ -89,6 +89,14 @@ jobs:
         shell: pwsh
         run: ./eng/v1-release-gate.ps1 -Mode quick -SkipBenchmark
 
+      - name: Upload release gate test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gate-test-results
+          path: "tests/TestResults/**/*.trx"
+          retention-days: 7
+
       - name: Upload package artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -154,13 +162,10 @@ jobs:
           done
 
       - name: Test (live MySQL parity)
+        shell: pwsh
         env:
           NORM_TEST_MYSQL: "Server=127.0.0.1;Port=3306;Database=normtest;User=root;Password=normtest;AllowPublicKeyRetrieval=True"
-        run: >
-          dotnet test tests/ --no-build --nologo
-          --filter "FullyQualifiedName~LiveProvider|FullyQualifiedName~MySql|FullyQualifiedName~OccConflictMatrix"
-          --logger "trx;LogFileName=test-results-mysql.trx"
-          --logger "console;verbosity=normal"
+        run: ./eng/v1-release-gate.ps1 -Mode live -MinLiveProviders 1 -SkipBenchmark
 
       - name: Upload MySQL test results
         if: always()
@@ -216,13 +221,10 @@ jobs:
         run: dotnet build tests/ --no-restore --nologo -v quiet
 
       - name: Test (live Postgres parity)
+        shell: pwsh
         env:
           NORM_TEST_POSTGRES: "Host=127.0.0.1;Port=5432;Database=normtest;Username=postgres;Password=normtest"
-        run: >
-          dotnet test tests/ --no-build --nologo
-          --filter "FullyQualifiedName~LiveProvider|FullyQualifiedName~Postgres|FullyQualifiedName~ProviderParity"
-          --logger "trx;LogFileName=test-results-postgres.trx"
-          --logger "console;verbosity=normal"
+        run: ./eng/v1-release-gate.ps1 -Mode live -MinLiveProviders 1 -SkipBenchmark
 
       - name: Upload Postgres test results
         if: always()
@@ -279,13 +281,10 @@ jobs:
         run: dotnet build tests/ --no-restore --nologo -v quiet
 
       - name: Test (live SQL Server parity)
+        shell: pwsh
         env:
           NORM_TEST_SQLSERVER: "Server=127.0.0.1,1433;Database=normtest;User Id=sa;Password=NormTest!2024;TrustServerCertificate=True"
-        run: >
-          dotnet test tests/ --no-build --nologo
-          --filter "FullyQualifiedName~LiveProvider|FullyQualifiedName~SqlServer|FullyQualifiedName~ProviderParity"
-          --logger "trx;LogFileName=test-results-sqlserver.trx"
-          --logger "console;verbosity=normal"
+        run: ./eng/v1-release-gate.ps1 -Mode live -MinLiveProviders 1 -SkipBenchmark
 
       - name: Upload SQL Server test results
         if: always()
