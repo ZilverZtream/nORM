@@ -219,7 +219,7 @@ namespace nORM.Configuration
         /// materialization. Filters, joins, grouping, ordering and paging are still
         /// translated server-side before any allowed client projection is applied.
         /// </summary>
-        public ClientEvaluationPolicy ClientEvaluationPolicy { get; set; } = ClientEvaluationPolicy.Warn;
+        public ClientEvaluationPolicy ClientEvaluationPolicy { get; set; } = ClientEvaluationPolicy.Throw;
 
         /// <summary>
         /// Gets the collection of command interceptors that will be invoked for every

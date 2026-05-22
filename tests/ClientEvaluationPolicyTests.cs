@@ -15,6 +15,20 @@ namespace nORM.Tests;
 public class ClientEvaluationPolicyTests
 {
     [Fact]
+    public async Task ClientEvaluationPolicy_Default_rejects_projection_client_eval()
+    {
+        await using var connection = await OpenConnectionAsync();
+        using var context = new DbContext(connection, new SqliteProvider());
+
+        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
+            context.Query<ClientEvalUser>()
+                .Select(u => new ClientEvalUser { Id = u.Id, Name = FormatName(u.Name) })
+                .ToListAsync());
+
+        Assert.Contains("requires client-side evaluation", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ClientEvaluationPolicy_Warn_logs_and_applies_projection_after_server_query()
     {
         await using var connection = await OpenConnectionAsync();
