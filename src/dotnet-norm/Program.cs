@@ -36,22 +36,23 @@ scaffold.Add(nsOpt);
 scaffold.Add(ctxOpt);
 scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
 {
-    var prov = result.GetValue(providerOpt)!;
-    var conn = ConnectionStringValidator.ValidateAndSanitize(result.GetValue(connOpt)!, prov);
-    var output = result.GetValue(outputOpt)!;
-    var ns = result.GetValue(nsOpt)!;
-    var ctx = result.GetValue(ctxOpt)!;
     try
     {
-        using var connection = CreateConnection(prov, conn);
+        var prov = result.GetValue(providerOpt)!;
+        var validated = ConnectionStringValidator.Validate(result.GetValue(connOpt)!, prov);
+        var output = result.GetValue(outputOpt)!;
+        var ns = result.GetValue(nsOpt)!;
+        var ctx = result.GetValue(ctxOpt)!;
+        using var connection = CreateConnection(prov, validated.ConnectionString);
         await connection.OpenAsync();
         var provider = CreateProvider(prov);
         await DatabaseScaffolder.ScaffoldAsync(connection, provider, output, ns, ctx);
         Console.WriteLine($"Scaffolding completed. Files written to {output}.");
+        return 0;
     }
     catch (Exception ex)
     {
-        Console.Error.WriteLine($"Error: {ex.Message}");
+        return Fail(ex);
     }
 });
 root.Add(scaffold);
@@ -68,17 +69,17 @@ update.Add(migProvOpt);
 update.Add(assemblyOpt);
 update.SetAction(async (ParseResult result, CancellationToken _) =>
 {
-    var prov = result.GetValue(migProvOpt)!;
-    var conn = ConnectionStringValidator.ValidateAndSanitize(result.GetValue(migConnOpt)!, prov);
-    var asmPath = result.GetValue(assemblyOpt)!;
     try
     {
+        var prov = result.GetValue(migProvOpt)!;
+        var validated = ConnectionStringValidator.Validate(result.GetValue(migConnOpt)!, prov);
+        var asmPath = result.GetValue(assemblyOpt)!;
         if (!File.Exists(asmPath))
         {
             Console.Error.WriteLine($"Assembly '{asmPath}' not found.");
-            return;
+            return 2;
         }
-        using var connection = CreateConnection(prov, conn);
+        using var connection = CreateConnection(prov, validated.ConnectionString);
         await connection.OpenAsync();
         var assembly = Assembly.LoadFrom(asmPath);
         IMigrationRunner runner = prov.ToLowerInvariant() switch
@@ -92,14 +93,15 @@ update.SetAction(async (ParseResult result, CancellationToken _) =>
         if (!await runner.HasPendingMigrationsAsync())
         {
             Console.WriteLine("No pending migrations found.");
-            return;
+            return 0;
         }
         await runner.ApplyMigrationsAsync();
         Console.WriteLine("Migrations applied successfully.");
+        return 0;
     }
     catch (Exception ex)
     {
-        Console.Error.WriteLine($"Error: {ex.Message}");
+        return Fail(ex);
     }
 });
 
@@ -110,13 +112,13 @@ drop.Add(dropConnOpt);
 drop.Add(dropProvOpt);
 drop.SetAction(async (ParseResult result, CancellationToken _) =>
 {
-    var prov = result.GetValue(dropProvOpt)!;
-    var conn = ConnectionStringValidator.ValidateAndSanitize(result.GetValue(dropConnOpt)!, prov);
     try
     {
+        var prov = result.GetValue(dropProvOpt)!;
+        var validated = ConnectionStringValidator.Validate(result.GetValue(dropConnOpt)!, prov);
         if (prov.Equals("sqlite", StringComparison.OrdinalIgnoreCase))
         {
-            var builder = new SqliteConnectionStringBuilder(conn);
+            var builder = new SqliteConnectionStringBuilder(validated.ConnectionString);
             var file = builder.DataSource;
             if (File.Exists(file))
             {
@@ -127,10 +129,10 @@ drop.SetAction(async (ParseResult result, CancellationToken _) =>
             {
                 Console.WriteLine($"Database file '{file}' not found.");
             }
-            return;
+            return 0;
         }
 
-        using var connection = CreateConnection(prov, conn);
+        using var connection = CreateConnection(prov, validated.ConnectionString);
         await connection.OpenAsync();
         var provider = CreateProvider(prov);
         var schema = connection.GetSchema("Tables");
@@ -148,10 +150,11 @@ drop.SetAction(async (ParseResult result, CancellationToken _) =>
             catch (DbException ex) { Console.Error.WriteLine($"  Warning: DROP TABLE {full} failed: {ex.Message}"); }
         }
         Console.WriteLine("Database dropped successfully.");
+        return 0;
     }
     catch (Exception ex)
     {
-        Console.Error.WriteLine($"Error: {ex.Message}");
+        return Fail(ex);
     }
 });
 
@@ -172,16 +175,16 @@ add.Add(addAsmOpt);
 add.Add(addOutOpt);
 add.SetAction((ParseResult result) =>
 {
-    var name = result.GetValue(migNameArg)!;
-    var prov = result.GetValue(addProvOpt)!;
-    var asmPath = result.GetValue(addAsmOpt)!;
-    var output = result.GetValue(addOutOpt)!;
     try
     {
+        var name = result.GetValue(migNameArg)!;
+        var prov = result.GetValue(addProvOpt)!;
+        var asmPath = result.GetValue(addAsmOpt)!;
+        var output = result.GetValue(addOutOpt)!;
         if (!File.Exists(asmPath))
         {
             Console.Error.WriteLine($"Assembly '{asmPath}' not found.");
-            return;
+            return 2;
         }
         var assembly = Assembly.LoadFrom(asmPath);
 
@@ -224,7 +227,7 @@ add.SetAction((ParseResult result) =>
         if (!diff.HasChanges)
         {
             Console.WriteLine("No changes detected.");
-            return;
+            return 0;
         }
 
         IMigrationSqlGenerator generator = prov.ToLowerInvariant() switch
@@ -240,16 +243,17 @@ add.SetAction((ParseResult result) =>
         Directory.CreateDirectory(output);
 
         var version = long.Parse(DateTime.UtcNow.ToString("yyyyMMddHHmmss"));
-        var className = $"{version}_{name}";
+        var className = $"Migration_{version}_{ToCSharpIdentifier(name)}";
         var filePath = Path.Combine(output, className + ".cs");
 
         var sb = new StringBuilder();
         sb.AppendLine("using System.Data.Common;");
+        sb.AppendLine("using System.Threading;");
         sb.AppendLine("using nORM.Migration;");
         sb.AppendLine();
         sb.AppendLine($"public class {className} : Migration");
         sb.AppendLine("{");
-        sb.AppendLine($"    public {className}() : base({version}, \"{name}\") {{ }}");
+        sb.AppendLine($"    public {className}() : base({version}, {ToCSharpStringLiteral(name)}) {{ }}");
         AppendMethod("Up", sql.PreTransactionUp, sql.Up, sql.PostTransactionUp, sb);
         AppendMethod("Down", sql.PreTransactionDown, sql.Down, sql.PostTransactionDown, sb);
         sb.AppendLine("}");
@@ -258,10 +262,11 @@ add.SetAction((ParseResult result) =>
         var snapJson = JsonSerializer.Serialize(newSnap, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(snapshotPath, snapJson);
         Console.WriteLine($"Migration '{className}' generated at {filePath}.");
+        return 0;
     }
     catch (Exception ex)
     {
-        Console.Error.WriteLine($"Error: {ex.Message}");
+        return Fail(ex);
     }
 });
 
@@ -307,14 +312,20 @@ static DatabaseProvider CreateProvider(string provider) =>
     {
         "sqlserver" => new SqlServerProvider(),
         "sqlite" => new SqliteProvider(),
-        "postgres" or "postgresql" => new PostgresProvider(new NpgsqlParameterFactory()),
-        "mysql" => new MySqlProvider(new MySqlParameterFactory()),
+        "postgres" or "postgresql" => new PostgresProvider(),
+        "mysql" => new MySqlProvider(),
         _ => throw new ArgumentException($"Unsupported provider '{provider}'.")
     };
 
+static int Fail(Exception ex, int exitCode = 1)
+{
+    Console.Error.WriteLine($"Error: {ex.Message}");
+    return exitCode;
+}
+
 static void AppendMethod(string methodName, IReadOnlyList<string>? preStatements, IReadOnlyList<string> statements, IReadOnlyList<string>? postStatements, StringBuilder sb)
 {
-    sb.AppendLine($"    public override void {methodName}(DbConnection connection, DbTransaction transaction)");
+    sb.AppendLine($"    public override void {methodName}(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)");
     sb.AppendLine("    {");
 
     // MG-2: Pre-transaction statements (e.g. PRAGMA foreign_keys=OFF) run outside the transaction.
@@ -323,8 +334,8 @@ static void AppendMethod(string methodName, IReadOnlyList<string>? preStatements
         sb.AppendLine("        // Pre-transaction statements: execute outside the transaction.");
         foreach (var pre in preStatements)
         {
-            var stmt = pre.Replace("\"", "\\\"");
-            sb.AppendLine($"        using (var preCmd = connection.CreateCommand()) {{ preCmd.CommandText = \"{stmt}\"; preCmd.ExecuteNonQuery(); }}");
+            sb.AppendLine("        ct.ThrowIfCancellationRequested();");
+            sb.AppendLine($"        using (var preCmd = connection.CreateCommand()) {{ preCmd.CommandText = {ToCSharpStringLiteral(pre)}; preCmd.ExecuteNonQuery(); }}");
         }
     }
 
@@ -333,12 +344,12 @@ static void AppendMethod(string methodName, IReadOnlyList<string>? preStatements
         sb.AppendLine("        foreach (var sql in new[] {");
         for (int i = 0; i < statements.Count; i++)
         {
-            var stmt = statements[i].Replace("\"", "\\\"");
             var comma = i < statements.Count - 1 ? "," : string.Empty;
-            sb.AppendLine($"            \"{stmt}\"{comma}");
+            sb.AppendLine($"            {ToCSharpStringLiteral(statements[i])}{comma}");
         }
         sb.AppendLine("        })");
         sb.AppendLine("        {");
+        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
         sb.AppendLine("            using var cmd = connection.CreateCommand();");
         sb.AppendLine("            cmd.Transaction = transaction;");
         sb.AppendLine("            cmd.CommandText = sql;");
@@ -352,11 +363,50 @@ static void AppendMethod(string methodName, IReadOnlyList<string>? preStatements
         sb.AppendLine("        // Post-transaction statements: execute after the transaction commits.");
         foreach (var post in postStatements)
         {
-            var stmt = post.Replace("\"", "\\\"");
-            sb.AppendLine($"        using (var postCmd = connection.CreateCommand()) {{ postCmd.CommandText = \"{stmt}\"; postCmd.ExecuteNonQuery(); }}");
+            sb.AppendLine("        ct.ThrowIfCancellationRequested();");
+            sb.AppendLine($"        using (var postCmd = connection.CreateCommand()) {{ postCmd.CommandText = {ToCSharpStringLiteral(post)}; postCmd.ExecuteNonQuery(); }}");
         }
     }
 
     sb.AppendLine("    }");
 }
 
+static string ToCSharpStringLiteral(string value)
+{
+    var builder = new StringBuilder(value.Length + 2);
+    builder.Append('"');
+    foreach (var ch in value)
+    {
+        builder.Append(ch switch
+        {
+            '\\' => "\\\\",
+            '"' => "\\\"",
+            '\0' => "\\0",
+            '\a' => "\\a",
+            '\b' => "\\b",
+            '\f' => "\\f",
+            '\n' => "\\n",
+            '\r' => "\\r",
+            '\t' => "\\t",
+            '\v' => "\\v",
+            _ when char.IsControl(ch) => "\\u" + ((int)ch).ToString("x4"),
+            _ => ch.ToString()
+        });
+    }
+    builder.Append('"');
+    return builder.ToString();
+}
+
+static string ToCSharpIdentifier(string value)
+{
+    var builder = new StringBuilder(value.Length);
+    for (var i = 0; i < value.Length; i++)
+    {
+        var ch = value[i];
+        builder.Append(i == 0
+            ? (char.IsLetter(ch) || ch == '_' ? ch : '_')
+            : (char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_'));
+    }
+
+    return builder.Length == 0 ? "_" : builder.ToString();
+}

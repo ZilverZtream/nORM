@@ -50,6 +50,35 @@ jobs:
   # Gate 4.5 requirement: mandatory live provider matrix, no optional skip path
   # for core parity scenarios. The NORM_TEST_MYSQL env var activates live tests;
   # this job always sets it so the parity tests are never skipped in CI.
+  release-gate-quick:
+    name: v1 Release Gate (quick)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Run quick release gate
+        shell: pwsh
+        run: ./eng/v1-release-gate.ps1 -Mode quick -SkipBenchmark
+
+      - name: Upload package artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gate-packages
+          path: |
+            src/bin/Release/*.nupkg
+            src/bin/Release/*.snupkg
+            src/dotnet-norm/bin/Release/*.nupkg
+            src/dotnet-norm/bin/Release/*.snupkg
+          retention-days: 7
+
   test-mysql:
     name: Live MySQL Provider Parity
     runs-on: ubuntu-latest

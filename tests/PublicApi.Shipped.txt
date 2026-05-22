@@ -512,6 +512,7 @@ M:nORM.Providers.DynamicBatchSizer.CalculateOptimalBatchSize``1(System.Collectio
 M:nORM.Providers.DynamicBatchSizer.RecordBatchPerformance(System.String,System.Int32,System.TimeSpan,System.Int32):System.Void
 M:nORM.Providers.IDbParameterFactory.CreateParameter(System.String,System.Object):System.Data.Common.DbParameter
 M:nORM.Providers.IFastProvider.BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32&):System.Void
+M:nORM.Providers.MySqlProvider.#ctor()
 M:nORM.Providers.MySqlProvider.#ctor(nORM.Providers.IDbParameterFactory)
 M:nORM.Providers.MySqlProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String):System.Void
 M:nORM.Providers.MySqlProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
@@ -529,6 +530,7 @@ M:nORM.Providers.MySqlProvider.IsAvailableAsync():System.Threading.Tasks.Task{Sy
 M:nORM.Providers.MySqlProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.MySqlProvider.TranslateFunction(System.String,System.Type,System.String[]):System.String
 M:nORM.Providers.MySqlProvider.TranslateJsonPathAccess(System.String,System.String):System.String
+M:nORM.Providers.PostgresProvider.#ctor()
 M:nORM.Providers.PostgresProvider.#ctor(nORM.Providers.IDbParameterFactory)
 M:nORM.Providers.PostgresProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String):System.Void
 M:nORM.Providers.PostgresProvider.BuildContainsClause(System.Data.Common.DbCommand,System.String,System.Collections.Generic.IReadOnlyList{System.Object}):System.String

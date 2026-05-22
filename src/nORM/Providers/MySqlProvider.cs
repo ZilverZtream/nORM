@@ -48,6 +48,19 @@ namespace nORM.Providers
         /// <summary>
         /// Initializes a new instance of the <see cref="MySqlProvider"/> class.
         /// </summary>
+        /// <remarks>
+        /// Uses a reflection-based MySQL parameter factory. Consumer applications must
+        /// reference either <c>MySqlConnector</c> or <c>MySql.Data</c> when executing
+        /// MySQL commands.
+        /// </remarks>
+        public MySqlProvider()
+            : this(new ReflectionMySqlParameterFactory())
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MySqlProvider"/> class.
+        /// </summary>
         /// <param name="parameterFactory">Factory used to create provider-specific parameters.</param>
         /// <remarks>
         /// <para>
@@ -67,6 +80,24 @@ namespace nORM.Providers
         public MySqlProvider(IDbParameterFactory parameterFactory)
         {
             _parameterFactory = parameterFactory ?? throw new ArgumentNullException(nameof(parameterFactory));
+        }
+
+        private sealed class ReflectionMySqlParameterFactory : IDbParameterFactory
+        {
+            private readonly Type? _parameterType =
+                Type.GetType("MySqlConnector.MySqlParameter, MySqlConnector") ??
+                Type.GetType("MySql.Data.MySqlClient.MySqlParameter, MySql.Data");
+
+            public DbParameter CreateParameter(string name, object? value)
+            {
+                if (_parameterType == null)
+                {
+                    throw new InvalidOperationException(
+                        "MySQL package is required for MySQL support. Add PackageReference Include=\"MySqlConnector\" or Include=\"MySql.Data\" to the consuming project.");
+                }
+
+                return (DbParameter)Activator.CreateInstance(_parameterType, name, value ?? DBNull.Value)!;
+            }
         }
 
         /// <summary>

@@ -907,8 +907,8 @@ public class ProviderMatrixBenchmarks
         {
             "Sqlite" => new SqliteProvider(),
             "SqlServer" => new SqlServerProvider(),
-            "Postgres" => new PostgresProvider(new BenchmarkNpgsqlParameterFactory()),
-            "MySql" => new MySqlProvider(new BenchmarkMySqlParameterFactory()),
+            "Postgres" => new PostgresProvider(),
+            "MySql" => new MySqlProvider(),
             _ => throw new InvalidOperationException($"Unsupported benchmark provider '{provider}'.")
         };
 
