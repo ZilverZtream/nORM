@@ -13,6 +13,14 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
+$solutionPath = Join-Path $root 'nORM.sln'
+$testsProjectPath = Join-Path (Join-Path $root 'tests') 'nORM.Tests.csproj'
+$benchmarkProjectPath = Join-Path (Join-Path $root 'benchmarks') 'nORM.Benchmarks.csproj'
+$runtimeProjectPath = Join-Path (Join-Path $root 'src') 'nORM.csproj'
+$toolProjectPath = Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') 'dotnet-norm.csproj'
+$testResultsPath = Join-Path (Join-Path (Join-Path $root 'tests') 'TestResults') 'v1-release-gate'
+New-Item -ItemType Directory -Force -Path $testResultsPath | Out-Null
+
 function Invoke-Step {
     param(
         [string]$Name,
@@ -24,6 +32,41 @@ function Invoke-Step {
     & $Command
     if ($LASTEXITCODE -ne 0) {
         throw "Step failed: $Name (exit code $LASTEXITCODE)"
+    }
+}
+
+function Get-TrxLogFileName {
+    param([string]$Name)
+    return (($Name -replace '[^A-Za-z0-9_.-]', '_') + '.trx')
+}
+
+function Invoke-TestStep {
+    param(
+        [string]$Name,
+        [string]$Filter
+    )
+
+    Invoke-Step $Name {
+        $arguments = @(
+            'test',
+            $testsProjectPath,
+            '-c',
+            $Configuration,
+            '--no-build',
+            '--no-restore',
+            '--logger',
+            'console;verbosity=minimal',
+            '--logger',
+            "trx;LogFileName=$(Get-TrxLogFileName $Name)",
+            '--results-directory',
+            $testResultsPath
+        )
+
+        if ($Filter) {
+            $arguments += @('--filter', $Filter)
+        }
+
+        dotnet @arguments
     }
 }
 
@@ -74,41 +117,41 @@ Write-Host "  Min live providers:  $MinLiveProviders"
 Write-Host "  Benchmark:           $(if ($SkipBenchmark) { 'skipped' } else { 'enabled' })"
 Write-Host "  Provider matrix:     $(if ($SkipBenchmark -or $SkipProviderMatrixBenchmark -or $Mode -ne 'rc') { 'skipped' } else { 'enabled' })"
 
-Invoke-Step 'restore' { dotnet restore nORM.sln }
-Invoke-Step 'build' { dotnet build nORM.sln --no-restore -c $Configuration --nologo }
-Invoke-Step 'public API snapshot' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter 'FullyQualifiedName~PublicApiSnapshotTests' --logger 'console;verbosity=minimal' }
-Invoke-Step 'package consumer smoke tests' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter 'FullyQualifiedName~PackageConsumerIntegrationTests' --logger 'console;verbosity=minimal' }
-Invoke-Step 'CLI smoke tests' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter 'FullyQualifiedName~CliIntegrationTests' --logger 'console;verbosity=minimal' }
+Invoke-Step 'restore' { dotnet restore $solutionPath }
+Invoke-Step 'build' { dotnet build $solutionPath --no-restore -c $Configuration --nologo }
+Invoke-TestStep 'public API snapshot' 'FullyQualifiedName~PublicApiSnapshotTests'
+Invoke-TestStep 'package consumer smoke tests' 'FullyQualifiedName~PackageConsumerIntegrationTests'
+Invoke-TestStep 'CLI smoke tests' 'FullyQualifiedName~CliIntegrationTests'
 
 if ($Mode -in @('live', 'full', 'rc')) {
-    Invoke-Step 'live provider gate' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter $liveFilter --logger 'console;verbosity=minimal' }
+    Invoke-TestStep 'live provider gate' $liveFilter
 }
 
 if ($Mode -in @('full', 'rc')) {
-    Invoke-Step 'full test suite' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --logger 'console;verbosity=minimal' }
+    Invoke-TestStep 'full test suite' ''
 }
 
 if ($Mode -eq 'rc') {
     foreach ($i in 1..$StressIterations) {
-        Invoke-Step "navigation stress $i/$StressIterations" { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter $navigationFilter --logger 'console;verbosity=minimal' }
+        Invoke-TestStep "navigation stress $i/$StressIterations" $navigationFilter
     }
     foreach ($i in 1..$StressIterations) {
-        Invoke-Step "transaction stress $i/$StressIterations" { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter $transactionFilter --logger 'console;verbosity=minimal' }
+        Invoke-TestStep "transaction stress $i/$StressIterations" $transactionFilter
     }
     foreach ($i in 1..$StressIterations) {
-        Invoke-Step "compiled query stress $i/$StressIterations" { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter $compiledFilter --logger 'console;verbosity=minimal' }
+        Invoke-TestStep "compiled query stress $i/$StressIterations" $compiledFilter
     }
 
-    Invoke-Step 'provider/source-gen parity' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter $parityFilter --logger 'console;verbosity=minimal' }
-    Invoke-Step 'bulk/provider parity' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter $bulkFilter --logger 'console;verbosity=minimal' }
-    Invoke-Step 'migration provider gate' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter $migrationFilter --logger 'console;verbosity=minimal' }
-    Invoke-Step 'concurrency/adversarial gate' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter $adversarialFilter --logger 'console;verbosity=minimal' }
-    Invoke-Step 'live provider gate second pass' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter $liveFilter --logger 'console;verbosity=minimal' }
-    Invoke-Step 'full test suite second pass' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --logger 'console;verbosity=minimal' }
+    Invoke-TestStep 'provider/source-gen parity' $parityFilter
+    Invoke-TestStep 'bulk/provider parity' $bulkFilter
+    Invoke-TestStep 'migration provider gate' $migrationFilter
+    Invoke-TestStep 'concurrency/adversarial gate' $adversarialFilter
+    Invoke-TestStep 'live provider gate second pass' $liveFilter
+    Invoke-TestStep 'full test suite second pass' ''
 }
 
 if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
-    Invoke-Step 'fast complex query benchmark' { dotnet run --project benchmarks\nORM.Benchmarks.csproj -c $Configuration -- --fast Query_Complex }
+    Invoke-Step 'fast complex query benchmark' { dotnet run --project $benchmarkProjectPath -c $Configuration -- --fast Query_Complex }
 }
 
 if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'rc') {
@@ -117,12 +160,12 @@ if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'r
     }
 
     Invoke-Step 'SQLite/SQL Server/PostgreSQL/MySQL provider matrix benchmark' {
-        dotnet run --project benchmarks\nORM.Benchmarks.csproj -c $Configuration -- --provider-matrix --filter $ProviderMatrixBenchmarkFilter
+        dotnet run --project $benchmarkProjectPath -c $Configuration -- --provider-matrix --filter $ProviderMatrixBenchmarkFilter
     }
 }
 
-Invoke-Step 'pack nORM' { dotnet pack src\nORM.csproj -c $Configuration --no-build --include-symbols -p:SymbolPackageFormat=snupkg }
-Invoke-Step 'pack dotnet-norm' { dotnet pack src\dotnet-norm\dotnet-norm.csproj -c $Configuration --no-build --include-symbols -p:SymbolPackageFormat=snupkg }
+Invoke-Step 'pack nORM' { dotnet pack $runtimeProjectPath -c $Configuration --no-build --include-symbols -p:SymbolPackageFormat=snupkg }
+Invoke-Step 'pack dotnet-norm' { dotnet pack $toolProjectPath -c $Configuration --no-build --include-symbols -p:SymbolPackageFormat=snupkg }
 
 Write-Host ""
 Write-Host "nORM v1 release gate passed."

@@ -70,3 +70,19 @@ that cannot access all three external servers locally.
 
 The public API baseline is documented in `docs\public-api-policy.md`. The v1.0
 release checklist is documented in `docs\v1-readiness.md`.
+
+## CI Release Gates
+
+CI uses the same release-gate script instead of a separate hand-written test
+path:
+
+- `.github/workflows/ci.yml` runs the quick package/API/CLI gate on every push
+  and pull request.
+- The live MySQL, PostgreSQL, and SQL Server jobs run `v1-release-gate.ps1
+  -Mode live -MinLiveProviders 1 -SkipBenchmark` against their service
+  database.
+- `.github/workflows/v1-rc.yml` runs the full `rc` gate on a weekly schedule and
+  on manual dispatch with SQL Server, PostgreSQL, and MySQL service databases.
+
+The CI gates upload TRX test results, generated packages, and BenchmarkDotNet
+artifacts so the release evidence is attached to the workflow run.
