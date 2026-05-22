@@ -237,7 +237,7 @@ namespace nORM.Query
                 ExpressionType.LessThanOrEqual => " <= ",
                 ExpressionType.AndAlso => " AND ",
                 ExpressionType.OrElse => " OR ",
-                _ => throw new NotSupportedException($"Binary operator '{node.NodeType}' not supported.")
+                _ => throw new NormUnsupportedFeatureException($"Binary operator '{node.NodeType}' is not supported.")
             });
             Visit(node.Right);
             _sql.Append(")");
@@ -519,7 +519,7 @@ namespace nORM.Query
                     return node;
                 }
             }
-            throw new NotSupportedException($"Member '{node.Member.Name}' is not supported in this context.");
+            throw new NormUnsupportedFeatureException($"Member '{node.Member.Name}' is not supported in this context.");
         }
         protected override Expression VisitConstant(ConstantExpression node)
         {
@@ -635,7 +635,7 @@ namespace nORM.Query
                     _sql.Append(fn);
                     return node;
                 }
-                throw new NotSupportedException($"String method '{node.Method.Name}' not supported.");
+                throw new NormUnsupportedFeatureException($"String method '{node.Method.Name}' is not supported.");
             }
             if (node.Method.DeclaringType == typeof(Enumerable) || node.Method.DeclaringType == typeof(Queryable))
             {
@@ -828,7 +828,7 @@ namespace nORM.Query
                         BuildIn(node.Arguments[0], node.Arguments[1]);
                         return node;
                     default:
-                        throw new NotSupportedException($"Queryable method '{node.Method.Name}' not supported.");
+                        throw new NormUnsupportedFeatureException($"Queryable method '{node.Method.Name}' is not supported.");
                 }
             }
             var args = new List<string>();
@@ -849,7 +849,7 @@ namespace nORM.Query
                 _sql.Append(formatted);
                 return node;
             }
-            throw new NotSupportedException($"Method '{node.Method.Name}' not supported.");
+            throw new NormUnsupportedFeatureException($"Method '{node.Method.Name}' is not supported.");
         }
         private void BuildExists(Expression source, LambdaExpression? predicate, bool negate)
         {

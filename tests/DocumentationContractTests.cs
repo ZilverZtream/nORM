@@ -224,6 +224,20 @@ public class DocumentationContractTests
         Assert.DoesNotContain("subclass", readme, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Readme_links_to_exception_taxonomy()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "exception-taxonomy.md"));
+
+        Assert.Contains("docs/exception-taxonomy.md", readme, StringComparison.Ordinal);
+        Assert.Contains("NormException", contract, StringComparison.Ordinal);
+        Assert.Contains("NormUnsupportedFeatureException", contract, StringComparison.Ordinal);
+        Assert.Contains("DbConcurrencyException", contract, StringComparison.Ordinal);
+        Assert.Contains("OperationCanceledException", contract, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

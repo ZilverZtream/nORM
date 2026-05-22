@@ -29,7 +29,7 @@ namespace nORM.Query
         /// the bulk operation.
         /// </summary>
         /// <param name="sql">The SQL statement to validate.</param>
-        /// <exception cref="NotSupportedException">Thrown when the statement contains unsupported constructs.</exception>
+        /// <exception cref="NormUnsupportedFeatureException">Thrown when the statement contains unsupported constructs.</exception>
         /// <remarks>
         /// PERFORMANCE: Uses ReadOnlySpan to avoid allocating uppercase copy of entire SQL string.
         /// </remarks>
@@ -39,7 +39,7 @@ namespace nORM.Query
                 sql.AsSpan().Contains(" ORDER BY ".AsSpan(), StringComparison.OrdinalIgnoreCase) ||
                 sql.AsSpan().Contains(" HAVING ".AsSpan(), StringComparison.OrdinalIgnoreCase) ||
                 sql.AsSpan().Contains(" JOIN ".AsSpan(), StringComparison.OrdinalIgnoreCase))
-                throw new NotSupportedException("ExecuteUpdate/Delete does not support grouped, ordered, joined or aggregated queries.");
+                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete does not support grouped, ordered, joined or aggregated queries.");
         }
 
         /// <summary>
@@ -47,14 +47,14 @@ namespace nORM.Query
         /// instead of scanning generated SQL text.
         /// </summary>
         /// <param name="shape">The query shape captured during LINQ translation.</param>
-        /// <exception cref="NotSupportedException">Thrown when the query shape is unsupported for bulk CUD.</exception>
+        /// <exception cref="NormUnsupportedFeatureException">Thrown when the query shape is unsupported for bulk CUD.</exception>
         public void ValidateCudPlan(BulkCudQueryShape? shape)
         {
             if (shape == null)
-                throw new NotSupportedException("ExecuteUpdate/Delete requires query-shape metadata.");
+                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete requires query-shape metadata.");
 
             if (shape.HasGroupBy || shape.HasOrderBy || shape.HasHaving || shape.HasJoins || shape.HasDistinct || shape.HasPaging)
-                throw new NotSupportedException("ExecuteUpdate/Delete does not support grouped, ordered, joined, distinct, paged or aggregated queries.");
+                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete does not support grouped, ordered, joined, distinct, paged or aggregated queries.");
         }
 
         /// <summary>
@@ -250,7 +250,7 @@ namespace nORM.Query
                 var member = (MemberExpression)lambda.Body;
                 var column = mapping.ColumnsByName[member.Member.Name].EscCol;
                 if (!TryGetSetValue(call.Arguments[1], out var value))
-                    throw new NotSupportedException("ExecuteUpdate set values must be constants or captured local values. Method calls and computed expressions are not supported.");
+                    throw new NormUnsupportedFeatureException("ExecuteUpdate set values must be constants or captured local values. Method calls and computed expressions are not supported.");
                 assigns.Add((column, value));
                 call = call.Object as MethodCallExpression;
             }
