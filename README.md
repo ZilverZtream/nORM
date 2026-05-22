@@ -17,33 +17,31 @@ nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .
 - **Modern Features**: JSON querying, window functions, temporal queries
 - **Enterprise Ready**: Multi-tenancy, caching, retry policies, and interceptors
 
-## Performance Comparison
+## Performance Validation
 
-Benchmarks: .NET 8.0, SQLite WAL mode, 1000 users + 2000 orders, i9-12900K. The provider matrix also covers SQL Server, PostgreSQL, and MySQL. All tools run against identical data and schema. Compiled = nORM `CompileQuery` / EF Core `CompileAsyncQuery`. Prepared = pre-compiled provider commands.
+nORM ships with BenchmarkDotNet suites that compare EF Core, Dapper, Raw ADO.NET, and nORM across SQLite, SQL Server, PostgreSQL, and MySQL. Release decisions should be based on fresh local or CI benchmark output, not hard-coded numbers in this README. All benchmark paths are expected to use the same seeded schema, equivalent SQL shape, typed result materialization, and comparable compiled/prepared modes.
 
 ### Read Queries
 
-| Operation                        | nORM      | EF Core   | Dapper    | Raw ADO   | vs EF Core        |
-|----------------------------------|-----------|-----------|-----------|-----------|-------------------|
-| Simple query (standard)          | Dapper-competitive | comparable | Dapper baseline | fastest manual path | comparable |
-| Simple query (compiled/prepared) | very strong | slower warm path | prepared baseline | prepared baseline | favorable |
-| Complex query (standard)         | strong | slower | competitive | manual baseline | favorable |
-| Complex query (compiled/prepared)| under active tuning | slower | prepared baseline | prepared baseline | needs regular regression checks |
-| JOIN query                       | strong | slower | competitive | manual baseline | favorable |
-| Count                            | excellent | slower | competitive | fastest manual path | favorable |
+| Operation                        | Compared modes |
+|----------------------------------|----------------|
+| Simple query                     | runtime, compiled/prepared, Raw ADO |
+| Complex query                    | runtime, compiled/prepared, Raw ADO |
+| JOIN query                       | runtime, compiled, typed Dapper, Raw ADO |
+| Count                            | runtime, compiled/prepared, Raw ADO |
 
 ### Write Operations
 
-| Operation                        | nORM      | EF Core   | Dapper    | vs EF Core        |
-|----------------------------------|-----------|-----------|-----------|-------------------|
-| Single insert                    | competitive | competitive | competitive | comparable |
-| Bulk insert - naive (100 rows)   | faster than EF Core | slower | competitive | favorable |
-| Bulk insert - batched+prepared   | strong | slower | competitive | favorable |
-| Bulk insert - idiomatic API      | strong | slower | competitive | favorable |
+| Operation                        | Compared modes |
+|----------------------------------|----------------|
+| Single insert                    | EF Core, Dapper, Raw ADO, nORM |
+| Bulk insert - naive              | EF Core, Dapper, Raw ADO, nORM |
+| Bulk insert - batched/prepared   | EF Core, Dapper, Raw ADO, nORM |
+| Bulk insert - idiomatic API      | provider-native nORM path |
 
-> nORM's compiled query cache is intended to deliver the largest gains on warm paths. Performance-sensitive work should use the benchmark project before release decisions; generated BenchmarkDotNet output is intentionally not tracked in source control.
+> nORM's compiled query cache is intended to deliver the largest gains on warm paths. Performance-sensitive work should run `benchmarks/nORM.Benchmarks.csproj` before release decisions; generated BenchmarkDotNet output is intentionally not tracked in source control.
 
-*Benchmarks run on .NET 8.0 with realistic database scenarios. Raw ADO numbers represent the theoretical minimum overhead: hand-written parameterized SQL plus manual mapping.*
+Raw ADO.NET represents the manual baseline: hand-written parameterized SQL plus manual mapping.
 
 ## Installation
 
@@ -95,10 +93,9 @@ var userStats = await context.Query<User>()
     .ToListAsync();
 
 // Compiled queries for maximum performance
-var getActiveUsers = Norm.CompileQuery<MyContext, DateTime, User[]>(
+var getActiveUsers = Norm.CompileQuery<MyContext, DateTime, User>(
     (ctx, since) => ctx.Query<User>()
         .Where(u => u.CreatedAt > since)
-        .ToArray()
 );
 ```
 
@@ -122,7 +119,7 @@ await context.DeleteAsync(user);
 ```csharp
 // Process thousands of records efficiently
 var users = GenerateUsers(10000);
-await context.BulkInsertAsync(users); // 77% faster than EF Core
+await context.BulkInsertAsync(users);
 
 await context.BulkUpdateAsync(modifiedUsers);
 await context.BulkDeleteAsync(usersToDelete);
