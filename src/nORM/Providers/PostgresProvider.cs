@@ -24,6 +24,9 @@ namespace nORM.Providers
     public sealed partial class PostgresProvider : BulkOperationProvider
     {
         internal override bool SupportsFastPathPreparedCommandCache => true;
+        internal override bool PrefersSyncFastPathExecution => true;
+
+        internal override bool PrefersSyncQueryPlanExecution => true;
 
         /// <summary>
         /// Minimum PostgreSQL version required (9.5 introduced ON CONFLICT, UPSERT, and row-level security).

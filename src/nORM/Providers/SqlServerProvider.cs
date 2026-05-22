@@ -51,6 +51,10 @@ namespace nORM.Providers
         /// </summary>
         internal override bool PrefersSyncFastPathExecution => true;
 
+        internal override bool PrefersSyncCompiledQueryExecution => true;
+
+        internal override bool PrefersSyncQueryPlanExecution => true;
+
         /// <summary>
         /// Maximum length of a single SQL statement supported by SQL Server.
         /// </summary>

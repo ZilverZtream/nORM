@@ -74,6 +74,7 @@ namespace nORM.Query
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
         private readonly ConcurrentDictionary<string, string> _simpleSqlCache = new();
+        private readonly ConcurrentDictionary<ExpressionFingerprint, PooledPlanCommand> _pooledPlanCommands = new();
         /// <summary>PERF: Dedicated count SQL cache with structured keys to avoid per-call string composition and predicate-shape collisions.</summary>
         private readonly ConcurrentDictionary<CountSqlCacheKey, (string Sql, bool NeedsParam)> _countSqlCache = new();
         /// <summary>PERF: Pooled prepared commands for parameterless count queries (keyed by SQL), each paired with a lock object to serialize concurrent access.</summary>
@@ -90,6 +91,17 @@ namespace nORM.Query
         }
 
         private readonly record struct CountSqlCacheKey(Type ElementType, string PredicateKey, CountPredicateShape Shape);
+
+        private sealed class PooledPlanCommand
+        {
+            public PooledPlanCommand(DbCommand command)
+            {
+                Command = command;
+            }
+
+            public DbCommand Command { get; }
+            public object Lock { get; } = new();
+        }
 
         public NormQueryProvider(DbContext ctx)
         {
@@ -109,6 +121,9 @@ namespace nORM.Query
             foreach (var entry in _pooledCountCommands.Values)
                 try { entry.Cmd.Dispose(); } catch (ObjectDisposedException) { /* already disposed — safe to ignore */ }
             _pooledCountCommands.Clear();
+            foreach (var entry in _pooledPlanCommands.Values)
+                try { entry.Command.Dispose(); } catch (ObjectDisposedException) { /* already disposed — safe to ignore */ }
+            _pooledPlanCommands.Clear();
 
             // C1: stop background timers when the last provider is disposed so the process
             // can undergo deterministic teardown (e.g. in test runs / hosting teardown).
@@ -449,6 +464,9 @@ namespace nORM.Query
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteQueryFromPlanSlowAsync<TResult>(ensureTask, plan, paramValues, sw, ct);
 
+            if (CanUsePooledPlanCommand(plan, paramValues))
+                return ExecutePooledQueryPlanSync<TResult>(plan, sw, ct);
+
             // Synchronous command setup — no async state machine needed
             var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
@@ -464,14 +482,14 @@ namespace nORM.Query
             if (plan.IsScalar)
             {
                 // Sync scalar for providers without true async I/O (SQLite)
-                if (_ctx.Provider.PrefersSyncExecution)
+                if (_ctx.Provider.PrefersSyncExecution || _ctx.Provider.PrefersSyncQueryPlanExecution)
                     return ExecuteScalarPlanSync<TResult>(plan, cmd, sw);
                 return ExecuteScalarPlanAsync<TResult>(plan, cmd, sw, ct);
             }
 
             // For providers that don't support true async I/O (SQLite), use fully synchronous
             // materialization to eliminate per-row ReadAsync state machine overhead (~50ns × N rows).
-            if (_ctx.Provider.PrefersSyncExecution)
+            if (_ctx.Provider.PrefersSyncExecution || _ctx.Provider.PrefersSyncQueryPlanExecution)
                 return ExecuteListPlanSyncWrapped<TResult>(plan, cmd, sw);
 
             if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
@@ -484,18 +502,78 @@ namespace nORM.Query
         private async Task<TResult> ExecuteQueryFromPlanSlowAsync<TResult>(Task<DbConnection> ensureTask, QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
         {
             await ensureTask.ConfigureAwait(false);
+            if (CanUsePooledPlanCommand(plan, paramValues))
+                return await ExecutePooledQueryPlanSync<TResult>(plan, sw, ct).ConfigureAwait(false);
+
             var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
             BindPlanParameters(cmd, plan, paramValues);
 
             if (plan.IsScalar)
+            {
+                if (_ctx.Provider.PrefersSyncExecution || _ctx.Provider.PrefersSyncQueryPlanExecution)
+                    return await ExecuteScalarPlanSync<TResult>(plan, cmd, sw).ConfigureAwait(false);
                 return await ExecuteScalarPlanAsync<TResult>(plan, cmd, sw, ct).ConfigureAwait(false);
+            }
 
             if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
                 return (TResult)(object)await ExecuteObjectListPlanAsync(plan, cmd, sw, ct).ConfigureAwait(false);
 
+            if (_ctx.Provider.PrefersSyncExecution || _ctx.Provider.PrefersSyncQueryPlanExecution)
+                return await ExecuteListPlanSyncWrapped<TResult>(plan, cmd, sw).ConfigureAwait(false);
+
             return await ExecuteListPlanAsync<TResult>(plan, cmd, sw, ct).ConfigureAwait(false);
+        }
+
+        private bool CanUsePooledPlanCommand(QueryPlan plan, IReadOnlyList<object?>? paramValues)
+            => _ctx.Provider.SupportsQueryPlanPreparedCommandCache &&
+               _ctx.Options.CommandInterceptors.Count == 0 &&
+               paramValues == null &&
+               plan.CompiledParameters.Count == 0 &&
+               !plan.IsScalar &&
+               !plan.SingleResult &&
+               plan.GroupJoinInfo == null &&
+               plan.Includes.Count == 0 &&
+               !plan.SplitQuery &&
+               plan.DependentQueries is not { Count: > 0 } &&
+               plan.M2MIncludes is not { Count: > 0 } &&
+               plan.ClientProjection == null;
+
+        private Task<TResult> ExecutePooledQueryPlanSync<TResult>(QueryPlan plan, Stopwatch? sw, CancellationToken ct)
+        {
+            var pooled = _pooledPlanCommands.GetOrAdd(plan.Fingerprint, _ => CreatePooledPlanCommand(plan));
+            lock (pooled.Lock)
+            {
+                ct.ThrowIfCancellationRequested();
+                pooled.Command.Transaction = _ctx.CurrentTransaction;
+                var list = _executor.MaterializePooled(plan, pooled.Command);
+                sw?.Stop();
+                _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, list.Count);
+                return Task.FromResult((TResult)(object)list);
+            }
+        }
+
+        private PooledPlanCommand CreatePooledPlanCommand(QueryPlan plan)
+        {
+            var cmd = _ctx.CreateCommand();
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+            cmd.CommandText = plan.Sql;
+            BindPlanParameters(cmd, plan, null);
+            try
+            {
+                cmd.Prepare();
+            }
+            catch (NotSupportedException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            catch (DbException)
+            {
+            }
+            return new PooledPlanCommand(cmd);
         }
 
         /// <summary>PERF: Extracted parameter binding to share between fast and slow paths.</summary>

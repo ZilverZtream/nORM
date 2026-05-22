@@ -51,6 +51,8 @@ namespace nORM.Query
         /// </summary>
         private static readonly ConcurrentDictionary<(string TypeFullName, string Property, string WhereKind, int? TakeCount, string ProviderType, int MappingHash), string> _fullSqlCache = new();
         private static readonly ConcurrentDictionary<string, string> _pageSqlCache = new();
+        private static readonly ConcurrentLruCache<ExpressionFingerprint, bool> _unsupportedListFastPathCache =
+            new(maxSize: 2_048, timeToLive: TimeSpan.FromMinutes(30));
 
         /// <summary>
         /// Cache whether a type is eligible for fast-path execution (class with parameterless ctor).
@@ -135,6 +137,16 @@ namespace nORM.Query
             result = default!;
             if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null)
                 return false;
+
+            var cacheUnsupportedMiss = ShouldCacheUnsupportedListMiss(expr);
+            var unsupportedKey = default(ExpressionFingerprint);
+            if (cacheUnsupportedMiss)
+            {
+                unsupportedKey = BuildUnsupportedListMissKey<T>(expr, ctx);
+                if (_unsupportedListFastPathCache.TryGet(unsupportedKey, out _))
+                    return false;
+            }
+
             if (IsSimpleWherePattern(expr, out var whereInfo, out var takeCount))
             {
                 result = ExecuteSimpleWhereList<T>(ctx, whereInfo, takeCount, ct);
@@ -151,7 +163,40 @@ namespace nORM.Query
                 result = ExecuteFilteredOrderedPageList<T>(ctx, pageInfo, ct);
                 return true;
             }
+            if (cacheUnsupportedMiss)
+                _unsupportedListFastPathCache.Set(unsupportedKey, true);
             return false;
+        }
+
+        private static ExpressionFingerprint BuildUnsupportedListMissKey<T>(Expression expr, DbContext ctx) where T : class
+            => ExpressionFingerprint.ComputeForPlanCache(expr)
+                .Extend(ctx.Provider.GetType().GetHashCode(), ctx.GetMappingHash(), typeof(T).GetHashCode(),
+                    expr.Type.GetHashCode(), ctx.Options.CommandInterceptors.Count);
+
+        private static bool ShouldCacheUnsupportedListMiss(Expression expr)
+        {
+            while (true)
+            {
+                expr = Unwrap(expr);
+                if (expr is not MethodCallExpression call)
+                    return false;
+
+                if (call.Method.DeclaringType != typeof(Queryable))
+                    return true;
+
+                switch (call.Method.Name)
+                {
+                    case nameof(Queryable.Where):
+                    case nameof(Queryable.Take):
+                    case nameof(Queryable.Skip):
+                    case nameof(Queryable.OrderBy):
+                    case nameof(Queryable.OrderByDescending):
+                        expr = call.Arguments[0];
+                        continue;
+                    default:
+                        return true;
+                }
+            }
         }
         private static bool IsSimpleCountPattern(Expression expr, out bool hasPredicate)
         {
@@ -510,9 +555,19 @@ namespace nORM.Query
 
                 var results = new List<T>(info.TakeCount ?? QueryExecutor.DefaultListCapacity);
                 var materializer = GetSyncMaterializer<T>(ctx);
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
-                while (await reader.ReadAsync(ct).ConfigureAwait(false))
-                    results.Add(materializer(reader));
+                if (ctx.Provider.PrefersSyncFastPathExecution)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    using var reader = cmd.ExecuteReaderWithInterception(ctx, CommandBehavior.SingleResult);
+                    while (reader.Read())
+                        results.Add(materializer(reader));
+                }
+                else
+                {
+                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
+                    while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                        results.Add(materializer(reader));
+                }
 
                 if (map.OwnedCollections.Count > 0 && results.Count > 0)
                     await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
@@ -738,9 +793,19 @@ namespace nORM.Query
 
                 var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
                 var materializer = GetSyncMaterializer<T>(ctx);
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
-                while (await reader.ReadAsync(ct).ConfigureAwait(false))
-                    results.Add(materializer(reader));
+                if (ctx.Provider.PrefersSyncFastPathExecution)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    using var reader = cmd.ExecuteReaderWithInterception(ctx, CommandBehavior.SingleResult);
+                    while (reader.Read())
+                        results.Add(materializer(reader));
+                }
+                else
+                {
+                    await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
+                    while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                        results.Add(materializer(reader));
+                }
 
                 if (map.OwnedCollections.Count > 0 && results.Count > 0)
                     await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
