@@ -228,9 +228,13 @@ for the locked v1 package/dependency contract.
 ## Raw SQL & Stored Procedures
 
 ```csharp
-// Raw SQL with type safety
-var users = await context.FromSqlRawAsync<User>(
-    "SELECT * FROM Users WHERE CreatedAt > @date", 
+// Prefer interpolated raw SQL so values are parameterized automatically
+var users = await context.FromSqlInterpolatedAsync<User>(
+    $"SELECT * FROM Users WHERE CreatedAt > {DateTime.Now.AddDays(-7)}");
+
+// Raw SQL is still available when parameter names need to be explicit
+var recent = await context.FromSqlRawAsync<User>(
+    "SELECT * FROM Users WHERE CreatedAt > @p0",
     DateTime.Now.AddDays(-7));
 
 // Stored procedures

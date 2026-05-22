@@ -148,6 +148,7 @@ M:nORM.Core.DbContext.ExecuteCompiledQueryListAsync``1(System.Data.Common.DbComm
 M:nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object):System.Collections.Generic.IAsyncEnumerable{`0}
 M:nORM.Core.DbContext.ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[]):System.Threading.Tasks.Task{nORM.Core.StoredProcedureResult{`0}}
+M:nORM.Core.DbContext.FromSqlInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[]):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.GetCompiledQueryMaterializer``1(System.String):System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{`0}}
 M:nORM.Core.DbContext.GetShadowProperty(System.Object,System.String):System.Object
@@ -157,6 +158,7 @@ M:nORM.Core.DbContext.IsHealthyAsync(System.Threading.CancellationToken):System.
 M:nORM.Core.DbContext.PrepareInsertAsync``1(System.Threading.CancellationToken,System.Boolean):System.Threading.Tasks.Task{nORM.Core.PreparedOperation{`0}}
 M:nORM.Core.DbContext.Query(System.String):System.Linq.IQueryable
 M:nORM.Core.DbContext.QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[]):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
+M:nORM.Core.DbContext.QueryUnchangedInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.RegisterForDisposal(System.IDisposable):System.Void
 M:nORM.Core.DbContext.Remove``1(`0):nORM.Core.EntityEntry
 M:nORM.Core.DbContext.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
