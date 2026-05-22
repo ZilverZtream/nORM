@@ -1,0 +1,361 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Common;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using nORM.Execution;
+using nORM.Internal;
+using nORM.Mapping;
+
+#nullable enable
+
+namespace nORM.Core
+{
+    public partial class DbContext
+    {
+        /// <summary>
+        /// Executes the provided SQL and materializes the results into instances of
+        /// <typeparamref name="T"/> without tracking them in the <see cref="ChangeTracker"/>.
+        /// </summary>
+        /// <typeparam name="T">Type to materialize each row to.</typeparam>
+        /// <param name="sql">Raw SQL query to execute.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="parameters">Optional parameters for the SQL query.</param>
+        /// <returns>A list of entities populated from the query results.</returns>
+        public Task<List<T>> QueryUnchangedAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
+        {
+            ThrowIfDisposed();
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
+                var sw = Stopwatch.StartNew();
+                await using var cmd = CommandPool.Get(ctx.Connection, sql);
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
+                var paramDict = ctx.AddParametersFast(cmd, parameters);
+                if (!NormValidator.IsSafeRawSql(sql, ctx.Provider))
+                    throw new NormUsageException("Potential SQL injection detected in raw query.");
+                NormValidator.ValidateRawSql(sql, paramDict);
+
+                var list = new List<T>();
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
+                var mapping = ctx.GetMapping(typeof(T));
+
+                var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
+
+                while (await reader.ReadAsync(token).ConfigureAwait(false))
+                    list.Add(MaterializeRawEntity<T>(reader, colOrdinals));
+
+                ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
+                cmd.Parameters.Clear();
+                return list;
+            }, ct);
+        }
+
+        private static object CoerceRawValue(object raw, Type propType)
+        {
+            if (propType.IsEnum) return Enum.ToObject(propType, raw);
+
+            if (propType == typeof(Guid))
+            {
+                if (raw is string s) return Guid.Parse(s);
+                if (raw is byte[] b && b.Length == 16) return new Guid(b);
+            }
+
+            if (propType == typeof(DateOnly))
+            {
+                if (raw is DateTime dt) return DateOnly.FromDateTime(dt);
+                if (raw is DateTimeOffset dto) return DateOnly.FromDateTime(dto.DateTime);
+                if (raw is string s) return DateOnly.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            if (propType == typeof(TimeOnly))
+            {
+                if (raw is TimeSpan ts) return TimeOnly.FromTimeSpan(ts);
+                if (raw is DateTime dt) return TimeOnly.FromDateTime(dt);
+                if (raw is long l) return TimeOnly.FromTimeSpan(TimeSpan.FromTicks(l));
+                if (raw is string s)
+                {
+                    if (TimeSpan.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, out var ts2))
+                        return TimeOnly.FromTimeSpan(ts2);
+                    return TimeOnly.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+                }
+            }
+
+            if (propType == typeof(DateTimeOffset))
+            {
+                if (raw is DateTime dt) return new DateTimeOffset(dt);
+                if (raw is string s) return DateTimeOffset.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+                if (raw is long l) return DateTimeOffset.FromUnixTimeMilliseconds(l);
+            }
+
+            if (propType == typeof(TimeSpan))
+            {
+                if (raw is long l) return TimeSpan.FromTicks(l);
+                if (raw is string s) return TimeSpan.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            if (propType == typeof(char) && raw is string str && str.Length > 0)
+                return str[0];
+
+            return Convert.ChangeType(raw, propType, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static (Column Col, int Ordinal)[] ResolveRawResultOrdinals(DbDataReader reader, TableMapping mapping, Type targetType)
+        {
+            var fieldCount = reader.FieldCount;
+            var nameToOrdinal = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
+            var duplicateColumnNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < fieldCount; i++)
+            {
+                var name = reader.GetName(i);
+                if (!nameToOrdinal.TryAdd(name, i))
+                    duplicateColumnNames.Add(name);
+            }
+
+            var colOrdinals = new (Column Col, int Ordinal)[mapping.Columns.Length];
+            for (int i = 0; i < mapping.Columns.Length; i++)
+            {
+                var col = mapping.Columns[i];
+                if (duplicateColumnNames.Contains(col.Name))
+                    throw new InvalidOperationException(
+                        $"Column '{col.Name}' appears multiple times in the raw SQL result for {targetType.Name}. " +
+                        "Use unique aliases for projected columns so materialization is unambiguous.");
+                if (!nameToOrdinal.TryGetValue(col.Name, out var ordinal))
+                    throw new InvalidOperationException(
+                        $"Column '{col.Name}' expected by {targetType.Name} is not present in the raw SQL result. " +
+                        "Include all mapped columns in the SELECT list, or use column aliases that match property names.");
+                colOrdinals[i] = (col, ordinal);
+            }
+
+            return colOrdinals;
+        }
+
+        private static T MaterializeRawEntity<T>(DbDataReader reader, (Column Col, int Ordinal)[] colOrdinals) where T : class, new()
+        {
+            var instance = Activator.CreateInstance<T>();
+            foreach (var (col, ordinal) in colOrdinals)
+            {
+                if (reader.IsDBNull(ordinal)) continue;
+                var raw = reader.GetValue(ordinal);
+                var propType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
+                if (raw.GetType() != propType)
+                    raw = CoerceRawValue(raw, propType);
+                col.Setter(instance, raw);
+            }
+            return instance;
+        }
+
+        /// <summary>
+        /// Executes a raw SQL query and materializes the results into instances of
+        /// <typeparamref name="T"/>.
+        /// </summary>
+        public Task<List<T>> FromSqlRawAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
+        {
+            ThrowIfDisposed();
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
+                var sw = Stopwatch.StartNew();
+                await using var cmd = CommandPool.Get(ctx.Connection, sql);
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
+                var paramDict = ctx.AddParametersFast(cmd, parameters);
+                if (!NormValidator.IsSafeRawSql(sql, ctx.Provider))
+                    throw new NormUsageException("Potential SQL injection detected in raw query.");
+                NormValidator.ValidateRawSql(sql, paramDict);
+
+                var mapping = ctx.GetMapping(typeof(T));
+                var list = new List<T>();
+
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
+                var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
+                while (await reader.ReadAsync(token).ConfigureAwait(false))
+                    list.Add(MaterializeRawEntity<T>(reader, colOrdinals));
+
+                ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
+                cmd.Parameters.Clear();
+                return list;
+            }, ct);
+        }
+
+        /// <summary>
+        /// Executes a stored procedure and materializes the first result set into
+        /// instances of <typeparamref name="T"/>.
+        /// </summary>
+        public Task<List<T>> ExecuteStoredProcedureAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()
+        {
+            ThrowIfDisposed();
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
+                var sw = Stopwatch.StartNew();
+                await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
+                cmd.CommandType = ctx._p.StoredProcedureCommandType;
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
+
+                var paramDict = new Dictionary<string, object>();
+                if (parameters != null)
+                {
+                    var props = parameters.GetType().GetProperties();
+                    var span = new (string name, object value)[props.Length];
+                    for (int i = 0; i < props.Length; i++)
+                    {
+                        var pName = ctx._p.ParamPrefix + props[i].Name;
+                        var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
+                        span[i] = (pName, pValue);
+                        paramDict[pName] = pValue;
+                    }
+                    cmd.SetParametersFast(span);
+                }
+
+                if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, ctx._p))
+                    throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
+
+                NormValidator.ValidateRawSql(procedureName, paramDict);
+
+                var mapping = ctx.GetMapping(typeof(T));
+                var list = new List<T>();
+
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
+                var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
+                while (await reader.ReadAsync(token).ConfigureAwait(false))
+                    list.Add(MaterializeRawEntity<T>(reader, colOrdinals));
+
+                ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
+                cmd.Parameters.Clear();
+                return list;
+            }, ct);
+        }
+
+        /// <summary>
+        /// Streams the results of a stored procedure as an <see cref="IAsyncEnumerable{T}"/>.
+        /// </summary>
+        public async IAsyncEnumerable<T> ExecuteStoredProcedureAsAsyncEnumerable<T>(string procedureName, [EnumeratorCancellation] CancellationToken ct = default, object? parameters = null) where T : class, new()
+        {
+            ThrowIfDisposed();
+            await EnsureConnectionAsync(ct).ConfigureAwait(false);
+            var sw = Stopwatch.StartNew();
+            await using var cmd = CommandPool.Get(Connection, procedureName);
+            if (CurrentTransaction != null)
+                cmd.Transaction = CurrentTransaction;
+            cmd.CommandType = _p.StoredProcedureCommandType;
+            cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
+
+            var paramDict = new Dictionary<string, object>();
+            if (parameters != null)
+            {
+                var props = parameters.GetType().GetProperties();
+                var span = new (string name, object value)[props.Length];
+                for (int i = 0; i < props.Length; i++)
+                {
+                    var pName = _p.ParamPrefix + props[i].Name;
+                    var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
+                    span[i] = (pName, pValue);
+                    paramDict[pName] = pValue;
+                }
+                cmd.SetParametersFast(span);
+            }
+
+            if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, Provider))
+                throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
+
+            NormValidator.ValidateRawSql(procedureName, paramDict);
+
+            var mapping = GetMapping(typeof(T));
+            var count = 0;
+
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.SequentialAccess, ct).ConfigureAwait(false);
+            var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                var entity = MaterializeRawEntity<T>(reader, colOrdinals);
+                count++;
+                yield return entity;
+            }
+
+            Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, count);
+            cmd.Parameters.Clear();
+        }
+
+        /// <summary>
+        /// Executes a stored procedure that returns both a result set and output
+        /// parameters.
+        /// </summary>
+        public Task<StoredProcedureResult<T>> ExecuteStoredProcedureWithOutputAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()
+        {
+            ThrowIfDisposed();
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
+                var sw = Stopwatch.StartNew();
+                await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
+                cmd.CommandType = ctx._p.StoredProcedureCommandType;
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
+
+                var paramDict = new Dictionary<string, object>();
+                if (parameters != null)
+                {
+                    var props = parameters.GetType().GetProperties();
+                    var span = new (string name, object value)[props.Length];
+                    for (int i = 0; i < props.Length; i++)
+                    {
+                        var pName = ctx._p.ParamPrefix + props[i].Name;
+                        var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
+                        span[i] = (pName, pValue);
+                        paramDict[pName] = pValue;
+                    }
+                    cmd.SetParametersFast(span);
+                }
+
+                var outputParamMap = new Dictionary<string, DbParameter>();
+                foreach (var op in outputParameters)
+                {
+                    if (!IsSafeOutputParamName(op.Name))
+                        throw new NormUsageException($"Invalid output parameter name: '{op.Name}'. " +
+                            "Parameter names must start with a letter or underscore and contain only letters, digits, and underscores.");
+                    var pName = ctx._p.ParamPrefix + op.Name;
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = pName;
+                    p.DbType = op.DbType;
+                    p.Direction = ParameterDirection.Output;
+                    if (op.Size.HasValue) p.Size = op.Size.Value;
+                    cmd.Parameters.Add(p);
+                    outputParamMap[op.Name] = p;
+                }
+
+                if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, ctx._p))
+                    throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
+
+                NormValidator.ValidateRawSql(procedureName, paramDict);
+
+                var mapping = ctx.GetMapping(typeof(T));
+                var list = new List<T>();
+
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
+                var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
+                while (await reader.ReadAsync(token).ConfigureAwait(false))
+                    list.Add(MaterializeRawEntity<T>(reader, colOrdinals));
+                await reader.DisposeAsync().ConfigureAwait(false);
+
+                var outputs = new Dictionary<string, object?>();
+                foreach (var kv in outputParamMap)
+                    outputs[kv.Key] = kv.Value.Value == DBNull.Value ? null : kv.Value.Value;
+
+                ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
+                cmd.Parameters.Clear();
+                return new StoredProcedureResult<T>(list, outputs);
+            }, ct);
+        }
+    }
+}

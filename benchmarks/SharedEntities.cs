@@ -38,6 +38,17 @@ namespace nORM.Benchmarks
 
     public sealed class BenchmarkJoinRow
     {
+        public BenchmarkJoinRow()
+        {
+        }
+
+        public BenchmarkJoinRow(string name, decimal amount, string productName)
+        {
+            Name = name;
+            Amount = amount;
+            ProductName = productName;
+        }
+
         public string Name { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public string ProductName { get; set; } = string.Empty;

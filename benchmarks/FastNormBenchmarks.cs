@@ -32,7 +32,7 @@ namespace nORM.Benchmarks
         // --- Compiled Queries ---
         private static Func<nORM.Core.DbContext, int, Task<List<BenchmarkUser>>>? _normSimpleCompiled;
         private static Func<nORM.Core.DbContext, (int, string), Task<List<BenchmarkUser>>>? _normComplexCompiled;
-        private static Func<nORM.Core.DbContext, int, Task<List<object>>>? _normJoinCompiled;
+        private static Func<nORM.Core.DbContext, int, Task<List<BenchmarkJoinRow>>>? _normJoinCompiled;
         private nORM.Core.DbContext GetContext()
         {
             return _context ?? throw new InvalidOperationException("nORM context not initialized.");
@@ -100,9 +100,9 @@ namespace nORM.Benchmarks
                 (c, p) => c.Query<BenchmarkUser>()
                     .Where(u => u.IsActive == true && u.Age > p.Item1 && u.City == p.Item2)
                     .AsNoTracking().OrderBy(u => u.Name).Skip(5).Take(20));
-            _normJoinCompiled = Norm.CompileQuery<nORM.Core.DbContext, int, object>(
+            _normJoinCompiled = Norm.CompileQuery<nORM.Core.DbContext, int, BenchmarkJoinRow>(
                 (c, amount) => c.Query<BenchmarkUser>()
-                    .Join(c.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new { u.Name, o.Amount, o.ProductName })
+                    .Join(c.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName))
                     .AsNoTracking()
                     .Where(x => x.Amount > amount)
                     .Take(50));
@@ -147,15 +147,12 @@ namespace nORM.Benchmarks
                 .Take(20));
 
         [Benchmark]
-        public async Task<List<object>> Query_Join()
-        {
-            var result = await NormAsyncExtensions.ToListAsync(GetContext().Query<BenchmarkUser>()
-                .Join(GetContext().Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new { u.Name, o.Amount, o.ProductName })
+        public Task<List<BenchmarkJoinRow>> Query_Join()
+            => NormAsyncExtensions.ToListAsync(GetContext().Query<BenchmarkUser>()
+                .Join(GetContext().Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName))
                 .AsNoTracking()
                 .Where(x => x.Amount > 100)
                 .Take(50));
-            return result.Cast<object>().ToList();
-        }
 
         [Benchmark]
         public Task<List<BenchmarkUser>> Query_Complex_NoResults() => NormAsyncExtensions.ToListAsync(GetContext().Query<BenchmarkUser>().Where(u => u.Age > 9999));
@@ -165,7 +162,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public Task<List<BenchmarkUser>> Query_Complex_Compiled() => _normComplexCompiled!(GetContext(), (25, "New York"));
         [Benchmark]
-        public Task<List<object>> Query_Join_Compiled() => _normJoinCompiled!(GetContext(), 100);
+        public Task<List<BenchmarkJoinRow>> Query_Join_Compiled() => _normJoinCompiled!(GetContext(), 100);
         // ========== Aggregates & Streaming ==========
         [Benchmark]
         public Task<int> Count_Operation() => NormAsyncExtensions.CountAsync(GetContext().Query<BenchmarkUser>().Where(u => u.IsActive));

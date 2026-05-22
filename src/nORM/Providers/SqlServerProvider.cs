@@ -35,12 +35,21 @@ namespace nORM.Providers
         /// <summary>SQL Server error number for "Invalid object name" (table/view does not exist).</summary>
         private const int SqlErrorObjectNotFound = 208;
 
+        private const int SqlBulkCopySmallBatchThreshold = 512;
+
         private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: KeyTableSchemaCacheSize);
 
         /// <summary>
         /// SQL Server uses TOP(n)/OFFSET-FETCH paging syntax rather than LIMIT.
         /// </summary>
         public override bool UsesFetchOffsetPaging => true;
+
+        /// <summary>
+        /// Microsoft.Data.SqlClient's async reader path is measurably slower for the small,
+        /// already-buffered result shapes nORM's runtime query fast paths target. Prefer the
+        /// synchronous reader path there while leaving the broader async pipeline unchanged.
+        /// </summary>
+        internal override bool PrefersSyncFastPathExecution => true;
 
         /// <summary>
         /// Maximum length of a single SQL statement supported by SQL Server.
@@ -632,6 +641,9 @@ END;";
 
             var entityList = entities.ToList();
             if (entityList.Count == 0) return 0;
+
+            if (entityList.Count <= SqlBulkCopySmallBatchThreshold)
+                return await base.BulkInsertAsync(ctx, m, entityList, ct).ConfigureAwait(false);
 
             var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
             var operationKey = $"SqlServer_BulkInsert_{m.Type.Name}";

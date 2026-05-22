@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
@@ -33,7 +33,7 @@ namespace nORM.Core
     /// change tracking, transactions and provider specific behavior. Instances are
     /// intended to be short lived and not thread safe.
     /// </summary>
-    public class DbContext : IDisposable, IAsyncDisposable
+    public partial class DbContext : IDisposable, IAsyncDisposable
     {
         /// <summary>Maximum SQL length (in chars) before falling back to length-based complexity estimation.</summary>
         private const int SqlComplexityAnalysisMaxLength = 102_400; // 100 KB
@@ -49,7 +49,7 @@ namespace nORM.Core
         private const int SqlServerDeadlockErrorNumber = 1205;
         /// <summary>Number of parameters reserved for internal use (e.g. tenant, timestamp) when computing batch sizes.</summary>
         private const int ParameterBudgetReserve = 10;
-        /// <summary>Jitter range (Â±) applied to retry backoff delays to prevent thundering herd.</summary>
+        /// <summary>Jitter range (±) applied to retry backoff delays to prevent thundering herd.</summary>
         private const double RetryJitterRange = 0.2;
         /// <summary>Maximum seconds to wait for the cleanup timer to drain during dispose.</summary>
         private const int CleanupTimerDrainTimeoutSeconds = 5;
@@ -118,6 +118,7 @@ namespace nORM.Core
         private DbTransaction? _currentTransaction; // Access via Interlocked.* only
         // ConcurrentDictionary eliminates lock contention on the insert fast path.
         private readonly ConcurrentDictionary<(Type EntityType, bool HydrateGeneratedKeys), PreparedInsertCommand> _preparedInsertCache = new();
+        private readonly ConcurrentDictionary<string, FastPathPreparedCommand> _fastPathPreparedCommandCache = new();
         private volatile bool _disposed;
 
         /// <summary>
@@ -151,7 +152,7 @@ namespace nORM.Core
 
         // Internal constructor that allows callers (e.g. migration runners) to pass an
         // externally-owned connection. When ownsConnection is false, Dispose/DisposeAsync will NOT
-        // close or dispose the connection â€” the caller retains full ownership.
+        // close or dispose the connection — the caller retains full ownership.
         internal DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options, bool ownsConnection)
         {
             _cn = cn ?? throw new ArgumentNullException(nameof(cn));
@@ -255,7 +256,7 @@ namespace nORM.Core
             if (ct.IsCancellationRequested)
                 return Task.FromCanceled<DbConnection>(ct);
 
-            // Fast path â€” connection already open, provider initialized, and temporal init either
+            // Fast path — connection already open, provider initialized, and temporal init either
             // not needed or already complete. Returns a cached Task to avoid async state machine allocation.
             if (_cn.State == ConnectionState.Open && _providerInitialized &&
                 (!Options.IsTemporalVersioningEnabled || _temporalInitComplete))
@@ -343,7 +344,7 @@ namespace nORM.Core
                     }
                 }
             }
-            // A1/X1: Parity with EnsureConnectionSlowAsync â€” run temporal bootstrap on
+            // A1/X1: Parity with EnsureConnectionSlowAsync — run temporal bootstrap on
             // sync entry paths too.
             //
             // Sync-over-async (.GetAwaiter().GetResult()) is safe here because:
@@ -523,6 +524,44 @@ namespace nORM.Core
             return cmd;
         }
 
+        internal FastPathPreparedCommand GetOrCreateFastPathPreparedCommand(
+            string cacheKey,
+            string sql,
+            int commandTimeout,
+            Action<DbCommand> initializeParameters)
+        {
+            return _fastPathPreparedCommandCache.GetOrAdd(cacheKey, static (_, state) =>
+            {
+                var cmd = state.Context.CreateCommand();
+                try
+                {
+                    cmd.CommandText = state.Sql;
+                    cmd.CommandTimeout = state.CommandTimeout;
+                    state.InitializeParameters(cmd);
+                    try
+                    {
+                        cmd.Prepare();
+                    }
+                    catch (NotSupportedException)
+                    {
+                    }
+                    catch (InvalidOperationException)
+                    {
+                    }
+                    catch (DbException)
+                    {
+                    }
+
+                    return new FastPathPreparedCommand(cmd);
+                }
+                catch
+                {
+                    cmd.Dispose();
+                    throw;
+                }
+            }, (Context: this, Sql: sql, CommandTimeout: commandTimeout, InitializeParameters: initializeParameters));
+        }
+
         /// <summary>
         /// X1: Creates a <see cref="DbCommand"/> that is fully lifecycle-aware:
         /// opens the connection if closed, binds the active transaction, and participates in
@@ -583,7 +622,7 @@ namespace nORM.Core
                 var mapping = GetMapping(typeof(T));
                 return _compiledQueryMaterializerFactory.CreateMaterializer<T>(mapping);
             }
-            // Entity not registered in this context â€” no runtime fluent config can override the
+            // Entity not registered in this context — no runtime fluent config can override the
             // compiled materializer, so use it directly without guards.
             if (SourceGeneration.CompiledMaterializerStore.TryGet(typeof(T), tableName, out var compiledUntyped))
             {
@@ -656,7 +695,7 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Returns a stable hash of all entity type â†’ table name mappings.
+        /// Returns a stable hash of all entity type ? table name mappings.
         /// Computed once and cached for the lifetime of the context.
         /// </summary>
         internal int GetMappingHash()
@@ -665,7 +704,7 @@ namespace nORM.Core
             int h = 0;
             foreach (var mapping in GetAllMappings())
             {
-                // Q1/C1/Cache1 fix: include full mapping shape â€” not just Type+TableName.
+                // Q1/C1/Cache1 fix: include full mapping shape — not just Type+TableName.
                 // Column names, converter fingerprint, shadow fingerprint, tenant column,
                 // and timestamp column all affect SQL generation and materialization.
                 // Without these, divergent fluent configurations sharing the same CLR type
@@ -695,7 +734,7 @@ namespace nORM.Core
         internal void RegisterEntityType(Type t) => _entityQueryRoots.TryAdd(t, 0);
 
         /// <summary>
-        /// Returns true when the type is a known entity root â€” either explicitly
+        /// Returns true when the type is a known entity root — either explicitly
         /// registered with the ModelBuilder OR used as a direct query root via Query&lt;T&gt;.
         /// DTO projection results (from .Select(x => new Dto {...})) are never query roots
         /// and will NOT be tracked, preventing ChangeTracker pollution.
@@ -822,7 +861,7 @@ namespace nORM.Core
             if (!IsSafeIdentifier(tableName))
                 throw new NormUsageException("Invalid table name.");
             // Gate C fix: Use normalized full connection string instead of 32-bit hash to
-            // eliminate key collision risk. GetHashCode() is a 32-bit projection â€” two
+            // eliminate key collision risk. GetHashCode() is a 32-bit projection — two
             // distinct connection strings can share the same hash, causing schema aliasing
             // where queries against different databases return stale type definitions.
             // Normalizing (sort key=value pairs, lowercase) also ensures that identical
@@ -925,7 +964,7 @@ namespace nORM.Core
             NormValidator.ValidateEntity(entity, nameof(entity));
 
             // Check if entity is already tracked before returning entry.
-            // Auto-attaching untracked entities is dangerous â€” it silently modifies tracking state.
+            // Auto-attaching untracked entities is dangerous — it silently modifies tracking state.
             // Uses O(1) identity-map lookup via _entriesByReference dictionary.
             var existingEntry = ChangeTracker.GetEntryOrDefault(entity);
             if (existingEntry == null)
@@ -1051,7 +1090,7 @@ namespace nORM.Core
                 }
                 catch (Exception ex) when (!commitAttempted && attempt < maxRetries - 1 && IsRetryableException(ex))
                 {
-                    // Only retry pre-commit transient failures â€” if commit was attempted, the outcome
+                    // Only retry pre-commit transient failures — if commit was attempted, the outcome
                     // is unknown and retrying could produce duplicate rows.
                     var backoffMs = baseDelay.TotalMilliseconds * Math.Pow(2, attempt);
                     var jitter = 1 + (rand.NextDouble() * 2 * RetryJitterRange - RetryJitterRange);
@@ -1074,7 +1113,7 @@ namespace nORM.Core
         /// <returns>The total number of state entries written to the database.</returns>
         private async Task<int> SaveChangesInternalAsync(bool detectChanges, CancellationToken ct, Action? onCommitAttempted = null)
         {
-            // Only detect changes if requested â€” DetectChanges is O(entities Ã— properties).
+            // Only detect changes if requested — DetectChanges is O(entities × properties).
             if (detectChanges)
             {
                 ChangeTracker.DetectAllChanges();
@@ -1255,7 +1294,7 @@ namespace nORM.Core
                         originalEx, rollbackEx);
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable â€” satisfies compiler
+                throw; // unreachable — satisfies compiler
             }
 
             // Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE the try/catch
@@ -1343,7 +1382,7 @@ namespace nORM.Core
 
                 if (ownerState == EntityState.Modified || ownerState == EntityState.Deleted)
                 {
-                    // DELETE existing owned items â€” use a dedicated command so that the
+                    // DELETE existing owned items — use a dedicated command so that the
                     // INSERT command below starts fully fresh (no prepared-statement residue).
                     await using var delScope = new CommandScope(Connection, transaction);
                     await using var delCmd = delScope.CreateCommand();
@@ -1392,7 +1431,7 @@ namespace nORM.Core
                         insertTenantId = Options.TenantProvider.GetCurrentTenantId();
                 }
 
-                // INSERT each item individually â€” avoids multi-statement batch issues
+                // INSERT each item individually — avoids multi-statement batch issues
                 // across providers (e.g. SQLite drivers that stop after the first statement).
                 foreach (var item in items)
                 {
@@ -1450,7 +1489,7 @@ namespace nORM.Core
                 string.Equals(c.Name, ownedFkColumnName, StringComparison.OrdinalIgnoreCase));
             if (match != null) return match;
 
-            // Try 2: strip owner type name prefix (e.g. FK="OrderId", owner type="Order" â†’ "Id", key="Id")
+            // Try 2: strip owner type name prefix (e.g. FK="OrderId", owner type="Order" ? "Id", key="Id")
             if (ownedFkColumnName.Length > ownerTypeName.Length &&
                 ownedFkColumnName.StartsWith(ownerTypeName, StringComparison.OrdinalIgnoreCase))
             {
@@ -1506,7 +1545,7 @@ namespace nORM.Core
                 }
 
                 // Compute current set of right PKs from the collection.
-                // SEC1: Also keep a pkâ†’entity map so we can validate right-entity tenant before INSERT.
+                // SEC1: Also keep a pk?entity map so we can validate right-entity tenant before INSERT.
                 var collection = jtm.LeftCollectionGetter(entity);
                 var currentSet = new HashSet<object>();
                 var rightEntityByPk = new Dictionary<object, object>();
@@ -1524,7 +1563,7 @@ namespace nORM.Core
                     }
                 }
 
-                // For Added entities, snapshot is irrelevant â€” insert everything.
+                // For Added entities, snapshot is irrelevant — insert everything.
                 // For Modified entities, use the snapshot to compute delta.
                 HashSet<object> snapshot;
                 if (entry.State == EntityState.Added ||
@@ -1605,7 +1644,7 @@ namespace nORM.Core
                 // Resolve which owner key column this FK references (composite-key aware).
                 var pkCol = ResolveOwnerKeyColumnForOwnedFk(ownerMap.KeyColumns, ownedMap.ForeignKeyColumn, ownerMap.Type.Name);
 
-                // Build PK â†’ owner lookup keyed by the FK-referenced key column value.
+                // Build PK ? owner lookup keyed by the FK-referenced key column value.
                 var ownerByPk = new Dictionary<object, object>(owners.Count);
                 foreach (var owner in owners)
                 {
@@ -1785,7 +1824,7 @@ namespace nORM.Core
                 while (await reader.NextResultAsync(ct).ConfigureAwait(false) && i < batch.Count);
 
                 // If DB returned fewer keys than entities, identity map is corrupt.
-                // Throwing here triggers the SaveChanges catch block â†’ rollback.
+                // Throwing here triggers the SaveChanges catch block ? rollback.
                 if (keysAssigned != batch.Count)
                 {
                     var identitySql = _p.GetIdentityRetrievalString(map);
@@ -1884,9 +1923,9 @@ namespace nORM.Core
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            // S1 â€” Optimistic-concurrency rowcount check.
+            // S1 — Optimistic-concurrency rowcount check.
             // For matched-row providers (UseAffectedRowsSemantics=false): 0 rows updated means
-            // the WHERE clause (pk + token) did not match, so the token was stale â€” throw.
+            // the WHERE clause (pk + token) did not match, so the token was stale — throw.
             // For affected-row providers (UseAffectedRowsSemantics=true, e.g. MySQL default):
             // 0 rows can mean either a genuine stale token OR a same-value update (no columns
             // actually changed). Disambiguate with a SELECT-then-verify: query for rows that
@@ -1956,10 +1995,10 @@ namespace nORM.Core
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            // S1 â€” DELETE rowcount check. Unlike UPDATE, DELETE has no same-value ambiguity:
+            // S1 — DELETE rowcount check. Unlike UPDATE, DELETE has no same-value ambiguity:
             // a row is "deleted" only if it actually existed and was removed. Even on affected-row
             // providers (UseAffectedRowsSemantics=true), 0 deleted rows always means either the
-            // token was stale or the row was already gone â€” both are genuine conflicts. No
+            // token was stale or the row was already gone — both are genuine conflicts. No
             // SELECT-then-verify is needed; we always throw when deleted != batch.Count.
             if (map.TimestampColumn != null && deleted != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
@@ -1968,15 +2007,15 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// S1 â€” SELECT-then-verify fallback for affected-row semantics providers (e.g. MySQL).
+        /// S1 — SELECT-then-verify fallback for affected-row semantics providers (e.g. MySQL).
         /// Called from <see cref="ExecuteUpdateBatch"/> when <c>UseAffectedRowsSemantics=true</c>
         /// and the UPDATE rowcount does not match the batch size. Queries the database for rows
         /// that still carry their original concurrency tokens:
         /// <list type="bullet">
         ///   <item>If all tokens still match (<c>count == batch.Count</c>): the UPDATE returned 0
-        ///     because no column values actually changed (same-value update). No conflict â€” return.</item>
+        ///     because no column values actually changed (same-value update). No conflict — return.</item>
         ///   <item>If any token is missing (<c>count &lt; batch.Count</c>): a competing writer
-        ///     changed the token. Genuine stale-row conflict â€” throw <see cref="DbConcurrencyException"/>.</item>
+        ///     changed the token. Genuine stale-row conflict — throw <see cref="DbConcurrencyException"/>.</item>
         /// </list>
         /// </summary>
         private async Task VerifyUpdateOccAsync(DbCommand batchCmd, TableMapping map, List<EntityEntry> batch, CancellationToken ct)
@@ -2033,7 +2072,7 @@ namespace nORM.Core
 
             cmd.CommandText = sb.ToString();
 
-            // Guard against null scalar result â€” Convert.ToInt32(null) throws ArgumentNullException
+            // Guard against null scalar result — Convert.ToInt32(null) throws ArgumentNullException
             // X2: route through interceptor pipeline so observability tools see verification queries.
             var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
             var matchCount = scalarResult == null || scalarResult is DBNull ? 0 : Convert.ToInt32(scalarResult);
@@ -2042,10 +2081,10 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// S1 â€” SELECT-then-verify for the single-entity direct UpdateAsync path on affected-row
+        /// S1 — SELECT-then-verify for the single-entity direct UpdateAsync path on affected-row
         /// semantics providers (e.g. MySQL). Called when <c>recordsAffected == 0</c> and
         /// <c>UseAffectedRowsSemantics=true</c> to distinguish a same-value update (token still
-        /// present â†’ no conflict) from a genuine stale-row conflict (token gone â†’ throw).
+        /// present ? no conflict) from a genuine stale-row conflict (token gone ? throw).
         /// </summary>
         private async Task VerifySingleUpdateOccAsync<T>(
             DbCommand writeCmd,
@@ -2104,7 +2143,7 @@ namespace nORM.Core
         {
             if (ex is DbException dbEx && Options.RetryPolicy != null)
                 return Options.RetryPolicy.ShouldRetry(dbEx);
-            return false;   // TimeoutException is excluded â€” retrying a timed-out write can duplicate data.
+            return false;   // TimeoutException is excluded — retrying a timed-out write can duplicate data.
         }
         /// <summary>
         /// Converts a <see cref="TimeSpan"/> to an integer number of seconds, clamping at
@@ -2146,8 +2185,8 @@ namespace nORM.Core
                     && ReferenceEquals(prepared.BoundTransaction, null))
                 {
                     // Skip EnableLazyLoading on insert fast path.
-                    // Entities being inserted don't need lazy loading proxies â€” they're being
-                    // written to DB, not read from it. Saves ~2-5Âµs ConditionalWeakTable + reflection.
+                    // Entities being inserted don't need lazy loading proxies — they're being
+                    // written to DB, not read from it. Saves ~2-5µs ConditionalWeakTable + reflection.
                     return prepared.ExecuteAsync(entity, ct);
                 }
             }
@@ -2335,7 +2374,7 @@ namespace nORM.Core
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable â€” satisfies compiler
+                throw; // unreachable — satisfies compiler
             }
             finally
             {
@@ -2405,7 +2444,7 @@ namespace nORM.Core
                 WriteOperation.Delete => _p.BuildDelete(map, includeTenant),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation))
             };
-            // Simple INSERT/UPDATE/DELETE have no JOINs/subqueries â€” use base timeout
+            // Simple INSERT/UPDATE/DELETE have no JOINs/subqueries — use base timeout
             // to avoid SQL string scanning in GetAdaptiveTimeout.
             cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
             var originalToken = ChangeTracker.GetEntryOrDefault(entity)?.OriginalToken;
@@ -2426,7 +2465,7 @@ namespace nORM.Core
                 // S1: On affected-row semantics providers (e.g. MySQL default), 0 rows affected from
                 // an UPDATE can mean either a stale OCC token OR a same-value update (no columns
                 // actually changed). Disambiguate with a SELECT-then-verify, mirroring ExecuteUpdateBatch.
-                // DELETE has no same-value ambiguity â€” always a genuine conflict.
+                // DELETE has no same-value ambiguity — always a genuine conflict.
                 if (Provider.UseAffectedRowsSemantics && operation == WriteOperation.Update)
                     await VerifySingleUpdateOccAsync(cmd, map, entity, originalToken, ct).ConfigureAwait(false);
                 else
@@ -2465,7 +2504,7 @@ namespace nORM.Core
                     {
                         // Use the original snapshot token (not the current possibly-mutated property value)
                         // to match the concurrency predicate parity of the batched SaveChanges path.
-                        // Fallback to current property value when originalToken is null â€” this happens
+                        // Fallback to current property value when originalToken is null — this happens
                         // for entities that were attached without going through full snapshot tracking
                         // (e.g. manual Attach() or first-time tracked entities where no snapshot was
                         // captured yet). In that case the current property value is the best available
@@ -2474,7 +2513,7 @@ namespace nORM.Core
                         cmd.AddOptimizedParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
                     // X1: bind tenant param to match the WHERE predicate added by BuildUpdate(includeTenant=true).
-                    // Skip if TenantColumn is already in UpdateColumns â€” same @PropName is already bound
+                    // Skip if TenantColumn is already in UpdateColumns — same @PropName is already bound
                     // for the SET clause, and SQLite/ADO.NET providers reuse named params by name, so
                     // the SET-bound value is used for the WHERE predicate too. Adding it twice throws.
                     if (Options.TenantProvider != null && map.TenantColumn != null
@@ -2492,7 +2531,7 @@ namespace nORM.Core
                     if (map.TimestampColumn != null)
                     {
                         // Fallback: use current property value when originalToken is null (same
-                        // rationale as the Update case above â€” entities attached without snapshot).
+                        // rationale as the Update case above — entities attached without snapshot).
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddOptimizedParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
@@ -2724,7 +2763,7 @@ namespace nORM.Core
 
             // Gate B fix: Always populate the parameter dictionary so that ValidateRawSql
             // receives accurate parameter metadata regardless of logging state.
-            // The dictionary is required for validation (not just logging) â€” decoupling the
+            // The dictionary is required for validation (not just logging) — decoupling the
             // two concerns ensures parameterized queries are never incorrectly flagged by
             // the validator when debug logging is disabled.
             if (parameters.Length == 0)
@@ -2895,401 +2934,6 @@ namespace nORM.Core
         }
         #endregion
 
-        #region Raw SQL & Stored Procedures
-        /// <summary>
-        /// Executes the provided SQL and materializes the results into instances of
-        /// <typeparamref name="T"/> without tracking them in the <see cref="ChangeTracker"/>.
-        /// </summary>
-        /// <typeparam name="T">Type to materialize each row to.</typeparam>
-        /// <param name="sql">Raw SQL query to execute.</param>
-        /// <param name="ct">Cancellation token.</param>
-        /// <param name="parameters">Optional parameters for the SQL query.</param>
-        /// <returns>A list of entities populated from the query results.</returns>
-        public Task<List<T>> QueryUnchangedAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
-        {
-            ThrowIfDisposed();
-            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
-            {
-                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
-                var sw = Stopwatch.StartNew();
-                await using var cmd = CommandPool.Get(ctx.Connection, sql);
-                // Bind to active transaction so raw SQL reads participate in the unit-of-work.
-                if (ctx.CurrentTransaction != null)
-                    cmd.Transaction = ctx.CurrentTransaction;
-                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
-                var paramDict = ctx.AddParametersFast(cmd, parameters);
-                if (!NormValidator.IsSafeRawSql(sql, ctx.Provider))
-                    throw new NormUsageException("Potential SQL injection detected in raw query.");
-                NormValidator.ValidateRawSql(sql, paramDict);
-
-                // Materialization uses mapping-driven property setters (compiled delegates from
-                // TableMapping.Columns[].Setter) rather than raw PropertyInfo.SetValue reflection.
-                // This is faster than pure reflection but does not use the full MaterializerFactory
-                // pipeline (which is reserved for LINQ query execution via NormQueryProvider).
-                var list = new List<T>();
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
-                
-                // Get or create mapping for type T - this supports both mapped entities and ad-hoc types
-                var mapping = ctx.GetMapping(typeof(T));
-
-                var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
-
-                while (await reader.ReadAsync(token).ConfigureAwait(false))
-                    list.Add(MaterializeRawEntity<T>(reader, colOrdinals));
-
-                ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
-                cmd.Parameters.Clear();
-                return list;
-            }, ct);
-        }
-
-        /// <summary>
-        /// Coerces a provider-returned raw value to the target CLR property type.
-        /// Handles types that Convert.ChangeType does not support:
-        /// Guid (from string/bytes), DateOnly, TimeOnly, DateTimeOffset, TimeSpan,
-        /// char, and enum types. Falls back to Convert.ChangeType for all others.
-        /// </summary>
-        private static object CoerceRawValue(object raw, Type propType)
-        {
-            if (propType.IsEnum) return Enum.ToObject(propType, raw);
-
-            if (propType == typeof(Guid))
-            {
-                if (raw is string s)   return Guid.Parse(s);
-                if (raw is byte[] b && b.Length == 16) return new Guid(b);
-            }
-
-            if (propType == typeof(DateOnly))
-            {
-                if (raw is DateTime dt)       return DateOnly.FromDateTime(dt);
-                if (raw is DateTimeOffset dto) return DateOnly.FromDateTime(dto.DateTime);
-                if (raw is string s)          return DateOnly.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
-            }
-
-            if (propType == typeof(TimeOnly))
-            {
-                if (raw is TimeSpan ts) return TimeOnly.FromTimeSpan(ts);
-                if (raw is DateTime dt) return TimeOnly.FromDateTime(dt);
-                if (raw is long l)      return TimeOnly.FromTimeSpan(TimeSpan.FromTicks(l));
-                if (raw is string s)
-                {
-                    if (TimeSpan.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, out var ts2))
-                        return TimeOnly.FromTimeSpan(ts2);
-                    return TimeOnly.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
-                }
-            }
-
-            if (propType == typeof(DateTimeOffset))
-            {
-                if (raw is DateTime dt) return new DateTimeOffset(dt);
-                if (raw is string s)    return DateTimeOffset.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
-                if (raw is long l)      return DateTimeOffset.FromUnixTimeMilliseconds(l);
-            }
-
-            if (propType == typeof(TimeSpan))
-            {
-                if (raw is long l)   return TimeSpan.FromTicks(l);
-                if (raw is string s) return TimeSpan.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
-            }
-
-            // Many database providers (SQLite, MySQL, Postgres) store CHAR(1) columns as
-            // single-character strings. Convert.ChangeType does not handle stringâ†’char,
-            // so we extract the first character explicitly when the CLR property is char.
-            if (propType == typeof(char) && raw is string str && str.Length > 0)
-                return str[0];
-
-            return Convert.ChangeType(raw, propType, System.Globalization.CultureInfo.InvariantCulture);
-        }
-
-        private static (Column Col, int Ordinal)[] ResolveRawResultOrdinals(DbDataReader reader, TableMapping mapping, Type targetType)
-        {
-            var fieldCount = reader.FieldCount;
-            var nameToOrdinal = new Dictionary<string, int>(fieldCount, StringComparer.OrdinalIgnoreCase);
-            var duplicateColumnNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < fieldCount; i++)
-            {
-                var name = reader.GetName(i);
-                if (!nameToOrdinal.TryAdd(name, i))
-                    duplicateColumnNames.Add(name);
-            }
-
-            var colOrdinals = new (Column Col, int Ordinal)[mapping.Columns.Length];
-            for (int i = 0; i < mapping.Columns.Length; i++)
-            {
-                var col = mapping.Columns[i];
-                if (duplicateColumnNames.Contains(col.Name))
-                    throw new InvalidOperationException(
-                        $"Column '{col.Name}' appears multiple times in the raw SQL result for {targetType.Name}. " +
-                        "Use unique aliases for projected columns so materialization is unambiguous.");
-                if (!nameToOrdinal.TryGetValue(col.Name, out var ordinal))
-                    throw new InvalidOperationException(
-                        $"Column '{col.Name}' expected by {targetType.Name} is not present in the raw SQL result. " +
-                        "Include all mapped columns in the SELECT list, or use column aliases that match property names.");
-                colOrdinals[i] = (col, ordinal);
-            }
-
-            return colOrdinals;
-        }
-
-        private static T MaterializeRawEntity<T>(DbDataReader reader, (Column Col, int Ordinal)[] colOrdinals) where T : class, new()
-        {
-            var instance = Activator.CreateInstance<T>();
-            foreach (var (col, ordinal) in colOrdinals)
-            {
-                if (reader.IsDBNull(ordinal)) continue;
-                var raw = reader.GetValue(ordinal);
-                var propType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
-                if (raw.GetType() != propType)
-                    raw = CoerceRawValue(raw, propType);
-                col.Setter(instance, raw);
-            }
-            return instance;
-        }
-
-        /// <summary>
-        /// Executes a raw SQL query and materializes the results into instances of
-        /// <typeparamref name="T"/>. Unlike <see cref="QueryUnchangedAsync"/>, the
-        /// entities are materialized using the same name-based raw entity path as
-        /// <see cref="QueryUnchangedAsync{T}"/>.
-        /// </summary>
-        /// <typeparam name="T">Result entity type.</typeparam>
-        /// <param name="sql">Raw SQL query to execute.</param>
-        /// <param name="ct">Cancellation token.</param>
-        /// <param name="parameters">Optional parameters for the SQL query.</param>
-        /// <returns>A list of materialized entities.</returns>
-        public Task<List<T>> FromSqlRawAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
-        {
-            ThrowIfDisposed();
-            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
-            {
-                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
-                var sw = Stopwatch.StartNew();
-                await using var cmd = CommandPool.Get(ctx.Connection, sql);
-                // Bind to active transaction so raw SQL reads participate in the unit-of-work.
-                if (ctx.CurrentTransaction != null)
-                    cmd.Transaction = ctx.CurrentTransaction;
-                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
-                var paramDict = ctx.AddParametersFast(cmd, parameters);
-                if (!NormValidator.IsSafeRawSql(sql, ctx.Provider))
-                    throw new NormUsageException("Potential SQL injection detected in raw query.");
-                NormValidator.ValidateRawSql(sql, paramDict);
-
-                var mapping = ctx.GetMapping(typeof(T));
-                var list = new List<T>();
-
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
-                var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
-                while (await reader.ReadAsync(token).ConfigureAwait(false))
-                    list.Add(MaterializeRawEntity<T>(reader, colOrdinals));
-
-                ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
-                cmd.Parameters.Clear();
-                return list;
-            }, ct);
-        }
-
-        /// <summary>
-        /// Executes a stored procedure and materializes the first result set into
-        /// instances of <typeparamref name="T"/>.
-        /// </summary>
-        /// <typeparam name="T">Type to materialize the rows to.</typeparam>
-        /// <param name="procedureName">Name of the stored procedure.</param>
-        /// <param name="ct">Cancellation token.</param>
-        /// <param name="parameters">Anonymous object containing input parameters.</param>
-        /// <returns>A list of results returned by the procedure.</returns>
-        public Task<List<T>> ExecuteStoredProcedureAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()
-        {
-            ThrowIfDisposed();
-            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
-            {
-                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
-                var sw = Stopwatch.StartNew();
-                await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
-                // Bind to active transaction so stored procedure calls participate in the unit-of-work.
-                if (ctx.CurrentTransaction != null)
-                    cmd.Transaction = ctx.CurrentTransaction;
-                cmd.CommandType = ctx._p.StoredProcedureCommandType;
-                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
-
-                var paramDict = new Dictionary<string, object>();
-                if (parameters != null)
-                {
-                    var props = parameters.GetType().GetProperties();
-                    var span = new (string name, object value)[props.Length];
-                    for (int i = 0; i < props.Length; i++)
-                    {
-                        var pName = ctx._p.ParamPrefix + props[i].Name;
-                        var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
-                        span[i] = (pName, pValue);
-                        paramDict[pName] = pValue;
-                    }
-                    cmd.SetParametersFast(span);
-                }
-
-                // Dual-check: accept either a safe identifier (stored proc name) or safe raw SQL
-                // for providers like SQLite that use CommandType.Text and pass a SELECT query
-                // as the "procedure name".
-                if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, ctx._p))
-                    throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
-
-                NormValidator.ValidateRawSql(procedureName, paramDict);
-
-                var mapping = ctx.GetMapping(typeof(T));
-                var list = new List<T>();
-
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
-                var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
-                while (await reader.ReadAsync(token).ConfigureAwait(false))
-                    list.Add(MaterializeRawEntity<T>(reader, colOrdinals));
-
-                ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
-                cmd.Parameters.Clear();
-                return list;
-            }, ct);
-        }
-
-        /// <summary>
-        /// Streams the results of a stored procedure as an <see cref="IAsyncEnumerable{T}"/>.
-        /// This is useful for large result sets where buffering would be prohibitive.
-        /// </summary>
-        /// <typeparam name="T">Type of objects yielded.</typeparam>
-        /// <param name="procedureName">Name of the stored procedure.</param>
-        /// <param name="ct">Cancellation token.</param>
-        /// <param name="parameters">Anonymous object containing input parameters.</param>
-        /// <returns>An asynchronous stream of materialized entities.</returns>
-        public async IAsyncEnumerable<T> ExecuteStoredProcedureAsAsyncEnumerable<T>(string procedureName, [EnumeratorCancellation] CancellationToken ct = default, object? parameters = null) where T : class, new()
-        {
-            ThrowIfDisposed();
-            await EnsureConnectionAsync(ct).ConfigureAwait(false);
-            var sw = Stopwatch.StartNew();
-            await using var cmd = CommandPool.Get(Connection, procedureName);
-            // Bind to active transaction so stored procedure calls participate in the unit-of-work.
-            if (CurrentTransaction != null)
-                cmd.Transaction = CurrentTransaction;
-            cmd.CommandType = _p.StoredProcedureCommandType;
-            cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
-
-            var paramDict = new Dictionary<string, object>();
-            if (parameters != null)
-            {
-                var props = parameters.GetType().GetProperties();
-                var span = new (string name, object value)[props.Length];
-                for (int i = 0; i < props.Length; i++)
-                {
-                    var pName = _p.ParamPrefix + props[i].Name;
-                    var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
-                    span[i] = (pName, pValue);
-                    paramDict[pName] = pValue;
-                }
-                cmd.SetParametersFast(span);
-            }
-
-            if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, Provider))
-                throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
-
-            NormValidator.ValidateRawSql(procedureName, paramDict);
-
-            var mapping = GetMapping(typeof(T));
-            var count = 0;
-
-            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.SequentialAccess, ct).ConfigureAwait(false);
-            var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
-            while (await reader.ReadAsync(ct).ConfigureAwait(false))
-            {
-                var entity = MaterializeRawEntity<T>(reader, colOrdinals);
-                count++;
-                yield return entity;
-            }
-
-            Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, count);
-            cmd.Parameters.Clear();
-        }
-
-        /// <summary>
-        /// Executes a stored procedure that returns both a result set and output
-        /// parameters. The result set is materialized to <typeparamref name="T"/> and
-        /// output parameters are captured in the returned <see cref="StoredProcedureResult{T}"/>.
-        /// </summary>
-        /// <typeparam name="T">Type to materialize the first result set.</typeparam>
-        /// <param name="procedureName">Name of the stored procedure.</param>
-        /// <param name="ct">Cancellation token.</param>
-        /// <param name="parameters">Anonymous object containing input parameters.</param>
-        /// <param name="outputParameters">Definitions of output parameters to retrieve.</param>
-        /// <returns>A <see cref="StoredProcedureResult{T}"/> containing results and output values.</returns>
-        public Task<StoredProcedureResult<T>> ExecuteStoredProcedureWithOutputAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()
-        {
-            ThrowIfDisposed();
-            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
-            {
-                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
-                var sw = Stopwatch.StartNew();
-                await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
-                // Bind to active transaction so stored procedure calls participate in the unit-of-work.
-                if (ctx.CurrentTransaction != null)
-                    cmd.Transaction = ctx.CurrentTransaction;
-                cmd.CommandType = ctx._p.StoredProcedureCommandType;
-                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
-
-                var paramDict = new Dictionary<string, object>();
-                if (parameters != null)
-                {
-                    var props = parameters.GetType().GetProperties();
-                    var span = new (string name, object value)[props.Length];
-                    for (int i = 0; i < props.Length; i++)
-                    {
-                        var pName = ctx._p.ParamPrefix + props[i].Name;
-                        var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
-                        span[i] = (pName, pValue);
-                        paramDict[pName] = pValue;
-                    }
-                    cmd.SetParametersFast(span);
-                }
-
-                var outputParamMap = new Dictionary<string, DbParameter>();
-                foreach (var op in outputParameters)
-                {
-                    // SP1: use strict validator (letters/digits/underscore only; no spaces or dots)
-                    // so names that pass IsSafeIdentifier but are invalid ADO.NET param identifiers
-                    // are rejected early with a deterministic NormUsageException.
-                    if (!IsSafeOutputParamName(op.Name))
-                        throw new NormUsageException($"Invalid output parameter name: '{op.Name}'. " +
-                            "Parameter names must start with a letter or underscore and contain only letters, digits, and underscores.");
-                    var pName = ctx._p.ParamPrefix + op.Name;
-                    var p = cmd.CreateParameter();
-                    p.ParameterName = pName;
-                    p.DbType = op.DbType;
-                    p.Direction = ParameterDirection.Output;
-                    if (op.Size.HasValue) p.Size = op.Size.Value;
-                    cmd.Parameters.Add(p);
-                    outputParamMap[op.Name] = p;
-                }
-
-                // Dual-check: accept either a safe identifier or safe raw SQL.
-                if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, ctx._p))
-                    throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
-
-                NormValidator.ValidateRawSql(procedureName, paramDict);
-
-                var mapping = ctx.GetMapping(typeof(T));
-                var list = new List<T>();
-
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
-                var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
-                while (await reader.ReadAsync(token).ConfigureAwait(false))
-                    list.Add(MaterializeRawEntity<T>(reader, colOrdinals));
-                await reader.DisposeAsync().ConfigureAwait(false);
-
-                var outputs = new Dictionary<string, object?>();
-                foreach (var kv in outputParamMap)
-                    outputs[kv.Key] = kv.Value.Value == DBNull.Value ? null : kv.Value.Value;
-
-                ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
-                cmd.Parameters.Clear();
-                return new StoredProcedureResult<T>(list, outputs);
-            }, ct);
-        }
-        #endregion
-
         private void ValidateTenantContext<T>(T entity, TableMapping map, WriteOperation operation) where T : class
         {
             if (Options.TenantProvider == null) return;
@@ -3299,7 +2943,7 @@ namespace nORM.Core
             if (tenantId == null)
                 throw new InvalidOperationException("Tenant context required but not available");
             var entityTenant = tenantCol.Getter(entity);
-            // Auto-injecting tenant ID is dangerous â€” developers might intend null for global records.
+            // Auto-injecting tenant ID is dangerous — developers might intend null for global records.
             // Requiring explicit tenant ID setting prevents accidental data leakage.
             if (entityTenant == null)
             {
@@ -3371,7 +3015,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 var p0 = _p.ParamPrefix + "p0";
                 var p1 = _p.ParamPrefix + "p1";
-                // Use provider-escaped identifiers â€” raw table/column names are not safe across all
+                // Use provider-escaped identifiers — raw table/column names are not safe across all
                 // providers (e.g. SQL Server reserves "Timestamp" as a type keyword).
                 await using var cmd = CommandPool.Get(ctx.Connection, _p.GetCreateTagSql(p0, p1));
                 var span = new (string name, object value)[2];
@@ -3383,147 +3027,6 @@ namespace nORM.Core
                 return 0;
             }, default).ConfigureAwait(false);
         }
-
-        #region Prepared Statements
-        /// <summary>
-        /// Creates a prepared INSERT statement for the specified entity type. This allows
-        /// the cost of SQL generation and command preparation to be paid only once, with
-        /// subsequent executions only updating parameter values. Ideal for batch insert
-        /// scenarios where the same operation is repeated many times.
-        /// </summary>
-        /// <typeparam name="T">The entity type to prepare the insert for.</typeparam>
-        /// <param name="ct">Cancellation token for the operation.</param>
-        /// <param name="hydrateGeneratedKeys">
-        /// When <c>false</c>, uses a plain <c>INSERT</c> shape and skips generated-key backfill.
-        /// </param>
-        /// <returns>A <see cref="PreparedOperation{T}"/> that can be executed multiple times.</returns>
-        /// <remarks>
-        /// Example usage:
-        /// <code>
-        /// await using var preparedInsert = await context.PrepareInsertAsync&lt;User&gt;();
-        /// for (int i = 0; i &lt; users.Length; i++)
-        /// {
-        ///     await preparedInsert.ExecuteAsync(users[i]);
-        /// }
-        /// </code>
-        /// </remarks>
-        public async Task<PreparedOperation<T>> PrepareInsertAsync<T>(
-            CancellationToken ct = default,
-            bool hydrateGeneratedKeys = true) where T : class
-        {
-            ThrowIfDisposed();
-            var mapping = GetMapping(typeof(T));
-            if (Database.CurrentTransaction == null && System.Transactions.Transaction.Current != null)
-            {
-                await using var ambientScope = await TransactionManager.CreateAsync(this, ct).ConfigureAwait(false);
-            }
-
-            var transaction = Database.CurrentTransaction;
-            var preparedInsert = await CreatePreparedInsertCommandAsync(
-                mapping, transaction, hydrateGeneratedKeys, ct).ConfigureAwait(false);
-            return new PreparedOperation<T>(preparedInsert);
-        }
-
-        private async Task<PreparedInsertCommand> GetOrCreatePreparedInsertCommandAsync(
-            TableMapping mapping,
-            DbTransaction? transaction,
-            bool hydrateGeneratedKeys,
-            CancellationToken ct)
-        {
-            var key = (mapping.Type, hydrateGeneratedKeys);
-
-            if (_preparedInsertCache.TryGetValue(key, out var cached))
-            {
-                if (ReferenceEquals(cached.BoundTransaction, transaction))
-                    return cached;
-
-                _preparedInsertCache.TryRemove(key, out _);
-                await cached.DisposeAsync().ConfigureAwait(false);
-            }
-
-            var created = await CreatePreparedInsertCommandAsync(
-                mapping, transaction, hydrateGeneratedKeys, ct).ConfigureAwait(false);
-
-            _preparedInsertCache[key] = created;
-
-            return created;
-        }
-
-        private async Task<PreparedInsertCommand> CreatePreparedInsertCommandAsync(
-            TableMapping mapping,
-            DbTransaction? transaction,
-            bool hydrateGeneratedKeys,
-            CancellationToken ct)
-        {
-            await EnsureConnectionAsync(ct).ConfigureAwait(false);
-            var cmd = Connection.CreateCommand();
-            try
-            {
-                if (transaction != null)
-                    cmd.Transaction = transaction;
-
-                cmd.CommandText = _p.BuildInsert(mapping, hydrateGeneratedKeys);
-                cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
-
-                foreach (var col in mapping.InsertColumns)
-                {
-                    cmd.AddOptimizedParam(_p.ParamPrefix + col.PropName, null, GetParameterKnownType(col, null));
-                    ApplyPreparedInsertSizeHint(cmd.Parameters[cmd.Parameters.Count - 1], col);
-                }
-
-                try
-                {
-                    await cmd.PrepareAsync(ct).ConfigureAwait(false);
-                }
-                catch (NotSupportedException)
-                {
-                    // Some providers expose command reuse but not explicit preparation.
-                }
-
-                return new PreparedInsertCommand(cmd, mapping, this, hydrateGeneratedKeys, transaction);
-            }
-            catch
-            {
-                await cmd.DisposeAsync().ConfigureAwait(false);
-                throw;
-            }
-        }
-
-        private static void ApplyPreparedInsertSizeHint(DbParameter parameter, Column column)
-        {
-            if (parameter.Size != 0)
-                return;
-
-            var type = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
-            if (type == typeof(string) || type == typeof(char))
-                parameter.Size = ParameterOptimizer.MaxInlineStringSize;
-            else if (type == typeof(byte[]))
-                parameter.Size = -1;
-            else if (parameter.DbType == DbType.Object)
-                parameter.Size = ParameterOptimizer.MaxInlineStringSize;
-            else
-                parameter.Size = 1;
-        }
-
-        private List<PreparedInsertCommand> DrainPreparedInsertCache()
-        {
-            var commands = _preparedInsertCache.Values.ToList();
-            _preparedInsertCache.Clear();
-            return commands;
-        }
-
-        private void DisposePreparedInsertCache()
-        {
-            foreach (var command in DrainPreparedInsertCache())
-                command.Dispose();
-        }
-
-        private async Task DisposePreparedInsertCacheAsync()
-        {
-            foreach (var command in DrainPreparedInsertCache())
-                await command.DisposeAsync().ConfigureAwait(false);
-        }
-        #endregion
 
         /// <summary>
         /// Releases resources used by the context. When <paramref name="disposing"/>
@@ -3546,6 +3049,7 @@ namespace nORM.Core
                 _providerInitLock.Dispose();
                 _temporalInitLock.Dispose();
                 DisposePreparedInsertCache();
+                DisposeFastPathPreparedCommandCache();
 
                 // Copy disposables to a local list inside the lock, then dispose outside the lock.
                 // Prevents deadlock if a disposable's Dispose() acquires locks or accesses DbContext.
@@ -3688,6 +3192,7 @@ namespace nORM.Core
                 _providerInitLock.Dispose();
                 _temporalInitLock.Dispose();
                 await DisposePreparedInsertCacheAsync().ConfigureAwait(false);
+                await DisposeFastPathPreparedCommandCacheAsync().ConfigureAwait(false);
                 await CleanupDisposablesAsync().ConfigureAwait(false);
                 // Only dispose the connection when this context owns it.
                 // _cn is always non-null (set in constructor with null-guard), so the null
@@ -3700,151 +3205,4 @@ namespace nORM.Core
         }
     }
 
-    /// <summary>
-    /// Represents an output parameter for stored procedure execution.
-    /// </summary>
-    /// <param name="Name">Name of the parameter without provider-specific prefix.</param>
-    /// <param name="DbType">Database type of the output parameter.</param>
-    /// <param name="Size">Optional size for variable-length parameters.</param>
-    public sealed record OutputParameter(string Name, DbType DbType, int? Size = null);
-    /// <summary>
-    /// Encapsulates the results of a stored procedure that returns both a result set
-    /// and output parameters.
-    /// </summary>
-    /// <typeparam name="T">Type of entities in the result set.</typeparam>
-    /// <param name="Results">List of materialized entities returned by the procedure.</param>
-    /// <param name="OutputParameters">Dictionary of output parameter values keyed by name.</param>
-    public sealed record StoredProcedureResult<T>(List<T> Results, IReadOnlyDictionary<string, object?> OutputParameters);
-
-    /// <summary>
-    /// Represents a prepared database operation that can be executed multiple times
-    /// with different parameter values. The SQL and command structure are prepared
-    /// once and reused, providing significant performance benefits for repeated
-    /// operations like batch inserts.
-    /// </summary>
-    /// <typeparam name="T">The entity type this operation works with.</typeparam>
-    public sealed class PreparedOperation<T> : IAsyncDisposable where T : class
-    {
-        private readonly PreparedInsertCommand _command;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="PreparedOperation{T}"/> class.
-        /// </summary>
-        /// <param name="command">The prepared database command.</param>
-        internal PreparedOperation(PreparedInsertCommand command)
-        {
-            _command = command ?? throw new ArgumentNullException(nameof(command));
-        }
-
-        /// <summary>
-        /// Executes the prepared operation for the specified entity. Parameter values
-        /// are updated from the entity properties and the command is executed.
-        /// </summary>
-        /// <param name="entity">The entity to insert.</param>
-        /// <param name="ct">Cancellation token for the operation.</param>
-        /// <returns>The number of rows affected.</returns>
-        public Task<int> ExecuteAsync(T entity, CancellationToken ct = default)
-            => _command.ExecuteAsync(entity, ct);
-
-        /// <summary>
-        /// Releases all resources used by this prepared operation.
-        /// </summary>
-        public ValueTask DisposeAsync()
-            => _command.DisposeAsync();
-    }
-
-    internal sealed class PreparedInsertCommand : IDisposable, IAsyncDisposable
-    {
-        private readonly DbCommand _command;
-        private readonly TableMapping _mapping;
-        private readonly DbContext _context;
-        private readonly (DbParameter Parameter, Mapping.Column Column)[] _bindings;
-        private readonly bool _hydrateGeneratedKeys;
-        private volatile bool _disposed;
-
-        internal PreparedInsertCommand(
-            DbCommand command,
-            TableMapping mapping,
-            DbContext context,
-            bool hydrateGeneratedKeys,
-            DbTransaction? boundTransaction)
-        {
-            _command = command ?? throw new ArgumentNullException(nameof(command));
-            _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-            BoundTransaction = boundTransaction;
-            _hydrateGeneratedKeys = hydrateGeneratedKeys && DbContext.HasDbGeneratedKey(_mapping.KeyColumns);
-
-            var insertCols = _mapping.InsertColumns;
-            _bindings = new (DbParameter, Mapping.Column)[insertCols.Length];
-            var prefix = _context.Provider.ParamPrefix;
-
-            for (int i = 0; i < insertCols.Length; i++)
-            {
-                var col = insertCols[i];
-                var paramName = prefix + col.PropName;
-                if (!_command.Parameters.Contains(paramName))
-                    throw new InvalidOperationException(
-                        $"Prepared INSERT command is missing expected parameter '{paramName}' " +
-                        $"for column '{col.EscCol}' on table '{mapping.TableName}'.");
-                _bindings[i] = (_command.Parameters[paramName], col);
-            }
-        }
-
-        internal DbTransaction? BoundTransaction { get; }
-
-        internal Task<int> ExecuteAsync(object entity, CancellationToken ct = default)
-        {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(PreparedInsertCommand));
-            if (entity == null)
-                throw new ArgumentNullException(nameof(entity));
-
-            var bindings = _bindings;
-            for (int i = 0; i < bindings.Length; i++)
-            {
-                var (param, col) = bindings[i];
-                var rawValue = col.Getter(entity);
-                var value = col.Converter != null ? col.Converter.ConvertToProvider(rawValue) : rawValue;
-                ParameterAssign.AssignValue(param, value, DbContext.GetParameterKnownType(col, value));
-            }
-
-            if (_hydrateGeneratedKeys)
-            {
-                // Separate async method only for hydrate path to avoid state machine
-                // allocation on the non-hydrate fast path.
-                return ExecuteWithHydrateAsync(entity, ct);
-            }
-
-            // Return task directly â€” no async state machine needed since all
-            // work above is synchronous (parameter binding via compiled delegates).
-            return _command.ExecuteNonQueryWithInterceptionAsync(_context, ct);
-        }
-
-        private async Task<int> ExecuteWithHydrateAsync(object entity, CancellationToken ct)
-        {
-            var newId = await _command.ExecuteScalarWithInterceptionAsync(_context, ct).ConfigureAwait(false);
-            if (newId != null && newId != DBNull.Value)
-                _mapping.SetPrimaryKey(entity, newId);
-            return 1;
-        }
-
-        public void Dispose()
-        {
-            if (_disposed)
-                return;
-
-            _command.Dispose();
-            _disposed = true;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            if (_disposed)
-                return;
-
-            await _command.DisposeAsync().ConfigureAwait(false);
-            _disposed = true;
-        }
-    }
 }

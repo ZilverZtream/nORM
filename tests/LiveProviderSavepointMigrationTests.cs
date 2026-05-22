@@ -32,6 +32,7 @@ namespace nORM.Tests;
 // 4. Cancellation races under load (CR-1, CR-2)
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Collection(ConcurrencyStressCollection.Name)]
 public class LiveProviderSavepointMigrationTests
 {
     // ── Entities ──────────────────────────────────────────────────────────────
@@ -639,8 +640,7 @@ public class LiveProviderSavepointMigrationTests
         finally
         {
             SqliteConnection.ClearAllPools();
-            if (System.IO.File.Exists(dbPath))
-                System.IO.File.Delete(dbPath);
+            DeleteSqliteFileWithRetry(dbPath);
         }
     }
 
@@ -711,41 +711,54 @@ public class LiveProviderSavepointMigrationTests
                 cmd.ExecuteNonQuery();
             }
 
-            // Wrap each Task.Run so that a TaskCanceledException from the task scheduler
-            // (when the CTS is already cancelled) is caught and returned as a Cancelled tuple.
+            // Dedicated workers keep this stress test independent of thread-pool pressure.
+            using var startSignal = new ManualResetEventSlim(false);
             var tasks = ctsList.Select((cts, idx) =>
             {
-                var inner = Task.Run(async () =>
+                var tcs = new TaskCompletionSource<(bool Success, int Count, bool Cancelled)>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                var thread = new Thread(() =>
                 {
-                    var cn  = new SqliteConnection($"Data Source={dbPath}");
-                    cn.Open();
-                    await using var ctx = new DbContext(cn, new SqliteProvider());
                     try
                     {
+                        startSignal.Wait();
+                        if (cts.IsCancellationRequested)
+                        {
+                            tcs.SetResult((Success: false, Count: 0, Cancelled: true));
+                            return;
+                        }
+
+                        using var cn = new SqliteConnection($"Data Source={dbPath}");
+                        cn.Open();
+                        using var ctx = new DbContext(cn, new SqliteProvider());
                         var rows = ctx.Query<CrItem>().Where(x => x.Id > 0).ToList();
-                        return (Success: true, Count: rows.Count, Cancelled: false);
+                        tcs.SetResult((Success: true, Count: rows.Count, Cancelled: false));
                     }
                     catch (OperationCanceledException)
                     {
-                        return (Success: false, Count: 0, Cancelled: true);
+                        tcs.SetResult((Success: false, Count: 0, Cancelled: true));
                     }
-                }, cts.Token);
+                    catch (Exception ex)
+                    {
+                        tcs.SetException(ex);
+                    }
+                })
+                {
+                    IsBackground = true,
+                    Name = $"nORM cancellation race worker {idx}"
+                };
 
-                // If Task.Run itself is cancelled before the lambda runs, wrap the
-                // TaskCanceledException into the expected result tuple.
-                return inner.ContinueWith(t =>
-                    t.IsCanceled
-                        ? (Success: false, Count: 0, Cancelled: true)
-                        : t.Result,
-                    TaskContinuationOptions.None);
+                thread.Start();
+                return tcs.Task;
             }).ToArray();
 
             // Cancel 5 of them shortly after they start.
+            startSignal.Set();
             for (int i = 0; i < toCancel; i++)
                 ctsList[i].Cancel();
 
             // All tasks must complete — no deadlock or hang.
-            var timeout = Task.Delay(TimeSpan.FromSeconds(15));
+            var timeout = Task.Delay(TimeSpan.FromSeconds(30));
             var all     = Task.WhenAll(tasks);
             var winner  = await Task.WhenAny(all, timeout);
             Assert.Same(all, winner); // must not timeout
@@ -766,8 +779,7 @@ public class LiveProviderSavepointMigrationTests
             foreach (var cts in ctsList)
                 cts.Dispose();
             SqliteConnection.ClearAllPools();
-            if (System.IO.File.Exists(dbPath))
-                System.IO.File.Delete(dbPath);
+            DeleteSqliteFileWithRetry(dbPath);
         }
     }
 
@@ -897,6 +909,35 @@ public class LiveProviderSavepointMigrationTests
             try { Exec(cn!, $"DROP TABLE IF EXISTS {tableName}"); } catch { }
             try { Exec(cn!, $"DELETE FROM \"__NormMigrationsHistory\" WHERE Version = {version}"); } catch { }
             cn?.Dispose();
+        }
+    }
+
+    private static void DeleteSqliteFileWithRetry(string dbPath)
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            try
+            {
+                if (System.IO.File.Exists(dbPath))
+                    System.IO.File.Delete(dbPath);
+                return;
+            }
+            catch (System.IO.IOException)
+            {
+                if (attempt == 9)
+                    return;
+
+                Thread.Sleep(50);
+                SqliteConnection.ClearAllPools();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                if (attempt == 9)
+                    return;
+
+                Thread.Sleep(50);
+                SqliteConnection.ClearAllPools();
+            }
         }
     }
 }

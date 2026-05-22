@@ -39,6 +39,8 @@ public class CompiledQuerySqlShapeParityTests
         public string ProductName { get; set; } = "";
     }
 
+    public sealed record SqlShapeJoinRow(string Name, decimal Amount, string ProductName);
+
     [Fact]
     public async Task SimpleQuery_CompiledAndRuntime_UseSameSqlShape()
     {
@@ -132,6 +134,36 @@ public class CompiledQuerySqlShapeParityTests
 
         Assert.Equal(runtime.Count, compiledRows.Count);
         AssertSqlShapeEqual(runtimeSql, interceptor.LastReaderSql);
+    }
+
+    [Fact]
+    public async Task JoinQuery_WithConstructorDtoProjection_CanFilterProjectedMembers()
+    {
+        using var cn = CreateConnection();
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var runtime = await ctx.Query<SqlShapeUser>()
+            .Join(ctx.Query<SqlShapeOrder>(), u => u.Id, o => o.UserId,
+                (u, o) => new SqlShapeJoinRow(u.Name, o.Amount, o.ProductName))
+            .Where(x => x.Amount > 100m)
+            .Take(10)
+            .ToListAsync();
+
+        var compiled = Norm.CompileQuery<DbContext, decimal, SqlShapeJoinRow>((c, amount) =>
+            c.Query<SqlShapeUser>()
+                .Join(c.Query<SqlShapeOrder>(), u => u.Id, o => o.UserId,
+                    (u, o) => new SqlShapeJoinRow(u.Name, o.Amount, o.ProductName))
+                .Where(x => x.Amount > amount)
+                .Take(10));
+
+        var compiledRows = await compiled(ctx, 100m);
+
+        Assert.Equal(new[]
+        {
+            new SqlShapeJoinRow("Ada", 150m, "Keyboard"),
+            new SqlShapeJoinRow("Ada", 225m, "Monitor")
+        }, runtime);
+        Assert.Equal(runtime, compiledRows);
     }
 
     private static SqliteConnection CreateConnection()

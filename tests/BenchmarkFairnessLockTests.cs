@@ -1,0 +1,111 @@
+using System;
+using System.IO;
+using System.Text.RegularExpressions;
+using Xunit;
+
+namespace nORM.Tests;
+
+public sealed class BenchmarkFairnessLockTests
+{
+    private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+
+    [Theory]
+    [InlineData("benchmarks/ProviderMatrixBenchmarks.cs", "s_normJoinCompiled")]
+    [InlineData("benchmarks/OrmBenchmarks.cs", "_normJoinCompiled")]
+    public void JoinBenchmarks_UseSameTypedDtoShape(string relativePath, string compiledFieldName)
+    {
+        var code = ReadRepoFile(relativePath);
+
+        Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_EfCore()", code);
+        Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_nORM()", code);
+        Assert.Contains("public async Task<List<BenchmarkJoinRow>> Query_Join_Dapper()", code);
+        Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo()", code);
+        Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_nORM_Compiled()", code);
+
+        Assert.Contains($"Func<nORM.Core.DbContext, int, Task<List<BenchmarkJoinRow>>> {compiledFieldName}", code);
+        Assert.Contains("new { u.Name, o.Amount, o.ProductName }", code);
+        Assert.Contains("new BenchmarkJoinRow(x.Name, x.Amount, x.ProductName)", code);
+        Assert.Contains("QueryAsync<BenchmarkJoinRow>", code);
+
+        Assert.DoesNotContain("QueryAsync(QueryJoinSql()", code);
+        Assert.DoesNotContain("QueryAsync(sql, new { Amount = 100 })", code);
+    }
+
+    [Fact]
+    public void FastNormJoinBenchmarks_UseSameTypedDtoShape()
+    {
+        var code = ReadRepoFile("benchmarks/FastNormBenchmarks.cs");
+
+        Assert.Contains("Func<nORM.Core.DbContext, int, Task<List<BenchmarkJoinRow>>>? _normJoinCompiled", code);
+        Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join()", code);
+        Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_Compiled()", code);
+        Assert.Contains("new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName)", code);
+        Assert.DoesNotContain("Task<List<object>>? _normJoinCompiled", code);
+        Assert.DoesNotContain("public async Task<List<object>> Query_Join()", code);
+        Assert.DoesNotContain("public Task<List<object>> Query_Join_Compiled()", code);
+    }
+
+    [Fact]
+    public void ProviderMatrix_SeparatesComparableExecutionModes()
+    {
+        var code = ReadRepoFile("benchmarks/ProviderMatrixBenchmarks.cs");
+
+        Assert.Contains("[Params(\"Sqlite\", \"SqlServer\", \"Postgres\", \"MySql\")]", code);
+        Assert.Contains("NORM_TEST_MYSQL", code);
+        Assert.Contains("Query_Simple_EfCore_Compiled", code);
+        Assert.Contains("Query_Simple_nORM_Compiled", code);
+        Assert.Contains("Query_Simple_Dapper_Prepared", code);
+        Assert.Contains("Query_Simple_RawAdo_Prepared", code);
+        Assert.Contains("Query_Complex_EfCore_Compiled", code);
+        Assert.Contains("Query_Complex_nORM_Compiled", code);
+        Assert.Contains("Query_Complex_Dapper_Prepared", code);
+        Assert.Contains("Query_Complex_RawAdo_Prepared", code);
+    }
+
+    [Theory]
+    [InlineData("benchmarks/ProviderMatrixBenchmarks.cs")]
+    [InlineData("benchmarks/OrmBenchmarks.cs")]
+    public void RuntimeQueryBenchmarks_AreNoTrackingAcrossEfAndNorm(string relativePath)
+    {
+        var code = ReadRepoFile(relativePath);
+
+        AssertMethodContains(code, "Query_Simple_EfCore", ".AsNoTracking()");
+        AssertMethodContains(code, "Query_Simple_nORM", ".AsNoTracking()");
+        AssertMethodContains(code, "Query_Complex_EfCore", ".AsNoTracking()");
+        AssertMethodContains(code, "Query_Complex_nORM", ".AsNoTracking()");
+        AssertMethodContains(code, "Query_Join_EfCore", ".AsNoTracking()");
+        AssertMethodContains(code, "Query_Join_nORM", ".AsNoTracking()");
+    }
+
+    [Fact]
+    public void BenchmarkJoinRow_IsTypedDtoWithDapperAndProjectionConstructors()
+    {
+        var code = ReadRepoFile("benchmarks/SharedEntities.cs");
+
+        Assert.Contains("public sealed class BenchmarkJoinRow", code);
+        Assert.Contains("public BenchmarkJoinRow()", code);
+        Assert.Contains("public BenchmarkJoinRow(string name, decimal amount, string productName)", code);
+        Assert.Contains("public string Name { get; set; }", code);
+        Assert.Contains("public decimal Amount { get; set; }", code);
+        Assert.Contains("public string ProductName { get; set; }", code);
+    }
+
+    private static void AssertMethodContains(string code, string methodName, string expected)
+    {
+        var pattern = $@"public\s+(?:async\s+)?(?:Task<[^>]+>|Task|ValueTask<[^>]+>|[A-Za-z0-9_<>,\s]+)\s+{Regex.Escape(methodName)}\s*\([^)]*\)\s*(?:=>|{{)";
+        var match = Regex.Match(code, pattern);
+        Assert.True(match.Success, $"Could not find method '{methodName}'.");
+
+        var bodyStart = match.Index;
+        var nextBenchmark = code.IndexOf("[Benchmark", bodyStart + match.Length, StringComparison.Ordinal);
+        var body = nextBenchmark >= 0 ? code[bodyStart..nextBenchmark] : code[bodyStart..];
+        Assert.Contains(expected, body);
+    }
+
+    private static string ReadRepoFile(string relativePath)
+    {
+        var fullPath = Path.Combine(RepoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Assert.True(File.Exists(fullPath), $"Missing file: {fullPath}");
+        return File.ReadAllText(fullPath);
+    }
+}

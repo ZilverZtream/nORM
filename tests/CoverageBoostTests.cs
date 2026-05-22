@@ -1091,18 +1091,24 @@ public class CoverageBoostTests : TestBase
     }
 
     [Fact]
-    public void DbConnectionFactory_MySqlProvider_ThrowsWhenConnectorNotInstalled()
+    public void DbConnectionFactory_MySqlProvider_HandlesInstalledOrMissingConnector()
     {
         var createMethod = typeof(DbContext).Assembly
             .GetType("nORM.Core.DbConnectionFactory", true)!
             .GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!;
 
-        var ex = Assert.Throws<TargetInvocationException>(() =>
-            createMethod.Invoke(null, new object[] { "Server=localhost;Database=test;", new MySqlProvider(new SqliteParameterFactory()) }));
-
-        Assert.True(
-            ex.InnerException is InvalidOperationException || ex.InnerException is ArgumentException,
-            $"Expected InvalidOperationException or ArgumentException, got: {ex.InnerException?.GetType().Name}");
+        try
+        {
+            var connection = Assert.IsAssignableFrom<DbConnection>(
+                createMethod.Invoke(null, new object[] { "Server=localhost;Database=test;", new MySqlProvider(new SqliteParameterFactory()) }));
+            Assert.Contains("MySql", connection.GetType().FullName, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (TargetInvocationException ex)
+        {
+            Assert.True(
+                ex.InnerException is InvalidOperationException || ex.InnerException is ArgumentException,
+                $"Expected InvalidOperationException or ArgumentException, got: {ex.InnerException?.GetType().Name}");
+        }
     }
 
     [Fact]
@@ -5641,7 +5647,7 @@ public class ConnectionManagerPrivateMethodTests
 // ═══════════════════════════════════════════════════════════════════════════════
 // GROUP 55 — DbConnectionFactory: PostgresProvider + MySqlProvider paths
 // Covers: Lines 44-49 (PostgresProvider), 50-57 (MySqlProvider) —
-//         both throw InvalidOperationException when their packages aren't installed.
+//         both create provider connections when drivers are present or throw when absent.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 public class DbConnectionFactoryProviderPathTests
@@ -5662,12 +5668,18 @@ public class DbConnectionFactoryProviderPathTests
     }
 
     [Fact]
-    public void Create_MySqlProvider_ThrowsWhenMySqlNotInstalled()
+    public void Create_MySqlProvider_HandlesInstalledOrMissingMySqlConnector()
     {
-        // In the test environment MySqlConnector/MySql.Data is not available
-        var ex = Assert.Throws<InvalidOperationException>(() =>
-            DbConnectionFactory.Create("Server=localhost;Database=test;", new MySqlProvider(new SqliteParameterFactory())));
-        Assert.Contains("MySQL", ex.Message, StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            using var connection = DbConnectionFactory.Create(
+                "Server=localhost;Database=test;", new MySqlProvider(new SqliteParameterFactory()));
+            Assert.Contains("MySql", connection.GetType().FullName, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Assert.Contains("MySQL", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }
 

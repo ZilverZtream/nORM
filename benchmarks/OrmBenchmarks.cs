@@ -118,10 +118,10 @@ namespace nORM.Benchmarks
                     .Skip(5)
                     .Take(20));
 
-        private static readonly Func<nORM.Core.DbContext, int, Task<List<object>>> _normJoinCompiled
-            = Norm.CompileQuery<nORM.Core.DbContext, int, object>((ctx, amount) =>
+        private static readonly Func<nORM.Core.DbContext, int, Task<List<BenchmarkJoinRow>>> _normJoinCompiled
+            = Norm.CompileQuery<nORM.Core.DbContext, int, BenchmarkJoinRow>((ctx, amount) =>
                 ctx.Query<BenchmarkUser>()
-                    .Join(ctx.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new { u.Name, o.Amount, o.ProductName })
+                    .Join(ctx.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName))
                     .AsNoTracking()
                     .Where(x => x.Amount > amount)
                     .Take(50));
@@ -620,47 +620,37 @@ namespace nORM.Benchmarks
         // ========== JOIN ==========
 
         [Benchmark]
-        public async Task<List<object>> Query_Join_EfCore()
-        {
-            var result = await EfQueryableExtensions.ToListAsync(_efContext!.Users
+        public Task<List<BenchmarkJoinRow>> Query_Join_EfCore()
+            => EfQueryableExtensions.ToListAsync(_efContext!.Users
+                .AsNoTracking()
                 .Join(_efContext.Orders, u => u.Id, o => o.UserId, (u, o) => new { u.Name, o.Amount, o.ProductName })
                 .Where(x => x.Amount > 100)
+                .Select(x => new BenchmarkJoinRow(x.Name, x.Amount, x.ProductName))
                 .Take(50));
-            return result.Cast<object>().ToList();
-        }
 
         [Benchmark]
-        public async Task<List<object>> Query_Join_nORM()
-        {
-            var result = await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
+        public Task<List<BenchmarkJoinRow>> Query_Join_nORM()
+            => NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Join(
                     _nOrmContext!.Query<BenchmarkOrder>(),
                     u => u.Id,
                     o => o.UserId,
-                    (u, o) => new { u.Name, o.Amount, o.ProductName }
+                    (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName)
                 )
                 .AsNoTracking()
                 .Where(x => x.Amount > 100)
                 .Take(50));
-            return result.Cast<object>().ToList();
-        }
 
         [Benchmark]
-        public async Task<List<object>> Query_Join_Dapper()
-        {
-            const string sql = @"
-                SELECT u.Name, o.Amount, o.ProductName
-                FROM BenchmarkUser u
-                INNER JOIN BenchmarkOrder o ON u.Id = o.UserId
-                WHERE o.Amount > @Amount
-                LIMIT 50";
-
-            var result = await _dapperConnection!.QueryAsync(sql, new { Amount = 100 });
-            return result.Cast<object>().ToList();
-        }
+        public async Task<List<BenchmarkJoinRow>> Query_Join_Dapper()
+            => (await _dapperConnection!.QueryAsync<BenchmarkJoinRow>(QueryJoinSql(), new { Amount = 100 })).ToList();
 
         [Benchmark]
-        public Task<List<object>> Query_Join_nORM_Compiled() => _normJoinCompiled(_nOrmContext!, 100);
+        public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo()
+            => ReadJoinRowsAsync(QueryJoinSql(), ("@Amount", DbType.Decimal, 100m));
+
+        [Benchmark]
+        public Task<List<BenchmarkJoinRow>> Query_Join_nORM_Compiled() => _normJoinCompiled(_nOrmContext!, 100);
 
         // ========== COUNT ==========
 
@@ -682,6 +672,39 @@ namespace nORM.Benchmarks
             using var command = _dapperConnection!.CreateCommand();
             command.CommandText = "SELECT COUNT(*) FROM BenchmarkUser WHERE IsActive = 1";
             return Convert.ToInt32(await command.ExecuteScalarAsync());
+        }
+
+        private const string JoinSql = @"
+                SELECT u.Name, o.Amount, o.ProductName
+                FROM BenchmarkUser u
+                INNER JOIN BenchmarkOrder o ON u.Id = o.UserId
+                WHERE o.Amount > @Amount
+                LIMIT 50";
+
+        private static string QueryJoinSql() => JoinSql;
+
+        private async Task<List<BenchmarkJoinRow>> ReadJoinRowsAsync(string sql, params (string Name, DbType Type, object Value)[] parameters)
+        {
+            using var command = _dapperConnection!.CreateCommand();
+            command.CommandText = sql;
+            foreach (var (name, type, value) in parameters)
+            {
+                var parameter = command.CreateParameter();
+                parameter.ParameterName = name;
+                parameter.DbType = type;
+                parameter.Value = value;
+                command.Parameters.Add(parameter);
+            }
+
+            using var reader = await command.ExecuteReaderAsync();
+            var rows = new List<BenchmarkJoinRow>();
+            while (await reader.ReadAsync())
+                rows.Add(new BenchmarkJoinRow(
+                    reader.GetString(0),
+                    reader.GetDecimal(1),
+                    reader.GetString(2)));
+
+            return rows;
         }
 
         // ========== BULK INSERTS: Naive / Batched / Idiomatic ==========

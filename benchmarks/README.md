@@ -29,11 +29,12 @@ paths.
 ```powershell
 $env:NORM_TEST_SQLSERVER = 'Server=localhost\SQLEXPRESS;Database=normtest;Integrated Security=True;TrustServerCertificate=True;Encrypt=False;Connect Timeout=10'
 $env:NORM_TEST_POSTGRES = 'Host=127.0.0.1;Port=5432;Database=normtest;Username=postgres;Password=<password>'
+$env:NORM_TEST_MYSQL = 'Server=127.0.0.1;Port=3306;Database=normtest;User ID=root;Password=<password>'
 dotnet run -c Release -- --provider-matrix
 ```
 
 The provider matrix runs the same schema, seed data, and benchmark scenarios on
-SQLite, SQL Server, and PostgreSQL. Each provider compares:
+SQLite, SQL Server, PostgreSQL, and MySQL. Each provider compares:
 
 - nORM
 - Entity Framework Core
@@ -72,8 +73,10 @@ Key columns:
 - `Allocated`: managed allocation per operation; lower means less GC pressure.
 - `Rank`: BenchmarkDotNet relative rank within the displayed result set.
 
-For v1.0, nORM should remain competitive with Dapper on hot query paths, keep
-compiled queries materially faster than runtime translation, and allocate
-substantially less than EF Core on comparable no-tracking query paths.
+For v1.0, nORM should remain competitive with Dapper and Raw ADO.NET on hot
+query paths, keep compiled queries materially faster than runtime translation,
+and allocate substantially less than EF Core on comparable no-tracking query
+paths. Any release claim should come from the generated BenchmarkDotNet reports,
+not from hand-copied numbers.
 
 BenchmarkDotNet writes reports to `BenchmarkDotNet.Artifacts/results/`.

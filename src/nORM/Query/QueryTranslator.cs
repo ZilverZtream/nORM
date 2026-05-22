@@ -2145,12 +2145,25 @@ namespace nORM.Query
         {
             protected override Expression VisitMember(MemberExpression node)
             {
-                if (node.Expression is NewExpression newExpr && newExpr.Members != null)
+                if (node.Expression is NewExpression newExpr)
                 {
-                    for (int i = 0; i < newExpr.Members.Count; i++)
+                    if (newExpr.Members != null)
                     {
-                        if (newExpr.Members[i].Name == node.Member.Name)
-                            return Visit(newExpr.Arguments[i]);
+                        for (int i = 0; i < newExpr.Members.Count; i++)
+                        {
+                            if (newExpr.Members[i].Name == node.Member.Name)
+                                return Visit(newExpr.Arguments[i]);
+                        }
+                    }
+
+                    var parameters = newExpr.Constructor?.GetParameters();
+                    if (parameters != null)
+                    {
+                        for (int i = 0; i < parameters.Length && i < newExpr.Arguments.Count; i++)
+                        {
+                            if (string.Equals(parameters[i].Name, node.Member.Name, StringComparison.OrdinalIgnoreCase))
+                                return Visit(newExpr.Arguments[i]);
+                        }
                     }
                 }
                 return base.VisitMember(node);

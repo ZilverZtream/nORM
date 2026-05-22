@@ -7,14 +7,13 @@ public v1.0 package is cut.
 
 - Public API snapshot passes without `NORM_UPDATE_PUBLIC_API`.
 - Full test suite passes in `Release`.
-- SQL Server and PostgreSQL live provider gates pass against real local or CI
-  databases.
-- MySQL support is either live-gated or explicitly documented as preview.
+- SQL Server, PostgreSQL, and MySQL live provider gates pass against real local
+  or CI databases.
 - Fast complex-query benchmark keeps compiled query materially ahead of runtime
   query and below the recorded allocation baseline.
-- Full provider benchmark matrix passes for SQLite, SQL Server, and PostgreSQL,
-  covering nORM, EF Core, Dapper, and Raw ADO.NET for query, prepared/compiled,
-  join, count, insert, and bulk insert scenarios.
+- Full provider benchmark matrix passes for SQLite, SQL Server, PostgreSQL, and
+  MySQL, covering nORM, EF Core, Dapper, and Raw ADO.NET for query,
+  prepared/compiled, join, count, insert, and bulk insert scenarios.
 - `dotnet pack` succeeds for `nORM` and `dotnet-norm`, including symbols.
 
 ## Recommended RC Command
@@ -24,12 +23,13 @@ Configure live providers:
 ```powershell
 $env:NORM_TEST_SQLSERVER = 'Server=localhost\SQLEXPRESS;Database=normtest;Integrated Security=True;TrustServerCertificate=True;Encrypt=False;Connect Timeout=10'
 $env:NORM_TEST_POSTGRES = 'Host=127.0.0.1;Port=5432;Database=normtest;Username=postgres;Password=<password>'
+$env:NORM_TEST_MYSQL = 'Server=127.0.0.1;Port=3306;Database=normtest;User ID=root;Password=<password>'
 ```
 
 Run the release-candidate gate:
 
 ```powershell
-.\eng\v1-release-gate.ps1 -Mode rc -MinLiveProviders 2 -StressIterations 20
+.\eng\v1-release-gate.ps1 -Mode rc -MinLiveProviders 3 -StressIterations 20
 ```
 
 ## API Freeze
@@ -56,5 +56,6 @@ Capture these values from the final RC run:
 - Live provider pass count and configured providers.
 - Fast benchmark means and allocations for `Query_Complex` and
   `Query_Complex_Compiled`.
-- Provider matrix benchmark summaries for SQLite, SQL Server, and PostgreSQL.
+- Provider matrix benchmark summaries for SQLite, SQL Server, PostgreSQL, and
+  MySQL.
 - Package files produced in `src/bin/Release`.

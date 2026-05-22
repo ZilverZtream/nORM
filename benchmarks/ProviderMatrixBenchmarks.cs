@@ -11,6 +11,7 @@ using BenchmarkDotNet.Order;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using MySqlConnector;
 using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
@@ -44,6 +45,7 @@ public sealed class ProviderMatrixEfContext : EfDbContext
             "Sqlite" => optionsBuilder.UseSqlite(_connectionString),
             "SqlServer" => optionsBuilder.UseSqlServer(_connectionString),
             "Postgres" => optionsBuilder.UseNpgsql(_connectionString),
+            "MySql" => optionsBuilder.UseMySql(_connectionString, ServerVersion.AutoDetect(_connectionString)),
             _ => throw new InvalidOperationException($"Unsupported benchmark provider '{_provider}'.")
         };
     }
@@ -56,6 +58,8 @@ public sealed class ProviderMatrixEfContext : EfDbContext
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
             if (_provider == "Postgres")
                 entity.Property(e => e.CreatedAt).HasColumnType("timestamp without time zone");
+            else if (_provider == "MySql")
+                entity.Property(e => e.CreatedAt).HasColumnType("datetime(6)");
             entity.ToTable("BenchmarkUser");
             entity.HasIndex(e => e.IsActive);
             entity.HasIndex(e => e.Age);
@@ -68,6 +72,8 @@ public sealed class ProviderMatrixEfContext : EfDbContext
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
             if (_provider == "Postgres")
                 entity.Property(e => e.OrderDate).HasColumnType("timestamp without time zone");
+            else if (_provider == "MySql")
+                entity.Property(e => e.OrderDate).HasColumnType("datetime(6)");
             entity.ToTable("BenchmarkOrder");
             entity.HasIndex(e => e.UserId);
         });
@@ -85,7 +91,7 @@ public class ProviderMatrixBenchmarks
     private readonly List<BenchmarkUser> _testUsers = new();
     private readonly List<BenchmarkOrder> _testOrders = new();
 
-    [Params("Sqlite", "SqlServer", "Postgres")]
+    [Params("Sqlite", "SqlServer", "Postgres", "MySql")]
     public string Provider { get; set; } = "Sqlite";
 
     private string _connectionString = string.Empty;
@@ -130,11 +136,11 @@ public class ProviderMatrixBenchmarks
                 .Skip(5)
                 .Take(20));
 
-    private static readonly Func<nORM.Core.DbContext, int, Task<List<object>>> s_normJoinCompiled
-        = Norm.CompileQuery<nORM.Core.DbContext, int, object>((ctx, amount) =>
+    private static readonly Func<nORM.Core.DbContext, int, Task<List<BenchmarkJoinRow>>> s_normJoinCompiled
+        = Norm.CompileQuery<nORM.Core.DbContext, int, BenchmarkJoinRow>((ctx, amount) =>
             ctx.Query<BenchmarkUser>()
                 .Join(ctx.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId,
-                    (u, o) => new { u.Name, o.Amount, o.ProductName })
+                    (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName))
                 .AsNoTracking()
                 .Where(x => x.Amount > amount)
                 .Take(50));
@@ -145,6 +151,7 @@ public class ProviderMatrixBenchmarks
         _connectionString = GetConnectionString(Provider);
         SeedDeterministicData();
 
+        await EnsureProviderDatabaseAsync();
         await ResetSchemaAsync();
         await SeedDatabaseAsync();
 
@@ -217,6 +224,27 @@ public class ProviderMatrixBenchmarks
         foreach (var sql in SplitStatements(GetResetSql()))
             await connection.ExecuteAsync(sql);
     }
+
+    private async Task EnsureProviderDatabaseAsync()
+    {
+        if (Provider != "MySql")
+            return;
+
+        var builder = new MySqlConnectionStringBuilder(_connectionString);
+        var database = builder.Database;
+        if (string.IsNullOrWhiteSpace(database))
+            return;
+
+        builder.Database = "";
+        await using var connection = new MySqlConnection(builder.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"CREATE DATABASE IF NOT EXISTS {EscapeMySqlIdentifier(database)}";
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static string EscapeMySqlIdentifier(string value)
+        => $"`{value.Replace("`", "``", StringComparison.Ordinal)}`";
 
     private async Task SeedDatabaseAsync()
     {
@@ -394,27 +422,23 @@ public class ProviderMatrixBenchmarks
     }
 
     [Benchmark]
-    public async Task<List<object>> Query_Join_EfCore()
-    {
-        var rows = await EfQueryableExtensions.ToListAsync(_efContext!.Users
+    public Task<List<BenchmarkJoinRow>> Query_Join_EfCore()
+        => EfQueryableExtensions.ToListAsync(_efContext!.Users
+            .AsNoTracking()
             .Join(_efContext.Orders, u => u.Id, o => o.UserId,
                 (u, o) => new { u.Name, o.Amount, o.ProductName })
             .Where(x => x.Amount > 100)
+            .Select(x => new BenchmarkJoinRow(x.Name, x.Amount, x.ProductName))
             .Take(50));
-        return rows.Cast<object>().ToList();
-    }
 
     [Benchmark]
-    public async Task<List<object>> Query_Join_nORM()
-    {
-        var rows = await NormAsyncExtensions.ToListAsync(_normContext!.Query<BenchmarkUser>()
+    public Task<List<BenchmarkJoinRow>> Query_Join_nORM()
+        => NormAsyncExtensions.ToListAsync(_normContext!.Query<BenchmarkUser>()
             .Join(_normContext!.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId,
-                (u, o) => new { u.Name, o.Amount, o.ProductName })
+                (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName))
             .AsNoTracking()
             .Where(x => x.Amount > 100)
             .Take(50));
-        return rows.Cast<object>().ToList();
-    }
 
     [Benchmark]
     public async Task<List<BenchmarkJoinRow>> Query_Join_Dapper()
@@ -425,7 +449,7 @@ public class ProviderMatrixBenchmarks
         => ReadJoinRowsAsync(QueryJoinSql(), ("@Amount", DbType.Decimal, 100m));
 
     [Benchmark]
-    public Task<List<object>> Query_Join_nORM_Compiled()
+    public Task<List<BenchmarkJoinRow>> Query_Join_nORM_Compiled()
         => s_normJoinCompiled(_normContext!, 100);
 
     [Benchmark]
@@ -622,11 +646,19 @@ public class ProviderMatrixBenchmarks
         VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)
         """;
 
-    private string UserTable() => Provider == "Postgres" ? "\"BenchmarkUser\"" : "BenchmarkUser";
+    private string UserTable() => QuoteIdentifier("BenchmarkUser");
 
-    private string OrderTable() => Provider == "Postgres" ? "\"BenchmarkOrder\"" : "BenchmarkOrder";
+    private string OrderTable() => QuoteIdentifier("BenchmarkOrder");
 
-    private string Col(string name) => Provider == "Postgres" ? $"\"{name}\"" : name;
+    private string Col(string name) => QuoteIdentifier(name);
+
+    private string QuoteIdentifier(string name)
+        => Provider switch
+        {
+            "Postgres" => $"\"{name}\"",
+            "MySql" => $"`{name}`",
+            _ => name
+        };
 
     private async Task<List<BenchmarkUser>> ReadUsersAsync(string sql, params (string Name, DbType Type, object Value)[] parameters)
     {
@@ -659,12 +691,10 @@ public class ProviderMatrixBenchmarks
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            rows.Add(new BenchmarkJoinRow
-            {
-                Name = reader.GetString(0),
-                Amount = reader.GetDecimal(1),
-                ProductName = reader.GetString(2)
-            });
+            rows.Add(new BenchmarkJoinRow(
+                reader.GetString(0),
+                reader.GetDecimal(1),
+                reader.GetString(2)));
         }
 
         return rows;
@@ -830,6 +860,32 @@ public class ProviderMatrixBenchmarks
                 );
                 CREATE INDEX "IX_BenchmarkOrder_UserId" ON "BenchmarkOrder" ("UserId");
                 """,
+            "MySql" => """
+                DROP TABLE IF EXISTS `BenchmarkOrder`;
+                DROP TABLE IF EXISTS `BenchmarkUser`;
+                CREATE TABLE `BenchmarkUser` (
+                    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    `Name` VARCHAR(256) NOT NULL,
+                    `Email` VARCHAR(256) NOT NULL,
+                    `CreatedAt` DATETIME(6) NOT NULL,
+                    `IsActive` TINYINT(1) NOT NULL,
+                    `Age` INT NOT NULL,
+                    `City` VARCHAR(128) NOT NULL,
+                    `Department` VARCHAR(128) NOT NULL,
+                    `Salary` DOUBLE NOT NULL
+                );
+                CREATE INDEX `IX_BenchmarkUser_IsActive` ON `BenchmarkUser` (`IsActive`);
+                CREATE INDEX `IX_BenchmarkUser_Age` ON `BenchmarkUser` (`Age`);
+                CREATE INDEX `IX_BenchmarkUser_City` ON `BenchmarkUser` (`City`);
+                CREATE TABLE `BenchmarkOrder` (
+                    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    `UserId` INT NOT NULL,
+                    `Amount` DECIMAL(18,2) NOT NULL,
+                    `OrderDate` DATETIME(6) NOT NULL,
+                    `ProductName` VARCHAR(256) NOT NULL
+                );
+                CREATE INDEX `IX_BenchmarkOrder_UserId` ON `BenchmarkOrder` (`UserId`);
+                """,
             _ => throw new InvalidOperationException($"Unsupported benchmark provider '{Provider}'.")
         };
 
@@ -842,6 +898,7 @@ public class ProviderMatrixBenchmarks
             "Sqlite" => new SqliteConnection(connectionString),
             "SqlServer" => new SqlClient.SqlConnection(connectionString),
             "Postgres" => new NpgsqlConnection(connectionString),
+            "MySql" => new MySqlConnection(connectionString),
             _ => throw new InvalidOperationException($"Unsupported benchmark provider '{provider}'.")
         };
 
@@ -851,6 +908,7 @@ public class ProviderMatrixBenchmarks
             "Sqlite" => new SqliteProvider(),
             "SqlServer" => new SqlServerProvider(),
             "Postgres" => new PostgresProvider(new BenchmarkNpgsqlParameterFactory()),
+            "MySql" => new MySqlProvider(new BenchmarkMySqlParameterFactory()),
             _ => throw new InvalidOperationException($"Unsupported benchmark provider '{provider}'.")
         };
 
@@ -860,6 +918,7 @@ public class ProviderMatrixBenchmarks
             "Sqlite" => "Data Source=provider_matrix_benchmark.db",
             "SqlServer" => GetLiveConnectionString("NORM_TEST_SQLSERVER"),
             "Postgres" => GetLiveConnectionString("NORM_TEST_POSTGRES"),
+            "MySql" => GetLiveConnectionString("NORM_TEST_MYSQL"),
             _ => throw new InvalidOperationException($"Unsupported benchmark provider '{provider}'.")
         };
 
@@ -897,5 +956,11 @@ public class ProviderMatrixBenchmarks
     {
         public DbParameter CreateParameter(string name, object? value)
             => new NpgsqlParameter(name, value ?? DBNull.Value);
+    }
+
+    private sealed class BenchmarkMySqlParameterFactory : IDbParameterFactory
+    {
+        public DbParameter CreateParameter(string name, object? value)
+            => new MySqlParameter(name, value ?? DBNull.Value);
     }
 }
