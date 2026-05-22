@@ -620,11 +620,17 @@ Problem: Transaction behavior spans explicit transactions, ambient
 `TransactionScope`, savepoints, sync APIs, async APIs, temporal bootstrap, and
 provider-specific unsupported operations.
 
+Status: In Progress.
+
 Evidence:
 
 - `DbContext.EnsureConnectionSync` can run temporal bootstrap synchronously.
 - `TransactionManager` has provider fallback policies.
 - Savepoint support differs by provider.
+- `docs/transactions.md` and `docs/sync-policy.md` are linked from README and
+  covered by documentation contract tests.
+- Raw SQL and SQLite text-mode stored procedure paths have active-transaction
+  binding tests.
 
 Scope:
 

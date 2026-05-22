@@ -197,6 +197,21 @@ public class DocumentationContractTests
     }
 
     [Fact]
+    public void Readme_links_to_sync_policy_contract()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "sync-policy.md"));
+
+        Assert.Contains("docs/sync-policy.md", readme, StringComparison.Ordinal);
+        Assert.Contains("There is no synchronous `SaveChanges` API", contract, StringComparison.Ordinal);
+        Assert.Contains("ToListSync", contract, StringComparison.Ordinal);
+        Assert.Contains("CountSync", contract, StringComparison.Ordinal);
+        Assert.Contains("Unsupported Sync Patterns", contract, StringComparison.Ordinal);
+        Assert.Contains("not thread safe", contract, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Readme_links_to_multi_tenancy_security_contract()
     {
         var root = FindRepositoryRoot();
