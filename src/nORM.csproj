@@ -7,7 +7,7 @@
     <NoWarn>$(NoWarn);CA2229</NoWarn>
     <GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
     <PackageId>nORM</PackageId>
-    <Version>0.9.0-preview.1</Version>
+    <Version>$(NormVersion)</Version>
     <Authors>Dennis Ostling</Authors>
     <Description>nORM - The Norm: a high-performance ORM for .NET with LINQ querying, compiled queries, multi-provider support, multi-tenancy, caching, resilience, migrations, and bulk operations.</Description>
     <PackageTags>ORM;Database;LINQ;Performance;Entity Framework;Dapper;SQL;SQLite;PostgreSQL;MySQL</PackageTags>

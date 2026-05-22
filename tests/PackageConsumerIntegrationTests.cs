@@ -4,13 +4,14 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
+using System.Xml.Linq;
 using Xunit;
 
 namespace nORM.Tests;
 
 public class PackageConsumerIntegrationTests
 {
-    private const string PackageVersion = "0.9.0-preview.1";
+    private static string PackageVersion => ReadPackageVersion(FindRepositoryRoot());
 
     [Fact]
     public void Runtime_package_contains_source_generator_analyzer()
@@ -109,6 +110,23 @@ public class PackageConsumerIntegrationTests
         }
     }
 
+    [Fact]
+    public void Package_outputs_are_cleaned_before_pack()
+    {
+        var root = FindRepositoryRoot();
+        EnsureRuntimePackage(root);
+        EnsureToolPackage(root);
+
+        AssertCurrentPackagesOnly(
+            Path.Combine(root, "src", "bin", "Release"),
+            "nORM",
+            PackageVersion);
+        AssertCurrentPackagesOnly(
+            Path.Combine(root, "src", "dotnet-norm", "bin", "Release"),
+            "dotnet-norm",
+            PackageVersion);
+    }
+
     private static void AssertPackageEntry(ZipArchive archive, string fullName)
     {
         Assert.Contains(archive.Entries, entry => string.Equals(entry.FullName, fullName, StringComparison.Ordinal));
@@ -188,12 +206,46 @@ public class PackageConsumerIntegrationTests
 
     private static void EnsureRuntimePackage(string root)
     {
+        CleanPackageOutput(Path.Combine(root, "src", "bin", "Release"), "nORM");
         RunDotNet("pack src\\nORM.csproj -c Release --no-restore --nologo", root, null);
     }
 
     private static void EnsureToolPackage(string root)
     {
+        CleanPackageOutput(Path.Combine(root, "src", "dotnet-norm", "bin", "Release"), "dotnet-norm");
         RunDotNet("pack src\\dotnet-norm\\dotnet-norm.csproj -c Release --no-restore --nologo", root, null);
+    }
+
+    private static string ReadPackageVersion(string root)
+    {
+        var props = XDocument.Load(Path.Combine(root, "Directory.Build.props"));
+        return props.Descendants("NormVersion").Single().Value;
+    }
+
+    private static void CleanPackageOutput(string directory, string packageId)
+    {
+        if (!Directory.Exists(directory))
+            return;
+
+        foreach (var package in Directory.EnumerateFiles(directory, $"{packageId}.*.nupkg")
+                     .Concat(Directory.EnumerateFiles(directory, $"{packageId}.*.snupkg")))
+            File.Delete(package);
+    }
+
+    private static void AssertCurrentPackagesOnly(string directory, string packageId, string version)
+    {
+        var expected = new[]
+        {
+            $"{packageId}.{version}.nupkg",
+            $"{packageId}.{version}.snupkg"
+        };
+
+        var actual = Directory.EnumerateFiles(directory, $"{packageId}.*.*nupkg")
+            .Select(Path.GetFileName)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(expected.OrderBy(name => name, StringComparer.Ordinal), actual);
     }
 
     private static string RunDotNet(string arguments, string workingDirectory, string? packageCache)

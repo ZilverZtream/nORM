@@ -33,7 +33,7 @@ still needs release evidence.
 | 5 | Make Release build warning-free | Verified | `dotnet build nORM.sln -c Release --nologo` reports 0 warnings on this tree. |
 | 6 | Harden public API snapshotting before freeze | In Progress | `tests/PublicApi.Shipped.txt` exists; full supportability classification remains open. |
 | 7 | Revisit runtime package dependency architecture | Open | Dependency graph is documented only partially; package split decision remains open. |
-| 8 | Clean release artifact and version hygiene | Open | Version is still declared in multiple project/test locations and stale local packages can exist. |
+| 8 | Clean release artifact and version hygiene | Verified | `NormVersion` is centralized in `Directory.Build.props`; package tests and `eng/v1-release-gate.ps1` clean and validate package outputs. |
 | 9 | Run package consumer tests cross-platform | In Progress | Package consumer tests exist; cross-platform CI evidence is still required. |
 | 10 | Replace or freeze beta CLI dependency | Open | `dotnet-norm` still uses `System.CommandLine` beta. |
 | 11 | Isolate CLI design-time assembly loading | Open | CLI still needs robust design-time dependency loading validation. |
