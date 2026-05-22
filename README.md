@@ -322,6 +322,10 @@ configuration. See [Design-Time Migrations](docs/design-time-migrations.md).
 to drop known system databases such as `master`, `postgres`, `mysql`, and
 `information_schema`.
 
+Transaction ownership, ambient `TransactionScope` policy, savepoints, and
+commit/rollback cancellation behavior are documented in
+[Transaction Contract](docs/transactions.md).
+
 ## Production-Ready Features
 
 ### Thread Safety
