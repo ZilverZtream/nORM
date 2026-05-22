@@ -5,7 +5,7 @@ nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .
 ## Why Choose nORM?
 
 - **Fast by design**: Dapper-competitive read paths, compiled queries, and native bulk operations
-- **Complete LINQ Support**: Full-featured LINQ provider with joins, grouping, subqueries, and complex projections
+- **Documented LINQ Support**: Provider-tested LINQ support for common query shapes, with explicit limits documented in [the LINQ support matrix](docs/linq-support.md)
 - **Familiar API**: EF Core-style context, configuration, and change-tracking patterns
 - **Enterprise-Grade Bulk Operations**: High-performance bulk insert, update, and delete operations
 - **Advanced Query Capabilities**: Raw SQL, stored procedures, and compiled queries
