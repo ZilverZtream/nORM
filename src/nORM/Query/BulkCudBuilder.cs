@@ -23,26 +23,6 @@ namespace nORM.Query
         public BulkCudBuilder(DbContext ctx) => _ctx = ctx;
 
         /// <summary>
-        /// Validates that the provided SQL fragment represents a simple, non-aggregated query
-        /// suitable for bulk update or delete operations. Certain constructs such as grouping,
-        /// ordering and joins are explicitly disallowed because they would change the semantics of
-        /// the bulk operation.
-        /// </summary>
-        /// <param name="sql">The SQL statement to validate.</param>
-        /// <exception cref="NormUnsupportedFeatureException">Thrown when the statement contains unsupported constructs.</exception>
-        /// <remarks>
-        /// PERFORMANCE: Uses ReadOnlySpan to avoid allocating uppercase copy of entire SQL string.
-        /// </remarks>
-        public void ValidateCudPlan(string sql)
-        {
-            if (sql.AsSpan().Contains(" GROUP BY ".AsSpan(), StringComparison.OrdinalIgnoreCase) ||
-                sql.AsSpan().Contains(" ORDER BY ".AsSpan(), StringComparison.OrdinalIgnoreCase) ||
-                sql.AsSpan().Contains(" HAVING ".AsSpan(), StringComparison.OrdinalIgnoreCase) ||
-                sql.AsSpan().Contains(" JOIN ".AsSpan(), StringComparison.OrdinalIgnoreCase))
-                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete does not support grouped, ordered, joined or aggregated queries.");
-        }
-
-        /// <summary>
         /// Validates a bulk update/delete query from structural translation metadata
         /// instead of scanning generated SQL text.
         /// </summary>
@@ -68,49 +48,6 @@ namespace nORM.Query
                 return string.Empty;
 
             return RemoveAliasFromWhereClause(shape.WhereClause, alias: null);
-        }
-
-        /// <summary>
-        /// Attempts to extract the <c>WHERE</c> clause from an arbitrary SQL statement while removing
-        /// any table aliases that may be present. The resulting clause can be reused in generated
-        /// bulk update or delete statements.
-        /// </summary>
-        /// <param name="sql">The original SQL statement.</param>
-        /// <param name="escTable">The escaped table name used in the statement.</param>
-        /// <returns>The extracted <c>WHERE</c> clause, or an empty string if no clause exists.</returns>
-        /// <remarks>
-        /// PERFORMANCE: Reduced string allocations by using IndexOf with OrdinalIgnoreCase
-        /// instead of creating uppercase copy of entire SQL string.
-        /// </remarks>
-        public string ExtractWhereClause(string sql, string escTable)
-        {
-            var fromPattern = "FROM " + escTable;
-            var fromIndex = sql.IndexOf(fromPattern, StringComparison.OrdinalIgnoreCase);
-            string? alias = null;
-            if (fromIndex >= 0)
-            {
-                var after = sql.Substring(fromIndex + fromPattern.Length);
-                var tokens = after.TrimStart().Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                // Only treat the first token as an alias if it is not a SQL keyword.
-                // Without this guard, "SELECT ... FROM [Table] WHERE ..." would assign "WHERE" as alias.
-                if (tokens.Length > 0 &&
-                    !tokens[0].Equals("WHERE", StringComparison.OrdinalIgnoreCase) &&
-                    !tokens[0].Equals("ORDER", StringComparison.OrdinalIgnoreCase) &&
-                    !tokens[0].Equals("GROUP", StringComparison.OrdinalIgnoreCase) &&
-                    !tokens[0].Equals("HAVING", StringComparison.OrdinalIgnoreCase) &&
-                    !tokens[0].Equals("INNER", StringComparison.OrdinalIgnoreCase) &&
-                    !tokens[0].Equals("LEFT", StringComparison.OrdinalIgnoreCase) &&
-                    !tokens[0].Equals("RIGHT", StringComparison.OrdinalIgnoreCase) &&
-                    !tokens[0].Equals("CROSS", StringComparison.OrdinalIgnoreCase) &&
-                    !tokens[0].Equals("JOIN", StringComparison.OrdinalIgnoreCase) &&
-                    !tokens[0].Equals("LIMIT", StringComparison.OrdinalIgnoreCase))
-                    alias = tokens[0];
-            }
-            var whereIndex = sql.IndexOf(" WHERE", StringComparison.OrdinalIgnoreCase);
-            if (whereIndex < 0) return string.Empty;
-            var where = sql.Substring(whereIndex);
-            where = RemoveAliasFromWhereClause(where, alias);
-            return where;
         }
 
         /// <summary>

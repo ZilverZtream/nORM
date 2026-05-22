@@ -46,7 +46,7 @@ still needs release evidence.
 | 18 | Stabilize Include and lazy-loading contracts | In Progress | Relationship docs exist; unsupported paths and exception taxonomy need cleanup. |
 | 19 | Prove terminal operator parity in every execution path | In Progress | Sync/async SQLite cardinality coverage now includes terminal operators; compiled/live-provider parity remains open. |
 | 20 | Decide the v1 default for client evaluation | Verified | The v1 default is `ClientEvaluationPolicy.Throw`; `Warn` and `Allow` are explicit opt-ins with tests and docs. |
-| 21 | Remove legacy string-based bulk CUD paths | Open | Structural validation exists, but legacy SQL parsing paths remain. |
+| 21 | Remove legacy string-based bulk CUD paths | Verified | Bulk CUD now validates `BulkCudQueryShape` only; `ValidateCudPlan(string)` and `ExtractWhereClause(string, ...)` are removed and documentation tests lock that boundary. |
 | 22 | Define bulk update value-expression support | In Progress | Safe extraction exists; documented expression contract needs sharpening. |
 | 23 | Replace raw SQL safety heuristics with provider-aware validation | Open | Raw SQL validation still needs provider-aware policy. |
 | 24 | Tighten stored procedure security and tenant boundaries | In Progress | Multi-tenancy docs identify bypass paths; examples/helpers remain open. |
