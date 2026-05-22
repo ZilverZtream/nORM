@@ -220,6 +220,12 @@ if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'r
     }
 }
 
+if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
+    Invoke-Step 'benchmark evidence manifest' {
+        & (Join-Path $root 'eng/benchmark-evidence.ps1') -BenchmarkFilter $ProviderMatrixBenchmarkFilter -Mode $Mode
+    }
+}
+
 Invoke-Step 'clean package outputs' {
     Clear-PackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'nORM'
     Clear-PackageOutput (Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') "bin\$Configuration") 'dotnet-norm'

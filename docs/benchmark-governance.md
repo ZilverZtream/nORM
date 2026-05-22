@@ -49,3 +49,10 @@ Release candidates must upload:
 - the exact benchmark filter used,
 - a short markdown summary that identifies the fastest method per provider and
   flags any nORM losses above the release threshold.
+
+`eng/benchmark-evidence.ps1` generates the required release-evidence manifest
+from `BenchmarkDotNet.Artifacts/results`. It writes
+`BenchmarkDotNet.Artifacts/v1-evidence/benchmark-evidence.md` and `.json` with
+the release commit, SDK/OS, raw report paths, driver package versions, redacted
+provider configuration, and fastest method per provider. Release automation runs
+this script after benchmark steps in `full` and `rc` modes.
