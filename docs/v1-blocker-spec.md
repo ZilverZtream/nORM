@@ -649,10 +649,16 @@ Problem: `ConnectionManager` handles health checks, primary selection, read
 replicas, circuit breaking, and background disposal. That is production-critical
 and separate from simple DbContext connection use.
 
+Status: In Progress.
+
 Evidence:
 
 - `ConnectionManager` starts a background health-check task.
 - It creates fresh connections and relies on provider-native pooling.
+- Write failover now treats an unhealthy current primary as unavailable and
+  selects a healthy secondary.
+- Tests cover deterministic secondary failover, read-replica fallback, circuit
+  breaker behavior, and concurrent read/dispose races.
 
 Scope:
 

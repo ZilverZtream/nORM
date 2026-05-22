@@ -51,7 +51,7 @@ still needs release evidence.
 | 23 | Replace raw SQL safety heuristics with provider-aware validation | Verified | Raw query APIs now call `NormValidator.ValidateRawQuerySql`, which combines provider-aware SELECT/CTE gating with shared injection checks; `docs/raw-sql-security.md` documents read-only raw query and privileged-path boundaries. |
 | 24 | Tighten stored procedure security and tenant boundaries | Verified | Stored procedure APIs validate provider command text/name shape, SQLite text mode uses the read-only raw query gate, and docs show tenant-parameter patterns plus privileged-path review rules. |
 | 25 | Finish transaction and sync/async policy hardening | In Progress | Transaction and sync docs are contract-tested; raw SQL and SQLite text-mode stored procedure paths bind to active transactions. Live provider and interceptor parity remain open. |
-| 26 | Prove `ConnectionManager` failover behavior under load | Open | Needs stress tests for health checks, replica churn, and dispose races. |
+| 26 | Prove `ConnectionManager` failover behavior under load | In Progress | Write failover now skips unhealthy primaries; tests cover deterministic secondary failover, read-replica fallback, circuit breaker, and concurrent read/dispose races. Health-check churn stress remains open. |
 | 27 | Treat multi-tenancy as a verified security boundary | In Progress | Adversarial tests and docs exist; full live-provider security gate remains open. |
 | 28 | Decide temporal/versioning stability | In Progress | Temporal docs exist; v1 stable/preview decision and live evidence remain open. |
 | 29 | Enforce provider version support at startup | In Progress | Capability descriptors exist; startup validation needs to be enforced. |
