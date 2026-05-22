@@ -9,7 +9,7 @@
     <GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
     <PackageId>dotnet-norm</PackageId>
     <Version>0.9.0-preview.1</Version>
-    <Authors>Dennis Östling</Authors>
+    <Authors>Dennis Ostling</Authors>
     <Description>Command-line tooling for nORM projects, including scaffolding, validation, and project diagnostics.</Description>
     <PackageTags>nORM;ORM;Database;CLI;Scaffolding;Migrations</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

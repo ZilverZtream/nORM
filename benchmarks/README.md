@@ -74,9 +74,11 @@ Key columns:
 - `Rank`: BenchmarkDotNet relative rank within the displayed result set.
 
 For v1.0, nORM should remain competitive with Dapper and Raw ADO.NET on hot
-query paths, keep compiled queries materially faster than runtime translation,
-and allocate substantially less than EF Core on comparable no-tracking query
-paths. Any release claim should come from the generated BenchmarkDotNet reports,
-not from hand-copied numbers.
+query paths, keep both runtime and compiled/prepared query paths within their
+recorded time and allocation baselines, and allocate substantially less than EF
+Core on comparable no-tracking query paths. Provider-specific runtime fast paths
+may beat compiled/prepared paths; that is acceptable when the full matrix stays
+healthy. Any release claim should come from the generated BenchmarkDotNet
+reports, not from hand-copied numbers.
 
 BenchmarkDotNet writes reports to `BenchmarkDotNet.Artifacts/results/`.
