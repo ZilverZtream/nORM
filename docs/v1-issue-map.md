@@ -61,7 +61,7 @@ still needs release evidence.
 | 33 | Stress cache and plan memory bounds as release gates | Verified | RC gate now has a dedicated cache memory bounds step; cache policy names the release evidence, and stress tests assert bounded counts/evictions for LRU, bounded FIFO, and compiled materializer caches. |
 | 34 | Normalize public exception taxonomy | Verified | Public unsupported query paths for bulk CUD, async streaming Include/GroupJoin, and composite-key includes now throw `NormUnsupportedFeatureException`; docs/tests lock the taxonomy. |
 | 35 | Complete logging and redaction coverage | Verified | `LogQuery`, CLI connection-string validation, and the built-in command interceptor now have tests proving SQL literals, parameter values, scalar results, and connection-string secrets are not emitted by default; docs cover benchmark/release artifact boundaries. |
-| 36 | Freeze interceptor semantics | In Progress | Interceptor contract docs exist; retry/transaction/mutation verification remains open. |
+| 36 | Freeze interceptor semantics | Verified | Command interceptor ordering, mutation visibility, suppression notifications, and failure propagation now have contract tests; docs define the suppression and mutation rules. |
 | 37 | Rebuild benchmark evidence before any performance launch | In Progress | Fair benchmark categories exist; full reproducible release artifacts remain open. |
 | 38 | Make benchmark thresholds executable | Open | Governance docs exist; versioned threshold files and gate enforcement remain open. |
 | 39 | Reduce test-suite entropy before v1 | In Progress | Build is warning-free; test-result hygiene and coverage-test consolidation remain open. |
