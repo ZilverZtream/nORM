@@ -109,18 +109,38 @@ update.SetAction(async (ParseResult result, CancellationToken _) =>
 var drop = new Command("drop", "Drop the target database or all tables. Useful for resetting test databases.\nExample:\n  norm database drop --connection \"...\" --provider postgres");
 var dropConnOpt = new Option<string>("--connection") { Description = "Database connection string", Required = true };
 var dropProvOpt = new Option<string>("--provider") { Description = "Database provider (sqlserver, sqlite, postgres, mysql)", Required = true };
+var dropYesOpt = new Option<bool>("--yes") { Description = "Confirm destructive deletion. Required unless --dry-run is used." };
+var dropDryRunOpt = new Option<bool>("--dry-run") { Description = "Print the objects that would be dropped without deleting anything." };
 drop.Add(dropConnOpt);
 drop.Add(dropProvOpt);
+drop.Add(dropYesOpt);
+drop.Add(dropDryRunOpt);
 drop.SetAction(async (ParseResult result, CancellationToken _) =>
 {
     try
     {
         var prov = result.GetValue(dropProvOpt)!;
         var validated = ConnectionStringValidator.Validate(result.GetValue(dropConnOpt)!, prov);
+        var yes = result.GetValue(dropYesOpt);
+        var dryRun = result.GetValue(dropDryRunOpt);
+        if (!yes && !dryRun)
+        {
+            Console.Error.WriteLine("Refusing to run destructive database drop without --yes. Use --dry-run to preview.");
+            return 3;
+        }
+
         if (prov.Equals("sqlite", StringComparison.OrdinalIgnoreCase))
         {
             var builder = new SqliteConnectionStringBuilder(validated.ConnectionString);
             var file = builder.DataSource;
+            if (dryRun)
+            {
+                Console.WriteLine(File.Exists(file)
+                    ? $"Would delete SQLite database file '{file}'."
+                    : $"SQLite database file '{file}' does not exist.");
+                return 0;
+            }
+
             if (File.Exists(file))
             {
                 File.Delete(file);
@@ -135,6 +155,12 @@ drop.SetAction(async (ParseResult result, CancellationToken _) =>
 
         using var connection = CreateConnection(prov, validated.ConnectionString);
         await connection.OpenAsync();
+        if (IsProtectedDatabaseName(prov, connection.Database))
+        {
+            Console.Error.WriteLine($"Refusing to drop protected {prov} database '{connection.Database}'.");
+            return 4;
+        }
+
         var provider = CreateProvider(prov);
         var schema = connection.GetSchema("Tables");
         foreach (DataRow row in schema.Rows)
@@ -145,12 +171,18 @@ drop.SetAction(async (ParseResult result, CancellationToken _) =>
             var full = string.IsNullOrEmpty(tableSchema)
                 ? provider.Escape(tableName)
                 : $"{provider.Escape(tableSchema!)}.{provider.Escape(tableName!)}";
+            if (dryRun)
+            {
+                Console.WriteLine($"Would drop table {full}");
+                continue;
+            }
+
             using var cmd = connection.CreateCommand();
             cmd.CommandText = $"DROP TABLE {full}";
             try { await cmd.ExecuteNonQueryAsync(); }
             catch (DbException ex) { Console.Error.WriteLine($"  Warning: DROP TABLE {full} failed: {ex.Message}"); }
         }
-        Console.WriteLine("Database dropped successfully.");
+        Console.WriteLine(dryRun ? "Dry run completed." : "Database dropped successfully.");
         return 0;
     }
     catch (Exception ex)
@@ -363,6 +395,29 @@ static DatabaseProvider CreateProvider(string provider) =>
         "mysql" => new MySqlProvider(),
         _ => throw new ArgumentException($"Unsupported provider '{provider}'.")
     };
+
+static bool IsProtectedDatabaseName(string provider, string databaseName)
+{
+    if (string.IsNullOrWhiteSpace(databaseName))
+        return false;
+
+    var normalized = databaseName.Trim();
+    return provider.ToLowerInvariant() switch
+    {
+        "sqlserver" => normalized.Equals("master", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("model", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("msdb", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("tempdb", StringComparison.OrdinalIgnoreCase),
+        "postgres" or "postgresql" => normalized.Equals("postgres", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("template0", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("template1", StringComparison.OrdinalIgnoreCase),
+        "mysql" => normalized.Equals("mysql", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("sys", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("information_schema", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("performance_schema", StringComparison.OrdinalIgnoreCase),
+        _ => false
+    };
+}
 
 static int Fail(Exception ex, int exitCode = 1)
 {
