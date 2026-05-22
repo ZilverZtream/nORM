@@ -19,10 +19,7 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_EfCore()", code);
         Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_nORM()", code);
         Assert.Contains("public async Task<List<BenchmarkJoinRow>> Query_Join_Dapper()", code);
-        if (relativePath.Contains("ProviderMatrix", StringComparison.Ordinal))
-            Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo_Optimized()", code);
-        else
-            Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo()", code);
+        Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo_Optimized()", code);
         Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_nORM_Compiled()", code);
 
         Assert.Contains($"Func<nORM.Core.DbContext, int, Task<List<BenchmarkJoinRow>>> {compiledFieldName}", code);
@@ -132,6 +129,25 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("public string Name { get; set; }", code);
         Assert.Contains("public decimal Amount { get; set; }", code);
         Assert.Contains("public string ProductName { get; set; }", code);
+    }
+
+    [Fact]
+    public void ReleaseGate_GeneratesBenchmarkEvidenceManifest()
+    {
+        var gate = ReadRepoFile("eng/v1-release-gate.ps1");
+        var evidence = ReadRepoFile("eng/benchmark-evidence.ps1");
+        var governance = ReadRepoFile("docs/benchmark-governance.md");
+
+        Assert.Contains("benchmark evidence manifest", gate);
+        Assert.Contains("eng/benchmark-evidence.ps1", gate);
+        Assert.Contains("BenchmarkDotNet.Artifacts/v1-evidence", governance);
+        Assert.Contains("Redact-ConnectionString", evidence);
+        Assert.Contains("NORM_TEST_SQLSERVER", evidence);
+        Assert.Contains("NORM_TEST_POSTGRES", evidence);
+        Assert.Contains("NORM_TEST_MYSQL", evidence);
+        Assert.Contains("FastestByProvider", evidence);
+        Assert.Contains("DriverPackages", evidence);
+        Assert.DoesNotContain("Password=$env", evidence);
     }
 
     private static void AssertMethodContains(string code, string methodName, string expected)

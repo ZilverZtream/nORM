@@ -941,19 +941,23 @@ Evidence:
 - `docs/benchmark-governance.md` defines Raw ADO convenience/optimized/prepared
   categories.
 - `BenchmarkFairnessLockTests` checks some benchmark labels and reader paths.
-- This pass did not run the full provider matrix.
+- `eng/benchmark-evidence.ps1` generates release evidence from raw
+  BenchmarkDotNet CSV reports.
+- `eng/v1-release-gate.ps1` runs the evidence manifest after benchmark steps in
+  `full` and `rc` modes.
 
 Scope:
 
-- Run full BenchmarkDotNet provider matrix on release hardware.
-- Publish raw artifacts, SDK, hardware, driver versions, schema, seed, and
-  command line.
+- Run full BenchmarkDotNet provider matrix on release hardware before launch.
+- Publish raw artifacts, SDK/OS, driver packages, provider configuration with
+  secrets redacted, schema/seed notes, and command line/filter.
 - Verify read and write scenarios have equivalent SQL shape and semantics.
 - Separate identity-hydrating inserts from throughput-only inserts.
 
 Done when:
 
-- Every public performance claim maps to a benchmark artifact.
+- Every public performance claim maps to a generated benchmark evidence
+  manifest and its raw BenchmarkDotNet artifacts.
 
 ### 38. Make benchmark thresholds executable
 
