@@ -209,6 +209,11 @@ var provider = new SqliteProvider();
 var provider = new MySqlProvider();
 ```
 
+Install `nORM` for all providers. SQL Server and SQLite drivers are included by
+the runtime package; PostgreSQL requires `Npgsql`, and MySQL requires either
+`MySqlConnector` or `MySql.Data`. See [Provider Packages](docs/provider-packages.md)
+for the locked v1 package/dependency contract.
+
 ## Raw SQL & Stored Procedures
 
 ```csharp

@@ -44,6 +44,11 @@ public class PackageConsumerIntegrationTests
             Assert.Contains("<readme>README.md</readme>", nuspec, StringComparison.Ordinal);
             Assert.Contains("<repository type=\"git\" url=\"https://github.com/zilverztream/nORM\"", nuspec, StringComparison.Ordinal);
             Assert.Contains("<tags>ORM Database LINQ Performance Entity Framework Dapper SQL SQLite PostgreSQL MySQL</tags>", nuspec, StringComparison.Ordinal);
+            Assert.Contains("<dependency id=\"Microsoft.Data.SqlClient\"", nuspec, StringComparison.Ordinal);
+            Assert.Contains("<dependency id=\"Microsoft.Data.Sqlite\"", nuspec, StringComparison.Ordinal);
+            Assert.DoesNotContain("<dependency id=\"Npgsql\"", nuspec, StringComparison.Ordinal);
+            Assert.DoesNotContain("<dependency id=\"MySqlConnector\"", nuspec, StringComparison.Ordinal);
+            Assert.DoesNotContain("<dependency id=\"MySql.Data\"", nuspec, StringComparison.Ordinal);
         }
 
         using (var symbols = ZipFile.OpenRead(symbolsPath))
