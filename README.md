@@ -182,6 +182,11 @@ options.RetryPolicy = new RetryPolicy
 };
 ```
 
+Multi-tenancy is enforced on ORM-generated query and write paths. Raw SQL,
+stored procedures, migrations, scaffolding, and direct connection access are
+caller-controlled privileged paths. See the
+[Multi-Tenancy Security Contract](docs/multi-tenancy-security.md).
+
 ### Temporal Queries & Versioning
 
 ```csharp

@@ -113,6 +113,22 @@ public class DocumentationContractTests
         Assert.Contains("CancellationToken.None", contract, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Readme_links_to_multi_tenancy_security_contract()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "multi-tenancy-security.md"));
+
+        Assert.Contains("docs/multi-tenancy-security.md", readme, StringComparison.Ordinal);
+        Assert.Contains("Enforced Paths", contract, StringComparison.Ordinal);
+        Assert.Contains("Caller-Controlled Paths", contract, StringComparison.Ordinal);
+        Assert.Contains("FromSqlRawAsync", contract, StringComparison.Ordinal);
+        Assert.Contains("ExecuteStoredProcedure", contract, StringComparison.Ordinal);
+        Assert.Contains("BulkUpdateAsync", contract, StringComparison.Ordinal);
+        Assert.Contains("row-level security", contract, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
