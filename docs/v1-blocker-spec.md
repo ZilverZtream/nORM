@@ -913,12 +913,17 @@ Evidence:
 - `DbContextOptions.CommandInterceptors` and `SaveChangesInterceptors` are
   public.
 - Docs describe interceptor ordering and transaction behavior.
+- `InterceptorContractTests` verifies command interceptor registration order,
+  command mutation visibility, suppression notification semantics, and failure
+  propagation.
+- Existing save-interceptor tests verify pre-commit mutation, post-commit
+  visibility, cancellation handling, and post-commit exception logging.
 
 Scope:
 
-- Verify interceptor ordering under retry and transaction ownership.
-- Decide which mutations are supported.
-- Document suppression behavior and failure semantics.
+- Keep command and save interceptor contract tests in the release gate.
+- Keep docs explicit about supported command mutations, unsupported transaction
+  ownership mutations, suppression behavior, and failure semantics.
 
 Done when:
 

@@ -13,7 +13,7 @@ runners when options are supplied to the runner.
 | Phase | Contract |
 | --- | --- |
 | Before execution | `*Executing*` hooks run in registration order. Interceptors may inspect and mutate `DbCommand` before execution. |
-| Suppression | Returning `InterceptionResult<T>.SuppressWithResult` skips database execution and returns that result. nORM still calls the matching `*Executed*` hook for all registered interceptors with `TimeSpan.Zero`. |
+| Suppression | Returning `InterceptionResult<T>.SuppressWithResult` skips database execution and returns that result. Remaining `*Executing*` hooks are not called after suppression. nORM still calls the matching `*Executed*` hook for all registered interceptors with `TimeSpan.Zero`. |
 | After success | `*Executed*` hooks run in registration order after command execution succeeds. |
 | Failure | `CommandFailed*` hooks run in registration order when execution throws. The original exception is rethrown after hooks complete. |
 | Cancellation | The caller cancellation token is passed to async hooks and command execution. Cancellation from the command path is treated as command failure and is rethrown. |
@@ -57,6 +57,7 @@ contexts or used concurrently.
 ## Test Evidence
 
 The v1 gate covers command suppression, sync and async command hooks, command
-failure notification, redacted base-interceptor logging, post-commit save
-interceptor cancellation behavior, post-commit exception swallowing/logging,
-multiple save interceptors, and save-interceptor mutation before commit.
+mutation visibility, registration-order execution, command failure
+notification, redacted base-interceptor logging, post-commit save interceptor
+cancellation behavior, post-commit exception swallowing/logging, multiple save
+interceptors, and save-interceptor mutation before commit.

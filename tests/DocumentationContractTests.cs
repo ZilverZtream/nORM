@@ -317,6 +317,8 @@ public class DocumentationContractTests
         Assert.Contains("docs/interceptors.md", readme, StringComparison.Ordinal);
         Assert.Contains("registration order", contract, StringComparison.Ordinal);
         Assert.Contains("SuppressWithResult", contract, StringComparison.Ordinal);
+        Assert.Contains("Remaining `*Executing*` hooks are not called after suppression", contract, StringComparison.Ordinal);
+        Assert.Contains("mutation visibility", contract, StringComparison.Ordinal);
         Assert.Contains("CommandFailed", contract, StringComparison.Ordinal);
         Assert.Contains("SavedChangesAsync", contract, StringComparison.Ordinal);
         Assert.Contains("CancellationToken.None", contract, StringComparison.Ordinal);
