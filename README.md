@@ -19,16 +19,16 @@ nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .
 
 ## Performance Validation
 
-nORM ships with BenchmarkDotNet suites that compare EF Core, Dapper, Raw ADO.NET, and nORM across SQLite, SQL Server, PostgreSQL, and MySQL. Release decisions should be based on fresh local or CI benchmark output, not hard-coded numbers in this README. All benchmark paths are expected to use the same seeded schema, equivalent SQL shape, typed result materialization, and comparable compiled/prepared modes.
+nORM ships with BenchmarkDotNet suites that compare EF Core, Dapper, Raw ADO.NET, and nORM across SQLite, SQL Server, PostgreSQL, and MySQL. Release decisions should be based on fresh local or CI benchmark output, not hard-coded numbers in this README. All benchmark paths are expected to use the same seeded schema, equivalent SQL shape, typed result materialization, and comparable compiled/prepared modes. Raw ADO.NET results are split into explicit convenience and optimized categories so public claims do not blur easy handwritten ADO with ordinal-based, typed-getter ADO.
 
 ### Read Queries
 
 | Operation                        | Compared modes |
 |----------------------------------|----------------|
-| Simple query                     | runtime, compiled/prepared, Raw ADO |
-| Complex query                    | runtime, compiled/prepared, Raw ADO |
-| JOIN query                       | runtime, compiled, typed Dapper, Raw ADO |
-| Count                            | runtime, compiled/prepared, Raw ADO |
+| Simple query                     | runtime, compiled/prepared, Dapper, Raw ADO convenience/optimized/prepared-optimized |
+| Complex query                    | runtime, compiled/prepared, Dapper, Raw ADO convenience/optimized/prepared-optimized |
+| JOIN query                       | runtime, compiled, typed Dapper, Raw ADO optimized |
+| Count                            | runtime, compiled/prepared, Dapper, Raw ADO optimized |
 
 ### Write Operations
 
@@ -41,7 +41,7 @@ nORM ships with BenchmarkDotNet suites that compare EF Core, Dapper, Raw ADO.NET
 
 > nORM's compiled query cache is intended to deliver the largest gains on warm paths. Performance-sensitive work should run `benchmarks/nORM.Benchmarks.csproj` before release decisions; generated BenchmarkDotNet output is intentionally not tracked in source control.
 
-Raw ADO.NET represents the manual baseline: hand-written parameterized SQL plus manual mapping.
+Raw ADO.NET labels are precise: `Convenience` means straightforward handwritten ADO using name lookup/conversions, `Optimized` means ordinal-based typed getters where provider values permit them, and `PreparedOptimized` means prepared command reuse plus the optimized reader path. Any public "beats Raw ADO" claim must name the exact category, provider, and benchmark artifact.
 
 ## Installation
 

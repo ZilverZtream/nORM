@@ -76,14 +76,7 @@ namespace nORM.Benchmarks
         private nORM.Core.DbContext? _nOrmContext;
         private SqliteConnection? _dapperConnection;
 
-        // Prepared commands (for prepared/compiled-equivalent benchmarks)
-        private SqliteCommand? _dapperSimplePrepared;
-        private SqliteParameter? _dapperSimpleTakeParam;
-
-        private SqliteCommand? _dapperComplexPrepared;
-        private SqliteParameter? _dapperComplexAgeParam;
-        private SqliteParameter? _dapperComplexCityParam;
-
+        // Prepared Raw ADO commands for optimized/manual baselines.
         private SqliteCommand? _adoSimplePrepared;
         private SqliteParameter? _adoSimpleTakeParam;
 
@@ -235,35 +228,12 @@ namespace nORM.Benchmarks
             await ApplySqlitePragmasAsync(_dapperConnection);
 
             // Prepared statements (once)
-            // Simple
-            _dapperSimplePrepared = _dapperConnection.CreateCommand();
-            _dapperSimplePrepared.CommandText = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT @Take";
-            _dapperSimpleTakeParam = _dapperSimplePrepared.CreateParameter();
-            _dapperSimpleTakeParam.ParameterName = "@Take";
-            _dapperSimplePrepared.Parameters.Add(_dapperSimpleTakeParam);
-            _dapperSimplePrepared.Prepare();
-
             _adoSimplePrepared = _dapperConnection.CreateCommand();
             _adoSimplePrepared.CommandText = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT @Take";
             _adoSimpleTakeParam = _adoSimplePrepared.CreateParameter();
             _adoSimpleTakeParam.ParameterName = "@Take";
             _adoSimplePrepared.Parameters.Add(_adoSimpleTakeParam);
             _adoSimplePrepared.Prepare();
-
-            // Complex
-            _dapperComplexPrepared = _dapperConnection.CreateCommand();
-            _dapperComplexPrepared.CommandText = @"
-                SELECT * FROM BenchmarkUser
-                WHERE IsActive = 1 AND Age > @Age AND City = @City
-                ORDER BY Name
-                LIMIT 20 OFFSET 5";
-            _dapperComplexAgeParam = _dapperComplexPrepared.CreateParameter();
-            _dapperComplexAgeParam.ParameterName = "@Age";
-            _dapperComplexCityParam = _dapperComplexPrepared.CreateParameter();
-            _dapperComplexCityParam.ParameterName = "@City";
-            _dapperComplexPrepared.Parameters.Add(_dapperComplexAgeParam);
-            _dapperComplexPrepared.Parameters.Add(_dapperComplexCityParam);
-            _dapperComplexPrepared.Prepare();
 
             _adoComplexPrepared = _dapperConnection.CreateCommand();
             _adoComplexPrepared.CommandText = @"
@@ -389,8 +359,8 @@ namespace nORM.Benchmarks
             return result.ToList();
         }
 
-        [Benchmark]
-        public async Task<List<BenchmarkUser>> Query_Simple_RawAdo()
+        [Benchmark(Description = "Query Simple Raw ADO (Convenience)")]
+        public async Task<List<BenchmarkUser>> Query_Simple_RawAdo_Convenience()
         {
             const string sql = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
             using var command = _dapperConnection!.CreateCommand();
@@ -433,52 +403,20 @@ namespace nORM.Benchmarks
         public Task<List<BenchmarkUser>> Query_Simple_nORM_Compiled()
             => _normSimpleCompiled(_nOrmContext!, 10);
 
-        [Benchmark(Description = "Query Simple Dapper (Prepared)")]
-        public async Task<List<BenchmarkUser>> Query_Simple_Dapper_Prepared()
+        [Benchmark(Description = "Query Simple Raw ADO (Optimized)")]
+        public async Task<List<BenchmarkUser>> Query_Simple_RawAdo_Optimized()
         {
-            _dapperSimpleTakeParam!.Value = 10;
-            using var reader = await _dapperSimplePrepared!.ExecuteReaderAsync();
-            var users = new List<BenchmarkUser>();
-            while (await reader.ReadAsync())
-            {
-                users.Add(new BenchmarkUser
-                {
-                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                    Name = reader.GetString(reader.GetOrdinal("Name")),
-                    Email = reader.GetString(reader.GetOrdinal("Email")),
-                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                    IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
-                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
-                    City = reader.GetString(reader.GetOrdinal("City")),
-                    Department = reader.GetString(reader.GetOrdinal("Department")),
-                    Salary = reader.GetDouble(reader.GetOrdinal("Salary"))
-                });
-            }
-            return users;
+            const string sql = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
+            using var command = _dapperConnection!.CreateCommand();
+            command.CommandText = sql;
+            return await ReadUsersOptimizedAsync(command);
         }
 
-        [Benchmark(Description = "Query Simple Raw ADO (Prepared)")]
-        public async Task<List<BenchmarkUser>> Query_Simple_RawAdo_Prepared()
+        [Benchmark(Description = "Query Simple Raw ADO (Prepared Optimized)")]
+        public async Task<List<BenchmarkUser>> Query_Simple_RawAdo_PreparedOptimized()
         {
             _adoSimpleTakeParam!.Value = 10;
-            using var reader = await _adoSimplePrepared!.ExecuteReaderAsync();
-            var users = new List<BenchmarkUser>();
-            while (await reader.ReadAsync())
-            {
-                users.Add(new BenchmarkUser
-                {
-                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                    Name = reader.GetString(reader.GetOrdinal("Name")),
-                    Email = reader.GetString(reader.GetOrdinal("Email")),
-                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                    IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
-                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
-                    City = reader.GetString(reader.GetOrdinal("City")),
-                    Department = reader.GetString(reader.GetOrdinal("Department")),
-                    Salary = reader.GetDouble(reader.GetOrdinal("Salary"))
-                });
-            }
-            return users;
+            return await ReadUsersOptimizedAsync(_adoSimplePrepared!);
         }
 
         // ========== COMPLEX QUERY (standard) ==========
@@ -518,8 +456,8 @@ namespace nORM.Benchmarks
             return result.ToList();
         }
 
-        [Benchmark]
-        public async Task<List<BenchmarkUser>> Query_Complex_RawAdo()
+        [Benchmark(Description = "Query Complex Raw ADO (Convenience)")]
+        public async Task<List<BenchmarkUser>> Query_Complex_RawAdo_Convenience()
         {
             const string sql = @"
                 SELECT * FROM BenchmarkUser
@@ -567,54 +505,57 @@ namespace nORM.Benchmarks
         public Task<List<BenchmarkUser>> Query_Complex_nORM_Compiled()
             => _normComplexCompiled(_nOrmContext!, (25, "New York"));
 
-        [Benchmark(Description = "Query Complex Dapper (Prepared)")]
-        public async Task<List<BenchmarkUser>> Query_Complex_Dapper_Prepared()
+        [Benchmark(Description = "Query Complex Raw ADO (Optimized)")]
+        public async Task<List<BenchmarkUser>> Query_Complex_RawAdo_Optimized()
         {
-            _dapperComplexAgeParam!.Value = 25;
-            _dapperComplexCityParam!.Value = "New York";
-            using var reader = await _dapperComplexPrepared!.ExecuteReaderAsync();
-            var users = new List<BenchmarkUser>();
-            while (await reader.ReadAsync())
-            {
-                users.Add(new BenchmarkUser
-                {
-                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                    Name = reader.GetString(reader.GetOrdinal("Name")),
-                    Email = reader.GetString(reader.GetOrdinal("Email")),
-                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                    IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
-                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
-                    City = reader.GetString(reader.GetOrdinal("City")),
-                    Department = reader.GetString(reader.GetOrdinal("Department")),
-                    Salary = reader.GetDouble(reader.GetOrdinal("Salary"))
-                });
-            }
-            return users;
+            using var command = _dapperConnection!.CreateCommand();
+            command.CommandText = @"
+                SELECT * FROM BenchmarkUser
+                WHERE IsActive = 1 AND Age > @Age AND City = @City
+                ORDER BY Name
+                LIMIT 20 OFFSET 5";
+            command.Parameters.Add(CreateParameter(command, "@Age", DbType.Int32, 25));
+            command.Parameters.Add(CreateParameter(command, "@City", DbType.String, "New York"));
+            return await ReadUsersOptimizedAsync(command);
         }
 
-        [Benchmark(Description = "Query Complex Raw ADO (Prepared)")]
-        public async Task<List<BenchmarkUser>> Query_Complex_RawAdo_Prepared()
+        [Benchmark(Description = "Query Complex Raw ADO (Prepared Optimized)")]
+        public async Task<List<BenchmarkUser>> Query_Complex_RawAdo_PreparedOptimized()
         {
             _adoComplexAgeParam!.Value = 25;
             _adoComplexCityParam!.Value = "New York";
-            using var reader = await _adoComplexPrepared!.ExecuteReaderAsync();
+            return await ReadUsersOptimizedAsync(_adoComplexPrepared!);
+        }
+
+        private static async Task<List<BenchmarkUser>> ReadUsersOptimizedAsync(SqliteCommand command)
+        {
+            using var reader = await command.ExecuteReaderAsync();
             var users = new List<BenchmarkUser>();
             while (await reader.ReadAsync())
-            {
-                users.Add(new BenchmarkUser
-                {
-                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                    Name = reader.GetString(reader.GetOrdinal("Name")),
-                    Email = reader.GetString(reader.GetOrdinal("Email")),
-                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                    IsActive = reader.GetInt32(reader.GetOrdinal("IsActive")) == 1,
-                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
-                    City = reader.GetString(reader.GetOrdinal("City")),
-                    Department = reader.GetString(reader.GetOrdinal("Department")),
-                    Salary = reader.GetDouble(reader.GetOrdinal("Salary"))
-                });
-            }
+                users.Add(ReadUserOptimized(reader));
             return users;
+        }
+
+        private static BenchmarkUser ReadUserOptimized(SqliteDataReader reader) => new()
+        {
+            Id = reader.GetInt32(0),
+            Name = reader.GetString(1),
+            Email = reader.GetString(2),
+            CreatedAt = reader.GetDateTime(3),
+            IsActive = reader.GetInt32(4) == 1,
+            Age = reader.GetInt32(5),
+            City = reader.GetString(6),
+            Department = reader.GetString(7),
+            Salary = reader.GetDouble(8)
+        };
+
+        private static SqliteParameter CreateParameter(SqliteCommand command, string name, DbType type, object value)
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.DbType = type;
+            parameter.Value = value;
+            return parameter;
         }
 
         // ========== JOIN ==========
@@ -666,8 +607,8 @@ namespace nORM.Benchmarks
         public Task<int> Count_Dapper()
             => _dapperConnection!.QuerySingleAsync<int>("SELECT COUNT(*) FROM BenchmarkUser WHERE IsActive = 1");
 
-        [Benchmark]
-        public async Task<int> Count_RawAdo()
+        [Benchmark(Description = "Count Raw ADO (Optimized)")]
+        public async Task<int> Count_RawAdo_Optimized()
         {
             using var command = _dapperConnection!.CreateCommand();
             command.CommandText = "SELECT COUNT(*) FROM BenchmarkUser WHERE IsActive = 1";

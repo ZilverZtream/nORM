@@ -39,14 +39,17 @@ SQLite, SQL Server, PostgreSQL, and MySQL. Each provider compares:
 - nORM
 - Entity Framework Core
 - Dapper
-- Raw ADO.NET
+- Raw ADO.NET convenience mapping
+- Raw ADO.NET optimized mapping
 
 Covered scenarios:
 
 - Single insert
 - Simple query
 - Complex query with filters, ordering, skip, and take
-- Compiled/prepared simple and complex query paths
+- Compiled/prepared simple and complex query paths. Prepared Raw ADO baselines
+  are labeled `PreparedOptimized`; Dapper benchmarks are only labeled Dapper
+  when Dapper performs result materialization.
 - Join query
 - Count query
 - Naive, batched, prepared, and idiomatic bulk insert variants
@@ -73,12 +76,14 @@ Key columns:
 - `Allocated`: managed allocation per operation; lower means less GC pressure.
 - `Rank`: BenchmarkDotNet relative rank within the displayed result set.
 
-For v1.0, nORM should remain competitive with Dapper and Raw ADO.NET on hot
-query paths, keep both runtime and compiled/prepared query paths within their
-recorded time and allocation baselines, and allocate substantially less than EF
-Core on comparable no-tracking query paths. Provider-specific runtime fast paths
-may beat compiled/prepared paths; that is acceptable when the full matrix stays
-healthy. Any release claim should come from the generated BenchmarkDotNet
-reports, not from hand-copied numbers.
+For v1.0, nORM should remain competitive with Dapper and with the optimized Raw
+ADO.NET categories on hot query paths, keep both runtime and compiled/prepared
+query paths within their recorded time and allocation baselines, and allocate
+substantially less than EF Core on comparable no-tracking query paths.
+Provider-specific runtime fast paths may beat compiled/prepared paths; that is
+acceptable when the full matrix stays healthy. Public claims must name the exact
+category being compared, for example `RawAdo_Convenience`,
+`RawAdo_Optimized`, or `RawAdo_PreparedOptimized`, and must come from generated
+BenchmarkDotNet reports rather than hand-copied numbers.
 
 BenchmarkDotNet writes reports to `BenchmarkDotNet.Artifacts/results/`.
