@@ -29,8 +29,8 @@ log parameter values.
 `FromSqlInterpolatedAsync` and `QueryUnchangedInterpolatedAsync` convert
 interpolation holes to database parameters before execution. Prefer these APIs
 when SQL contains runtime values. `FromSqlRawAsync` and `QueryUnchangedAsync`
-remain available for explicit parameter names and advanced SQL, but callers own
-the SQL shape.
+remain available for explicit parameter names and advanced read-only SQL. The
+raw query security contract is documented in `docs/raw-sql-security.md`.
 
 ## Release Gate
 

@@ -227,6 +227,22 @@ public class DocumentationContractTests
     }
 
     [Fact]
+    public void Readme_links_to_raw_sql_security_contract()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "raw-sql-security.md"));
+        var rawSql = File.ReadAllText(Path.Combine(root, "src", "nORM", "Core", "DbContext.RawSql.cs"));
+
+        Assert.Contains("docs/raw-sql-security.md", readme, StringComparison.Ordinal);
+        Assert.Contains("ValidateRawQuerySql", contract, StringComparison.Ordinal);
+        Assert.Contains("provider-aware", contract, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SELECT", contract, StringComparison.Ordinal);
+        Assert.Contains("Privileged Escape Hatches", contract, StringComparison.Ordinal);
+        Assert.Contains("ValidateRawQuerySql(sql, ctx.Provider", rawSql, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Readme_links_to_interceptor_contract()
     {
         var root = FindRepositoryRoot();

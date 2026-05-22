@@ -553,21 +553,31 @@ Done when:
 
 ### 23. Replace raw SQL safety heuristics with provider-aware validation
 
-Problem: `FromSqlRawAsync` and stored procedure APIs rely on SQL safety
-validation. Blacklist/heuristic validators can be both too strict and too weak,
-especially across providers.
+Status: Verified for read-only raw query APIs; stored-procedure hardening remains
+tracked by blocker 24.
+
+Problem addressed: `FromSqlRawAsync` and `QueryUnchangedAsync` now use a single
+provider-aware raw query gate instead of hand-assembling validation in each API.
+The gate rejects non-read-only statements before execution and then applies the
+shared injection-pattern and parameter-budget checks.
 
 Evidence:
 
 - Raw SQL docs say caller owns SQL shape.
 - `NormValidator.IsSafeRawSql` has extensive adversarial tests.
 - SQL Server ScriptDom is already a runtime dependency.
+- `NormValidator.ValidateRawQuerySql` combines provider-aware SELECT/CTE gating
+  with shared raw SQL validation.
+- `DbContext.RawSql.cs` routes `FromSqlRawAsync` and `QueryUnchangedAsync`
+  through `ValidateRawQuerySql`.
+- `docs/raw-sql-security.md` separates read-only raw query APIs from privileged
+  stored procedure, migration, scaffolding, and direct connection paths.
 
 Scope:
 
-- Define a provider-aware raw SQL policy.
+- Keep the provider-aware raw SQL policy documented.
 - Use structured parsing where practical.
-- Clearly separate read-only raw query APIs from privileged escape hatches.
+- Keep read-only raw query APIs separate from privileged escape hatches.
 
 Done when:
 

@@ -1,3 +1,4 @@
+using System;
 using nORM.Core;
 using nORM.Providers;
 using Xunit;
@@ -14,6 +15,8 @@ public class SqlSafetyProviderAwareTests
 {
     private static readonly DatabaseProvider Sqlite    = new SqliteProvider();
     private static readonly DatabaseProvider SqlServer = new SqlServerProvider();
+    private static readonly DatabaseProvider Postgres  = new PostgresProvider();
+    private static readonly DatabaseProvider MySql     = new MySqlProvider();
 
     // Plain SELECT is safe for all providers
     [Theory]
@@ -46,5 +49,30 @@ public class SqlSafetyProviderAwareTests
         const string sql = "WITH RECURSIVE cte(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM cte WHERE n<5) SELECT n FROM cte";
         // SQLite provider skips TSql parser — should pass keyword check only
         Assert.True(NormValidator.IsSafeRawSql(sql, Sqlite));
+    }
+    [Theory]
+    [InlineData("SELECT Id, Name FROM Users WHERE Id = @p0")]
+    [InlineData("WITH recent AS (SELECT Id FROM Users) SELECT Id FROM recent")]
+    public void ValidateRawQuerySql_AcceptsReadOnlyQueries_ForAllProviders(string sql)
+    {
+        NormValidator.ValidateRawQuerySql(sql, Sqlite);
+        NormValidator.ValidateRawQuerySql(sql, SqlServer);
+        NormValidator.ValidateRawQuerySql(sql, Postgres);
+        NormValidator.ValidateRawQuerySql(sql, MySql);
+    }
+
+    [Theory]
+    [InlineData("UPDATE Users SET Name = @p0 WHERE Id = @p1")]
+    [InlineData("SELECT 1; DROP TABLE Users")]
+    [InlineData("EXEC dbo.GetUsers")]
+    public void ValidateRawQuerySql_RejectsPrivilegedStatements_ForAllProviders(string sql)
+    {
+        foreach (var provider in new[] { Sqlite, SqlServer, Postgres, MySql })
+        {
+            var ex = Assert.Throws<NormUsageException>(() =>
+                NormValidator.ValidateRawQuerySql(sql, provider));
+
+            Assert.Contains("read-only SELECT or CTE", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }
