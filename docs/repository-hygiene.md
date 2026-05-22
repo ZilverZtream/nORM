@@ -12,7 +12,11 @@ files, coverage reports, or temporary scratch projects. These paths are ignored:
 - `*.nupkg` and `*.snupkg`
 - `BenchmarkDotNet.Artifacts/`
 - `tests/TestResults/`
+- `*.trx` and `*.coverage`
 - `coverage/` and `coverage-report/`
+
+Test ownership and legacy coverage-suite cleanup are documented in
+`docs/test-suite-ownership.md`.
 
 ## Scripts
 
