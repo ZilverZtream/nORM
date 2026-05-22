@@ -1162,7 +1162,7 @@ namespace nORM.Query
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             if (plan.Tables.Count != 1)
-                throw new NotSupportedException("ExecuteDeleteAsync only supports single table queries.");
+                throw new NormUnsupportedFeatureException("ExecuteDeleteAsync only supports single table queries.");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
@@ -1184,7 +1184,7 @@ namespace nORM.Query
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             if (plan.Tables.Count != 1)
-                throw new NotSupportedException("ExecuteUpdateAsync only supports single table queries.");
+                throw new NormUnsupportedFeatureException("ExecuteUpdateAsync only supports single table queries.");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
@@ -1223,7 +1223,7 @@ namespace nORM.Query
             cmd.CommandText = plan.Sql;
             BindPlanParameters(cmd, plan, paramValues);
             if (plan.Includes.Count > 0 || plan.GroupJoinInfo != null)
-                throw new NotSupportedException("AsAsyncEnumerable does not support Include or GroupJoin operations.");
+                throw new NormUnsupportedFeatureException("AsAsyncEnumerable does not support Include or GroupJoin operations.");
             var trackable = !plan.NoTracking &&
                              plan.ElementType.IsClass &&
                              !plan.ElementType.Name.StartsWith("<>") &&

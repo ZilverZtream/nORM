@@ -828,7 +828,7 @@ namespace nORM.Query
                             // Guard against composite-PK dependents early at translation time.
                             var depMap = t._ctx.GetMapping(relation.DependentType);
                             if (depMap.KeyColumns.Length > 1)
-                                throw new NotSupportedException(
+                                throw new NormUnsupportedFeatureException(
                                     $"Include on '{depMap.Type.Name}' with a composite primary key is not yet supported. " +
                                     "Use a projected query or manual loading instead.");
                             t._includes.Add(new IncludePlan(new List<TableMapping.Relation> { relation }));
@@ -881,7 +881,7 @@ namespace nORM.Query
                                 // Guard against composite-PK dependents early at translation time.
                                 var depMap = t._ctx.GetMapping(relation.DependentType);
                                 if (depMap.KeyColumns.Length > 1)
-                                    throw new NotSupportedException(
+                                    throw new NormUnsupportedFeatureException(
                                         $"Include with composite primary key is not supported for '{relation.DependentType.Name}'.");
                                 lastInclude.Path.Add(relation);
                                 t.TrackMapping(relation.DependentType);

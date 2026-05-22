@@ -13,7 +13,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Verifies that Include on a composite-PK dependent entity throws NotSupportedException
+/// Verifies that Include on a composite-PK dependent entity throws NormUnsupportedFeatureException
 /// rather than silently corrupting data.
 /// </summary>
 public class CompositeKeyIncludeTests
@@ -48,7 +48,7 @@ public class CompositeKeyIncludeTests
     };
 
     [Fact]
-    public async Task Include_CompositeKeyDependent_ThrowsNotSupportedException()
+    public async Task Include_CompositeKeyDependent_ThrowsNormUnsupportedFeatureException()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -71,8 +71,8 @@ public class CompositeKeyIncludeTests
         ctx.Add(blog);
         await ctx.SaveChangesAsync();
 
-        // Include on a composite-PK dependent must throw NotSupportedException.
-        await Assert.ThrowsAsync<NotSupportedException>(async () =>
+        // Include on a composite-PK dependent must throw a stable nORM unsupported-feature exception.
+        await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
             await ((INormQueryable<Blog>)ctx.Query<Blog>()).Include(b => b.OrderLines).ToListAsync());
     }
 
@@ -99,7 +99,7 @@ public class CompositeKeyIncludeTests
         ctx.Add(blog);
         await ctx.SaveChangesAsync();
 
-        var ex = await Assert.ThrowsAsync<NotSupportedException>(async () =>
+        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
             await ((INormQueryable<Blog>)ctx.Query<Blog>()).Include(b => b.OrderLines).ToListAsync());
 
         Assert.Contains("OrderLine", ex.Message);
@@ -107,7 +107,7 @@ public class CompositeKeyIncludeTests
     }
 
     [Fact]
-    public void Include_CompositeKeyDependent_Sync_ThrowsNotSupportedException()
+    public void Include_CompositeKeyDependent_Sync_ThrowsNormUnsupportedFeatureException()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -132,7 +132,7 @@ public class CompositeKeyIncludeTests
             cmd.ExecuteNonQuery();
         }
 
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<NormUnsupportedFeatureException>(() =>
             ((INormQueryable<Blog>)ctx.Query<Blog>()).Include(b => b.OrderLines).ToList());
     }
 }

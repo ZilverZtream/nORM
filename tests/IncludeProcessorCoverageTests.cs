@@ -362,7 +362,7 @@ public class IncludeProcessorCoverageTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task EagerLoadAsync_CompositePkDependent_ThrowsNotSupported()
+    public async Task EagerLoadAsync_CompositePkDependent_ThrowsNormUnsupportedFeatureException()
     {
         using var cn = OpenDb();
         Exec(cn, "CREATE TABLE IPC_CompositeParent (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL)");
@@ -384,7 +384,7 @@ public class IncludeProcessorCoverageTests
         Exec(cn, "INSERT INTO IPC_CompositeParent VALUES(1,'CP1')");
         Exec(cn, "INSERT INTO IPC_CompositeChild VALUES(1,1,'CK1')");
 
-        await Assert.ThrowsAsync<NotSupportedException>(async () =>
+        await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
             await ((INormQueryable<IpcCompositeParent>)ctx.Query<IpcCompositeParent>())
                 .AsSplitQuery()
                 .Include(p => p.Children)
@@ -392,7 +392,7 @@ public class IncludeProcessorCoverageTests
     }
 
     [Fact]
-    public void EagerLoad_Sync_CompositePkDependent_ThrowsNotSupported()
+    public void EagerLoad_Sync_CompositePkDependent_ThrowsNormUnsupportedFeatureException()
     {
         using var cn = OpenDb();
         Exec(cn, "CREATE TABLE IPC_CompositeParent (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL)");
@@ -414,7 +414,7 @@ public class IncludeProcessorCoverageTests
         Exec(cn, "INSERT INTO IPC_CompositeParent VALUES(1,'SP1')");
         Exec(cn, "INSERT INTO IPC_CompositeChild VALUES(1,1,'SK1')");
 
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<NormUnsupportedFeatureException>(() =>
             ((INormQueryable<IpcCompositeParent>)ctx.Query<IpcCompositeParent>())
                 .AsSplitQuery()
                 .Include(p => p.Children)

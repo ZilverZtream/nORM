@@ -28,7 +28,7 @@ Status values:
 | Group joins | Constrained | Supported for simple key joins and bounded by `DbContextOptions.MaxGroupJoinSize`. Async streaming with group joins is not supported. |
 | `SelectMany` | Constrained | Supported for tested navigation/query shapes. Complex correlated collection expansion is not a full v1 guarantee. |
 | Set operations: `Union`, `Intersect`, `Except` | Supported | Translator tests cover SQL generation and execution coverage tests cover result behavior. |
-| `Include`, `ThenInclude` | Constrained | Supported for mapped navigation paths. Composite-key dependent includes and unsupported relationship shapes throw `NotSupportedException`. |
+| `Include`, `ThenInclude` | Constrained | Supported for mapped navigation paths. Composite-key dependent includes and unsupported relationship shapes throw `NormUnsupportedFeatureException`. |
 | `AsSplitQuery`, `AsNoTracking`, caching, temporal `AsOf` | Supported | These are nORM-specific query modifiers with dedicated tests. |
 | Raw SQL composition | Constrained | `FromSqlRawAsync<T>` and `FromSqlInterpolatedAsync<T>` execute read-only `SELECT`/CTE statements through the provider-aware raw query gate. Raw SQL does not add tenant predicates automatically. |
 | `AsAsyncEnumerable` | Constrained | Streams ordinary queries. Include and group-join streaming paths are rejected because they require coordinated materialization. |

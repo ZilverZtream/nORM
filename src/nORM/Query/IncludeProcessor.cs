@@ -389,7 +389,7 @@ namespace nORM.Query
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
             foreach (var (rel, map) in include.Path.Zip(pathMappings))
                 if (map.KeyColumns.Length > 1)
-                    throw new NotSupportedException(
+                    throw new NormUnsupportedFeatureException(
                         $"Include on '{map.Type.Name}' with a composite primary key is not yet supported. " +
                         "Use a projected query or manual loading instead.");
 
@@ -474,7 +474,7 @@ namespace nORM.Query
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
             foreach (var (rel, map) in include.Path.Zip(pathMappings))
                 if (map.KeyColumns.Length > 1)
-                    throw new NotSupportedException(
+                    throw new NormUnsupportedFeatureException(
                         $"Include on '{map.Type.Name}' with a composite primary key is not yet supported. " +
                         "Use a projected query or manual loading instead.");
 
