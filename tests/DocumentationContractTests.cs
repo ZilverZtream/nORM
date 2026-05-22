@@ -83,6 +83,20 @@ public class DocumentationContractTests
         Assert.Contains("Relationship", contract, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Readme_documents_design_time_migration_factory()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "design-time-migrations.md"));
+
+        Assert.Contains("docs/design-time-migrations.md", readme, StringComparison.Ordinal);
+        Assert.Contains("INormDesignTimeDbContextFactory", readme, StringComparison.Ordinal);
+        Assert.Contains("INormDesignTimeDbContextFactory", contract, StringComparison.Ordinal);
+        Assert.Contains("--attribute-only", contract, StringComparison.Ordinal);
+        Assert.Contains("silently falls back", contract, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

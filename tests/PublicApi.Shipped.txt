@@ -331,6 +331,7 @@ M:nORM.Migration.IMigrationRunner.ApplyMigrationsAsync(System.Threading.Cancella
 M:nORM.Migration.IMigrationRunner.GetPendingMigrationsAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.String[]}
 M:nORM.Migration.IMigrationRunner.HasPendingMigrationsAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Boolean}
 M:nORM.Migration.IMigrationSqlGenerator.GenerateSql(nORM.Migration.SchemaDiff):nORM.Migration.MigrationSqlStatements
+M:nORM.Migration.INormDesignTimeDbContextFactory{`0}.CreateDbContext(System.String[]):`0
 M:nORM.Migration.Migration.Down(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken):System.Void
 M:nORM.Migration.Migration.Up(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken):System.Void
 M:nORM.Migration.MigrationOptions.#ctor(System.String,System.String,System.Nullable{System.TimeSpan},System.Nullable{System.Int64})
@@ -939,6 +940,7 @@ T:nORM.Migration.ColumnSchema
 T:nORM.Migration.ForeignKeySchema
 T:nORM.Migration.IMigrationRunner
 T:nORM.Migration.IMigrationSqlGenerator
+T:nORM.Migration.INormDesignTimeDbContextFactory{`0}
 T:nORM.Migration.Migration
 T:nORM.Migration.MigrationOptions
 T:nORM.Migration.MigrationSqlStatements

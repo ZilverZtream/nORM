@@ -312,6 +312,11 @@ transaction rolls back cleanly. On MySQL, DDL auto-commits per step; the advisor
 entirely. For the full provider contract, cancellation behavior, and custom migration options, see
 [Migration Provider Contract](docs/migration-provider-contract.md).
 
+`norm migrations add` uses `INormDesignTimeDbContextFactory<TContext>` when one
+is present, so fluent mapping is included in generated migration snapshots. Use
+`--attribute-only` only when you intentionally want to ignore fluent model
+configuration. See [Design-Time Migrations](docs/design-time-migrations.md).
+
 ## Production-Ready Features
 
 ### Thread Safety
