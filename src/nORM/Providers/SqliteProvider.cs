@@ -63,6 +63,17 @@ namespace nORM.Providers
         /// </summary>
         public override int MaxParameters => 999;
 
+        /// <inheritdoc />
+        public override ProviderCapabilities Capabilities => new(
+            "SQLite",
+            new Version(3, 9),
+            MaxParameters,
+            true,
+            true,
+            false,
+            true,
+            "Requires Microsoft.Data.Sqlite. JSON support depends on the SQLite JSON1 extension.");
+
         /// <summary>
         /// Escapes an identifier by wrapping it in double quotes, per SQLite requirements.
         /// Handles multi-part identifiers (schema.table / attached-db.table) by escaping each

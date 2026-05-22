@@ -158,6 +158,23 @@ public class DocumentationContractTests
         Assert.Contains("CancellationToken.None", contract, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Readme_links_to_provider_capabilities()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "provider-capabilities.md"));
+
+        Assert.Contains("docs/provider-capabilities.md", readme, StringComparison.Ordinal);
+        Assert.Contains("DatabaseProvider", contract, StringComparison.Ordinal);
+        Assert.Contains("Capabilities", contract, StringComparison.Ordinal);
+        Assert.Contains("IsAvailableAsync", contract, StringComparison.Ordinal);
+        Assert.Contains("SQL Server", contract, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL", contract, StringComparison.Ordinal);
+        Assert.Contains("MySQL", contract, StringComparison.Ordinal);
+        Assert.Contains("SQLite", contract, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

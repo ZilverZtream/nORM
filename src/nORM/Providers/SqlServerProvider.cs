@@ -72,6 +72,17 @@ namespace nORM.Providers
         /// </summary>
         public override int MaxParameters => 2_100;
 
+        /// <inheritdoc />
+        public override ProviderCapabilities Capabilities => new(
+            "SQL Server",
+            MinimumSqlServerVersion,
+            MaxParameters,
+            true,
+            true,
+            true,
+            true,
+            "Requires Microsoft.Data.SqlClient and SQL Server 2016 or newer.");
+
         /// <summary>
         /// Escapes an identifier such as a table or column name using SQL Server brackets.
         /// Handles multi-part identifiers (schema.table) correctly by escaping each part.
