@@ -51,6 +51,22 @@ public class DocumentationContractTests
         Assert.Contains("process-wide", policy, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Readme_links_to_migration_provider_contract()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "migration-provider-contract.md"));
+
+        Assert.Contains("docs/migration-provider-contract.md", readme, StringComparison.Ordinal);
+        Assert.Contains("MigrationOptions", contract, StringComparison.Ordinal);
+        Assert.Contains("SQL Server", contract, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL", contract, StringComparison.Ordinal);
+        Assert.Contains("MySQL", contract, StringComparison.Ordinal);
+        Assert.Contains("SQLite", contract, StringComparison.Ordinal);
+        Assert.Contains("Partial", contract, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

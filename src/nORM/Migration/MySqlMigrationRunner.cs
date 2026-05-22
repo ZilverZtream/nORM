@@ -23,6 +23,7 @@ namespace nORM.Migration
     {
         private readonly DbConnection _connection;
         private readonly Assembly _migrationsAssembly;
+        private readonly MigrationOptions _migrationOptions;
         private DbContext? _context;
         private const string HistoryTableName = "__NormMigrationsHistory";
         internal const string MigrationLockName = "__NormMigrationsLock";
@@ -43,9 +44,22 @@ namespace nORM.Migration
         /// <param name="migrationsAssembly">Assembly containing migration classes.</param>
         /// <param name="options">Optional DbContext configuration for interceptors.</param>
         public MySqlMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null)
+            : this(connection, migrationsAssembly, new MigrationOptions(), options)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MySqlMigrationRunner"/> class.
+        /// </summary>
+        /// <param name="connection">Open connection to the target MySQL database.</param>
+        /// <param name="migrationsAssembly">Assembly containing migration classes.</param>
+        /// <param name="migrationOptions">Migration runner options.</param>
+        /// <param name="options">Optional DbContext configuration for interceptors.</param>
+        public MySqlMigrationRunner(DbConnection connection, Assembly migrationsAssembly, MigrationOptions migrationOptions, DbContextOptions? options = null)
         {
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
             _migrationsAssembly = migrationsAssembly ?? throw new ArgumentNullException(nameof(migrationsAssembly));
+            _migrationOptions = migrationOptions ?? throw new ArgumentNullException(nameof(migrationOptions));
             if (options != null && options.CommandInterceptors.Count > 0)
             {
                 // Pass ownsConnection=false so the context does NOT dispose the
@@ -133,11 +147,11 @@ namespace nORM.Migration
             cmd.CommandText = "SELECT GET_LOCK(@lockName, @lockTimeout)";
             var pName = cmd.CreateParameter();
             pName.ParameterName = "@lockName";
-            pName.Value = MigrationLockName;
+            pName.Value = _migrationOptions.LockName;
             cmd.Parameters.Add(pName);
             var pTimeout = cmd.CreateParameter();
             pTimeout.ParameterName = "@lockTimeout";
-            pTimeout.Value = MigrationLockTimeoutSeconds;
+            pTimeout.Value = _migrationOptions.LockTimeoutSeconds;
             cmd.Parameters.Add(pTimeout);
             var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
             if (result == null || result == DBNull.Value || Convert.ToInt32(result) != 1)
@@ -155,7 +169,7 @@ namespace nORM.Migration
             cmd.CommandText = "DO RELEASE_LOCK(@lockName)";
             var pName = cmd.CreateParameter();
             pName.ParameterName = "@lockName";
-            pName.Value = MigrationLockName;
+            pName.Value = _migrationOptions.LockName;
             cmd.Parameters.Add(pName);
             try { await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false); }
             catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
@@ -244,7 +258,7 @@ namespace nORM.Migration
                 var desc = string.Join(", ", partials.Select(p => $"v{p.Key} '{p.Value.Name}'"));
                 throw new InvalidOperationException(
                     $"nORM: MySQL migration(s) are in Partial state (DDL auto-committed, step not recorded as Applied): {desc}. " +
-                    $"Inspect the schema manually, then DELETE FROM `{HistoryTableName}` WHERE Version IN " +
+                    $"Inspect the schema manually, then DELETE FROM `{_migrationOptions.HistoryTableName}` WHERE Version IN " +
                     $"({string.Join(",", partials.Select(p => p.Key))}) to retry.");
             }
 
@@ -273,7 +287,7 @@ namespace nORM.Migration
         {
             await using var cmd = _connection.CreateCommand();
             cmd.Transaction = transaction;
-            cmd.CommandText = $"INSERT INTO `{HistoryTableName}` (`Version`, `Name`, `AppliedOn`, `Status`) VALUES (@Version, @Name, @AppliedOn, 'Partial');";
+            cmd.CommandText = $"INSERT INTO `{_migrationOptions.HistoryTableName}` (`Version`, `Name`, `AppliedOn`, `Status`) VALUES (@Version, @Name, @AppliedOn, 'Partial');";
             cmd.AddParam("@Version", migration.Version);
             cmd.AddParam("@Name", migration.Name);
             cmd.AddParam("@AppliedOn", DateTime.UtcNow);
@@ -289,7 +303,7 @@ namespace nORM.Migration
         {
             await using var cmd = _connection.CreateCommand();
             cmd.Transaction = transaction;
-            cmd.CommandText = $"UPDATE `{HistoryTableName}` SET `Status` = 'Applied' WHERE `Version` = @Version;";
+            cmd.CommandText = $"UPDATE `{_migrationOptions.HistoryTableName}` SET `Status` = 'Applied' WHERE `Version` = @Version;";
             cmd.AddParam("@Version", migration.Version);
             await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
         }
@@ -303,7 +317,7 @@ namespace nORM.Migration
         {
             var applied = new Dictionary<long, (string Name, string Status)>();
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"SELECT `Version`, `Name`, `Status` FROM `{HistoryTableName}`";
+            cmd.CommandText = $"SELECT `Version`, `Name`, `Status` FROM `{_migrationOptions.HistoryTableName}`";
             try
             {
                 await using var reader = await ExecuteReaderAsync(cmd, ct).ConfigureAwait(false);
@@ -344,7 +358,7 @@ namespace nORM.Migration
         private async Task EnsureHistoryTableAsync(CancellationToken ct)
         {
             await using var cmd = _connection.CreateCommand();
-            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS `{HistoryTableName}` " +
+            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS `{_migrationOptions.HistoryTableName}` " +
                 "(Version BIGINT PRIMARY KEY, Name VARCHAR(255) NOT NULL, AppliedOn DATETIME(6) NOT NULL, " +
                 "Status VARCHAR(20) NOT NULL DEFAULT 'Applied');";
             await ExecuteNonQueryAsync(cmd, ct).ConfigureAwait(false);
@@ -352,7 +366,7 @@ namespace nORM.Migration
             // M1: Upgrade existing deployments that have the table without the Status column.
             // ALTER TABLE ADD COLUMN is idempotent via error suppression for "duplicate column name".
             await using var alterCmd = _connection.CreateCommand();
-            alterCmd.CommandText = $"ALTER TABLE `{HistoryTableName}` ADD COLUMN Status VARCHAR(20) NOT NULL DEFAULT 'Applied'";
+            alterCmd.CommandText = $"ALTER TABLE `{_migrationOptions.HistoryTableName}` ADD COLUMN Status VARCHAR(20) NOT NULL DEFAULT 'Applied'";
             try { await ExecuteNonQueryAsync(alterCmd, ct).ConfigureAwait(false); }
             catch (DbException ex) when (IsColumnAlreadyExistsError(ex)) { /* column already present — new schema */ }
         }
