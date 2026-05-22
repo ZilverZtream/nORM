@@ -42,6 +42,7 @@ Thumbs.db
 # BenchmarkDotNet output
 /BenchmarkDotNet.Artifacts/
 /benchmarks/BenchmarkDotNet.Artifacts/
+/artifacts/
 
 # Coverage and test result artifacts
 tests/TestResults/

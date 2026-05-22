@@ -65,7 +65,7 @@ still needs release evidence.
 | 37 | Rebuild benchmark evidence before any performance launch | Verified | Release gate now generates a benchmark evidence manifest from raw BenchmarkDotNet reports, including commit, SDK/OS, driver packages, redacted provider configuration, report paths, and fastest methods by provider. |
 | 38 | Make benchmark thresholds executable | Verified | `eng/benchmark-thresholds.json` defines versioned latency/allocation budgets, `eng/check-benchmark-thresholds.ps1` enforces them from raw BenchmarkDotNet CSV reports, and the release gate runs the checker after benchmark evidence. |
 | 39 | Reduce test-suite entropy before v1 | Verified | The stale `CS1998` test-project suppression is removed, ignored local TRX artifacts are cleaned, `.gitignore` covers TRX/coverage outputs, `docs/test-suite-ownership.md` contains the legacy coverage-file policy, and `RepositoryHygieneTests` locks the hygiene rules. |
-| 40 | Run and publish a real RC release gate | Open | Requires `eng/v1-release-gate.ps1 -Mode rc -MinLiveProviders 3` artifacts. |
+| 40 | Run and publish a real RC release gate | In Progress | The release gate now writes an auditable RC artifact manifest and CI uploads it with TRX/package/benchmark artifacts; the remaining release action is the full `eng/v1-release-gate.ps1 -Mode rc -MinLiveProviders 3` run from the candidate commit. |
 
 ## Closure Rule
 

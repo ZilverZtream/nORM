@@ -1026,7 +1026,12 @@ Evidence:
 
 - `eng/v1-release-gate.ps1` supports `quick`, `live`, `full`, and `rc`.
 - `.github/workflows/v1-rc.yml` exists.
-- This pass did not run the full RC gate or live provider matrix.
+- `eng/rc-artifact-manifest.ps1` writes `artifacts/v1-rc/rc-artifacts.md` and
+  `.json` with the validated commit, mode, SDK, configured providers, test
+  results, packages, benchmark artifacts, and benchmark evidence.
+- `.github/workflows/v1-rc.yml` uploads the RC artifact manifest alongside TRX,
+  package, and benchmark artifacts.
+- `docs/release-checklist.md` requires reviewing the manifest before tagging.
 
 Scope:
 
@@ -1037,4 +1042,5 @@ Scope:
 
 Done when:
 
-- v1.0 is backed by an auditable RC run from the release commit.
+- v1.0 is backed by an auditable RC run from the release commit, and the
+  generated artifact manifest is attached to the release evidence.

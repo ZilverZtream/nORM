@@ -12,6 +12,8 @@ namespace nORM.Tests;
 
 public class CliIntegrationTests
 {
+    private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(2);
+
     [Fact]
     public void Database_update_missing_assembly_returns_nonzero_without_leaking_connection_secret()
     {
@@ -631,9 +633,29 @@ public class CliIntegrationTests
         };
 
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException($"Failed to start {fileName}.");
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(ProcessTimeout))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // The process may exit between timeout detection and Kill.
+            }
+
+            process.WaitForExit();
+            var timedOutStdout = stdoutTask.GetAwaiter().GetResult();
+            var timedOutStderr = stderrTask.GetAwaiter().GetResult();
+            throw new TimeoutException(
+                $"{fileName} {arguments} did not exit within {ProcessTimeout.TotalSeconds:N0} seconds.{Environment.NewLine}STDOUT:{Environment.NewLine}{timedOutStdout}{Environment.NewLine}STDERR:{Environment.NewLine}{timedOutStderr}");
+        }
+
         process.WaitForExit();
+        var stdout = stdoutTask.GetAwaiter().GetResult();
+        var stderr = stderrTask.GetAwaiter().GetResult();
         return new CliResult(process.ExitCode, stdout, stderr);
     }
 

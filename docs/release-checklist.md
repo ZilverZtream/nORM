@@ -18,6 +18,8 @@ Use this checklist for every v1 release candidate and stable release.
 - `eng/v1-release-gate.ps1 -Mode full`
 - Live SQL Server, PostgreSQL, MySQL, and SQLite provider gates.
 - BenchmarkDotNet provider matrix with benchmark governance artifacts.
+- `artifacts/v1-rc/rc-artifacts.md` reviewed and linked from the release notes
+  or release issue.
 
 ## Packaging
 
@@ -30,5 +32,6 @@ Use this checklist for every v1 release candidate and stable release.
 
 - Tag points at the validated commit.
 - CI artifacts are retained for the release.
+- RC artifact manifest commit matches the tag target.
 - Known limitations and provider/version caveats are included in release notes.
 - Security/support policy is current.
