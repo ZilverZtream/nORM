@@ -376,11 +376,14 @@ foreach (var batch in items.Chunk(500))
 
 ### MySQL Optimistic Concurrency
 
-`MySqlProvider` defaults to `UseAffectedRowsSemantics = true`, which is required by most MySQL connectors. MySQL's `affected-rows` count does not distinguish "row matched but value unchanged" from "no row matched". nORM handles this with a **SELECT-then-verify** fallback: when an UPDATE returns fewer rows than expected, nORM queries the database to check whether the original concurrency tokens still exist. If they do, the update was a same-value no-op and no conflict is raised. If any token has changed, a `DbConcurrencyException` is thrown as expected.
+`MySqlProvider` defaults to affected-row semantics, which is required by most MySQL connectors. MySQL's `affected-rows` count does not distinguish "row matched but value unchanged" from "no row matched". nORM handles this with a **SELECT-then-verify** fallback: when an UPDATE returns fewer rows than expected, nORM queries the database to check whether the original concurrency tokens still exist. If they do, the update was a same-value no-op and no conflict is raised. If any token has changed, a `DbConcurrencyException` is thrown as expected.
 
-**Residual gap**: if a concurrent writer sets the concurrency token to the *same* new value (same-value token conflict), neither the UPDATE rowcount nor the SELECT verification can detect the conflict because the WHERE clause still matches. This edge case requires application-level versioning (e.g. monotonically increasing versions) to close. To eliminate the gap entirely, use `useAffectedRows=false` in the connection string with a connector that supports it, or subclass `MySqlProvider` and override `UseAffectedRowsSemantics` to `false`.
+**Residual gap**: if a concurrent writer sets the concurrency token to the *same* new value (same-value token conflict), neither the UPDATE rowcount nor the SELECT verification can detect the conflict because the WHERE clause still matches. This edge case requires application-level versioning (e.g. monotonically increasing versions) to close. To eliminate the gap entirely, use `UseAffectedRows=false` in the connection string with a connector that supports it and construct `new MySqlProvider(useAffectedRowsSemantics: false)`.
 
 **DELETE path**: DELETE rowcount is always checked regardless of `UseAffectedRowsSemantics`, because deleting a row always counts it as affected. There is no same-value ambiguity for deletes.
+
+The full provider-specific contract is documented in
+[Optimistic Concurrency](docs/optimistic-concurrency.md).
 
 ### Connection Management & Pooling
 
