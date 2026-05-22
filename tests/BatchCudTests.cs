@@ -94,7 +94,7 @@ public class BatchCudTests
         }
         using var ctx = new DbContext(cn, new SqliteProvider());
 
-        var ex = await Assert.ThrowsAsync<NotSupportedException>(() =>
+        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
             ctx.Query<User>()
                 .Where(u => u.Id == 1)
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.Name, ThrowingName())));
@@ -116,7 +116,7 @@ public class BatchCudTests
         }
         using var ctx = new DbContext(cn, new SqliteProvider());
 
-        var ex = await Assert.ThrowsAsync<NotSupportedException>(() =>
+        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
             ctx.Query<User>().Where(u => !u.Archived).Take(1).ExecuteDeleteAsync());
 
         Assert.Contains("paged", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -136,7 +136,7 @@ public class BatchCudTests
         }
         using var ctx = new DbContext(cn, new SqliteProvider());
 
-        var ex = await Assert.ThrowsAsync<NotSupportedException>(() =>
+        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
             ctx.Query<User>()
                 .Where(u => !u.Archived)
                 .OrderBy(u => u.Name)

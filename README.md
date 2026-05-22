@@ -255,6 +255,9 @@ var results = await context.ExecuteStoredProcedureAsync<UserStats>(
 
 SQL diagnostics redact string literals and parameter values by default. See
 [Logging and Redaction](docs/logging-redaction.md).
+Stable exception categories for query, provider, timeout, configuration, usage,
+unsupported-feature, and concurrency failures are documented in
+[Exception Taxonomy](docs/exception-taxonomy.md).
 
 ## Database Migrations
 
