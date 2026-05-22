@@ -49,7 +49,7 @@ still needs release evidence.
 | 21 | Remove legacy string-based bulk CUD paths | Verified | Bulk CUD now validates `BulkCudQueryShape` only; `ValidateCudPlan(string)` and `ExtractWhereClause(string, ...)` are removed and documentation tests lock that boundary. |
 | 22 | Define bulk update value-expression support | Verified | `ExecuteUpdateAsync` v1 assignment values are documented as literal constants or precomputed captured locals only; unsupported computed/server expressions throw actionable `NormUnsupportedFeatureException`s. |
 | 23 | Replace raw SQL safety heuristics with provider-aware validation | Verified | Raw query APIs now call `NormValidator.ValidateRawQuerySql`, which combines provider-aware SELECT/CTE gating with shared injection checks; `docs/raw-sql-security.md` documents read-only raw query and privileged-path boundaries. |
-| 24 | Tighten stored procedure security and tenant boundaries | In Progress | Multi-tenancy docs identify bypass paths; examples/helpers remain open. |
+| 24 | Tighten stored procedure security and tenant boundaries | Verified | Stored procedure APIs validate provider command text/name shape, SQLite text mode uses the read-only raw query gate, and docs show tenant-parameter patterns plus privileged-path review rules. |
 | 25 | Finish transaction and sync/async policy hardening | In Progress | Transaction and sync docs exist; live/cancellation/interceptor parity remains open. |
 | 26 | Prove `ConnectionManager` failover behavior under load | Open | Needs stress tests for health checks, replica churn, and dispose races. |
 | 27 | Treat multi-tenancy as a verified security boundary | In Progress | Adversarial tests and docs exist; full live-provider security gate remains open. |

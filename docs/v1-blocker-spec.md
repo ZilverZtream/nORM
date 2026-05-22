@@ -585,20 +585,28 @@ Done when:
 
 ### 24. Tighten stored procedure security and tenant boundaries
 
-Problem: Stored procedures bypass LINQ tenant filters unless the procedure
-itself enforces tenant isolation. That is fine for privileged paths, but v1 must
-make the boundary explicit.
+Status: Verified.
+
+Problem addressed: Stored procedures bypass LINQ tenant filters unless the
+procedure itself enforces tenant isolation. The runtime now rejects unsafe
+procedure command text/name shapes, and the docs make the privileged tenant
+boundary explicit.
 
 Evidence:
 
 - `docs/multi-tenancy-security.md` says stored procedures must enforce tenant
   isolation internally or receive a tenant parameter.
 - `DbContext.RawSql.cs` exposes stored procedure APIs.
+- `DbContext.RawSql.cs` validates stored procedure command text through provider
+  command-type rules: SQLite text mode uses the read-only raw query gate, while
+  stored-procedure providers accept only simple/schema-qualified identifiers.
+- `docs/stored-procedure-security.md` documents tenant-safe parameter patterns
+  and review rules.
 
 Scope:
 
-- Add examples for tenant-safe stored procedures.
-- Add optional helper patterns that inject tenant parameters.
+- Keep examples for tenant-safe stored procedures.
+- Keep tenant-parameter helper patterns documented.
 - Ensure docs label stored procedures as privileged/bypass-capable.
 
 Done when:

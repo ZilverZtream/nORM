@@ -4,6 +4,7 @@ using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -254,10 +255,7 @@ namespace nORM.Core
                     cmd.SetParametersFast(span);
                 }
 
-                if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, ctx._p))
-                    throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
-
-                NormValidator.ValidateRawSql(procedureName, paramDict);
+                ValidateStoredProcedureCommandText(procedureName, ctx._p, paramDict);
 
                 var mapping = ctx.GetMapping(typeof(T));
                 var list = new List<T>();
@@ -302,10 +300,7 @@ namespace nORM.Core
                 cmd.SetParametersFast(span);
             }
 
-            if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, Provider))
-                throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
-
-            NormValidator.ValidateRawSql(procedureName, paramDict);
+            ValidateStoredProcedureCommandText(procedureName, Provider, paramDict);
 
             var mapping = GetMapping(typeof(T));
             var count = 0;
@@ -371,10 +366,7 @@ namespace nORM.Core
                     outputParamMap[op.Name] = p;
                 }
 
-                if (!IsSafeIdentifier(procedureName) && !NormValidator.IsSafeRawSql(procedureName, ctx._p))
-                    throw new NormUsageException("Potential SQL injection detected in stored procedure name.");
-
-                NormValidator.ValidateRawSql(procedureName, paramDict);
+                ValidateStoredProcedureCommandText(procedureName, ctx._p, paramDict);
 
                 var mapping = ctx.GetMapping(typeof(T));
                 var list = new List<T>();
@@ -393,6 +385,66 @@ namespace nORM.Core
                 cmd.Parameters.Clear();
                 return new StoredProcedureResult<T>(list, outputs);
             }, ct);
+        }
+
+        internal static void ValidateStoredProcedureCommandText(
+            string procedureName,
+            Providers.DatabaseProvider provider,
+            IReadOnlyDictionary<string, object>? parameters)
+        {
+            if (provider.StoredProcedureCommandType == CommandType.Text)
+            {
+                NormValidator.ValidateRawQuerySql(procedureName, provider, parameters);
+                return;
+            }
+
+            if (!IsSafeStoredProcedureIdentifier(procedureName))
+            {
+                throw new NormUsageException(
+                    "Stored procedure names must be simple or schema-qualified identifiers. " +
+                    "Raw SQL, EXEC text, whitespace-separated command text and stacked statements are not allowed in stored procedure APIs.");
+            }
+
+            NormValidator.ValidateRawSql(procedureName, parameters);
+        }
+
+        private static bool IsSafeStoredProcedureIdentifier(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return false;
+
+            var trimmed = name.Trim();
+            if (trimmed.Contains(';') || trimmed.Contains("--") || trimmed.Contains("/*") ||
+                trimmed.Contains("*/") || trimmed.Contains('\''))
+                return false;
+
+            var parts = trimmed.Split('.');
+            foreach (var part in parts)
+            {
+                if (!IsSafeStoredProcedureIdentifierPart(part.Trim()))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsSafeStoredProcedureIdentifierPart(string part)
+        {
+            if (part.Length == 0)
+                return false;
+
+            if ((part.StartsWith("[", StringComparison.Ordinal) && part.EndsWith("]", StringComparison.Ordinal)) ||
+                (part.StartsWith("\"", StringComparison.Ordinal) && part.EndsWith("\"", StringComparison.Ordinal)) ||
+                (part.StartsWith("`", StringComparison.Ordinal) && part.EndsWith("`", StringComparison.Ordinal)))
+            {
+                if (part.Length < 3)
+                    return false;
+
+                var inner = part[1..^1];
+                return inner.Length > 0 && inner.All(c => char.IsLetterOrDigit(c) || c == '_' || c == ' ');
+            }
+
+            return s_safeOutputParamNameRegex.IsMatch(part);
         }
     }
 }

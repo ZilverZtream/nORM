@@ -58,6 +58,20 @@ parameter usage, but it cannot determine whether caller-authored SQL is supposed
 to be tenant-scoped. Public APIs and docs should therefore describe raw SQL and
 stored procedures as bypass-capable privileged paths.
 
+Stored procedure calls should pass the current tenant explicitly unless the
+database enforces row-level security:
+
+```csharp
+var tenantId = tenantProvider.GetCurrentTenantId();
+var rows = await context.ExecuteStoredProcedureAsync<UserStats>(
+    "reporting.GetUserStatsForTenant",
+    parameters: new { TenantId = tenantId, StartDate = startDate });
+```
+
+The procedure body must use `TenantId` in every tenant-owned read or write. See
+`docs/stored-procedure-security.md` for the stored procedure validation and
+review contract.
+
 ## Operational Requirements
 
 - Configure `TenantProvider` and `TenantColumnName` together. nORM rejects a
