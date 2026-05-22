@@ -497,6 +497,7 @@ Repository artifact and encoding rules are documented in
 Project process is documented in [CONTRIBUTING.md](CONTRIBUTING.md),
 [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md), [CHANGELOG.md](CHANGELOG.md),
 and the [Release Checklist](docs/release-checklist.md).
+The v1 blocker execution map is tracked in [v1 Issue Map](docs/v1-issue-map.md).
 
 ### Development Setup
 
