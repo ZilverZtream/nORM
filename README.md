@@ -1,25 +1,25 @@
 # nORM (The Norm) - High-Performance ORM for .NET
 
-nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .NET that delivers **dramatic performance improvements over Entity Framework Core** while maintaining all the developer-friendly features you expect from a modern ORM. Built for enterprise applications that demand both developer productivity and exceptional performance.
+nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .NET that targets Dapper-competitive hot paths and substantially lower overhead than Entity Framework Core while maintaining the developer-friendly features expected from a modern ORM. Built for enterprise applications that demand both developer productivity and performance.
 
 ## Why Choose nORM?
 
 - **Fast by design**: Dapper-competitive read paths, compiled queries, and native bulk operations
-- ** Complete LINQ Support**: Full-featured LINQ provider with joins, grouping, subqueries, and complex projections
-- ** Zero-Learning Curve**: Familiar EF Core-style API - migrate your existing knowledge instantly
-- ** Enterprise-Grade Bulk Operations**: High-performance bulk insert, update, and delete operations
-- ** Advanced Query Capabilities**: Raw SQL, stored procedures, and compiled queries
-- ** Intelligent Connection Management**: Built-in pooling and connection optimization
-- ** Multi-Database Support**: SQL Server, PostgreSQL, SQLite, and MySQL
-- ** Smart Relationship Handling**: Automatic relationship discovery and lazy loading
-- ** Flexible Configuration**: Fluent API and attribute-based configuration
-- ** Developer Tools**: Database scaffolding and reverse engineering
-- ** Modern Features**: JSON querying, window functions, temporal queries
-- ** Enterprise Ready**: Multi-tenancy, caching, retry policies, and interceptors
+- **Complete LINQ Support**: Full-featured LINQ provider with joins, grouping, subqueries, and complex projections
+- **Familiar API**: EF Core-style context, configuration, and change-tracking patterns
+- **Enterprise-Grade Bulk Operations**: High-performance bulk insert, update, and delete operations
+- **Advanced Query Capabilities**: Raw SQL, stored procedures, and compiled queries
+- **Intelligent Connection Management**: Built-in pooling and connection optimization
+- **Multi-Database Support**: SQL Server, PostgreSQL, SQLite, and MySQL
+- **Smart Relationship Handling**: Automatic relationship discovery and lazy loading
+- **Flexible Configuration**: Fluent API and attribute-based configuration
+- **Developer Tools**: Database scaffolding and reverse engineering
+- **Modern Features**: JSON querying, window functions, temporal queries
+- **Enterprise Ready**: Multi-tenancy, caching, retry policies, and interceptors
 
 ## Performance Comparison
 
-Benchmarks: .NET 8.0, SQLite WAL mode, 1000 users + 2000 orders, i9-12900K. All tools run against identical data and schema. Compiled = nORM `CompileQuery` / EF Core `CompileAsyncQuery`. Prepared = pre-compiled `SqliteCommand`.
+Benchmarks: .NET 8.0, SQLite WAL mode, 1000 users + 2000 orders, i9-12900K. The provider matrix also covers SQL Server, PostgreSQL, and MySQL. All tools run against identical data and schema. Compiled = nORM `CompileQuery` / EF Core `CompileAsyncQuery`. Prepared = pre-compiled provider commands.
 
 ### Read Queries
 
@@ -80,14 +80,14 @@ public class User
 ### High-Performance LINQ Queries
 
 ```csharp
-// Identical syntax to EF Core, but much faster execution
+// Familiar EF Core-style syntax with lower runtime overhead on tuned paths
 var users = await context.Query<User>()
     .Where(u => u.Name.StartsWith("John"))
     .Include(u => u.Orders)
     .OrderBy(u => u.CreatedAt)
     .ToListAsync();
 
-// Complex queries with dramatic performance improvements
+// Complex queries remain composable and benchmarked across providers
 var userStats = await context.Query<User>()
     .Where(u => u.CreatedAt > DateTime.Now.AddDays(-30))
     .GroupBy(u => u.CreatedAt.Date)

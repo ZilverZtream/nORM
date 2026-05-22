@@ -374,7 +374,7 @@ public class LiveCrossProviderTests
             {
                 "sqlite"    => "UPDATE LS_OccItem SET Token=randomblob(8) WHERE Id=1",
                 "sqlserver" => "UPDATE LS_OccItem SET Token=CONVERT(VARBINARY(8),NEWID()) WHERE Id=1",
-                "mysql"     => "UPDATE LS_OccItem SET Token=UNHEX(REPLACE(UUID(),'-','')) WHERE Id=1",
+                "mysql"     => "UPDATE LS_OccItem SET Token=UNHEX(SUBSTRING(REPLACE(UUID(),'-',''),1,16)) WHERE Id=1",
                 "postgres"  => "UPDATE LS_OccItem SET Token=decode(md5(random()::text), 'hex') WHERE Id=1",
                 _           => throw new ArgumentOutOfRangeException(nameof(kind))
             };

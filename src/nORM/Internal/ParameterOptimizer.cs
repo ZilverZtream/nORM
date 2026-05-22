@@ -170,8 +170,11 @@ namespace nORM.Internal
                 else if (valueType == typeof(string))
                 {
                     param.DbType = DbType.String;
-                    var str = (string)value;
-                    param.Size = str.Length <= MaxInlineStringSize ? str.Length : -1;
+                    if (param is SqlParameter)
+                    {
+                        var str = (string)value;
+                        param.Size = str.Length <= MaxInlineStringSize ? str.Length : -1;
+                    }
                 }
                 else if (valueType == typeof(long))
                 {

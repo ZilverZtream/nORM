@@ -42,6 +42,7 @@ namespace nORM.Scaffolding
         // preventing unloadable assembly accumulation when types are evicted from cache.
         private static readonly AssemblyBuilder _sharedAssembly;
         private static readonly ModuleBuilder _sharedModule;
+        private static readonly object _moduleBuilderLock = new();
         private static long _typeCounter;
 
         static DynamicEntityTypeGenerator()
@@ -104,88 +105,91 @@ namespace nORM.Scaffolding
         /// </summary>
         private static Type BuildDynamicType(string tableName, IReadOnlyList<ColumnInfo> columns)
         {
-            var className = EscapeCSharpIdentifier(ToPascalCase(GetUnqualifiedName(tableName)));
-
-            // Generate unique type name to avoid conflicts when same table is regenerated
-            var typeId = Interlocked.Increment(ref _typeCounter);
-            var uniqueTypeName = $"{DynamicTypeNamespace}.{className}_{typeId}";
-
-            // Create type using shared module
-            var typeBuilder = _sharedModule.DefineType(
-                uniqueTypeName,
-                TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed,
-                typeof(object));
-
-            // Add parameterless constructor
-            typeBuilder.DefineDefaultConstructor(
-                MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName);
-
-            // Add properties for each column
-            foreach (var col in columns)
+            lock (_moduleBuilderLock)
             {
-                var propertyType = col.PropertyType;
-                var fieldBuilder = typeBuilder.DefineField($"_{col.PropertyName}", propertyType, FieldAttributes.Private);
-                var propertyBuilder = typeBuilder.DefineProperty(col.PropertyName, PropertyAttributes.HasDefault, propertyType, null);
+                var className = EscapeCSharpIdentifier(ToPascalCase(GetUnqualifiedName(tableName)));
 
-                // Add [Column] attribute mapping to the original database column name
-                var columnAttrCtor = typeof(ColumnAttribute).GetConstructor(new[] { typeof(string) })!;
-                var columnAttr = new CustomAttributeBuilder(columnAttrCtor, new object[] { col.ColumnName });
-                propertyBuilder.SetCustomAttribute(columnAttr);
+                // Generate unique type name to avoid conflicts when same table is regenerated
+                var typeId = Interlocked.Increment(ref _typeCounter);
+                var uniqueTypeName = $"{DynamicTypeNamespace}.{className}_{typeId}";
 
-                // Add [Key] attribute for primary key columns
-                if (col.IsKey)
+                // Create type using shared module
+                var typeBuilder = _sharedModule.DefineType(
+                    uniqueTypeName,
+                    TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed,
+                    typeof(object));
+
+                // Add parameterless constructor
+                typeBuilder.DefineDefaultConstructor(
+                    MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName);
+
+                // Add properties for each column
+                foreach (var col in columns)
                 {
-                    var keyAttrCtor = typeof(KeyAttribute).GetConstructor(Type.EmptyTypes)!;
-                    var keyAttr = new CustomAttributeBuilder(keyAttrCtor, Array.Empty<object>());
-                    propertyBuilder.SetCustomAttribute(keyAttr);
+                    var propertyType = col.PropertyType;
+                    var fieldBuilder = typeBuilder.DefineField($"_{col.PropertyName}", propertyType, FieldAttributes.Private);
+                    var propertyBuilder = typeBuilder.DefineProperty(col.PropertyName, PropertyAttributes.HasDefault, propertyType, null);
+
+                    // Add [Column] attribute mapping to the original database column name
+                    var columnAttrCtor = typeof(ColumnAttribute).GetConstructor(new[] { typeof(string) })!;
+                    var columnAttr = new CustomAttributeBuilder(columnAttrCtor, new object[] { col.ColumnName });
+                    propertyBuilder.SetCustomAttribute(columnAttr);
+
+                    // Add [Key] attribute for primary key columns
+                    if (col.IsKey)
+                    {
+                        var keyAttrCtor = typeof(KeyAttribute).GetConstructor(Type.EmptyTypes)!;
+                        var keyAttr = new CustomAttributeBuilder(keyAttrCtor, Array.Empty<object>());
+                        propertyBuilder.SetCustomAttribute(keyAttr);
+                    }
+
+                    // Add [DatabaseGenerated(Identity)] attribute for auto-increment columns
+                    if (col.IsAuto)
+                    {
+                        var dbGenAttrCtor = typeof(DatabaseGeneratedAttribute).GetConstructor(new[] { typeof(DatabaseGeneratedOption) })!;
+                        var dbGenAttr = new CustomAttributeBuilder(dbGenAttrCtor, new object[] { DatabaseGeneratedOption.Identity });
+                        propertyBuilder.SetCustomAttribute(dbGenAttr);
+                    }
+
+                    // Add [MaxLength] attribute for string columns with a known size
+                    if (col.MaxLength.HasValue)
+                    {
+                        var maxLenAttrCtor = typeof(MaxLengthAttribute).GetConstructor(new[] { typeof(int) })!;
+                        var maxLenAttr = new CustomAttributeBuilder(maxLenAttrCtor, new object[] { col.MaxLength.Value });
+                        propertyBuilder.SetCustomAttribute(maxLenAttr);
+                    }
+
+                    // Define getter
+                    var getMethod = typeBuilder.DefineMethod(
+                        $"get_{col.PropertyName}",
+                        MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+                        propertyType,
+                        Type.EmptyTypes);
+
+                    var getIl = getMethod.GetILGenerator();
+                    getIl.Emit(OpCodes.Ldarg_0);
+                    getIl.Emit(OpCodes.Ldfld, fieldBuilder);
+                    getIl.Emit(OpCodes.Ret);
+
+                    // Define setter
+                    var setMethod = typeBuilder.DefineMethod(
+                        $"set_{col.PropertyName}",
+                        MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+                        null,
+                        new[] { propertyType });
+
+                    var setIl = setMethod.GetILGenerator();
+                    setIl.Emit(OpCodes.Ldarg_0);
+                    setIl.Emit(OpCodes.Ldarg_1);
+                    setIl.Emit(OpCodes.Stfld, fieldBuilder);
+                    setIl.Emit(OpCodes.Ret);
+
+                    propertyBuilder.SetGetMethod(getMethod);
+                    propertyBuilder.SetSetMethod(setMethod);
                 }
 
-                // Add [DatabaseGenerated(Identity)] attribute for auto-increment columns
-                if (col.IsAuto)
-                {
-                    var dbGenAttrCtor = typeof(DatabaseGeneratedAttribute).GetConstructor(new[] { typeof(DatabaseGeneratedOption) })!;
-                    var dbGenAttr = new CustomAttributeBuilder(dbGenAttrCtor, new object[] { DatabaseGeneratedOption.Identity });
-                    propertyBuilder.SetCustomAttribute(dbGenAttr);
-                }
-
-                // Add [MaxLength] attribute for string columns with a known size
-                if (col.MaxLength.HasValue)
-                {
-                    var maxLenAttrCtor = typeof(MaxLengthAttribute).GetConstructor(new[] { typeof(int) })!;
-                    var maxLenAttr = new CustomAttributeBuilder(maxLenAttrCtor, new object[] { col.MaxLength.Value });
-                    propertyBuilder.SetCustomAttribute(maxLenAttr);
-                }
-
-                // Define getter
-                var getMethod = typeBuilder.DefineMethod(
-                    $"get_{col.PropertyName}",
-                    MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
-                    propertyType,
-                    Type.EmptyTypes);
-
-                var getIl = getMethod.GetILGenerator();
-                getIl.Emit(OpCodes.Ldarg_0);
-                getIl.Emit(OpCodes.Ldfld, fieldBuilder);
-                getIl.Emit(OpCodes.Ret);
-
-                // Define setter
-                var setMethod = typeBuilder.DefineMethod(
-                    $"set_{col.PropertyName}",
-                    MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
-                    null,
-                    new[] { propertyType });
-
-                var setIl = setMethod.GetILGenerator();
-                setIl.Emit(OpCodes.Ldarg_0);
-                setIl.Emit(OpCodes.Ldarg_1);
-                setIl.Emit(OpCodes.Stfld, fieldBuilder);
-                setIl.Emit(OpCodes.Ret);
-
-                propertyBuilder.SetGetMethod(getMethod);
-                propertyBuilder.SetSetMethod(setMethod);
+                return typeBuilder.CreateType()!;
             }
-
-            return typeBuilder.CreateType()!;
         }
 
         /// <summary>

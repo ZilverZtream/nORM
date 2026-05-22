@@ -38,7 +38,10 @@ if (Test-ProviderConfigured 'SQLSERVER') { $liveProviders += 'SQL Server' }
 if (Test-ProviderConfigured 'POSTGRES') { $liveProviders += 'PostgreSQL' }
 if (Test-ProviderConfigured 'MYSQL') { $liveProviders += 'MySQL' }
 
-if ($MinLiveProviders -eq 0 -and ($Mode -eq 'rc' -or $Mode -eq 'live')) {
+if ($MinLiveProviders -eq 0 -and $Mode -eq 'rc') {
+    $MinLiveProviders = 3
+}
+elseif ($MinLiveProviders -eq 0 -and $Mode -eq 'live') {
     $MinLiveProviders = 2
 }
 
@@ -107,11 +110,11 @@ if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
 }
 
 if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'rc') {
-    if (-not (Test-ProviderConfigured 'SQLSERVER') -or -not (Test-ProviderConfigured 'POSTGRES')) {
-        throw 'Provider matrix benchmark requires both SQL Server and PostgreSQL live connection strings.'
+    if (-not (Test-ProviderConfigured 'SQLSERVER') -or -not (Test-ProviderConfigured 'POSTGRES') -or -not (Test-ProviderConfigured 'MYSQL')) {
+        throw 'Provider matrix benchmark requires SQL Server, PostgreSQL, and MySQL live connection strings.'
     }
 
-    Invoke-Step 'SQLite/SQL Server/PostgreSQL provider matrix benchmark' {
+    Invoke-Step 'SQLite/SQL Server/PostgreSQL/MySQL provider matrix benchmark' {
         dotnet run --project benchmarks\nORM.Benchmarks.csproj -c $Configuration -- --provider-matrix --filter $ProviderMatrixBenchmarkFilter
     }
 }

@@ -23,6 +23,8 @@ namespace nORM.Providers
     /// </summary>
     public sealed class PostgresProvider : BulkOperationProvider
     {
+        internal override bool SupportsFastPathPreparedCommandCache => true;
+
         /// <summary>
         /// Minimum PostgreSQL version required (9.5 introduced ON CONFLICT, UPSERT, and row-level security).
         /// </summary>

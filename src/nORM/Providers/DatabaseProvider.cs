@@ -65,6 +65,21 @@ namespace nORM.Providers
         public virtual bool PrefersSyncExecution => false;
 
         /// <summary>
+        /// Indicates whether small query fast paths should prefer synchronous reader execution
+        /// while preserving the public async API. Defaults to <see cref="PrefersSyncExecution"/>
+        /// so providers such as SQLite keep their existing behavior.
+        /// </summary>
+        internal virtual bool PrefersSyncFastPathExecution => PrefersSyncExecution;
+
+        internal virtual bool ParameterizeFastPathBooleanPredicates => false;
+
+        internal virtual bool SupportsFastPathPreparedCommandCache => false;
+
+        internal virtual bool SupportsCommandGeneratedKeyRetrieval => false;
+
+        internal virtual object? GetCommandGeneratedKey(DbCommand command, TableMapping mapping) => null;
+
+        /// <summary>
         /// Returns true when bare boolean predicates such as <c>WHERE IsActive</c> and
         /// <c>WHERE NOT IsActive</c> are valid and preferred over equality-to-literal forms.
         /// </summary>

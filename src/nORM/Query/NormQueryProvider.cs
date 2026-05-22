@@ -303,6 +303,18 @@ namespace nORM.Query
             if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(List<>))
             {
                 elementType = resultType.GetGenericArguments()[0];
+                try
+                {
+                    if (FastPathQueryExecutor.TryExecuteListNonGeneric(elementType, expression, _ctx, ct, out var typedListTask))
+                    {
+                        result = (Task<TResult>)typedListTask;
+                        return true;
+                    }
+                }
+                catch (NotSupportedException)
+                {
+                    // ignore and fall back to full translation path
+                }
             }
             else if (resultType == typeof(int) || resultType == typeof(long))
             {
@@ -1934,9 +1946,9 @@ namespace nORM.Query
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteCountFastSlowAsync<TResult>(ensureTask, sql, parameters, ct);
 
-            // For providers without true async I/O (SQLite), use pooled prepared command
-            // for parameterless count queries to eliminate per-call command creation/disposal.
-            if (_ctx.Provider.PrefersSyncExecution && ReferenceEquals(parameters, _emptyParams))
+            // Parameterless count queries are safe to pool per context. This avoids repeated
+            // command allocation on hot CountAsync paths while serializing use of the command.
+            if (ReferenceEquals(parameters, _emptyParams) && _ctx.Options.CommandInterceptors.Count == 0)
             {
                 var entry = _pooledCountCommands.GetOrAdd(sql, static (s, ctx) =>
                 {

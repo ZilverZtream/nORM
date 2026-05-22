@@ -32,6 +32,7 @@ namespace nORM.Tests;
 /// 4. Owned-collection saves remain consistent when multiple contexts write
 ///    concurrently to the same logical data set.
 /// </summary>
+[Collection(ConcurrencyStressCollection.Name)]
 public class DynamicQueryRootConcurrencyTests
 {
     // ── shared SQLite helpers ─────────────────────────────────────────────────
@@ -461,18 +462,35 @@ public class DynamicQueryRootConcurrencyTests
             .Select(_ => CreateDynDb("A1Interleaved"))
             .ToList();
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-
-        var queryTasks = Enumerable.Range(0, parallelism).Select(i => Task.Run(() =>
+        var queryTasks = Enumerable.Range(0, parallelism).Select(i =>
         {
-            using var ctx = CreateDynCtx(connections[i]);
-            var q = ctx.Query("A1Interleaved");
-            Assert.NotNull(q);
-        }, cts.Token)).ToList();
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    using var ctx = CreateDynCtx(connections[i]);
+                    var q = ctx.Query("A1Interleaved");
+                    Assert.NotNull(q);
+                    tcs.SetResult();
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            })
+            {
+                IsBackground = true,
+                Name = $"nORM dynamic query root worker {i}"
+            };
+
+            thread.Start();
+            return tcs.Task;
+        }).ToList();
 
         try
         {
-            await Task.WhenAll(queryTasks);
+            await Task.WhenAll(queryTasks).WaitAsync(TimeSpan.FromSeconds(30));
         }
         finally
         {

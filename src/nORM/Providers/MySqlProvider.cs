@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
@@ -7,6 +8,7 @@ using nORM.Query;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Data.Common;
+using System.Linq.Expressions;
 using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
@@ -23,10 +25,18 @@ namespace nORM.Providers
     /// </summary>
     public sealed class MySqlProvider : DatabaseProvider
     {
+        internal override bool ParameterizeFastPathBooleanPredicates => true;
+
+        internal override bool SupportsFastPathPreparedCommandCache => true;
+
+        internal override bool SupportsCommandGeneratedKeyRetrieval => true;
+
         /// <summary>Maximum number of cached DataTable schemas used for bulk insert data tables.</summary>
         private const int TableSchemaCacheSize = 100;
 
         private static readonly ConcurrentLruCache<Type, DataTable> _tableSchemas = new(maxSize: TableSchemaCacheSize);
+        private static readonly ConcurrentDictionary<string, bool> _bulkCopyUnavailable = new(StringComparer.Ordinal);
+        private static readonly ConcurrentDictionary<Type, Func<DbCommand, object?>> _lastInsertedIdAccessors = new();
         private readonly IDbParameterFactory _parameterFactory;
 
         /// <summary>
@@ -149,6 +159,24 @@ namespace nORM.Providers
                         "or use a trigger with a numeric surrogate key.");
             }
             return "; SELECT LAST_INSERT_ID();";
+        }
+
+        internal override object? GetCommandGeneratedKey(DbCommand command, TableMapping mapping)
+        {
+            var accessor = _lastInsertedIdAccessors.GetOrAdd(command.GetType(), static commandType =>
+            {
+                var property = commandType.GetProperty("LastInsertedId");
+                if (property == null)
+                    return static _ => null;
+
+                var commandParameter = Expression.Parameter(typeof(DbCommand), "command");
+                var typedCommand = Expression.Convert(commandParameter, commandType);
+                var propertyAccess = Expression.Property(typedCommand, property);
+                var boxed = Expression.Convert(propertyAccess, typeof(object));
+                return Expression.Lambda<Func<DbCommand, object?>>(boxed, commandParameter).Compile();
+            });
+
+            return accessor(command);
         }
 
         private static bool IsNumericType(Type t) =>
@@ -497,7 +525,10 @@ END;";
             var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(BatchSizingSampleCount), m, operationKey, entityList.Count);
 
             var bulkCopyType = Type.GetType("MySqlConnector.MySqlBulkCopy, MySqlConnector");
-            if (bulkCopyType != null && ctx.Connection.GetType().FullName == "MySqlConnector.MySqlConnection")
+            var bulkCopyKey = GetBulkCopyCapabilityKey(ctx.Connection);
+            if (bulkCopyType != null &&
+                ctx.Connection.GetType().FullName == "MySqlConnector.MySqlConnection" &&
+                !_bulkCopyUnavailable.ContainsKey(bulkCopyKey))
             {
                 // Respect ambient CurrentTransaction; only create a new one if none is active.
                 bool ownedTx = ctx.CurrentTransaction == null;
@@ -505,10 +536,9 @@ END;";
                     ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
                 try
                 {
-                    dynamic bulkCopy = Activator.CreateInstance(bulkCopyType, ctx.Connection)!;
+                    dynamic bulkCopy = Activator.CreateInstance(bulkCopyType, ctx.Connection, transaction)!;
                     bulkCopy.DestinationTableName = m.EscTable.Trim('`');
                     bulkCopy.BulkCopyTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-                    bulkCopy.Transaction = transaction;
 
                     var totalInserted = 0;
                     for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
@@ -532,6 +562,15 @@ END;";
                     ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, totalInserted, sw.Elapsed);
                     return totalInserted;
                 }
+                catch (Exception ex) when (IsMySqlBulkCopyUnavailable(ex))
+                {
+                    _bulkCopyUnavailable.TryAdd(bulkCopyKey, true);
+                    if (ownedTx)
+                    {
+                        try { await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); }
+                        catch (Exception rollbackEx) { throw new AggregateException(ex, rollbackEx); }
+                    }
+                }
                 catch (Exception ex)
                 {
                     if (ownedTx)
@@ -550,6 +589,24 @@ END;";
             var affected = await base.BulkInsertAsync(ctx, m, entityList, ct).ConfigureAwait(false);
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkInsertAsync), m.EscTable, affected, sw.Elapsed);
             return affected;
+        }
+
+        private static string GetBulkCopyCapabilityKey(DbConnection connection)
+            => $"{connection.GetType().FullName}|{connection.DataSource}|{connection.Database}";
+
+        private static bool IsMySqlBulkCopyUnavailable(Exception ex)
+        {
+            for (var current = ex; current != null; current = current.InnerException)
+            {
+                if (current is NotSupportedException)
+                    return true;
+
+                if (current.Message.Contains("Loading local data is disabled", StringComparison.OrdinalIgnoreCase) ||
+                    current.Message.Contains("AllowLoadLocalInfile", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>

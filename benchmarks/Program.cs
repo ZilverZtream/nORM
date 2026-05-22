@@ -36,7 +36,7 @@ namespace nORM.Benchmarks
                         return;
 
                     case "--provider-matrix":
-                        Console.WriteLine("Running SQLite/SQL Server/PostgreSQL provider matrix benchmarks...");
+                        Console.WriteLine("Running SQLite/SQL Server/PostgreSQL/MySQL provider matrix benchmarks...");
                         RunProviderMatrixBenchmarks(args.Skip(1).ToArray());
                         return;
 
@@ -136,7 +136,7 @@ namespace nORM.Benchmarks
             Console.WriteLine("  --fast <filter>   Fast nORM-only benchmarks matching a filter");
             Console.WriteLine("  --norm-only       Same as --fast");
             Console.WriteLine("  --complex         Focused complex-query comparison");
-            Console.WriteLine("  --provider-matrix Run full provider matrix comparison across SQLite, SQL Server, PostgreSQL");
+            Console.WriteLine("  --provider-matrix Run full provider matrix comparison across SQLite, SQL Server, PostgreSQL, MySQL");
             Console.WriteLine("  --filter <pattern> Run benchmarks matching a BenchmarkDotNet filter");
             Console.WriteLine("  --help            Show this help");
             Console.WriteLine();

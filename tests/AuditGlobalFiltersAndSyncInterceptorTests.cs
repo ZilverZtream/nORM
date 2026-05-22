@@ -346,16 +346,29 @@ INSERT INTO GfItem (IsActive, Name) VALUES (0, 'inactive');";
         //   ReaderExecutingAsync which does Task.Yield() → posts continuation to
         //   BlockedSC → continuation never runs → GetResult() blocks forever.
         // After the fix: sync path calls ReaderExecuting (sync, no-op) → no await → completes.
-        var task = Task.Run(() =>
+        var completion = new TaskCompletionSource<List<GfItem>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
         {
             var blocked = new BlockedSynchronizationContext();
             SynchronizationContext.SetSynchronizationContext(blocked);
-            try { return ctx.Query<GfItem>().ToList(); }
-            finally { SynchronizationContext.SetSynchronizationContext(null); }
+            try
+            {
+                completion.SetResult(ctx.Query<GfItem>().ToList());
+            }
+            catch (Exception ex)
+            {
+                completion.SetException(ex);
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(null);
+            }
         });
+        thread.IsBackground = true;
+        thread.Start();
 
         // 5-second timeout catches deadlocks; successful fix completes in milliseconds.
-        var items = await task.WaitAsync(TimeSpan.FromSeconds(5));
+        var items = await completion.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Single(items);
     }
 

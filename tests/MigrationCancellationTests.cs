@@ -208,13 +208,28 @@ public class MigrationCancellationTests
         using var cn = OpenConnection();
         await using var tx = await cn.BeginTransactionAsync();
 
-        // Run Up() on a thread pool thread; cancel after it signals it has started.
-        var upTask = Task.Run(() => blocking.Up(cn, tx, cts.Token));
+        // Use a dedicated thread so this cancellation test is not affected by
+        // thread-pool pressure from the broader stress suite.
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                blocking.Up(cn, tx, cts.Token);
+                completion.SetResult();
+            }
+            catch (Exception ex)
+            {
+                completion.SetException(ex);
+            }
+        });
+        thread.IsBackground = true;
+        thread.Start();
 
         Assert.True(blocking.WaitForStart(TimeSpan.FromSeconds(5)));
         cts.Cancel(); // Signal cancellation while Up() is blocked.
 
-        var ex = await Record.ExceptionAsync(() => upTask);
+        var ex = await Record.ExceptionAsync(() => completion.Task);
         Assert.IsType<OperationCanceledException>(ex);
     }
 

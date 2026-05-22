@@ -1064,6 +1064,16 @@ namespace nORM.Query
                 ? mapping.Columns
                 : ExtractColumnsFromProjection(mapping, projection);
 
+            if (projection?.Body is NewExpression projectionNew
+                && projectionNew.Type == targetType
+                && projectionNew.Arguments.Count == columns.Length
+                && projectionNew.Constructor is { } projectionCtor
+                && projectionCtor.GetParameters().Length == columns.Length)
+            {
+                var projectionCtorParams = projectionCtor.GetParameters();
+                return CreateProjectionConstructorMaterializer(projectionCtor, projectionCtorParams, startOffset);
+            }
+
             var parameterlessCtor = _parameterlessCtorCache.GetOrAdd(targetType, t => t.GetConstructor(Type.EmptyTypes));
             bool hasConverters = columns.Any(c => c.Converter != null);
 
@@ -1292,6 +1302,27 @@ namespace nORM.Query
             il.Emit(OpCodes.Ret);
 
             return (Func<object?[], object>)method.CreateDelegate(typeof(Func<object?[], object>));
+        }
+
+        private static Func<DbDataReader, object> CreateProjectionConstructorMaterializer(
+            ConstructorInfo ctor,
+            ParameterInfo[] parameters,
+            int startOffset)
+        {
+            var reader = Expression.Parameter(typeof(DbDataReader), "reader");
+            var args = new Expression[parameters.Length];
+
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                var paramType = parameters[i].ParameterType;
+                var readValue = GetOptimizedReaderCall(reader, paramType, i + startOffset);
+                var defaultValue = Expression.Default(paramType);
+                var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(i + startOffset));
+                args[i] = Expression.Condition(isDbNull, defaultValue, readValue);
+            }
+
+            var body = Expression.Convert(Expression.New(ctor, args), typeof(object));
+            return Expression.Lambda<Func<DbDataReader, object>>(body, reader).Compile();
         }
 
         /// <summary>

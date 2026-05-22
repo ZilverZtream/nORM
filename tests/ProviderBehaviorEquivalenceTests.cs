@@ -121,7 +121,7 @@ public class ProviderBehaviorEquivalenceTests
     {
         "sqlite"    => $"ALTER TABLE {tableName} ADD COLUMN {colName} INTEGER NOT NULL DEFAULT 0",
         "sqlserver" => $"IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='{tableName}' AND COLUMN_NAME='{colName}') ALTER TABLE {tableName} ADD {colName} INT NOT NULL DEFAULT 0",
-        "mysql"     => $"ALTER TABLE {tableName} ADD COLUMN IF NOT EXISTS {colName} INT NOT NULL DEFAULT 0",
+        "mysql"     => $"ALTER TABLE {tableName} ADD COLUMN {colName} INT NOT NULL DEFAULT 0",
         "postgres"  => $"ALTER TABLE {LiveProviderSql.Quote(tableName)} ADD COLUMN IF NOT EXISTS {LiveProviderSql.Quote(colName)} INT NOT NULL DEFAULT 0",
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
@@ -1188,7 +1188,7 @@ public class ProviderBehaviorEquivalenceTests
             {
                 "sqlite"    => "UPDATE LPM_OccItem SET Token=randomblob(8) WHERE Id=1",
                 "sqlserver" => "UPDATE LPM_OccItem SET Token=CONVERT(VARBINARY(8),NEWID()) WHERE Id=1",
-                "mysql"     => "UPDATE LPM_OccItem SET Token=UNHEX(REPLACE(UUID(),'-','')) WHERE Id=1",
+                "mysql"     => "UPDATE LPM_OccItem SET Token=UNHEX(SUBSTRING(REPLACE(UUID(),'-',''),1,16)) WHERE Id=1",
                 "postgres"  => "UPDATE LPM_OccItem SET Token=decode(md5(random()::text), 'hex') WHERE Id=1",
                 _           => throw new ArgumentOutOfRangeException(nameof(kind))
             };
