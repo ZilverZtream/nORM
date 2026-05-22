@@ -41,7 +41,8 @@ function Test-ProviderConfigured {
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
 $commit = (& git -C $root rev-parse HEAD).Trim()
-$status = (& git -C $root status --short).Trim()
+$statusOutput = & git -C $root status --short
+$status = if ($null -eq $statusOutput) { '' } else { ($statusOutput -join [Environment]::NewLine).Trim() }
 $sdkVersion = (& dotnet --version).Trim()
 $generatedUtc = [DateTime]::UtcNow.ToString('O')
 
