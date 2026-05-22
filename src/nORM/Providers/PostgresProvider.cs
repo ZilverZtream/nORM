@@ -48,6 +48,18 @@ namespace nORM.Providers
         /// <summary>
         /// Initializes a new instance of the <see cref="PostgresProvider"/> class.
         /// </summary>
+        /// <remarks>
+        /// Uses a reflection-based Npgsql parameter factory. Consumer applications must
+        /// reference the <c>Npgsql</c> package when executing PostgreSQL commands.
+        /// </remarks>
+        public PostgresProvider()
+            : this(new ReflectionNpgsqlParameterFactory())
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PostgresProvider"/> class.
+        /// </summary>
         /// <param name="parameterFactory">Factory responsible for creating PostgreSQL parameters.</param>
         /// <remarks>
         /// <para>
@@ -63,6 +75,22 @@ namespace nORM.Providers
         public PostgresProvider(IDbParameterFactory parameterFactory)
         {
             _parameterFactory = parameterFactory ?? throw new ArgumentNullException(nameof(parameterFactory));
+        }
+
+        private sealed class ReflectionNpgsqlParameterFactory : IDbParameterFactory
+        {
+            private readonly Type? _parameterType = Type.GetType("Npgsql.NpgsqlParameter, Npgsql");
+
+            public DbParameter CreateParameter(string name, object? value)
+            {
+                if (_parameterType == null)
+                {
+                    throw new InvalidOperationException(
+                        "Npgsql package is required for PostgreSQL support. Add PackageReference Include=\"Npgsql\" to the consuming project.");
+                }
+
+                return (DbParameter)Activator.CreateInstance(_parameterType, name, value ?? DBNull.Value)!;
+            }
         }
 
         /// <summary>

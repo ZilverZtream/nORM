@@ -77,6 +77,8 @@ Write-Host "  Provider matrix:     $(if ($SkipBenchmark -or $SkipProviderMatrixB
 Invoke-Step 'restore' { dotnet restore nORM.sln }
 Invoke-Step 'build' { dotnet build nORM.sln --no-restore -c $Configuration --nologo }
 Invoke-Step 'public API snapshot' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter 'FullyQualifiedName~PublicApiSnapshotTests' --logger 'console;verbosity=minimal' }
+Invoke-Step 'package consumer smoke tests' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter 'FullyQualifiedName~PackageConsumerIntegrationTests' --logger 'console;verbosity=minimal' }
+Invoke-Step 'CLI smoke tests' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter 'FullyQualifiedName~CliIntegrationTests' --logger 'console;verbosity=minimal' }
 
 if ($Mode -in @('live', 'full', 'rc')) {
     Invoke-Step 'live provider gate' { dotnet test tests\nORM.Tests.csproj -c $Configuration --no-build --no-restore --filter $liveFilter --logger 'console;verbosity=minimal' }

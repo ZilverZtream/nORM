@@ -5,6 +5,8 @@ namespace nORM.Security
 {
     public static class ConnectionStringValidator
     {
+        public sealed record ValidatedConnectionString(string ConnectionString, string RedactedConnectionString);
+
         /// <summary>
         /// Forbidden keywords stored in uppercase so Contains() against the uppercased
         /// connection string does not allocate a new string on every call.
@@ -16,6 +18,9 @@ namespace nORM.Security
         };
 
         public static string ValidateAndSanitize(string connectionString, string provider)
+            => Validate(connectionString, provider).RedactedConnectionString;
+
+        public static ValidatedConnectionString Validate(string connectionString, string provider)
         {
             if (string.IsNullOrWhiteSpace(connectionString))
                 throw new ArgumentException("Connection string cannot be null or empty");
@@ -33,23 +38,13 @@ namespace nORM.Security
             {
                 var builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
 
-                // Remove sensitive information from potential logs
-                var sanitized = new DbConnectionStringBuilder();
-                foreach (string key in builder.Keys)
-                {
-                    if (!IsSensitiveKey(key))
-                        sanitized[key] = builder[key];
-                    else
-                        sanitized[key] = "***";
-                }
-
                 // Enforce security requirements for SQL Server
                 if (provider.Equals("sqlserver", StringComparison.OrdinalIgnoreCase))
                 {
                     EnforceSqlServerSecurity(builder);
                 }
 
-                return sanitized.ConnectionString;
+                return new ValidatedConnectionString(builder.ConnectionString, Redact(builder));
             }
             catch (ArgumentException)
             {
@@ -59,6 +54,23 @@ namespace nORM.Security
             {
                 throw new ArgumentException("Invalid connection string format", ex);
             }
+        }
+
+        public static string Redact(string connectionString)
+        {
+            var builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
+            return Redact(builder);
+        }
+
+        private static string Redact(DbConnectionStringBuilder builder)
+        {
+            var redacted = new DbConnectionStringBuilder();
+            foreach (string key in builder.Keys)
+            {
+                redacted[key] = IsSensitiveKey(key) ? "***" : builder[key];
+            }
+
+            return redacted.ConnectionString;
         }
 
         private static bool IsSensitiveKey(string key)

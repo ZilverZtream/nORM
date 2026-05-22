@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1998</WarningsNotAsErrors>
   </PropertyGroup>
   <ItemGroup>
     <!-- Tests use ScriptDom directly to keep full AST-validation coverage. -->
