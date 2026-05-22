@@ -35,5 +35,22 @@ public class ConcurrentLruCacheTests
         cache.Clear();
         Assert.False(cache.TryGet(1, out _));
     }
+
+    [Fact]
+    public void Size_evictions_are_tracked()
+    {
+        var cache = new ConcurrentLruCache<int, string>(maxSize: 2, timeToLive: TimeSpan.FromMinutes(1));
+
+        cache.Set(1, "one");
+        cache.Set(2, "two");
+        cache.Set(3, "three");
+
+        Assert.Equal(2, cache.Count);
+        Assert.Equal(1, cache.Evictions);
+
+        cache.Clear();
+
+        Assert.Equal(0, cache.Evictions);
+    }
 }
 
