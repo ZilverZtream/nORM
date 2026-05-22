@@ -68,6 +68,13 @@ and `NORM_TEST_MYSQL` (or `NORM_TEST_MYSQL_CS`). Use
 `-SkipProviderMatrixBenchmark` only when validating a non-performance change
 that cannot access all three external servers locally.
 
+Every successful gate writes an artifact index with
+`eng/rc-artifact-manifest.ps1` under `artifacts/v1-rc/`. The manifest records
+the validated commit, mode, SDK, configured providers, TRX files, package files,
+BenchmarkDotNet outputs, and benchmark evidence/threshold summaries. A release
+tag should point at the commit in this manifest, not merely at a locally passing
+working tree.
+
 The public API baseline is documented in `docs\public-api-policy.md`. The v1.0
 release checklist is documented in `docs\v1-readiness.md`.
 
@@ -84,5 +91,6 @@ path:
 - `.github/workflows/v1-rc.yml` runs the full `rc` gate on a weekly schedule and
   on manual dispatch with SQL Server, PostgreSQL, and MySQL service databases.
 
-The CI gates upload TRX test results, generated packages, and BenchmarkDotNet
-artifacts so the release evidence is attached to the workflow run.
+The CI gates upload TRX test results, generated packages, BenchmarkDotNet
+artifacts, and the RC artifact manifest so the release evidence is attached to
+the workflow run.

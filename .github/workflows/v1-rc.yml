@@ -139,3 +139,11 @@ jobs:
             BenchmarkDotNet.Artifacts/**
             benchmarks/BenchmarkDotNet.Artifacts/**
           retention-days: 14
+
+      - name: Upload RC artifact manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1-rc-artifact-manifest
+          path: "artifacts/v1-rc/**"
+          retention-days: 14

@@ -248,6 +248,13 @@ Invoke-Step 'validate package outputs' {
     Assert-CurrentPackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'nORM' $normVersion
     Assert-CurrentPackageOutput (Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') "bin\$Configuration") 'dotnet-norm' $normVersion
 }
+Invoke-Step 'RC artifact manifest' {
+    & (Join-Path $root 'eng/rc-artifact-manifest.ps1') `
+        -Mode $Mode `
+        -Configuration $Configuration `
+        -StressIterations $StressIterations `
+        -BenchmarkSkipped ([bool]$SkipBenchmark)
+}
 
 Write-Host ""
 Write-Host "nORM v1 release gate passed."

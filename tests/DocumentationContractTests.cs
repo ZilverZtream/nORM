@@ -500,6 +500,27 @@ public class DocumentationContractTests
     }
 
     [Fact]
+    public void Release_gate_documents_rc_artifact_manifest()
+    {
+        var root = FindRepositoryRoot();
+        var gates = File.ReadAllText(Path.Combine(root, "docs", "release-gates.md"));
+        var checklist = File.ReadAllText(Path.Combine(root, "docs", "release-checklist.md"));
+        var gateScript = File.ReadAllText(Path.Combine(root, "eng", "v1-release-gate.ps1"));
+        var manifestScript = File.ReadAllText(Path.Combine(root, "eng", "rc-artifact-manifest.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "v1-rc.yml"));
+
+        Assert.Contains("eng/rc-artifact-manifest.ps1", gates, StringComparison.Ordinal);
+        Assert.Contains("artifacts/v1-rc/", gates, StringComparison.Ordinal);
+        Assert.Contains("rc-artifacts.md", checklist, StringComparison.Ordinal);
+        Assert.Contains("RC artifact manifest", gateScript, StringComparison.Ordinal);
+        Assert.Contains("rc-artifact-manifest.ps1", gateScript, StringComparison.Ordinal);
+        Assert.Contains("TestResults", manifestScript, StringComparison.Ordinal);
+        Assert.Contains("BenchmarkArtifacts", manifestScript, StringComparison.Ordinal);
+        Assert.Contains("ReleaseEvidence", manifestScript, StringComparison.Ordinal);
+        Assert.Contains("v1-rc-artifact-manifest", workflow, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Readme_links_to_production_operations_runbook()
     {
         var root = FindRepositoryRoot();
