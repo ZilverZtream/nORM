@@ -35,7 +35,7 @@ still needs release evidence.
 | 7 | Revisit runtime package dependency architecture | Open | Dependency graph is documented only partially; package split decision remains open. |
 | 8 | Clean release artifact and version hygiene | Verified | `NormVersion` is centralized in `Directory.Build.props`; package tests and `eng/v1-release-gate.ps1` clean and validate package outputs. |
 | 9 | Run package consumer tests cross-platform | In Progress | Package consumer tests exist; cross-platform CI evidence is still required. |
-| 10 | Replace or freeze beta CLI dependency | Open | `dotnet-norm` still uses `System.CommandLine` beta. |
+| 10 | Replace or freeze beta CLI dependency | Verified | `dotnet-norm` now references stable `System.CommandLine` 2.0.8; CLI and package consumer smoke tests passed. |
 | 11 | Isolate CLI design-time assembly loading | Open | CLI still needs robust design-time dependency loading validation. |
 | 12 | Harden destructive database drop behavior | In Progress | `--yes` and `--dry-run` exist; live provider safety contracts remain open. |
 | 13 | Make migration rename/data-loss handling first-class | In Progress | Destructive-operation warnings exist; first-class rename workflow remains open. |
