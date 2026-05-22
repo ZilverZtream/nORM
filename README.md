@@ -389,6 +389,9 @@ The full provider-specific contract is documented in
 [Optimistic Concurrency](docs/optimistic-concurrency.md).
 Source generator package boundaries and runtime attribute ownership are
 documented in [Source Generation](docs/source-generation.md).
+Production setup, connection pooling, retries, transactions, migrations,
+multi-tenancy, logging, and troubleshooting are covered in
+[Production Operations](docs/production-operations.md).
 
 ### Connection Management & Pooling
 

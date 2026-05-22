@@ -297,6 +297,25 @@ public class DocumentationContractTests
         Assert.Contains("Query_Join_RawAdo_PreparedOptimized", sqliteMatrix, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Readme_links_to_production_operations_runbook()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var runbook = File.ReadAllText(Path.Combine(root, "docs", "production-operations.md"));
+
+        Assert.Contains("docs/production-operations.md", readme, StringComparison.Ordinal);
+        Assert.Contains("Provider Setup", runbook, StringComparison.Ordinal);
+        Assert.Contains("Connection Pooling", runbook, StringComparison.Ordinal);
+        Assert.Contains("Timeouts and Retries", runbook, StringComparison.Ordinal);
+        Assert.Contains("Transactions", runbook, StringComparison.Ordinal);
+        Assert.Contains("Migrations", runbook, StringComparison.Ordinal);
+        Assert.Contains("Multi-Tenancy", runbook, StringComparison.Ordinal);
+        Assert.Contains("Raw SQL", runbook, StringComparison.Ordinal);
+        Assert.Contains("Performance Tuning", runbook, StringComparison.Ordinal);
+        Assert.Contains("Troubleshooting", runbook, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
