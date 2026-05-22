@@ -171,11 +171,13 @@ var addProvOpt = new Option<string>("--provider") { Description = "Database prov
 var addAsmOpt = new Option<string>("--assembly") { Description = "Path to assembly containing DbContext and entities", Required = true };
 var addOutOpt = new Option<string>("--output") { Description = "Output directory for migrations", DefaultValueFactory = _ => "Migrations" };
 var addForceOpt = new Option<bool>("--force") { Description = "Allow destructive table/column drops when generating the migration." };
+var addAttributeOnlyOpt = new Option<bool>("--attribute-only") { Description = "Generate from attribute-only entity scanning instead of a design-time DbContext." };
 add.Add(migNameArg);
 add.Add(addProvOpt);
 add.Add(addAsmOpt);
 add.Add(addOutOpt);
 add.Add(addForceOpt);
+add.Add(addAttributeOnlyOpt);
 add.SetAction((ParseResult result) =>
 {
     try
@@ -185,6 +187,7 @@ add.SetAction((ParseResult result) =>
         var asmPath = result.GetValue(addAsmOpt)!;
         var output = result.GetValue(addOutOpt)!;
         var force = result.GetValue(addForceOpt);
+        var attributeOnly = result.GetValue(addAttributeOnlyOpt);
         if (!File.Exists(asmPath))
         {
             Console.Error.WriteLine($"Assembly '{asmPath}' not found.");
@@ -197,36 +200,7 @@ add.SetAction((ParseResult result) =>
             ? JsonSerializer.Deserialize<SchemaSnapshot>(File.ReadAllText(snapshotPath)) ?? new SchemaSnapshot()
             : new SchemaSnapshot();
 
-        // M1 fix: try to find a DbContext subclass in the assembly and use Build(DbContext)
-        // so fluent model configuration (ToTable, HasColumnName, HasKey, relationships) is
-        // included in the snapshot. Falls back to Build(assembly) for attribute-only models.
-        SchemaSnapshot newSnap;
-        var ctxType = assembly.GetTypes()
-            .FirstOrDefault(t => t.IsClass && !t.IsAbstract && typeof(DbContext).IsAssignableFrom(t));
-        if (ctxType != null)
-        {
-            try
-            {
-                // Try to instantiate the DbContext with a minimal in-memory SQLite connection
-                // just to extract the model configuration.
-                using var modelCn = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
-                modelCn.Open();
-                var provider = new nORM.Providers.SqliteProvider();
-                using var modelCtx = (DbContext)Activator.CreateInstance(ctxType, modelCn, provider)!;
-                newSnap = SchemaSnapshotBuilder.Build(modelCtx);
-                Console.WriteLine($"Using fluent model from {ctxType.Name}.");
-            }
-            catch (Exception ex) when (ex is MissingMethodException or TargetInvocationException or InvalidOperationException or MemberAccessException)
-            {
-                // DbContext may require constructor args we can't provide — fall back
-                newSnap = SchemaSnapshotBuilder.Build(assembly);
-                Console.WriteLine($"Warning: Could not instantiate DbContext for fluent model ({ex.GetType().Name}: {ex.Message}); using attribute-only snapshot.");
-            }
-        }
-        else
-        {
-            newSnap = SchemaSnapshotBuilder.Build(assembly);
-        }
+        var newSnap = BuildMigrationSnapshot(assembly, attributeOnly);
         var diff = SchemaDiffer.Diff(oldSnap, newSnap);
         if (!diff.HasChanges)
         {
@@ -277,6 +251,76 @@ migrations.Add(add);
 root.Add(migrations);
 
 return await root.Parse(args).InvokeAsync(new InvocationConfiguration());
+
+static SchemaSnapshot BuildMigrationSnapshot(Assembly assembly, bool attributeOnly)
+{
+    var factory = FindDesignTimeFactory(assembly);
+    if (factory != null)
+    {
+        using var ctx = CreateDesignTimeContext(factory.Value.FactoryType, factory.Value.InterfaceType);
+        Console.WriteLine($"Using design-time DbContext factory {factory.Value.FactoryType.FullName}.");
+        return SchemaSnapshotBuilder.Build(ctx);
+    }
+
+    if (attributeOnly)
+    {
+        Console.WriteLine("Using attribute-only model snapshot.");
+        return SchemaSnapshotBuilder.Build(assembly);
+    }
+
+    var ctxType = assembly.GetTypes()
+        .FirstOrDefault(t => t.IsClass && !t.IsAbstract && typeof(DbContext).IsAssignableFrom(t));
+    if (ctxType == null)
+    {
+        throw new InvalidOperationException(
+            "No DbContext type was found. Add an INormDesignTimeDbContextFactory<TContext> implementation " +
+            "or re-run with --attribute-only to generate from attributes only.");
+    }
+
+    try
+    {
+        using var modelCn = new SqliteConnection("Data Source=:memory:");
+        modelCn.Open();
+        var provider = new SqliteProvider();
+        using var modelCtx = (DbContext)Activator.CreateInstance(ctxType, modelCn, provider)!;
+        Console.WriteLine($"Using fluent model from {ctxType.Name}.");
+        return SchemaSnapshotBuilder.Build(modelCtx);
+    }
+    catch (Exception ex) when (ex is MissingMethodException or TargetInvocationException or InvalidOperationException or MemberAccessException)
+    {
+        throw new InvalidOperationException(
+            $"Could not instantiate DbContext type '{ctxType.FullName}' for migration generation. " +
+            "Add an INormDesignTimeDbContextFactory<TContext> implementation or re-run with --attribute-only " +
+            "if you intentionally want to ignore fluent model configuration.",
+            ex);
+    }
+}
+
+static (Type FactoryType, Type InterfaceType)? FindDesignTimeFactory(Assembly assembly)
+{
+    foreach (var type in assembly.GetTypes().Where(static t => t.IsClass && !t.IsAbstract))
+    {
+        var interfaceType = type.GetInterfaces().FirstOrDefault(static i =>
+            i.IsGenericType && i.GetGenericTypeDefinition() == typeof(INormDesignTimeDbContextFactory<>));
+        if (interfaceType != null)
+            return (type, interfaceType);
+    }
+
+    return null;
+}
+
+static DbContext CreateDesignTimeContext(Type factoryType, Type interfaceType)
+{
+    var factory = Activator.CreateInstance(factoryType)
+        ?? throw new InvalidOperationException($"Could not create design-time factory '{factoryType.FullName}'.");
+    var method = interfaceType.GetMethod(nameof(INormDesignTimeDbContextFactory<DbContext>.CreateDbContext))
+        ?? throw new InvalidOperationException($"Design-time factory '{factoryType.FullName}' does not expose CreateDbContext.");
+    var context = method.Invoke(factory, new object[] { Array.Empty<string>() })
+        ?? throw new InvalidOperationException($"Design-time factory '{factoryType.FullName}' returned null.");
+    if (context is not DbContext dbContext)
+        throw new InvalidOperationException($"Design-time factory '{factoryType.FullName}' did not return a nORM DbContext.");
+    return dbContext;
+}
 
 static DbConnection CreateConnection(string provider, string connectionString)
 {

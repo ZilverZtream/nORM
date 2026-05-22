@@ -47,7 +47,7 @@ public class CliIntegrationTests
             var modelAssembly = Path.Combine(tempRoot, "bin", "Release", "net8.0", "CliModel.dll");
             var migrationsDir = Path.Combine(tempRoot, "Migrations");
             var result = RunCli(
-                $"migrations add WeirdMigration --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)}",
+                $"migrations add WeirdMigration --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)} --attribute-only",
                 root);
 
             Assert.Equal(0, result.ExitCode);
@@ -56,6 +56,36 @@ public class CliIntegrationTests
             Assert.Contains("\\n", File.ReadAllText(generated), StringComparison.Ordinal);
 
             RunDotNet("build -c Release --no-restore --nologo", tempRoot);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
+    public void Migrations_add_without_context_requires_explicit_attribute_only()
+    {
+        var root = FindRepositoryRoot();
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_cli_no_context_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(tempRoot, "CliModel.csproj"), ModelProjectXml(root), Encoding.UTF8);
+            File.WriteAllText(Path.Combine(tempRoot, "Model.cs"), WeirdModelSource, Encoding.UTF8);
+
+            RunDotNet("build -c Release --nologo", tempRoot);
+
+            var modelAssembly = Path.Combine(tempRoot, "bin", "Release", "net8.0", "CliModel.dll");
+            var migrationsDir = Path.Combine(tempRoot, "Migrations");
+            var result = RunCli(
+                $"migrations add NeedsExplicitMode --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)}",
+                root);
+
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.Contains("No DbContext type was found", result.Stderr, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("--attribute-only", result.Stderr, StringComparison.Ordinal);
         }
         finally
         {
@@ -101,7 +131,7 @@ public class CliIntegrationTests
 
             var modelAssembly = Path.Combine(tempRoot, "bin", "Release", "net8.0", "CliModel.dll");
             var blocked = RunCli(
-                $"migrations add RenameTotal --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)}",
+                $"migrations add RenameTotal --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)} --attribute-only",
                 root);
 
             Assert.Equal(3, blocked.ExitCode);
@@ -110,7 +140,7 @@ public class CliIntegrationTests
             Assert.Empty(Directory.EnumerateFiles(migrationsDir, "Migration_*_RenameTotal.cs"));
 
             var forced = RunCli(
-                $"migrations add RenameTotal --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)} --force",
+                $"migrations add RenameTotal --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)} --attribute-only --force",
                 root);
 
             Assert.Equal(0, forced.ExitCode);
@@ -119,6 +149,40 @@ public class CliIntegrationTests
             Assert.Contains("WARNING: destructive schema changes", source, StringComparison.Ordinal);
             Assert.Contains("Possible rename candidate", source, StringComparison.Ordinal);
             Assert.Contains("Orders.TotalAmount", source, StringComparison.Ordinal);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
+    public void Migrations_add_uses_design_time_factory_for_fluent_model()
+    {
+        var root = FindRepositoryRoot();
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_cli_factory_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(tempRoot, "CliModel.csproj"), ModelProjectXml(root), Encoding.UTF8);
+            File.WriteAllText(Path.Combine(tempRoot, "Model.cs"), DesignTimeFactoryModelSource, Encoding.UTF8);
+
+            RunDotNet("build -c Release --nologo", tempRoot);
+
+            var modelAssembly = Path.Combine(tempRoot, "bin", "Release", "net8.0", "CliModel.dll");
+            var migrationsDir = Path.Combine(tempRoot, "Migrations");
+            var result = RunCli(
+                $"migrations add FactoryModel --provider sqlite --assembly {Quote(modelAssembly)} --output {Quote(migrationsDir)}",
+                root);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("design-time DbContext factory", result.Stdout, StringComparison.OrdinalIgnoreCase);
+
+            var generated = Directory.EnumerateFiles(migrationsDir, "Migration_*_FactoryModel.cs").Single();
+            var source = File.ReadAllText(generated);
+            Assert.Contains("FactoryTable", source, StringComparison.Ordinal);
+            Assert.Contains("display_name", source, StringComparison.Ordinal);
         }
         finally
         {
@@ -242,6 +306,42 @@ public class CliIntegrationTests
             public int Id { get; set; }
 
             public decimal? TotalAmount { get; set; }
+        }
+        """;
+
+    private const string DesignTimeFactoryModelSource = """
+        using System.Data.Common;
+        using Microsoft.Data.Sqlite;
+        using nORM.Configuration;
+        using nORM.Core;
+        using nORM.Migration;
+        using nORM.Providers;
+
+        public sealed class FactoryEntity
+        {
+            public int Id { get; set; }
+            public string Name { get; set; } = "";
+        }
+
+        public sealed class FactoryContext(DbConnection connection, DatabaseProvider provider, DbContextOptions? options = null)
+            : DbContext(connection, provider, options);
+
+        public sealed class FactoryDesignTimeContext : INormDesignTimeDbContextFactory<FactoryContext>
+        {
+            public FactoryContext CreateDbContext(string[] args)
+            {
+                var connection = new SqliteConnection("Data Source=:memory:");
+                connection.Open();
+                var options = new DbContextOptions
+                {
+                    OnModelCreating = mb => mb.Entity<FactoryEntity>()
+                        .ToTable("FactoryTable")
+                        .HasKey(e => e.Id)
+                        .Property(e => e.Name)
+                        .HasColumnName("display_name")
+                };
+                return new FactoryContext(connection, new SqliteProvider(), options);
+            }
         }
         """;
 
