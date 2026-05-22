@@ -836,12 +836,16 @@ Evidence:
 - `NormQueryProvider.Compiled.cs` has a bounded compiled parameter-set cache.
 - Cache policy docs exist.
 - Many tests cover cache collision and tenant isolation.
+- The RC release gate now runs a dedicated `cache memory bounds gate`.
+- `CacheMemoryBoundReleaseGateTests` churns bounded cache primitives and the
+  compiled materializer store beyond capacity and asserts counts/evictions.
 
 Scope:
 
-- Run cache stress tests in RC mode with memory baselines.
-- Add diagnostics for cache size/eviction where missing.
-- Prove tenant and provider dimensions are always included in cache keys.
+- Keep cache stress tests in RC mode with count-based memory bounds.
+- Keep public diagnostics for source-generated materializer cache
+  size/hits/misses/evictions.
+- Keep tenant and provider cache-key isolation tests in the adversarial suite.
 
 Done when:
 

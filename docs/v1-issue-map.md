@@ -58,7 +58,7 @@ still needs release evidence.
 | 30 | Finish MySQL optimistic concurrency guarantees | Verified | MySQL affected-row OCC is refused by default through `RequireMatchedRowOccSemantics=true`; matched-row mode and explicit weakened opt-in are documented and covered by regression tests. |
 | 31 | Prove AOT and trimming claims with real publish tests | Verified | AOT/trimming is explicitly unsupported for v1; annotation tests and a negative `PublishTrimmed=true` smoke test lock the current boundary with real publish diagnostics. |
 | 32 | Harden source generator limitations | Verified | Source-generation docs now define the v1 materializer support contract and diagnostics; package-consumer tests verify unsupported mapped properties report `nORMSG005`. |
-| 33 | Stress cache and plan memory bounds as release gates | In Progress | Cache policy exists; RC memory stress evidence remains open. |
+| 33 | Stress cache and plan memory bounds as release gates | Verified | RC gate now has a dedicated cache memory bounds step; cache policy names the release evidence, and stress tests assert bounded counts/evictions for LRU, bounded FIFO, and compiled materializer caches. |
 | 34 | Normalize public exception taxonomy | In Progress | Some unsupported query paths use nORM exceptions; remaining public paths need audit. |
 | 35 | Complete logging and redaction coverage | In Progress | Connection-string and SQL redaction exist; artifact/interceptor/benchmark coverage remains open. |
 | 36 | Freeze interceptor semantics | In Progress | Interceptor contract docs exist; retry/transaction/mutation verification remains open. |

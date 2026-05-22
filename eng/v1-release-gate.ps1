@@ -155,6 +155,7 @@ $compiledFilter = 'FullyQualifiedName~CompiledQueryTests.Compiled_query_multi_pa
 $parityFilter = 'FullyQualifiedName~ProviderBindingParityTests|FullyQualifiedName~CompileTimeQueryParameterParityTests|FullyQualifiedName~CompiledQueryProviderMatrixTests|FullyQualifiedName~SourceGenBasicEquivalenceTests|FullyQualifiedName~SourceGenRuntimeParityTests|FullyQualifiedName~CompileTimeQueryLifecycleTests'
 $bulkFilter = 'FullyQualifiedName~BulkProviderParityTests|FullyQualifiedName~BulkTransactionAtomicityTests|FullyQualifiedName~BulkTempTableLeakTests|FullyQualifiedName~PostgresBulkDuplicateTests|FullyQualifiedName~ProviderBehaviorEquivalenceTests|FullyQualifiedName~ProviderParityDepthTests|FullyQualifiedName~ProviderParityQueryPagingTests'
 $migrationFilter = 'FullyQualifiedName~LiveProviderSavepointMigrationTests|FullyQualifiedName~SqlServerMigrationRunnerTests|FullyQualifiedName~PostgresMigrationRunnerTests|FullyQualifiedName~MigrationCommitCancellationTests|FullyQualifiedName~MigrationCancellationTests|FullyQualifiedName~MigrationReplayFailureTests|FullyQualifiedName~MigrationRunnerCoverageTests'
+$cacheMemoryFilter = 'FullyQualifiedName~CacheMemoryBoundReleaseGateTests|FullyQualifiedName~CacheFaultInjectionStressTests.BoundedCacheEvictionUnderContention_30Tasks_SizeBounded_ValuesCorrect|FullyQualifiedName~ConcurrentLruCacheStressTests|FullyQualifiedName~CacheLockConcurrencyTests'
 $adversarialFilter = 'FullyQualifiedName~Concurrency|FullyQualifiedName~Concurrent|FullyQualifiedName~Adversarial|FullyQualifiedName~FaultInjected|FullyQualifiedName~Stress'
 
 Write-Host "nORM v1 release gate"
@@ -199,6 +200,7 @@ if ($Mode -eq 'rc') {
     Invoke-TestStep 'provider/source-gen parity' $parityFilter
     Invoke-TestStep 'bulk/provider parity' $bulkFilter
     Invoke-TestStep 'migration provider gate' $migrationFilter
+    Invoke-TestStep 'cache memory bounds gate' $cacheMemoryFilter
     Invoke-TestStep 'concurrency/adversarial gate' $adversarialFilter
     Invoke-TestStep 'live provider gate second pass' $liveFilter
     Invoke-TestStep 'full test suite second pass' ''
