@@ -32,8 +32,8 @@ Status values:
 | `AsSplitQuery`, `AsNoTracking`, caching, temporal `AsOf` | Supported | These are nORM-specific query modifiers with dedicated tests. |
 | Raw SQL composition | Constrained | `FromSqlRawAsync<T>` executes caller-provided SQL. Caller owns SQL shape and parameter safety until the safer raw SQL API gate is completed. |
 | `AsAsyncEnumerable` | Constrained | Streams ordinary queries. Include and group-join streaming paths are rejected because they require coordinated materialization. |
-| `ExecuteUpdateAsync` | Constrained | Simple filtered entity queries only. Grouped, ordered, joined, and aggregated queries are rejected. Set expressions currently allow constants and captured values through the existing bulk CUD path. |
-| `ExecuteDeleteAsync` | Constrained | Simple filtered entity queries only. Grouped, ordered, joined, and aggregated queries are rejected. |
+| `ExecuteUpdateAsync` | Constrained | Simple filtered entity queries only. Grouped, ordered, joined, distinct, paged, and aggregated queries are rejected. Assignment values allow literal constants and precomputed captured locals only; method calls, inline computed values, column-based updates, and server expressions are post-v1. |
+| `ExecuteDeleteAsync` | Constrained | Simple filtered entity queries only. Grouped, ordered, joined, distinct, paged, and aggregated queries are rejected. |
 | Arbitrary CLR methods in predicates | Unsupported | Unsupported methods/members throw from expression translation instead of being evaluated client-side in filters. |
 | Arbitrary client evaluation before server filtering/paging | Unsupported | Server filters and paging must happen before any allowed client projection tail. |
 

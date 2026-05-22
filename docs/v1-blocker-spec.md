@@ -525,20 +525,27 @@ Done when:
 
 ### 22. Define bulk update value-expression support
 
-Problem: `ExecuteUpdate` set values are limited to constants and captured local
-values. That is safer than invoking arbitrary expressions, but it is narrower
-than many users expect from EF-style `ExecuteUpdate`.
+Status: Verified.
+
+Problem addressed: `ExecuteUpdate` set values are limited to literal constants
+and precomputed captured local values. That is safer than invoking arbitrary
+expressions and is now documented as the v1 contract instead of being left as an
+implicit EF-style expectation.
 
 Evidence:
 
 - `BulkCudBuilder.TryGetSetValue` only accepts constants and captured fields.
 - `BatchCudTests` verifies method calls are rejected.
+- `BatchCudTests` verifies inline computed assignment values are rejected with
+  an actionable message.
+- `docs/bulk-operations.md` documents that server-side computed updates are a
+  post-v1 feature.
 
 Scope:
 
-- Document supported set expressions.
-- Decide whether computed server expressions are v1 or post-v1.
-- Add clear exception messages for unsupported computed updates.
+- Keep supported set expressions documented.
+- Keep computed server expressions out of the v1 compatibility contract.
+- Keep clear exception messages for unsupported computed updates.
 
 Done when:
 

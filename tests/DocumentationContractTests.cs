@@ -290,6 +290,10 @@ public class DocumentationContractTests
         Assert.Contains("tenant", contract, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("CancellationToken.None", contract, StringComparison.Ordinal);
         Assert.Contains("SupportsNativeBulkInsert", contract, StringComparison.Ordinal);
+        Assert.Contains("`ExecuteUpdateAsync` Set Values", contract, StringComparison.Ordinal);
+        Assert.Contains("precomputed captured local values", contract, StringComparison.Ordinal);
+        Assert.Contains("inline computed values", contract, StringComparison.Ordinal);
+        Assert.Contains("Server-side computed updates are a post-v1 feature", contract, StringComparison.Ordinal);
     }
 
     [Fact]
