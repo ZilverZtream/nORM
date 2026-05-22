@@ -97,6 +97,22 @@ public class DocumentationContractTests
         Assert.Contains("silently falls back", contract, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Readme_links_to_transaction_contract()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var contract = File.ReadAllText(Path.Combine(root, "docs", "transactions.md"));
+
+        Assert.Contains("docs/transactions.md", readme, StringComparison.Ordinal);
+        Assert.Contains("Database.BeginTransactionAsync", contract, StringComparison.Ordinal);
+        Assert.Contains("AmbientTransactionPolicy", contract, StringComparison.Ordinal);
+        Assert.Contains("FailFast", contract, StringComparison.Ordinal);
+        Assert.Contains("BestEffort", contract, StringComparison.Ordinal);
+        Assert.Contains("Ignore", contract, StringComparison.Ordinal);
+        Assert.Contains("CancellationToken.None", contract, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
