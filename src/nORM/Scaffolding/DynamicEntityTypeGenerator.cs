@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Security.Cryptography;
@@ -19,6 +20,8 @@ namespace nORM.Scaffolding
     /// Reuses a single shared <see cref="ModuleBuilder"/> to prevent unloadable assembly
     /// accumulation when types are evicted from cache.
     /// </summary>
+    [RequiresDynamicCode("Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")]
+    [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
     public class DynamicEntityTypeGenerator
     {
         private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool IsKey, bool IsAuto, int? MaxLength);
@@ -61,6 +64,8 @@ namespace nORM.Scaffolding
         /// <returns>The generated <see cref="Type"/>.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection"/> is <c>null</c>.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="tableName"/> is null or whitespace.</exception>
+        [RequiresDynamicCode("Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")]
+        [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
         public async Task<Type> GenerateEntityTypeAsync(DbConnection connection, string tableName)
         {
             ArgumentNullException.ThrowIfNull(connection);
@@ -84,6 +89,8 @@ namespace nORM.Scaffolding
         /// <returns>The generated <see cref="Type"/>.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection"/> is <c>null</c>.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="tableName"/> is null or whitespace.</exception>
+        [RequiresDynamicCode("Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")]
+        [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
         public Type GenerateEntityType(DbConnection connection, string tableName)
         {
             ArgumentNullException.ThrowIfNull(connection);
