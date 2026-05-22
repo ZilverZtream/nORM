@@ -317,6 +317,11 @@ is present, so fluent mapping is included in generated migration snapshots. Use
 `--attribute-only` only when you intentionally want to ignore fluent model
 configuration. See [Design-Time Migrations](docs/design-time-migrations.md).
 
+`norm database drop` is guarded: destructive execution requires `--yes`, and
+`--dry-run` previews the files or tables that would be removed. The tool refuses
+to drop known system databases such as `master`, `postgres`, `mysql`, and
+`information_schema`.
+
 ## Production-Ready Features
 
 ### Thread Safety
