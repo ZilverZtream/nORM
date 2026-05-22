@@ -494,6 +494,9 @@ Benchmark claims must follow the reproducibility and baseline rules in
 Before public release, use focused issues or pull requests with a clear reproduction, test coverage, and benchmark data when performance is involved.
 Repository artifact and encoding rules are documented in
 [Repository Hygiene](docs/repository-hygiene.md).
+Project process is documented in [CONTRIBUTING.md](CONTRIBUTING.md),
+[SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md), [CHANGELOG.md](CHANGELOG.md),
+and the [Release Checklist](docs/release-checklist.md).
 
 ### Development Setup
 
