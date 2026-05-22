@@ -84,11 +84,19 @@ namespace nORM.SourceGenerators
             }
         }
 
+        /// <summary>
+        /// Registers the syntax receiver used to collect source-generation candidates.
+        /// </summary>
+        /// <param name="context">The Roslyn generator initialization context.</param>
         public void Initialize(GeneratorInitializationContext context)
         {
             context.RegisterForSyntaxNotifications(() => new SyntaxReceiver());
         }
 
+        /// <summary>
+        /// Emits materializer and compile-time query source for annotated user code.
+        /// </summary>
+        /// <param name="context">The Roslyn generator execution context.</param>
         public void Execute(GeneratorExecutionContext context)
         {
             if (context.SyntaxContextReceiver is not SyntaxReceiver receiver)
