@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
+using nORM.Cli;
 using nORM.Configuration;
 using nORM.Core;
 using nORM.Migration;
@@ -246,18 +247,7 @@ add.SetAction((ParseResult result) =>
         var className = $"Migration_{version}_{ToCSharpIdentifier(name)}";
         var filePath = Path.Combine(output, className + ".cs");
 
-        var sb = new StringBuilder();
-        sb.AppendLine("using System.Data.Common;");
-        sb.AppendLine("using System.Threading;");
-        sb.AppendLine("using nORM.Migration;");
-        sb.AppendLine();
-        sb.AppendLine($"public class {className} : Migration");
-        sb.AppendLine("{");
-        sb.AppendLine($"    public {className}() : base({version}, {ToCSharpStringLiteral(name)}) {{ }}");
-        AppendMethod("Up", sql.PreTransactionUp, sql.Up, sql.PostTransactionUp, sb);
-        AppendMethod("Down", sql.PreTransactionDown, sql.Down, sql.PostTransactionDown, sb);
-        sb.AppendLine("}");
-        File.WriteAllText(filePath, sb.ToString());
+        File.WriteAllText(filePath, MigrationCodeWriter.WriteMigrationSource(className, version, name, sql));
 
         var snapJson = JsonSerializer.Serialize(newSnap, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(snapshotPath, snapJson);
@@ -321,80 +311,6 @@ static int Fail(Exception ex, int exitCode = 1)
 {
     Console.Error.WriteLine($"Error: {ex.Message}");
     return exitCode;
-}
-
-static void AppendMethod(string methodName, IReadOnlyList<string>? preStatements, IReadOnlyList<string> statements, IReadOnlyList<string>? postStatements, StringBuilder sb)
-{
-    sb.AppendLine($"    public override void {methodName}(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)");
-    sb.AppendLine("    {");
-
-    // MG-2: Pre-transaction statements (e.g. PRAGMA foreign_keys=OFF) run outside the transaction.
-    if (preStatements != null && preStatements.Count > 0)
-    {
-        sb.AppendLine("        // Pre-transaction statements: execute outside the transaction.");
-        foreach (var pre in preStatements)
-        {
-            sb.AppendLine("        ct.ThrowIfCancellationRequested();");
-            sb.AppendLine($"        using (var preCmd = connection.CreateCommand()) {{ preCmd.CommandText = {ToCSharpStringLiteral(pre)}; preCmd.ExecuteNonQuery(); }}");
-        }
-    }
-
-    if (statements.Count > 0)
-    {
-        sb.AppendLine("        foreach (var sql in new[] {");
-        for (int i = 0; i < statements.Count; i++)
-        {
-            var comma = i < statements.Count - 1 ? "," : string.Empty;
-            sb.AppendLine($"            {ToCSharpStringLiteral(statements[i])}{comma}");
-        }
-        sb.AppendLine("        })");
-        sb.AppendLine("        {");
-        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
-        sb.AppendLine("            using var cmd = connection.CreateCommand();");
-        sb.AppendLine("            cmd.Transaction = transaction;");
-        sb.AppendLine("            cmd.CommandText = sql;");
-        sb.AppendLine("            cmd.ExecuteNonQuery();");
-        sb.AppendLine("        }");
-    }
-
-    // MG-2: Post-transaction statements (e.g. PRAGMA foreign_keys=ON) run after commit.
-    if (postStatements != null && postStatements.Count > 0)
-    {
-        sb.AppendLine("        // Post-transaction statements: execute after the transaction commits.");
-        foreach (var post in postStatements)
-        {
-            sb.AppendLine("        ct.ThrowIfCancellationRequested();");
-            sb.AppendLine($"        using (var postCmd = connection.CreateCommand()) {{ postCmd.CommandText = {ToCSharpStringLiteral(post)}; postCmd.ExecuteNonQuery(); }}");
-        }
-    }
-
-    sb.AppendLine("    }");
-}
-
-static string ToCSharpStringLiteral(string value)
-{
-    var builder = new StringBuilder(value.Length + 2);
-    builder.Append('"');
-    foreach (var ch in value)
-    {
-        builder.Append(ch switch
-        {
-            '\\' => "\\\\",
-            '"' => "\\\"",
-            '\0' => "\\0",
-            '\a' => "\\a",
-            '\b' => "\\b",
-            '\f' => "\\f",
-            '\n' => "\\n",
-            '\r' => "\\r",
-            '\t' => "\\t",
-            '\v' => "\\v",
-            _ when char.IsControl(ch) => "\\u" + ((int)ch).ToString("x4"),
-            _ => ch.ToString()
-        });
-    }
-    builder.Append('"');
-    return builder.ToString();
 }
 
 static string ToCSharpIdentifier(string value)

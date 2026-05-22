@@ -22,6 +22,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../src/nORM.csproj" />
+    <ProjectReference Include="../src/dotnet-norm/dotnet-norm.csproj" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../src/nORM.SourceGenerators/nORM.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
