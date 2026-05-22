@@ -29,8 +29,9 @@ function Invoke-Step {
 
     Write-Host ""
     Write-Host "==> $Name"
+    $global:LASTEXITCODE = $null
     & $Command
-    if ($LASTEXITCODE -ne 0) {
+    if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) {
         throw "Step failed: $Name (exit code $LASTEXITCODE)"
     }
 }
@@ -76,6 +77,52 @@ function Test-ProviderConfigured {
         [Environment]::GetEnvironmentVariable("NORM_TEST_${Name}_CS"))
 }
 
+function Get-NormVersion {
+    $propsPath = Join-Path $root 'Directory.Build.props'
+    [xml]$props = Get-Content $propsPath
+    return $props.Project.PropertyGroup.NormVersion
+}
+
+function Clear-PackageOutput {
+    param(
+        [string]$Directory,
+        [string]$PackageId
+    )
+
+    if (-not (Test-Path $Directory)) {
+        return
+    }
+
+    Get-ChildItem -LiteralPath $Directory -File -Filter "$PackageId.*.nupkg" | Remove-Item -Force
+    Get-ChildItem -LiteralPath $Directory -File -Filter "$PackageId.*.snupkg" | Remove-Item -Force
+}
+
+function Assert-CurrentPackageOutput {
+    param(
+        [string]$Directory,
+        [string]$PackageId,
+        [string]$Version
+    )
+
+    $expected = @(
+        "$PackageId.$Version.nupkg",
+        "$PackageId.$Version.snupkg"
+    ) | Sort-Object
+    $actual = Get-ChildItem -LiteralPath $Directory -File -Filter "$PackageId.*.*nupkg" |
+        Select-Object -ExpandProperty Name |
+        Sort-Object
+
+    if (@($actual).Count -ne @($expected).Count) {
+        throw "Unexpected package artifacts for $PackageId in $Directory. Expected: $($expected -join ', '); actual: $($actual -join ', ')"
+    }
+
+    for ($i = 0; $i -lt $expected.Count; $i++) {
+        if ($actual[$i] -ne $expected[$i]) {
+            throw "Unexpected package artifact for $PackageId at index $i. Expected '$($expected[$i])', actual '$($actual[$i])'."
+        }
+    }
+}
+
 $liveProviders = @()
 if (Test-ProviderConfigured 'SQLSERVER') { $liveProviders += 'SQL Server' }
 if (Test-ProviderConfigured 'POSTGRES') { $liveProviders += 'PostgreSQL' }
@@ -99,6 +146,8 @@ if (-not $env:NORM_MIN_LIVE_PROVIDERS) {
     $env:NORM_MIN_LIVE_PROVIDERS = "$($liveProviders.Count)"
 }
 
+$normVersion = Get-NormVersion
+
 $liveFilter = 'FullyQualifiedName~LiveProvider|FullyQualifiedName~LiveCrossProviderTests|FullyQualifiedName~ProviderSwapSmokeTests|FullyQualifiedName~ProviderParity|FullyQualifiedName~ProviderBehaviorEquivalenceTests|FullyQualifiedName~ProviderBindingParityTests|FullyQualifiedName~BulkProviderParityTests|FullyQualifiedName~CrossProviderAdversarialTests|FullyQualifiedName~ProviderDmlMigrationParityTests|FullyQualifiedName~SqlServerMigrationRunnerTests|FullyQualifiedName~PostgresMigrationRunnerTests|FullyQualifiedName~BulkTransactionAtomicityTests.Postgres_BulkUpdate_BatchFailure_RollsBackEarlierBatches_Live|FullyQualifiedName~BulkTempTableLeakTests.SqlServer|FullyQualifiedName~PostgresBulkDuplicateTests'
 $navigationFilter = 'FullyQualifiedName~BatchedNavigationBatchTests|FullyQualifiedName~BatchedNavigationCancellationParityTests|FullyQualifiedName~NavigationCancellationLeakTests|FullyQualifiedName~BatchedNavigationProviderCapTests|FullyQualifiedName~NavigationLoaderSqlServerCapTests'
 $transactionFilter = 'FullyQualifiedName~TransactionAtomicCompletionTests|FullyQualifiedName~TransactionRaceTests|FullyQualifiedName~TransactionLifecycleTests|FullyQualifiedName~SyncTransactionCleanupTests|FullyQualifiedName~TransactionFaultInjectionTests'
@@ -116,7 +165,12 @@ Write-Host "  Live providers:      $($liveProviders -join ', ')"
 Write-Host "  Min live providers:  $MinLiveProviders"
 Write-Host "  Benchmark:           $(if ($SkipBenchmark) { 'skipped' } else { 'enabled' })"
 Write-Host "  Provider matrix:     $(if ($SkipBenchmark -or $SkipProviderMatrixBenchmark -or $Mode -ne 'rc') { 'skipped' } else { 'enabled' })"
+Write-Host "  Package version:     $normVersion"
 
+Invoke-Step 'clean package outputs before build' {
+    Clear-PackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'nORM'
+    Clear-PackageOutput (Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') "bin\$Configuration") 'dotnet-norm'
+}
 Invoke-Step 'restore' { dotnet restore $solutionPath }
 Invoke-Step 'build' { dotnet build $solutionPath --no-restore -c $Configuration --nologo }
 Invoke-TestStep 'public API snapshot' 'FullyQualifiedName~PublicApiSnapshotTests'
@@ -164,8 +218,16 @@ if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'r
     }
 }
 
+Invoke-Step 'clean package outputs' {
+    Clear-PackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'nORM'
+    Clear-PackageOutput (Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') "bin\$Configuration") 'dotnet-norm'
+}
 Invoke-Step 'pack nORM' { dotnet pack $runtimeProjectPath -c $Configuration --no-build --include-symbols -p:SymbolPackageFormat=snupkg }
 Invoke-Step 'pack dotnet-norm' { dotnet pack $toolProjectPath -c $Configuration --no-build --include-symbols -p:SymbolPackageFormat=snupkg }
+Invoke-Step 'validate package outputs' {
+    Assert-CurrentPackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'nORM' $normVersion
+    Assert-CurrentPackageOutput (Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') "bin\$Configuration") 'dotnet-norm' $normVersion
+}
 
 Write-Host ""
 Write-Host "nORM v1 release gate passed."
