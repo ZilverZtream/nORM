@@ -196,17 +196,15 @@ public class LinqOperatorCardinalityTests
         Assert.Equal(2, count);
     }
 
-    // ─── Any (via Count) ─────────────────────────────────────────────────────
-    // Note: AnyAsync can fail with datatype mismatch on some SQLite configurations.
-    // Using Count > 0 as an equivalent idiom for "any rows exist".
+    // Any / All
 
     [Fact]
     public async Task Any_ZeroRows_ReturnsFalse()
     {
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
-        var count = await ctx.Query<CardItem>().CountAsync();
-        Assert.Equal(0, count);
+        Assert.False(await ctx.Query<CardItem>().AnyAsync());
+        Assert.False(ctx.Query<CardItem>().Any(x => x.CategoryId == 1));
     }
 
     [Fact]
@@ -215,29 +213,55 @@ public class LinqOperatorCardinalityTests
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
         InsertRow(cn, 1, "Alpha", 10);
-        var count = await ctx.Query<CardItem>().CountAsync();
-        Assert.True(count > 0);
+        Assert.True(await ctx.Query<CardItem>().AnyAsync());
+        Assert.True(ctx.Query<CardItem>().Any(x => x.CategoryId == 1));
     }
 
     [Fact]
-    public async Task Any_WithPredicate_NoMatch_ReturnsFalse()
+    public void Any_WithPredicate_NoMatch_ReturnsFalse()
     {
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
         InsertRow(cn, 1, "Alpha", 10);
-        var count = await ctx.Query<CardItem>().Where(x => x.CategoryId == 99).CountAsync();
-        Assert.Equal(0, count);
+        Assert.False(ctx.Query<CardItem>().Any(x => x.CategoryId == 99));
     }
 
     [Fact]
-    public async Task Any_WithPredicate_SomeMatch_ReturnsTrue()
+    public void Any_WithPredicate_SomeMatch_ReturnsTrue()
     {
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
         InsertRow(cn, 1, "Alpha", 10);
         InsertRow(cn, 2, "Beta", 20);
-        var count = await ctx.Query<CardItem>().Where(x => x.CategoryId == 2).CountAsync();
-        Assert.True(count > 0);
+        Assert.True(ctx.Query<CardItem>().Any(x => x.CategoryId == 2));
+    }
+
+    [Fact]
+    public void All_EmptyRows_ReturnsTrue()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        Assert.True(ctx.Query<CardItem>().All(x => x.Value > 0));
+    }
+
+    [Fact]
+    public void All_AllRowsMatch_ReturnsTrue()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        InsertRow(cn, 1, "Alpha", 10);
+        InsertRow(cn, 2, "Beta", 20);
+        Assert.True(ctx.Query<CardItem>().All(x => x.Value > 0));
+    }
+
+    [Fact]
+    public void All_SomeRowsDoNotMatch_ReturnsFalse()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn; using var _ctx = ctx;
+        InsertRow(cn, 1, "Alpha", 10);
+        InsertRow(cn, 2, "Beta", -1);
+        Assert.False(ctx.Query<CardItem>().All(x => x.Value > 0));
     }
 
     // ─── Skip / Take ────────────────────────────────────────────────────────
