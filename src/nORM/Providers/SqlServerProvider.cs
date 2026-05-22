@@ -594,6 +594,22 @@ END;";
             }
         }
 
+        /// <inheritdoc />
+        protected override async Task<string?> GetServerVersionStringAsync(DbConnection connection, CancellationToken ct)
+        {
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT CAST(SERVERPROPERTY('ProductVersion') AS VARCHAR(20))";
+            return await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
+        }
+
+        /// <inheritdoc />
+        protected override string? GetServerVersionString(DbConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT CAST(SERVERPROPERTY('ProductVersion') AS VARCHAR(20))";
+            return cmd.ExecuteScalar() as string;
+        }
+
         /// <summary>
         /// Creates a transaction savepoint using SQL Server's <see cref="SqlTransaction.Save(string)"/> API.
         /// Checks the CancellationToken before and after executing so that pre-cancelled

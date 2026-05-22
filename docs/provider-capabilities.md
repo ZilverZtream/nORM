@@ -19,11 +19,17 @@ Applications that need hard startup validation should call
 returns `false`. That probe validates driver availability and minimum server
 version for the provider's default local connection behavior.
 
-Applications with non-local databases should validate the actual configured
-connection by opening it during startup and then use the provider capability
+Every `DbContext` connection initialization also validates the actual opened
+connection against `Capabilities.MinimumServerVersion`. Unsupported server
+versions fail before query execution with a `NormConfigurationException` that
+names the provider, actual version, and minimum supported version.
+
+Applications with non-local databases should still validate the actual
+configured connection during service startup. Open the configured connection,
+construct the matching provider, and call `InitializeConnectionAsync` or create
+a short-lived `DbContext` and run a startup probe. Then use the capability
 descriptor to enforce feature requirements. For example, require
-`Capabilities.SupportsNativeBulkInsert` before enabling a native bulk-only path,
-or require `Capabilities.MinimumServerVersion` in operational checks.
+`Capabilities.SupportsNativeBulkInsert` before enabling a native bulk-only path.
 
 ## Feature Flags
 
@@ -33,6 +39,5 @@ implementations for a feature. SQLite, for example, does not advertise native
 bulk insert because nORM uses optimized batched SQL rather than a provider-native
 copy API.
 
-Unsupported database versions or missing drivers should fail early with
-actionable messages instead of surfacing later as translation or command
-execution errors.
+Unsupported database versions and missing drivers fail early with actionable
+messages instead of surfacing later as translation or command execution errors.

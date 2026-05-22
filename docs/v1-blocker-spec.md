@@ -729,12 +729,16 @@ up late.
 Evidence:
 
 - `PostgresProvider` and `MySqlProvider` use reflection parameter factories.
-- Provider capability docs exist but startup enforcement is the real gate.
+- Provider capability docs define `IsAvailableAsync` and actual-connection
+  startup validation.
+- Provider initialization validates opened connections against
+  `Capabilities.MinimumServerVersion` and throws `NormConfigurationException`
+  before query execution for unsupported versions.
 
 Scope:
 
-- Validate driver presence and minimum versions at startup.
-- Validate database version/capability where required.
+- Keep driver presence and minimum versions validated at startup.
+- Keep actual database version/capability checks on opened connections.
 - Produce actionable errors for missing optional drivers.
 
 Done when:

@@ -493,14 +493,104 @@ namespace nORM.Providers
         /// </summary>
         /// <param name="connection">The open connection to initialize.</param>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
-        public virtual Task InitializeConnectionAsync(DbConnection connection, CancellationToken ct) => Task.CompletedTask;
+        public virtual async Task InitializeConnectionAsync(DbConnection connection, CancellationToken ct)
+        {
+            ValidateConnection(connection);
+            await ValidateServerVersionAsync(connection, ct).ConfigureAwait(false);
+        }
 
         /// <summary>
         /// Synchronous counterpart to <see cref="InitializeConnectionAsync"/> allowing
         /// providers to perform connection initialization without asynchronous overhead.
         /// </summary>
         /// <param name="connection">The open connection to initialize.</param>
-        public virtual void InitializeConnection(DbConnection connection) { }
+        public virtual void InitializeConnection(DbConnection connection)
+        {
+            ValidateConnection(connection);
+            ValidateServerVersion(connection);
+        }
+
+        /// <summary>
+        /// Reads the connected database server version as provider-specific text.
+        /// Providers with a minimum-version contract override this method.
+        /// </summary>
+        protected virtual Task<string?> GetServerVersionStringAsync(DbConnection connection, CancellationToken ct)
+            => Task.FromResult<string?>(null);
+
+        /// <summary>
+        /// Reads the connected database server version synchronously as provider-specific text.
+        /// Providers with a minimum-version contract override this method.
+        /// </summary>
+        protected virtual string? GetServerVersionString(DbConnection connection) => null;
+
+        /// <summary>
+        /// Parses a provider version string into a comparable <see cref="Version"/>.
+        /// </summary>
+        protected virtual Version? ParseServerVersion(string? versionText)
+        {
+            if (string.IsNullOrWhiteSpace(versionText))
+                return null;
+
+            var text = versionText.Trim();
+            var start = -1;
+            for (var i = 0; i < text.Length; i++)
+            {
+                if (char.IsDigit(text[i]))
+                {
+                    start = i;
+                    break;
+                }
+            }
+
+            if (start < 0)
+                return null;
+
+            var end = start;
+            while (end < text.Length && (char.IsDigit(text[end]) || text[end] == '.'))
+                end++;
+
+            var candidate = text[start..end].Trim('.');
+            if (candidate.Length == 0)
+                return null;
+
+            var parts = candidate.Split('.', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 1)
+                candidate += ".0";
+
+            return Version.TryParse(candidate, out var version) ? version : null;
+        }
+
+        private async Task ValidateServerVersionAsync(DbConnection connection, CancellationToken ct)
+        {
+            var minimum = Capabilities.MinimumServerVersion;
+            if (minimum == null)
+                return;
+
+            var versionText = await GetServerVersionStringAsync(connection, ct).ConfigureAwait(false);
+            ValidateServerVersionText(versionText, minimum);
+        }
+
+        private void ValidateServerVersion(DbConnection connection)
+        {
+            var minimum = Capabilities.MinimumServerVersion;
+            if (minimum == null)
+                return;
+
+            var versionText = GetServerVersionString(connection);
+            ValidateServerVersionText(versionText, minimum);
+        }
+
+        private void ValidateServerVersionText(string? versionText, Version minimum)
+        {
+            var actual = ParseServerVersion(versionText);
+            if (actual == null)
+                throw new NormConfigurationException(
+                    $"{Capabilities.ProviderName} server version could not be determined during provider startup validation.");
+
+            if (actual < minimum)
+                throw new NormConfigurationException(
+                    $"{Capabilities.ProviderName} server version {actual} is not supported. Minimum supported version is {minimum}.");
+        }
 
         /// <summary>
         /// Gets the <see cref="CommandType"/> used when executing stored procedures for

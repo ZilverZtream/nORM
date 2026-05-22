@@ -138,7 +138,7 @@ namespace nORM.Providers
         /// <param name="ct">Cancellation token.</param>
         public override async Task InitializeConnectionAsync(DbConnection connection, CancellationToken ct)
         {
-            ValidateConnection(connection);
+            await base.InitializeConnectionAsync(connection, ct).ConfigureAwait(false);
             await using var pragmaCmd = connection.CreateCommand();
             pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
             await pragmaCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -150,7 +150,7 @@ namespace nORM.Providers
         /// <param name="connection">The connection to configure.</param>
         public override void InitializeConnection(DbConnection connection)
         {
-            ValidateConnection(connection);
+            base.InitializeConnection(connection);
             using var pragmaCmd = connection.CreateCommand();
             pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
             pragmaCmd.ExecuteNonQuery();
@@ -438,6 +438,22 @@ END;";
             {
                 return false;
             }
+        }
+
+        /// <inheritdoc />
+        protected override async Task<string?> GetServerVersionStringAsync(DbConnection connection, CancellationToken ct)
+        {
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = "select sqlite_version()";
+            return await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
+        }
+
+        /// <inheritdoc />
+        protected override string? GetServerVersionString(DbConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "select sqlite_version()";
+            return cmd.ExecuteScalar() as string;
         }
 
         /// <summary>
