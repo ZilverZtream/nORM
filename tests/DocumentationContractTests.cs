@@ -219,6 +219,8 @@ public class DocumentationContractTests
         var contract = File.ReadAllText(Path.Combine(root, "docs", "multi-tenancy-security.md"));
 
         Assert.Contains("docs/multi-tenancy-security.md", readme, StringComparison.Ordinal);
+        Assert.Contains("Boundary Inventory", contract, StringComparison.Ordinal);
+        Assert.Contains("Bypass-capable APIs", contract, StringComparison.Ordinal);
         Assert.Contains("Enforced Paths", contract, StringComparison.Ordinal);
         Assert.Contains("Caller-Controlled Paths", contract, StringComparison.Ordinal);
         Assert.Contains("FromSqlRawAsync", contract, StringComparison.Ordinal);
