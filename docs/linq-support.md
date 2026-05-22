@@ -17,7 +17,7 @@ Status values:
 | --- | --- | --- |
 | `Where` predicates | Supported | Member comparisons, boolean logic, null checks, `Contains`, `StartsWith`, `EndsWith`, string/date/math translations covered by provider tests. |
 | `Select` entity and scalar projections | Supported | Fully translatable projections run server-side. |
-| `Select` with custom client logic | Constrained | Current default splits projections and runs the untranslatable tail after server materialization. This is documented behavior until the client-evaluation policy gate is completed. |
+| `Select` with custom client logic | Constrained | Controlled by `DbContextOptions.ClientEvaluationPolicy`: `Warn` logs and allows the projection tail after server materialization, `Throw` rejects it, and `Allow` permits it silently. |
 | `OrderBy`, `ThenBy` | Supported | Provider-specific identifier escaping and expression translation apply. |
 | `Skip`, `Take` | Supported | Provider-specific paging syntax is used. MySQL skip-only queries emit the maximum unsigned BIGINT limit. |
 | `Distinct` | Supported | Applies to the projected SQL shape. |

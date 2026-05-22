@@ -40,6 +40,31 @@ namespace nORM.Configuration
     }
 
     /// <summary>
+    /// Controls how nORM handles projection expressions that cannot be fully
+    /// translated to SQL but can be completed after server-side materialization.
+    /// </summary>
+    public enum ClientEvaluationPolicy
+    {
+        /// <summary>
+        /// Allow the client-side projection tail and emit a diagnostic log entry
+        /// when a logger is configured. This is the default v1 compatibility mode.
+        /// </summary>
+        Warn,
+
+        /// <summary>
+        /// Throw <see cref="NormUnsupportedFeatureException"/> instead of running
+        /// any client-side projection tail.
+        /// </summary>
+        Throw,
+
+        /// <summary>
+        /// Allow the client-side projection tail without emitting the warning
+        /// diagnostic.
+        /// </summary>
+        Allow
+    }
+
+    /// <summary>
     /// Represents the configurable options for a <see cref="DbContext"/> instance.
     /// These settings control behavior such as command timeouts, logging, caching and
     /// how entities are tracked and filtered across the context.
@@ -187,6 +212,14 @@ namespace nORM.Configuration
         /// against the context.
         /// </summary>
         public QueryTrackingBehavior DefaultTrackingBehavior { get; set; } = QueryTrackingBehavior.TrackAll;
+
+        /// <summary>
+        /// Gets or sets the policy used when an otherwise server-side query contains
+        /// a projection tail that nORM can only evaluate on the client after
+        /// materialization. Filters, joins, grouping, ordering and paging are still
+        /// translated server-side before any allowed client projection is applied.
+        /// </summary>
+        public ClientEvaluationPolicy ClientEvaluationPolicy { get; set; } = ClientEvaluationPolicy.Warn;
 
         /// <summary>
         /// Gets the collection of command interceptors that will be invoked for every

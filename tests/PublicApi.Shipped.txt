@@ -2,6 +2,10 @@ F:nORM.Configuration.AmbientTransactionEnlistmentPolicy.BestEffort:nORM.Configur
 F:nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast:nORM.Configuration.AmbientTransactionEnlistmentPolicy
 F:nORM.Configuration.AmbientTransactionEnlistmentPolicy.Ignore:nORM.Configuration.AmbientTransactionEnlistmentPolicy
 F:nORM.Configuration.AmbientTransactionEnlistmentPolicy.value__:System.Int32
+F:nORM.Configuration.ClientEvaluationPolicy.Allow:nORM.Configuration.ClientEvaluationPolicy
+F:nORM.Configuration.ClientEvaluationPolicy.Throw:nORM.Configuration.ClientEvaluationPolicy
+F:nORM.Configuration.ClientEvaluationPolicy.Warn:nORM.Configuration.ClientEvaluationPolicy
+F:nORM.Configuration.ClientEvaluationPolicy.value__:System.Int32
 F:nORM.Core.DatabaseTopology.DatabaseRole.Primary:nORM.Core.DatabaseTopology.DatabaseRole
 F:nORM.Core.DatabaseTopology.DatabaseRole.ReadReplica:nORM.Core.DatabaseTopology.DatabaseRole
 F:nORM.Core.DatabaseTopology.DatabaseRole.SecondaryMaster:nORM.Core.DatabaseTopology.DatabaseRole
@@ -585,6 +589,7 @@ P:nORM.Configuration.DbContextOptions.AmbientTransactionPolicy:nORM.Configuratio
 P:nORM.Configuration.DbContextOptions.BulkBatchSize:System.Int32
 P:nORM.Configuration.DbContextOptions.CacheExpiration:System.TimeSpan
 P:nORM.Configuration.DbContextOptions.CacheProvider:nORM.Enterprise.IDbCacheProvider
+P:nORM.Configuration.DbContextOptions.ClientEvaluationPolicy:nORM.Configuration.ClientEvaluationPolicy
 P:nORM.Configuration.DbContextOptions.CommandInterceptors:System.Collections.Generic.IList{nORM.Enterprise.IDbCommandInterceptor}
 P:nORM.Configuration.DbContextOptions.DefaultTrackingBehavior:nORM.Core.QueryTrackingBehavior
 P:nORM.Configuration.DbContextOptions.EagerChangeTracking:System.Boolean
@@ -835,6 +840,7 @@ P:nORM.Query.SqlFunctionAttribute.Format:System.String
 P:nORM.SourceGeneration.CompileTimeQueryAttribute.Sql:System.String
 T:Microsoft.Extensions.Logging.DbContextLoggingExtensions
 T:nORM.Configuration.AmbientTransactionEnlistmentPolicy
+T:nORM.Configuration.ClientEvaluationPolicy
 T:nORM.Configuration.ConverterConfiguration
 T:nORM.Configuration.DbContextOptions
 T:nORM.Configuration.EntityTypeBuilder{`0,`1}

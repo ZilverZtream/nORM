@@ -1270,7 +1270,8 @@ namespace nORM.Query
             var fingerprint = ExpressionFingerprint
                 .ComputeForPlanCache(filtered)
                 .Extend(tenantHash, elementType.GetHashCode(), filtered.Type.GetHashCode(),
-                        _ctx.Provider.GetType().GetHashCode(), mappingHash);
+                        _ctx.Provider.GetType().GetHashCode(), mappingHash)
+                .Extend((int)_ctx.Options.ClientEvaluationPolicy);
 
             if (_planCache.TryGet(fingerprint, out var cached))
             {
