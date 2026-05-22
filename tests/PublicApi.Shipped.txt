@@ -586,7 +586,6 @@ P:nORM.Configuration.DbContextOptions.BulkBatchSize:System.Int32
 P:nORM.Configuration.DbContextOptions.CacheExpiration:System.TimeSpan
 P:nORM.Configuration.DbContextOptions.CacheProvider:nORM.Enterprise.IDbCacheProvider
 P:nORM.Configuration.DbContextOptions.CommandInterceptors:System.Collections.Generic.IList{nORM.Enterprise.IDbCommandInterceptor}
-P:nORM.Configuration.DbContextOptions.CommandTimeout:System.TimeSpan
 P:nORM.Configuration.DbContextOptions.DefaultTrackingBehavior:nORM.Core.QueryTrackingBehavior
 P:nORM.Configuration.DbContextOptions.EagerChangeTracking:System.Boolean
 P:nORM.Configuration.DbContextOptions.GlobalFilters:System.Collections.Generic.IReadOnlyDictionary{System.Type,System.Collections.Generic.IReadOnlyList{System.Linq.Expressions.LambdaExpression}}

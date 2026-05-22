@@ -118,18 +118,6 @@ namespace nORM.Configuration
         }
 
         /// <summary>
-        /// Gets or sets the base timeout applied to all commands.
-        /// This property is obsolete and provided for backward compatibility. Use
-        /// <see cref="AdaptiveTimeoutManager.TimeoutConfiguration.BaseTimeout"/> instead.
-        /// </summary>
-        [Obsolete("Use TimeoutConfiguration.BaseTimeout instead")]
-        public TimeSpan CommandTimeout
-        {
-            get => TimeoutConfiguration.BaseTimeout;
-            set => TimeoutConfiguration.BaseTimeout = value;
-        }
-
-        /// <summary>
         /// Gets or sets the number of records processed in each batch during bulk
         /// operations such as bulk insert, update or delete. The value must be between
         /// 1 and 10,000.

@@ -5015,18 +5015,6 @@ public class DbContextOptionsCoverageTests
     }
 
     [Fact]
-    [System.Obsolete]
-    public void CommandTimeout_GetSet_RoundTrips()
-    {
-        var opts = new DbContextOptions();
-        var timeout = TimeSpan.FromSeconds(30);
-#pragma warning disable CS0618
-        opts.CommandTimeout = timeout;
-        Assert.Equal(timeout, opts.CommandTimeout);
-#pragma warning restore CS0618
-    }
-
-    [Fact]
     public void Validate_ValidConfig_DoesNotThrow()
     {
         var opts = new DbContextOptions();
