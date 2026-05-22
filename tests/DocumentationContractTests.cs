@@ -345,6 +345,23 @@ public class DocumentationContractTests
         Assert.Contains("docs/release-checklist.md", readme, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void V1_issue_map_tracks_all_blockers_including_benchmark_trust()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var map = File.ReadAllText(Path.Combine(root, "docs", "v1-issue-map.md"));
+
+        Assert.Contains("docs/v1-issue-map.md", readme, StringComparison.Ordinal);
+        for (var i = 1; i <= 41; i++)
+            Assert.Contains($"| {i} |", map, StringComparison.Ordinal);
+
+        Assert.Contains("Benchmark trust", map, StringComparison.Ordinal);
+        Assert.Contains("optimized Raw ADO", map, StringComparison.Ordinal);
+        Assert.Contains("Closure Rule", map, StringComparison.Ordinal);
+        Assert.Contains("README no longer claims full LINQ", map, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
