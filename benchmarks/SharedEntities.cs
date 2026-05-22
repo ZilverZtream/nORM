@@ -35,4 +35,11 @@ namespace nORM.Benchmarks
         [ForeignKey(nameof(UserId))]
         public virtual BenchmarkUser? User { get; set; }
     }
+
+    public sealed class BenchmarkJoinRow
+    {
+        public string Name { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+    }
 }

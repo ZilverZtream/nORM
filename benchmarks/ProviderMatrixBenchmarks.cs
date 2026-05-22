@@ -417,8 +417,12 @@ public class ProviderMatrixBenchmarks
     }
 
     [Benchmark]
-    public async Task<List<object>> Query_Join_Dapper()
-        => (await _adoConnection!.QueryAsync(QueryJoinSql(), new { Amount = 100 })).Cast<object>().ToList();
+    public async Task<List<BenchmarkJoinRow>> Query_Join_Dapper()
+        => (await _adoConnection!.QueryAsync<BenchmarkJoinRow>(QueryJoinSql(), new { Amount = 100 })).ToList();
+
+    [Benchmark]
+    public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo()
+        => ReadJoinRowsAsync(QueryJoinSql(), ("@Amount", DbType.Decimal, 100m));
 
     [Benchmark]
     public Task<List<object>> Query_Join_nORM_Compiled()
@@ -642,6 +646,28 @@ public class ProviderMatrixBenchmarks
         while (await reader.ReadAsync())
             users.Add(ReadUser(reader));
         return users;
+    }
+
+    private async Task<List<BenchmarkJoinRow>> ReadJoinRowsAsync(string sql, params (string Name, DbType Type, object Value)[] parameters)
+    {
+        await using var command = _adoConnection!.CreateCommand();
+        command.CommandText = sql;
+        foreach (var (name, type, value) in parameters)
+            AddParameter(command, name, type, value);
+
+        var rows = new List<BenchmarkJoinRow>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new BenchmarkJoinRow
+            {
+                Name = reader.GetString(0),
+                Amount = reader.GetDecimal(1),
+                ProductName = reader.GetString(2)
+            });
+        }
+
+        return rows;
     }
 
     private void EnsureActiveParameter(DbCommand command)
