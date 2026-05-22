@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -83,7 +84,7 @@ public sealed class ProviderMatrixEfContext : EfDbContext
 [MemoryDiagnoser]
 [Orderer(SummaryOrderPolicy.FastestToSlowest)]
 [RankColumn]
-[SimpleJob(RuntimeMoniker.Net80, warmupCount: 1, iterationCount: 3)]
+[SimpleJob(RuntimeMoniker.Net80, warmupCount: 3, iterationCount: 10)]
 public class ProviderMatrixBenchmarks
 {
     private const int UserCount = 1000;
@@ -100,11 +101,6 @@ public class ProviderMatrixBenchmarks
     private nORM.Core.DbContext? _normContext;
     private DbConnection? _adoConnection;
 
-    private DbCommand? _dapperSimplePrepared;
-    private DbParameter? _dapperSimpleTakeParam;
-    private DbCommand? _dapperComplexPrepared;
-    private DbParameter? _dapperComplexAgeParam;
-    private DbParameter? _dapperComplexCityParam;
     private DbCommand? _adoSimplePrepared;
     private DbParameter? _adoSimpleTakeParam;
     private DbCommand? _adoComplexPrepared;
@@ -265,10 +261,8 @@ public class ProviderMatrixBenchmarks
 
     private void PrepareCommands()
     {
-        _dapperSimplePrepared = CreatePreparedCommand(QuerySimpleSql(prepared: true), out _dapperSimpleTakeParam);
         _adoSimplePrepared = CreatePreparedCommand(QuerySimpleSql(prepared: true), out _adoSimpleTakeParam);
 
-        _dapperComplexPrepared = CreatePreparedCommand(QueryComplexSql(), out _dapperComplexAgeParam, out _dapperComplexCityParam);
         _adoComplexPrepared = CreatePreparedCommand(QueryComplexSql(), out _adoComplexAgeParam, out _adoComplexCityParam);
     }
 
@@ -334,9 +328,13 @@ public class ProviderMatrixBenchmarks
         => (await _adoConnection!.QueryAsync<BenchmarkUser>(QuerySimpleSql(prepared: false),
             new { IsActive = ActiveValue() })).ToList();
 
-    [Benchmark]
-    public Task<List<BenchmarkUser>> Query_Simple_RawAdo()
-        => ReadUsersAsync(QuerySimpleSql(prepared: false));
+    [Benchmark(Description = "Query Simple Raw ADO (Convenience)")]
+    public Task<List<BenchmarkUser>> Query_Simple_RawAdo_Convenience()
+        => ReadUsersConvenienceAsync(QuerySimpleSql(prepared: false));
+
+    [Benchmark(Description = "Query Simple Raw ADO (Optimized)")]
+    public Task<List<BenchmarkUser>> Query_Simple_RawAdo_Optimized()
+        => ReadUsersOptimizedAsync(QuerySimpleSql(prepared: false));
 
     [Benchmark(Description = "Query Simple EF Core (Compiled)")]
     public async Task<List<BenchmarkUser>> Query_Simple_EfCore_Compiled()
@@ -351,18 +349,11 @@ public class ProviderMatrixBenchmarks
     public Task<List<BenchmarkUser>> Query_Simple_nORM_Compiled()
         => s_normSimpleCompiled(_normContext!, 10);
 
-    [Benchmark(Description = "Query Simple Dapper (Prepared)")]
-    public Task<List<BenchmarkUser>> Query_Simple_Dapper_Prepared()
-    {
-        _dapperSimpleTakeParam!.Value = 10;
-        return ReadUsersAsync(_dapperSimplePrepared!);
-    }
-
-    [Benchmark(Description = "Query Simple Raw ADO (Prepared)")]
-    public Task<List<BenchmarkUser>> Query_Simple_RawAdo_Prepared()
+    [Benchmark(Description = "Query Simple Raw ADO (Prepared Optimized)")]
+    public Task<List<BenchmarkUser>> Query_Simple_RawAdo_PreparedOptimized()
     {
         _adoSimpleTakeParam!.Value = 10;
-        return ReadUsersAsync(_adoSimplePrepared!);
+        return ReadUsersOptimizedAsync(_adoSimplePrepared!);
     }
 
     [Benchmark]
@@ -388,9 +379,13 @@ public class ProviderMatrixBenchmarks
         => (await _adoConnection!.QueryAsync<BenchmarkUser>(QueryComplexSql(),
             new { IsActive = ActiveValue(), Age = 25, City = "New York" })).ToList();
 
-    [Benchmark]
-    public Task<List<BenchmarkUser>> Query_Complex_RawAdo()
-        => ReadUsersAsync(QueryComplexSql(), ("@Age", DbType.Int32, 25), ("@City", DbType.String, "New York"));
+    [Benchmark(Description = "Query Complex Raw ADO (Convenience)")]
+    public Task<List<BenchmarkUser>> Query_Complex_RawAdo_Convenience()
+        => ReadUsersConvenienceAsync(QueryComplexSql(), ("@Age", DbType.Int32, 25), ("@City", DbType.String, "New York"));
+
+    [Benchmark(Description = "Query Complex Raw ADO (Optimized)")]
+    public Task<List<BenchmarkUser>> Query_Complex_RawAdo_Optimized()
+        => ReadUsersOptimizedAsync(QueryComplexSql(), ("@Age", DbType.Int32, 25), ("@City", DbType.String, "New York"));
 
     [Benchmark(Description = "Query Complex EF Core (Compiled)")]
     public async Task<List<BenchmarkUser>> Query_Complex_EfCore_Compiled()
@@ -405,20 +400,12 @@ public class ProviderMatrixBenchmarks
     public Task<List<BenchmarkUser>> Query_Complex_nORM_Compiled()
         => s_normComplexCompiled(_normContext!, (25, "New York"));
 
-    [Benchmark(Description = "Query Complex Dapper (Prepared)")]
-    public Task<List<BenchmarkUser>> Query_Complex_Dapper_Prepared()
-    {
-        _dapperComplexAgeParam!.Value = 25;
-        _dapperComplexCityParam!.Value = "New York";
-        return ReadUsersAsync(_dapperComplexPrepared!);
-    }
-
-    [Benchmark(Description = "Query Complex Raw ADO (Prepared)")]
-    public Task<List<BenchmarkUser>> Query_Complex_RawAdo_Prepared()
+    [Benchmark(Description = "Query Complex Raw ADO (Prepared Optimized)")]
+    public Task<List<BenchmarkUser>> Query_Complex_RawAdo_PreparedOptimized()
     {
         _adoComplexAgeParam!.Value = 25;
         _adoComplexCityParam!.Value = "New York";
-        return ReadUsersAsync(_adoComplexPrepared!);
+        return ReadUsersOptimizedAsync(_adoComplexPrepared!);
     }
 
     [Benchmark]
@@ -444,8 +431,8 @@ public class ProviderMatrixBenchmarks
     public async Task<List<BenchmarkJoinRow>> Query_Join_Dapper()
         => (await _adoConnection!.QueryAsync<BenchmarkJoinRow>(QueryJoinSql(), new { Amount = 100 })).ToList();
 
-    [Benchmark]
-    public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo()
+    [Benchmark(Description = "Query Join Raw ADO (Optimized)")]
+    public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo_Optimized()
         => ReadJoinRowsAsync(QueryJoinSql(), ("@Amount", DbType.Decimal, 100m));
 
     [Benchmark]
@@ -466,8 +453,8 @@ public class ProviderMatrixBenchmarks
             $"SELECT COUNT(*) FROM {UserTable()} WHERE {Col("IsActive")} = @IsActive",
             new { IsActive = ActiveValue() });
 
-    [Benchmark]
-    public async Task<int> Count_RawAdo()
+    [Benchmark(Description = "Count Raw ADO (Optimized)")]
+    public async Task<int> Count_RawAdo_Optimized()
     {
         await using var command = _adoConnection!.CreateCommand();
         command.CommandText = $"SELECT COUNT(*) FROM {UserTable()} WHERE {Col("IsActive")} = @IsActive";
@@ -660,23 +647,43 @@ public class ProviderMatrixBenchmarks
             _ => name
         };
 
-    private async Task<List<BenchmarkUser>> ReadUsersAsync(string sql, params (string Name, DbType Type, object Value)[] parameters)
+    private async Task<List<BenchmarkUser>> ReadUsersConvenienceAsync(string sql, params (string Name, DbType Type, object Value)[] parameters)
     {
         await using var command = _adoConnection!.CreateCommand();
         command.CommandText = sql;
         AddParameter(command, "@IsActive", DbType.Boolean, ActiveValue());
         foreach (var (name, type, value) in parameters)
             AddParameter(command, name, type, value);
-        return await ReadUsersAsync(command);
+        return await ReadUsersConvenienceAsync(command);
     }
 
-    private async Task<List<BenchmarkUser>> ReadUsersAsync(DbCommand command)
+    private async Task<List<BenchmarkUser>> ReadUsersConvenienceAsync(DbCommand command)
     {
         EnsureActiveParameter(command);
         var users = new List<BenchmarkUser>();
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
-            users.Add(ReadUser(reader));
+            users.Add(ReadUserConvenience(reader));
+        return users;
+    }
+
+    private async Task<List<BenchmarkUser>> ReadUsersOptimizedAsync(string sql, params (string Name, DbType Type, object Value)[] parameters)
+    {
+        await using var command = _adoConnection!.CreateCommand();
+        command.CommandText = sql;
+        AddParameter(command, "@IsActive", DbType.Boolean, ActiveValue());
+        foreach (var (name, type, value) in parameters)
+            AddParameter(command, name, type, value);
+        return await ReadUsersOptimizedAsync(command);
+    }
+
+    private async Task<List<BenchmarkUser>> ReadUsersOptimizedAsync(DbCommand command)
+    {
+        EnsureActiveParameter(command);
+        var users = new List<BenchmarkUser>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            users.Add(ReadUserOptimized(reader));
         return users;
     }
 
@@ -708,7 +715,7 @@ public class ProviderMatrixBenchmarks
             command.Parameters["@IsActive"]!.Value = ActiveValue();
     }
 
-    private static BenchmarkUser ReadUser(DbDataReader reader) => new()
+    private static BenchmarkUser ReadUserConvenience(DbDataReader reader) => new()
     {
         Id = Convert.ToInt32(reader["Id"]),
         Name = Convert.ToString(reader["Name"])!,
@@ -720,6 +727,35 @@ public class ProviderMatrixBenchmarks
         Department = Convert.ToString(reader["Department"])!,
         Salary = Convert.ToDouble(reader["Salary"])
     };
+
+    private static BenchmarkUser ReadUserOptimized(DbDataReader reader) => new()
+    {
+        Id = reader.GetInt32(0),
+        Name = reader.GetString(1),
+        Email = reader.GetString(2),
+        CreatedAt = ReadDateTime(reader, 3),
+        IsActive = ReadBoolean(reader, 4),
+        Age = reader.GetInt32(5),
+        City = reader.GetString(6),
+        Department = reader.GetString(7),
+        Salary = reader.GetDouble(8)
+    };
+
+    private static DateTime ReadDateTime(DbDataReader reader, int ordinal)
+    {
+        var value = reader.GetValue(ordinal);
+        return value is DateTime dateTime
+            ? dateTime
+            : Convert.ToDateTime(value, CultureInfo.InvariantCulture);
+    }
+
+    private static bool ReadBoolean(DbDataReader reader, int ordinal)
+    {
+        var value = reader.GetValue(ordinal);
+        return value is bool boolean
+            ? boolean
+            : Convert.ToBoolean(value, CultureInfo.InvariantCulture);
+    }
 
     private void AddUserParameters(DbCommand command, BenchmarkUser user)
     {

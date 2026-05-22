@@ -19,7 +19,10 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_EfCore()", code);
         Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_nORM()", code);
         Assert.Contains("public async Task<List<BenchmarkJoinRow>> Query_Join_Dapper()", code);
-        Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo()", code);
+        if (relativePath.Contains("ProviderMatrix", StringComparison.Ordinal))
+            Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo_Optimized()", code);
+        else
+            Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_RawAdo()", code);
         Assert.Contains("public Task<List<BenchmarkJoinRow>> Query_Join_nORM_Compiled()", code);
 
         Assert.Contains($"Func<nORM.Core.DbContext, int, Task<List<BenchmarkJoinRow>>> {compiledFieldName}", code);
@@ -54,12 +57,53 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("NORM_TEST_MYSQL", code);
         Assert.Contains("Query_Simple_EfCore_Compiled", code);
         Assert.Contains("Query_Simple_nORM_Compiled", code);
-        Assert.Contains("Query_Simple_Dapper_Prepared", code);
-        Assert.Contains("Query_Simple_RawAdo_Prepared", code);
+        Assert.Contains("Query_Simple_RawAdo_Convenience", code);
+        Assert.Contains("Query_Simple_RawAdo_Optimized", code);
+        Assert.Contains("Query_Simple_RawAdo_PreparedOptimized", code);
         Assert.Contains("Query_Complex_EfCore_Compiled", code);
         Assert.Contains("Query_Complex_nORM_Compiled", code);
-        Assert.Contains("Query_Complex_Dapper_Prepared", code);
-        Assert.Contains("Query_Complex_RawAdo_Prepared", code);
+        Assert.Contains("Query_Complex_RawAdo_Convenience", code);
+        Assert.Contains("Query_Complex_RawAdo_Optimized", code);
+        Assert.Contains("Query_Complex_RawAdo_PreparedOptimized", code);
+        Assert.DoesNotContain("Query_Simple_Dapper_Prepared", code);
+        Assert.DoesNotContain("Query_Complex_Dapper_Prepared", code);
+    }
+
+    [Fact]
+    public void ProviderMatrix_OptimizedRawAdoUsesOrdinalTypedGetterPath()
+    {
+        var code = ReadRepoFile("benchmarks/ProviderMatrixBenchmarks.cs");
+
+        Assert.Contains("ReadUsersConvenienceAsync", code);
+        Assert.Contains("ReadUsersOptimizedAsync", code);
+        Assert.Contains("ReadUserConvenience", code);
+        Assert.Contains("ReadUserOptimized", code);
+        Assert.Contains("reader[\"Id\"]", code);
+        Assert.Contains("reader.GetInt32(0)", code);
+        Assert.Contains("reader.GetString(1)", code);
+        Assert.Contains("reader.GetDouble(8)", code);
+        Assert.Contains("[SimpleJob(RuntimeMoniker.Net80, warmupCount: 3, iterationCount: 10)]", code);
+        AssertMethodContains(code, "Query_Simple_RawAdo_Optimized", "ReadUsersOptimizedAsync");
+        AssertMethodContains(code, "Query_Complex_RawAdo_Optimized", "ReadUsersOptimizedAsync");
+        AssertMethodContains(code, "Query_Simple_RawAdo_PreparedOptimized", "ReadUsersOptimizedAsync(_adoSimplePrepared!)");
+        AssertMethodContains(code, "Query_Complex_RawAdo_PreparedOptimized", "ReadUsersOptimizedAsync(_adoComplexPrepared!)");
+    }
+
+    [Fact]
+    public void SqliteComparison_UsesExplicitRawAdoCategories()
+    {
+        var code = ReadRepoFile("benchmarks/OrmBenchmarks.cs");
+
+        Assert.Contains("Query_Simple_RawAdo_Convenience", code);
+        Assert.Contains("Query_Simple_RawAdo_Optimized", code);
+        Assert.Contains("Query_Simple_RawAdo_PreparedOptimized", code);
+        Assert.Contains("Query_Complex_RawAdo_Convenience", code);
+        Assert.Contains("Query_Complex_RawAdo_Optimized", code);
+        Assert.Contains("Query_Complex_RawAdo_PreparedOptimized", code);
+        Assert.Contains("ReadUserOptimized", code);
+        Assert.Contains("reader.GetInt32(0)", code);
+        Assert.DoesNotContain("Query_Simple_Dapper_Prepared", code);
+        Assert.DoesNotContain("Query_Complex_Dapper_Prepared", code);
     }
 
     [Theory]
