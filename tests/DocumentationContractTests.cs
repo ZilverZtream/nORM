@@ -316,9 +316,13 @@ public class DocumentationContractTests
 
         Assert.Contains("docs/temporal-versioning.md", readme, StringComparison.Ordinal);
         Assert.Contains("EnableTemporalVersioning", contract, StringComparison.Ordinal);
+        Assert.Contains("stable v1 feature", contract, StringComparison.Ordinal);
+        Assert.Contains("nORM-managed temporal history", contract, StringComparison.Ordinal);
         Assert.Contains("__NormTemporalTags", contract, StringComparison.Ordinal);
         Assert.Contains("_History", contract, StringComparison.Ordinal);
         Assert.Contains("AsOf(DateTime)", contract, StringComparison.Ordinal);
+        Assert.Contains("Release candidates must run temporal tests in the live provider gate", contract, StringComparison.Ordinal);
+        Assert.Contains("Rollback is also explicit", contract, StringComparison.Ordinal);
         Assert.Contains("SQL Server", contract, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL", contract, StringComparison.Ordinal);
         Assert.Contains("MySQL", contract, StringComparison.Ordinal);

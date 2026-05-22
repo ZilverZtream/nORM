@@ -705,13 +705,16 @@ Evidence:
 
 - `DbContextOptions.EnableTemporalVersioning()` bootstraps temporal objects.
 - `TemporalManager` validates and executes provider DDL.
-- Docs describe temporal schema and migration interaction.
+- `docs/temporal-versioning.md` defines temporal as a stable v1 feature for
+  nORM-managed history tables/triggers, not provider-native temporal tables.
+- Docs describe temporal schema ownership, migration interaction, rollback
+  responsibilities, and RC live-provider evidence requirements.
 
 Scope:
 
-- Decide whether temporal is stable or preview for v1.
-- Verify bootstrap/migration interaction on live providers.
-- Document schema ownership and rollback strategy.
+- Keep temporal stable for v1 with the documented nORM-managed storage model.
+- Verify bootstrap/migration interaction in RC live-provider gates.
+- Keep schema ownership and rollback strategy documented.
 
 Done when:
 

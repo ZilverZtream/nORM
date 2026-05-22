@@ -3,6 +3,20 @@
 Temporal versioning is a stable v1 feature for mapped nORM entities when
 `DbContextOptions.EnableTemporalVersioning()` is enabled.
 
+## Support Level
+
+The v1 contract is nORM-managed temporal history, not provider-native temporal
+tables. nORM owns the `__NormTemporalTags` table, each `<TableName>_History`
+table, and the provider-specific triggers/functions that populate history rows.
+Applications own live-table schema migrations and any manual rename, rollback,
+or cleanup work for temporal infrastructure.
+
+Release candidates must run temporal tests in the live provider gate before
+temporal claims are used in release notes. Local unit tests lock SQL generation,
+custom column names, SQLite bootstrap, cancellation, idempotency, and `AsOf`
+translation; live RC artifacts prove execution against the configured provider
+versions.
+
 ## Runtime Model
 
 On first connection initialization, nORM creates provider-specific temporal
@@ -48,6 +62,11 @@ refresh provider trigger definitions on the next context initialization.
 Renaming a live table or column can leave old history objects behind. Treat
 renames as explicit migration work: move or rename history tables and triggers in
 the migration rather than relying on automatic detection.
+
+Rollback is also explicit. If a deployment rolls back a live-table schema change,
+the rollback migration must restore or remove the matching history table columns,
+triggers, and functions. nORM does not infer destructive temporal cleanup from
+the runtime model.
 
 ## Operational Notes
 
