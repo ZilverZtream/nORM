@@ -88,7 +88,18 @@ namespace nORM.Query
         List<DependentQueryDefinition>? DependentQueries = null,
         Func<object, object>? ClientProjection = null,
         QueryComplexityMetrics Complexity = default,
-        List<M2MIncludePlan>? M2MIncludes = null
+        List<M2MIncludePlan>? M2MIncludes = null,
+        BulkCudQueryShape? BulkCudShape = null
+    );
+
+    internal sealed record BulkCudQueryShape(
+        string WhereClause,
+        bool HasGroupBy,
+        bool HasOrderBy,
+        bool HasHaving,
+        bool HasJoins,
+        bool HasDistinct,
+        bool HasPaging
     );
 
     internal sealed record IncludePlan(List<TableMapping.Relation> Path);

@@ -589,6 +589,14 @@ namespace nORM.Query
                 var singleResult = _t._singleResult || _t._methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
                     or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
                 var elementType = _t._groupJoinInfo?.ResultType ?? materializerType;
+                var bulkCudShape = new BulkCudQueryShape(
+                    _t._where.Length > 0 ? " WHERE " + _t._where.ToSqlString() : string.Empty,
+                    _t._groupBy.Count > 0,
+                    _t._orderBy.Count > 0,
+                    _t._having.Length > 0,
+                    _t._complexityMetrics.JoinCount > 0,
+                    _t._isDistinct,
+                    _t._take.HasValue || _t._skip.HasValue || _t._takeParam != null || _t._skipParam != null);
 
                 // Build dependent query definitions for nested collections
                 List<DependentQueryDefinition>? dependentQueries = null;
@@ -619,7 +627,8 @@ namespace nORM.Query
                     DependentQueries: dependentQueries,
                     ClientProjection: _t._clientProjection,
                     Complexity: _t._complexityMetrics,
-                    M2MIncludes: _t._m2mIncludes.Count > 0 ? new List<M2MIncludePlan>(_t._m2mIncludes) : null
+                    M2MIncludes: _t._m2mIncludes.Count > 0 ? new List<M2MIncludePlan>(_t._m2mIncludes) : null,
+                    BulkCudShape: bulkCudShape
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;

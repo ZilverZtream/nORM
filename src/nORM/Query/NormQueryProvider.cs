@@ -1165,8 +1165,8 @@ namespace nORM.Query
                 throw new NotSupportedException("ExecuteDeleteAsync only supports single table queries.");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
-            _cudBuilder.ValidateCudPlan(plan.Sql);
-            var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
+            _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
+            var whereClause = _cudBuilder.GetWhereClause(plan.BulkCudShape);
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
@@ -1187,8 +1187,8 @@ namespace nORM.Query
                 throw new NotSupportedException("ExecuteUpdateAsync only supports single table queries.");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
-            _cudBuilder.ValidateCudPlan(plan.Sql);
-            var whereClause = _cudBuilder.ExtractWhereClause(plan.Sql, mapping.EscTable);
+            _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
+            var whereClause = _cudBuilder.GetWhereClause(plan.BulkCudShape);
             var (setClause, setParams) = _cudBuilder.BuildSetClause(mapping, set);
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
