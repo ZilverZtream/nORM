@@ -26,6 +26,9 @@ classes without parsing provider messages.
 - Unsupported LINQ translation and bulk CUD shapes throw
   `NormUnsupportedFeatureException`, not `NotSupportedException`, on public query
   paths.
+- Constrained relationship loading paths, including composite-key dependent
+  includes and async streaming with Include/GroupJoin, also throw
+  `NormUnsupportedFeatureException`.
 
 ## Guidance
 

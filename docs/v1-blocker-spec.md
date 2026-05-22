@@ -859,13 +859,16 @@ exceptions in some unsupported-feature cases.
 
 Evidence:
 
-- `docs/linq-support.md` says some Include shapes throw `NotSupportedException`.
+- `docs/linq-support.md` now says constrained Include shapes throw
+  `NormUnsupportedFeatureException`.
 - Query translator paths use `NormUnsupportedFeatureException` in many places.
+- Public bulk CUD, async streaming Include/GroupJoin, and composite-key include
+  paths have regression tests for `NormUnsupportedFeatureException`.
 
 Scope:
 
-- Decide which exceptions are part of the public contract.
-- Wrap unsupported query/provider features consistently.
+- Keep unsupported public query/provider feature failures on
+  `NormUnsupportedFeatureException`.
 - Keep provider exceptions where they are intentionally transparent.
 
 Done when:

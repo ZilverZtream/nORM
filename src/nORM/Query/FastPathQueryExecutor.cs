@@ -409,7 +409,7 @@ namespace nORM.Query
                 ExpressionType.GreaterThanOrEqual => ">=",
                 ExpressionType.LessThan => "<",
                 ExpressionType.LessThanOrEqual => "<=",
-                _ => throw new NotSupportedException($"Unsupported predicate operation '{operation}'.")
+                _ => throw new NormUnsupportedFeatureException($"Unsupported predicate operation '{operation}'.")
             };
 
         private static string BuildFilteredOrderedPageCacheKey<T>(ComplexQueryInfo info, DbContext ctx) where T : class

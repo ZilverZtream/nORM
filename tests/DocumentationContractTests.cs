@@ -428,6 +428,8 @@ public class DocumentationContractTests
         Assert.Contains("NormUnsupportedFeatureException", contract, StringComparison.Ordinal);
         Assert.Contains("DbConcurrencyException", contract, StringComparison.Ordinal);
         Assert.Contains("OperationCanceledException", contract, StringComparison.Ordinal);
+        Assert.Contains("composite-key dependent", contract, StringComparison.Ordinal);
+        Assert.Contains("Include/GroupJoin", contract, StringComparison.Ordinal);
     }
 
     [Fact]
