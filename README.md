@@ -15,7 +15,7 @@ nORM is a modern, high-performance Object-Relational Mapping (ORM) library for .
 - **Multi-Database Support**: SQL Server, PostgreSQL, SQLite, and MySQL
 - **Smart Relationship Handling**: Automatic relationship discovery and lazy loading
 - **Flexible Configuration**: Fluent API and attribute-based configuration
-- **Developer Tools**: Database scaffolding and reverse engineering
+- **Developer Tools**: Preview database scaffolding and reverse engineering
 - **Modern Features**: JSON querying, window functions, temporal queries
 - **Enterprise Ready**: Multi-tenancy, caching, retry policies, and interceptors
 
@@ -135,9 +135,13 @@ await context.BulkDeleteAsync(usersToDelete);
 // Query any table without defining entity classes
 var users = await context.Query("Users").ToListAsync();
 
-// Scaffold entire database automatically
+// Preview: scaffold tables and columns from an existing database
 await DatabaseScaffolder.ScaffoldAsync(connection, provider, outputDir, "MyApp.Entities");
 ```
+
+Scaffolding is preview in v1: table and column reverse engineering is supported,
+but relationship/index generation remains explicit post-processing. See
+[Scaffolding Preview Contract](docs/scaffolding.md).
 
 ### Modern SQL Features
 
