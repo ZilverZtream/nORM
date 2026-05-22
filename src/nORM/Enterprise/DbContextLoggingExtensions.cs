@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using nORM.Core;
+using nORM.Query;
 
 namespace Microsoft.Extensions.Logging
 {
@@ -15,7 +16,23 @@ namespace Microsoft.Extensions.Logging
         public static void LogQuery(this ILogger logger, string sql, IReadOnlyDictionary<string, object> parameters, TimeSpan duration, int recordCount)
         {
             if (logger == null) return;
-            logger.LogInformation("Executed SQL query {Sql} with parameters {@Parameters} in {Duration}. Records: {RecordCount}", sql, parameters, duration, recordCount);
+            logger.LogInformation(
+                "Executed SQL query {Sql} with parameters {@Parameters} in {Duration}. Records: {RecordCount}",
+                QueryExecutor.RedactSqlForLogging(sql),
+                RedactParameters(parameters),
+                duration,
+                recordCount);
+        }
+
+        private static IReadOnlyDictionary<string, object> RedactParameters(IReadOnlyDictionary<string, object> parameters)
+        {
+            if (parameters.Count == 0)
+                return parameters;
+
+            var redacted = new Dictionary<string, object>(parameters.Count, StringComparer.Ordinal);
+            foreach (var parameter in parameters)
+                redacted[parameter.Key] = parameter.Value is null or DBNull ? DBNull.Value : "[redacted]";
+            return redacted;
         }
 
         /// <summary>
