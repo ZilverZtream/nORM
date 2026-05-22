@@ -111,6 +111,17 @@ namespace nORM.Providers
         /// </summary>
         public override int MaxParameters => 32_767;
 
+        /// <inheritdoc />
+        public override ProviderCapabilities Capabilities => new(
+            "PostgreSQL",
+            MinimumPostgresVersion,
+            MaxParameters,
+            true,
+            true,
+            true,
+            true,
+            "Requires Npgsql and PostgreSQL 9.5 or newer.");
+
         /// <summary>PostgreSQL supports <c>IS NOT DISTINCT FROM</c> for index-friendly null-safe equality.</summary>
         public override string NullSafeEqual(string left, string right)
             => $"{left} IS NOT DISTINCT FROM {right}";

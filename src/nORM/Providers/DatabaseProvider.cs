@@ -143,6 +143,20 @@ namespace nORM.Providers
         public virtual int MaxParameters => int.MaxValue;
 
         /// <summary>
+        /// Gets the provider capability descriptor used by startup validation,
+        /// diagnostics and documentation.
+        /// </summary>
+        public virtual ProviderCapabilities Capabilities => new(
+            GetType().Name,
+            null,
+            MaxParameters,
+            false,
+            false,
+            false,
+            true,
+            "Generic provider capabilities are unknown.");
+
+        /// <summary>
         /// Escapes an identifier (such as a table or column name) for inclusion in SQL statements.
         /// </summary>
         /// <param name="id">The identifier to escape.</param>

@@ -110,6 +110,17 @@ namespace nORM.Providers
         /// </summary>
         public override int MaxParameters => 65_535;
 
+        /// <inheritdoc />
+        public override ProviderCapabilities Capabilities => new(
+            "MySQL",
+            new Version(8, 0),
+            MaxParameters,
+            true,
+            true,
+            true,
+            true,
+            "Requires MySqlConnector or MySql.Data and MySQL 8.0 or newer.");
+
         /// <summary>
         /// Escapes an identifier using MySQL backtick delimiters.
         /// Handles multi-part identifiers (schema.table) by escaping each segment separately so
