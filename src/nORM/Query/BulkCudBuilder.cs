@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using nORM.Core;
 using nORM.Mapping;
@@ -248,7 +249,8 @@ namespace nORM.Query
                 var lambda = (LambdaExpression)StripQuotes(call.Arguments[0]);
                 var member = (MemberExpression)lambda.Body;
                 var column = mapping.ColumnsByName[member.Member.Name].EscCol;
-                var value = Expression.Lambda(call.Arguments[1]).Compile().DynamicInvoke();
+                if (!TryGetSetValue(call.Arguments[1], out var value))
+                    throw new NotSupportedException("ExecuteUpdate set values must be constants or captured local values. Method calls and computed expressions are not supported.");
                 assigns.Add((column, value));
                 call = call.Object as MethodCallExpression;
             }
@@ -277,6 +279,46 @@ namespace nORM.Query
         {
             while (e.NodeType == ExpressionType.Quote) e = ((UnaryExpression)e).Operand;
             return e;
+        }
+
+        private static bool TryGetSetValue(Expression expression, out object? value)
+        {
+            expression = StripConvert(expression);
+            switch (expression)
+            {
+                case ConstantExpression constant:
+                    value = constant.Value;
+                    return true;
+
+                case MemberExpression { Member: FieldInfo field } member:
+                    if (member.Expression == null)
+                    {
+                        value = field.GetValue(null);
+                        return true;
+                    }
+
+                    if (TryGetSetValue(member.Expression, out var owner))
+                    {
+                        value = field.GetValue(owner);
+                        return true;
+                    }
+
+                    break;
+            }
+
+            value = null;
+            return false;
+        }
+
+        private static Expression StripConvert(Expression expression)
+        {
+            while (expression is UnaryExpression unary &&
+                   (unary.NodeType == ExpressionType.Convert || unary.NodeType == ExpressionType.ConvertChecked))
+            {
+                expression = unary.Operand;
+            }
+
+            return expression;
         }
     }
 }
