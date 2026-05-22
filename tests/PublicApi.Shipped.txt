@@ -578,6 +578,7 @@ M:nORM.SourceGeneration.CompileTimeQueryAttribute.#ctor(System.String)
 M:nORM.SourceGeneration.CompiledMaterializerStore.Add(System.Type,System.Func{System.Data.Common.DbDataReader,System.Object}):System.Void
 M:nORM.SourceGeneration.CompiledMaterializerStore.Add``1(System.Func{System.Data.Common.DbDataReader,`0}):System.Void
 M:nORM.SourceGeneration.CompiledMaterializerStore.Add``1(System.String,System.Func{System.Data.Common.DbDataReader,`0}):System.Void
+M:nORM.SourceGeneration.CompiledMaterializerStore.Clear():System.Void
 M:nORM.SourceGeneration.CompiledMaterializerStore.Get``1():System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{`0}}
 M:nORM.SourceGeneration.CompiledMaterializerStore.Get``1(System.String):System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{`0}}
 M:nORM.SourceGeneration.CompiledMaterializerStore.TryGet(System.Type,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{System.Object}}&):System.Boolean
@@ -684,6 +685,7 @@ P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime:Syste
 P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate:System.Double
 P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount:System.Int32
 P:nORM.Internal.ConcurrentLruCache{`0,`1}.Count:System.Int32
+P:nORM.Internal.ConcurrentLruCache{`0,`1}.Evictions:System.Int64
 P:nORM.Internal.ConcurrentLruCache{`0,`1}.HitRate:System.Double
 P:nORM.Internal.ConcurrentLruCache{`0,`1}.Hits:System.Int64
 P:nORM.Internal.ConcurrentLruCache{`0,`1}.Misses:System.Int64
@@ -838,6 +840,11 @@ P:nORM.Providers.SqliteProvider.StoredProcedureCommandType:System.Data.CommandTy
 P:nORM.Query.OptimizedSqlBuilder.Length:System.Int32
 P:nORM.Query.SqlFunctionAttribute.Format:System.String
 P:nORM.SourceGeneration.CompileTimeQueryAttribute.Sql:System.String
+P:nORM.SourceGeneration.CompiledMaterializerStore.Count:System.Int32
+P:nORM.SourceGeneration.CompiledMaterializerStore.Evictions:System.Int64
+P:nORM.SourceGeneration.CompiledMaterializerStore.HitRate:System.Double
+P:nORM.SourceGeneration.CompiledMaterializerStore.Hits:System.Int64
+P:nORM.SourceGeneration.CompiledMaterializerStore.Misses:System.Int64
 T:Microsoft.Extensions.Logging.DbContextLoggingExtensions
 T:nORM.Configuration.AmbientTransactionEnlistmentPolicy
 T:nORM.Configuration.ClientEvaluationPolicy

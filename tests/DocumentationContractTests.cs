@@ -37,6 +37,20 @@ public class DocumentationContractTests
         Assert.Contains("not supported", policy, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Readme_links_to_cache_policy()
+    {
+        var root = FindRepositoryRoot();
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        var policy = File.ReadAllText(Path.Combine(root, "docs", "cache-policy.md"));
+
+        Assert.Contains("docs/cache-policy.md", readme, StringComparison.Ordinal);
+        Assert.Contains("Compiled materializer store", policy, StringComparison.Ordinal);
+        Assert.Contains("Evictions", policy, StringComparison.Ordinal);
+        Assert.Contains("Per-Context Caches", policy, StringComparison.Ordinal);
+        Assert.Contains("process-wide", policy, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

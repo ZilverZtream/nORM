@@ -30,6 +30,7 @@ namespace nORM.Internal
         private readonly TimeSpan? _timeToLive;
         private long _hits;
         private long _misses;
+        private long _evictions;
 
         // Lazy LRU uses timestamps instead of list manipulation: update LastAccessed with
         // Interlocked (no lock required) and defer structural promotion, allowing true
@@ -72,7 +73,8 @@ namespace nORM.Internal
                 {
                     var last = _lruList.Last!;
                     _lruList.RemoveLast();
-                    _cache.TryRemove(last.Value.Key, out _);
+                    if (_cache.TryRemove(last.Value.Key, out _))
+                        Interlocked.Increment(ref _evictions);
                 }
             }
             finally
@@ -101,6 +103,7 @@ namespace nORM.Internal
                 _lruList.Clear();
                 Interlocked.Exchange(ref _hits, 0);
                 Interlocked.Exchange(ref _misses, 0);
+                Interlocked.Exchange(ref _evictions, 0);
             }
             finally
             {
@@ -228,7 +231,8 @@ namespace nORM.Internal
                     if (oldestNode != null)
                     {
                         _lruList.Remove(oldestNode);
-                        _cache.TryRemove(oldestNode.Value.Key, out _);
+                        if (_cache.TryRemove(oldestNode.Value.Key, out _))
+                            Interlocked.Increment(ref _evictions);
                     }
                 }
 
@@ -307,7 +311,8 @@ namespace nORM.Internal
                     if (oldestNode != null)
                     {
                         _lruList.Remove(oldestNode);
-                        _cache.TryRemove(oldestNode.Value.Key, out _);
+                        if (_cache.TryRemove(oldestNode.Value.Key, out _))
+                            Interlocked.Increment(ref _evictions);
                     }
                 }
             }
@@ -331,6 +336,11 @@ namespace nORM.Internal
         /// Gets the total number of cache misses.
         /// </summary>
         public long Misses => Interlocked.Read(ref _misses);
+
+        /// <summary>
+        /// Gets the total number of entries evicted because the cache exceeded its size limit.
+        /// </summary>
+        public long Evictions => Interlocked.Read(ref _evictions);
 
         /// <summary>
         /// Gets the ratio of hits to total lookups.

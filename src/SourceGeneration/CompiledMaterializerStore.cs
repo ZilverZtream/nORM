@@ -29,6 +29,36 @@ namespace nORM.SourceGeneration
 
         private static readonly ConcurrentLruCache<(Type, string), (Delegate Typed, Func<DbDataReader, CancellationToken, Task<object>> Untyped)> _map = new(maxSize: DefaultMaxCacheSize);
 
+        /// <summary>
+        /// Gets the current number of cached compiled materializer entries.
+        /// </summary>
+        public static int Count => _map.Count;
+
+        /// <summary>
+        /// Gets the total number of compiled materializer cache hits.
+        /// </summary>
+        public static long Hits => _map.Hits;
+
+        /// <summary>
+        /// Gets the total number of compiled materializer cache misses.
+        /// </summary>
+        public static long Misses => _map.Misses;
+
+        /// <summary>
+        /// Gets the number of compiled materializer entries evicted because the cache reached its size limit.
+        /// </summary>
+        public static long Evictions => _map.Evictions;
+
+        /// <summary>
+        /// Gets the ratio of compiled materializer cache hits to total lookups.
+        /// </summary>
+        public static double HitRate => _map.HitRate;
+
+        /// <summary>
+        /// Clears all compiled materializer entries and resets cache statistics.
+        /// </summary>
+        public static void Clear() => _map.Clear();
+
         /// <summary>Returns the table name used as cache-key discriminator for <paramref name="type"/>.</summary>
         private static string GetTableName(Type type)
             => type.GetCustomAttribute<TableAttribute>(inherit: false)?.Name ?? type.Name;

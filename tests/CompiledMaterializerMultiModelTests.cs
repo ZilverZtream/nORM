@@ -60,6 +60,9 @@ public class CompiledMaterializerMultiModelTests
     [Table("XTableA")]
     private class XTableDiscriminator { public int Id { get; set; } }
 
+    [Table("XCacheStats")]
+    private class XCacheStats { public int Id { get; set; } }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>Creates an in-memory SQLite reader with one row of (Id=1, Val="hello").</summary>
@@ -77,6 +80,23 @@ public class CompiledMaterializerMultiModelTests
         var cmd = cn.CreateCommand();
         cmd.CommandText = $"SELECT Id, Val FROM \"{tableName}\"";
         return await cmd.ExecuteReaderAsync();
+    }
+
+    [Fact]
+    public void CompiledMaterializerStore_exposes_cache_diagnostics()
+    {
+        var missesBefore = CompiledMaterializerStore.Misses;
+        Assert.False(CompiledMaterializerStore.TryGet(typeof(XCacheStats), "XCacheStats_NotRegistered", out _));
+        Assert.True(CompiledMaterializerStore.Misses >= missesBefore + 1);
+
+        var hitsBefore = CompiledMaterializerStore.Hits;
+        CompiledMaterializerStore.Add<XCacheStats>("XCacheStats", _ => new XCacheStats { Id = 42 });
+        Assert.True(CompiledMaterializerStore.TryGet(typeof(XCacheStats), "XCacheStats", out _));
+
+        Assert.True(CompiledMaterializerStore.Count > 0);
+        Assert.True(CompiledMaterializerStore.Hits >= hitsBefore + 1);
+        Assert.True(CompiledMaterializerStore.Evictions >= 0);
+        Assert.InRange(CompiledMaterializerStore.HitRate, 0.0, 1.0);
     }
 
     // ── TryGet(type, tableName) discriminates by table name ───────────────────
