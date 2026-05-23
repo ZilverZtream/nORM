@@ -55,3 +55,4 @@ coverage-report/
 # under eng/ or .github/ must remain visible to git.
 *.local.ps1
 *.scratch.ps1
+.claude/
