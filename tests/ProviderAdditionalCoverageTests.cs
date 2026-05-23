@@ -121,7 +121,7 @@ public class ProviderAdditionalCoverageTests
     public void MySqlProvider_TranslateFunction_DateTime_UnknownMethod_ReturnsNull()
     {
         var p = new MySqlProvider(new SqliteParameterFactory());
-        var result = p.TranslateFunction("DayOfWeek", typeof(DateTime), "col");
+        var result = p.TranslateFunction("Quarter", typeof(DateTime), "col");
         Assert.Null(result);
     }
 
@@ -463,7 +463,7 @@ public class ProviderAdditionalCoverageTests
     public void SqlServerProvider_TranslateFunction_DateTime_UnknownMethod_ReturnsNull()
     {
         var p = new SqlServerProvider();
-        var result = p.TranslateFunction("DayOfYear", typeof(DateTime), "col");
+        var result = p.TranslateFunction("Quarter", typeof(DateTime), "col");
         Assert.Null(result);
     }
 
@@ -816,7 +816,7 @@ public class ProviderAdditionalCoverageTests
     public void PostgresProvider_TranslateFunction_DateTime_UnknownMethod_ReturnsNull()
     {
         var p = new PostgresProvider(new SqliteParameterFactory());
-        var result = p.TranslateFunction("DayOfYear", typeof(DateTime), "col");
+        var result = p.TranslateFunction("Quarter", typeof(DateTime), "col");
         Assert.Null(result);
     }
 
