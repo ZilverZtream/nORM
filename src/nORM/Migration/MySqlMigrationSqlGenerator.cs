@@ -205,6 +205,14 @@ namespace nORM.Migration
             foreach (var (table, fk) in diff.DroppedForeignKeys)
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
 
+            // Rename columns — MySQL 8.0+ supports ALTER TABLE t RENAME COLUMN old TO new.
+            foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
+            {
+                up.Add($"ALTER TABLE {Esc(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
+                // Down: rename back
+                down.Add($"ALTER TABLE {Esc(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
+            }
+
             return new MigrationSqlStatements(up, down);
         }
 
