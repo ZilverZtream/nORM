@@ -325,6 +325,11 @@ namespace nORM.Providers
                     nameof(DateTime.AddDays) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) DAY)",
                     nameof(DateTime.AddMonths) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) MONTH)",
                     nameof(DateTime.AddYears) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) YEAR)",
+                    nameof(DateTime.AddHours) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) HOUR)",
+                    nameof(DateTime.AddMinutes) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) MINUTE)",
+                    nameof(DateTime.AddSeconds) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) SECOND)",
+                    // MySQL DAYOFWEEK returns 1=Sun..7=Sat; .NET DayOfWeek is 0=Sun..6=Sat.
+                    nameof(DateTime.DayOfWeek) => $"(DAYOFWEEK({args[0]}) - 1)",
                     _ => null
                 };
             }
@@ -350,6 +355,13 @@ namespace nORM.Providers
                     nameof(Math.Floor) => $"FLOOR({args[0]})",
                     nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
                     nameof(Math.Round) => $"ROUND({args[0]})",
+                    nameof(Math.Sqrt) when args.Length == 1 => $"SQRT({args[0]})",
+                    nameof(Math.Pow) when args.Length == 2 => $"POW({args[0]}, {args[1]})",
+                    nameof(Math.Exp) when args.Length == 1 => $"EXP({args[0]})",
+                    nameof(Math.Log) when args.Length == 1 => $"LN({args[0]})",
+                    nameof(Math.Log) when args.Length == 2 => $"LOG({args[1]}, {args[0]})",
+                    nameof(Math.Log10) when args.Length == 1 => $"LOG10({args[0]})",
+                    nameof(Math.Sign) when args.Length == 1 => $"SIGN({args[0]})",
                     _ => null
                 };
             }

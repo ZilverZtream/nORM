@@ -265,6 +265,11 @@ namespace nORM.Providers
                     nameof(DateTime.AddDays) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' days')",
                     nameof(DateTime.AddMonths) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' months')",
                     nameof(DateTime.AddYears) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' years')",
+                    nameof(DateTime.AddHours) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' hours')",
+                    nameof(DateTime.AddMinutes) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' minutes')",
+                    nameof(DateTime.AddSeconds) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' seconds')",
+                    // SQLite strftime %w returns 0..6 (Sun..Sat); .NET DayOfWeek enum matches.
+                    nameof(DateTime.DayOfWeek) => $"CAST(strftime('%w', {args[0]}) AS INTEGER)",
                     _ => null
                 };
             }
@@ -290,6 +295,15 @@ namespace nORM.Providers
                     nameof(Math.Floor) => $"FLOOR({args[0]})",
                     nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
                     nameof(Math.Round) => $"ROUND({args[0]})",
+                    nameof(Math.Sqrt) when args.Length == 1 => $"SQRT({args[0]})",
+                    nameof(Math.Pow) when args.Length == 2 => $"POW({args[0]}, {args[1]})",
+                    nameof(Math.Exp) when args.Length == 1 => $"EXP({args[0]})",
+                    nameof(Math.Log) when args.Length == 1 => $"LN({args[0]})",
+                    nameof(Math.Log) when args.Length == 2 => $"LOG({args[1]}, {args[0]})",
+                    nameof(Math.Log10) when args.Length == 1 => $"LOG10({args[0]})",
+                    nameof(Math.Sign) when args.Length == 1 => $"SIGN({args[0]})",
+                    nameof(Math.Min) when args.Length == 2 => $"MIN({args[0]}, {args[1]})",
+                    nameof(Math.Max) when args.Length == 2 => $"MAX({args[0]}, {args[1]})",
                     _ => null
                 };
             }

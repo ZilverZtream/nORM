@@ -624,6 +624,39 @@ namespace nORM.Query
             // String methods are handled by _fastMethodHandlers (see above).
             if (node.Method.DeclaringType == typeof(string))
             {
+                // static string.IsNullOrEmpty(x) -> (x IS NULL OR x = '')
+                // static string.IsNullOrWhiteSpace(x) -> (x IS NULL OR LTRIM(RTRIM(x)) = '')
+                if (node.Object == null && node.Arguments.Count == 1 &&
+                    (node.Method.Name == nameof(string.IsNullOrEmpty) || node.Method.Name == nameof(string.IsNullOrWhiteSpace)))
+                {
+                    var inner = GetSql(node.Arguments[0]);
+                    var trimmed = _provider.TranslateFunction(nameof(string.Trim), typeof(string), inner) ?? inner;
+                    var target = node.Method.Name == nameof(string.IsNullOrWhiteSpace) ? trimmed : inner;
+                    _sql.Append('(').Append(inner).Append(" IS NULL OR ").Append(target).Append(" = '')");
+                    return node;
+                }
+                // static string.Concat(a, b, ...) -> provider-specific concat
+                if (node.Object == null && node.Method.Name == nameof(string.Concat) && node.Arguments.Count >= 1)
+                {
+                    var parts = new List<string>();
+                    foreach (var a in node.Arguments)
+                    {
+                        // string.Concat(params object[]) - skip the array wrapper if present
+                        if (a is NewArrayExpression arr)
+                        {
+                            foreach (var item in arr.Expressions) parts.Add(GetSql(item));
+                        }
+                        else
+                        {
+                            parts.Add(GetSql(a));
+                        }
+                    }
+                    var concatSql = parts.Count == 1
+                        ? parts[0]
+                        : parts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next));
+                    _sql.Append(concatSql);
+                    return node;
+                }
                 var strArgs = new List<string>();
                 if (node.Object != null)
                     strArgs.Add(GetSql(node.Object));
@@ -639,6 +672,25 @@ namespace nORM.Query
             }
             if (node.Method.DeclaringType == typeof(Enumerable) || node.Method.DeclaringType == typeof(Queryable))
             {
+                // Detect nested aggregates on a mapped navigation collection in a predicate context,
+                // e.g. `parent.Children.Any(c => c.Foo > x)`. The receiver `parent.Children` is a
+                // CLR List/IEnumerable, not an IQueryable, so it normally cannot translate. We
+                // rewrite it into a correlated subquery on the dependent table joined by the
+                // relation's FK, then let the existing Queryable.Any/All/Count handlers run.
+                if (node.Arguments.Count >= 1 &&
+                    node.Arguments[0] is MemberExpression navMember &&
+                    navMember.Expression is ParameterExpression navParent &&
+                    _parameterMappings.TryGetValue(navParent, out var navParentInfo) &&
+                    navParentInfo.Mapping.Relations.TryGetValue(navMember.Member.Name, out var relation) &&
+                    (node.Method.Name is nameof(Queryable.Any)
+                                      or nameof(Queryable.All)
+                                      or nameof(Queryable.Count)
+                                      or nameof(Queryable.LongCount)))
+                {
+                    var rewritten = RewriteNavigationAggregate(node, navParent, relation);
+                    Visit(rewritten);
+                    return node;
+                }
                 switch (node.Method.Name)
                 {
                     case nameof(Queryable.GroupBy):
@@ -663,6 +715,14 @@ namespace nORM.Query
                             {
                                 _sql.Append("COUNT(*)");
                             }
+                            return node;
+                        }
+                        // Count/LongCount over a query source in a predicate context: emit a
+                        // correlated scalar subquery (SELECT COUNT(*) FROM child WHERE ...).
+                        if (node.Arguments.Count >= 1)
+                        {
+                            var countLambda = node.Arguments.Count > 1 ? StripQuotes(node.Arguments[1]) as LambdaExpression : null;
+                            BuildScalarCountSubquery(node.Arguments[0], countLambda);
                             return node;
                         }
                         break;
@@ -851,6 +911,69 @@ namespace nORM.Query
             }
             throw new NormUnsupportedFeatureException($"Method '{node.Method.Name}' is not supported.");
         }
+        /// <summary>
+        /// Rewrites a navigation-aware aggregate call (e.g. <c>parent.Children.Any(...)</c>)
+        /// into the equivalent <c>Queryable</c> shape that the existing translator can consume:
+        /// <c>NormQueryable.Query&lt;Child&gt;(ctx).Where(c => c.FK == parent.PK).Any(...)</c>.
+        /// The outer parameter reference inside the FK join condition is preserved so the
+        /// translator emits a correlated subquery instead of an independent SELECT.
+        /// </summary>
+        private MethodCallExpression RewriteNavigationAggregate(
+            MethodCallExpression originalCall,
+            ParameterExpression parentParam,
+            TableMapping.Relation relation)
+        {
+            var depType = relation.DependentType;
+
+            // Materialize the dependent IQueryable upfront so the sub-translator sees a
+            // ConstantExpression<IQueryable<Child>> at the root - that is the shape its
+            // VisitConstant recognizes as the query source. Building the expression as
+            // `Expression.Call(NormQueryable.Query, ctxConstant)` would emit the DbContext
+            // as a SQL parameter instead.
+            var queryMethod = typeof(NormQueryable).GetMethod(nameof(NormQueryable.Query))!
+                .MakeGenericMethod(depType);
+            var dependentQuery = queryMethod.Invoke(null, new object[] { _ctx })!;
+            var sourceExpr = (Expression)Expression.Constant(dependentQuery, typeof(IQueryable<>).MakeGenericType(depType));
+
+            // Build the FK = PK predicate against the dependent's property.
+            var childParam = Expression.Parameter(depType, "__nav_" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            Expression fkAccess = Expression.Property(childParam, relation.ForeignKey.Prop);
+            Expression pkAccess = Expression.Property(parentParam, relation.PrincipalKey.Prop);
+            // Promote nullable mismatches so Expression.Equal type-checks (e.g. nullable FK
+            // referring to a non-nullable PK).
+            if (fkAccess.Type != pkAccess.Type)
+            {
+                var common = Nullable.GetUnderlyingType(fkAccess.Type) ?? fkAccess.Type;
+                if (fkAccess.Type != common) fkAccess = Expression.Convert(fkAccess, common);
+                if (pkAccess.Type != common) pkAccess = Expression.Convert(pkAccess, common);
+            }
+            var fkPredicate = Expression.Lambda(Expression.Equal(fkAccess, pkAccess), childParam);
+
+            sourceExpr = Expression.Call(typeof(Queryable), nameof(Queryable.Where),
+                new[] { depType }, sourceExpr, Expression.Quote(fkPredicate));
+
+            // Re-emit the aggregate call (Any/All/Count/LongCount) against the synthesized
+            // Queryable source. The original predicate (if any) is the second arg.
+            var methodName = originalCall.Method.Name;
+            if (originalCall.Arguments.Count > 1)
+            {
+                var innerPredicate = StripQuotes(originalCall.Arguments[1]) as LambdaExpression
+                    ?? throw new NormQueryException(
+                        $"{methodName}() on a navigation collection requires a lambda predicate argument.");
+                var queryableMethod = typeof(Queryable).GetMethods()
+                    .First(m => m.Name == methodName && m.GetParameters().Length == 2)
+                    .MakeGenericMethod(depType);
+                return Expression.Call(queryableMethod, sourceExpr, Expression.Quote(innerPredicate));
+            }
+            else
+            {
+                var queryableMethod = typeof(Queryable).GetMethods()
+                    .First(m => m.Name == methodName && m.GetParameters().Length == 1)
+                    .MakeGenericMethod(depType);
+                return Expression.Call(queryableMethod, sourceExpr);
+            }
+        }
+
         private void BuildExists(Expression source, LambdaExpression? predicate, bool negate)
         {
             if (predicate != null)
@@ -860,12 +983,47 @@ namespace nORM.Query
             }
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
-            // Pass _recursionDepth + 1 so deeply nested Any()/All() subqueries respect the depth limit.
-            using var subTranslator = QueryTranslator.Create(_ctx, mapping, _params, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
+            // Separate tempParams dict so subTranslator.Dispose() (which Resets its Parameters)
+            // does not wipe params shared with the outer query. Copy collected params back before dispose.
+            var tempParams = new Dictionary<string, object>();
+            using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
+            foreach (var kvp in tempParams)
+                _params[kvp.Key] = kvp.Value;
             _sql.Append(negate ? "NOT EXISTS(" : "EXISTS(");
             _sql.Append(subPlan.Sql);
+            _sql.Append(")");
+        }
+        private void BuildScalarCountSubquery(Expression source, LambdaExpression? predicate)
+        {
+            if (predicate != null)
+            {
+                var et = GetElementType(source);
+                source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { et }, source, Expression.Quote(predicate));
+            }
+            var rootType = GetRootElementType(source);
+            var mapping = _ctx.GetMapping(rootType);
+            var tempParams = new Dictionary<string, object>();
+            using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
+            var subPlan = subTranslator.Translate(source);
+            _paramIndex = subTranslator.ParameterIndex;
+            foreach (var kvp in tempParams)
+                _params[kvp.Key] = kvp.Value;
+
+            // Rewrite the entity SELECT into SELECT COUNT(*) by replacing everything before the
+            // first ` FROM `. Strip any trailing ORDER BY which is meaningless inside a scalar
+            // subquery and disallowed by some providers.
+            var sql = subPlan.Sql;
+            var fromIdx = sql.IndexOf(" FROM ", StringComparison.OrdinalIgnoreCase);
+            if (fromIdx < 0)
+                throw new NormQueryException("Could not rewrite Count() subquery: no FROM clause found.");
+            var tail = sql.Substring(fromIdx);
+            var orderIdx = tail.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
+            if (orderIdx >= 0)
+                tail = tail.Substring(0, orderIdx);
+            _sql.Append("(SELECT COUNT(*)");
+            _sql.Append(tail);
             _sql.Append(")");
         }
         private void BuildIn(Expression source, Expression value)
@@ -1137,7 +1295,12 @@ namespace nORM.Query
         {
             while (source is MethodCallExpression mce)
             {
-                if (mce.Method.Name == "Query" && mce.Arguments.Count == 0)
+                // ctx.Query<T>() shows up as either an instance-style call (zero arguments) or
+                // as the static extension-style NormQueryable.Query<T>(ctx) (one argument).
+                // Both are the root of a query expression - stop walking and return T.
+                if (mce.Method.Name == "Query"
+                    && (mce.Arguments.Count == 0
+                        || mce.Method.DeclaringType == typeof(NormQueryable)))
                     return GetElementType(mce);
                 source = mce.Arguments[0];
             }

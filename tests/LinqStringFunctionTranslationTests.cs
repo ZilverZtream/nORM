@@ -154,6 +154,38 @@ public class LinqStringFunctionTranslationTests : IAsyncLifetime
         Assert.Equal(new[] { 2, 5 }, hits.Select(r => r.Id).ToArray());
     }
 
+    [Fact]
+    public async Task IsNullOrEmpty_matches_null_and_empty_rows()
+    {
+        await using var cmd = _cn.CreateCommand();
+        cmd.CommandText = "INSERT INTO StrRow VALUES (6, ''), (7, 'real');";
+        await cmd.ExecuteNonQueryAsync();
+        var hits = await _ctx.Query<StrRow>().Where(r => string.IsNullOrEmpty(r.Name)).OrderBy(r => r.Id).ToListAsync();
+        Assert.Single(hits);
+        Assert.Equal(6, hits[0].Id);
+    }
+
+    [Fact]
+    public async Task IsNullOrWhiteSpace_matches_whitespace_only_rows()
+    {
+        await using var cmd = _cn.CreateCommand();
+        cmd.CommandText = "INSERT INTO StrRow VALUES (8, '   '), (9, 'ok');";
+        await cmd.ExecuteNonQueryAsync();
+        var hits = await _ctx.Query<StrRow>().Where(r => string.IsNullOrWhiteSpace(r.Name)).OrderBy(r => r.Id).ToListAsync();
+        Assert.Single(hits);
+        Assert.Equal(8, hits[0].Id);
+    }
+
+    [Fact]
+    public async Task Concat_two_columns_compares_to_literal()
+    {
+        var hits = await _ctx.Query<StrRow>()
+            .Where(r => string.Concat(r.Name, "!") == "Beta!")
+            .ToListAsync();
+        Assert.Single(hits);
+        Assert.Equal(2, hits[0].Id);
+    }
+
     [Table("StrRow")]
     public sealed class StrRow
     {
