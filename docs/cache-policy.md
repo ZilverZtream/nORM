@@ -26,12 +26,23 @@ diagnostics.
 | Fast-path prepared command cache | `DbContext` instance | disposed and cleared by `DbContext.Dispose` / `DisposeAsync` |
 | Query-provider pooled plan/count commands | `NormQueryProvider` instance | disposed and cleared when the provider is disposed |
 
+## Compiled Query Cache
+
+Each compiled query expression creates a per-expression `ConcurrentLruCache` of
+query plans, keyed by provider type, mapping hash, and tenant/filter identity.
+The compiled query plan cache is bounded at 256 entries per compiled expression
+context. This prevents unbounded growth when a single compiled query is reused
+across many different context configurations.
+
 ## User Result Cache
 
 `DbContextOptions.UseInMemoryCache()` installs the built-in query result cache
-provider. Query result cache entries are opt-in through `Cacheable(...)` and use
+provider. The built-in `NormMemoryCacheProvider` is backed by
+`Microsoft.Extensions.Caching.Memory` with a size limit of 10,240 entries.
+Query result cache entries are opt-in through `Cacheable(...)` and use
 `DbContextOptions.CacheExpiration`, which defaults to five minutes. Bulk and
-write paths invalidate table tags after mutation.
+write paths invalidate table tags after mutation. Result cache entries do not
+persist after the cache provider is disposed.
 
 ## Operational Guidance
 
