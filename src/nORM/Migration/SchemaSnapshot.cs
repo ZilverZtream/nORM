@@ -106,6 +106,8 @@ namespace nORM.Migration
     /// Helper responsible for creating <see cref="SchemaSnapshot"/> instances by
     /// scanning assemblies for entity types and their mapping attributes.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("SchemaSnapshotBuilder scans assemblies via reflection; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("SchemaSnapshotBuilder reflects over entity types; trimming may remove the required members.")]
     public static class SchemaSnapshotBuilder
     {
         /// <summary>

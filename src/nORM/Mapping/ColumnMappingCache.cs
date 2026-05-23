@@ -18,6 +18,8 @@ namespace nORM.Mapping
     /// <summary>
     /// Provides cached reflection-based metadata describing how entity properties map to database columns.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("ColumnMappingCache reflects over entity properties; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("ColumnMappingCache reflects over entity properties; trimming may remove the required members.")]
     public static class ColumnMappingCache
     {
         private static readonly ConcurrentDictionary<Type, CachedTypeInfo> _typeCache = new();

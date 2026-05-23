@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Numerics;
@@ -14,6 +15,8 @@ namespace nORM.Core
     /// <summary>
     /// Compact aggregate extensions for nORM using numeric generics
     /// </summary>
+    [RequiresDynamicCode("nORM aggregate extensions emit generic-method LINQ expressions; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [RequiresUnreferencedCode("nORM aggregate extensions reflect over LINQ method metadata; trimming may remove the required members.")]
     public static class AdvancedLinqExtensions
     {
         #region Sum

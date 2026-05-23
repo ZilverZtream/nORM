@@ -34,6 +34,8 @@ namespace nORM.Core
     /// change tracking, transactions and provider specific behavior. Instances are
     /// intended to be short lived and not thread safe.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("DbContext uses Expression-based query translation and reflection-built materializers; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("DbContext reflects over entity types to build mappings; trimming may remove the required members.")]
     public partial class DbContext : IDisposable, IAsyncDisposable
     {
         /// <summary>Maximum SQL length (in chars) before falling back to length-based complexity estimation.</summary>

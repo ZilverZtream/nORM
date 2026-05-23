@@ -26,6 +26,11 @@ namespace nORM.Enterprise
     ///     <see cref="System.Threading.SynchronizationContext"/> environments.</description></item>
     /// </list>
     /// </remarks>
+    // IDbCommandInterceptor cannot carry [RequiresDynamicCode]/[RequiresUnreferencedCode] at the
+    // interface level; those attributes only apply to classes, constructors, and methods. The
+    // implementing types (BaseDbCommandInterceptor and its subclasses) carry the dynamic-code
+    // marker, and the AOT baseline at eng/aot-baseline.txt accepts the residual interface-method
+    // diagnostics as a known-dynamic surface.
     public interface IDbCommandInterceptor
     {
         // ── Async hooks ──────────────────────────────────────────────────────────────────────────

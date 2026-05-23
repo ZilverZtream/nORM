@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -8,6 +9,8 @@ namespace nORM.Core
     /// <summary>
     /// Provides LINQ extension methods for SQL window functions.
     /// </summary>
+    [RequiresDynamicCode("nORM window functions emit MakeGenericMethod-built expressions; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [RequiresUnreferencedCode("nORM window functions reflect over LINQ method metadata; trimming may remove the required members.")]
     public static class WindowFunctionsExtensions
     {
         /// <summary>

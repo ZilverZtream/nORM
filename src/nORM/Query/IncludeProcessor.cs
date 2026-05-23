@@ -20,6 +20,8 @@ namespace nORM.Query
     /// and separate paired queries for many-to-many relationships
     /// (<see cref="LoadManyToManyAsync"/>/<see cref="LoadManyToMany"/>).
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("IncludeProcessor builds expressions via reflection; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("IncludeProcessor reflects over navigation property metadata; trimming may remove the required members.")]
     internal sealed class IncludeProcessor
     {
         private readonly DbContext _ctx;

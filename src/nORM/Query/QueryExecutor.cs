@@ -23,6 +23,8 @@ namespace nORM.Query
     /// <summary>
     /// Executes <see cref="DbCommand"/> instances and materializes results.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("QueryExecutor materializes rows via reflection-built delegates; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("QueryExecutor reflects over entity types; trimming may remove the required members.")]
     internal sealed class QueryExecutor
     {
         private readonly DbContext _ctx;

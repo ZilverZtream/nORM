@@ -19,6 +19,8 @@ namespace nORM.Migration
     /// <summary>
     /// Executes migrations against a MySQL database using a supplied connection and migrations assembly.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("MySqlMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("MySqlMigrationRunner reflects over Migration types; trimming may remove the required members.")]
     public class MySqlMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable
     {
         private readonly DbConnection _connection;

@@ -25,6 +25,8 @@ using nORM.Navigation;
 #nullable enable
 namespace nORM.Query
 {
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("NormQueryProvider builds and executes Expression trees via reflection; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("NormQueryProvider reflects over entity and query types; trimming may remove the required members.")]
     internal sealed partial class NormQueryProvider : IQueryProvider, IDisposable
     {
         /// <summary>Default initial capacity for list materialization when no Take hint is available.</summary>

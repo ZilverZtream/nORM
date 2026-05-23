@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -8,6 +9,8 @@ namespace nORM.Core
     /// <summary>
     /// Provides helper methods for querying temporal tables at specific points in time.
     /// </summary>
+    [RequiresDynamicCode("nORM temporal extensions emit reflection-built LINQ expressions; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [RequiresUnreferencedCode("nORM temporal extensions reflect over LINQ method metadata; trimming may remove the required members.")]
     public static class TemporalExtensions
     {
         /// <summary>

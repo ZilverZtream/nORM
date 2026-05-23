@@ -259,7 +259,7 @@ namespace nORM.Query
                 }
                 else if (resultSelector == null)
                 {
-                    // No result selector â€” select only inner columns
+                    // No result selector — select only inner columns
                     for (int i = 0; i < innerMapping.Columns.Length; i++)
                     {
                         if (i > 0) _sql.Append(", ");

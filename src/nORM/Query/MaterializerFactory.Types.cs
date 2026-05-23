@@ -502,7 +502,7 @@ namespace nORM.Query
         {
             public readonly Type MappingType;     // was int MappingTypeHash
             public readonly Type TargetType;      // was int TargetTypeHash
-            public readonly long ProjectionHash;  // was int â€” now 64-bit to reduce collision risk
+            public readonly long ProjectionHash;  // was int — now 64-bit to reduce collision risk
             public readonly string TableName;
             public readonly int StartOffset;
             public readonly int ConverterFingerprint;
@@ -526,7 +526,7 @@ namespace nORM.Query
             /// <param name="other">The cache key to compare with the current key.</param>
             /// <returns><c>true</c> if the keys represent the same configuration; otherwise, <c>false</c>.</returns>
             public bool Equals(MaterializerCacheKey other) =>
-                MappingType == other.MappingType &&   // reference equality â€” no collision
+                MappingType == other.MappingType &&   // reference equality — no collision
                 TargetType == other.TargetType &&
                 ProjectionHash == other.ProjectionHash &&
                 StartOffset == other.StartOffset &&

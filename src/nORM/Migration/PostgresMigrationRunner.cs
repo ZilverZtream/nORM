@@ -19,6 +19,8 @@ namespace nORM.Migration
     /// <summary>
     /// Executes migrations against a PostgreSQL database using a supplied connection and migrations assembly.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("PostgresMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("PostgresMigrationRunner reflects over Migration types; trimming may remove the required members.")]
     public class PostgresMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable
     {
         private readonly DbConnection _connection;
