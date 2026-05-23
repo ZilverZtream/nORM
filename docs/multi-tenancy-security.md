@@ -5,6 +5,16 @@ nORM multi-tenancy is a security boundary for ORM-generated access paths when
 configured `TenantColumnName`. It is not a replacement for database-level row
 security on caller-authored SQL.
 
+## Threat Model Summary
+
+| Protected paths (tenant filter automatically applied) | Bypass-capable paths (caller must enforce tenant isolation) |
+| --- | --- |
+| All ORM queries through `IQueryable<T>` | Raw SQL (`ExecuteRawSqlAsync`) |
+| Compiled queries | Stored procedures |
+| Include/EagerLoad | Migrations |
+| Change tracking save operations | Scaffolding |
+| Bulk CUD operations | Direct connection access (`DatabaseFacade.GetDbConnection()`) |
+
 ## Threat Model
 
 nORM protects normal application reads and writes from accidentally reading,

@@ -32,7 +32,7 @@ still needs release evidence.
 | 4 | Fix v1 issue map and blocker accounting | Verified | This map tracks exactly 40 blockers with evidence-aware statuses. |
 | 5 | Make Release build warning-free | Verified | `dotnet build nORM.sln -c Release --nologo` reports 0 warnings on this tree. |
 | 6 | Harden public API snapshotting before freeze | In Progress | `tests/PublicApi.Shipped.txt` exists; full supportability classification remains open. |
-| 7 | Revisit runtime package dependency architecture | Open | Dependency graph is documented only partially; package split decision remains open. |
+| 7 | Revisit runtime package dependency architecture | Verified | Decision documented in `docs/provider-packages.md`: single runtime package with SQL Server/SQLite bundled; Postgres/MySQL via reflection to avoid transitive dependencies. Architecture decided and documented. Package-consumer tests validate the dependency contract. |
 | 8 | Clean release artifact and version hygiene | Verified | `NormVersion` is centralized in `Directory.Build.props`; package tests and `eng/v1-release-gate.ps1` clean and validate package outputs. |
 | 9 | Run package consumer tests cross-platform | In Progress | Package consumer tests exist; cross-platform CI evidence is still required. |
 | 10 | Replace or freeze beta CLI dependency | Verified | `dotnet-norm` now references stable `System.CommandLine` 2.0.8; CLI and package consumer smoke tests passed. |
