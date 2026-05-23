@@ -24,10 +24,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TimeoutStatistics
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 29
+    startLine: 46
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Captures statistics about past executions to guide future timeout adjustments.
+  example: []
   syntax:
     content: public class AdaptiveTimeoutManager.TimeoutStatistics
     content.vb: Public Class AdaptiveTimeoutManager.TimeoutStatistics
@@ -64,10 +66,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AverageExecutionTime
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 31
+    startLine: 49
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: The average execution duration of the operation.
+  example: []
   syntax:
     content: public TimeSpan AverageExecutionTime { get; set; }
     parameters: []
@@ -93,10 +97,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxExecutionTime
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 32
+    startLine: 51
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: The maximum observed execution time.
+  example: []
   syntax:
     content: public TimeSpan MaxExecutionTime { get; set; }
     parameters: []
@@ -122,10 +128,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecutionCount
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 33
+    startLine: 53
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Total number of executions recorded.
+  example: []
   syntax:
     content: public int ExecutionCount { get; set; }
     parameters: []
@@ -151,10 +159,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TimeoutCount
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 34
+    startLine: 55
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Number of executions that resulted in a timeout.
+  example: []
   syntax:
     content: public int TimeoutCount { get; set; }
     parameters: []
@@ -180,10 +190,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SuccessRate
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 35
+    startLine: 57
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: The ratio of successful executions to total executions.
+  example: []
   syntax:
     content: public double SuccessRate { get; }
     parameters: []

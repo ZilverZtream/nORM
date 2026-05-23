@@ -26,7 +26,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RelationshipConfiguration
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 42
+    startLine: 88
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -70,7 +70,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 42
+    startLine: 88
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -120,7 +120,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PrincipalNavigation
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 42
+    startLine: 88
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -151,7 +151,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DependentType
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 42
+    startLine: 88
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -182,7 +182,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DependentNavigation
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 43
+    startLine: 89
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -213,7 +213,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PrincipalKey
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 43
+    startLine: 89
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -244,7 +244,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKey
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 43
+    startLine: 89
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -275,7 +275,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CascadeDelete
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 43
+    startLine: 89
   assemblies:
   - nORM
   namespace: nORM.Configuration

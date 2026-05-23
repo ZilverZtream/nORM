@@ -114,7 +114,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToListAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 34
+    startLine: 35
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -155,7 +155,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CountAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 52
+    startLine: 54
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -196,7 +196,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToListSync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 74
+    startLine: 83
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -235,7 +235,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CountSync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 87
+    startLine: 97
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -274,7 +274,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToArrayAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 105
+    startLine: 116
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -315,7 +315,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AnyAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 123
+    startLine: 135
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -356,7 +356,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 145
+    startLine: 158
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -397,7 +397,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstOrDefaultAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 167
+    startLine: 181
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -438,21 +438,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteDeleteAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 186
+    startLine: 208
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Executes a bulk delete for the entities matching the query.
+  example: []
   syntax:
     content: 'public static Task<int> ExecuteDeleteAsync<T>(this IQueryable<T> source, CancellationToken ct = default) where T : class'
     parameters:
     - id: source
       type: System.Linq.IQueryable{{T}}
+      description: Query identifying entities to delete.
     - id: ct
       type: System.Threading.CancellationToken
+      description: Cancellation token.
     typeParameters:
     - id: T
+      description: Type of the entity.
     return:
       type: System.Threading.Tasks.Task{System.Int32}
+      description: The number of affected rows.
     content.vb: Public Shared Function ExecuteDeleteAsync(Of T As Class)(source As IQueryable(Of T), ct As CancellationToken = Nothing) As Task(Of Integer)
   overload: nORM.Core.NormAsyncExtensions.ExecuteDeleteAsync*
   nameWithType.vb: NormAsyncExtensions.ExecuteDeleteAsync(Of T)(IQueryable(Of T), CancellationToken)
@@ -477,23 +483,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteUpdateAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 199
+    startLine: 229
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Executes a bulk update for entities matching the query using the provided property assignments.
+  example: []
   syntax:
     content: 'public static Task<int> ExecuteUpdateAsync<T>(this IQueryable<T> source, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct = default) where T : class'
     parameters:
     - id: source
       type: System.Linq.IQueryable{{T}}
+      description: Query identifying entities to update.
     - id: set
       type: System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{{T}},nORM.Core.SetPropertyCalls{{T}}}}
+      description: Delegate specifying property assignments.
     - id: ct
       type: System.Threading.CancellationToken
+      description: Cancellation token.
     typeParameters:
     - id: T
+      description: Type of the entity.
     return:
       type: System.Threading.Tasks.Task{System.Int32}
+      description: The number of affected rows.
     content.vb: Public Shared Function ExecuteUpdateAsync(Of T As Class)(source As IQueryable(Of T), [set] As Expression(Of Func(Of SetPropertyCalls(Of T), SetPropertyCalls(Of T))), ct As CancellationToken = Nothing) As Task(Of Integer)
   overload: nORM.Core.NormAsyncExtensions.ExecuteUpdateAsync*
   nameWithType.vb: NormAsyncExtensions.ExecuteUpdateAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of SetPropertyCalls(Of T), SetPropertyCalls(Of T))), CancellationToken)
@@ -518,10 +531,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Join
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 213
+    startLine: 246
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Performs an inner join between two queryable sources.
+  example: []
   syntax:
     content: public static IQueryable<TResult> Join<TOuter, TInner, TKey, TResult>(this IQueryable<TOuter> outer, IQueryable<TInner> inner, Expression<Func<TOuter, TKey>> outerKeySelector, Expression<Func<TInner, TKey>> innerKeySelector, Expression<Func<TOuter, TInner, TResult>> resultSelector)
     parameters:
@@ -566,10 +581,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GroupJoin
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 223
+    startLine: 259
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Performs a group join between two queryable sources.
+  example: []
   syntax:
     content: public static IQueryable<TResult> GroupJoin<TOuter, TInner, TKey, TResult>(this IQueryable<TOuter> outer, IQueryable<TInner> inner, Expression<Func<TOuter, TKey>> outerKeySelector, Expression<Func<TInner, TKey>> innerKeySelector, Expression<Func<TOuter, IEnumerable<TInner>, TResult>> resultSelector)
     parameters:
@@ -1236,7 +1253,7 @@ references:
   nameWithType: NormAsyncExtensions.ToListSync
   fullName: nORM.Core.NormAsyncExtensions.ToListSync
 - uid: System.Collections.Generic.List{{T}}
-  commentId: T:System.Collections.Generic.List{`0}
+  commentId: T:System.Collections.Generic.List{``0}
   parent: System.Collections.Generic
   definition: System.Collections.Generic.List`1
   href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1

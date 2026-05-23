@@ -22,13 +22,20 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IMigrationRunner
     path: src/nORM/Migration/IMigrationRunner.cs
-    startLine: 7
+    startLine: 10
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Defines a service capable of applying and querying database migrations.
+  example: []
   syntax:
     content: public interface IMigrationRunner
     content.vb: Public Interface IMigrationRunner
+  derivedClasses:
+  - nORM.Migration.MySqlMigrationRunner
+  - nORM.Migration.PostgresMigrationRunner
+  - nORM.Migration.SqlServerMigrationRunner
+  - nORM.Migration.SqliteMigrationRunner
   extensionMethods:
   - nORM.Migration.IMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
   - nORM.Migration.IMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.IMigrationRunner,{TProperty}}})
@@ -52,17 +59,24 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPendingMigrationsAsync
     path: src/nORM/Migration/IMigrationRunner.cs
-    startLine: 9
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: >-
+    Determines whether there are migrations in the configured assembly that have not
+
+    yet been applied to the target database.
+  example: []
   syntax:
     content: Task<bool> HasPendingMigrationsAsync(CancellationToken ct = default)
     parameters:
     - id: ct
       type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
     return:
       type: System.Threading.Tasks.Task{System.Boolean}
+      description: <code>true</code> if pending migrations exist; otherwise, <code>false</code>.
     content.vb: Function HasPendingMigrationsAsync(ct As CancellationToken = Nothing) As Task(Of Boolean)
   overload: nORM.Migration.IMigrationRunner.HasPendingMigrationsAsync*
 - uid: nORM.Migration.IMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken)
@@ -83,15 +97,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ApplyMigrationsAsync
     path: src/nORM/Migration/IMigrationRunner.cs
-    startLine: 10
+    startLine: 24
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Applies all pending migrations to the database.
+  example: []
   syntax:
     content: Task ApplyMigrationsAsync(CancellationToken ct = default)
     parameters:
     - id: ct
       type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
     return:
       type: System.Threading.Tasks.Task
     content.vb: Function ApplyMigrationsAsync(ct As CancellationToken = Nothing) As Task
@@ -114,17 +131,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetPendingMigrationsAsync
     path: src/nORM/Migration/IMigrationRunner.cs
-    startLine: 11
+    startLine: 31
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Returns the identifiers of migrations that have not yet been applied.
+  example: []
   syntax:
     content: Task<string[]> GetPendingMigrationsAsync(CancellationToken ct = default)
     parameters:
     - id: ct
       type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
     return:
       type: System.Threading.Tasks.Task{System.String[]}
+      description: An array of strings representing pending migration identifiers.
     content.vb: Function GetPendingMigrationsAsync(ct As CancellationToken = Nothing) As Task(Of String())
   overload: nORM.Migration.IMigrationRunner.GetPendingMigrationsAsync*
 references:

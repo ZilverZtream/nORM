@@ -2,7 +2,7 @@
   "metadata": [
     {
       "src": [
-        { "cwd": "src", "files": [ "nORM.csproj" ] }
+        { "files": [ "src/nORM.csproj" ] }
       ],
       "dest": "docs/api",
       "properties": {

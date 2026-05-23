@@ -20,10 +20,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaSnapshot
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 9
+    startLine: 20
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: >-
+    Represents the desired database schema state derived from code mappings (attributes or
+
+    fluent configuration). This is NOT a live snapshot of an actual database — it reflects
+
+    what the schema <em>should</em> look like based on the current entity model.
+
+    Use <xref href="nORM.Migration.SchemaDiffer.Diff(nORM.Migration.SchemaSnapshot%2cnORM.Migration.SchemaSnapshot)" data-throw-if-not-resolved="false"></xref> to compare two snapshots and produce the migrations
+
+    required to bring an old schema up to date with a new one.
+  example: []
   syntax:
     content: public class SchemaSnapshot
     content.vb: Public Class SchemaSnapshot
@@ -60,18 +71,54 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Tables
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 11
+    startLine: 23
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Tables captured in the snapshot.
+  example: []
   syntax:
-    content: public List<TableSchema> Tables { get; set; }
+    content: public List<TableSchema> Tables { get; init; }
     parameters: []
     return:
       type: System.Collections.Generic.List{nORM.Migration.TableSchema}
     content.vb: Public Property Tables As List(Of TableSchema)
   overload: nORM.Migration.SchemaSnapshot.Tables*
 references:
+- uid: nORM.Migration.SchemaDiffer.Diff(nORM.Migration.SchemaSnapshot,nORM.Migration.SchemaSnapshot)
+  commentId: M:nORM.Migration.SchemaDiffer.Diff(nORM.Migration.SchemaSnapshot,nORM.Migration.SchemaSnapshot)
+  href: nORM.Migration.SchemaDiffer.html#nORM_Migration_SchemaDiffer_Diff_nORM_Migration_SchemaSnapshot_nORM_Migration_SchemaSnapshot_
+  name: Diff(SchemaSnapshot, SchemaSnapshot)
+  nameWithType: SchemaDiffer.Diff(SchemaSnapshot, SchemaSnapshot)
+  fullName: nORM.Migration.SchemaDiffer.Diff(nORM.Migration.SchemaSnapshot, nORM.Migration.SchemaSnapshot)
+  spec.csharp:
+  - uid: nORM.Migration.SchemaDiffer.Diff(nORM.Migration.SchemaSnapshot,nORM.Migration.SchemaSnapshot)
+    name: Diff
+    href: nORM.Migration.SchemaDiffer.html#nORM_Migration_SchemaDiffer_Diff_nORM_Migration_SchemaSnapshot_nORM_Migration_SchemaSnapshot_
+  - name: (
+  - uid: nORM.Migration.SchemaSnapshot
+    name: SchemaSnapshot
+    href: nORM.Migration.SchemaSnapshot.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Migration.SchemaSnapshot
+    name: SchemaSnapshot
+    href: nORM.Migration.SchemaSnapshot.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Migration.SchemaDiffer.Diff(nORM.Migration.SchemaSnapshot,nORM.Migration.SchemaSnapshot)
+    name: Diff
+    href: nORM.Migration.SchemaDiffer.html#nORM_Migration_SchemaDiffer_Diff_nORM_Migration_SchemaSnapshot_nORM_Migration_SchemaSnapshot_
+  - name: (
+  - uid: nORM.Migration.SchemaSnapshot
+    name: SchemaSnapshot
+    href: nORM.Migration.SchemaSnapshot.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Migration.SchemaSnapshot
+    name: SchemaSnapshot
+    href: nORM.Migration.SchemaSnapshot.html
+  - name: )
 - uid: nORM.Migration
   commentId: N:nORM.Migration
   href: nORM.html

@@ -23,10 +23,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AdaptiveTimeoutManager
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 13
+    startLine: 17
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: >-
+    Provides heuristics for determining and tracking database command timeouts based on
+
+    operation type, complexity and historical execution statistics.
+  example: []
   syntax:
     content: public class AdaptiveTimeoutManager
     content.vb: Public Class AdaptiveTimeoutManager
@@ -63,17 +68,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 54
+    startLine: 105
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Initializes a new instance of the <xref href="nORM.Execution.AdaptiveTimeoutManager" data-throw-if-not-resolved="false"></xref> class.
+  example: []
   syntax:
     content: public AdaptiveTimeoutManager(AdaptiveTimeoutManager.TimeoutConfiguration config, ILogger logger)
     parameters:
     - id: config
       type: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
+      description: Configuration options governing timeout behavior.
     - id: logger
       type: Microsoft.Extensions.Logging.ILogger
+      description: Logger used to record diagnostic information.
     content.vb: Public Sub New(config As AdaptiveTimeoutManager.TimeoutConfiguration, logger As ILogger)
   overload: nORM.Execution.AdaptiveTimeoutManager.#ctor*
   nameWithType.vb: AdaptiveTimeoutManager.New(AdaptiveTimeoutManager.TimeoutConfiguration, ILogger)
@@ -97,7 +106,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetTimeoutForOperation
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 69
+    startLine: 120
   assemblies:
   - nORM
   namespace: nORM.Execution
@@ -147,29 +156,45 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteWithAdaptiveTimeout
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 134
+    startLine: 196
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: >-
+    Executes the provided asynchronous operation enforcing an adaptive timeout based on the
+
+    configured heuristics and records the outcome for future adjustments.
+  example: []
   syntax:
     content: public Task<T> ExecuteWithAdaptiveTimeout<T>(Func<CancellationToken, Task<T>> operation, AdaptiveTimeoutManager.OperationType operationType, string operationKey, int recordCount = 1, int complexityScore = 1)
     parameters:
     - id: operation
       type: System.Func{System.Threading.CancellationToken,System.Threading.Tasks.Task{{T}}}
+      description: Delegate representing the work to execute.
     - id: operationType
       type: nORM.Execution.AdaptiveTimeoutManager.OperationType
+      description: Classification of the operation being executed.
     - id: operationKey
       type: System.String
+      description: Identifier used for tracking execution statistics.
     - id: recordCount
       type: System.Int32
+      description: Number of records involved, used for scaling bulk operation timeouts.
     - id: complexityScore
       type: System.Int32
+      description: Relative complexity score of the operation.
     typeParameters:
     - id: T
+      description: Type of the result produced by the operation.
     return:
       type: System.Threading.Tasks.Task{{T}}
+      description: The result produced by the <code class="paramref">operation</code>.
     content.vb: Public Function ExecuteWithAdaptiveTimeout(Of T)(operation As Func(Of CancellationToken, Task(Of T)), operationType As AdaptiveTimeoutManager.OperationType, operationKey As String, recordCount As Integer = 1, complexityScore As Integer = 1) As Task(Of T)
   overload: nORM.Execution.AdaptiveTimeoutManager.ExecuteWithAdaptiveTimeout*
+  exceptions:
+  - type: nORM.Core.NormTimeoutException
+    commentId: T:nORM.Core.NormTimeoutException
+    description: Thrown when the operation exceeds the calculated timeout.
   nameWithType.vb: AdaptiveTimeoutManager.ExecuteWithAdaptiveTimeout(Of T)(Func(Of CancellationToken, Task(Of T)), AdaptiveTimeoutManager.OperationType, String, Integer, Integer)
   fullName.vb: nORM.Execution.AdaptiveTimeoutManager.ExecuteWithAdaptiveTimeout(Of T)(System.Func(Of System.Threading.CancellationToken, System.Threading.Tasks.Task(Of T)), nORM.Execution.AdaptiveTimeoutManager.OperationType, String, Integer, Integer)
   name.vb: ExecuteWithAdaptiveTimeout(Of T)(Func(Of CancellationToken, Task(Of T)), OperationType, String, Integer, Integer)
@@ -191,7 +216,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetOperationStatistics
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 219
+    startLine: 281
   assemblies:
   - nORM
   namespace: nORM.Execution
@@ -1168,6 +1193,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Execution.AdaptiveTimeoutManager
+  commentId: T:nORM.Execution.AdaptiveTimeoutManager
+  href: nORM.Execution.AdaptiveTimeoutManager.html
+  name: AdaptiveTimeoutManager
+  nameWithType: AdaptiveTimeoutManager
+  fullName: nORM.Execution.AdaptiveTimeoutManager
 - uid: nORM.Execution.AdaptiveTimeoutManager.#ctor*
   commentId: Overload:nORM.Execution.AdaptiveTimeoutManager.#ctor
   href: nORM.Execution.AdaptiveTimeoutManager.html#nORM_Execution_AdaptiveTimeoutManager__ctor_nORM_Execution_AdaptiveTimeoutManager_TimeoutConfiguration_Microsoft_Extensions_Logging_ILogger_
@@ -1297,6 +1328,12 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
+- uid: nORM.Core.NormTimeoutException
+  commentId: T:nORM.Core.NormTimeoutException
+  href: nORM.Core.NormTimeoutException.html
+  name: NormTimeoutException
+  nameWithType: NormTimeoutException
+  fullName: nORM.Core.NormTimeoutException
 - uid: nORM.Execution.AdaptiveTimeoutManager.ExecuteWithAdaptiveTimeout*
   commentId: Overload:nORM.Execution.AdaptiveTimeoutManager.ExecuteWithAdaptiveTimeout
   href: nORM.Execution.AdaptiveTimeoutManager.html#nORM_Execution_AdaptiveTimeoutManager_ExecuteWithAdaptiveTimeout__1_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_Task___0___nORM_Execution_AdaptiveTimeoutManager_OperationType_System_String_System_Int32_System_Int32_

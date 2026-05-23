@@ -29,10 +29,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OperationType
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 38
+    startLine: 63
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Enumerates the types of database operations for which timeouts can be calculated.
+  example: []
   syntax:
     content: public enum AdaptiveTimeoutManager.OperationType
     content.vb: Public Enum AdaptiveTimeoutManager.OperationType
@@ -54,10 +56,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SimpleSelect
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 40
+    startLine: 66
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: A simple read-only query.
+  example: []
   syntax:
     content: SimpleSelect = 0
     return:
@@ -80,10 +84,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComplexSelect
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 41
+    startLine: 68
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: A complex read-only query.
+  example: []
   syntax:
     content: ComplexSelect = 1
     return:
@@ -106,10 +112,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Insert
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 42
+    startLine: 70
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: An insert operation.
+  example: []
   syntax:
     content: Insert = 2
     return:
@@ -132,10 +140,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Update
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 43
+    startLine: 72
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: An update operation.
+  example: []
   syntax:
     content: Update = 3
     return:
@@ -158,10 +168,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Delete
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 44
+    startLine: 74
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: A delete operation.
+  example: []
   syntax:
     content: Delete = 4
     return:
@@ -184,10 +196,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkInsert
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 45
+    startLine: 76
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: A bulk insert operation.
+  example: []
   syntax:
     content: BulkInsert = 5
     return:
@@ -210,10 +224,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkUpdate
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 46
+    startLine: 78
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: A bulk update operation.
+  example: []
   syntax:
     content: BulkUpdate = 6
     return:
@@ -236,10 +252,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkDelete
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 47
+    startLine: 80
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: A bulk delete operation.
+  example: []
   syntax:
     content: BulkDelete = 7
     return:
@@ -262,10 +280,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Transaction
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 48
+    startLine: 82
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: An explicit transaction.
+  example: []
   syntax:
     content: Transaction = 8
     return:
@@ -288,10 +308,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: StoredProcedure
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 49
+    startLine: 84
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: A stored procedure invocation.
+  example: []
   syntax:
     content: StoredProcedure = 9
     return:

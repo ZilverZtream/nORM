@@ -1,0 +1,604 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Internal.ParameterOptimizer
+  commentId: T:nORM.Internal.ParameterOptimizer
+  id: ParameterOptimizer
+  parent: nORM.Internal
+  children:
+  - nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand,System.String,System.Object,System.Type)
+  - nORM.Internal.ParameterOptimizer.AddParam(System.Data.Common.DbCommand,System.String,System.Object)
+  langs:
+  - csharp
+  - vb
+  name: ParameterOptimizer
+  nameWithType: ParameterOptimizer
+  fullName: nORM.Internal.ParameterOptimizer
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Internal/ParameterOptimizer.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ParameterOptimizer
+    path: src/nORM/Internal/ParameterOptimizer.cs
+    startLine: 18
+  assemblies:
+  - nORM
+  namespace: nORM.Internal
+  summary: >-
+    Provides optimized parameter binding with provider-aware type coercion.
+
+    Expanded type map covering 33 types reduces fallback to DbType.Object
+
+    which can cause inefficient query plans. Public to allow source-generated
+
+    compile-time query methods to use the same parameter binding logic as
+
+    runtime queries (SG1 fix).
+  example: []
+  syntax:
+    content: public static class ParameterOptimizer
+    content.vb: Public Module ParameterOptimizer
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+- uid: nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand,System.String,System.Object,System.Type)
+  commentId: M:nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand,System.String,System.Object,System.Type)
+  id: AddOptimizedParam(System.Data.Common.DbCommand,System.String,System.Object,System.Type)
+  isExtensionMethod: true
+  parent: nORM.Internal.ParameterOptimizer
+  langs:
+  - csharp
+  - vb
+  name: AddOptimizedParam(DbCommand, string, object?, Type?)
+  nameWithType: ParameterOptimizer.AddOptimizedParam(DbCommand, string, object?, Type?)
+  fullName: nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand, string, object?, System.Type?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Internal/ParameterOptimizer.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AddOptimizedParam
+    path: src/nORM/Internal/ParameterOptimizer.cs
+    startLine: 106
+  assemblies:
+  - nORM
+  namespace: nORM.Internal
+  summary: >-
+    Adds a parameter to the command, attempting to infer the optimal <xref href="System.Data.DbType" data-throw-if-not-resolved="false"></xref> and
+
+    size based on the supplied value. When a <code class="paramref">knownType</code> is provided and the
+
+    value is <code>null</code>, the mapping is still applied to avoid provider ambiguity.
+  example: []
+  syntax:
+    content: public static void AddOptimizedParam(this DbCommand cmd, string name, object? value, Type? knownType = null)
+    parameters:
+    - id: cmd
+      type: System.Data.Common.DbCommand
+      description: The command to which the parameter is added.
+    - id: name
+      type: System.String
+      description: The parameter name including prefix (e.g. <code>@Id</code>).
+    - id: value
+      type: System.Object
+      description: The value to bind to the parameter.
+    - id: knownType
+      type: System.Type
+      description: Optional type hint used when <code class="paramref">value</code> is <code>null</code>.
+    content.vb: Public Shared Sub AddOptimizedParam(cmd As DbCommand, name As String, value As Object, knownType As Type = Nothing)
+  overload: nORM.Internal.ParameterOptimizer.AddOptimizedParam*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">name</code> is <code>null</code>.
+  nameWithType.vb: ParameterOptimizer.AddOptimizedParam(DbCommand, String, Object, Type)
+  fullName.vb: nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand, String, Object, System.Type)
+  name.vb: AddOptimizedParam(DbCommand, String, Object, Type)
+- uid: nORM.Internal.ParameterOptimizer.AddParam(System.Data.Common.DbCommand,System.String,System.Object)
+  commentId: M:nORM.Internal.ParameterOptimizer.AddParam(System.Data.Common.DbCommand,System.String,System.Object)
+  id: AddParam(System.Data.Common.DbCommand,System.String,System.Object)
+  isExtensionMethod: true
+  parent: nORM.Internal.ParameterOptimizer
+  langs:
+  - csharp
+  - vb
+  name: AddParam(DbCommand, string, object?)
+  nameWithType: ParameterOptimizer.AddParam(DbCommand, string, object?)
+  fullName: nORM.Internal.ParameterOptimizer.AddParam(System.Data.Common.DbCommand, string, object?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Internal/ParameterOptimizer.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AddParam
+    path: src/nORM/Internal/ParameterOptimizer.cs
+    startLine: 311
+  assemblies:
+  - nORM
+  namespace: nORM.Internal
+  summary: >-
+    Adds a parameter to the command, inferring the <xref href="System.Data.DbType" data-throw-if-not-resolved="false"></xref> from the runtime
+
+    type of <code class="paramref">value</code>. Equivalent to calling
+
+    <xref href="nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand%2cSystem.String%2cSystem.Object%2cSystem.Type)" data-throw-if-not-resolved="false"></xref> with no <code>knownType</code>.
+
+    For typed-null parameters (value is <code>null</code> but the column type is known), prefer
+
+    <xref href="nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand%2cSystem.String%2cSystem.Object%2cSystem.Type)" data-throw-if-not-resolved="false"></xref> with an explicit type hint
+
+    to avoid provider ambiguity on the null binding. (A-1 fix: corrected misleading doc that
+
+    said "without additional type metadata" — type IS inferred from value.GetType().)
+  example: []
+  syntax:
+    content: public static void AddParam(this DbCommand cmd, string name, object? value)
+    parameters:
+    - id: cmd
+      type: System.Data.Common.DbCommand
+      description: The command to which the parameter is added.
+    - id: name
+      type: System.String
+      description: The parameter name including prefix.
+    - id: value
+      type: System.Object
+      description: The value to bind to the parameter.
+    content.vb: Public Shared Sub AddParam(cmd As DbCommand, name As String, value As Object)
+  overload: nORM.Internal.ParameterOptimizer.AddParam*
+  nameWithType.vb: ParameterOptimizer.AddParam(DbCommand, String, Object)
+  fullName.vb: nORM.Internal.ParameterOptimizer.AddParam(System.Data.Common.DbCommand, String, Object)
+  name.vb: AddParam(DbCommand, String, Object)
+references:
+- uid: nORM.Internal
+  commentId: N:nORM.Internal
+  href: nORM.html
+  name: nORM.Internal
+  nameWithType: nORM.Internal
+  fullName: nORM.Internal
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Internal
+    name: Internal
+    href: nORM.Internal.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Internal
+    name: Internal
+    href: nORM.Internal.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Data.DbType
+  commentId: T:System.Data.DbType
+  parent: System.Data
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.dbtype
+  name: DbType
+  nameWithType: DbType
+  fullName: System.Data.DbType
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
+- uid: nORM.Internal.ParameterOptimizer.AddOptimizedParam*
+  commentId: Overload:nORM.Internal.ParameterOptimizer.AddOptimizedParam
+  href: nORM.Internal.ParameterOptimizer.html#nORM_Internal_ParameterOptimizer_AddOptimizedParam_System_Data_Common_DbCommand_System_String_System_Object_System_Type_
+  name: AddOptimizedParam
+  nameWithType: ParameterOptimizer.AddOptimizedParam
+  fullName: nORM.Internal.ParameterOptimizer.AddOptimizedParam
+- uid: System.Data.Common.DbCommand
+  commentId: T:System.Data.Common.DbCommand
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbcommand
+  name: DbCommand
+  nameWithType: DbCommand
+  fullName: System.Data.Common.DbCommand
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: System.Type
+  commentId: T:System.Type
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.type
+  name: Type
+  nameWithType: Type
+  fullName: System.Type
+- uid: System.Data
+  commentId: N:System.Data
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Data
+  nameWithType: System.Data
+  fullName: System.Data
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+- uid: System.Data.Common
+  commentId: N:System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Data.Common
+  nameWithType: System.Data.Common
+  fullName: System.Data.Common
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+- uid: nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand,System.String,System.Object,System.Type)
+  commentId: M:nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand,System.String,System.Object,System.Type)
+  isExternal: true
+  href: nORM.Internal.ParameterOptimizer.html#nORM_Internal_ParameterOptimizer_AddOptimizedParam_System_Data_Common_DbCommand_System_String_System_Object_System_Type_
+  name: AddOptimizedParam(DbCommand, string, object, Type)
+  nameWithType: ParameterOptimizer.AddOptimizedParam(DbCommand, string, object, Type)
+  fullName: nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand, string, object, System.Type)
+  nameWithType.vb: ParameterOptimizer.AddOptimizedParam(DbCommand, String, Object, Type)
+  fullName.vb: nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand, String, Object, System.Type)
+  name.vb: AddOptimizedParam(DbCommand, String, Object, Type)
+  spec.csharp:
+  - uid: nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand,System.String,System.Object,System.Type)
+    name: AddOptimizedParam
+    href: nORM.Internal.ParameterOptimizer.html#nORM_Internal_ParameterOptimizer_AddOptimizedParam_System_Data_Common_DbCommand_System_String_System_Object_System_Type_
+  - name: (
+  - uid: System.Data.Common.DbCommand
+    name: DbCommand
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbcommand
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Type
+    name: Type
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.type
+  - name: )
+  spec.vb:
+  - uid: nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand,System.String,System.Object,System.Type)
+    name: AddOptimizedParam
+    href: nORM.Internal.ParameterOptimizer.html#nORM_Internal_ParameterOptimizer_AddOptimizedParam_System_Data_Common_DbCommand_System_String_System_Object_System_Type_
+  - name: (
+  - uid: System.Data.Common.DbCommand
+    name: DbCommand
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbcommand
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Type
+    name: Type
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.type
+  - name: )
+- uid: nORM.Internal.ParameterOptimizer.AddParam*
+  commentId: Overload:nORM.Internal.ParameterOptimizer.AddParam
+  href: nORM.Internal.ParameterOptimizer.html#nORM_Internal_ParameterOptimizer_AddParam_System_Data_Common_DbCommand_System_String_System_Object_
+  name: AddParam
+  nameWithType: ParameterOptimizer.AddParam
+  fullName: nORM.Internal.ParameterOptimizer.AddParam

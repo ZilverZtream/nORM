@@ -5,7 +5,9 @@ items:
   id: DynamicEntityTypeGenerator
   parent: nORM.Scaffolding
   children:
+  - nORM.Scaffolding.DynamicEntityTypeGenerator.ComputeSchemaSignature(System.Data.Common.DbConnection,System.String)
   - nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType(System.Data.Common.DbConnection,System.String)
+  - nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityTypeAsync(System.Data.Common.DbConnection,System.String)
   langs:
   - csharp
   - vb
@@ -20,15 +22,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DynamicEntityTypeGenerator
     path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 17
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
-  summary: Generates entity types at runtime based on database schema information.
+  summary: >-
+    Generates entity types at runtime based on database schema information.
+
+    Reuses a single shared <xref href="System.Reflection.Emit.ModuleBuilder" data-throw-if-not-resolved="false"></xref> to prevent unloadable assembly
+
+    accumulation when types are evicted from cache.
   example: []
   syntax:
-    content: public class DynamicEntityTypeGenerator
-    content.vb: Public Class DynamicEntityTypeGenerator
+    content: >-
+      [RequiresDynamicCode("Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")]
+
+      [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
+
+      public class DynamicEntityTypeGenerator
+    content.vb: >-
+      <RequiresDynamicCode("Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")>
+
+      <RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")>
+
+      Public Class DynamicEntityTypeGenerator
   inheritance:
   - System.Object
   inheritedMembers:
@@ -44,6 +61,89 @@ items:
   - nORM.Scaffolding.DynamicEntityTypeGenerator.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Scaffolding.DynamicEntityTypeGenerator,{TProperty}}})
   - nORM.Scaffolding.DynamicEntityTypeGenerator.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Scaffolding.DynamicEntityTypeGenerator,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Scaffolding.DynamicEntityTypeGenerator.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Scaffolding.DynamicEntityTypeGenerator,{TProperty}}},System.Threading.CancellationToken)
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.
+- uid: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityTypeAsync(System.Data.Common.DbConnection,System.String)
+  commentId: M:nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityTypeAsync(System.Data.Common.DbConnection,System.String)
+  id: GenerateEntityTypeAsync(System.Data.Common.DbConnection,System.String)
+  parent: nORM.Scaffolding.DynamicEntityTypeGenerator
+  langs:
+  - csharp
+  - vb
+  name: GenerateEntityTypeAsync(DbConnection, string)
+  nameWithType: DynamicEntityTypeGenerator.GenerateEntityTypeAsync(DbConnection, string)
+  fullName: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityTypeAsync(System.Data.Common.DbConnection, string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GenerateEntityTypeAsync
+    path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
+    startLine: 66
+  assemblies:
+  - nORM
+  namespace: nORM.Scaffolding
+  summary: >-
+    Generates a CLR type representing the specified table asynchronously.
+
+    Uses the shared <xref href="System.Reflection.Emit.ModuleBuilder" data-throw-if-not-resolved="false"></xref> to avoid per-type assembly allocation.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")]
+
+      [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
+
+      public Task<Type> GenerateEntityTypeAsync(DbConnection connection, string tableName)
+    parameters:
+    - id: connection
+      type: System.Data.Common.DbConnection
+      description: Database connection. Will be opened if not already open.
+    - id: tableName
+      type: System.String
+      description: Name of the table to generate. May include schema (schema.table).
+    return:
+      type: System.Threading.Tasks.Task{System.Type}
+      description: The generated <xref href="System.Type" data-throw-if-not-resolved="false"></xref>.
+    content.vb: >-
+      <RequiresDynamicCode("Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")>
+
+      <RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")>
+
+      Public Function GenerateEntityTypeAsync(connection As DbConnection, tableName As String) As Task(Of Type)
+  overload: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityTypeAsync*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">connection</code> is <code>null</code>.
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">tableName</code> is null or whitespace.
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.
+  nameWithType.vb: DynamicEntityTypeGenerator.GenerateEntityTypeAsync(DbConnection, String)
+  fullName.vb: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityTypeAsync(System.Data.Common.DbConnection, String)
+  name.vb: GenerateEntityTypeAsync(DbConnection, String)
 - uid: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType(System.Data.Common.DbConnection,System.String)
   commentId: M:nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType(System.Data.Common.DbConnection,System.String)
   id: GenerateEntityType(System.Data.Common.DbConnection,System.String)
@@ -62,14 +162,22 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateEntityType
     path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 29
+    startLine: 91
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
-  summary: Generates a CLR type representing the specified table.
+  summary: >-
+    Generates a CLR type representing the specified table synchronously.
+
+    Uses the shared <xref href="System.Reflection.Emit.ModuleBuilder" data-throw-if-not-resolved="false"></xref> to avoid per-type assembly allocation.
   example: []
   syntax:
-    content: public Type GenerateEntityType(DbConnection connection, string tableName)
+    content: >-
+      [RequiresDynamicCode("Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")]
+
+      [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
+
+      public Type GenerateEntityType(DbConnection connection, string tableName)
     parameters:
     - id: connection
       type: System.Data.Common.DbConnection
@@ -80,12 +188,101 @@ items:
     return:
       type: System.Type
       description: The generated <xref href="System.Type" data-throw-if-not-resolved="false"></xref>.
-    content.vb: Public Function GenerateEntityType(connection As DbConnection, tableName As String) As Type
+    content.vb: >-
+      <RequiresDynamicCode("Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")>
+
+      <RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")>
+
+      Public Function GenerateEntityType(connection As DbConnection, tableName As String) As Type
   overload: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">connection</code> is <code>null</code>.
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">tableName</code> is null or whitespace.
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.
   nameWithType.vb: DynamicEntityTypeGenerator.GenerateEntityType(DbConnection, String)
   fullName.vb: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType(System.Data.Common.DbConnection, String)
   name.vb: GenerateEntityType(DbConnection, String)
+- uid: nORM.Scaffolding.DynamicEntityTypeGenerator.ComputeSchemaSignature(System.Data.Common.DbConnection,System.String)
+  commentId: M:nORM.Scaffolding.DynamicEntityTypeGenerator.ComputeSchemaSignature(System.Data.Common.DbConnection,System.String)
+  id: ComputeSchemaSignature(System.Data.Common.DbConnection,System.String)
+  parent: nORM.Scaffolding.DynamicEntityTypeGenerator
+  langs:
+  - csharp
+  - vb
+  name: ComputeSchemaSignature(DbConnection, string)
+  nameWithType: DynamicEntityTypeGenerator.ComputeSchemaSignature(DbConnection, string)
+  fullName: nORM.Scaffolding.DynamicEntityTypeGenerator.ComputeSchemaSignature(System.Data.Common.DbConnection, string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ComputeSchemaSignature
+    path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
+    startLine: 214
+  assemblies:
+  - nORM
+  namespace: nORM.Scaffolding
+  summary: >-
+    Computes a stable hash string that represents the schema of the specified table.
+
+    The signature is derived from ordered column names, their CLR types, primary-key status,
+
+    and nullability. Including this in the dynamic-type cache key ensures that schema changes
+
+    (added columns, changed types) produce a new cache entry rather than returning a stale type.
+
+    Uses SHA-256 truncated to <xref href="nORM.Scaffolding.DynamicEntityTypeGenerator.SchemaSignatureTruncationBytes" data-throw-if-not-resolved="false"></xref> bytes (32-char hex)
+
+    for negligible collision probability.
+  example: []
+  syntax:
+    content: public string ComputeSchemaSignature(DbConnection connection, string tableName)
+    parameters:
+    - id: connection
+      type: System.Data.Common.DbConnection
+      description: Open database connection used to probe the schema.
+    - id: tableName
+      type: System.String
+      description: Possibly schema-qualified table name.
+    return:
+      type: System.String
+      description: A hex string fingerprint of the column descriptors in ordinal order.
+    content.vb: Public Function ComputeSchemaSignature(connection As DbConnection, tableName As String) As String
+  overload: nORM.Scaffolding.DynamicEntityTypeGenerator.ComputeSchemaSignature*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">connection</code> is <code>null</code>.
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">tableName</code> is null or whitespace.
+  nameWithType.vb: DynamicEntityTypeGenerator.ComputeSchemaSignature(DbConnection, String)
+  fullName.vb: nORM.Scaffolding.DynamicEntityTypeGenerator.ComputeSchemaSignature(System.Data.Common.DbConnection, String)
+  name.vb: ComputeSchemaSignature(DbConnection, String)
 references:
+- uid: System.Reflection.Emit.ModuleBuilder
+  commentId: T:System.Reflection.Emit.ModuleBuilder
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.reflection.emit.modulebuilder
+  name: ModuleBuilder
+  nameWithType: ModuleBuilder
+  fullName: System.Reflection.Emit.ModuleBuilder
 - uid: nORM.Scaffolding
   commentId: N:nORM.Scaffolding
   href: nORM.html
@@ -1057,12 +1254,26 @@ references:
   name: Type
   nameWithType: Type
   fullName: System.Type
-- uid: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType*
-  commentId: Overload:nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType
-  href: nORM.Scaffolding.DynamicEntityTypeGenerator.html#nORM_Scaffolding_DynamicEntityTypeGenerator_GenerateEntityType_System_Data_Common_DbConnection_System_String_
-  name: GenerateEntityType
-  nameWithType: DynamicEntityTypeGenerator.GenerateEntityType
-  fullName: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
+- uid: System.ArgumentException
+  commentId: T:System.ArgumentException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentexception
+  name: ArgumentException
+  nameWithType: ArgumentException
+  fullName: System.ArgumentException
+- uid: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityTypeAsync*
+  commentId: Overload:nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityTypeAsync
+  href: nORM.Scaffolding.DynamicEntityTypeGenerator.html#nORM_Scaffolding_DynamicEntityTypeGenerator_GenerateEntityTypeAsync_System_Data_Common_DbConnection_System_String_
+  name: GenerateEntityTypeAsync
+  nameWithType: DynamicEntityTypeGenerator.GenerateEntityTypeAsync
+  fullName: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityTypeAsync
 - uid: System.Data.Common.DbConnection
   commentId: T:System.Data.Common.DbConnection
   parent: System.Data.Common
@@ -1082,6 +1293,41 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
+- uid: System.Threading.Tasks.Task{System.Type}
+  commentId: T:System.Threading.Tasks.Task{System.Type}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<Type>
+  nameWithType: Task<Type>
+  fullName: System.Threading.Tasks.Task<System.Type>
+  nameWithType.vb: Task(Of Type)
+  fullName.vb: System.Threading.Tasks.Task(Of System.Type)
+  name.vb: Task(Of Type)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Type
+    name: Type
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.type
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Type
+    name: Type
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.type
+  - name: )
 - uid: System.Data.Common
   commentId: N:System.Data.Common
   isExternal: true
@@ -1119,3 +1365,85 @@ references:
     name: Common
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.data.common
+- uid: System.Threading.Tasks.Task`1
+  commentId: T:System.Threading.Tasks.Task`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<TResult>
+  nameWithType: Task<TResult>
+  fullName: System.Threading.Tasks.Task<TResult>
+  nameWithType.vb: Task(Of TResult)
+  fullName.vb: System.Threading.Tasks.Task(Of TResult)
+  name.vb: Task(Of TResult)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TResult
+  - name: )
+- uid: System.Threading.Tasks
+  commentId: N:System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading.Tasks
+  nameWithType: System.Threading.Tasks
+  fullName: System.Threading.Tasks
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType*
+  commentId: Overload:nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType
+  href: nORM.Scaffolding.DynamicEntityTypeGenerator.html#nORM_Scaffolding_DynamicEntityTypeGenerator_GenerateEntityType_System_Data_Common_DbConnection_System_String_
+  name: GenerateEntityType
+  nameWithType: DynamicEntityTypeGenerator.GenerateEntityType
+  fullName: nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType
+- uid: nORM.Scaffolding.DynamicEntityTypeGenerator.SchemaSignatureTruncationBytes
+  commentId: F:nORM.Scaffolding.DynamicEntityTypeGenerator.SchemaSignatureTruncationBytes
+  name: SchemaSignatureTruncationBytes
+  nameWithType: DynamicEntityTypeGenerator.SchemaSignatureTruncationBytes
+  fullName: nORM.Scaffolding.DynamicEntityTypeGenerator.SchemaSignatureTruncationBytes
+- uid: nORM.Scaffolding.DynamicEntityTypeGenerator.ComputeSchemaSignature*
+  commentId: Overload:nORM.Scaffolding.DynamicEntityTypeGenerator.ComputeSchemaSignature
+  href: nORM.Scaffolding.DynamicEntityTypeGenerator.html#nORM_Scaffolding_DynamicEntityTypeGenerator_ComputeSchemaSignature_System_Data_Common_DbConnection_System_String_
+  name: ComputeSchemaSignature
+  nameWithType: DynamicEntityTypeGenerator.ComputeSchemaSignature
+  fullName: nORM.Scaffolding.DynamicEntityTypeGenerator.ComputeSchemaSignature

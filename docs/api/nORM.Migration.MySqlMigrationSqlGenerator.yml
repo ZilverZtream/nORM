@@ -20,10 +20,23 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MySqlMigrationSqlGenerator
     path: src/nORM/Migration/MySqlMigrationSqlGenerator.cs
-    startLine: 6
+    startLine: 17
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: >-
+    Generates MySQL-compatible SQL statements for applying schema migrations.
+
+    This implementation translates high level <xref href="nORM.Migration.SchemaDiff" data-throw-if-not-resolved="false"></xref> objects
+
+    into SQL required to upgrade or downgrade a database.
+  remarks: >-
+    Provider: MySQL (backtick-escaped identifiers). Uses AUTO_INCREMENT for identity columns,
+
+    MODIFY COLUMN for alterations, and DROP FOREIGN KEY (not DROP CONSTRAINT) for FK removal.
+
+    FK referential actions are validated against an allowlist before being interpolated into DDL.
+  example: []
   syntax:
     content: 'public class MySqlMigrationSqlGenerator : IMigrationSqlGenerator'
     content.vb: Public Class MySqlMigrationSqlGenerator Implements IMigrationSqlGenerator
@@ -62,7 +75,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateSql
     path: src/nORM/Migration/MySqlMigrationSqlGenerator.cs
-    startLine: 28
+    startLine: 60
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -82,6 +95,13 @@ items:
   implements:
   - nORM.Migration.IMigrationSqlGenerator.GenerateSql(nORM.Migration.SchemaDiff)
 references:
+- uid: nORM.Migration.SchemaDiff
+  commentId: T:nORM.Migration.SchemaDiff
+  parent: nORM.Migration
+  href: nORM.Migration.SchemaDiff.html
+  name: SchemaDiff
+  nameWithType: SchemaDiff
+  fullName: nORM.Migration.SchemaDiff
 - uid: nORM.Migration
   commentId: N:nORM.Migration
   href: nORM.html
@@ -1083,13 +1103,6 @@ references:
     name: SchemaDiff
     href: nORM.Migration.SchemaDiff.html
   - name: )
-- uid: nORM.Migration.SchemaDiff
-  commentId: T:nORM.Migration.SchemaDiff
-  parent: nORM.Migration
-  href: nORM.Migration.SchemaDiff.html
-  name: SchemaDiff
-  nameWithType: SchemaDiff
-  fullName: nORM.Migration.SchemaDiff
 - uid: nORM.Migration.MigrationSqlStatements
   commentId: T:nORM.Migration.MigrationSqlStatements
   parent: nORM.Migration

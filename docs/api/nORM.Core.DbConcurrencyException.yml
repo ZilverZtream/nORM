@@ -77,10 +77,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/DbConcurrencyException.cs
-    startLine: 9
+    startLine: 12
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Initializes a new instance of the <xref href="nORM.Core.DbConcurrencyException" data-throw-if-not-resolved="false"></xref> class.
+  example: []
   syntax:
     content: public DbConcurrencyException()
     content.vb: Public Sub New()
@@ -106,15 +108,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/DbConcurrencyException.cs
-    startLine: 10
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Initializes a new instance of the <xref href="nORM.Core.DbConcurrencyException" data-throw-if-not-resolved="false"></xref> class
+
+    with a specified error <code class="paramref">message</code>.
+  example: []
   syntax:
     content: public DbConcurrencyException(string? message)
     parameters:
     - id: message
       type: System.String
+      description: The message that describes the error.
     content.vb: Public Sub New(message As String)
   overload: nORM.Core.DbConcurrencyException.#ctor*
   nameWithType.vb: DbConcurrencyException.New(String)
@@ -138,17 +146,26 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/DbConcurrencyException.cs
-    startLine: 11
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Initializes a new instance of the <xref href="nORM.Core.DbConcurrencyException" data-throw-if-not-resolved="false"></xref> class
+
+    with a specified error <code class="paramref">message</code> and a reference to the
+
+    inner <code class="paramref">innerException</code> that is the cause of this exception.
+  example: []
   syntax:
     content: public DbConcurrencyException(string? message, Exception? innerException)
     parameters:
     - id: message
       type: System.String
+      description: The message that describes the error.
     - id: innerException
       type: System.Exception
+      description: The exception that is the cause of the current exception.
     content.vb: Public Sub New(message As String, innerException As Exception)
   overload: nORM.Core.DbConcurrencyException.#ctor*
   nameWithType.vb: DbConcurrencyException.New(String, Exception)
@@ -1261,6 +1278,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.DbConcurrencyException
+  commentId: T:nORM.Core.DbConcurrencyException
+  href: nORM.Core.DbConcurrencyException.html
+  name: DbConcurrencyException
+  nameWithType: DbConcurrencyException
+  fullName: nORM.Core.DbConcurrencyException
 - uid: nORM.Core.DbConcurrencyException.#ctor*
   commentId: Overload:nORM.Core.DbConcurrencyException.#ctor
   href: nORM.Core.DbConcurrencyException.html#nORM_Core_DbConcurrencyException__ctor

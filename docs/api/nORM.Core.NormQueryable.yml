@@ -58,19 +58,24 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Query
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 17
+    startLine: 29
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Creates a queryable source for the specified entity type backed by the provided context.
+  example: []
   syntax:
     content: 'public static IQueryable<T> Query<T>(this DbContext ctx) where T : class'
     parameters:
     - id: ctx
       type: nORM.Core.DbContext
+      description: The <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> that provides access to the database.
     typeParameters:
     - id: T
+      description: The entity type to query.
     return:
       type: System.Linq.IQueryable{{T}}
+      description: An <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> to compose and execute queries.
     content.vb: Public Shared Function Query(Of T As Class)(ctx As DbContext) As IQueryable(Of T)
   overload: nORM.Core.NormQueryable.Query*
   nameWithType.vb: NormQueryable.Query(Of T)(DbContext)
@@ -336,12 +341,6 @@ references:
   name: System
   nameWithType: System
   fullName: System
-- uid: nORM.Core.NormQueryable.Query*
-  commentId: Overload:nORM.Core.NormQueryable.Query
-  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_
-  name: Query
-  nameWithType: NormQueryable.Query
-  fullName: nORM.Core.NormQueryable.Query
 - uid: nORM.Core.DbContext
   commentId: T:nORM.Core.DbContext
   parent: nORM.Core
@@ -349,10 +348,9 @@ references:
   name: DbContext
   nameWithType: DbContext
   fullName: nORM.Core.DbContext
-- uid: System.Linq.IQueryable{{T}}
-  commentId: T:System.Linq.IQueryable{``0}
-  parent: System.Linq
-  definition: System.Linq.IQueryable`1
+- uid: System.Linq.IQueryable`1
+  commentId: T:System.Linq.IQueryable`1
+  isExternal: true
   href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
   name: IQueryable<T>
   nameWithType: IQueryable<T>
@@ -378,9 +376,16 @@ references:
   - name: " "
   - name: T
   - name: )
-- uid: System.Linq.IQueryable`1
-  commentId: T:System.Linq.IQueryable`1
-  isExternal: true
+- uid: nORM.Core.NormQueryable.Query*
+  commentId: Overload:nORM.Core.NormQueryable.Query
+  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_
+  name: Query
+  nameWithType: NormQueryable.Query
+  fullName: nORM.Core.NormQueryable.Query
+- uid: System.Linq.IQueryable{{T}}
+  commentId: T:System.Linq.IQueryable{``0}
+  parent: System.Linq
+  definition: System.Linq.IQueryable`1
   href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
   name: IQueryable<T>
   nameWithType: IQueryable<T>

@@ -86,17 +86,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/NormUsageException.cs
-    startLine: 9
+    startLine: 14
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Initializes a new instance of <xref href="nORM.Core.NormUsageException" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: public NormUsageException(string message, Exception? inner = null)
     parameters:
     - id: message
       type: System.String
+      description: Description of the incorrect usage.
     - id: inner
       type: System.Exception
+      description: Optional inner exception.
     content.vb: Public Sub New(message As String, inner As Exception = Nothing)
   overload: nORM.Core.NormUsageException.#ctor*
   nameWithType.vb: NormUsageException.New(String, Exception)
@@ -1368,6 +1372,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.NormUsageException
+  commentId: T:nORM.Core.NormUsageException
+  href: nORM.Core.NormUsageException.html
+  name: NormUsageException
+  nameWithType: NormUsageException
+  fullName: nORM.Core.NormUsageException
 - uid: nORM.Core.NormUsageException.#ctor*
   commentId: Overload:nORM.Core.NormUsageException.#ctor
   href: nORM.Core.NormUsageException.html#nORM_Core_NormUsageException__ctor_System_String_System_Exception_

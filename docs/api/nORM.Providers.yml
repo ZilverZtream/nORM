@@ -6,12 +6,14 @@ items:
   children:
   - nORM.Providers.BulkOperationProvider
   - nORM.Providers.DatabaseProvider
+  - nORM.Providers.DatabaseProvider.LiveColumnInfo
   - nORM.Providers.DynamicBatchSizer
   - nORM.Providers.DynamicBatchSizer.BatchSizingResult
   - nORM.Providers.IDbParameterFactory
   - nORM.Providers.IFastProvider
   - nORM.Providers.MySqlProvider
   - nORM.Providers.PostgresProvider
+  - nORM.Providers.ProviderCapabilities
   - nORM.Providers.SqlServerProvider
   - nORM.Providers.SqliteProvider
   langs:
@@ -38,6 +40,28 @@ references:
   name: DatabaseProvider
   nameWithType: DatabaseProvider
   fullName: nORM.Providers.DatabaseProvider
+- uid: nORM.Providers.DatabaseProvider.LiveColumnInfo
+  commentId: T:nORM.Providers.DatabaseProvider.LiveColumnInfo
+  href: nORM.Providers.DatabaseProvider.html
+  name: DatabaseProvider.LiveColumnInfo
+  nameWithType: DatabaseProvider.LiveColumnInfo
+  fullName: nORM.Providers.DatabaseProvider.LiveColumnInfo
+  spec.csharp:
+  - uid: nORM.Providers.DatabaseProvider
+    name: DatabaseProvider
+    href: nORM.Providers.DatabaseProvider.html
+  - name: .
+  - uid: nORM.Providers.DatabaseProvider.LiveColumnInfo
+    name: LiveColumnInfo
+    href: nORM.Providers.DatabaseProvider.LiveColumnInfo.html
+  spec.vb:
+  - uid: nORM.Providers.DatabaseProvider
+    name: DatabaseProvider
+    href: nORM.Providers.DatabaseProvider.html
+  - name: .
+  - uid: nORM.Providers.DatabaseProvider.LiveColumnInfo
+    name: LiveColumnInfo
+    href: nORM.Providers.DatabaseProvider.LiveColumnInfo.html
 - uid: nORM.Providers.DynamicBatchSizer
   commentId: T:nORM.Providers.DynamicBatchSizer
   parent: nORM.Providers
@@ -94,6 +118,13 @@ references:
   name: PostgresProvider
   nameWithType: PostgresProvider
   fullName: nORM.Providers.PostgresProvider
+- uid: nORM.Providers.ProviderCapabilities
+  commentId: T:nORM.Providers.ProviderCapabilities
+  parent: nORM.Providers
+  href: nORM.Providers.ProviderCapabilities.html
+  name: ProviderCapabilities
+  nameWithType: ProviderCapabilities
+  fullName: nORM.Providers.ProviderCapabilities
 - uid: nORM.Providers.SqliteProvider
   commentId: T:nORM.Providers.SqliteProvider
   href: nORM.Providers.SqliteProvider.html

@@ -73,24 +73,35 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SumAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 20
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Asynchronously computes the sum of the sequence of values obtained by
+
+    applying the projection to each element of an <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: 'public static Task<TResult> SumAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default) where TSource : class, new() where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: nORM.Core.INormQueryable{{TSource}}
+      description: The nORM queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},{TResult}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{{TResult}}
+      description: A task containing the computed sum.
     content.vb: Public Shared Function SumAsync(Of TSource As {Class, New}, TResult As {Structure, INumber(Of TResult)})(source As INormQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult)), ct As CancellationToken = Nothing) As Task(Of TResult)
   overload: nORM.Core.AdvancedLinqExtensions.SumAsync*
   nameWithType.vb: AdvancedLinqExtensions.SumAsync(Of TSource, TResult)(INormQueryable(Of TSource), Expression(Of Func(Of TSource, TResult)), CancellationToken)
@@ -115,24 +126,37 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SumAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 25
+    startLine: 46
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Asynchronously computes the sum of the sequence of nullable values
+
+    obtained by applying the projection to each element of an <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>.
+
+    Null values are ignored.
+  example: []
   syntax:
     content: 'public static Task<TResult?> SumAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default) where TSource : class, new() where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: nORM.Core.INormQueryable{{TSource}}
+      description: The nORM queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},System.Nullable{{TResult}}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{System.Nullable{{TResult}}}
+      description: A task containing the computed sum or <code>null</code> if the sequence is empty.
     content.vb: Public Shared Function SumAsync(Of TSource As {Class, New}, TResult As {Structure, INumber(Of TResult)})(source As INormQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult?)), ct As CancellationToken = Nothing) As Task(Of TResult?)
   overload: nORM.Core.AdvancedLinqExtensions.SumAsync*
   nameWithType.vb: AdvancedLinqExtensions.SumAsync(Of TSource, TResult)(INormQueryable(Of TSource), Expression(Of Func(Of TSource, TResult?)), CancellationToken)
@@ -157,24 +181,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SumAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 30
+    startLine: 60
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously computes the sum for an arbitrary <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> backed by nORM.
+  example: []
   syntax:
     content: 'public static Task<TResult> SumAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default) where TSource : class where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: System.Linq.IQueryable{{TSource}}
+      description: The queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},{TResult}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{{TResult}}
+      description: A task containing the computed sum.
     content.vb: Public Shared Function SumAsync(Of TSource As Class, TResult As {Structure, INumber(Of TResult)})(source As IQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult)), ct As CancellationToken = Nothing) As Task(Of TResult)
   overload: nORM.Core.AdvancedLinqExtensions.SumAsync*
   nameWithType.vb: AdvancedLinqExtensions.SumAsync(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TResult)), CancellationToken)
@@ -199,24 +231,35 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SumAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 35
+    startLine: 75
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Asynchronously computes the sum of nullable values for an arbitrary <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> backed by nORM.
+
+    Null values are ignored.
+  example: []
   syntax:
     content: 'public static Task<TResult?> SumAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default) where TSource : class where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: System.Linq.IQueryable{{TSource}}
+      description: The queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},System.Nullable{{TResult}}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{System.Nullable{{TResult}}}
+      description: A task containing the computed sum or <code>null</code> if the sequence is empty.
     content.vb: Public Shared Function SumAsync(Of TSource As Class, TResult As {Structure, INumber(Of TResult)})(source As IQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult?)), ct As CancellationToken = Nothing) As Task(Of TResult?)
   overload: nORM.Core.AdvancedLinqExtensions.SumAsync*
   nameWithType.vb: AdvancedLinqExtensions.SumAsync(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TResult?)), CancellationToken)
@@ -241,24 +284,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AverageAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 44
+    startLine: 93
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously computes the average of the sequence of values obtained by applying the projection to each element of an <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: 'public static Task<TResult> AverageAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default) where TSource : class, new() where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: nORM.Core.INormQueryable{{TSource}}
+      description: The nORM queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},{TResult}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{{TResult}}
+      description: A task containing the computed average.
     content.vb: Public Shared Function AverageAsync(Of TSource As {Class, New}, TResult As {Structure, INumber(Of TResult)})(source As INormQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult)), ct As CancellationToken = Nothing) As Task(Of TResult)
   overload: nORM.Core.AdvancedLinqExtensions.AverageAsync*
   nameWithType.vb: AdvancedLinqExtensions.AverageAsync(Of TSource, TResult)(INormQueryable(Of TSource), Expression(Of Func(Of TSource, TResult)), CancellationToken)
@@ -283,24 +334,37 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AverageAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 49
+    startLine: 109
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Asynchronously computes the average of the sequence of nullable values
+
+    obtained by applying the projection to each element of an <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>.
+
+    Null values are ignored.
+  example: []
   syntax:
     content: 'public static Task<TResult?> AverageAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default) where TSource : class, new() where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: nORM.Core.INormQueryable{{TSource}}
+      description: The nORM queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},System.Nullable{{TResult}}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{System.Nullable{{TResult}}}
+      description: A task containing the computed average or <code>null</code> if the sequence is empty.
     content.vb: Public Shared Function AverageAsync(Of TSource As {Class, New}, TResult As {Structure, INumber(Of TResult)})(source As INormQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult?)), ct As CancellationToken = Nothing) As Task(Of TResult?)
   overload: nORM.Core.AdvancedLinqExtensions.AverageAsync*
   nameWithType.vb: AdvancedLinqExtensions.AverageAsync(Of TSource, TResult)(INormQueryable(Of TSource), Expression(Of Func(Of TSource, TResult?)), CancellationToken)
@@ -325,24 +389,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AverageAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 54
+    startLine: 123
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously computes the average for an arbitrary <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> backed by nORM.
+  example: []
   syntax:
     content: 'public static Task<TResult> AverageAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default) where TSource : class where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: System.Linq.IQueryable{{TSource}}
+      description: The queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},{TResult}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{{TResult}}
+      description: A task containing the computed average.
     content.vb: Public Shared Function AverageAsync(Of TSource As Class, TResult As {Structure, INumber(Of TResult)})(source As IQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult)), ct As CancellationToken = Nothing) As Task(Of TResult)
   overload: nORM.Core.AdvancedLinqExtensions.AverageAsync*
   nameWithType.vb: AdvancedLinqExtensions.AverageAsync(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TResult)), CancellationToken)
@@ -367,24 +439,35 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AverageAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 59
+    startLine: 138
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Asynchronously computes the average of nullable values for an <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> backed by nORM.
+
+    Null values are ignored.
+  example: []
   syntax:
     content: 'public static Task<TResult?> AverageAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default) where TSource : class where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: System.Linq.IQueryable{{TSource}}
+      description: The queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},System.Nullable{{TResult}}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{System.Nullable{{TResult}}}
+      description: A task containing the computed average or <code>null</code> if the sequence is empty.
     content.vb: Public Shared Function AverageAsync(Of TSource As Class, TResult As {Structure, INumber(Of TResult)})(source As IQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult?)), ct As CancellationToken = Nothing) As Task(Of TResult?)
   overload: nORM.Core.AdvancedLinqExtensions.AverageAsync*
   nameWithType.vb: AdvancedLinqExtensions.AverageAsync(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TResult?)), CancellationToken)
@@ -409,24 +492,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MinAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 68
+    startLine: 156
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously computes the minimum value of the sequence obtained by applying the projection to each element of an <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: 'public static Task<TResult> MinAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default) where TSource : class, new() where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: nORM.Core.INormQueryable{{TSource}}
+      description: The nORM queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},{TResult}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{{TResult}}
+      description: A task containing the minimum value.
     content.vb: Public Shared Function MinAsync(Of TSource As {Class, New}, TResult As {Structure, INumber(Of TResult)})(source As INormQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult)), ct As CancellationToken = Nothing) As Task(Of TResult)
   overload: nORM.Core.AdvancedLinqExtensions.MinAsync*
   nameWithType.vb: AdvancedLinqExtensions.MinAsync(Of TSource, TResult)(INormQueryable(Of TSource), Expression(Of Func(Of TSource, TResult)), CancellationToken)
@@ -451,24 +542,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MinAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 73
+    startLine: 170
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously computes the minimum of the sequence of nullable values obtained by applying the projection to each element of an <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: 'public static Task<TResult?> MinAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default) where TSource : class, new() where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: nORM.Core.INormQueryable{{TSource}}
+      description: The nORM queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},System.Nullable{{TResult}}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{System.Nullable{{TResult}}}
+      description: A task containing the minimum value or <code>null</code> if the sequence is empty.
     content.vb: Public Shared Function MinAsync(Of TSource As {Class, New}, TResult As {Structure, INumber(Of TResult)})(source As INormQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult?)), ct As CancellationToken = Nothing) As Task(Of TResult?)
   overload: nORM.Core.AdvancedLinqExtensions.MinAsync*
   nameWithType.vb: AdvancedLinqExtensions.MinAsync(Of TSource, TResult)(INormQueryable(Of TSource), Expression(Of Func(Of TSource, TResult?)), CancellationToken)
@@ -493,24 +592,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MinAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 78
+    startLine: 184
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously computes the minimum value for an arbitrary <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> backed by nORM.
+  example: []
   syntax:
     content: 'public static Task<TResult> MinAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default) where TSource : class where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: System.Linq.IQueryable{{TSource}}
+      description: The queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},{TResult}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{{TResult}}
+      description: A task containing the minimum value.
     content.vb: Public Shared Function MinAsync(Of TSource As Class, TResult As {Structure, INumber(Of TResult)})(source As IQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult)), ct As CancellationToken = Nothing) As Task(Of TResult)
   overload: nORM.Core.AdvancedLinqExtensions.MinAsync*
   nameWithType.vb: AdvancedLinqExtensions.MinAsync(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TResult)), CancellationToken)
@@ -535,24 +642,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MinAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 83
+    startLine: 198
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously computes the minimum of nullable values for an <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> backed by nORM.
+  example: []
   syntax:
     content: 'public static Task<TResult?> MinAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default) where TSource : class where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: System.Linq.IQueryable{{TSource}}
+      description: The queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},System.Nullable{{TResult}}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{System.Nullable{{TResult}}}
+      description: A task containing the minimum value or <code>null</code> if the sequence is empty.
     content.vb: Public Shared Function MinAsync(Of TSource As Class, TResult As {Structure, INumber(Of TResult)})(source As IQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult?)), ct As CancellationToken = Nothing) As Task(Of TResult?)
   overload: nORM.Core.AdvancedLinqExtensions.MinAsync*
   nameWithType.vb: AdvancedLinqExtensions.MinAsync(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TResult?)), CancellationToken)
@@ -577,24 +692,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 88
+    startLine: 212
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously computes the maximum value of the sequence obtained by applying the projection to each element of an <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: 'public static Task<TResult> MaxAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default) where TSource : class, new() where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: nORM.Core.INormQueryable{{TSource}}
+      description: The nORM queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},{TResult}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{{TResult}}
+      description: A task containing the maximum value.
     content.vb: Public Shared Function MaxAsync(Of TSource As {Class, New}, TResult As {Structure, INumber(Of TResult)})(source As INormQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult)), ct As CancellationToken = Nothing) As Task(Of TResult)
   overload: nORM.Core.AdvancedLinqExtensions.MaxAsync*
   nameWithType.vb: AdvancedLinqExtensions.MaxAsync(Of TSource, TResult)(INormQueryable(Of TSource), Expression(Of Func(Of TSource, TResult)), CancellationToken)
@@ -619,24 +742,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 93
+    startLine: 226
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously computes the maximum of the sequence of nullable values obtained by applying the projection to each element of an <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: 'public static Task<TResult?> MaxAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default) where TSource : class, new() where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: nORM.Core.INormQueryable{{TSource}}
+      description: The nORM queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},System.Nullable{{TResult}}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{System.Nullable{{TResult}}}
+      description: A task containing the maximum value or <code>null</code> if the sequence is empty.
     content.vb: Public Shared Function MaxAsync(Of TSource As {Class, New}, TResult As {Structure, INumber(Of TResult)})(source As INormQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult?)), ct As CancellationToken = Nothing) As Task(Of TResult?)
   overload: nORM.Core.AdvancedLinqExtensions.MaxAsync*
   nameWithType.vb: AdvancedLinqExtensions.MaxAsync(Of TSource, TResult)(INormQueryable(Of TSource), Expression(Of Func(Of TSource, TResult?)), CancellationToken)
@@ -661,24 +792,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 98
+    startLine: 240
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously computes the maximum value for an arbitrary <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> backed by nORM.
+  example: []
   syntax:
     content: 'public static Task<TResult> MaxAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default) where TSource : class where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: System.Linq.IQueryable{{TSource}}
+      description: The queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},{TResult}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{{TResult}}
+      description: A task containing the maximum value.
     content.vb: Public Shared Function MaxAsync(Of TSource As Class, TResult As {Structure, INumber(Of TResult)})(source As IQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult)), ct As CancellationToken = Nothing) As Task(Of TResult)
   overload: nORM.Core.AdvancedLinqExtensions.MaxAsync*
   nameWithType.vb: AdvancedLinqExtensions.MaxAsync(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TResult)), CancellationToken)
@@ -703,24 +842,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 103
+    startLine: 254
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously computes the maximum of nullable values for an <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> backed by nORM.
+  example: []
   syntax:
     content: 'public static Task<TResult?> MaxAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default) where TSource : class where TResult : struct, INumber<TResult>'
     parameters:
     - id: source
       type: System.Linq.IQueryable{{TSource}}
+      description: The queryable source.
     - id: selector
       type: System.Linq.Expressions.Expression{System.Func{{TSource},System.Nullable{{TResult}}}}
+      description: A projection to apply to each element.
     - id: ct
       type: System.Threading.CancellationToken
+      description: A cancellation token for the operation.
     typeParameters:
     - id: TSource
+      description: The element type of the queryable source.
     - id: TResult
+      description: The numeric type of the projection.
     return:
       type: System.Threading.Tasks.Task{System.Nullable{{TResult}}}
+      description: A task containing the maximum value or <code>null</code> if the sequence is empty.
     content.vb: Public Shared Function MaxAsync(Of TSource As Class, TResult As {Structure, INumber(Of TResult)})(source As IQueryable(Of TSource), selector As Expression(Of Func(Of TSource, TResult?)), ct As CancellationToken = Nothing) As Task(Of TResult?)
   overload: nORM.Core.AdvancedLinqExtensions.MaxAsync*
   nameWithType.vb: AdvancedLinqExtensions.MaxAsync(Of TSource, TResult)(IQueryable(Of TSource), Expression(Of Func(Of TSource, TResult?)), CancellationToken)
@@ -986,6 +1133,32 @@ references:
   name: System
   nameWithType: System
   fullName: System
+- uid: nORM.Core.INormQueryable`1
+  commentId: T:nORM.Core.INormQueryable`1
+  parent: nORM.Core
+  href: nORM.Core.INormQueryable-1.html
+  name: INormQueryable<T>
+  nameWithType: INormQueryable<T>
+  fullName: nORM.Core.INormQueryable<T>
+  nameWithType.vb: INormQueryable(Of T)
+  fullName.vb: nORM.Core.INormQueryable(Of T)
+  name.vb: INormQueryable(Of T)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
 - uid: nORM.Core.AdvancedLinqExtensions.SumAsync*
   commentId: Overload:nORM.Core.AdvancedLinqExtensions.SumAsync
   href: nORM.Core.AdvancedLinqExtensions.html#nORM_Core_AdvancedLinqExtensions_SumAsync__2_nORM_Core_INormQueryable___0__System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
@@ -1104,32 +1277,6 @@ references:
   - name: Of
   - name: " "
   - name: TResult
-  - name: )
-- uid: nORM.Core.INormQueryable`1
-  commentId: T:nORM.Core.INormQueryable`1
-  parent: nORM.Core
-  href: nORM.Core.INormQueryable-1.html
-  name: INormQueryable<T>
-  nameWithType: INormQueryable<T>
-  fullName: nORM.Core.INormQueryable<T>
-  nameWithType.vb: INormQueryable(Of T)
-  fullName.vb: nORM.Core.INormQueryable(Of T)
-  name.vb: INormQueryable(Of T)
-  spec.csharp:
-  - uid: nORM.Core.INormQueryable`1
-    name: INormQueryable
-    href: nORM.Core.INormQueryable-1.html
-  - name: <
-  - name: T
-  - name: '>'
-  spec.vb:
-  - uid: nORM.Core.INormQueryable`1
-    name: INormQueryable
-    href: nORM.Core.INormQueryable-1.html
-  - name: (
-  - name: Of
-  - name: " "
-  - name: T
   - name: )
 - uid: System.Linq.Expressions.Expression`1
   commentId: T:System.Linq.Expressions.Expression`1
@@ -1370,6 +1517,34 @@ references:
   - name: TResult
   - name: '?'
   - name: )
+- uid: System.Linq.IQueryable`1
+  commentId: T:System.Linq.IQueryable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  name: IQueryable<T>
+  nameWithType: IQueryable<T>
+  fullName: System.Linq.IQueryable<T>
+  nameWithType.vb: IQueryable(Of T)
+  fullName.vb: System.Linq.IQueryable(Of T)
+  name.vb: IQueryable(Of T)
+  spec.csharp:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
 - uid: System.Linq.IQueryable{{TSource}}
   commentId: T:System.Linq.IQueryable{``0}
   parent: System.Linq
@@ -1398,34 +1573,6 @@ references:
   - name: Of
   - name: " "
   - name: TSource
-  - name: )
-- uid: System.Linq.IQueryable`1
-  commentId: T:System.Linq.IQueryable`1
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
-  name: IQueryable<T>
-  nameWithType: IQueryable<T>
-  fullName: System.Linq.IQueryable<T>
-  nameWithType.vb: IQueryable(Of T)
-  fullName.vb: System.Linq.IQueryable(Of T)
-  name.vb: IQueryable(Of T)
-  spec.csharp:
-  - uid: System.Linq.IQueryable`1
-    name: IQueryable
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
-  - name: <
-  - name: T
-  - name: '>'
-  spec.vb:
-  - uid: System.Linq.IQueryable`1
-    name: IQueryable
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
-  - name: (
-  - name: Of
-  - name: " "
-  - name: T
   - name: )
 - uid: System.Linq
   commentId: N:System.Linq

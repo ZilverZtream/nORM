@@ -66,10 +66,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsSuppressed
     path: src/nORM/Enterprise/InterceptionResult.cs
-    startLine: 13
+    startLine: 16
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: Gets a value indicating whether the command execution should be suppressed.
+  example: []
   syntax:
     content: public bool IsSuppressed { get; }
     parameters: []
@@ -97,17 +99,29 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Result
     path: src/nORM/Enterprise/InterceptionResult.cs
-    startLine: 14
+    startLine: 21
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: Gets the result to return when <xref href="nORM.Enterprise.InterceptionResult%601.IsSuppressed" data-throw-if-not-resolved="false"></xref> is <code>true</code>.
+  example: []
   syntax:
-    content: public T Result { get; }
+    content: >-
+      [MaybeNull]
+
+      public T Result { get; }
     parameters: []
     return:
       type: '{T}'
-    content.vb: Public ReadOnly Property Result As T
+    content.vb: >-
+      <MaybeNull>
+
+      Public ReadOnly Property Result As T
   overload: nORM.Enterprise.InterceptionResult`1.Result*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.MaybeNullAttribute
+    ctor: System.Diagnostics.CodeAnalysis.MaybeNullAttribute.#ctor
+    arguments: []
   nameWithType.vb: InterceptionResult(Of T).Result
   fullName.vb: nORM.Enterprise.InterceptionResult(Of T).Result
 - uid: nORM.Enterprise.InterceptionResult`1.Continue
@@ -128,7 +142,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Continue
     path: src/nORM/Enterprise/InterceptionResult.cs
-    startLine: 26
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -160,7 +174,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SuppressWithResult
     path: src/nORM/Enterprise/InterceptionResult.cs
-    startLine: 32
+    startLine: 39
   assemblies:
   - nORM
   namespace: nORM.Enterprise

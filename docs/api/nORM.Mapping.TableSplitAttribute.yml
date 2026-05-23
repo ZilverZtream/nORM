@@ -21,10 +21,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableSplitAttribute
     path: src/nORM/Mapping/TableSplitAttribute.cs
-    startLine: 4
+    startLine: 7
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Indicates that an entity shares its table with another principal entity (table splitting).
+  example: []
   syntax:
     content: >-
       [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
@@ -112,10 +114,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PrincipalType
     path: src/nORM/Mapping/TableSplitAttribute.cs
-    startLine: 7
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the principal entity type with which the table is shared.
+  example: []
   syntax:
     content: public Type PrincipalType { get; }
     parameters: []
@@ -141,15 +145,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/TableSplitAttribute.cs
-    startLine: 9
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Initializes the attribute with the principal entity type.
+  example: []
   syntax:
     content: public TableSplitAttribute(Type principalType)
     parameters:
     - id: principalType
       type: System.Type
+      description: Type of the principal entity.
     content.vb: Public Sub New(principalType As Type)
   overload: nORM.Mapping.TableSplitAttribute.#ctor*
   nameWithType.vb: TableSplitAttribute.New(Type)

@@ -8,13 +8,17 @@ items:
   - nORM.Mapping.TableMapping.#ctor(System.Type,nORM.Providers.DatabaseProvider,nORM.Core.DbContext,nORM.Configuration.IEntityTypeConfiguration)
   - nORM.Mapping.TableMapping.Columns
   - nORM.Mapping.TableMapping.ColumnsByName
+  - nORM.Mapping.TableMapping.ConverterFingerprint
   - nORM.Mapping.TableMapping.DiscriminatorColumn
   - nORM.Mapping.TableMapping.EscTable
   - nORM.Mapping.TableMapping.InsertColumns
   - nORM.Mapping.TableMapping.KeyColumns
+  - nORM.Mapping.TableMapping.ManyToManyJoins
+  - nORM.Mapping.TableMapping.OwnedCollections
   - nORM.Mapping.TableMapping.Provider
   - nORM.Mapping.TableMapping.Relations
   - nORM.Mapping.TableMapping.SetPrimaryKey(System.Object,System.Object)
+  - nORM.Mapping.TableMapping.ShadowFingerprint
   - nORM.Mapping.TableMapping.TableName
   - nORM.Mapping.TableMapping.TenantColumn
   - nORM.Mapping.TableMapping.TimestampColumn
@@ -35,10 +39,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableMapping
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 17
+    startLine: 21
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Describes how a CLR type maps to a database table including column and relationship metadata.
+  example: []
   syntax:
     content: public sealed class TableMapping
     content.vb: Public NotInheritable Class TableMapping
@@ -57,7 +63,7 @@ items:
   - nORM.Mapping.TableMapping.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.TableMapping,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Mapping.TableMapping.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.TableMapping,{TProperty}}},System.Threading.CancellationToken)
 - uid: nORM.Mapping.TableMapping.Type
-  commentId: F:nORM.Mapping.TableMapping.Type
+  commentId: P:nORM.Mapping.TableMapping.Type
   id: Type
   parent: nORM.Mapping.TableMapping
   langs:
@@ -66,7 +72,7 @@ items:
   name: Type
   nameWithType: TableMapping.Type
   fullName: nORM.Mapping.TableMapping.Type
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -74,17 +80,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Type
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 19
+    startLine: 24
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the CLR type represented by this mapping.
+  example: []
   syntax:
-    content: public readonly Type Type
+    content: public Type Type { get; }
+    parameters: []
     return:
       type: System.Type
-    content.vb: Public ReadOnly Type As Type
+    content.vb: Public ReadOnly Property Type As Type
+  overload: nORM.Mapping.TableMapping.Type*
 - uid: nORM.Mapping.TableMapping.EscTable
-  commentId: F:nORM.Mapping.TableMapping.EscTable
+  commentId: P:nORM.Mapping.TableMapping.EscTable
   id: EscTable
   parent: nORM.Mapping.TableMapping
   langs:
@@ -93,7 +103,7 @@ items:
   name: EscTable
   nameWithType: TableMapping.EscTable
   fullName: nORM.Mapping.TableMapping.EscTable
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -101,17 +111,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscTable
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 20
+    startLine: 27
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the escaped table name used in SQL statements.
+  example: []
   syntax:
-    content: public string EscTable
+    content: public string EscTable { get; set; }
+    parameters: []
     return:
       type: System.String
-    content.vb: Public EscTable As String
+    content.vb: Public Property EscTable As String
+  overload: nORM.Mapping.TableMapping.EscTable*
 - uid: nORM.Mapping.TableMapping.Columns
-  commentId: F:nORM.Mapping.TableMapping.Columns
+  commentId: P:nORM.Mapping.TableMapping.Columns
   id: Columns
   parent: nORM.Mapping.TableMapping
   langs:
@@ -120,7 +134,7 @@ items:
   name: Columns
   nameWithType: TableMapping.Columns
   fullName: nORM.Mapping.TableMapping.Columns
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -128,17 +142,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Columns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 21
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets all mapped columns.
+  example: []
   syntax:
-    content: public readonly Column[] Columns
+    content: public Column[] Columns { get; }
+    parameters: []
     return:
       type: nORM.Mapping.Column[]
-    content.vb: Public ReadOnly Columns As Column()
+    content.vb: Public ReadOnly Property Columns As Column()
+  overload: nORM.Mapping.TableMapping.Columns*
 - uid: nORM.Mapping.TableMapping.ColumnsByName
-  commentId: F:nORM.Mapping.TableMapping.ColumnsByName
+  commentId: P:nORM.Mapping.TableMapping.ColumnsByName
   id: ColumnsByName
   parent: nORM.Mapping.TableMapping
   langs:
@@ -147,7 +165,7 @@ items:
   name: ColumnsByName
   nameWithType: TableMapping.ColumnsByName
   fullName: nORM.Mapping.TableMapping.ColumnsByName
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -155,17 +173,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnsByName
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 22
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets a lookup of columns by property name.
+  example: []
   syntax:
-    content: public readonly Dictionary<string, Column> ColumnsByName
+    content: public Dictionary<string, Column> ColumnsByName { get; }
+    parameters: []
     return:
       type: System.Collections.Generic.Dictionary{System.String,nORM.Mapping.Column}
-    content.vb: Public ReadOnly ColumnsByName As Dictionary(Of String, Column)
+    content.vb: Public ReadOnly Property ColumnsByName As Dictionary(Of String, Column)
+  overload: nORM.Mapping.TableMapping.ColumnsByName*
 - uid: nORM.Mapping.TableMapping.KeyColumns
-  commentId: F:nORM.Mapping.TableMapping.KeyColumns
+  commentId: P:nORM.Mapping.TableMapping.KeyColumns
   id: KeyColumns
   parent: nORM.Mapping.TableMapping
   langs:
@@ -174,7 +196,7 @@ items:
   name: KeyColumns
   nameWithType: TableMapping.KeyColumns
   fullName: nORM.Mapping.TableMapping.KeyColumns
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -182,17 +204,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: KeyColumns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 23
+    startLine: 36
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the columns that form the primary key.
+  example: []
   syntax:
-    content: public readonly Column[] KeyColumns
+    content: public Column[] KeyColumns { get; }
+    parameters: []
     return:
       type: nORM.Mapping.Column[]
-    content.vb: Public ReadOnly KeyColumns As Column()
+    content.vb: Public ReadOnly Property KeyColumns As Column()
+  overload: nORM.Mapping.TableMapping.KeyColumns*
 - uid: nORM.Mapping.TableMapping.TimestampColumn
-  commentId: F:nORM.Mapping.TableMapping.TimestampColumn
+  commentId: P:nORM.Mapping.TableMapping.TimestampColumn
   id: TimestampColumn
   parent: nORM.Mapping.TableMapping
   langs:
@@ -201,7 +227,7 @@ items:
   name: TimestampColumn
   nameWithType: TableMapping.TimestampColumn
   fullName: nORM.Mapping.TableMapping.TimestampColumn
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -209,17 +235,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TimestampColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 24
+    startLine: 39
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the timestamp column used for concurrency, if any.
+  example: []
   syntax:
-    content: public readonly Column? TimestampColumn
+    content: public Column? TimestampColumn { get; }
+    parameters: []
     return:
       type: nORM.Mapping.Column
-    content.vb: Public ReadOnly TimestampColumn As Column
+    content.vb: Public ReadOnly Property TimestampColumn As Column
+  overload: nORM.Mapping.TableMapping.TimestampColumn*
 - uid: nORM.Mapping.TableMapping.TenantColumn
-  commentId: F:nORM.Mapping.TableMapping.TenantColumn
+  commentId: P:nORM.Mapping.TableMapping.TenantColumn
   id: TenantColumn
   parent: nORM.Mapping.TableMapping
   langs:
@@ -228,7 +258,7 @@ items:
   name: TenantColumn
   nameWithType: TableMapping.TenantColumn
   fullName: nORM.Mapping.TableMapping.TenantColumn
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -236,17 +266,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TenantColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 25
+    startLine: 42
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the tenant discriminator column, if multi-tenancy is enabled.
+  example: []
   syntax:
-    content: public readonly Column? TenantColumn
+    content: public Column? TenantColumn { get; }
+    parameters: []
     return:
       type: nORM.Mapping.Column
-    content.vb: Public ReadOnly TenantColumn As Column
+    content.vb: Public ReadOnly Property TenantColumn As Column
+  overload: nORM.Mapping.TableMapping.TenantColumn*
 - uid: nORM.Mapping.TableMapping.InsertColumns
-  commentId: F:nORM.Mapping.TableMapping.InsertColumns
+  commentId: P:nORM.Mapping.TableMapping.InsertColumns
   id: InsertColumns
   parent: nORM.Mapping.TableMapping
   langs:
@@ -255,7 +289,7 @@ items:
   name: InsertColumns
   nameWithType: TableMapping.InsertColumns
   fullName: nORM.Mapping.TableMapping.InsertColumns
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -263,17 +297,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: InsertColumns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 26
+    startLine: 45
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the set of columns included in insert statements.
+  example: []
   syntax:
-    content: public readonly Column[] InsertColumns
+    content: public Column[] InsertColumns { get; }
+    parameters: []
     return:
       type: nORM.Mapping.Column[]
-    content.vb: Public ReadOnly InsertColumns As Column()
+    content.vb: Public ReadOnly Property InsertColumns As Column()
+  overload: nORM.Mapping.TableMapping.InsertColumns*
 - uid: nORM.Mapping.TableMapping.UpdateColumns
-  commentId: F:nORM.Mapping.TableMapping.UpdateColumns
+  commentId: P:nORM.Mapping.TableMapping.UpdateColumns
   id: UpdateColumns
   parent: nORM.Mapping.TableMapping
   langs:
@@ -282,7 +320,7 @@ items:
   name: UpdateColumns
   nameWithType: TableMapping.UpdateColumns
   fullName: nORM.Mapping.TableMapping.UpdateColumns
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -290,15 +328,19 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UpdateColumns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 27
+    startLine: 48
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the set of columns included in update statements.
+  example: []
   syntax:
-    content: public readonly Column[] UpdateColumns
+    content: public Column[] UpdateColumns { get; }
+    parameters: []
     return:
       type: nORM.Mapping.Column[]
-    content.vb: Public ReadOnly UpdateColumns As Column()
+    content.vb: Public ReadOnly Property UpdateColumns As Column()
+  overload: nORM.Mapping.TableMapping.UpdateColumns*
 - uid: nORM.Mapping.TableMapping.TableName
   commentId: P:nORM.Mapping.TableMapping.TableName
   id: TableName
@@ -317,10 +359,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableName
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 28
+    startLine: 51
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the unescaped table name.
+  example: []
   syntax:
     content: public string TableName { get; }
     parameters: []
@@ -329,7 +373,7 @@ items:
     content.vb: Public ReadOnly Property TableName As String
   overload: nORM.Mapping.TableMapping.TableName*
 - uid: nORM.Mapping.TableMapping.Relations
-  commentId: F:nORM.Mapping.TableMapping.Relations
+  commentId: P:nORM.Mapping.TableMapping.Relations
   id: Relations
   parent: nORM.Mapping.TableMapping
   langs:
@@ -338,7 +382,7 @@ items:
   name: Relations
   nameWithType: TableMapping.Relations
   fullName: nORM.Mapping.TableMapping.Relations
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -346,17 +390,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relations
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 29
+    startLine: 54
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the relationships to dependent entities.
+  example: []
   syntax:
-    content: public readonly Dictionary<string, TableMapping.Relation> Relations
+    content: public Dictionary<string, TableMapping.Relation> Relations { get; }
+    parameters: []
     return:
       type: System.Collections.Generic.Dictionary{System.String,nORM.Mapping.TableMapping.Relation}
-    content.vb: Public ReadOnly Relations As Dictionary(Of String, TableMapping.Relation)
+    content.vb: Public ReadOnly Property Relations As Dictionary(Of String, TableMapping.Relation)
+  overload: nORM.Mapping.TableMapping.Relations*
 - uid: nORM.Mapping.TableMapping.Provider
-  commentId: F:nORM.Mapping.TableMapping.Provider
+  commentId: P:nORM.Mapping.TableMapping.Provider
   id: Provider
   parent: nORM.Mapping.TableMapping
   langs:
@@ -365,7 +413,7 @@ items:
   name: Provider
   nameWithType: TableMapping.Provider
   fullName: nORM.Mapping.TableMapping.Provider
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -373,17 +421,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Provider
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 30
+    startLine: 57
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the database provider associated with this mapping.
+  example: []
   syntax:
-    content: public readonly DatabaseProvider Provider
+    content: public DatabaseProvider Provider { get; }
+    parameters: []
     return:
       type: nORM.Providers.DatabaseProvider
-    content.vb: Public ReadOnly Provider As DatabaseProvider
+    content.vb: Public ReadOnly Property Provider As DatabaseProvider
+  overload: nORM.Mapping.TableMapping.Provider*
 - uid: nORM.Mapping.TableMapping.DiscriminatorColumn
-  commentId: F:nORM.Mapping.TableMapping.DiscriminatorColumn
+  commentId: P:nORM.Mapping.TableMapping.DiscriminatorColumn
   id: DiscriminatorColumn
   parent: nORM.Mapping.TableMapping
   langs:
@@ -392,7 +444,7 @@ items:
   name: DiscriminatorColumn
   nameWithType: TableMapping.DiscriminatorColumn
   fullName: nORM.Mapping.TableMapping.DiscriminatorColumn
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -400,17 +452,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DiscriminatorColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 31
+    startLine: 60
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the discriminator column used for TPH inheritance, if any.
+  example: []
   syntax:
-    content: public readonly Column? DiscriminatorColumn
+    content: public Column? DiscriminatorColumn { get; }
+    parameters: []
     return:
       type: nORM.Mapping.Column
-    content.vb: Public ReadOnly DiscriminatorColumn As Column
+    content.vb: Public Property DiscriminatorColumn As Column
+  overload: nORM.Mapping.TableMapping.DiscriminatorColumn*
 - uid: nORM.Mapping.TableMapping.TphMappings
-  commentId: F:nORM.Mapping.TableMapping.TphMappings
+  commentId: P:nORM.Mapping.TableMapping.TphMappings
   id: TphMappings
   parent: nORM.Mapping.TableMapping
   langs:
@@ -419,7 +475,7 @@ items:
   name: TphMappings
   nameWithType: TableMapping.TphMappings
   fullName: nORM.Mapping.TableMapping.TphMappings
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/TableMapping.cs
@@ -427,15 +483,143 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TphMappings
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 32
+    startLine: 63
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets mappings for derived types in TPH inheritance scenarios.
+  example: []
   syntax:
-    content: public readonly Dictionary<object, TableMapping> TphMappings
+    content: public Dictionary<object, TableMapping> TphMappings { get; }
+    parameters: []
     return:
       type: System.Collections.Generic.Dictionary{System.Object,nORM.Mapping.TableMapping}
-    content.vb: Public ReadOnly TphMappings As Dictionary(Of Object, TableMapping)
+    content.vb: Public ReadOnly Property TphMappings As Dictionary(Of Object, TableMapping)
+  overload: nORM.Mapping.TableMapping.TphMappings*
+- uid: nORM.Mapping.TableMapping.ConverterFingerprint
+  commentId: P:nORM.Mapping.TableMapping.ConverterFingerprint
+  id: ConverterFingerprint
+  parent: nORM.Mapping.TableMapping
+  langs:
+  - csharp
+  - vb
+  name: ConverterFingerprint
+  nameWithType: TableMapping.ConverterFingerprint
+  fullName: nORM.Mapping.TableMapping.ConverterFingerprint
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ConverterFingerprint
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 66
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets a fingerprint hash of all converter configurations for cache differentiation.
+  example: []
+  syntax:
+    content: public int ConverterFingerprint { get; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public Property ConverterFingerprint As Integer
+  overload: nORM.Mapping.TableMapping.ConverterFingerprint*
+- uid: nORM.Mapping.TableMapping.ShadowFingerprint
+  commentId: P:nORM.Mapping.TableMapping.ShadowFingerprint
+  id: ShadowFingerprint
+  parent: nORM.Mapping.TableMapping
+  langs:
+  - csharp
+  - vb
+  name: ShadowFingerprint
+  nameWithType: TableMapping.ShadowFingerprint
+  fullName: nORM.Mapping.TableMapping.ShadowFingerprint
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ShadowFingerprint
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 69
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets a fingerprint hash of shadow property columns for cache differentiation.
+  example: []
+  syntax:
+    content: public int ShadowFingerprint { get; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public Property ShadowFingerprint As Integer
+  overload: nORM.Mapping.TableMapping.ShadowFingerprint*
+- uid: nORM.Mapping.TableMapping.OwnedCollections
+  commentId: P:nORM.Mapping.TableMapping.OwnedCollections
+  id: OwnedCollections
+  parent: nORM.Mapping.TableMapping
+  langs:
+  - csharp
+  - vb
+  name: OwnedCollections
+  nameWithType: TableMapping.OwnedCollections
+  fullName: nORM.Mapping.TableMapping.OwnedCollections
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OwnedCollections
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 72
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets the owned collection mappings for this entity type.
+  example: []
+  syntax:
+    content: public List<OwnedCollectionMapping> OwnedCollections { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{nORM.Mapping.OwnedCollectionMapping}
+    content.vb: Public ReadOnly Property OwnedCollections As List(Of OwnedCollectionMapping)
+  overload: nORM.Mapping.TableMapping.OwnedCollections*
+- uid: nORM.Mapping.TableMapping.ManyToManyJoins
+  commentId: P:nORM.Mapping.TableMapping.ManyToManyJoins
+  id: ManyToManyJoins
+  parent: nORM.Mapping.TableMapping
+  langs:
+  - csharp
+  - vb
+  name: ManyToManyJoins
+  nameWithType: TableMapping.ManyToManyJoins
+  fullName: nORM.Mapping.TableMapping.ManyToManyJoins
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ManyToManyJoins
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 75
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets the many-to-many join table mappings for this entity type.
+  example: []
+  syntax:
+    content: public List<JoinTableMapping> ManyToManyJoins { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{nORM.Mapping.JoinTableMapping}
+    content.vb: Public ReadOnly Property ManyToManyJoins As List(Of JoinTableMapping)
+  overload: nORM.Mapping.TableMapping.ManyToManyJoins*
 - uid: nORM.Mapping.TableMapping.#ctor(System.Type,nORM.Providers.DatabaseProvider,nORM.Core.DbContext,nORM.Configuration.IEntityTypeConfiguration)
   commentId: M:nORM.Mapping.TableMapping.#ctor(System.Type,nORM.Providers.DatabaseProvider,nORM.Core.DbContext,nORM.Configuration.IEntityTypeConfiguration)
   id: '#ctor(System.Type,nORM.Providers.DatabaseProvider,nORM.Core.DbContext,nORM.Configuration.IEntityTypeConfiguration)'
@@ -454,21 +638,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 35
+    startLine: 93
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Creates a new <xref href="nORM.Mapping.TableMapping" data-throw-if-not-resolved="false"></xref> for the specified type and provider.
+  example: []
   syntax:
     content: public TableMapping(Type t, DatabaseProvider p, DbContext ctx, IEntityTypeConfiguration? fluentConfig)
     parameters:
     - id: t
       type: System.Type
+      description: CLR type being mapped.
     - id: p
       type: nORM.Providers.DatabaseProvider
+      description: Database provider used for identifier escaping.
     - id: ctx
       type: nORM.Core.DbContext
+      description: Context used to resolve related mappings.
     - id: fluentConfig
       type: nORM.Configuration.IEntityTypeConfiguration
+      description: Optional configuration overrides.
     content.vb: Public Sub New(t As Type, p As DatabaseProvider, ctx As DbContext, fluentConfig As IEntityTypeConfiguration)
   overload: nORM.Mapping.TableMapping.#ctor*
   nameWithType.vb: TableMapping.New(Type, DatabaseProvider, DbContext, IEntityTypeConfiguration)
@@ -492,7 +682,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetPrimaryKey
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 166
+    startLine: 297
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -1455,6 +1645,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Mapping.TableMapping.Type*
+  commentId: Overload:nORM.Mapping.TableMapping.Type
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_Type
+  name: Type
+  nameWithType: TableMapping.Type
+  fullName: nORM.Mapping.TableMapping.Type
 - uid: System.Type
   commentId: T:System.Type
   parent: System
@@ -1463,6 +1659,12 @@ references:
   name: Type
   nameWithType: Type
   fullName: System.Type
+- uid: nORM.Mapping.TableMapping.EscTable*
+  commentId: Overload:nORM.Mapping.TableMapping.EscTable
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_EscTable
+  name: EscTable
+  nameWithType: TableMapping.EscTable
+  fullName: nORM.Mapping.TableMapping.EscTable
 - uid: System.String
   commentId: T:System.String
   parent: System
@@ -1474,6 +1676,12 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
+- uid: nORM.Mapping.TableMapping.Columns*
+  commentId: Overload:nORM.Mapping.TableMapping.Columns
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_Columns
+  name: Columns
+  nameWithType: TableMapping.Columns
+  fullName: nORM.Mapping.TableMapping.Columns
 - uid: nORM.Mapping.Column[]
   isExternal: true
   href: nORM.Mapping.Column.html
@@ -1495,6 +1703,12 @@ references:
     href: nORM.Mapping.Column.html
   - name: (
   - name: )
+- uid: nORM.Mapping.TableMapping.ColumnsByName*
+  commentId: Overload:nORM.Mapping.TableMapping.ColumnsByName
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_ColumnsByName
+  name: ColumnsByName
+  nameWithType: TableMapping.ColumnsByName
+  fullName: nORM.Mapping.TableMapping.ColumnsByName
 - uid: System.Collections.Generic.Dictionary{System.String,nORM.Mapping.Column}
   commentId: T:System.Collections.Generic.Dictionary{System.String,nORM.Mapping.Column}
   parent: System.Collections.Generic
@@ -1611,6 +1825,18 @@ references:
     name: Generic
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Mapping.TableMapping.KeyColumns*
+  commentId: Overload:nORM.Mapping.TableMapping.KeyColumns
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_KeyColumns
+  name: KeyColumns
+  nameWithType: TableMapping.KeyColumns
+  fullName: nORM.Mapping.TableMapping.KeyColumns
+- uid: nORM.Mapping.TableMapping.TimestampColumn*
+  commentId: Overload:nORM.Mapping.TableMapping.TimestampColumn
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_TimestampColumn
+  name: TimestampColumn
+  nameWithType: TableMapping.TimestampColumn
+  fullName: nORM.Mapping.TableMapping.TimestampColumn
 - uid: nORM.Mapping.Column
   commentId: T:nORM.Mapping.Column
   parent: nORM.Mapping
@@ -1618,12 +1844,36 @@ references:
   name: Column
   nameWithType: Column
   fullName: nORM.Mapping.Column
+- uid: nORM.Mapping.TableMapping.TenantColumn*
+  commentId: Overload:nORM.Mapping.TableMapping.TenantColumn
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_TenantColumn
+  name: TenantColumn
+  nameWithType: TableMapping.TenantColumn
+  fullName: nORM.Mapping.TableMapping.TenantColumn
+- uid: nORM.Mapping.TableMapping.InsertColumns*
+  commentId: Overload:nORM.Mapping.TableMapping.InsertColumns
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_InsertColumns
+  name: InsertColumns
+  nameWithType: TableMapping.InsertColumns
+  fullName: nORM.Mapping.TableMapping.InsertColumns
+- uid: nORM.Mapping.TableMapping.UpdateColumns*
+  commentId: Overload:nORM.Mapping.TableMapping.UpdateColumns
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_UpdateColumns
+  name: UpdateColumns
+  nameWithType: TableMapping.UpdateColumns
+  fullName: nORM.Mapping.TableMapping.UpdateColumns
 - uid: nORM.Mapping.TableMapping.TableName*
   commentId: Overload:nORM.Mapping.TableMapping.TableName
   href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_TableName
   name: TableName
   nameWithType: TableMapping.TableName
   fullName: nORM.Mapping.TableMapping.TableName
+- uid: nORM.Mapping.TableMapping.Relations*
+  commentId: Overload:nORM.Mapping.TableMapping.Relations
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_Relations
+  name: Relations
+  nameWithType: TableMapping.Relations
+  fullName: nORM.Mapping.TableMapping.Relations
 - uid: System.Collections.Generic.Dictionary{System.String,nORM.Mapping.TableMapping.Relation}
   commentId: T:System.Collections.Generic.Dictionary{System.String,nORM.Mapping.TableMapping.Relation}
   parent: System.Collections.Generic
@@ -1677,6 +1927,12 @@ references:
     name: Relation
     href: nORM.Mapping.TableMapping.Relation.html
   - name: )
+- uid: nORM.Mapping.TableMapping.Provider*
+  commentId: Overload:nORM.Mapping.TableMapping.Provider
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_Provider
+  name: Provider
+  nameWithType: TableMapping.Provider
+  fullName: nORM.Mapping.TableMapping.Provider
 - uid: nORM.Providers.DatabaseProvider
   commentId: T:nORM.Providers.DatabaseProvider
   parent: nORM.Providers
@@ -1706,6 +1962,18 @@ references:
   - uid: nORM.Providers
     name: Providers
     href: nORM.Providers.html
+- uid: nORM.Mapping.TableMapping.DiscriminatorColumn*
+  commentId: Overload:nORM.Mapping.TableMapping.DiscriminatorColumn
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_DiscriminatorColumn
+  name: DiscriminatorColumn
+  nameWithType: TableMapping.DiscriminatorColumn
+  fullName: nORM.Mapping.TableMapping.DiscriminatorColumn
+- uid: nORM.Mapping.TableMapping.TphMappings*
+  commentId: Overload:nORM.Mapping.TableMapping.TphMappings
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_TphMappings
+  name: TphMappings
+  nameWithType: TableMapping.TphMappings
+  fullName: nORM.Mapping.TableMapping.TphMappings
 - uid: System.Collections.Generic.Dictionary{System.Object,nORM.Mapping.TableMapping}
   commentId: T:System.Collections.Generic.Dictionary{System.Object,nORM.Mapping.TableMapping}
   parent: System.Collections.Generic
@@ -1751,6 +2019,142 @@ references:
     name: TableMapping
     href: nORM.Mapping.TableMapping.html
   - name: )
+- uid: nORM.Mapping.TableMapping.ConverterFingerprint*
+  commentId: Overload:nORM.Mapping.TableMapping.ConverterFingerprint
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_ConverterFingerprint
+  name: ConverterFingerprint
+  nameWithType: TableMapping.ConverterFingerprint
+  fullName: nORM.Mapping.TableMapping.ConverterFingerprint
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: nORM.Mapping.TableMapping.ShadowFingerprint*
+  commentId: Overload:nORM.Mapping.TableMapping.ShadowFingerprint
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_ShadowFingerprint
+  name: ShadowFingerprint
+  nameWithType: TableMapping.ShadowFingerprint
+  fullName: nORM.Mapping.TableMapping.ShadowFingerprint
+- uid: nORM.Mapping.TableMapping.OwnedCollections*
+  commentId: Overload:nORM.Mapping.TableMapping.OwnedCollections
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_OwnedCollections
+  name: OwnedCollections
+  nameWithType: TableMapping.OwnedCollections
+  fullName: nORM.Mapping.TableMapping.OwnedCollections
+- uid: System.Collections.Generic.List{nORM.Mapping.OwnedCollectionMapping}
+  commentId: T:System.Collections.Generic.List{nORM.Mapping.OwnedCollectionMapping}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<OwnedCollectionMapping>
+  nameWithType: List<OwnedCollectionMapping>
+  fullName: System.Collections.Generic.List<nORM.Mapping.OwnedCollectionMapping>
+  nameWithType.vb: List(Of OwnedCollectionMapping)
+  fullName.vb: System.Collections.Generic.List(Of nORM.Mapping.OwnedCollectionMapping)
+  name.vb: List(Of OwnedCollectionMapping)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - uid: nORM.Mapping.OwnedCollectionMapping
+    name: OwnedCollectionMapping
+    href: nORM.Mapping.OwnedCollectionMapping.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.OwnedCollectionMapping
+    name: OwnedCollectionMapping
+    href: nORM.Mapping.OwnedCollectionMapping.html
+  - name: )
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Mapping.TableMapping.ManyToManyJoins*
+  commentId: Overload:nORM.Mapping.TableMapping.ManyToManyJoins
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_ManyToManyJoins
+  name: ManyToManyJoins
+  nameWithType: TableMapping.ManyToManyJoins
+  fullName: nORM.Mapping.TableMapping.ManyToManyJoins
+- uid: System.Collections.Generic.List{nORM.Mapping.JoinTableMapping}
+  commentId: T:System.Collections.Generic.List{nORM.Mapping.JoinTableMapping}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<JoinTableMapping>
+  nameWithType: List<JoinTableMapping>
+  fullName: System.Collections.Generic.List<nORM.Mapping.JoinTableMapping>
+  nameWithType.vb: List(Of JoinTableMapping)
+  fullName.vb: System.Collections.Generic.List(Of nORM.Mapping.JoinTableMapping)
+  name.vb: List(Of JoinTableMapping)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: )
+- uid: nORM.Mapping.TableMapping
+  commentId: T:nORM.Mapping.TableMapping
+  parent: nORM.Mapping
+  href: nORM.Mapping.TableMapping.html
+  name: TableMapping
+  nameWithType: TableMapping
+  fullName: nORM.Mapping.TableMapping
 - uid: nORM.Mapping.TableMapping.#ctor*
   commentId: Overload:nORM.Mapping.TableMapping.#ctor
   href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping__ctor_System_Type_nORM_Providers_DatabaseProvider_nORM_Core_DbContext_nORM_Configuration_IEntityTypeConfiguration_

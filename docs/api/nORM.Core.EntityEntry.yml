@@ -21,10 +21,25 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EntityEntry
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 13
+    startLine: 24
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Represents the change tracking information for a single entity instance.
+
+    An <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref> keeps the original values and state required to
+
+    compute database updates when <code>SaveChanges</code> is invoked.
+  remarks: >-
+    PERFORMANCE OPTIMIZATION: Deferred initialization of tracking arrays.
+
+    Arrays are null until <xref href="nORM.Core.EntityEntry.InitializeTracking" data-throw-if-not-resolved="false"></xref> is called, reducing
+
+    memory overhead for read-only or short-lived entities (approximately 200-500
+
+    bytes per entity depending on column count).
+  example: []
   syntax:
     content: public class EntityEntry
     content.vb: Public Class EntityEntry
@@ -61,10 +76,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Entity
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 28
+    startLine: 50
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Gets the entity instance being tracked. May be <code>null</code> after the entity
+
+    has been detached from the context.
+  example: []
   syntax:
     content: public object? Entity { get; }
     parameters: []
@@ -90,10 +110,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: State
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 29
+    startLine: 56
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Gets or sets the current <xref href="nORM.Core.EntityState" data-throw-if-not-resolved="false"></xref> of the tracked entity
+
+    within the context.
+  example: []
   syntax:
     content: public EntityState State { get; }
     parameters: []
@@ -102,6 +127,28 @@ items:
     content.vb: Public Property State As EntityState
   overload: nORM.Core.EntityEntry.State*
 references:
+- uid: nORM.Core.EntityEntry
+  commentId: T:nORM.Core.EntityEntry
+  parent: nORM.Core
+  href: nORM.Core.EntityEntry.html
+  name: EntityEntry
+  nameWithType: EntityEntry
+  fullName: nORM.Core.EntityEntry
+- uid: nORM.Core.EntityEntry.InitializeTracking
+  commentId: M:nORM.Core.EntityEntry.InitializeTracking
+  name: InitializeTracking()
+  nameWithType: EntityEntry.InitializeTracking()
+  fullName: nORM.Core.EntityEntry.InitializeTracking()
+  spec.csharp:
+  - uid: nORM.Core.EntityEntry.InitializeTracking
+    name: InitializeTracking
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.EntityEntry.InitializeTracking
+    name: InitializeTracking
+  - name: (
+  - name: )
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html
@@ -1071,12 +1118,6 @@ references:
   name: Entity
   nameWithType: EntityEntry.Entity
   fullName: nORM.Core.EntityEntry.Entity
-- uid: nORM.Core.EntityEntry.State*
-  commentId: Overload:nORM.Core.EntityEntry.State
-  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_State
-  name: State
-  nameWithType: EntityEntry.State
-  fullName: nORM.Core.EntityEntry.State
 - uid: nORM.Core.EntityState
   commentId: T:nORM.Core.EntityState
   parent: nORM.Core
@@ -1084,3 +1125,9 @@ references:
   name: EntityState
   nameWithType: EntityState
   fullName: nORM.Core.EntityState
+- uid: nORM.Core.EntityEntry.State*
+  commentId: Overload:nORM.Core.EntityEntry.State
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_State
+  name: State
+  nameWithType: EntityEntry.State
+  fullName: nORM.Core.EntityEntry.State

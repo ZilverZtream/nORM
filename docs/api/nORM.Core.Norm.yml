@@ -20,10 +20,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Norm
     path: src/nORM/Core/Norm.cs
-    startLine: 11
+    startLine: 14
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Provides helpers for compiling query expressions into high-performance delegates.
+  example: []
   syntax:
     content: public static class Norm
     content.vb: Public Module Norm
@@ -55,21 +57,28 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CompileQuery
     path: src/nORM/Core/Norm.cs
-    startLine: 13
+    startLine: 24
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Compiles the supplied query expression into a reusable delegate that executes the query asynchronously.
+  example: []
   syntax:
     content: 'public static Func<TContext, TParam, Task<List<T>>> CompileQuery<TContext, TParam, T>(Expression<Func<TContext, TParam, IQueryable<T>>> queryExpression) where TContext : DbContext where T : class'
     parameters:
     - id: queryExpression
       type: System.Linq.Expressions.Expression{System.Func{{TContext},{TParam},System.Linq.IQueryable{{T}}}}
+      description: Expression describing the query to compile.
     typeParameters:
     - id: TContext
+      description: Type of the <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>.
     - id: TParam
+      description: Type of the parameter passed to the query.
     - id: T
+      description: Element type returned by the query.
     return:
       type: System.Func{{TContext},{TParam},System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}}
+      description: A delegate that executes the query and returns the results as a <xref href="System.Collections.Generic.List%601" data-throw-if-not-resolved="false"></xref>.
     content.vb: Public Shared Function CompileQuery(Of TContext As DbContext, TParam, T As Class)(queryExpression As Expression(Of Func(Of TContext, TParam, IQueryable(Of T)))) As Func(Of TContext, TParam, Task(Of List(Of T)))
   overload: nORM.Core.Norm.CompileQuery*
   nameWithType.vb: Norm.CompileQuery(Of TContext, TParam, T)(Expression(Of Func(Of TContext, TParam, IQueryable(Of T))))
@@ -335,6 +344,41 @@ references:
   name: System
   nameWithType: System
   fullName: System
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
 - uid: nORM.Core.Norm.CompileQuery*
   commentId: Overload:nORM.Core.Norm.CompileQuery
   href: nORM.Core.Norm.html#nORM_Core_Norm_CompileQuery__3_System_Linq_Expressions_Expression_System_Func___0___1_System_Linq_IQueryable___2____

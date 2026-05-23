@@ -20,10 +20,20 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SqlServerMigrationSqlGenerator
     path: src/nORM/Migration/SqlServerMigrationSqlGenerator.cs
-    startLine: 6
+    startLine: 16
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Generates SQL Server compatible migration scripts based on a schema diff.
+  remarks: >-
+    Provider: Microsoft SQL Server (T-SQL dialect). Uses bracket-escaped identifiers,
+
+    IDENTITY(1,1) for auto-increment columns, and dynamic T-SQL for DEFAULT constraint
+
+    discovery and removal. FK referential actions are validated against an allowlist
+
+    before being interpolated into DDL.
+  example: []
   syntax:
     content: 'public class SqlServerMigrationSqlGenerator : IMigrationSqlGenerator'
     content.vb: Public Class SqlServerMigrationSqlGenerator Implements IMigrationSqlGenerator
@@ -62,7 +72,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateSql
     path: src/nORM/Migration/SqlServerMigrationSqlGenerator.cs
-    startLine: 28
+    startLine: 69
   assemblies:
   - nORM
   namespace: nORM.Migration

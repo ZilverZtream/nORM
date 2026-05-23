@@ -1,0 +1,177 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  commentId: T:nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  id: AmbientTransactionEnlistmentPolicy
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.AmbientTransactionEnlistmentPolicy.BestEffort
+  - nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast
+  - nORM.Configuration.AmbientTransactionEnlistmentPolicy.Ignore
+  langs:
+  - csharp
+  - vb
+  name: AmbientTransactionEnlistmentPolicy
+  nameWithType: AmbientTransactionEnlistmentPolicy
+  fullName: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AmbientTransactionEnlistmentPolicy
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 18
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gate E: Controls what happens when the provider cannot enlist in an ambient
+
+    System.Transactions.TransactionScope. The default is <xref href="nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast" data-throw-if-not-resolved="false"></xref> so
+
+    that callers are alerted rather than silently committing outside the scope.
+  example: []
+  syntax:
+    content: public enum AmbientTransactionEnlistmentPolicy
+    content.vb: Public Enum AmbientTransactionEnlistmentPolicy
+- uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast
+  commentId: F:nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast
+  id: FailFast
+  parent: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  langs:
+  - csharp
+  - vb
+  name: FailFast
+  nameWithType: AmbientTransactionEnlistmentPolicy.FailFast
+  fullName: nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: FailFast
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 25
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Throw <xref href="nORM.Core.NormConfigurationException" data-throw-if-not-resolved="false"></xref> when enlistment fails.
+
+    This is the safe default — it ensures callers know their operations are NOT
+
+    participating in the ambient scope and can choose how to handle it.
+  example: []
+  syntax:
+    content: FailFast = 0
+    return:
+      type: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+- uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy.BestEffort
+  commentId: F:nORM.Configuration.AmbientTransactionEnlistmentPolicy.BestEffort
+  id: BestEffort
+  parent: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  langs:
+  - csharp
+  - vb
+  name: BestEffort
+  nameWithType: AmbientTransactionEnlistmentPolicy.BestEffort
+  fullName: nORM.Configuration.AmbientTransactionEnlistmentPolicy.BestEffort
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BestEffort
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 32
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Log a warning and continue when enlistment fails. Operations will commit
+
+    independently of the ambient TransactionScope. Use when targeting providers
+
+    known to have limited ambient transaction support.
+  example: []
+  syntax:
+    content: BestEffort = 1
+    return:
+      type: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+- uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy.Ignore
+  commentId: F:nORM.Configuration.AmbientTransactionEnlistmentPolicy.Ignore
+  id: Ignore
+  parent: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  langs:
+  - csharp
+  - vb
+  name: Ignore
+  nameWithType: AmbientTransactionEnlistmentPolicy.Ignore
+  fullName: nORM.Configuration.AmbientTransactionEnlistmentPolicy.Ignore
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Ignore
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 38
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Skip the EnlistTransaction call entirely. Use when the provider is known to
+
+    not support it and the overhead or warnings are undesirable.
+  example: []
+  syntax:
+    content: Ignore = 2
+    return:
+      type: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+references:
+- uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast
+  commentId: F:nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast
+  href: nORM.Configuration.AmbientTransactionEnlistmentPolicy.html#nORM_Configuration_AmbientTransactionEnlistmentPolicy_FailFast
+  name: FailFast
+  nameWithType: AmbientTransactionEnlistmentPolicy.FailFast
+  fullName: nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Core.NormConfigurationException
+  commentId: T:nORM.Core.NormConfigurationException
+  href: nORM.Core.NormConfigurationException.html
+  name: NormConfigurationException
+  nameWithType: NormConfigurationException
+  fullName: nORM.Core.NormConfigurationException
+- uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  commentId: T:nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  parent: nORM.Configuration
+  href: nORM.Configuration.AmbientTransactionEnlistmentPolicy.html
+  name: AmbientTransactionEnlistmentPolicy
+  nameWithType: AmbientTransactionEnlistmentPolicy
+  fullName: nORM.Configuration.AmbientTransactionEnlistmentPolicy

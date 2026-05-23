@@ -6,9 +6,14 @@ items:
   parent: nORM.Migration
   children:
   - nORM.Migration.MySqlMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)
+  - nORM.Migration.MySqlMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions)
+  - nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync(System.Threading.CancellationToken)
   - nORM.Migration.MySqlMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken)
+  - nORM.Migration.MySqlMigrationRunner.Dispose
+  - nORM.Migration.MySqlMigrationRunner.DisposeAsync
   - nORM.Migration.MySqlMigrationRunner.GetPendingMigrationsAsync(System.Threading.CancellationToken)
   - nORM.Migration.MySqlMigrationRunner.HasPendingMigrationsAsync(System.Threading.CancellationToken)
+  - nORM.Migration.MySqlMigrationRunner.ReleaseAdvisoryLockAsync(System.Threading.CancellationToken)
   langs:
   - csharp
   - vb
@@ -23,17 +28,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MySqlMigrationRunner
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 17
+    startLine: 21
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Executes migrations against a MySQL database using a supplied connection and migrations assembly.
+  example: []
   syntax:
-    content: 'public class MySqlMigrationRunner : IMigrationRunner'
-    content.vb: Public Class MySqlMigrationRunner Implements IMigrationRunner
+    content: 'public class MySqlMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable'
+    content.vb: Public Class MySqlMigrationRunner Implements IMigrationRunner, IAsyncDisposable, IDisposable
   inheritance:
   - System.Object
   implements:
   - nORM.Migration.IMigrationRunner
+  - System.IAsyncDisposable
+  - System.IDisposable
   inheritedMembers:
   - System.Object.Equals(System.Object)
   - System.Object.Equals(System.Object,System.Object)
@@ -65,24 +74,73 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 24
+    startLine: 45
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Initializes a new instance of the <xref href="nORM.Migration.MySqlMigrationRunner" data-throw-if-not-resolved="false"></xref> class.
+  example: []
   syntax:
     content: public MySqlMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null)
     parameters:
     - id: connection
       type: System.Data.Common.DbConnection
+      description: Open connection to the target MySQL database.
     - id: migrationsAssembly
       type: System.Reflection.Assembly
+      description: Assembly containing migration classes.
     - id: options
       type: nORM.Configuration.DbContextOptions
+      description: Optional DbContext configuration for interceptors.
     content.vb: Public Sub New(connection As DbConnection, migrationsAssembly As Assembly, options As DbContextOptions = Nothing)
   overload: nORM.Migration.MySqlMigrationRunner.#ctor*
   nameWithType.vb: MySqlMigrationRunner.New(DbConnection, Assembly, DbContextOptions)
   fullName.vb: nORM.Migration.MySqlMigrationRunner.New(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Configuration.DbContextOptions)
   name.vb: New(DbConnection, Assembly, DbContextOptions)
+- uid: nORM.Migration.MySqlMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions)
+  commentId: M:nORM.Migration.MySqlMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions)
+  id: '#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions)'
+  parent: nORM.Migration.MySqlMigrationRunner
+  langs:
+  - csharp
+  - vb
+  name: MySqlMigrationRunner(DbConnection, Assembly, MigrationOptions, DbContextOptions?)
+  nameWithType: MySqlMigrationRunner.MySqlMigrationRunner(DbConnection, Assembly, MigrationOptions, DbContextOptions?)
+  fullName: nORM.Migration.MySqlMigrationRunner.MySqlMigrationRunner(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Migration.MigrationOptions, nORM.Configuration.DbContextOptions?)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Migration/MySqlMigrationRunner.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Migration/MySqlMigrationRunner.cs
+    startLine: 57
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Initializes a new instance of the <xref href="nORM.Migration.MySqlMigrationRunner" data-throw-if-not-resolved="false"></xref> class.
+  example: []
+  syntax:
+    content: public MySqlMigrationRunner(DbConnection connection, Assembly migrationsAssembly, MigrationOptions migrationOptions, DbContextOptions? options = null)
+    parameters:
+    - id: connection
+      type: System.Data.Common.DbConnection
+      description: Open connection to the target MySQL database.
+    - id: migrationsAssembly
+      type: System.Reflection.Assembly
+      description: Assembly containing migration classes.
+    - id: migrationOptions
+      type: nORM.Migration.MigrationOptions
+      description: Migration runner options.
+    - id: options
+      type: nORM.Configuration.DbContextOptions
+      description: Optional DbContext configuration for interceptors.
+    content.vb: Public Sub New(connection As DbConnection, migrationsAssembly As Assembly, migrationOptions As MigrationOptions, options As DbContextOptions = Nothing)
+  overload: nORM.Migration.MySqlMigrationRunner.#ctor*
+  nameWithType.vb: MySqlMigrationRunner.New(DbConnection, Assembly, MigrationOptions, DbContextOptions)
+  fullName.vb: nORM.Migration.MySqlMigrationRunner.New(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Migration.MigrationOptions, nORM.Configuration.DbContextOptions)
+  name.vb: New(DbConnection, Assembly, MigrationOptions, DbContextOptions)
 - uid: nORM.Migration.MySqlMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken)
   commentId: M:nORM.Migration.MySqlMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken)
   id: ApplyMigrationsAsync(System.Threading.CancellationToken)
@@ -101,11 +159,16 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ApplyMigrationsAsync
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 38
+    startLine: 76
   assemblies:
   - nORM
   namespace: nORM.Migration
-  summary: Applies all pending migrations to the MySQL database.
+  summary: >-
+    Applies all pending migrations to the MySQL database.
+
+    Acquires an exclusive named advisory lock (<code>GET_LOCK</code>) before reading the pending list,
+
+    preventing concurrent deployers from running the same DDL simultaneously.
   example: []
   syntax:
     content: public Task ApplyMigrationsAsync(CancellationToken ct = default)
@@ -119,6 +182,79 @@ items:
   overload: nORM.Migration.MySqlMigrationRunner.ApplyMigrationsAsync*
   implements:
   - nORM.Migration.IMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken)
+- uid: nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync(System.Threading.CancellationToken)
+  id: AcquireAdvisoryLockAsync(System.Threading.CancellationToken)
+  parent: nORM.Migration.MySqlMigrationRunner
+  langs:
+  - csharp
+  - vb
+  name: AcquireAdvisoryLockAsync(CancellationToken)
+  nameWithType: MySqlMigrationRunner.AcquireAdvisoryLockAsync(CancellationToken)
+  fullName: nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Migration/MySqlMigrationRunner.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AcquireAdvisoryLockAsync
+    path: src/nORM/Migration/MySqlMigrationRunner.cs
+    startLine: 143
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: >-
+    Acquires a MySQL named advisory lock using <code>GET_LOCK(name, timeout)</code>.
+
+    Returns 1 if acquired, 0 if timeout, NULL on error. Throws
+
+    <xref href="System.InvalidOperationException" data-throw-if-not-resolved="false"></xref> on timeout or error so the caller is
+
+    not silently blocked.
+  example: []
+  syntax:
+    content: protected virtual Task AcquireAdvisoryLockAsync(CancellationToken ct)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Protected Overridable Function AcquireAdvisoryLockAsync(ct As CancellationToken) As Task
+  overload: nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync*
+- uid: nORM.Migration.MySqlMigrationRunner.ReleaseAdvisoryLockAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Migration.MySqlMigrationRunner.ReleaseAdvisoryLockAsync(System.Threading.CancellationToken)
+  id: ReleaseAdvisoryLockAsync(System.Threading.CancellationToken)
+  parent: nORM.Migration.MySqlMigrationRunner
+  langs:
+  - csharp
+  - vb
+  name: ReleaseAdvisoryLockAsync(CancellationToken)
+  nameWithType: MySqlMigrationRunner.ReleaseAdvisoryLockAsync(CancellationToken)
+  fullName: nORM.Migration.MySqlMigrationRunner.ReleaseAdvisoryLockAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Migration/MySqlMigrationRunner.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ReleaseAdvisoryLockAsync
+    path: src/nORM/Migration/MySqlMigrationRunner.cs
+    startLine: 165
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Releases the MySQL named advisory lock acquired by <xref href="nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync(System.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: protected virtual Task ReleaseAdvisoryLockAsync(CancellationToken ct)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Protected Overridable Function ReleaseAdvisoryLockAsync(ct As CancellationToken) As Task
+  overload: nORM.Migration.MySqlMigrationRunner.ReleaseAdvisoryLockAsync*
 - uid: nORM.Migration.MySqlMigrationRunner.HasPendingMigrationsAsync(System.Threading.CancellationToken)
   commentId: M:nORM.Migration.MySqlMigrationRunner.HasPendingMigrationsAsync(System.Threading.CancellationToken)
   id: HasPendingMigrationsAsync(System.Threading.CancellationToken)
@@ -137,7 +273,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPendingMigrationsAsync
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 58
+    startLine: 197
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -174,7 +310,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetPendingMigrationsAsync
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 70
+    startLine: 212
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -193,6 +329,68 @@ items:
   overload: nORM.Migration.MySqlMigrationRunner.GetPendingMigrationsAsync*
   implements:
   - nORM.Migration.IMigrationRunner.GetPendingMigrationsAsync(System.Threading.CancellationToken)
+- uid: nORM.Migration.MySqlMigrationRunner.DisposeAsync
+  commentId: M:nORM.Migration.MySqlMigrationRunner.DisposeAsync
+  id: DisposeAsync
+  parent: nORM.Migration.MySqlMigrationRunner
+  langs:
+  - csharp
+  - vb
+  name: DisposeAsync()
+  nameWithType: MySqlMigrationRunner.DisposeAsync()
+  fullName: nORM.Migration.MySqlMigrationRunner.DisposeAsync()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Migration/MySqlMigrationRunner.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DisposeAsync
+    path: src/nORM/Migration/MySqlMigrationRunner.cs
+    startLine: 413
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Asynchronously disposes the internal <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> created for interceptors.
+  example: []
+  syntax:
+    content: public ValueTask DisposeAsync()
+    return:
+      type: System.Threading.Tasks.ValueTask
+    content.vb: Public Function DisposeAsync() As ValueTask
+  overload: nORM.Migration.MySqlMigrationRunner.DisposeAsync*
+  implements:
+  - System.IAsyncDisposable.DisposeAsync
+- uid: nORM.Migration.MySqlMigrationRunner.Dispose
+  commentId: M:nORM.Migration.MySqlMigrationRunner.Dispose
+  id: Dispose
+  parent: nORM.Migration.MySqlMigrationRunner
+  langs:
+  - csharp
+  - vb
+  name: Dispose()
+  nameWithType: MySqlMigrationRunner.Dispose()
+  fullName: nORM.Migration.MySqlMigrationRunner.Dispose()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Migration/MySqlMigrationRunner.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Dispose
+    path: src/nORM/Migration/MySqlMigrationRunner.cs
+    startLine: 428
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Synchronously disposes the internal <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> created for interceptors.
+  example: []
+  syntax:
+    content: public void Dispose()
+    content.vb: Public Sub Dispose()
+  overload: nORM.Migration.MySqlMigrationRunner.Dispose*
+  implements:
+  - System.IDisposable.Dispose
 references:
 - uid: nORM.Migration
   commentId: N:nORM.Migration
@@ -234,6 +432,22 @@ references:
   name: IMigrationRunner
   nameWithType: IMigrationRunner
   fullName: nORM.Migration.IMigrationRunner
+- uid: System.IAsyncDisposable
+  commentId: T:System.IAsyncDisposable
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable
+  name: IAsyncDisposable
+  nameWithType: IAsyncDisposable
+  fullName: System.IAsyncDisposable
+- uid: System.IDisposable
+  commentId: T:System.IDisposable
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.idisposable
+  name: IDisposable
+  nameWithType: IDisposable
+  fullName: System.IDisposable
 - uid: System.Object.Equals(System.Object)
   commentId: M:System.Object.Equals(System.Object)
   parent: System.Object
@@ -1164,6 +1378,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Migration.MySqlMigrationRunner
+  commentId: T:nORM.Migration.MySqlMigrationRunner
+  href: nORM.Migration.MySqlMigrationRunner.html
+  name: MySqlMigrationRunner
+  nameWithType: MySqlMigrationRunner
+  fullName: nORM.Migration.MySqlMigrationRunner
 - uid: nORM.Migration.MySqlMigrationRunner.#ctor*
   commentId: Overload:nORM.Migration.MySqlMigrationRunner.#ctor
   href: nORM.Migration.MySqlMigrationRunner.html#nORM_Migration_MySqlMigrationRunner__ctor_System_Data_Common_DbConnection_System_Reflection_Assembly_nORM_Configuration_DbContextOptions_
@@ -1282,6 +1502,13 @@ references:
   - uid: nORM.Configuration
     name: Configuration
     href: nORM.Configuration.html
+- uid: nORM.Migration.MigrationOptions
+  commentId: T:nORM.Migration.MigrationOptions
+  parent: nORM.Migration
+  href: nORM.Migration.MigrationOptions.html
+  name: MigrationOptions
+  nameWithType: MigrationOptions
+  fullName: nORM.Migration.MigrationOptions
 - uid: nORM.Migration.MySqlMigrationRunner.ApplyMigrationsAsync*
   commentId: Overload:nORM.Migration.MySqlMigrationRunner.ApplyMigrationsAsync
   href: nORM.Migration.MySqlMigrationRunner.html#nORM_Migration_MySqlMigrationRunner_ApplyMigrationsAsync_System_Threading_CancellationToken_
@@ -1396,6 +1623,52 @@ references:
     name: Tasks
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: System.InvalidOperationException
+  commentId: T:System.InvalidOperationException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.invalidoperationexception
+  name: InvalidOperationException
+  nameWithType: InvalidOperationException
+  fullName: System.InvalidOperationException
+- uid: nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync*
+  commentId: Overload:nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync
+  href: nORM.Migration.MySqlMigrationRunner.html#nORM_Migration_MySqlMigrationRunner_AcquireAdvisoryLockAsync_System_Threading_CancellationToken_
+  name: AcquireAdvisoryLockAsync
+  nameWithType: MySqlMigrationRunner.AcquireAdvisoryLockAsync
+  fullName: nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync
+- uid: nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Migration.MySqlMigrationRunner.html#nORM_Migration_MySqlMigrationRunner_AcquireAdvisoryLockAsync_System_Threading_CancellationToken_
+  name: AcquireAdvisoryLockAsync(CancellationToken)
+  nameWithType: MySqlMigrationRunner.AcquireAdvisoryLockAsync(CancellationToken)
+  fullName: nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync(System.Threading.CancellationToken)
+    name: AcquireAdvisoryLockAsync
+    href: nORM.Migration.MySqlMigrationRunner.html#nORM_Migration_MySqlMigrationRunner_AcquireAdvisoryLockAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Migration.MySqlMigrationRunner.AcquireAdvisoryLockAsync(System.Threading.CancellationToken)
+    name: AcquireAdvisoryLockAsync
+    href: nORM.Migration.MySqlMigrationRunner.html#nORM_Migration_MySqlMigrationRunner_AcquireAdvisoryLockAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Migration.MySqlMigrationRunner.ReleaseAdvisoryLockAsync*
+  commentId: Overload:nORM.Migration.MySqlMigrationRunner.ReleaseAdvisoryLockAsync
+  href: nORM.Migration.MySqlMigrationRunner.html#nORM_Migration_MySqlMigrationRunner_ReleaseAdvisoryLockAsync_System_Threading_CancellationToken_
+  name: ReleaseAdvisoryLockAsync
+  nameWithType: MySqlMigrationRunner.ReleaseAdvisoryLockAsync
+  fullName: nORM.Migration.MySqlMigrationRunner.ReleaseAdvisoryLockAsync
 - uid: nORM.Migration.MySqlMigrationRunner.HasPendingMigrationsAsync*
   commentId: Overload:nORM.Migration.MySqlMigrationRunner.HasPendingMigrationsAsync
   href: nORM.Migration.MySqlMigrationRunner.html#nORM_Migration_MySqlMigrationRunner_HasPendingMigrationsAsync_System_Threading_CancellationToken_
@@ -1565,4 +1838,97 @@ references:
     href: https://learn.microsoft.com/dotnet/api/system.string
   - name: (
   - name: )
+  - name: )
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: nORM.Migration.MySqlMigrationRunner.DisposeAsync*
+  commentId: Overload:nORM.Migration.MySqlMigrationRunner.DisposeAsync
+  href: nORM.Migration.MySqlMigrationRunner.html#nORM_Migration_MySqlMigrationRunner_DisposeAsync
+  name: DisposeAsync
+  nameWithType: MySqlMigrationRunner.DisposeAsync
+  fullName: nORM.Migration.MySqlMigrationRunner.DisposeAsync
+- uid: System.IAsyncDisposable.DisposeAsync
+  commentId: M:System.IAsyncDisposable.DisposeAsync
+  parent: System.IAsyncDisposable
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  name: DisposeAsync()
+  nameWithType: IAsyncDisposable.DisposeAsync()
+  fullName: System.IAsyncDisposable.DisposeAsync()
+  spec.csharp:
+  - uid: System.IAsyncDisposable.DisposeAsync
+    name: DisposeAsync
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.IAsyncDisposable.DisposeAsync
+    name: DisposeAsync
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  - name: (
+  - name: )
+- uid: System.Threading.Tasks.ValueTask
+  commentId: T:System.Threading.Tasks.ValueTask
+  parent: System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask
+  name: ValueTask
+  nameWithType: ValueTask
+  fullName: System.Threading.Tasks.ValueTask
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: nORM.Migration.MySqlMigrationRunner.Dispose*
+  commentId: Overload:nORM.Migration.MySqlMigrationRunner.Dispose
+  href: nORM.Migration.MySqlMigrationRunner.html#nORM_Migration_MySqlMigrationRunner_Dispose
+  name: Dispose
+  nameWithType: MySqlMigrationRunner.Dispose
+  fullName: nORM.Migration.MySqlMigrationRunner.Dispose
+- uid: System.IDisposable.Dispose
+  commentId: M:System.IDisposable.Dispose
+  parent: System.IDisposable
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  name: Dispose()
+  nameWithType: IDisposable.Dispose()
+  fullName: System.IDisposable.Dispose()
+  spec.csharp:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
   - name: )

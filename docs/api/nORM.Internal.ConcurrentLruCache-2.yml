@@ -7,6 +7,9 @@ items:
   children:
   - nORM.Internal.ConcurrentLruCache`2.#ctor(System.Int32,System.Nullable{System.TimeSpan})
   - nORM.Internal.ConcurrentLruCache`2.Clear
+  - nORM.Internal.ConcurrentLruCache`2.Count
+  - nORM.Internal.ConcurrentLruCache`2.Dispose
+  - nORM.Internal.ConcurrentLruCache`2.Evictions
   - nORM.Internal.ConcurrentLruCache`2.GetOrAdd(`0,System.Func{`0,`1})
   - nORM.Internal.ConcurrentLruCache`2.HitRate
   - nORM.Internal.ConcurrentLruCache`2.Hits
@@ -38,13 +41,15 @@ items:
     Eviction on insert is size-based only (no TTL prune on insert) to minimize churn in hot paths.
   example: []
   syntax:
-    content: 'public class ConcurrentLruCache<TKey, TValue> where TKey : notnull'
+    content: 'public class ConcurrentLruCache<TKey, TValue> : IDisposable where TKey : notnull'
     typeParameters:
     - id: TKey
     - id: TValue
-    content.vb: Public Class ConcurrentLruCache(Of TKey, TValue)
+    content.vb: Public Class ConcurrentLruCache(Of TKey, TValue) Implements IDisposable
   inheritance:
   - System.Object
+  implements:
+  - System.IDisposable
   inheritedMembers:
   - System.Object.Equals(System.Object)
   - System.Object.Equals(System.Object,System.Object)
@@ -79,17 +84,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Internal/ConcurrentLruCache.cs
-    startLine: 24
+    startLine: 43
   assemblies:
   - nORM
   namespace: nORM.Internal
+  summary: Initializes a new concurrent LRU cache.
+  example: []
   syntax:
     content: public ConcurrentLruCache(int maxSize = 1000, TimeSpan? timeToLive = null)
     parameters:
     - id: maxSize
       type: System.Int32
+      description: Maximum number of items the cache can hold.
     - id: timeToLive
       type: System.Nullable{System.TimeSpan}
+      description: Optional time-to-live for cache entries.
     content.vb: Public Sub New(maxSize As Integer = 1000, timeToLive As TimeSpan? = Nothing)
   overload: nORM.Internal.ConcurrentLruCache`2.#ctor*
   nameWithType.vb: ConcurrentLruCache(Of TKey, TValue).New(Integer, TimeSpan?)
@@ -113,7 +122,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetMaxSize
     path: src/nORM/Internal/ConcurrentLruCache.cs
-    startLine: 37
+    startLine: 56
   assemblies:
   - nORM
   namespace: nORM.Internal
@@ -155,7 +164,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Clear
     path: src/nORM/Internal/ConcurrentLruCache.cs
-    startLine: 55
+    startLine: 88
   assemblies:
   - nORM
   namespace: nORM.Internal
@@ -185,14 +194,14 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TryGet
     path: src/nORM/Internal/ConcurrentLruCache.cs
-    startLine: 73
+    startLine: 120
   assemblies:
   - nORM
   namespace: nORM.Internal
   summary: >-
-    Attempts to retrieve a value from the cache. If found and not expired the entry is
+    Attempts to retrieve a value from the cache. If found and not expired the entry's
 
-    promoted to the most recently used position.
+    last accessed timestamp is updated lock-free using Interlocked operations.
   example: []
   syntax:
     content: public bool TryGet(TKey key, out TValue value)
@@ -229,11 +238,16 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetOrAdd
     path: src/nORM/Internal/ConcurrentLruCache.cs
-    startLine: 106
+    startLine: 182
   assemblies:
   - nORM
   namespace: nORM.Internal
-  summary: Adds or returns existing value. The factory runs only if missing/expired.
+  summary: >-
+    Adds or returns existing value. The factory runs at most once per key even under concurrent misses.
+
+    Uses a write-lock double-check pattern so that racing threads serialize on the write lock;
+
+    the first thread runs the factory and inserts the value, subsequent threads find it in the cache.
   example: []
   syntax:
     content: public TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
@@ -267,7 +281,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Set
     path: src/nORM/Internal/ConcurrentLruCache.cs
-    startLine: 120
+    startLine: 249
   assemblies:
   - nORM
   namespace: nORM.Internal
@@ -289,6 +303,39 @@ items:
   nameWithType.vb: ConcurrentLruCache(Of TKey, TValue).Set(TKey, TValue, TimeSpan?, IReadOnlyList(Of String))
   fullName.vb: nORM.Internal.ConcurrentLruCache(Of TKey, TValue).Set(TKey, TValue, System.TimeSpan?, System.Collections.Generic.IReadOnlyList(Of String))
   name.vb: Set(TKey, TValue, TimeSpan?, IReadOnlyList(Of String))
+- uid: nORM.Internal.ConcurrentLruCache`2.Count
+  commentId: P:nORM.Internal.ConcurrentLruCache`2.Count
+  id: Count
+  parent: nORM.Internal.ConcurrentLruCache`2
+  langs:
+  - csharp
+  - vb
+  name: Count
+  nameWithType: ConcurrentLruCache<TKey, TValue>.Count
+  fullName: nORM.Internal.ConcurrentLruCache<TKey, TValue>.Count
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Internal/ConcurrentLruCache.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Count
+    path: src/nORM/Internal/ConcurrentLruCache.cs
+    startLine: 327
+  assemblies:
+  - nORM
+  namespace: nORM.Internal
+  summary: Gets the current number of items in the cache.
+  example: []
+  syntax:
+    content: public int Count { get; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public ReadOnly Property Count As Integer
+  overload: nORM.Internal.ConcurrentLruCache`2.Count*
+  nameWithType.vb: ConcurrentLruCache(Of TKey, TValue).Count
+  fullName.vb: nORM.Internal.ConcurrentLruCache(Of TKey, TValue).Count
 - uid: nORM.Internal.ConcurrentLruCache`2.Hits
   commentId: P:nORM.Internal.ConcurrentLruCache`2.Hits
   id: Hits
@@ -307,10 +354,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Hits
     path: src/nORM/Internal/ConcurrentLruCache.cs
-    startLine: 151
+    startLine: 332
   assemblies:
   - nORM
   namespace: nORM.Internal
+  summary: Gets the total number of cache hits.
+  example: []
   syntax:
     content: public long Hits { get; }
     parameters: []
@@ -338,10 +387,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Misses
     path: src/nORM/Internal/ConcurrentLruCache.cs
-    startLine: 152
+    startLine: 337
   assemblies:
   - nORM
   namespace: nORM.Internal
+  summary: Gets the total number of cache misses.
+  example: []
   syntax:
     content: public long Misses { get; }
     parameters: []
@@ -351,6 +402,39 @@ items:
   overload: nORM.Internal.ConcurrentLruCache`2.Misses*
   nameWithType.vb: ConcurrentLruCache(Of TKey, TValue).Misses
   fullName.vb: nORM.Internal.ConcurrentLruCache(Of TKey, TValue).Misses
+- uid: nORM.Internal.ConcurrentLruCache`2.Evictions
+  commentId: P:nORM.Internal.ConcurrentLruCache`2.Evictions
+  id: Evictions
+  parent: nORM.Internal.ConcurrentLruCache`2
+  langs:
+  - csharp
+  - vb
+  name: Evictions
+  nameWithType: ConcurrentLruCache<TKey, TValue>.Evictions
+  fullName: nORM.Internal.ConcurrentLruCache<TKey, TValue>.Evictions
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Internal/ConcurrentLruCache.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Evictions
+    path: src/nORM/Internal/ConcurrentLruCache.cs
+    startLine: 342
+  assemblies:
+  - nORM
+  namespace: nORM.Internal
+  summary: Gets the total number of entries evicted because the cache exceeded its size limit.
+  example: []
+  syntax:
+    content: public long Evictions { get; }
+    parameters: []
+    return:
+      type: System.Int64
+    content.vb: Public ReadOnly Property Evictions As Long
+  overload: nORM.Internal.ConcurrentLruCache`2.Evictions*
+  nameWithType.vb: ConcurrentLruCache(Of TKey, TValue).Evictions
+  fullName.vb: nORM.Internal.ConcurrentLruCache(Of TKey, TValue).Evictions
 - uid: nORM.Internal.ConcurrentLruCache`2.HitRate
   commentId: P:nORM.Internal.ConcurrentLruCache`2.HitRate
   id: HitRate
@@ -369,10 +453,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HitRate
     path: src/nORM/Internal/ConcurrentLruCache.cs
-    startLine: 153
+    startLine: 347
   assemblies:
   - nORM
   namespace: nORM.Internal
+  summary: Gets the ratio of hits to total lookups.
+  example: []
   syntax:
     content: public double HitRate { get; }
     parameters: []
@@ -382,6 +468,38 @@ items:
   overload: nORM.Internal.ConcurrentLruCache`2.HitRate*
   nameWithType.vb: ConcurrentLruCache(Of TKey, TValue).HitRate
   fullName.vb: nORM.Internal.ConcurrentLruCache(Of TKey, TValue).HitRate
+- uid: nORM.Internal.ConcurrentLruCache`2.Dispose
+  commentId: M:nORM.Internal.ConcurrentLruCache`2.Dispose
+  id: Dispose
+  parent: nORM.Internal.ConcurrentLruCache`2
+  langs:
+  - csharp
+  - vb
+  name: Dispose()
+  nameWithType: ConcurrentLruCache<TKey, TValue>.Dispose()
+  fullName: nORM.Internal.ConcurrentLruCache<TKey, TValue>.Dispose()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Internal/ConcurrentLruCache.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Dispose
+    path: src/nORM/Internal/ConcurrentLruCache.cs
+    startLine: 394
+  assemblies:
+  - nORM
+  namespace: nORM.Internal
+  summary: Disposes the cache and releases the reader-writer lock.
+  example: []
+  syntax:
+    content: public void Dispose()
+    content.vb: Public Sub Dispose()
+  overload: nORM.Internal.ConcurrentLruCache`2.Dispose*
+  implements:
+  - System.IDisposable.Dispose
+  nameWithType.vb: ConcurrentLruCache(Of TKey, TValue).Dispose()
+  fullName.vb: nORM.Internal.ConcurrentLruCache(Of TKey, TValue).Dispose()
 references:
 - uid: nORM.Internal
   commentId: N:nORM.Internal
@@ -416,6 +534,14 @@ references:
   nameWithType.vb: Object
   fullName.vb: Object
   name.vb: Object
+- uid: System.IDisposable
+  commentId: T:System.IDisposable
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.idisposable
+  name: IDisposable
+  nameWithType: IDisposable
+  fullName: System.IDisposable
 - uid: System.Object.Equals(System.Object)
   commentId: M:System.Object.Equals(System.Object)
   parent: System.Object
@@ -1815,6 +1941,14 @@ references:
     name: Generic
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Internal.ConcurrentLruCache`2.Count*
+  commentId: Overload:nORM.Internal.ConcurrentLruCache`2.Count
+  href: nORM.Internal.ConcurrentLruCache-2.html#nORM_Internal_ConcurrentLruCache_2_Count
+  name: Count
+  nameWithType: ConcurrentLruCache<TKey, TValue>.Count
+  fullName: nORM.Internal.ConcurrentLruCache<TKey, TValue>.Count
+  nameWithType.vb: ConcurrentLruCache(Of TKey, TValue).Count
+  fullName.vb: nORM.Internal.ConcurrentLruCache(Of TKey, TValue).Count
 - uid: nORM.Internal.ConcurrentLruCache`2.Hits*
   commentId: Overload:nORM.Internal.ConcurrentLruCache`2.Hits
   href: nORM.Internal.ConcurrentLruCache-2.html#nORM_Internal_ConcurrentLruCache_2_Hits
@@ -1842,6 +1976,14 @@ references:
   fullName: nORM.Internal.ConcurrentLruCache<TKey, TValue>.Misses
   nameWithType.vb: ConcurrentLruCache(Of TKey, TValue).Misses
   fullName.vb: nORM.Internal.ConcurrentLruCache(Of TKey, TValue).Misses
+- uid: nORM.Internal.ConcurrentLruCache`2.Evictions*
+  commentId: Overload:nORM.Internal.ConcurrentLruCache`2.Evictions
+  href: nORM.Internal.ConcurrentLruCache-2.html#nORM_Internal_ConcurrentLruCache_2_Evictions
+  name: Evictions
+  nameWithType: ConcurrentLruCache<TKey, TValue>.Evictions
+  fullName: nORM.Internal.ConcurrentLruCache<TKey, TValue>.Evictions
+  nameWithType.vb: ConcurrentLruCache(Of TKey, TValue).Evictions
+  fullName.vb: nORM.Internal.ConcurrentLruCache(Of TKey, TValue).Evictions
 - uid: nORM.Internal.ConcurrentLruCache`2.HitRate*
   commentId: Overload:nORM.Internal.ConcurrentLruCache`2.HitRate
   href: nORM.Internal.ConcurrentLruCache-2.html#nORM_Internal_ConcurrentLruCache_2_HitRate
@@ -1861,3 +2003,33 @@ references:
   nameWithType.vb: Double
   fullName.vb: Double
   name.vb: Double
+- uid: nORM.Internal.ConcurrentLruCache`2.Dispose*
+  commentId: Overload:nORM.Internal.ConcurrentLruCache`2.Dispose
+  href: nORM.Internal.ConcurrentLruCache-2.html#nORM_Internal_ConcurrentLruCache_2_Dispose
+  name: Dispose
+  nameWithType: ConcurrentLruCache<TKey, TValue>.Dispose
+  fullName: nORM.Internal.ConcurrentLruCache<TKey, TValue>.Dispose
+  nameWithType.vb: ConcurrentLruCache(Of TKey, TValue).Dispose
+  fullName.vb: nORM.Internal.ConcurrentLruCache(Of TKey, TValue).Dispose
+- uid: System.IDisposable.Dispose
+  commentId: M:System.IDisposable.Dispose
+  parent: System.IDisposable
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  name: Dispose()
+  nameWithType: IDisposable.Dispose()
+  fullName: System.IDisposable.Dispose()
+  spec.csharp:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
+  - name: )

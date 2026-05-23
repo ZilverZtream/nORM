@@ -22,10 +22,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RetryPolicy
     path: src/nORM/Enterprise/RetryPolicy.cs
-    startLine: 8
+    startLine: 11
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: Defines how transient database failures should be retried.
+  example: []
   syntax:
     content: public class RetryPolicy
     content.vb: Public Class RetryPolicy
@@ -62,10 +64,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxRetries
     path: src/nORM/Enterprise/RetryPolicy.cs
-    startLine: 10
+    startLine: 16
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: Maximum number of retry attempts for a single operation.
+  example: []
   syntax:
     content: public int MaxRetries { get; set; }
     parameters: []
@@ -91,10 +95,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BaseDelay
     path: src/nORM/Enterprise/RetryPolicy.cs
-    startLine: 11
+    startLine: 21
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: Base delay applied between retry attempts.
+  example: []
   syntax:
     content: public TimeSpan BaseDelay { get; set; }
     parameters: []
@@ -120,16 +126,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShouldRetry
     path: src/nORM/Enterprise/RetryPolicy.cs
-    startLine: 12
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: >-
+    Delegate that determines whether a given <xref href="System.Exception" data-throw-if-not-resolved="false"></xref> is
+
+    considered transient and should trigger a retry.
+
+    Supports DbException (SQL Server transient errors), IOException, and SocketException.
+
+    TimeoutException is NOT retried by default — retrying a timed-out write can duplicate
+
+    data because the write may have succeeded before the timeout was raised.
+  example: []
   syntax:
-    content: public Func<DbException, bool> ShouldRetry { get; set; }
+    content: public Func<Exception, bool> ShouldRetry { get; set; }
     parameters: []
     return:
-      type: System.Func{System.Data.Common.DbException,System.Boolean}
-    content.vb: Public Property ShouldRetry As Func(Of DbException, Boolean)
+      type: System.Func{System.Exception,System.Boolean}
+    content.vb: Public Property ShouldRetry As Func(Of Exception, Boolean)
   overload: nORM.Enterprise.RetryPolicy.ShouldRetry*
 references:
 - uid: nORM.Enterprise
@@ -1126,33 +1143,41 @@ references:
   name: TimeSpan
   nameWithType: TimeSpan
   fullName: System.TimeSpan
+- uid: System.Exception
+  commentId: T:System.Exception
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.exception
+  name: Exception
+  nameWithType: Exception
+  fullName: System.Exception
 - uid: nORM.Enterprise.RetryPolicy.ShouldRetry*
   commentId: Overload:nORM.Enterprise.RetryPolicy.ShouldRetry
   href: nORM.Enterprise.RetryPolicy.html#nORM_Enterprise_RetryPolicy_ShouldRetry
   name: ShouldRetry
   nameWithType: RetryPolicy.ShouldRetry
   fullName: nORM.Enterprise.RetryPolicy.ShouldRetry
-- uid: System.Func{System.Data.Common.DbException,System.Boolean}
-  commentId: T:System.Func{System.Data.Common.DbException,System.Boolean}
+- uid: System.Func{System.Exception,System.Boolean}
+  commentId: T:System.Func{System.Exception,System.Boolean}
   parent: System
   definition: System.Func`2
   href: https://learn.microsoft.com/dotnet/api/system.func-2
-  name: Func<DbException, bool>
-  nameWithType: Func<DbException, bool>
-  fullName: System.Func<System.Data.Common.DbException, bool>
-  nameWithType.vb: Func(Of DbException, Boolean)
-  fullName.vb: System.Func(Of System.Data.Common.DbException, Boolean)
-  name.vb: Func(Of DbException, Boolean)
+  name: Func<Exception, bool>
+  nameWithType: Func<Exception, bool>
+  fullName: System.Func<System.Exception, bool>
+  nameWithType.vb: Func(Of Exception, Boolean)
+  fullName.vb: System.Func(Of System.Exception, Boolean)
+  name.vb: Func(Of Exception, Boolean)
   spec.csharp:
   - uid: System.Func`2
     name: Func
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.func-2
   - name: <
-  - uid: System.Data.Common.DbException
-    name: DbException
+  - uid: System.Exception
+    name: Exception
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbexception
+    href: https://learn.microsoft.com/dotnet/api/system.exception
   - name: ','
   - name: " "
   - uid: System.Boolean
@@ -1168,10 +1193,10 @@ references:
   - name: (
   - name: Of
   - name: " "
-  - uid: System.Data.Common.DbException
-    name: DbException
+  - uid: System.Exception
+    name: Exception
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbexception
+    href: https://learn.microsoft.com/dotnet/api/system.exception
   - name: ','
   - name: " "
   - uid: System.Boolean

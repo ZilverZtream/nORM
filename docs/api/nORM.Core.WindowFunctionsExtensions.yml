@@ -104,7 +104,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithRank
     path: src/nORM/Core/WindowFunctionsExtensions.cs
-    startLine: 31
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -146,7 +146,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithDenseRank
     path: src/nORM/Core/WindowFunctionsExtensions.cs
-    startLine: 47
+    startLine: 51
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -188,7 +188,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithLag
     path: src/nORM/Core/WindowFunctionsExtensions.cs
-    startLine: 63
+    startLine: 69
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -237,7 +237,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithLead
     path: src/nORM/Core/WindowFunctionsExtensions.cs
-    startLine: 92
+    startLine: 103
   assemblies:
   - nORM
   namespace: nORM.Core

@@ -6,9 +6,9 @@ items:
   parent: nORM.Migration
   children:
   - nORM.Migration.Migration.#ctor(System.Int64,System.String)
-  - nORM.Migration.Migration.Down(System.Data.Common.DbConnection,System.Data.Common.DbTransaction)
+  - nORM.Migration.Migration.Down(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
   - nORM.Migration.Migration.Name
-  - nORM.Migration.Migration.Up(System.Data.Common.DbConnection,System.Data.Common.DbTransaction)
+  - nORM.Migration.Migration.Up(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
   - nORM.Migration.Migration.Version
   langs:
   - csharp
@@ -24,10 +24,17 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Migration
     path: src/nORM/Migration/Migration.cs
-    startLine: 6
+    startLine: 12
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: >-
+    Represents a discrete database schema change that can be applied or rolled back.
+
+    Migrations are executed in version order to evolve the database alongside the
+
+    application's model.
+  example: []
   syntax:
     content: public abstract class Migration
     content.vb: Public MustInherit Class Migration
@@ -64,17 +71,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Migration/Migration.cs
-    startLine: 8
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Initializes a new instance of the <xref href="nORM.Migration.Migration" data-throw-if-not-resolved="false"></xref> class.
+  example: []
   syntax:
     content: protected Migration(long version, string name)
     parameters:
     - id: version
       type: System.Int64
+      description: Monotonically increasing version number of the migration.
     - id: name
       type: System.String
+      description: Human-readable name describing the migration.
     content.vb: Protected Sub New(version As Long, name As String)
   overload: nORM.Migration.Migration.#ctor*
   nameWithType.vb: Migration.New(Long, String)
@@ -98,10 +109,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Version
     path: src/nORM/Migration/Migration.cs
-    startLine: 14
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Gets the unique version number that orders migrations.
+  example: []
   syntax:
     content: public long Version { get; }
     parameters: []
@@ -127,10 +140,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Migration/Migration.cs
-    startLine: 15
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Gets the descriptive name of the migration.
+  example: []
   syntax:
     content: public string Name { get; }
     parameters: []
@@ -138,16 +153,16 @@ items:
       type: System.String
     content.vb: Public ReadOnly Property Name As String
   overload: nORM.Migration.Migration.Name*
-- uid: nORM.Migration.Migration.Up(System.Data.Common.DbConnection,System.Data.Common.DbTransaction)
-  commentId: M:nORM.Migration.Migration.Up(System.Data.Common.DbConnection,System.Data.Common.DbTransaction)
-  id: Up(System.Data.Common.DbConnection,System.Data.Common.DbTransaction)
+- uid: nORM.Migration.Migration.Up(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  commentId: M:nORM.Migration.Migration.Up(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  id: Up(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
   parent: nORM.Migration.Migration
   langs:
   - csharp
   - vb
-  name: Up(DbConnection, DbTransaction)
-  nameWithType: Migration.Up(DbConnection, DbTransaction)
-  fullName: nORM.Migration.Migration.Up(System.Data.Common.DbConnection, System.Data.Common.DbTransaction)
+  name: Up(DbConnection, DbTransaction, CancellationToken)
+  nameWithType: Migration.Up(DbConnection, DbTransaction, CancellationToken)
+  fullName: nORM.Migration.Migration.Up(System.Data.Common.DbConnection, System.Data.Common.DbTransaction, System.Threading.CancellationToken)
   type: Method
   source:
     remote:
@@ -156,14 +171,14 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Up
     path: src/nORM/Migration/Migration.cs
-    startLine: 22
+    startLine: 46
   assemblies:
   - nORM
   namespace: nORM.Migration
   summary: Applies the migration by bringing the database schema to the new state.
   example: []
   syntax:
-    content: public abstract void Up(DbConnection connection, DbTransaction transaction)
+    content: public abstract void Up(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)
     parameters:
     - id: connection
       type: System.Data.Common.DbConnection
@@ -171,18 +186,28 @@ items:
     - id: transaction
       type: System.Data.Common.DbTransaction
       description: The transaction within which the migration should run.
-    content.vb: Public MustOverride Sub Up(connection As DbConnection, transaction As DbTransaction)
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: >-
+        Token that can be used to signal cancellation. Implementations should check
+
+        <code class="paramref">ct</code> between long-running DDL steps. The token is provided on a
+
+        best-effort basis — DDL already sent to the database cannot be recalled, and any
+
+        partial schema changes remain subject to the enclosing transaction.
+    content.vb: Public MustOverride Sub Up(connection As DbConnection, transaction As DbTransaction, ct As CancellationToken = Nothing)
   overload: nORM.Migration.Migration.Up*
-- uid: nORM.Migration.Migration.Down(System.Data.Common.DbConnection,System.Data.Common.DbTransaction)
-  commentId: M:nORM.Migration.Migration.Down(System.Data.Common.DbConnection,System.Data.Common.DbTransaction)
-  id: Down(System.Data.Common.DbConnection,System.Data.Common.DbTransaction)
+- uid: nORM.Migration.Migration.Down(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  commentId: M:nORM.Migration.Migration.Down(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  id: Down(System.Data.Common.DbConnection,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
   parent: nORM.Migration.Migration
   langs:
   - csharp
   - vb
-  name: Down(DbConnection, DbTransaction)
-  nameWithType: Migration.Down(DbConnection, DbTransaction)
-  fullName: nORM.Migration.Migration.Down(System.Data.Common.DbConnection, System.Data.Common.DbTransaction)
+  name: Down(DbConnection, DbTransaction, CancellationToken)
+  nameWithType: Migration.Down(DbConnection, DbTransaction, CancellationToken)
+  fullName: nORM.Migration.Migration.Down(System.Data.Common.DbConnection, System.Data.Common.DbTransaction, System.Threading.CancellationToken)
   type: Method
   source:
     remote:
@@ -191,14 +216,14 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Down
     path: src/nORM/Migration/Migration.cs
-    startLine: 29
+    startLine: 54
   assemblies:
   - nORM
   namespace: nORM.Migration
   summary: Reverts the migration, returning the database schema to the previous state.
   example: []
   syntax:
-    content: public abstract void Down(DbConnection connection, DbTransaction transaction)
+    content: public abstract void Down(DbConnection connection, DbTransaction transaction, CancellationToken ct = default)
     parameters:
     - id: connection
       type: System.Data.Common.DbConnection
@@ -206,7 +231,10 @@ items:
     - id: transaction
       type: System.Data.Common.DbTransaction
       description: The transaction within which the rollback should run.
-    content.vb: Public MustOverride Sub Down(connection As DbConnection, transaction As DbTransaction)
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token that can be used to signal cancellation between DDL steps.
+    content.vb: Public MustOverride Sub Down(connection As DbConnection, transaction As DbTransaction, ct As CancellationToken = Nothing)
   overload: nORM.Migration.Migration.Down*
 references:
 - uid: nORM.Migration
@@ -1172,6 +1200,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Migration.Migration
+  commentId: T:nORM.Migration.Migration
+  href: nORM.Migration.Migration.html
+  name: Migration
+  nameWithType: Migration
+  fullName: nORM.Migration.Migration
 - uid: nORM.Migration.Migration.#ctor*
   commentId: Overload:nORM.Migration.Migration.#ctor
   href: nORM.Migration.Migration.html#nORM_Migration_Migration__ctor_System_Int64_System_String_
@@ -1217,7 +1251,7 @@ references:
   fullName: nORM.Migration.Migration.Name
 - uid: nORM.Migration.Migration.Up*
   commentId: Overload:nORM.Migration.Migration.Up
-  href: nORM.Migration.Migration.html#nORM_Migration_Migration_Up_System_Data_Common_DbConnection_System_Data_Common_DbTransaction_
+  href: nORM.Migration.Migration.html#nORM_Migration_Migration_Up_System_Data_Common_DbConnection_System_Data_Common_DbTransaction_System_Threading_CancellationToken_
   name: Up
   nameWithType: Migration.Up
   fullName: nORM.Migration.Migration.Up
@@ -1237,6 +1271,14 @@ references:
   name: DbTransaction
   nameWithType: DbTransaction
   fullName: System.Data.Common.DbTransaction
+- uid: System.Threading.CancellationToken
+  commentId: T:System.Threading.CancellationToken
+  parent: System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  name: CancellationToken
+  nameWithType: CancellationToken
+  fullName: System.Threading.CancellationToken
 - uid: System.Data.Common
   commentId: N:System.Data.Common
   isExternal: true
@@ -1274,9 +1316,36 @@ references:
     name: Common
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.data.common
+- uid: System.Threading
+  commentId: N:System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading
+  nameWithType: System.Threading
+  fullName: System.Threading
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
 - uid: nORM.Migration.Migration.Down*
   commentId: Overload:nORM.Migration.Migration.Down
-  href: nORM.Migration.Migration.html#nORM_Migration_Migration_Down_System_Data_Common_DbConnection_System_Data_Common_DbTransaction_
+  href: nORM.Migration.Migration.html#nORM_Migration_Migration_Down_System_Data_Common_DbConnection_System_Data_Common_DbTransaction_System_Threading_CancellationToken_
   name: Down
   nameWithType: Migration.Down
   fullName: nORM.Migration.Migration.Down

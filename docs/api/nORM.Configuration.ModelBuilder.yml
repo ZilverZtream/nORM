@@ -20,10 +20,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ModelBuilder
     path: src/nORM/Configuration/ModelBuilder.cs
-    startLine: 7
+    startLine: 10
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Collects entity type configuration metadata using a fluent API.
+  example: []
   syntax:
     content: public class ModelBuilder
     content.vb: Public Class ModelBuilder
@@ -60,16 +62,25 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Entity
     path: src/nORM/Configuration/ModelBuilder.cs
-    startLine: 11
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Begins configuration for the specified entity CLR type.
+
+    Repeated calls for the same type return the same builder so that
+
+    multiple chained configurations are accumulated rather than replaced.
+  example: []
   syntax:
     content: 'public EntityTypeBuilder<TEntity> Entity<TEntity>() where TEntity : class'
     typeParameters:
     - id: TEntity
+      description: The entity type to configure.
     return:
       type: nORM.Configuration.EntityTypeBuilder{{TEntity}}
+      description: An <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for configuring the entity.
     content.vb: Public Function Entity(Of TEntity As Class)() As EntityTypeBuilder(Of TEntity)
   overload: nORM.Configuration.ModelBuilder.Entity*
   nameWithType.vb: ModelBuilder.Entity(Of TEntity)()
@@ -1039,16 +1050,9 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
-- uid: nORM.Configuration.ModelBuilder.Entity*
-  commentId: Overload:nORM.Configuration.ModelBuilder.Entity
-  href: nORM.Configuration.ModelBuilder.html#nORM_Configuration_ModelBuilder_Entity__1
-  name: Entity
-  nameWithType: ModelBuilder.Entity
-  fullName: nORM.Configuration.ModelBuilder.Entity
-- uid: nORM.Configuration.EntityTypeBuilder{{TEntity}}
-  commentId: T:nORM.Configuration.EntityTypeBuilder{``0}
+- uid: nORM.Configuration.EntityTypeBuilder`1
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1
   parent: nORM.Configuration
-  definition: nORM.Configuration.EntityTypeBuilder`1
   href: nORM.Configuration.EntityTypeBuilder-1.html
   name: EntityTypeBuilder<TEntity>
   nameWithType: EntityTypeBuilder<TEntity>
@@ -1072,9 +1076,16 @@ references:
   - name: " "
   - name: TEntity
   - name: )
-- uid: nORM.Configuration.EntityTypeBuilder`1
-  commentId: T:nORM.Configuration.EntityTypeBuilder`1
+- uid: nORM.Configuration.ModelBuilder.Entity*
+  commentId: Overload:nORM.Configuration.ModelBuilder.Entity
+  href: nORM.Configuration.ModelBuilder.html#nORM_Configuration_ModelBuilder_Entity__1
+  name: Entity
+  nameWithType: ModelBuilder.Entity
+  fullName: nORM.Configuration.ModelBuilder.Entity
+- uid: nORM.Configuration.EntityTypeBuilder{{TEntity}}
+  commentId: T:nORM.Configuration.EntityTypeBuilder{``0}
   parent: nORM.Configuration
+  definition: nORM.Configuration.EntityTypeBuilder`1
   href: nORM.Configuration.EntityTypeBuilder-1.html
   name: EntityTypeBuilder<TEntity>
   nameWithType: EntityTypeBuilder<TEntity>

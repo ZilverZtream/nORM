@@ -69,15 +69,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/NormMemoryCacheProvider.cs
-    startLine: 23
+    startLine: 39
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Creates a new <xref href="nORM.Core.NormMemoryCacheProvider" data-throw-if-not-resolved="false"></xref> optionally scoped by tenant.
+  example: []
   syntax:
     content: public NormMemoryCacheProvider(Func<object?>? getTenantId = null)
     parameters:
     - id: getTenantId
       type: System.Func{System.Object}
+      description: Delegate that returns the current tenant identifier or <code>null</code> for single-tenant usage.
     content.vb: Public Sub New(getTenantId As Func(Of Object) = Nothing)
   overload: nORM.Core.NormMemoryCacheProvider.#ctor*
   nameWithType.vb: NormMemoryCacheProvider.New(Func(Of Object))
@@ -101,22 +104,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TryGet
     path: src/nORM/Core/NormMemoryCacheProvider.cs
-    startLine: 46
+    startLine: 69
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Attempts to retrieve a cached value.
   example: []
   syntax:
     content: public bool TryGet<T>(string key, out T? value)
     parameters:
     - id: key
       type: System.String
+      description: The unique cache key.
     - id: value
       type: '{T}'
+      description: The cached value, if present.
     typeParameters:
     - id: T
+      description: Type of the cached item.
     return:
       type: System.Boolean
+      description: <code>true</code> if the item was found; otherwise <code>false</code>.
     content.vb: Public Function TryGet(Of T)(key As String, value As T) As Boolean
   overload: nORM.Core.NormMemoryCacheProvider.TryGet*
   implements:
@@ -142,24 +150,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Set
     path: src/nORM/Core/NormMemoryCacheProvider.cs
-    startLine: 51
+    startLine: 83
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Stores a value in the cache with the specified expiration and tags.
   example: []
   syntax:
     content: public void Set<T>(string key, T value, TimeSpan expiration, IEnumerable<string> tags)
     parameters:
     - id: key
       type: System.String
+      description: Key under which the value is stored.
     - id: value
       type: '{T}'
+      description: Value to cache.
     - id: expiration
       type: System.TimeSpan
+      description: Absolute expiration for the cache entry.
     - id: tags
       type: System.Collections.Generic.IEnumerable{System.String}
+      description: Tags used to group related cache entries.
     typeParameters:
     - id: T
+      description: Type of the value being cached.
     content.vb: Public Sub [Set](Of T)(key As String, value As T, expiration As TimeSpan, tags As IEnumerable(Of String))
   overload: nORM.Core.NormMemoryCacheProvider.Set*
   implements:
@@ -185,7 +199,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: InvalidateTag
     path: src/nORM/Core/NormMemoryCacheProvider.cs
-    startLine: 71
+    startLine: 132
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -222,7 +236,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/NormMemoryCacheProvider.cs
-    startLine: 84
+    startLine: 146
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1235,6 +1249,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.NormMemoryCacheProvider
+  commentId: T:nORM.Core.NormMemoryCacheProvider
+  href: nORM.Core.NormMemoryCacheProvider.html
+  name: NormMemoryCacheProvider
+  nameWithType: NormMemoryCacheProvider
+  fullName: nORM.Core.NormMemoryCacheProvider
 - uid: nORM.Core.NormMemoryCacheProvider.#ctor*
   commentId: Overload:nORM.Core.NormMemoryCacheProvider.#ctor
   href: nORM.Core.NormMemoryCacheProvider.html#nORM_Core_NormMemoryCacheProvider__ctor_System_Func_System_Object__

@@ -5,9 +5,12 @@ items:
   id: nORM.Migration
   children:
   - nORM.Migration.ColumnSchema
+  - nORM.Migration.ForeignKeySchema
   - nORM.Migration.IMigrationRunner
   - nORM.Migration.IMigrationSqlGenerator
+  - nORM.Migration.INormDesignTimeDbContextFactory`1
   - nORM.Migration.Migration
+  - nORM.Migration.MigrationOptions
   - nORM.Migration.MigrationSqlStatements
   - nORM.Migration.MySqlMigrationRunner
   - nORM.Migration.MySqlMigrationSqlGenerator
@@ -53,12 +56,44 @@ references:
   name: MigrationSqlStatements
   nameWithType: MigrationSqlStatements
   fullName: nORM.Migration.MigrationSqlStatements
+- uid: nORM.Migration.INormDesignTimeDbContextFactory`1
+  commentId: T:nORM.Migration.INormDesignTimeDbContextFactory`1
+  href: nORM.Migration.INormDesignTimeDbContextFactory-1.html
+  name: INormDesignTimeDbContextFactory<TContext>
+  nameWithType: INormDesignTimeDbContextFactory<TContext>
+  fullName: nORM.Migration.INormDesignTimeDbContextFactory<TContext>
+  nameWithType.vb: INormDesignTimeDbContextFactory(Of TContext)
+  fullName.vb: nORM.Migration.INormDesignTimeDbContextFactory(Of TContext)
+  name.vb: INormDesignTimeDbContextFactory(Of TContext)
+  spec.csharp:
+  - uid: nORM.Migration.INormDesignTimeDbContextFactory`1
+    name: INormDesignTimeDbContextFactory
+    href: nORM.Migration.INormDesignTimeDbContextFactory-1.html
+  - name: <
+  - name: TContext
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Migration.INormDesignTimeDbContextFactory`1
+    name: INormDesignTimeDbContextFactory
+    href: nORM.Migration.INormDesignTimeDbContextFactory-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TContext
+  - name: )
 - uid: nORM.Migration.Migration
   commentId: T:nORM.Migration.Migration
   href: nORM.Migration.Migration.html
   name: Migration
   nameWithType: Migration
   fullName: nORM.Migration.Migration
+- uid: nORM.Migration.MigrationOptions
+  commentId: T:nORM.Migration.MigrationOptions
+  parent: nORM.Migration
+  href: nORM.Migration.MigrationOptions.html
+  name: MigrationOptions
+  nameWithType: MigrationOptions
+  fullName: nORM.Migration.MigrationOptions
 - uid: nORM.Migration.MySqlMigrationRunner
   commentId: T:nORM.Migration.MySqlMigrationRunner
   href: nORM.Migration.MySqlMigrationRunner.html
@@ -96,6 +131,12 @@ references:
   name: TableSchema
   nameWithType: TableSchema
   fullName: nORM.Migration.TableSchema
+- uid: nORM.Migration.ForeignKeySchema
+  commentId: T:nORM.Migration.ForeignKeySchema
+  href: nORM.Migration.ForeignKeySchema.html
+  name: ForeignKeySchema
+  nameWithType: ForeignKeySchema
+  fullName: nORM.Migration.ForeignKeySchema
 - uid: nORM.Migration.ColumnSchema
   commentId: T:nORM.Migration.ColumnSchema
   href: nORM.Migration.ColumnSchema.html

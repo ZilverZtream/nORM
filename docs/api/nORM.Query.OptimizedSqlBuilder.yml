@@ -8,10 +8,12 @@ items:
   - nORM.Query.OptimizedSqlBuilder.#ctor
   - nORM.Query.OptimizedSqlBuilder.#ctor(System.Int32)
   - nORM.Query.OptimizedSqlBuilder.Append(System.Char)
+  - nORM.Query.OptimizedSqlBuilder.Append(System.Int32)
   - nORM.Query.OptimizedSqlBuilder.Append(System.ReadOnlySpan{System.Char})
   - nORM.Query.OptimizedSqlBuilder.Append(System.String)
   - nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction(System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char})
   - nORM.Query.OptimizedSqlBuilder.AppendFragment(System.String)
+  - nORM.Query.OptimizedSqlBuilder.AppendGroupBy(System.ReadOnlySpan{System.Char})
   - nORM.Query.OptimizedSqlBuilder.AppendJoin(System.String,System.Collections.Generic.IEnumerable{System.String})
   - nORM.Query.OptimizedSqlBuilder.AppendParameterizedValue(System.String,System.Object,System.Collections.Generic.IDictionary{System.String,System.Object})
   - nORM.Query.OptimizedSqlBuilder.AppendSelect(System.ReadOnlySpan{System.Char})
@@ -24,6 +26,7 @@ items:
   - nORM.Query.OptimizedSqlBuilder.ToSqlString
   - nORM.Query.OptimizedSqlBuilder.ToString
   - nORM.Query.OptimizedSqlBuilder.ToString(System.Int32,System.Int32)
+  - nORM.Query.OptimizedSqlBuilder.TruncateTo(System.Int32)
   langs:
   - csharp
   - vb
@@ -38,7 +41,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OptimizedSqlBuilder
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 10
+    startLine: 11
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -83,10 +86,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 15
+    startLine: 20
   assemblies:
   - nORM
   namespace: nORM.Query
+  summary: >-
+    Creates a new <xref href="nORM.Query.OptimizedSqlBuilder" data-throw-if-not-resolved="false"></xref> with a default initial buffer
+
+    capacity of 256 characters.
+  example: []
   syntax:
     content: public OptimizedSqlBuilder()
     content.vb: Public Sub New()
@@ -112,15 +120,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 20
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Query
+  summary: >-
+    Creates a new <xref href="nORM.Query.OptimizedSqlBuilder" data-throw-if-not-resolved="false"></xref> with the specified initial
+
+    buffer size.
+  example: []
   syntax:
     content: public OptimizedSqlBuilder(int capacity)
     parameters:
     - id: capacity
       type: System.Int32
+      description: Number of characters to initially allocate.
     content.vb: Public Sub New(capacity As Integer)
   overload: nORM.Query.OptimizedSqlBuilder.#ctor*
   nameWithType.vb: OptimizedSqlBuilder.New(Integer)
@@ -144,10 +158,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Length
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 26
+    startLine: 39
   assemblies:
   - nORM
   namespace: nORM.Query
+  summary: Gets the number of characters currently written to the underlying buffer.
+  example: []
   syntax:
     content: public int Length { get; }
     parameters: []
@@ -173,7 +189,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Append
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 33
+    startLine: 47
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -211,7 +227,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Append
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 45
+    startLine: 61
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -249,7 +265,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Append
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 58
+    startLine: 77
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -269,6 +285,42 @@ items:
   nameWithType.vb: OptimizedSqlBuilder.Append(Char)
   fullName.vb: nORM.Query.OptimizedSqlBuilder.Append(Char)
   name.vb: Append(Char)
+- uid: nORM.Query.OptimizedSqlBuilder.Append(System.Int32)
+  commentId: M:nORM.Query.OptimizedSqlBuilder.Append(System.Int32)
+  id: Append(System.Int32)
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: Append(int)
+  nameWithType: OptimizedSqlBuilder.Append(int)
+  fullName: nORM.Query.OptimizedSqlBuilder.Append(int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Append
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 88
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Appends the decimal representation of an integer using stack-allocated formatting.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder Append(int value)
+    parameters:
+    - id: value
+      type: System.Int32
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+    content.vb: Public Function Append(value As Integer) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.Append*
+  nameWithType.vb: OptimizedSqlBuilder.Append(Integer)
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.Append(Integer)
+  name.vb: Append(Integer)
 - uid: nORM.Query.OptimizedSqlBuilder.AppendFragment(System.String)
   commentId: M:nORM.Query.OptimizedSqlBuilder.AppendFragment(System.String)
   id: AppendFragment(System.String)
@@ -287,7 +339,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AppendFragment
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 70
+    startLine: 103
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -325,7 +377,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AppendSelect
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 77
+    startLine: 110
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -345,6 +397,44 @@ items:
   nameWithType.vb: OptimizedSqlBuilder.AppendSelect(ReadOnlySpan(Of Char))
   fullName.vb: nORM.Query.OptimizedSqlBuilder.AppendSelect(System.ReadOnlySpan(Of Char))
   name.vb: AppendSelect(ReadOnlySpan(Of Char))
+- uid: nORM.Query.OptimizedSqlBuilder.AppendGroupBy(System.ReadOnlySpan{System.Char})
+  commentId: M:nORM.Query.OptimizedSqlBuilder.AppendGroupBy(System.ReadOnlySpan{System.Char})
+  id: AppendGroupBy(System.ReadOnlySpan{System.Char})
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: AppendGroupBy(ReadOnlySpan<char>)
+  nameWithType: OptimizedSqlBuilder.AppendGroupBy(ReadOnlySpan<char>)
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendGroupBy(System.ReadOnlySpan<char>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AppendGroupBy
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 123
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: Appends a <code>GROUP BY</code> clause with the supplied columns.
+  example: []
+  syntax:
+    content: public OptimizedSqlBuilder AppendGroupBy(ReadOnlySpan<char> columns)
+    parameters:
+    - id: columns
+      type: System.ReadOnlySpan{System.Char}
+      description: The column list for the <code>GROUP BY</code> clause.
+    return:
+      type: nORM.Query.OptimizedSqlBuilder
+      description: The current builder instance.
+    content.vb: Public Function AppendGroupBy(columns As ReadOnlySpan(Of Char)) As OptimizedSqlBuilder
+  overload: nORM.Query.OptimizedSqlBuilder.AppendGroupBy*
+  nameWithType.vb: OptimizedSqlBuilder.AppendGroupBy(ReadOnlySpan(Of Char))
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.AppendGroupBy(System.ReadOnlySpan(Of Char))
+  name.vb: AppendGroupBy(ReadOnlySpan(Of Char))
 - uid: nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction(System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char})
   commentId: M:nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction(System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char})
   id: AppendAggregateFunction(System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char})
@@ -363,7 +453,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AppendAggregateFunction
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 91
+    startLine: 139
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -404,7 +494,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AppendParameterizedValue
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 108
+    startLine: 156
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -451,7 +541,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AppendJoin
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 121
+    startLine: 169
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -492,7 +582,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Remove
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 142
+    startLine: 190
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -533,7 +623,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Insert
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 156
+    startLine: 204
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -574,7 +664,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Clear
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 169
+    startLine: 218
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -584,6 +674,44 @@ items:
     content: public void Clear()
     content.vb: Public Sub Clear()
   overload: nORM.Query.OptimizedSqlBuilder.Clear*
+- uid: nORM.Query.OptimizedSqlBuilder.TruncateTo(System.Int32)
+  commentId: M:nORM.Query.OptimizedSqlBuilder.TruncateTo(System.Int32)
+  id: TruncateTo(System.Int32)
+  parent: nORM.Query.OptimizedSqlBuilder
+  langs:
+  - csharp
+  - vb
+  name: TruncateTo(int)
+  nameWithType: OptimizedSqlBuilder.TruncateTo(int)
+  fullName: nORM.Query.OptimizedSqlBuilder.TruncateTo(int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Query/OptimizedSqlBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TruncateTo
+    path: src/nORM/Query/OptimizedSqlBuilder.cs
+    startLine: 225
+  assemblies:
+  - nORM
+  namespace: nORM.Query
+  summary: >-
+    Truncates the builder to the specified length, discarding any characters
+
+    written after that position. Used by expression visitors to "undo" a fragment.
+  example: []
+  syntax:
+    content: public void TruncateTo(int length)
+    parameters:
+    - id: length
+      type: System.Int32
+      description: The target length; must be &lt;= current <xref href="nORM.Query.OptimizedSqlBuilder.Length" data-throw-if-not-resolved="false"></xref>.
+    content.vb: Public Sub TruncateTo(length As Integer)
+  overload: nORM.Query.OptimizedSqlBuilder.TruncateTo*
+  nameWithType.vb: OptimizedSqlBuilder.TruncateTo(Integer)
+  fullName.vb: nORM.Query.OptimizedSqlBuilder.TruncateTo(Integer)
+  name.vb: TruncateTo(Integer)
 - uid: nORM.Query.OptimizedSqlBuilder.ToSqlString
   commentId: M:nORM.Query.OptimizedSqlBuilder.ToSqlString
   id: ToSqlString
@@ -602,7 +730,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToSqlString
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 175
+    startLine: 231
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -633,7 +761,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToString
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 183
+    startLine: 239
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -674,7 +802,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToString
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 188
+    startLine: 244
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -705,7 +833,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 193
+    startLine: 249
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -735,7 +863,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Reserve
     path: src/nORM/Query/OptimizedSqlBuilder.cs
-    startLine: 225
+    startLine: 287
   assemblies:
   - nORM
   namespace: nORM.Query
@@ -1682,6 +1810,13 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Query.OptimizedSqlBuilder
+  commentId: T:nORM.Query.OptimizedSqlBuilder
+  parent: nORM.Query
+  href: nORM.Query.OptimizedSqlBuilder.html
+  name: OptimizedSqlBuilder
+  nameWithType: OptimizedSqlBuilder
+  fullName: nORM.Query.OptimizedSqlBuilder
 - uid: nORM.Query.OptimizedSqlBuilder.#ctor*
   commentId: Overload:nORM.Query.OptimizedSqlBuilder.#ctor
   href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder__ctor
@@ -1725,13 +1860,6 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
-- uid: nORM.Query.OptimizedSqlBuilder
-  commentId: T:nORM.Query.OptimizedSqlBuilder
-  parent: nORM.Query
-  href: nORM.Query.OptimizedSqlBuilder.html
-  name: OptimizedSqlBuilder
-  nameWithType: OptimizedSqlBuilder
-  fullName: nORM.Query.OptimizedSqlBuilder
 - uid: System.ReadOnlySpan{System.Char}
   commentId: T:System.ReadOnlySpan{System.Char}
   parent: System
@@ -1818,6 +1946,12 @@ references:
   name: AppendSelect
   nameWithType: OptimizedSqlBuilder.AppendSelect
   fullName: nORM.Query.OptimizedSqlBuilder.AppendSelect
+- uid: nORM.Query.OptimizedSqlBuilder.AppendGroupBy*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.AppendGroupBy
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_AppendGroupBy_System_ReadOnlySpan_System_Char__
+  name: AppendGroupBy
+  nameWithType: OptimizedSqlBuilder.AppendGroupBy
+  fullName: nORM.Query.OptimizedSqlBuilder.AppendGroupBy
 - uid: nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction*
   commentId: Overload:nORM.Query.OptimizedSqlBuilder.AppendAggregateFunction
   href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_AppendAggregateFunction_System_ReadOnlySpan_System_Char__System_ReadOnlySpan_System_Char__
@@ -2035,6 +2169,18 @@ references:
   name: Clear
   nameWithType: OptimizedSqlBuilder.Clear
   fullName: nORM.Query.OptimizedSqlBuilder.Clear
+- uid: nORM.Query.OptimizedSqlBuilder.Length
+  commentId: P:nORM.Query.OptimizedSqlBuilder.Length
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_Length
+  name: Length
+  nameWithType: OptimizedSqlBuilder.Length
+  fullName: nORM.Query.OptimizedSqlBuilder.Length
+- uid: nORM.Query.OptimizedSqlBuilder.TruncateTo*
+  commentId: Overload:nORM.Query.OptimizedSqlBuilder.TruncateTo
+  href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_TruncateTo_System_Int32_
+  name: TruncateTo
+  nameWithType: OptimizedSqlBuilder.TruncateTo
+  fullName: nORM.Query.OptimizedSqlBuilder.TruncateTo
 - uid: nORM.Query.OptimizedSqlBuilder.ToSqlString*
   commentId: Overload:nORM.Query.OptimizedSqlBuilder.ToSqlString
   href: nORM.Query.OptimizedSqlBuilder.html#nORM_Query_OptimizedSqlBuilder_ToSqlString

@@ -86,17 +86,24 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/NormConfigurationException.cs
-    startLine: 9
+    startLine: 15
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Initializes a new instance of the <xref href="nORM.Core.NormConfigurationException" data-throw-if-not-resolved="false"></xref>
+
+    class with a specified error message and optional inner exception.
+  example: []
   syntax:
     content: public NormConfigurationException(string message, Exception? inner = null)
     parameters:
     - id: message
       type: System.String
+      description: The error message that explains the reason for the exception.
     - id: inner
       type: System.Exception
+      description: The exception that is the cause of the current exception.
     content.vb: Public Sub New(message As String, inner As Exception = Nothing)
   overload: nORM.Core.NormConfigurationException.#ctor*
   nameWithType.vb: NormConfigurationException.New(String, Exception)
@@ -1368,6 +1375,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.NormConfigurationException
+  commentId: T:nORM.Core.NormConfigurationException
+  href: nORM.Core.NormConfigurationException.html
+  name: NormConfigurationException
+  nameWithType: NormConfigurationException
+  fullName: nORM.Core.NormConfigurationException
 - uid: nORM.Core.NormConfigurationException.#ctor*
   commentId: Overload:nORM.Core.NormConfigurationException.#ctor
   href: nORM.Core.NormConfigurationException.html#nORM_Core_NormConfigurationException__ctor_System_String_System_Exception_

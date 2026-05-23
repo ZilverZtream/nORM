@@ -2,6 +2,33 @@
 
 Use this checklist for every v1 release candidate and stable release.
 
+## Version Transitions
+
+`Directory.Build.props` carries `NormVersion`, the single source of truth for every package and
+the changelog. Every transition below requires updating `NormVersion` in `Directory.Build.props`
+**and** appending a matching section to `CHANGELOG.md` (one PR, same commit). The release gate's
+`Assert-CurrentPackageOutput` step then refuses any stale `nORM.*.nupkg` / `dotnet-norm.*.nupkg`
+that does not match `NormVersion` byte-for-byte.
+
+| Phase | `NormVersion` example | When |
+| --- | --- | --- |
+| Release candidate | `1.0.0-rc.1`, `1.0.0-rc.2`, ... | Hardening; published to NuGet pre-release feed only |
+| Stable v1 | `1.0.0` | RC manifest signed off, live providers green, benchmark thresholds green |
+| Post-v1 development | `1.1.0-dev.1` | Immediately after tagging `v1.0.0` to avoid accidental reuse |
+| Stable v1.x | `1.1.0`, `1.2.0`, ... | New feature work that preserves the v1 public API contract |
+| Patch | `1.0.1`, `1.0.2`, ... | Bug fixes against v1.0 without API additions |
+
+Rules:
+
+- Never reuse a `NormVersion` value. A bad RC becomes `1.0.0-rc.2`, not a re-pack of `rc.1`.
+- After `git tag v1.0.0`, bump `NormVersion` to the next development value in the same merge so
+  `main` never reads back as a published version.
+- `CHANGELOG.md` must contain a heading whose version matches `NormVersion` for any commit that
+  produces a release artifact. The `Unreleased` section becomes the named release section at tag
+  time.
+- `ChangelogVersionContractTests` asserts the runtime `NormVersion` is referenced in the
+  changelog so docs and binaries cannot drift apart.
+
 ## Before RC
 
 - Public API review completed and `tests/PublicApi.Shipped.txt` updated only for

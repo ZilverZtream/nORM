@@ -26,10 +26,19 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DbContextTransaction
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 7
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Lightweight wrapper around <xref href="System.Data.Common.DbTransaction" data-throw-if-not-resolved="false"></xref> used by the
+
+    <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> to manage ambient transactions. The wrapper ensures
+
+    the context releases its reference when the transaction completes or is
+
+    disposed.
+  example: []
   syntax:
     content: 'public sealed class DbContextTransaction : IAsyncDisposable, IDisposable'
     content.vb: Public NotInheritable Class DbContextTransaction Implements IAsyncDisposable, IDisposable
@@ -68,10 +77,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Transaction
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 19
+    startLine: 31
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Gets the underlying <xref href="System.Data.Common.DbTransaction" data-throw-if-not-resolved="false"></xref> represented by this wrapper.
+
+    May be <code>null</code> when no transaction was started.
+  example: []
   syntax:
     content: public DbTransaction? Transaction { get; }
     parameters: []
@@ -97,7 +111,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Commit
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 26
+    startLine: 40
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -107,6 +121,10 @@ items:
     instance. After calling this method the transaction can no longer be used
 
     and the context's current transaction reference is cleared.
+
+    Uses try/finally so that Dispose (and therefore ClearTransaction) always
+
+    runs even when Commit throws, preventing a poisoned CurrentTransaction reference.
   example: []
   syntax:
     content: public void Commit()
@@ -130,11 +148,20 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CommitAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 36
+    startLine: 57
   assemblies:
   - nORM
   namespace: nORM.Core
-  summary: Asynchronously commits the underlying transaction and disposes the wrapper.
+  summary: >-
+    Asynchronously commits the underlying transaction and disposes the wrapper.
+
+    Uses try/finally so that CurrentTransaction is ALWAYS cleared even when
+
+    CommitAsync throws (e.g. network drop during commit acknowledgement). Without the
+
+    finally block a failed commit leaves the context's CurrentTransaction non-null, and
+
+    the next call to BeginTransactionAsync would throw "transaction already active".
   example: []
   syntax:
     content: public Task CommitAsync(CancellationToken ct = default)
@@ -164,7 +191,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Rollback
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 48
+    startLine: 85
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -174,6 +201,8 @@ items:
     instance. Any changes made within the transaction are undone and the
 
     context is returned to a non-transactional state.
+
+    Uses try/finally so that CurrentTransaction is always cleared even when Rollback throws.
   example: []
   syntax:
     content: public void Rollback()
@@ -197,11 +226,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RollbackAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 58
+    startLine: 101
   assemblies:
   - nORM
   namespace: nORM.Core
-  summary: Asynchronously rolls back the underlying transaction and disposes the wrapper.
+  summary: >-
+    Asynchronously rolls back the underlying transaction and disposes the wrapper.
+
+    Uses try/finally so that CurrentTransaction is ALWAYS cleared even when
+
+    RollbackAsync throws. Without the finally block a failed rollback leaves the context's
+
+    CurrentTransaction non-null.
   example: []
   syntax:
     content: public Task RollbackAsync(CancellationToken ct = default)
@@ -231,11 +267,14 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 68
+    startLine: 124
   assemblies:
   - nORM
   namespace: nORM.Core
-  summary: Disposes the transaction and clears it from the owning <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>.
+  summary: >-
+    Disposes the transaction and clears it from the owning <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>.
+
+    Interlocked.CompareExchange ensures only one concurrent caller proceeds.
   example: []
   syntax:
     content: public void Dispose()
@@ -261,11 +300,14 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DisposeAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 83
+    startLine: 135
   assemblies:
   - nORM
   namespace: nORM.Core
-  summary: Asynchronously disposes the transaction and clears it from the context.
+  summary: >-
+    Asynchronously disposes the transaction and clears it from the context.
+
+    Uses the same atomic gate as Dispose() to prevent double-dispose.
   example: []
   syntax:
     content: public ValueTask DisposeAsync()
@@ -277,6 +319,21 @@ items:
   implements:
   - System.IAsyncDisposable.DisposeAsync
 references:
+- uid: System.Data.Common.DbTransaction
+  commentId: T:System.Data.Common.DbTransaction
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction
+  name: DbTransaction
+  nameWithType: DbTransaction
+  fullName: System.Data.Common.DbTransaction
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html
@@ -883,6 +940,43 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
+- uid: System.Data.Common
+  commentId: N:System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Data.Common
+  nameWithType: System.Data.Common
+  fullName: System.Data.Common
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
 - uid: System
   commentId: N:System
   isExternal: true
@@ -1238,51 +1332,6 @@ references:
   name: Transaction
   nameWithType: DbContextTransaction.Transaction
   fullName: nORM.Core.DbContextTransaction.Transaction
-- uid: System.Data.Common.DbTransaction
-  commentId: T:System.Data.Common.DbTransaction
-  parent: System.Data.Common
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction
-  name: DbTransaction
-  nameWithType: DbTransaction
-  fullName: System.Data.Common.DbTransaction
-- uid: System.Data.Common
-  commentId: N:System.Data.Common
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system
-  name: System.Data.Common
-  nameWithType: System.Data.Common
-  fullName: System.Data.Common
-  spec.csharp:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Data
-    name: Data
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data
-  - name: .
-  - uid: System.Data.Common
-    name: Common
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common
-  spec.vb:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Data
-    name: Data
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data
-  - name: .
-  - uid: System.Data.Common
-    name: Common
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common
 - uid: nORM.Core.DbContextTransaction.Commit*
   commentId: Overload:nORM.Core.DbContextTransaction.Commit
   href: nORM.Core.DbContextTransaction.html#nORM_Core_DbContextTransaction_Commit
@@ -1387,13 +1436,6 @@ references:
   name: RollbackAsync
   nameWithType: DbContextTransaction.RollbackAsync
   fullName: nORM.Core.DbContextTransaction.RollbackAsync
-- uid: nORM.Core.DbContext
-  commentId: T:nORM.Core.DbContext
-  parent: nORM.Core
-  href: nORM.Core.DbContext.html
-  name: DbContext
-  nameWithType: DbContext
-  fullName: nORM.Core.DbContext
 - uid: nORM.Core.DbContextTransaction.Dispose*
   commentId: Overload:nORM.Core.DbContextTransaction.Dispose
   href: nORM.Core.DbContextTransaction.html#nORM_Core_DbContextTransaction_Dispose

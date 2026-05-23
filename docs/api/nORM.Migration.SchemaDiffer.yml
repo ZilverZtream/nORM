@@ -20,10 +20,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaDiffer
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 86
+    startLine: 524
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Provides methods for computing differences between two schema snapshots.
+  example: []
   syntax:
     content: public static class SchemaDiffer
     content.vb: Public Module SchemaDiffer
@@ -55,7 +57,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Diff
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 94
+    startLine: 532
   assemblies:
   - nORM
   namespace: nORM.Migration

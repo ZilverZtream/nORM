@@ -33,16 +33,24 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: INormQueryable
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 26
+    startLine: 62
   assemblies:
   - nORM
   namespace: nORM.Core
-  summary: Defines a queryable data source with extended functionality like Include.
+  summary: >-
+    Defines a queryable data source with extended functionality like eager-loading and
+
+    asynchronous evaluation.
+  remarks: >-
+    IMPORTANT: This interface no longer requires the new() constraint to support
+
+    entities with parameterized constructors (e.g., records, immutable classes).
   example: []
   syntax:
     content: 'public interface INormQueryable<T> : IOrderedQueryable<T>, IOrderedQueryable, IQueryable<T>, IEnumerable<T>, IQueryable, IEnumerable'
     typeParameters:
     - id: T
+      description: The entity type returned by the query.
     content.vb: Public Interface INormQueryable(Of T) Inherits IOrderedQueryable(Of T), IOrderedQueryable, IQueryable(Of T), IEnumerable(Of T), IQueryable, IEnumerable
   inheritedMembers:
   - System.Collections.Generic.IEnumerable{{T}}.GetEnumerator
@@ -80,17 +88,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Include
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 28
+    startLine: 69
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Specifies a navigation property to include in the query results.
+  example: []
   syntax:
     content: INormIncludableQueryable<T, TProperty> Include<TProperty>(Expression<Func<T, TProperty>> navigationPropertyPath)
     parameters:
     - id: navigationPropertyPath
       type: System.Linq.Expressions.Expression{System.Func{{T},{TProperty}}}
+      description: Expression identifying the navigation to include.
     typeParameters:
     - id: TProperty
+      description: Type of the navigation property.
     return:
       type: nORM.Core.INormIncludableQueryable{{T},{TProperty}}
     content.vb: Function Include(Of TProperty)(navigationPropertyPath As Expression(Of Func(Of T, TProperty))) As INormIncludableQueryable(Of T, TProperty)
@@ -116,10 +128,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsNoTracking
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 29
+    startLine: 72
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Disables change tracking for the query results.
+  example: []
   syntax:
     content: INormQueryable<T> AsNoTracking()
     return:
@@ -146,10 +160,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsSplitQuery
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 30
+    startLine: 77
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Splits collection navigations into multiple queries to reduce result set inflation.
+  example: []
   syntax:
     content: INormQueryable<T> AsSplitQuery()
     return:
@@ -176,10 +192,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsAsyncEnumerable
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 31
+    startLine: 80
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Executes the query as an asynchronous stream of entities.
+  example: []
   syntax:
     content: IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default)
     parameters:
@@ -209,10 +227,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToListAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 32
+    startLine: 83
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously materializes the query results into a list.
+  example: []
   syntax:
     content: Task<List<T>> ToListAsync(CancellationToken ct = default)
     parameters:
@@ -242,10 +262,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToArrayAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 33
+    startLine: 86
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously materializes the query results into an array.
+  example: []
   syntax:
     content: Task<T[]> ToArrayAsync(CancellationToken ct = default)
     parameters:
@@ -275,10 +297,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CountAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 34
+    startLine: 89
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Asynchronously counts the number of results.
+  example: []
   syntax:
     content: Task<int> CountAsync(CancellationToken ct = default)
     parameters:
@@ -308,10 +332,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AnyAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 35
+    startLine: 92
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Determines asynchronously whether any results exist.
+  example: []
   syntax:
     content: Task<bool> AnyAsync(CancellationToken ct = default)
     parameters:
@@ -341,10 +367,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 36
+    startLine: 95
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Returns the first element of the sequence, throwing if none exists.
+  example: []
   syntax:
     content: Task<T> FirstAsync(CancellationToken ct = default)
     parameters:
@@ -374,10 +402,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstOrDefaultAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 37
+    startLine: 98
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Returns the first element of the sequence or <code>null</code> if none exists.
+  example: []
   syntax:
     content: Task<T?> FirstOrDefaultAsync(CancellationToken ct = default)
     parameters:
@@ -407,10 +437,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SingleAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 38
+    startLine: 101
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Returns the single element of the sequence, throwing if the sequence does not contain exactly one element.
+  example: []
   syntax:
     content: Task<T> SingleAsync(CancellationToken ct = default)
     parameters:
@@ -440,10 +472,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SingleOrDefaultAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 39
+    startLine: 104
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Returns the single element of the sequence or <code>null</code> if no elements exist.
+  example: []
   syntax:
     content: Task<T?> SingleOrDefaultAsync(CancellationToken ct = default)
     parameters:
@@ -473,10 +507,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteDeleteAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 40
+    startLine: 107
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Executes a bulk delete based on the query.
+  example: []
   syntax:
     content: Task<int> ExecuteDeleteAsync(CancellationToken ct = default)
     parameters:
@@ -506,10 +542,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteUpdateAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 41
+    startLine: 110
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Executes a bulk update using the provided property setter expression.
+  example: []
   syntax:
     content: Task<int> ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct = default)
     parameters:

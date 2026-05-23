@@ -86,17 +86,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/NormUnsupportedFeatureException.cs
-    startLine: 9
+    startLine: 14
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Initializes a new instance of <xref href="nORM.Core.NormUnsupportedFeatureException" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: public NormUnsupportedFeatureException(string message, Exception? inner = null)
     parameters:
     - id: message
       type: System.String
+      description: Description of the unsupported feature.
     - id: inner
       type: System.Exception
+      description: Optional inner exception.
     content.vb: Public Sub New(message As String, inner As Exception = Nothing)
   overload: nORM.Core.NormUnsupportedFeatureException.#ctor*
   nameWithType.vb: NormUnsupportedFeatureException.New(String, Exception)
@@ -1368,6 +1372,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.NormUnsupportedFeatureException
+  commentId: T:nORM.Core.NormUnsupportedFeatureException
+  href: nORM.Core.NormUnsupportedFeatureException.html
+  name: NormUnsupportedFeatureException
+  nameWithType: NormUnsupportedFeatureException
+  fullName: nORM.Core.NormUnsupportedFeatureException
 - uid: nORM.Core.NormUnsupportedFeatureException.#ctor*
   commentId: Overload:nORM.Core.NormUnsupportedFeatureException.#ctor
   href: nORM.Core.NormUnsupportedFeatureException.html#nORM_Core_NormUnsupportedFeatureException__ctor_System_String_System_Exception_

@@ -17,19 +17,25 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Core/DbContext.cs
+      path: src/nORM/Core/StoredProcedureResult.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: StoredProcedureResult
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1372
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Encapsulates the results of a stored procedure that returns both a result set
+
+    and output parameters.
+  example: []
   syntax:
     content: 'public sealed record StoredProcedureResult<T> : IEquatable<StoredProcedureResult<T>>'
     typeParameters:
     - id: T
+      description: Type of entities in the result set.
     content.vb: Public NotInheritable Class StoredProcedureResult(Of T) Implements IEquatable(Of StoredProcedureResult(Of T))
   inheritance:
   - System.Object
@@ -63,22 +69,29 @@ items:
   type: Constructor
   source:
     remote:
-      path: src/nORM/Core/DbContext.cs
+      path: src/nORM/Core/StoredProcedureResult.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1372
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Encapsulates the results of a stored procedure that returns both a result set
+
+    and output parameters.
+  example: []
   syntax:
     content: public StoredProcedureResult(List<T> Results, IReadOnlyDictionary<string, object?> OutputParameters)
     parameters:
     - id: Results
       type: System.Collections.Generic.List{{T}}
+      description: List of materialized entities returned by the procedure.
     - id: OutputParameters
       type: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+      description: Dictionary of output parameter values keyed by name.
     content.vb: Public Sub New(Results As List(Of T), OutputParameters As IReadOnlyDictionary(Of String, Object))
   overload: nORM.Core.StoredProcedureResult`1.#ctor*
   nameWithType.vb: StoredProcedureResult(Of T).New(List(Of T), IReadOnlyDictionary(Of String, Object))
@@ -97,15 +110,17 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Core/DbContext.cs
+      path: src/nORM/Core/StoredProcedureResult.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Results
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1372
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: List of materialized entities returned by the procedure.
+  example: []
   syntax:
     content: public List<T> Results { get; init; }
     parameters: []
@@ -128,15 +143,17 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Core/DbContext.cs
+      path: src/nORM/Core/StoredProcedureResult.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: OutputParameters
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1372
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Dictionary of output parameter values keyed by name.
+  example: []
   syntax:
     content: public IReadOnlyDictionary<string, object?> OutputParameters { get; init; }
     parameters: []
@@ -1253,7 +1270,7 @@ references:
   fullName.vb: nORM.Core.StoredProcedureResult(Of T).New
   name.vb: New
 - uid: System.Collections.Generic.List{{T}}
-  commentId: T:System.Collections.Generic.List{`0}
+  commentId: T:System.Collections.Generic.List{``0}
   parent: System.Collections.Generic
   definition: System.Collections.Generic.List`1
   href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1

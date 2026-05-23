@@ -26,10 +26,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TimeoutConfiguration
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 18
+    startLine: 25
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Configuration options that influence how adaptive timeouts are calculated.
+  example: []
   syntax:
     content: public class AdaptiveTimeoutManager.TimeoutConfiguration
     content.vb: Public Class AdaptiveTimeoutManager.TimeoutConfiguration
@@ -66,10 +68,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BaseTimeout
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 20
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Baseline timeout for standard operations.
+  example: []
   syntax:
     content: public TimeSpan BaseTimeout { get; set; }
     parameters: []
@@ -95,10 +99,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SimpleQueryTimeout
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 21
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Timeout applied to simple read-only queries.
+  example: []
   syntax:
     content: public TimeSpan SimpleQueryTimeout { get; set; }
     parameters: []
@@ -124,10 +130,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComplexQueryTimeout
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 22
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Timeout applied to complex read-only queries.
+  example: []
   syntax:
     content: public TimeSpan ComplexQueryTimeout { get; set; }
     parameters: []
@@ -153,10 +161,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkOperationTimeout
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 23
+    startLine: 34
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Timeout applied to bulk operations such as inserts or updates.
+  example: []
   syntax:
     content: public TimeSpan BulkOperationTimeout { get; set; }
     parameters: []
@@ -182,10 +192,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TransactionTimeout
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 24
+    startLine: 36
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Timeout applied to explicit database transactions.
+  example: []
   syntax:
     content: public TimeSpan TransactionTimeout { get; set; }
     parameters: []
@@ -211,10 +223,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TimeoutMultiplierPerComplexity
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 25
+    startLine: 38
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Multiplier used to scale timeouts based on operation complexity.
+  example: []
   syntax:
     content: public double TimeoutMultiplierPerComplexity { get; set; }
     parameters: []
@@ -240,10 +254,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableAdaptiveTimeouts
     path: src/nORM/Execution/AdaptiveTimeoutManager.cs
-    startLine: 26
+    startLine: 40
   assemblies:
   - nORM
   namespace: nORM.Execution
+  summary: Indicates whether adaptive timeout calculation is enabled.
+  example: []
   syntax:
     content: public bool EnableAdaptiveTimeouts { get; set; }
     parameters: []

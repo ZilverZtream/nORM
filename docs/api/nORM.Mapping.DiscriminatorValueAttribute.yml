@@ -21,10 +21,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DiscriminatorValueAttribute
     path: src/nORM/Mapping/DiscriminatorValueAttribute.cs
-    startLine: 4
+    startLine: 7
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Specifies the discriminator value for an entity type in a table-per-hierarchy mapping.
+  example: []
   syntax:
     content: >-
       [AttributeUsage(AttributeTargets.Class, Inherited = false)]
@@ -112,10 +114,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Value
     path: src/nORM/Mapping/DiscriminatorValueAttribute.cs
-    startLine: 7
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the discriminator value associated with the entity type.
+  example: []
   syntax:
     content: public object Value { get; }
     parameters: []
@@ -141,15 +145,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/DiscriminatorValueAttribute.cs
-    startLine: 8
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Initializes the attribute with the discriminator value.
+  example: []
   syntax:
     content: public DiscriminatorValueAttribute(object value)
     parameters:
     - id: value
       type: System.Object
+      description: Value stored in the discriminator column for this type.
     content.vb: Public Sub New(value As Object)
   overload: nORM.Mapping.DiscriminatorValueAttribute.#ctor*
   nameWithType.vb: DiscriminatorValueAttribute.New(Object)

@@ -22,10 +22,17 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ChangeTracker
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 12
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Keeps track of entity instances and monitors their state so that changes can be
+
+    persisted to the database. The tracker manages identity resolution and
+
+    coordinates change detection for entities attached to a <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: public sealed class ChangeTracker
     content.vb: Public NotInheritable Class ChangeTracker
@@ -61,17 +68,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 20
+    startLine: 47
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Initializes a new instance of the <xref href="nORM.Core.ChangeTracker" data-throw-if-not-resolved="false"></xref> class using the
+
+    specified context options.
+  example: []
   syntax:
     content: public ChangeTracker(DbContextOptions options)
     parameters:
     - id: options
       type: nORM.Configuration.DbContextOptions
+      description: Options that influence change-tracking behavior.
     content.vb: Public Sub New(options As DbContextOptions)
   overload: nORM.Core.ChangeTracker.#ctor*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: <code class="paramref">options</code> is <code>null</code>.
   nameWithType.vb: ChangeTracker.New(DbContextOptions)
   fullName.vb: nORM.Core.ChangeTracker.New(nORM.Configuration.DbContextOptions)
   name.vb: New(DbContextOptions)
@@ -93,10 +110,23 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Entries
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 176
+    startLine: 434
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Gets an enumeration of the <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref> instances currently
+
+    tracked by the context.
+  remarks: >-
+    Returns a snapshot of the underlying collection. The <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref>
+
+    objects themselves are mutable; callers should not modify entry state (such as
+
+    <xref href="nORM.Core.EntityEntry.State" data-throw-if-not-resolved="false"></xref>) directly, as this bypasses change-tracker
+
+    invariants. Use <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> APIs to transition entity state.
+  example: []
   syntax:
     content: public IEnumerable<EntityEntry> Entries { get; }
     parameters: []
@@ -122,17 +152,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Clear
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 220
+    startLine: 572
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: Removes all tracked entity entries and resets the change tracker to an empty state.
+  remarks: >-
+    This method is not synchronized with <xref href="nORM.Core.ChangeTracker._trackLock" data-throw-if-not-resolved="false"></xref>. Since
+
+    <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> is single-threaded by design, callers must not invoke
+
+    <xref href="nORM.Core.ChangeTracker.Clear" data-throw-if-not-resolved="false"></xref> concurrently with <xref href="nORM.Core.ChangeTracker.Track(System.Object%2cnORM.Core.EntityState%2cnORM.Mapping.TableMapping)" data-throw-if-not-resolved="false"></xref> or <xref href="nORM.Core.ChangeTracker.Remove(System.Object%2cSystem.Boolean)" data-throw-if-not-resolved="false"></xref>.
   example: []
   syntax:
     content: public void Clear()
     content.vb: Public Sub Clear()
   overload: nORM.Core.ChangeTracker.Clear*
 references:
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html
@@ -1072,6 +1115,20 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.ChangeTracker
+  commentId: T:nORM.Core.ChangeTracker
+  parent: nORM.Core
+  href: nORM.Core.ChangeTracker.html
+  name: ChangeTracker
+  nameWithType: ChangeTracker
+  fullName: nORM.Core.ChangeTracker
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
 - uid: nORM.Core.ChangeTracker.#ctor*
   commentId: Overload:nORM.Core.ChangeTracker.#ctor
   href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker__ctor_nORM_Configuration_DbContextOptions_
@@ -1110,6 +1167,19 @@ references:
   - uid: nORM.Configuration
     name: Configuration
     href: nORM.Configuration.html
+- uid: nORM.Core.EntityEntry
+  commentId: T:nORM.Core.EntityEntry
+  parent: nORM.Core
+  href: nORM.Core.EntityEntry.html
+  name: EntityEntry
+  nameWithType: EntityEntry
+  fullName: nORM.Core.EntityEntry
+- uid: nORM.Core.EntityEntry.State
+  commentId: P:nORM.Core.EntityEntry.State
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_State
+  name: State
+  nameWithType: EntityEntry.State
+  fullName: nORM.Core.EntityEntry.State
 - uid: nORM.Core.ChangeTracker.Entries*
   commentId: Overload:nORM.Core.ChangeTracker.Entries
   href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_Entries
@@ -1214,6 +1284,117 @@ references:
     name: Generic
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Core.ChangeTracker._trackLock
+  commentId: F:nORM.Core.ChangeTracker._trackLock
+  name: _trackLock
+  nameWithType: ChangeTracker._trackLock
+  fullName: nORM.Core.ChangeTracker._trackLock
+- uid: nORM.Core.ChangeTracker.Clear
+  commentId: M:nORM.Core.ChangeTracker.Clear
+  href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_Clear
+  name: Clear()
+  nameWithType: ChangeTracker.Clear()
+  fullName: nORM.Core.ChangeTracker.Clear()
+  spec.csharp:
+  - uid: nORM.Core.ChangeTracker.Clear
+    name: Clear
+    href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_Clear
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.ChangeTracker.Clear
+    name: Clear
+    href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_Clear
+  - name: (
+  - name: )
+- uid: nORM.Core.ChangeTracker.Track(System.Object,nORM.Core.EntityState,nORM.Mapping.TableMapping)
+  commentId: M:nORM.Core.ChangeTracker.Track(System.Object,nORM.Core.EntityState,nORM.Mapping.TableMapping)
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: Track(object, EntityState, TableMapping)
+  nameWithType: ChangeTracker.Track(object, EntityState, TableMapping)
+  fullName: nORM.Core.ChangeTracker.Track(object, nORM.Core.EntityState, nORM.Mapping.TableMapping)
+  nameWithType.vb: ChangeTracker.Track(Object, EntityState, TableMapping)
+  fullName.vb: nORM.Core.ChangeTracker.Track(Object, nORM.Core.EntityState, nORM.Mapping.TableMapping)
+  name.vb: Track(Object, EntityState, TableMapping)
+  spec.csharp:
+  - uid: nORM.Core.ChangeTracker.Track(System.Object,nORM.Core.EntityState,nORM.Mapping.TableMapping)
+    name: Track
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.EntityState
+    name: EntityState
+    href: nORM.Core.EntityState.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.ChangeTracker.Track(System.Object,nORM.Core.EntityState,nORM.Mapping.TableMapping)
+    name: Track
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.EntityState
+    name: EntityState
+    href: nORM.Core.EntityState.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+- uid: nORM.Core.ChangeTracker.Remove(System.Object,System.Boolean)
+  commentId: M:nORM.Core.ChangeTracker.Remove(System.Object,System.Boolean)
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: Remove(object, bool)
+  nameWithType: ChangeTracker.Remove(object, bool)
+  fullName: nORM.Core.ChangeTracker.Remove(object, bool)
+  nameWithType.vb: ChangeTracker.Remove(Object, Boolean)
+  fullName.vb: nORM.Core.ChangeTracker.Remove(Object, Boolean)
+  name.vb: Remove(Object, Boolean)
+  spec.csharp:
+  - uid: nORM.Core.ChangeTracker.Remove(System.Object,System.Boolean)
+    name: Remove
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.ChangeTracker.Remove(System.Object,System.Boolean)
+    name: Remove
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
 - uid: nORM.Core.ChangeTracker.Clear*
   commentId: Overload:nORM.Core.ChangeTracker.Clear
   href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_Clear

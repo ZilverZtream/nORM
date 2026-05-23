@@ -21,13 +21,25 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IFastProvider
     path: src/nORM/Providers/IFastProvider.cs
-    startLine: 4
+    startLine: 8
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: >-
+    Interface for lightweight providers capable of constructing simple SQL
+
+    statements without allocations.
+  example: []
   syntax:
     content: public interface IFastProvider
     content.vb: Public Interface IFastProvider
+  derivedClasses:
+  - nORM.Providers.BulkOperationProvider
+  - nORM.Providers.DatabaseProvider
+  - nORM.Providers.MySqlProvider
+  - nORM.Providers.PostgresProvider
+  - nORM.Providers.SqlServerProvider
+  - nORM.Providers.SqliteProvider
   extensionMethods:
   - nORM.Providers.IFastProvider.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
   - nORM.Providers.IFastProvider.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Providers.IFastProvider,{TProperty}}})
@@ -51,21 +63,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BuildSimpleSelect
     path: src/nORM/Providers/IFastProvider.cs
-    startLine: 6
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: >-
+    Builds a basic <code>SELECT</code> statement targeting the specified table and
+
+    column list directly into the provided buffer.
+  example: []
   syntax:
     content: void BuildSimpleSelect(Span<char> buffer, ReadOnlySpan<char> table, ReadOnlySpan<char> columns, out int length)
     parameters:
     - id: buffer
       type: System.Span{System.Char}
+      description: Character buffer to receive the SQL.
     - id: table
       type: System.ReadOnlySpan{System.Char}
+      description: Table name segment.
     - id: columns
       type: System.ReadOnlySpan{System.Char}
+      description: Comma separated column list.
     - id: length
       type: System.Int32
+      description: Outputs the length of the written SQL.
     content.vb: Sub BuildSimpleSelect(buffer As Span(Of Char), table As ReadOnlySpan(Of Char), columns As ReadOnlySpan(Of Char), length As Integer)
   overload: nORM.Providers.IFastProvider.BuildSimpleSelect*
   nameWithType.vb: IFastProvider.BuildSimpleSelect(Span(Of Char), ReadOnlySpan(Of Char), ReadOnlySpan(Of Char), Integer)
@@ -89,10 +110,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ParameterPrefixChar
     path: src/nORM/Providers/IFastProvider.cs
-    startLine: 8
+    startLine: 24
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: Gets the parameter prefix character used by the provider.
+  example: []
   syntax:
     content: char ParameterPrefixChar { get; }
     parameters: []

@@ -29,6 +29,11 @@ items:
   syntax:
     content: public interface IMigrationSqlGenerator
     content.vb: Public Interface IMigrationSqlGenerator
+  derivedClasses:
+  - nORM.Migration.MySqlMigrationSqlGenerator
+  - nORM.Migration.PostgresMigrationSqlGenerator
+  - nORM.Migration.SqlServerMigrationSqlGenerator
+  - nORM.Migration.SqliteMigrationSqlGenerator
   extensionMethods:
   - nORM.Migration.IMigrationSqlGenerator.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
   - nORM.Migration.IMigrationSqlGenerator.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.IMigrationSqlGenerator,{TProperty}}})

@@ -21,10 +21,17 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DynamicBatchSizer
     path: src/nORM/Providers/DynamicBatchSizer.cs
-    startLine: 9
+    startLine: 14
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: >-
+    Provides heuristics for determining efficient batch sizes for bulk
+
+    operations. The sizing takes into account historical performance,
+
+    estimated memory usage and operation characteristics.
+  example: []
   syntax:
     content: public class DynamicBatchSizer
     content.vb: Public Class DynamicBatchSizer
@@ -61,7 +68,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CalculateOptimalBatchSize
     path: src/nORM/Providers/DynamicBatchSizer.cs
-    startLine: 44
+    startLine: 65
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -114,21 +121,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RecordBatchPerformance
     path: src/nORM/Providers/DynamicBatchSizer.cs
-    startLine: 238
+    startLine: 300
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: >-
+    Records the outcome of a batch execution so that future sizing decisions
+
+    can incorporate observed performance characteristics.
+  example: []
   syntax:
     content: public void RecordBatchPerformance(string operationKey, int batchSize, TimeSpan duration, int recordCount)
     parameters:
     - id: operationKey
       type: System.String
+      description: Identifier of the operation being tracked.
     - id: batchSize
       type: System.Int32
+      description: Number of records processed.
     - id: duration
       type: System.TimeSpan
+      description: Time taken to process the batch.
     - id: recordCount
       type: System.Int32
+      description: Actual record count processed.
     content.vb: Public Sub RecordBatchPerformance(operationKey As String, batchSize As Integer, duration As TimeSpan, recordCount As Integer)
   overload: nORM.Providers.DynamicBatchSizer.RecordBatchPerformance*
   nameWithType.vb: DynamicBatchSizer.RecordBatchPerformance(String, Integer, TimeSpan, Integer)

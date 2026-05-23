@@ -4,14 +4,21 @@ items:
   commentId: N:nORM.Configuration
   id: nORM.Configuration
   children:
+  - nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  - nORM.Configuration.ClientEvaluationPolicy
+  - nORM.Configuration.ConverterConfiguration
   - nORM.Configuration.DbContextOptions
   - nORM.Configuration.EntityTypeBuilder`1
   - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
   - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder`1
   - nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
   - nORM.Configuration.IEntityTypeConfiguration
+  - nORM.Configuration.ManyToManyConfiguration
   - nORM.Configuration.ModelBuilder
+  - nORM.Configuration.OwnedCollectionNavigation
   - nORM.Configuration.OwnedNavigation
   - nORM.Configuration.RelationshipConfiguration
   - nORM.Configuration.ShadowPropertyConfiguration
@@ -25,6 +32,20 @@ items:
   assemblies:
   - nORM
 references:
+- uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  commentId: T:nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  parent: nORM.Configuration
+  href: nORM.Configuration.AmbientTransactionEnlistmentPolicy.html
+  name: AmbientTransactionEnlistmentPolicy
+  nameWithType: AmbientTransactionEnlistmentPolicy
+  fullName: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+- uid: nORM.Configuration.ClientEvaluationPolicy
+  commentId: T:nORM.Configuration.ClientEvaluationPolicy
+  parent: nORM.Configuration
+  href: nORM.Configuration.ClientEvaluationPolicy.html
+  name: ClientEvaluationPolicy
+  nameWithType: ClientEvaluationPolicy
+  fullName: nORM.Configuration.ClientEvaluationPolicy
 - uid: nORM.Configuration.DbContextOptions
   commentId: T:nORM.Configuration.DbContextOptions
   parent: nORM.Configuration
@@ -92,6 +113,47 @@ references:
   - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
     name: PropertyBuilder
     href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder`1
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder`1
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.PropertyBuilder<TProperty>
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder<TProperty>
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder<TProperty>
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder(Of TProperty)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder(Of TProperty)
+  name.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder(Of TProperty)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder`1
+    name: PropertyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder-1.html
+  - name: <
+  - name: TProperty
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder`1
+    name: PropertyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
 - uid: nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
   commentId: T:nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
   parent: nORM.Configuration
@@ -167,6 +229,56 @@ references:
   - name: " "
   - name: TDependent
   - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  parent: nORM.Configuration
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder
+  name.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+    name: CollectionNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.html
+  - name: <
+  - name: TDependent
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+    name: ManyToManyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.ManyToManyBuilder.html
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+    name: CollectionNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDependent
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+    name: ManyToManyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.ManyToManyBuilder.html
 - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
   commentId: T:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
   parent: nORM.Configuration
@@ -242,6 +354,24 @@ references:
   name: RelationshipConfiguration
   nameWithType: RelationshipConfiguration
   fullName: nORM.Configuration.RelationshipConfiguration
+- uid: nORM.Configuration.ConverterConfiguration
+  commentId: T:nORM.Configuration.ConverterConfiguration
+  href: nORM.Configuration.ConverterConfiguration.html
+  name: ConverterConfiguration
+  nameWithType: ConverterConfiguration
+  fullName: nORM.Configuration.ConverterConfiguration
+- uid: nORM.Configuration.OwnedCollectionNavigation
+  commentId: T:nORM.Configuration.OwnedCollectionNavigation
+  href: nORM.Configuration.OwnedCollectionNavigation.html
+  name: OwnedCollectionNavigation
+  nameWithType: OwnedCollectionNavigation
+  fullName: nORM.Configuration.OwnedCollectionNavigation
+- uid: nORM.Configuration.ManyToManyConfiguration
+  commentId: T:nORM.Configuration.ManyToManyConfiguration
+  href: nORM.Configuration.ManyToManyConfiguration.html
+  name: ManyToManyConfiguration
+  nameWithType: ManyToManyConfiguration
+  fullName: nORM.Configuration.ManyToManyConfiguration
 - uid: nORM.Configuration.ModelBuilder
   commentId: T:nORM.Configuration.ModelBuilder
   href: nORM.Configuration.ModelBuilder.html

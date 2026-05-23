@@ -8,10 +8,15 @@ items:
   - nORM.Mapping.ColumnMappingCache
   - nORM.Mapping.DiscriminatorColumnAttribute
   - nORM.Mapping.DiscriminatorValueAttribute
+  - nORM.Mapping.IValueConverter
+  - nORM.Mapping.JoinTableMapping
   - nORM.Mapping.OwnedAttribute
+  - nORM.Mapping.OwnedCollectionMapping
+  - nORM.Mapping.RenameColumnAttribute
   - nORM.Mapping.TableMapping
   - nORM.Mapping.TableMapping.Relation
   - nORM.Mapping.TableSplitAttribute
+  - nORM.Mapping.ValueConverter`2
   langs:
   - csharp
   - vb
@@ -47,12 +52,24 @@ references:
   name: DiscriminatorValueAttribute
   nameWithType: DiscriminatorValueAttribute
   fullName: nORM.Mapping.DiscriminatorValueAttribute
+- uid: nORM.Mapping.JoinTableMapping
+  commentId: T:nORM.Mapping.JoinTableMapping
+  href: nORM.Mapping.JoinTableMapping.html
+  name: JoinTableMapping
+  nameWithType: JoinTableMapping
+  fullName: nORM.Mapping.JoinTableMapping
 - uid: nORM.Mapping.OwnedAttribute
   commentId: T:nORM.Mapping.OwnedAttribute
   href: nORM.Mapping.OwnedAttribute.html
   name: OwnedAttribute
   nameWithType: OwnedAttribute
   fullName: nORM.Mapping.OwnedAttribute
+- uid: nORM.Mapping.RenameColumnAttribute
+  commentId: T:nORM.Mapping.RenameColumnAttribute
+  href: nORM.Mapping.RenameColumnAttribute.html
+  name: RenameColumnAttribute
+  nameWithType: RenameColumnAttribute
+  fullName: nORM.Mapping.RenameColumnAttribute
 - uid: nORM.Mapping.TableMapping
   commentId: T:nORM.Mapping.TableMapping
   parent: nORM.Mapping
@@ -82,12 +99,56 @@ references:
   - uid: nORM.Mapping.TableMapping.Relation
     name: Relation
     href: nORM.Mapping.TableMapping.Relation.html
+- uid: nORM.Mapping.OwnedCollectionMapping
+  commentId: T:nORM.Mapping.OwnedCollectionMapping
+  href: nORM.Mapping.OwnedCollectionMapping.html
+  name: OwnedCollectionMapping
+  nameWithType: OwnedCollectionMapping
+  fullName: nORM.Mapping.OwnedCollectionMapping
 - uid: nORM.Mapping.TableSplitAttribute
   commentId: T:nORM.Mapping.TableSplitAttribute
   href: nORM.Mapping.TableSplitAttribute.html
   name: TableSplitAttribute
   nameWithType: TableSplitAttribute
   fullName: nORM.Mapping.TableSplitAttribute
+- uid: nORM.Mapping.IValueConverter
+  commentId: T:nORM.Mapping.IValueConverter
+  parent: nORM.Mapping
+  href: nORM.Mapping.IValueConverter.html
+  name: IValueConverter
+  nameWithType: IValueConverter
+  fullName: nORM.Mapping.IValueConverter
+- uid: nORM.Mapping.ValueConverter`2
+  commentId: T:nORM.Mapping.ValueConverter`2
+  href: nORM.Mapping.ValueConverter-2.html
+  name: ValueConverter<TModel, TProvider>
+  nameWithType: ValueConverter<TModel, TProvider>
+  fullName: nORM.Mapping.ValueConverter<TModel, TProvider>
+  nameWithType.vb: ValueConverter(Of TModel, TProvider)
+  fullName.vb: nORM.Mapping.ValueConverter(Of TModel, TProvider)
+  name.vb: ValueConverter(Of TModel, TProvider)
+  spec.csharp:
+  - uid: nORM.Mapping.ValueConverter`2
+    name: ValueConverter
+    href: nORM.Mapping.ValueConverter-2.html
+  - name: <
+  - name: TModel
+  - name: ','
+  - name: " "
+  - name: TProvider
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Mapping.ValueConverter`2
+    name: ValueConverter
+    href: nORM.Mapping.ValueConverter-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TModel
+  - name: ','
+  - name: " "
+  - name: TProvider
+  - name: )
 - uid: nORM.Mapping
   commentId: N:nORM.Mapping
   href: nORM.html

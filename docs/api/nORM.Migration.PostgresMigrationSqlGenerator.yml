@@ -20,10 +20,20 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PostgresMigrationSqlGenerator
     path: src/nORM/Migration/PostgresMigrationSqlGenerator.cs
-    startLine: 6
+    startLine: 15
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Generates PostgreSQL-specific SQL statements to apply and roll back schema changes.
+  remarks: >-
+    Provider: PostgreSQL (double-quote-escaped identifiers). Uses GENERATED ALWAYS AS IDENTITY
+
+    for auto-increment columns, separate ALTER COLUMN statements for type and nullability changes,
+
+    and SET DEFAULT / DROP DEFAULT for default value alterations. FK referential actions are
+
+    validated against an allowlist before being interpolated into DDL.
+  example: []
   syntax:
     content: 'public class PostgresMigrationSqlGenerator : IMigrationSqlGenerator'
     content.vb: Public Class PostgresMigrationSqlGenerator Implements IMigrationSqlGenerator
@@ -62,7 +72,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateSql
     path: src/nORM/Migration/PostgresMigrationSqlGenerator.cs
-    startLine: 28
+    startLine: 58
   assemblies:
   - nORM
   namespace: nORM.Migration

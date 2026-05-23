@@ -7,14 +7,17 @@ items:
   children:
   - nORM.Mapping.Column.#ctor(System.Reflection.PropertyInfo,nORM.Providers.DatabaseProvider,nORM.Configuration.IEntityTypeConfiguration,System.String,System.Func{System.Object,System.Object},System.Action{System.Object,System.Object},System.Reflection.MethodInfo)
   - nORM.Mapping.Column.#ctor(System.String,System.Type,System.Type,nORM.Providers.DatabaseProvider,System.String)
+  - nORM.Mapping.Column.Converter
   - nORM.Mapping.Column.CreateGetterDelegate(System.Reflection.PropertyInfo)
   - nORM.Mapping.Column.EscCol
   - nORM.Mapping.Column.ForeignKeyPrincipalTypeName
   - nORM.Mapping.Column.Getter
   - nORM.Mapping.Column.IsDbGenerated
   - nORM.Mapping.Column.IsKey
+  - nORM.Mapping.Column.IsNullable
   - nORM.Mapping.Column.IsShadow
   - nORM.Mapping.Column.IsTimestamp
+  - nORM.Mapping.Column.Name
   - nORM.Mapping.Column.Prop
   - nORM.Mapping.Column.PropName
   - nORM.Mapping.Column.Setter
@@ -33,10 +36,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Column
     path: src/nORM/Mapping/Column.cs
-    startLine: 13
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: >-
+    Describes the mapping between an entity property and a database column including
+
+    metadata used for query generation and materialization.
+  example: []
   syntax:
     content: public sealed class Column
     content.vb: Public NotInheritable Class Column
@@ -55,7 +63,7 @@ items:
   - nORM.Mapping.Column.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.Column,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Mapping.Column.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.Column,{TProperty}}},System.Threading.CancellationToken)
 - uid: nORM.Mapping.Column.Prop
-  commentId: F:nORM.Mapping.Column.Prop
+  commentId: P:nORM.Mapping.Column.Prop
   id: Prop
   parent: nORM.Mapping.Column
   langs:
@@ -64,7 +72,7 @@ items:
   name: Prop
   nameWithType: Column.Prop
   fullName: nORM.Mapping.Column.Prop
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/Column.cs
@@ -72,17 +80,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Prop
     path: src/nORM/Mapping/Column.cs
-    startLine: 15
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Reflection information for the property represented by this column.
+  example: []
   syntax:
-    content: public readonly PropertyInfo Prop
+    content: public PropertyInfo Prop { get; }
+    parameters: []
     return:
       type: System.Reflection.PropertyInfo
-    content.vb: Public ReadOnly Prop As PropertyInfo
+    content.vb: Public ReadOnly Property Prop As PropertyInfo
+  overload: nORM.Mapping.Column.Prop*
 - uid: nORM.Mapping.Column.PropName
-  commentId: F:nORM.Mapping.Column.PropName
+  commentId: P:nORM.Mapping.Column.PropName
   id: PropName
   parent: nORM.Mapping.Column
   langs:
@@ -91,7 +103,7 @@ items:
   name: PropName
   nameWithType: Column.PropName
   fullName: nORM.Mapping.Column.PropName
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/Column.cs
@@ -99,17 +111,52 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PropName
     path: src/nORM/Mapping/Column.cs
-    startLine: 16
+    startLine: 24
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Name of the property on the CLR type.
+  example: []
   syntax:
-    content: public readonly string PropName
+    content: public string PropName { get; }
+    parameters: []
     return:
       type: System.String
-    content.vb: Public ReadOnly PropName As String
+    content.vb: Public ReadOnly Property PropName As String
+  overload: nORM.Mapping.Column.PropName*
+- uid: nORM.Mapping.Column.Name
+  commentId: P:nORM.Mapping.Column.Name
+  id: Name
+  parent: nORM.Mapping.Column
+  langs:
+  - csharp
+  - vb
+  name: Name
+  nameWithType: Column.Name
+  fullName: nORM.Mapping.Column.Name
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/Column.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Name
+    path: src/nORM/Mapping/Column.cs
+    startLine: 26
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Plain (unescaped) column name.
+  example: []
+  syntax:
+    content: public string Name { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property Name As String
+  overload: nORM.Mapping.Column.Name*
 - uid: nORM.Mapping.Column.EscCol
-  commentId: F:nORM.Mapping.Column.EscCol
+  commentId: P:nORM.Mapping.Column.EscCol
   id: EscCol
   parent: nORM.Mapping.Column
   langs:
@@ -118,7 +165,7 @@ items:
   name: EscCol
   nameWithType: Column.EscCol
   fullName: nORM.Mapping.Column.EscCol
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/Column.cs
@@ -126,17 +173,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscCol
     path: src/nORM/Mapping/Column.cs
-    startLine: 16
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Escaped column name suitable for inclusion in SQL statements.
+  example: []
   syntax:
-    content: public readonly string EscCol
+    content: public string EscCol { get; }
+    parameters: []
     return:
       type: System.String
-    content.vb: Public ReadOnly EscCol As String
+    content.vb: Public ReadOnly Property EscCol As String
+  overload: nORM.Mapping.Column.EscCol*
 - uid: nORM.Mapping.Column.IsKey
-  commentId: F:nORM.Mapping.Column.IsKey
+  commentId: P:nORM.Mapping.Column.IsKey
   id: IsKey
   parent: nORM.Mapping.Column
   langs:
@@ -145,7 +196,7 @@ items:
   name: IsKey
   nameWithType: Column.IsKey
   fullName: nORM.Mapping.Column.IsKey
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/Column.cs
@@ -153,17 +204,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsKey
     path: src/nORM/Mapping/Column.cs
-    startLine: 17
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Indicates whether the column is part of the primary key.
+  example: []
   syntax:
-    content: public readonly bool IsKey
+    content: public bool IsKey { get; }
+    parameters: []
     return:
       type: System.Boolean
-    content.vb: Public ReadOnly IsKey As Boolean
+    content.vb: Public ReadOnly Property IsKey As Boolean
+  overload: nORM.Mapping.Column.IsKey*
 - uid: nORM.Mapping.Column.IsDbGenerated
-  commentId: F:nORM.Mapping.Column.IsDbGenerated
+  commentId: P:nORM.Mapping.Column.IsDbGenerated
   id: IsDbGenerated
   parent: nORM.Mapping.Column
   langs:
@@ -172,7 +227,7 @@ items:
   name: IsDbGenerated
   nameWithType: Column.IsDbGenerated
   fullName: nORM.Mapping.Column.IsDbGenerated
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/Column.cs
@@ -180,17 +235,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsDbGenerated
     path: src/nORM/Mapping/Column.cs
-    startLine: 17
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Indicates whether the column value is generated by the database.
+  example: []
   syntax:
-    content: public readonly bool IsDbGenerated
+    content: public bool IsDbGenerated { get; }
+    parameters: []
     return:
       type: System.Boolean
-    content.vb: Public ReadOnly IsDbGenerated As Boolean
+    content.vb: Public ReadOnly Property IsDbGenerated As Boolean
+  overload: nORM.Mapping.Column.IsDbGenerated*
 - uid: nORM.Mapping.Column.IsTimestamp
-  commentId: F:nORM.Mapping.Column.IsTimestamp
+  commentId: P:nORM.Mapping.Column.IsTimestamp
   id: IsTimestamp
   parent: nORM.Mapping.Column
   langs:
@@ -199,7 +258,7 @@ items:
   name: IsTimestamp
   nameWithType: Column.IsTimestamp
   fullName: nORM.Mapping.Column.IsTimestamp
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/Column.cs
@@ -207,17 +266,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsTimestamp
     path: src/nORM/Mapping/Column.cs
-    startLine: 17
+    startLine: 34
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Indicates whether the column stores a concurrency token.
+  example: []
   syntax:
-    content: public readonly bool IsTimestamp
+    content: public bool IsTimestamp { get; }
+    parameters: []
     return:
       type: System.Boolean
-    content.vb: Public ReadOnly IsTimestamp As Boolean
+    content.vb: Public ReadOnly Property IsTimestamp As Boolean
+  overload: nORM.Mapping.Column.IsTimestamp*
 - uid: nORM.Mapping.Column.IsShadow
-  commentId: F:nORM.Mapping.Column.IsShadow
+  commentId: P:nORM.Mapping.Column.IsShadow
   id: IsShadow
   parent: nORM.Mapping.Column
   langs:
@@ -226,7 +289,7 @@ items:
   name: IsShadow
   nameWithType: Column.IsShadow
   fullName: nORM.Mapping.Column.IsShadow
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/Column.cs
@@ -234,17 +297,52 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsShadow
     path: src/nORM/Mapping/Column.cs
-    startLine: 17
+    startLine: 36
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Indicates whether this column represents a shadow property not defined on the entity type.
+  example: []
   syntax:
-    content: public readonly bool IsShadow
+    content: public bool IsShadow { get; }
+    parameters: []
     return:
       type: System.Boolean
-    content.vb: Public ReadOnly IsShadow As Boolean
+    content.vb: Public ReadOnly Property IsShadow As Boolean
+  overload: nORM.Mapping.Column.IsShadow*
+- uid: nORM.Mapping.Column.IsNullable
+  commentId: P:nORM.Mapping.Column.IsNullable
+  id: IsNullable
+  parent: nORM.Mapping.Column
+  langs:
+  - csharp
+  - vb
+  name: IsNullable
+  nameWithType: Column.IsNullable
+  fullName: nORM.Mapping.Column.IsNullable
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/Column.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsNullable
+    path: src/nORM/Mapping/Column.cs
+    startLine: 38
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Indicates whether the mapped value can be null according to CLR metadata.
+  example: []
+  syntax:
+    content: public bool IsNullable { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public ReadOnly Property IsNullable As Boolean
+  overload: nORM.Mapping.Column.IsNullable*
 - uid: nORM.Mapping.Column.ForeignKeyPrincipalTypeName
-  commentId: F:nORM.Mapping.Column.ForeignKeyPrincipalTypeName
+  commentId: P:nORM.Mapping.Column.ForeignKeyPrincipalTypeName
   id: ForeignKeyPrincipalTypeName
   parent: nORM.Mapping.Column
   langs:
@@ -253,7 +351,7 @@ items:
   name: ForeignKeyPrincipalTypeName
   nameWithType: Column.ForeignKeyPrincipalTypeName
   fullName: nORM.Mapping.Column.ForeignKeyPrincipalTypeName
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/Column.cs
@@ -261,17 +359,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKeyPrincipalTypeName
     path: src/nORM/Mapping/Column.cs
-    startLine: 18
+    startLine: 40
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Name of the principal type if this column is a foreign key, otherwise <code>null</code>.
+  example: []
   syntax:
-    content: public readonly string? ForeignKeyPrincipalTypeName
+    content: public string? ForeignKeyPrincipalTypeName { get; }
+    parameters: []
     return:
       type: System.String
-    content.vb: Public ReadOnly ForeignKeyPrincipalTypeName As String
+    content.vb: Public ReadOnly Property ForeignKeyPrincipalTypeName As String
+  overload: nORM.Mapping.Column.ForeignKeyPrincipalTypeName*
 - uid: nORM.Mapping.Column.Getter
-  commentId: F:nORM.Mapping.Column.Getter
+  commentId: P:nORM.Mapping.Column.Getter
   id: Getter
   parent: nORM.Mapping.Column
   langs:
@@ -280,7 +382,7 @@ items:
   name: Getter
   nameWithType: Column.Getter
   fullName: nORM.Mapping.Column.Getter
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/Column.cs
@@ -288,17 +390,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Getter
     path: src/nORM/Mapping/Column.cs
-    startLine: 19
+    startLine: 42
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Delegate used to read the property value from an entity instance.
+  example: []
   syntax:
-    content: public readonly Func<object, object?> Getter
+    content: public Func<object, object?> Getter { get; }
+    parameters: []
     return:
       type: System.Func{System.Object,System.Object}
-    content.vb: Public ReadOnly Getter As Func(Of Object, Object)
+    content.vb: Public ReadOnly Property Getter As Func(Of Object, Object)
+  overload: nORM.Mapping.Column.Getter*
 - uid: nORM.Mapping.Column.Setter
-  commentId: F:nORM.Mapping.Column.Setter
+  commentId: P:nORM.Mapping.Column.Setter
   id: Setter
   parent: nORM.Mapping.Column
   langs:
@@ -307,7 +413,7 @@ items:
   name: Setter
   nameWithType: Column.Setter
   fullName: nORM.Mapping.Column.Setter
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/Column.cs
@@ -315,17 +421,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Setter
     path: src/nORM/Mapping/Column.cs
-    startLine: 20
+    startLine: 44
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Delegate used to assign a value to the property on an entity instance.
+  example: []
   syntax:
-    content: public readonly Action<object, object?> Setter
+    content: public Action<object, object?> Setter { get; }
+    parameters: []
     return:
       type: System.Action{System.Object,System.Object}
-    content.vb: Public ReadOnly Setter As Action(Of Object, Object)
+    content.vb: Public ReadOnly Property Setter As Action(Of Object, Object)
+  overload: nORM.Mapping.Column.Setter*
 - uid: nORM.Mapping.Column.SetterMethod
-  commentId: F:nORM.Mapping.Column.SetterMethod
+  commentId: P:nORM.Mapping.Column.SetterMethod
   id: SetterMethod
   parent: nORM.Mapping.Column
   langs:
@@ -334,7 +444,7 @@ items:
   name: SetterMethod
   nameWithType: Column.SetterMethod
   fullName: nORM.Mapping.Column.SetterMethod
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Mapping/Column.cs
@@ -342,15 +452,50 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetterMethod
     path: src/nORM/Mapping/Column.cs
-    startLine: 21
+    startLine: 46
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: The underlying setter method for the property.
+  example: []
   syntax:
-    content: public readonly MethodInfo SetterMethod
+    content: public MethodInfo SetterMethod { get; }
+    parameters: []
     return:
       type: System.Reflection.MethodInfo
-    content.vb: Public ReadOnly SetterMethod As MethodInfo
+    content.vb: Public ReadOnly Property SetterMethod As MethodInfo
+  overload: nORM.Mapping.Column.SetterMethod*
+- uid: nORM.Mapping.Column.Converter
+  commentId: P:nORM.Mapping.Column.Converter
+  id: Converter
+  parent: nORM.Mapping.Column
+  langs:
+  - csharp
+  - vb
+  name: Converter
+  nameWithType: Column.Converter
+  fullName: nORM.Mapping.Column.Converter
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/Column.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Converter
+    path: src/nORM/Mapping/Column.cs
+    startLine: 48
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Optional converter between model value and provider (database) value.
+  example: []
+  syntax:
+    content: public IValueConverter? Converter { get; set; }
+    parameters: []
+    return:
+      type: nORM.Mapping.IValueConverter
+    content.vb: Public Property Converter As IValueConverter
+  overload: nORM.Mapping.Column.Converter*
 - uid: nORM.Mapping.Column.#ctor(System.Reflection.PropertyInfo,nORM.Providers.DatabaseProvider,nORM.Configuration.IEntityTypeConfiguration,System.String,System.Func{System.Object,System.Object},System.Action{System.Object,System.Object},System.Reflection.MethodInfo)
   commentId: M:nORM.Mapping.Column.#ctor(System.Reflection.PropertyInfo,nORM.Providers.DatabaseProvider,nORM.Configuration.IEntityTypeConfiguration,System.String,System.Func{System.Object,System.Object},System.Action{System.Object,System.Object},System.Reflection.MethodInfo)
   id: '#ctor(System.Reflection.PropertyInfo,nORM.Providers.DatabaseProvider,nORM.Configuration.IEntityTypeConfiguration,System.String,System.Func{System.Object,System.Object},System.Action{System.Object,System.Object},System.Reflection.MethodInfo)'
@@ -369,27 +514,36 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/Column.cs
-    startLine: 61
+    startLine: 113
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Initializes a new mapping for a regular property.
+  example: []
   syntax:
     content: public Column(PropertyInfo pi, DatabaseProvider p, IEntityTypeConfiguration? fluentConfig, string? prefix = null, Func<object, object?>? getterOverride = null, Action<object, object?>? setterOverride = null, MethodInfo? setterMethodOverride = null)
     parameters:
     - id: pi
       type: System.Reflection.PropertyInfo
+      description: Property information.
     - id: p
       type: nORM.Providers.DatabaseProvider
+      description: Database provider used for escaping identifiers.
     - id: fluentConfig
       type: nORM.Configuration.IEntityTypeConfiguration
+      description: Optional fluent configuration supplying overrides.
     - id: prefix
       type: System.String
+      description: Optional prefix appended to the property name for column naming.
     - id: getterOverride
       type: System.Func{System.Object,System.Object}
+      description: Custom getter delegate.
     - id: setterOverride
       type: System.Action{System.Object,System.Object}
+      description: Custom setter delegate.
     - id: setterMethodOverride
       type: System.Reflection.MethodInfo
+      description: Custom setter method.
     content.vb: Public Sub New(pi As PropertyInfo, p As DatabaseProvider, fluentConfig As IEntityTypeConfiguration, prefix As String = Nothing, getterOverride As Func(Of Object, Object) = Nothing, setterOverride As Action(Of Object, Object) = Nothing, setterMethodOverride As MethodInfo = Nothing)
   overload: nORM.Mapping.Column.#ctor*
   nameWithType.vb: Column.New(PropertyInfo, DatabaseProvider, IEntityTypeConfiguration, String, Func(Of Object, Object), Action(Of Object, Object), MethodInfo)
@@ -413,23 +567,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/Column.cs
-    startLine: 99
+    startLine: 164
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Initializes a new mapping for a shadow property not present on the CLR type.
+  example: []
   syntax:
     content: public Column(string name, Type clrType, Type declaringType, DatabaseProvider p, string? columnName = null)
     parameters:
     - id: name
       type: System.String
+      description: Name of the shadow property.
     - id: clrType
       type: System.Type
+      description: CLR type of the property.
     - id: declaringType
       type: System.Type
+      description: Declaring entity type.
     - id: p
       type: nORM.Providers.DatabaseProvider
+      description: Database provider used for escaping identifiers.
     - id: columnName
       type: System.String
+      description: Optional column name override.
     content.vb: Public Sub New(name As String, clrType As Type, declaringType As Type, p As DatabaseProvider, columnName As String = Nothing)
   overload: nORM.Mapping.Column.#ctor*
   nameWithType.vb: Column.New(String, Type, Type, DatabaseProvider, String)
@@ -453,7 +614,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateGetterDelegate
     path: src/nORM/Mapping/Column.cs
-    startLine: 134
+    startLine: 247
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -1413,6 +1574,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Mapping.Column.Prop*
+  commentId: Overload:nORM.Mapping.Column.Prop
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_Prop
+  name: Prop
+  nameWithType: Column.Prop
+  fullName: nORM.Mapping.Column.Prop
 - uid: System.Reflection.PropertyInfo
   commentId: T:System.Reflection.PropertyInfo
   parent: System.Reflection
@@ -1448,6 +1615,12 @@ references:
     name: Reflection
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.reflection
+- uid: nORM.Mapping.Column.PropName*
+  commentId: Overload:nORM.Mapping.Column.PropName
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_PropName
+  name: PropName
+  nameWithType: Column.PropName
+  fullName: nORM.Mapping.Column.PropName
 - uid: System.String
   commentId: T:System.String
   parent: System
@@ -1459,6 +1632,24 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
+- uid: nORM.Mapping.Column.Name*
+  commentId: Overload:nORM.Mapping.Column.Name
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_Name
+  name: Name
+  nameWithType: Column.Name
+  fullName: nORM.Mapping.Column.Name
+- uid: nORM.Mapping.Column.EscCol*
+  commentId: Overload:nORM.Mapping.Column.EscCol
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_EscCol
+  name: EscCol
+  nameWithType: Column.EscCol
+  fullName: nORM.Mapping.Column.EscCol
+- uid: nORM.Mapping.Column.IsKey*
+  commentId: Overload:nORM.Mapping.Column.IsKey
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_IsKey
+  name: IsKey
+  nameWithType: Column.IsKey
+  fullName: nORM.Mapping.Column.IsKey
 - uid: System.Boolean
   commentId: T:System.Boolean
   parent: System
@@ -1470,6 +1661,42 @@ references:
   nameWithType.vb: Boolean
   fullName.vb: Boolean
   name.vb: Boolean
+- uid: nORM.Mapping.Column.IsDbGenerated*
+  commentId: Overload:nORM.Mapping.Column.IsDbGenerated
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_IsDbGenerated
+  name: IsDbGenerated
+  nameWithType: Column.IsDbGenerated
+  fullName: nORM.Mapping.Column.IsDbGenerated
+- uid: nORM.Mapping.Column.IsTimestamp*
+  commentId: Overload:nORM.Mapping.Column.IsTimestamp
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_IsTimestamp
+  name: IsTimestamp
+  nameWithType: Column.IsTimestamp
+  fullName: nORM.Mapping.Column.IsTimestamp
+- uid: nORM.Mapping.Column.IsShadow*
+  commentId: Overload:nORM.Mapping.Column.IsShadow
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_IsShadow
+  name: IsShadow
+  nameWithType: Column.IsShadow
+  fullName: nORM.Mapping.Column.IsShadow
+- uid: nORM.Mapping.Column.IsNullable*
+  commentId: Overload:nORM.Mapping.Column.IsNullable
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_IsNullable
+  name: IsNullable
+  nameWithType: Column.IsNullable
+  fullName: nORM.Mapping.Column.IsNullable
+- uid: nORM.Mapping.Column.ForeignKeyPrincipalTypeName*
+  commentId: Overload:nORM.Mapping.Column.ForeignKeyPrincipalTypeName
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_ForeignKeyPrincipalTypeName
+  name: ForeignKeyPrincipalTypeName
+  nameWithType: Column.ForeignKeyPrincipalTypeName
+  fullName: nORM.Mapping.Column.ForeignKeyPrincipalTypeName
+- uid: nORM.Mapping.Column.Getter*
+  commentId: Overload:nORM.Mapping.Column.Getter
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_Getter
+  name: Getter
+  nameWithType: Column.Getter
+  fullName: nORM.Mapping.Column.Getter
 - uid: System.Func{System.Object,System.Object}
   commentId: T:System.Func{System.Object,System.Object}
   parent: System
@@ -1551,6 +1778,12 @@ references:
   - name: " "
   - name: TResult
   - name: )
+- uid: nORM.Mapping.Column.Setter*
+  commentId: Overload:nORM.Mapping.Column.Setter
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_Setter
+  name: Setter
+  nameWithType: Column.Setter
+  fullName: nORM.Mapping.Column.Setter
 - uid: System.Action{System.Object,System.Object}
   commentId: T:System.Action{System.Object,System.Object}
   parent: System
@@ -1632,6 +1865,12 @@ references:
   - name: " "
   - name: T2
   - name: )
+- uid: nORM.Mapping.Column.SetterMethod*
+  commentId: Overload:nORM.Mapping.Column.SetterMethod
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_SetterMethod
+  name: SetterMethod
+  nameWithType: Column.SetterMethod
+  fullName: nORM.Mapping.Column.SetterMethod
 - uid: System.Reflection.MethodInfo
   commentId: T:System.Reflection.MethodInfo
   parent: System.Reflection
@@ -1640,6 +1879,19 @@ references:
   name: MethodInfo
   nameWithType: MethodInfo
   fullName: System.Reflection.MethodInfo
+- uid: nORM.Mapping.Column.Converter*
+  commentId: Overload:nORM.Mapping.Column.Converter
+  href: nORM.Mapping.Column.html#nORM_Mapping_Column_Converter
+  name: Converter
+  nameWithType: Column.Converter
+  fullName: nORM.Mapping.Column.Converter
+- uid: nORM.Mapping.IValueConverter
+  commentId: T:nORM.Mapping.IValueConverter
+  parent: nORM.Mapping
+  href: nORM.Mapping.IValueConverter.html
+  name: IValueConverter
+  nameWithType: IValueConverter
+  fullName: nORM.Mapping.IValueConverter
 - uid: nORM.Mapping.Column.#ctor*
   commentId: Overload:nORM.Mapping.Column.#ctor
   href: nORM.Mapping.Column.html#nORM_Mapping_Column__ctor_System_Reflection_PropertyInfo_nORM_Providers_DatabaseProvider_nORM_Configuration_IEntityTypeConfiguration_System_String_System_Func_System_Object_System_Object__System_Action_System_Object_System_Object__System_Reflection_MethodInfo_

@@ -19,10 +19,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: INormIncludableQueryable
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 44
+    startLine: 116
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Represents a queryable that supports inclusion of navigation properties.
+  example: []
   syntax:
     content: 'public interface INormIncludableQueryable<TEntity, out TProperty> : INormQueryable<TEntity>, IOrderedQueryable<TEntity>, IOrderedQueryable, IQueryable<TEntity>, IEnumerable<TEntity>, IQueryable, IEnumerable'
     typeParameters:

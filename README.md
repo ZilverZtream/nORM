@@ -291,38 +291,39 @@ await runner.ApplyMigrationsAsync();
 
 ### Migration Notes
 
-> **DATA LOSS WARNING - Column renames.** nORM cannot prove that a dropped column and a new column are
-> a rename. Renaming `Order.TotalCost` to `Order.TotalAmount` produces a migration diff that **drops
-> `TotalCost` and adds `TotalAmount`**. `norm migrations add` refuses to write table/column-drop
-> migrations unless `--force` is supplied, and forced migrations include TODO warnings. Always replace
-> rename-like drops/adds with a manual rename operation before applying the migration:
+> **Column renames - annotate with `[RenameColumn]`.** nORM cannot infer that a dropped column and a
+> new column are a rename from the diff alone, so without help it would emit a destructive DROP + ADD
+> pair. The supported v1 workflow is to annotate the renamed property with `[RenameColumn("OldName")]`
+> before the next `norm migrations add` run. The schema differ then matches the new property to the
+> old column and emits a provider-correct rename entry in `SchemaDiff.RenamedColumns` instead of
+> dropping data.
 >
 > ```csharp
-> // WRONG - renames the C# property directly -> DROP + ADD -> DATA LOSS
-> // public decimal TotalAmount { get; set; }   // was TotalCost
+> using nORM.Mapping;
 >
-> // CORRECT - write a manual migration that renames the column
-> public class RenameTotalCostToTotalAmount : Migration
-> {
->     public RenameTotalCostToTotalAmount() : base(20240201001, "RenameTotalCostToTotalAmount") { }
+> // Property was: public decimal TotalCost { get; set; }
+> // Renaming the property without [RenameColumn] -> DROP TotalCost + ADD TotalAmount -> DATA LOSS.
 >
->     public override void Up(DbConnection connection, DbTransaction transaction)
->     {
->         using var cmd = connection.CreateCommand();
->         cmd.Transaction = transaction;
->         // SQL Server:
->         cmd.CommandText = "EXEC sp_rename 'Orders.TotalCost', 'TotalAmount', 'COLUMN'";
->         // PostgreSQL / SQLite 3.25+:
->         // cmd.CommandText = "ALTER TABLE Orders RENAME COLUMN TotalCost TO TotalAmount";
->         // MySQL:
->         // cmd.CommandText = "ALTER TABLE Orders RENAME COLUMN TotalCost TO TotalAmount";
->         cmd.ExecuteNonQuery();
->     }
-> }
+> // Correct: annotate the renamed property with its previous column name.
+> [RenameColumn("TotalCost")]
+> public decimal TotalAmount { get; set; }
 > ```
 >
-> nORM *does* detect **migration class name drift** (renaming the C# migration class after it has already been
-> applied) and throws at startup. Only property-to-column renames are undetected.
+> The generated migration uses each provider's native rename syntax automatically:
+> - SQL Server: `EXEC sp_rename N'[Orders].[TotalCost]', N'TotalAmount', 'COLUMN'`
+> - PostgreSQL / SQLite 3.25+ / MySQL 8.0+: `ALTER TABLE Orders RENAME COLUMN TotalCost TO TotalAmount`
+>
+> **Unannotated renames still produce DROP + ADD.** `norm migrations add` refuses to write destructive
+> column or table drops unless `--force` is supplied, and forced migrations include TODO warnings so an
+> accidental rename is hard to miss in review.
+>
+> **Table renames are not yet auto-detected.** Rename the entity in code and write a manual migration
+> that issues the provider's table-rename statement (`sp_rename` on SQL Server,
+> `ALTER TABLE ... RENAME TO ...` elsewhere).
+>
+> nORM also detects **migration class name drift** - renaming the C# migration class after it has
+> already been applied - and throws at startup. Combined with `[RenameColumn]`, the only remaining
+> rename shape that requires a manual migration is the table rename above.
 
 **Concurrent deployments (SQL Server / MySQL / Postgres).** The runners acquire a database-level advisory
 lock before reading the pending list, serializing concurrent deployments automatically:

@@ -21,10 +21,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormIncludableQueryableExtensions
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 219
+    startLine: 380
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Extension methods for chaining <code>Include</code> calls on queryables that already include
+
+    a navigation property.
+  example: []
   syntax:
     content: public static class NormIncludableQueryableExtensions
     content.vb: Public Module NormIncludableQueryableExtensions
@@ -57,24 +62,32 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ThenInclude
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 221
+    startLine: 391
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Specifies an additional navigation property to include after a previous <code>Include</code> call.
+  example: []
   syntax:
-    content: 'public static INormIncludableQueryable<TEntity, TProperty> ThenInclude<TEntity, TPreviousProperty, TProperty>(this INormIncludableQueryable<TEntity, TPreviousProperty> source, Expression<Func<TPreviousProperty, TProperty>> path) where TEntity : class, new()'
+    content: 'public static INormIncludableQueryable<TEntity, TProperty> ThenInclude<TEntity, TPreviousProperty, TProperty>(this INormIncludableQueryable<TEntity, TPreviousProperty> source, Expression<Func<TPreviousProperty, TProperty>> path) where TEntity : class'
     parameters:
     - id: source
       type: nORM.Core.INormIncludableQueryable{{TEntity},{TPreviousProperty}}
+      description: The source query with an already included navigation.
     - id: path
       type: System.Linq.Expressions.Expression{System.Func{{TPreviousProperty},{TProperty}}}
+      description: Expression identifying the additional navigation to include.
     typeParameters:
     - id: TEntity
+      description: Root entity type of the query.
     - id: TPreviousProperty
+      description: Type of the previously included navigation.
     - id: TProperty
+      description: Type of the navigation to include.
     return:
       type: nORM.Core.INormIncludableQueryable{{TEntity},{TProperty}}
-    content.vb: Public Shared Function ThenInclude(Of TEntity As {Class, New}, TPreviousProperty, TProperty)(source As INormIncludableQueryable(Of TEntity, TPreviousProperty), path As Expression(Of Func(Of TPreviousProperty, TProperty))) As INormIncludableQueryable(Of TEntity, TProperty)
+      description: A new queryable with the navigation included.
+    content.vb: Public Shared Function ThenInclude(Of TEntity As Class, TPreviousProperty, TProperty)(source As INormIncludableQueryable(Of TEntity, TPreviousProperty), path As Expression(Of Func(Of TPreviousProperty, TProperty))) As INormIncludableQueryable(Of TEntity, TProperty)
   overload: nORM.Core.NormIncludableQueryableExtensions.ThenInclude*
   nameWithType.vb: NormIncludableQueryableExtensions.ThenInclude(Of TEntity, TPreviousProperty, TProperty)(INormIncludableQueryable(Of TEntity, TPreviousProperty), Expression(Of Func(Of TPreviousProperty, TProperty)))
   fullName.vb: nORM.Core.NormIncludableQueryableExtensions.ThenInclude(Of TEntity, TPreviousProperty, TProperty)(nORM.Core.INormIncludableQueryable(Of TEntity, TPreviousProperty), System.Linq.Expressions.Expression(Of System.Func(Of TPreviousProperty, TProperty)))
@@ -98,24 +111,35 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ThenInclude
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 233
+    startLine: 413
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Specifies an additional navigation property to include after a previous <code>Include</code> call
+
+    where the previous navigation was a collection.
+  example: []
   syntax:
-    content: 'public static INormIncludableQueryable<TEntity, TProperty> ThenInclude<TEntity, TPreviousProperty, TProperty>(this INormIncludableQueryable<TEntity, IEnumerable<TPreviousProperty>> source, Expression<Func<TPreviousProperty, TProperty>> path) where TEntity : class, new()'
+    content: 'public static INormIncludableQueryable<TEntity, TProperty> ThenInclude<TEntity, TPreviousProperty, TProperty>(this INormIncludableQueryable<TEntity, IEnumerable<TPreviousProperty>> source, Expression<Func<TPreviousProperty, TProperty>> path) where TEntity : class'
     parameters:
     - id: source
       type: nORM.Core.INormIncludableQueryable{{TEntity},System.Collections.Generic.IEnumerable{{TPreviousProperty}}}
+      description: The source query with an already included collection navigation.
     - id: path
       type: System.Linq.Expressions.Expression{System.Func{{TPreviousProperty},{TProperty}}}
+      description: Expression identifying the additional navigation to include.
     typeParameters:
     - id: TEntity
+      description: Root entity type of the query.
     - id: TPreviousProperty
+      description: Type of the elements in the previously included collection.
     - id: TProperty
+      description: Type of the navigation to include.
     return:
       type: nORM.Core.INormIncludableQueryable{{TEntity},{TProperty}}
-    content.vb: Public Shared Function ThenInclude(Of TEntity As {Class, New}, TPreviousProperty, TProperty)(source As INormIncludableQueryable(Of TEntity, IEnumerable(Of TPreviousProperty)), path As Expression(Of Func(Of TPreviousProperty, TProperty))) As INormIncludableQueryable(Of TEntity, TProperty)
+      description: A new queryable with the navigation included.
+    content.vb: Public Shared Function ThenInclude(Of TEntity As Class, TPreviousProperty, TProperty)(source As INormIncludableQueryable(Of TEntity, IEnumerable(Of TPreviousProperty)), path As Expression(Of Func(Of TPreviousProperty, TProperty))) As INormIncludableQueryable(Of TEntity, TProperty)
   overload: nORM.Core.NormIncludableQueryableExtensions.ThenInclude*
   nameWithType.vb: NormIncludableQueryableExtensions.ThenInclude(Of TEntity, TPreviousProperty, TProperty)(INormIncludableQueryable(Of TEntity, IEnumerable(Of TPreviousProperty)), Expression(Of Func(Of TPreviousProperty, TProperty)))
   fullName.vb: nORM.Core.NormIncludableQueryableExtensions.ThenInclude(Of TEntity, TPreviousProperty, TProperty)(nORM.Core.INormIncludableQueryable(Of TEntity, System.Collections.Generic.IEnumerable(Of TPreviousProperty)), System.Linq.Expressions.Expression(Of System.Func(Of TPreviousProperty, TProperty)))

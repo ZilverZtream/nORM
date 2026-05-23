@@ -6,8 +6,14 @@ items:
   parent: nORM.Migration
   children:
   - nORM.Migration.ColumnSchema.ClrType
+  - nORM.Migration.ColumnSchema.DefaultValue
+  - nORM.Migration.ColumnSchema.IndexName
+  - nORM.Migration.ColumnSchema.IsIdentity
   - nORM.Migration.ColumnSchema.IsNullable
+  - nORM.Migration.ColumnSchema.IsPrimaryKey
+  - nORM.Migration.ColumnSchema.IsUnique
   - nORM.Migration.ColumnSchema.Name
+  - nORM.Migration.ColumnSchema.PreviousName
   langs:
   - csharp
   - vb
@@ -22,10 +28,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnSchema
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 20
+    startLine: 67
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Describes a column within a table schema snapshot.
+  example: []
   syntax:
     content: public class ColumnSchema
     content.vb: Public Class ColumnSchema
@@ -62,10 +70,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 22
+    startLine: 70
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Name of the column.
+  example: []
   syntax:
     content: public string Name { get; set; }
     parameters: []
@@ -73,6 +83,44 @@ items:
       type: System.String
     content.vb: Public Property Name As String
   overload: nORM.Migration.ColumnSchema.Name*
+- uid: nORM.Migration.ColumnSchema.PreviousName
+  commentId: P:nORM.Migration.ColumnSchema.PreviousName
+  id: PreviousName
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: PreviousName
+  nameWithType: ColumnSchema.PreviousName
+  fullName: nORM.Migration.ColumnSchema.PreviousName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: PreviousName
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 77
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: >-
+    When non-null, indicates that this column was previously named <xref href="nORM.Migration.ColumnSchema.PreviousName" data-throw-if-not-resolved="false"></xref>
+
+    and the schema differ should emit a RENAME COLUMN operation instead of DROP + ADD.
+
+    Populated by <xref href="nORM.Migration.SchemaSnapshotBuilder" data-throw-if-not-resolved="false"></xref> when a property carries
+
+    <code>[RenameColumn("oldName")]</code>.
+  example: []
+  syntax:
+    content: public string? PreviousName { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property PreviousName As String
+  overload: nORM.Migration.ColumnSchema.PreviousName*
 - uid: nORM.Migration.ColumnSchema.ClrType
   commentId: P:nORM.Migration.ColumnSchema.ClrType
   id: ClrType
@@ -91,10 +139,23 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ClrType
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 23
+    startLine: 89
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: >-
+    Full CLR type name of the column (e.g. <code>System.Int32</code>).
+
+    An empty string is a recognizable placeholder meaning "unknown/unresolved type";
+
+    callers that produce <xref href="nORM.Migration.ColumnSchema" data-throw-if-not-resolved="false"></xref> instances should always populate this
+
+    field — leaving it empty will cause all four SQL generators to fall back to their
+
+    default type (e.g. NVARCHAR(MAX) for SQL Server) and may suppress spurious alter
+
+    detections because two columns with an empty ClrType compare equal.
+  example: []
   syntax:
     content: public string ClrType { get; set; }
     parameters: []
@@ -120,10 +181,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsNullable
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 24
+    startLine: 91
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Indicates whether the column allows <code>null</code> values.
+  example: []
   syntax:
     content: public bool IsNullable { get; set; }
     parameters: []
@@ -131,6 +194,161 @@ items:
       type: System.Boolean
     content.vb: Public Property IsNullable As Boolean
   overload: nORM.Migration.ColumnSchema.IsNullable*
+- uid: nORM.Migration.ColumnSchema.IsPrimaryKey
+  commentId: P:nORM.Migration.ColumnSchema.IsPrimaryKey
+  id: IsPrimaryKey
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: IsPrimaryKey
+  nameWithType: ColumnSchema.IsPrimaryKey
+  fullName: nORM.Migration.ColumnSchema.IsPrimaryKey
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsPrimaryKey
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 93
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: True when the column is (part of) the table's primary key.
+  example: []
+  syntax:
+    content: public bool IsPrimaryKey { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsPrimaryKey As Boolean
+  overload: nORM.Migration.ColumnSchema.IsPrimaryKey*
+- uid: nORM.Migration.ColumnSchema.IsUnique
+  commentId: P:nORM.Migration.ColumnSchema.IsUnique
+  id: IsUnique
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: IsUnique
+  nameWithType: ColumnSchema.IsUnique
+  fullName: nORM.Migration.ColumnSchema.IsUnique
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsUnique
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 95
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: True when the column has a UNIQUE index.
+  example: []
+  syntax:
+    content: public bool IsUnique { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsUnique As Boolean
+  overload: nORM.Migration.ColumnSchema.IsUnique*
+- uid: nORM.Migration.ColumnSchema.IndexName
+  commentId: P:nORM.Migration.ColumnSchema.IndexName
+  id: IndexName
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: IndexName
+  nameWithType: ColumnSchema.IndexName
+  fullName: nORM.Migration.ColumnSchema.IndexName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IndexName
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 97
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Non-null means the column is covered by a named index.
+  example: []
+  syntax:
+    content: public string? IndexName { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property IndexName As String
+  overload: nORM.Migration.ColumnSchema.IndexName*
+- uid: nORM.Migration.ColumnSchema.DefaultValue
+  commentId: P:nORM.Migration.ColumnSchema.DefaultValue
+  id: DefaultValue
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: DefaultValue
+  nameWithType: ColumnSchema.DefaultValue
+  fullName: nORM.Migration.ColumnSchema.DefaultValue
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DefaultValue
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 99
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: SQL literal default value for ADD COLUMN NOT NULL migrations (e.g. "''" or "0").
+  example: []
+  syntax:
+    content: public string? DefaultValue { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property DefaultValue As String
+  overload: nORM.Migration.ColumnSchema.DefaultValue*
+- uid: nORM.Migration.ColumnSchema.IsIdentity
+  commentId: P:nORM.Migration.ColumnSchema.IsIdentity
+  id: IsIdentity
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: IsIdentity
+  nameWithType: ColumnSchema.IsIdentity
+  fullName: nORM.Migration.ColumnSchema.IsIdentity
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsIdentity
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 101
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: True when the column has identity/autoincrement semantics (e.g. [DatabaseGenerated(Identity)]).
+  example: []
+  syntax:
+    content: public bool IsIdentity { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsIdentity As Boolean
+  overload: nORM.Migration.ColumnSchema.IsIdentity*
 references:
 - uid: nORM.Migration
   commentId: N:nORM.Migration
@@ -1112,6 +1330,30 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
+- uid: nORM.Migration.ColumnSchema.PreviousName
+  commentId: P:nORM.Migration.ColumnSchema.PreviousName
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_PreviousName
+  name: PreviousName
+  nameWithType: ColumnSchema.PreviousName
+  fullName: nORM.Migration.ColumnSchema.PreviousName
+- uid: nORM.Migration.SchemaSnapshotBuilder
+  commentId: T:nORM.Migration.SchemaSnapshotBuilder
+  href: nORM.Migration.SchemaSnapshotBuilder.html
+  name: SchemaSnapshotBuilder
+  nameWithType: SchemaSnapshotBuilder
+  fullName: nORM.Migration.SchemaSnapshotBuilder
+- uid: nORM.Migration.ColumnSchema.PreviousName*
+  commentId: Overload:nORM.Migration.ColumnSchema.PreviousName
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_PreviousName
+  name: PreviousName
+  nameWithType: ColumnSchema.PreviousName
+  fullName: nORM.Migration.ColumnSchema.PreviousName
+- uid: nORM.Migration.ColumnSchema
+  commentId: T:nORM.Migration.ColumnSchema
+  href: nORM.Migration.ColumnSchema.html
+  name: ColumnSchema
+  nameWithType: ColumnSchema
+  fullName: nORM.Migration.ColumnSchema
 - uid: nORM.Migration.ColumnSchema.ClrType*
   commentId: Overload:nORM.Migration.ColumnSchema.ClrType
   href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_ClrType
@@ -1135,3 +1377,33 @@ references:
   nameWithType.vb: Boolean
   fullName.vb: Boolean
   name.vb: Boolean
+- uid: nORM.Migration.ColumnSchema.IsPrimaryKey*
+  commentId: Overload:nORM.Migration.ColumnSchema.IsPrimaryKey
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsPrimaryKey
+  name: IsPrimaryKey
+  nameWithType: ColumnSchema.IsPrimaryKey
+  fullName: nORM.Migration.ColumnSchema.IsPrimaryKey
+- uid: nORM.Migration.ColumnSchema.IsUnique*
+  commentId: Overload:nORM.Migration.ColumnSchema.IsUnique
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsUnique
+  name: IsUnique
+  nameWithType: ColumnSchema.IsUnique
+  fullName: nORM.Migration.ColumnSchema.IsUnique
+- uid: nORM.Migration.ColumnSchema.IndexName*
+  commentId: Overload:nORM.Migration.ColumnSchema.IndexName
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IndexName
+  name: IndexName
+  nameWithType: ColumnSchema.IndexName
+  fullName: nORM.Migration.ColumnSchema.IndexName
+- uid: nORM.Migration.ColumnSchema.DefaultValue*
+  commentId: Overload:nORM.Migration.ColumnSchema.DefaultValue
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_DefaultValue
+  name: DefaultValue
+  nameWithType: ColumnSchema.DefaultValue
+  fullName: nORM.Migration.ColumnSchema.DefaultValue
+- uid: nORM.Migration.ColumnSchema.IsIdentity*
+  commentId: Overload:nORM.Migration.ColumnSchema.IsIdentity
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsIdentity
+  name: IsIdentity
+  nameWithType: ColumnSchema.IsIdentity
+  fullName: nORM.Migration.ColumnSchema.IsIdentity
