@@ -63,16 +63,25 @@ namespace nORM.Providers
         /// </summary>
         public override int MaxParameters => 999;
 
+        /// <summary>
+        /// Minimum SQLite version supported by nORM v1. SQLite 3.25 is the lowest version where
+        /// the migration generator's RENAME COLUMN, window functions, and UPSERT (ON CONFLICT)
+        /// emit valid statements. Older SQLite builds would parse-fail on those, so v1 fails
+        /// startup validation rather than producing later runtime errors. This floor matches
+        /// docs/provider-capabilities.md and is enforced by ProviderCapabilityContractTests.
+        /// </summary>
+        internal static readonly Version MinimumSqliteVersion = new(3, 25);
+
         /// <inheritdoc />
         public override ProviderCapabilities Capabilities => new(
             "SQLite",
-            new Version(3, 9),
+            MinimumSqliteVersion,
             MaxParameters,
             true,
             true,
             false,
             true,
-            "Requires Microsoft.Data.Sqlite. JSON support depends on the SQLite JSON1 extension.");
+            "Requires Microsoft.Data.Sqlite 3.25 or newer. JSON support depends on the SQLite JSON1 extension.");
 
         /// <summary>
         /// Escapes an identifier by wrapping it in double quotes, per SQLite requirements.
@@ -428,7 +437,7 @@ END;";
                 if (result is not string versionStr)
                     throw new NormDatabaseException("Unable to retrieve database version.", cmd.CommandText, null, null);
                 var version = new Version(versionStr);
-                return version >= new Version(3, 9);
+                return version >= MinimumSqliteVersion;
             }
             catch (DbException)
             {
