@@ -9,6 +9,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Trait("Category", TestCategory.PackageConsumer)]
 public class PackageConsumerIntegrationTests
 {
     private static string PackageVersion => ReadPackageVersion(FindRepositoryRoot());

@@ -37,6 +37,7 @@ namespace nORM.Tests;
 //   NORM_TEST_POSTGRES  = "Host=127.0.0.1;Port=5432;Database=normtest;Username=postgres;Password=normtest"
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Trait("Category", TestCategory.LiveProvider)]
 public class LiveCrossProviderTests
 {
     // ── Entities (explicit keys, no identity — compatible with all providers) ─
