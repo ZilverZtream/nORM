@@ -280,7 +280,7 @@ namespace nORM.Providers
                     nameof(Math.Abs) => $"ABS({args[0]})",
                     nameof(Math.Ceiling) => $"CEILING({args[0]})",
                     nameof(Math.Floor) => $"FLOOR({args[0]})",
-                    nameof(Math.Round) when args.Length > 1 => $"ROUND(({args[0]})::numeric, {args[1]})",
+                    nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
                     nameof(Math.Round) => $"ROUND({args[0]})",
                     nameof(Math.Sqrt) when args.Length == 1 => $"SQRT({args[0]})",
                     nameof(Math.Pow) when args.Length == 2 => $"POWER({args[0]}, {args[1]})",
